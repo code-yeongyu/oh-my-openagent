@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { SenpiSessionProvider, searchTranscripts } from "./index"
+import { removeTreeSync } from "../../../../test-support/remove-tree"
 
 // Fixtures mirror the on-disk senpi format verified against
 // senpi packages/coding-agent/src/core/session-manager.ts (SessionHeader / SessionEntryBase /
@@ -11,7 +12,7 @@ import { SenpiSessionProvider, searchTranscripts } from "./index"
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) removeTreeSync(root, { maxRetries: 10, retryDelay: 200 })
 })
 
 function sessionsRoot(): string {
@@ -197,6 +198,65 @@ describe("SenpiSessionProvider", () => {
 
     // then
     expect(results.map((result) => result.messageId)).toEqual(["v1"])
+  })
+
+  it("#given extension-injected custom messages #when mapped #then only memory-owned channels are hidden and other custom content stays searchable", () => {
+    // given: an omo-kibitzer recall hint (persisted both as the custom_message entry senpi writes
+    // today and as the role-custom message entry older or forked session files can carry) plus
+    // ANOTHER extension's custom message, which is real conversation-shaped content.
+    const root = sessionsRoot()
+    writeSession(join(root, "--tmp-project--"), "sess-recall.jsonl", [
+      header("sess-recall"),
+      userEntry("u1", null, "unrelated turn"),
+      JSON.stringify({
+        type: "custom_message",
+        id: "c1",
+        parentId: "u1",
+        timestamp: "2026-08-05T17:09:03.000Z",
+        customType: "omo-kibitzer:recall",
+        content: "<recalled-memory>drain kubernetes nodes</recalled-memory>",
+        display: false,
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "m1",
+        parentId: "c1",
+        timestamp: "2026-08-05T17:09:04.000Z",
+        message: {
+          role: "custom",
+          customType: "omo-kibitzer:recall",
+          content: [{ type: "text", text: "<recalled-memory>drain kubernetes nodes</recalled-memory>" }],
+          display: false,
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "m2",
+        parentId: "m1",
+        timestamp: "2026-08-05T17:09:05.000Z",
+        message: {
+          role: "custom",
+          customType: "vendor-banner:notice",
+          content: [{ type: "text", text: "sponsor banner copy for another extension" }],
+          display: false,
+        },
+      }),
+    ])
+    const provider = new SenpiSessionProvider({ sessionsDir: root })
+
+    // when
+    const conversations = provider.listConversations()
+    const recallHits = searchTranscripts(provider, "kubernetes", { includeHidden: true })
+    const bannerHits = searchTranscripts(provider, "sponsor banner", { includeHidden: true })
+
+    // then: the memory-owned hint is hidden, the foreign custom message survives
+    expect(conversations[0]?.messages.map((document) => document.id)).toEqual(["u1", "m2"])
+    expect(conversations[0]?.messages[1]).toMatchObject({
+      messageType: "custom",
+      content: "sponsor banner copy for another extension",
+    })
+    expect(recallHits).toEqual([])
+    expect(bannerHits.map((result) => result.messageId)).toEqual(["m2"])
   })
 
   it("#given a missing sessions directory or non-jsonl files #when listed #then reading is empty and never throws", () => {

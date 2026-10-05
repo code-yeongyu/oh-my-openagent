@@ -5,6 +5,7 @@ import type {
   TaskTransition,
   TaskTransitionResult,
 } from "./types"
+import { fenceRun } from "./run-fence"
 
 const terminalStatuses = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
 const residencyTransitionTypes = new Set<TaskTransition["type"]>([
@@ -69,18 +70,27 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "start":
       return {
         ...record,
+        started_at: transition.timestamp,
         ...(transition.pid === undefined ? {} : { pid: transition.pid }),
         ...(transition.child_session_id === undefined ? {} : { child_session_id: transition.child_session_id }),
       }
     case "complete":
       return { ...record, final_response: transition.final_response, ...runStatsField(transition.run_stats) }
-    case "fail":
+    case "fail": {
+      const {
+        failure_kind: _failureKind,
+        failure_reason: _failureReason,
+        ...withoutFailureFacts
+      } = record
       return {
-        ...record,
+        ...withoutFailureFacts,
         error_message: transition.error_message,
+        ...(transition.failure_kind === undefined ? {} : { failure_kind: transition.failure_kind }),
+        ...(transition.failure_reason === undefined ? {} : { failure_reason: transition.failure_reason }),
         ...(transition.killed === true ? { killed: true } : {}),
         ...runStatsField(transition.run_stats),
       }
+    }
     case "lose":
       return { ...record, error_message: transition.error_message }
     case "cancel":
@@ -112,6 +122,13 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
 }
 
 export function transitionTaskRecord(record: TaskRecord, transition: TaskTransition): TaskTransitionResult {
+  if (transition.type === "cancel" && transition.expected_run_epoch !== undefined && fenceRun(record, transition.expected_run_epoch) !== "live") {
+    return {
+      applied: false,
+      record,
+      audit: { type: "epoch_mismatch_ignored", expected_run_epoch: transition.expected_run_epoch, run_epoch: record.notification.run_epoch },
+    }
+  }
   const nextStatus = transitionStatus(transition, record.status)
   const changesOnlyResidency = residencyTransitionTypes.has(transition.type)
   if (terminalStatuses.has(record.status) && !changesOnlyResidency) {
@@ -140,11 +157,13 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
 
   const nextResidency = transitionResidency(transition, record.residency_state)
   const withFields = applyTransitionFields(record, transition)
+  const entersTerminal = terminalStatuses.has(nextStatus) && !terminalStatuses.has(record.status)
   const nextRecord = {
     ...withFields,
     status: nextStatus,
     residency_state: nextResidency,
     updated_at: transition.timestamp,
+    ...(entersTerminal ? { terminal_at: transition.timestamp } : {}),
   }
 
   return {
@@ -192,6 +211,7 @@ export function markRecordLostForReconciliation(
     status: "lost" as const,
     error_message: input.error_message,
     updated_at: input.timestamp,
+    ...(terminalStatuses.has(record.status) ? {} : { terminal_at: input.timestamp }),
   }
 
   return {

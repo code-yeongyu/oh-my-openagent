@@ -13,16 +13,21 @@ import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { wireEventBridge } from "./event-bridge"
 import { fakeSummary } from "./event-bridge.test-fixtures"
 import type { TaskEngine } from "./engine"
+import type { TaskRpcTimers } from "./task-rpc-bridge"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 
 type HarnessOptions = {
   readonly outcomes?: ReconcileResult["outcomes"]
   readonly records?: Readonly<Record<string, TaskRecord>>
+  // Task ids this engine currently holds live handles for (`manager.residentTaskIds()`).
+  readonly resident?: readonly string[]
   readonly liveRunStats?: Readonly<Record<string, TaskRunStats>>
   readonly cleanupDeleted?: readonly string[]
   readonly resumptionChannelCount?: number
   readonly withRpc?: boolean | "emit-only"
+  // Drives the task RPC bridge's progress-coalescing timer deterministically (no wall-clock waits).
+  readonly taskRpcTimers?: TaskRpcTimers
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -86,6 +91,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     } satisfies Partial<TaskLifecycle> as unknown as TaskLifecycle,
     manager: {
       get: (taskId: string) => records[taskId],
+      residentTaskIds: () => [...(options.resident ?? [])],
       list: (scope: { scope: "all" } | { scope: "parent-session"; session_id: string }) =>
         Object.values(records)
           .filter((record) => scope.scope === "all" || record.parent_session_id === scope.session_id)
@@ -217,7 +223,9 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     config: { getFlag: () => undefined },
   } as unknown as ComponentContext
 
-  wireEventBridge(pi, ctx, engine, statusUi, transitions, state)
+  wireEventBridge(pi, ctx, engine, statusUi, transitions, state, {
+    ...(options.taskRpcTimers === undefined ? {} : { taskRpc: { timers: options.taskRpcTimers } }),
+  })
 
   return {
     pi,

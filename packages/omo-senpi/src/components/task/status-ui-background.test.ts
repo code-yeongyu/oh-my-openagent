@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
+import { createChildProgress, HOST_TURN_RESUMED_EVENT, type ListedTask, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 import { createTaskStatusUi, type StatusUiManager, type StatusUiTimers } from "./status-ui"
@@ -139,6 +139,57 @@ describe("createTaskStatusUi.background progress", () => {
     expect(listCalls).toBe(1)
   })
 
+  it("#given a child before its first turn #when a host reattach resumes its turn #then both the footer progress line and the status row read running instead of starting", () => {
+    // given: no successful turn and no tool yet, so the stats-derived verb is "starting"
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const task = record({ task_id: "st_reattached", name: "c0", status: "running", category: "quick" })
+    const listeners = new Map<string, (event: { readonly type: string }) => void>()
+    const manager: StatusUiManager = {
+      list: () => listed([task]),
+      wasBackground: () => true,
+      subscribeChild: (taskId, listener) => {
+        listeners.set(taskId, listener)
+        return () => listeners.delete(taskId)
+      },
+      runStatsSnapshot: () => ({ runtime_ms: 11_000, turns: 0, tool_calls: 0 }),
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({
+      manager,
+      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
+      timers,
+      terminalWidth: () => 140,
+      now: () => Date.parse("2026-07-07T00:00:11.000Z"),
+    })
+    // The task tool's live progress line (the footer of a running task call) for the same child.
+    const progress = createChildProgress("st_reattached", { category: "quick" }, 0, () => 11_000)
+    statusUi.syncNow()
+    expect(ui.widgetCalls.at(-1)?.content?.[0]).toContain("· starting ·")
+    expect(progress.details().progress.activity).toEndWith("· starting")
+
+    // when - the one event a reattach emits reaches both surfaces
+    listeners.get("st_reattached")?.({ type: HOST_TURN_RESUMED_EVENT })
+    progress.accept({ type: HOST_TURN_RESUMED_EVENT })
+    for (const callback of [...active.values()]) callback()
+
+    // then
+    const row = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
+    expect(row).toContain("· running ·")
+    expect(row).not.toContain("starting")
+    expect(progress.details().progress.activity).toEndWith("· running")
+    expect(progress.details().turns).toBe(0)
+    statusUi.dispose()
+  })
+
   it("#given a live refresh timer #when the final background task completes #then the timer stops", () => {
     // given
     const active = new Map<number, () => void>()
@@ -195,9 +246,9 @@ describe("createTaskStatusUi.background progress", () => {
       model: "requested/model",
       resolved_model: {
         source: "category",
-        provider: "openai-codex",
+        provider: "chatgpt-subscription",
         model_id: "gpt-5.6-luna-fast",
-        display: "openai-codex/gpt-5.6-luna-fast",
+        display: "chatgpt-subscription/gpt-5.6-luna-fast",
         reasoning_effort: "high",
       },
       fallback_attempts: [
@@ -209,9 +260,9 @@ describe("createTaskStatusUi.background progress", () => {
         },
         {
           source: "category",
-          provider: "openai-codex",
+          provider: "chatgpt-subscription",
           model_id: "gpt-5.6-luna-fast",
-          display: "openai-codex/gpt-5.6-luna-fast",
+          display: "chatgpt-subscription/gpt-5.6-luna-fast",
           reasoning_effort: "high",
         },
       ],
@@ -224,9 +275,9 @@ describe("createTaskStatusUi.background progress", () => {
       model: "requested/model",
       resolved_model: {
         source: "agent",
-        provider: "openai-codex",
+        provider: "chatgpt-subscription",
         model_id: "gpt-5.6-luna-fast",
-        display: "openai-codex/gpt-5.6-luna-fast",
+        display: "chatgpt-subscription/gpt-5.6-luna-fast",
       },
     })
     const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
@@ -257,8 +308,8 @@ describe("createTaskStatusUi.background progress", () => {
     for (const callback of [...active.values()]) callback()
 
     expect(ui.widgetCalls.at(-1)?.content).toEqual([
-      "⠋ Investigate the unexpectedly long background child description · category:quick(openai-codex/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
-      "⠋ Review tests · agent:explore(openai-codex/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
+      "⠋ Investigate the unexpectedly long background child description · category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
+      "⠋ Review tests · agent:explore(chatgpt-subscription/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
     ])
     // C1: the duplicated footer task status line is gone; widget rows are the only task surface.
     expect(ui.statusCalls).toHaveLength(0)

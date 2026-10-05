@@ -71,6 +71,11 @@ export async function runJsonRpcStdioServer<HandlerOptions>(
   const idleTimer = createIdleTimer(idleTimeoutMs, log, () => {
     isClosed = true
     void config.onIdleTimeout?.()
+    // isClosed alone cannot end the read loop: it is only consulted after a
+    // message arrives, and an idle stdio server is idle precisely because none
+    // does. A parent that stays alive while abandoning the pipe never closes
+    // the write end either, so this destroy is the only teardown left.
+    config.input.destroy()
   })
   const watchdog = createParentWatchdog(config.parentWatchdog, (parentPid, pollIntervalMs) => {
     isClosed = true

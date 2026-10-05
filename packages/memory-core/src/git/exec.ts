@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitNotFoundError, GitTimeoutError } from "./errors"
 
@@ -14,6 +14,8 @@ export interface GitExecResult {
   code: number
   stdout: string
   stderr: string
+  /** Raw stdout for byte-framed output (`git cat-file --batch`); injected execs may omit it. */
+  stdoutBytes?: Buffer
 }
 
 export interface GitExec {
@@ -77,11 +79,15 @@ function runGitCommand(
 ): Promise<GitExecResult> {
   return new Promise((resolve, reject) => {
     const hasStdin = options.stdin !== undefined
+    // git.exe is a console-subsystem binary: without windowsHide every memory auto-commit and
+    // sync allocates a fresh console window that Windows foregrounds, stealing the user's focus
+    // (#8501). Inert on posix, load-bearing on win32 - do not drop it.
     const child = spawn(executable, [...argv], {
       cwd: options.cwd,
       env: environment,
       shell: false,
       stdio: [hasStdin ? "pipe" : "ignore", "pipe", "pipe"],
+      windowsHide: true,
     })
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []
@@ -125,10 +131,12 @@ function runGitCommand(
         reject(new GitTimeoutError(argv, options.timeoutMs))
         return
       }
+      const stdoutBytes = Buffer.concat(stdout)
       resolve({
         code: code ?? 1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
+        stdout: stdoutBytes.toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
+        stdoutBytes,
       })
     })
   })

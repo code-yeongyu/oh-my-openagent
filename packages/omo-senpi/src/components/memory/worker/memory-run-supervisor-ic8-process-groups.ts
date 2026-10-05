@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process"
+import { spawn } from "node:child_process"
 
 interface TaskkillResult {
   status: number | null
@@ -8,22 +8,33 @@ interface TaskkillResult {
 
 export interface ProcessGroupRuntime {
   platform: NodeJS.Platform
-  runTaskkill(pid: number): TaskkillResult
+  runTaskkill(pid: number): Promise<TaskkillResult>
   killGroup(pid: number): void
   probeGroup(pid: number): void
 }
 
 const defaultRuntime: ProcessGroupRuntime = {
   platform: process.platform,
-  runTaskkill: (pid) => {
-    const result = spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
-      stdio: "ignore",
+  runTaskkill: async (pid) => {
+    return await new Promise<TaskkillResult>((resolve) => {
+      const child = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true,
+      })
+      let resolved = false
+      child.once("error", (error) => {
+        if (!resolved) {
+          resolved = true
+          resolve({ status: null, error })
+        }
+      })
+      child.once("exit", (status, signal) => {
+        if (!resolved) {
+          resolved = true
+          resolve({ status, signal: signal as NodeJS.Signals | null })
+        }
+      })
     })
-    return {
-      status: result.status,
-      signal: result.signal,
-      error: result.error,
-    }
   },
   killGroup: (pid) => process.kill(-pid, "SIGKILL"),
   probeGroup: (pid) =>
@@ -37,16 +48,16 @@ export function validateProcessGroupPid(pid: number): number {
   return pid
 }
 
-export function terminateProcessGroup(
+export async function terminateProcessGroup(
   pid: number,
   runtime: ProcessGroupRuntime = defaultRuntime,
-): void {
+): Promise<void> {
   const validatedPid = validateProcessGroupPid(pid)
   if (runtime.platform !== "win32") {
     runtime.killGroup(validatedPid)
     return
   }
-  const result = runtime.runTaskkill(validatedPid)
+  const result = await runtime.runTaskkill(validatedPid)
   if (result.error) throw result.error
   if (result.status !== 0) {
     const detail = result.signal

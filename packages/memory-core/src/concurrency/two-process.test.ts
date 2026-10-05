@@ -7,7 +7,11 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
+import { memoryWriterLockPath, parseLockRecord } from "../locks"
+import { isLockOwnerProvenDead } from "../locks/acquire"
+import { exitedWithin, probeUntil } from "../locks/process-liveness.test-support"
 import { ReflectionReservationStore, type ReservationResult } from "../reflection/reservation"
+import type { ReservedRun } from "../reflection/machine"
 import { realpathSync } from "node:fs"
 
 const writerChildPath = fileURLToPath(new URL("./writer-child.ts", import.meta.url))
@@ -15,11 +19,16 @@ const reflectionChildPath = fileURLToPath(new URL("./reflection-child.ts", impor
 const temporaryDirectories: string[] = []
 const liveChildren = new Set<ChildProcessWithoutNullStreams>()
 
+const TEARDOWN_GRACE_MS = 2_000
+const DEATH_PROOF_BOUND_MS = 5_000
+const FIXTURE_REMOVAL_BOUND_MS = 5_000
+
 type Exit = { readonly code: number | null; readonly signal: NodeJS.Signals | null }
 
 type LineWaiter = {
   readonly predicate: (line: string) => boolean
   readonly resolve: (line: string) => void
+  readonly reject: (error: Error) => void
 }
 
 class ChildHarness {
@@ -29,6 +38,7 @@ class ChildHarness {
   private readonly waiters: LineWaiter[] = []
   private stderr = ""
   private stdoutBuffer = ""
+  private closed = false
 
   constructor(script: string, args: readonly string[]) {
     this.child = spawn(process.execPath, [script, ...args], { stdio: ["pipe", "pipe", "pipe"] })
@@ -42,6 +52,12 @@ class ChildHarness {
         liveChildren.delete(this.child)
         resolve({ code, signal })
       })
+    })
+    // `close` follows the last stdout byte, so a child that died before printing the awaited line
+    // fails its waiters now, with its output attached, instead of surfacing as an opaque timeout.
+    this.child.once("close", () => {
+      this.closed = true
+      for (const waiter of this.waiters.splice(0)) waiter.reject(this.exitedWithoutLine())
     })
   }
 
@@ -64,7 +80,12 @@ class ChildHarness {
   private waitFor(predicate: (line: string) => boolean): Promise<string> {
     const existing = this.lines.find(predicate)
     if (existing !== undefined) return Promise.resolve(existing)
-    return new Promise((resolve) => this.waiters.push({ predicate, resolve }))
+    if (this.closed) return Promise.reject(this.exitedWithoutLine())
+    return new Promise((resolve, reject) => this.waiters.push({ predicate, resolve, reject }))
+  }
+
+  private exitedWithoutLine(): Error {
+    return new Error(`child pid ${String(this.child.pid)} exited before the awaited line: ${this.failureContext()}`)
   }
 
   private acceptOutput(chunk: string): void {
@@ -143,9 +164,40 @@ async function assertTwentyLinearCommits(identity: MemoryIdentity): Promise<void
   expect(await git(identity.paths.repo, ["fsck", "--full"])).toBe("")
 }
 
+// Bun's fs.rm accepts maxRetries/retryDelay but never retries (bun-v1.4.2 node_fs.rs), so the wait
+// for Windows to release a just-exited child's handles lives here: bounded, loud when they never go.
+async function removeFixtureRoot(directory: string): Promise<void> {
+  let lastError: unknown
+  const removed = await probeUntil(async () => {
+    try {
+      await rm(directory, { recursive: true, force: true })
+      return true
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? error.code : undefined
+      if (code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") throw error
+      lastError = error
+      return false
+    }
+  }, FIXTURE_REMOVAL_BOUND_MS, 200)
+  if (!removed) throw new Error(`fixture root ${directory} still busy after ${String(FIXTURE_REMOVAL_BOUND_MS)}ms`, { cause: lastError })
+}
+
 afterEach(async () => {
-  for (const child of liveChildren) child.kill("SIGKILL")
-  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  // Temp roots die only after every tracked child is confirmed exited: rm under a live lock
+  // holder strands it, and a fire-and-forget SIGKILL is not a confirmation.
+  const tracked = [...liveChildren]
+  liveChildren.clear()
+  for (const child of tracked) {
+    if (child.exitCode !== null || child.signalCode !== null) continue
+    child.kill("SIGTERM")
+    if (!(await exitedWithin(child, TEARDOWN_GRACE_MS))) {
+      child.kill("SIGKILL")
+      if (!(await exitedWithin(child, TEARDOWN_GRACE_MS))) {
+        throw new Error(`tracked child pid ${String(child.pid)} survived SIGTERM and SIGKILL teardown`)
+      }
+    }
+  }
+  await Promise.all(temporaryDirectories.splice(0).map(removeFixtureRoot))
 })
 
 describe("one memory identity across real Bun processes", () => {
@@ -191,8 +243,8 @@ describe("one memory identity across real Bun processes", () => {
 
     // #then
     expect(results.map((result) => result.status).sort()).toEqual(["active", "pending"])
-    const activeRecord = JSON.parse(await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8")) as ReservationResult["run"]
-    const pendingRecord = JSON.parse(await readFile(join(shared.identity.paths.reflection, "pending.json"), "utf8")) as ReservationResult["run"]
+    const activeRecord = JSON.parse(await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8")) as ReservedRun
+    const pendingRecord = JSON.parse(await readFile(join(shared.identity.paths.reflection, "pending.json"), "utf8")) as ReservedRun
     expect(activeRecord.runId).not.toBe(pendingRecord.runId)
 
     const store = new ReflectionReservationStore({
@@ -207,7 +259,7 @@ describe("one memory identity across real Bun processes", () => {
     expect(completion.launch?.runId).toBe(pendingRecord.runId)
     expect(promoted.active?.runId).toBe(pendingRecord.runId)
     expect(promoted.pending).toBeUndefined()
-    expect((JSON.parse(await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8")) as ReservationResult["run"]).runId).toBe(pendingRecord.runId)
+    expect((JSON.parse(await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8")) as ReservedRun).runId).toBe(pendingRecord.runId)
   }, 30_000)
 
   test("#given a writer SIGKILLed while holding the shared lock #when its peer continues #then liveness takeover completes twenty clean commits", async () => {
@@ -224,6 +276,12 @@ describe("one memory identity across real Bun processes", () => {
     await killReady
     holder.child.kill("SIGKILL")
     expect(await holder.exit).toEqual({ code: null, signal: "SIGKILL" })
+    // The exit event only proves this parent reaped its child. Recovery starts once the lock
+    // protocol's own oracle proves the recorded owner dead, so the survivor never spends its
+    // acquire budget on an owner the OS has not yet let go of; a proof that never arrives fails here.
+    const holderRecord = parseLockRecord(await readFile(memoryWriterLockPath(shared.identity.paths.locks), "utf8"))
+    if (holderRecord === null || holderRecord.pid !== holder.child.pid) throw new Error(`unexpected lock owner: ${JSON.stringify(holderRecord)}`)
+    expect(await probeUntil(() => isLockOwnerProvenDead(holderRecord), DEATH_PROOF_BOUND_MS)).toBe(true)
     survivor.send("begin-recovery")
     await survivor.waitForPrefix("done:")
     await expectSuccessful(survivor)

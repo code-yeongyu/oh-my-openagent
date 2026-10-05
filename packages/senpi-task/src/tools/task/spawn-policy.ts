@@ -15,9 +15,10 @@ export function evaluateSpawnPolicy(
   callerPrompt: string,
   sessionId: string,
 ): SpawnPolicyVerdict {
-  const denial = invocationGateDenial(deps, subagentType, sessionId)
+  const name = subagentType.trim()
+  const denial = invocationGateDenial(deps, name, sessionId)
   if (denial !== undefined) return { kind: "deny", message: denial }
-  const contract = planReviewContractOutcome(deps, subagentType, callerPrompt, sessionId)
+  const contract = planReviewContractOutcome(deps, name, callerPrompt, sessionId)
   if (contract?.kind === "deny") return { kind: "deny", message: contract.message }
   if (contract?.kind === "prompt") return { kind: "force", prompt: contract.prompt }
   return { kind: "allow" }

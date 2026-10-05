@@ -4,6 +4,7 @@ export {
   isHeld,
   releaseLock,
   withLock,
+  setLockCandidateFsForTests,
 } from "./acquire"
 export type { AcquireLockOptions } from "./acquire"
 export {
@@ -21,5 +22,14 @@ export {
 export type { LockDomain } from "./domains"
 export { createLockRecord, parseLockRecord } from "./lock-record"
 export type { CreateLockRecordOptions, LockRecord } from "./lock-record"
-export { getPidLiveness, getProcessStartIdentity } from "./process-identity"
+export { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable } from "./process-identity"
 export type { ProcessLiveness } from "./process-identity"
+export {
+  RECALL_WAKE_DEFAULT_SLOTS,
+  RecallWakeBusyError,
+  acquireRecallWakeLease,
+  recallWakeLockPath,
+  recallWakeTicketDirectory,
+  withRecallWakeLease,
+} from "./recall-wake-domain"
+export type { RecallWakeLease, RecallWakeLeaseOptions } from "./recall-wake-domain"

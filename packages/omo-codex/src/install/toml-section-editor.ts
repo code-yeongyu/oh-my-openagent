@@ -93,6 +93,15 @@ export function replaceOrInsertRootSetting(config: string, key: string, value: s
   return `${replacement.trimEnd()}\n\n${suffix.trimStart()}`
 }
 
+export function removeRootSetting(config: string, key: string): string {
+  const sectionStart = findFirstTableStart(config)
+  const root = config.slice(0, sectionStart)
+  const suffix = config.slice(sectionStart)
+  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*(?:\\n|$)`, "m")
+  if (!linePattern.test(root)) return config
+  return root.replace(linePattern, "") + suffix
+}
+
 export function replaceOrInsertRootDottedSetting(config: string, keyPath: string, value: string): string {
   const targetPath = parseTomlDottedKey(keyPath)
   if (!targetPath) return config

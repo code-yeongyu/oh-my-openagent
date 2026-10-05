@@ -11,6 +11,8 @@ import type { DagRunEventType } from "./events"
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
 const LOCK_WAIT_TIMEOUT_MS = 1_000
+const WINDOWS_CLEANUP_RETRIES = 8
+const WINDOWS_CLEANUP_RETRY_MS = 5
 const READ_BUFFER_BYTES = 64 * 1024
 const TERMINAL_STATUSES = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
 const sleeper = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
@@ -128,6 +130,18 @@ export function dagKeyHash(parentSessionId: string, runKey: string): string {
   return sha256(`${parentSessionId}\0${runKey}`)
 }
 
+// The state directory can vanish under a live session (git clean, rm -rf .omo, worktree teardown).
+// Every listing reads a missing directory as empty: it holds no runs, and the next write recreates it.
+// Only a present-but-unreadable directory is an error worth raising.
+export function readDagDirectory(directory: string): readonly fs.Dirent[] {
+  try {
+    return fs.readdirSync(directory, { withFileTypes: true })
+  } catch (error) {
+    if (hasCode(error, "ENOENT")) return []
+    throw error
+  }
+}
+
 export function createDagFileStore(config: DagStoreConfig, options: StoreOptions = {}): DagFileStore {
   const stateDir = resolveStateDir(config)
   const paths = createPaths(stateDir)
@@ -140,9 +154,6 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
   const maxRunsPerSession = config.task?.dag?.max_runs_per_session ?? DAG_SETTINGS_DEFAULTS.max_runs_per_session
   const retentionDays = config.task?.dag?.retention_days ?? DAG_SETTINGS_DEFAULTS.retention_days
 
-  for (const directory of [paths.keys, paths.runs, paths.events, paths.results, paths.locks]) {
-    fs.mkdirSync(directory, { recursive: true })
-  }
   inspectExistingEventLogs(paths, diagnosticLog, recoveredPaths, now)
 
   const store: DagFileStore = {
@@ -263,7 +274,10 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
     pruneExpired(pruneNow = now()) {
       const cutoff = pruneNow - retentionDays * 24 * 60 * 60 * 1000
       const pruned: DagRunId[] = []
-      for (const entry of fs.readdirSync(paths.runs, { withFileTypes: true })) {
+      // The key and lock directories are indexed ONCE. Re-reading them per expired run made the
+      // sweep quadratic: 526 expired runs against 711 keys cost 4.6s, against 0.5s indexed.
+      const artifacts = indexRunArtifacts(paths)
+      for (const entry of readDagDirectory(paths.runs)) {
         if (!entry.isFile() || !entry.name.endsWith(".json")) continue
         const path = join(paths.runs, entry.name)
         const value = readJsonFile(path, entry.name.slice(0, -5) as DagRunId, now)
@@ -274,7 +288,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
         if (checkpoint.status === undefined || !TERMINAL_STATUSES.has(checkpoint.status)) continue
         const terminalAt = checkpoint.completedAt ?? checkpoint.updatedAt
         if (terminalAt === undefined || Date.parse(terminalAt) > cutoff) continue
-        pruneRunArtifacts(paths, checkpoint, runId)
+        pruneRunArtifacts(paths, checkpoint, runId, artifacts)
         pruned.push(runId)
       }
       return pruned
@@ -330,7 +344,7 @@ function writeCheckpointWithinSessionLimit(
       return
     }
     let runCount = 0
-    for (const entry of fs.readdirSync(paths.runs, { withFileTypes: true })) {
+    for (const entry of readDagDirectory(paths.runs)) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) continue
       const existingRunId = entry.name.slice(0, -5) as DagRunId
       const existingPath = join(paths.runs, entry.name)
@@ -395,7 +409,7 @@ function inspectExistingEventLogs(
   recoveredPaths: Set<string>,
   now: () => number,
 ): void {
-  for (const entry of fs.readdirSync(paths.events, { withFileTypes: true })) {
+  for (const entry of readDagDirectory(paths.events)) {
     if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue
     const runId = entry.name.slice(0, -6) as DagRunId
     inspectEventLog(join(paths.events, entry.name), runId, diagnostics, recoveredPaths, now)
@@ -537,7 +551,12 @@ function withLock<T>(
   fsyncWrites: boolean,
 ): T {
   assertSafeSegment(basename(path), "lock name")
-  const startedAt = now()
+  // LOCK_WAIT_TIMEOUT_MS bounds how long we sit behind ONE unchanged holder, not wall clock: a holder
+  // that changes or vanishes is the system making progress, our own reclaim I/O on a slow host is
+  // work, not waiting, and clearing a crashed reclaimer's stale sentinel is a state transition of
+  // the same class. Charging any of those to the deadline made a free lock look like a timeout.
+  let stalledSince = now()
+  let stalledBehind: LockHolder | undefined
   let acquiredHolder: LockHolder | undefined
   for (;;) {
     const content = JSON.stringify({
@@ -552,17 +571,20 @@ function withLock<T>(
     }
     const observedHolder = readLockHolder(path)
     if (observedHolder === undefined) continue
+    if (stalledBehind === undefined || !sameLockHolder(stalledBehind, observedHolder)) {
+      stalledBehind = observedHolder
+      stalledSince = now()
+    }
     if (observedHolder.pid === undefined || !isProcessAlive(observedHolder.pid)) {
-      const reclaimedHolder = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
-      if (reclaimedHolder !== undefined) {
-        acquiredHolder = reclaimedHolder
+      const outcome = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
+      if (outcome.kind === "acquired") {
+        acquiredHolder = outcome.holder
         break
       }
-      if (now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
-      Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
-      continue
+      if (outcome.kind === "holder_changed") continue
+      if (outcome.clearedStaleMutex) stalledSince = now()
     }
-    if (now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
+    if (now() - stalledSince >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
     Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
   }
   if (acquiredHolder === undefined) throw new Error(`Failed to acquire DAG lock: ${path}`)
@@ -619,7 +641,7 @@ function publishLockExclusively(path: string, content: string, fsyncWrites: bool
   }
 }
 
-function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boolean {
+function tryCreateLock(path: string, content: string, fsyncWrites: boolean, recreateMissingDirectory = true): boolean {
   const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`
   let fd: number | undefined
   try {
@@ -632,6 +654,12 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boo
     return true
   } catch (error) {
     if (hasCode(error, "EEXIST")) return false
+    if (hasCode(error, "ENOENT") && recreateMissingDirectory) {
+      // The locks directory vanished under a live session: recreate it and retry exactly once, so a
+      // directory that keeps disappearing still surfaces as the ENOENT it is.
+      fs.mkdirSync(dirname(path), { recursive: true })
+      return tryCreateLock(path, content, fsyncWrites, false)
+    }
     if (hasCode(error, "EPERM") || hasCode(error, "EACCES")) {
       return publishLockExclusively(path, content, fsyncWrites)
     }
@@ -642,6 +670,18 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boo
   }
 }
 
+/**
+ * Why a dead-holder reclaim did not hand us the lock. `reclaim_busy`: a live peer holds the reclaim
+ * mutex, so we are genuinely waiting on it; `clearedStaleMutex` marks that the pass did clear a
+ * crashed reclaimer's stale sentinel - a filesystem state transition the caller must treat as
+ * progress, not contention. `holder_changed`: the canonical lock was released or taken by someone
+ * else while we worked, so the next attempt should start over immediately.
+ */
+type ReclaimOutcome =
+  | { readonly kind: "acquired"; readonly holder: LockHolder }
+  | { readonly kind: "reclaim_busy"; readonly clearedStaleMutex: boolean }
+  | { readonly kind: "holder_changed" }
+
 function reclaimObservedLock(
   path: string,
   observedHolder: LockHolder,
@@ -649,10 +689,12 @@ function reclaimObservedLock(
   runId: DagRunId | undefined,
   now: () => number,
   fsyncWrites: boolean,
-): LockHolder | undefined {
+): ReclaimOutcome {
   const reclaimPath = `${path}.reclaim`
-  const reclaimHolder = tryAcquireReclaimMutex(reclaimPath, isProcessAlive, now, fsyncWrites)
-  if (reclaimHolder === undefined) return undefined
+  const reclaimMutex = tryAcquireReclaimMutex(reclaimPath, isProcessAlive, now, fsyncWrites)
+  if (reclaimMutex.holder === undefined) {
+    return { kind: "reclaim_busy", clearedStaleMutex: reclaimMutex.clearedStaleMutex }
+  }
   const content = JSON.stringify({
     hostPid: process.pid,
     runId,
@@ -670,15 +712,20 @@ function reclaimObservedLock(
     const currentHolder = readLockHolder(path)
     if (currentHolder === undefined || !sameLockHolder(observedHolder, currentHolder) ||
       (currentHolder.pid !== undefined && isProcessAlive(currentHolder.pid))) {
-      return undefined
+      return { kind: "holder_changed" }
     }
     fs.renameSync(successorPath, path)
-    return { pid: process.pid, content }
+    return { kind: "acquired", holder: { pid: process.pid, content } }
   } finally {
     if (fd !== undefined) fs.closeSync(fd)
     fs.rmSync(successorPath, { force: true })
-    removeObservedLock(reclaimPath, reclaimHolder, () => true)
+    removeObservedLock(reclaimPath, reclaimMutex.holder, () => true)
   }
+}
+
+type ReclaimMutexState = {
+  readonly holder: LockHolder | undefined
+  readonly clearedStaleMutex: boolean
 }
 
 function tryAcquireReclaimMutex(
@@ -686,23 +733,32 @@ function tryAcquireReclaimMutex(
   isProcessAlive: (pid: number) => boolean,
   now: () => number,
   fsyncWrites: boolean,
-): LockHolder | undefined {
+): ReclaimMutexState {
   const content = JSON.stringify({
     hostPid: process.pid,
     token: randomUUID(),
     createdAt: new Date(now()).toISOString(),
   })
-  if (tryCreateLock(path, content, fsyncWrites)) return { pid: process.pid, content }
-  const observedHolder = readLockHolder(path)
-  if (observedHolder !== undefined &&
-    (observedHolder.pid === undefined || !isProcessAlive(observedHolder.pid))) {
-    removeObservedLock(
-      path,
-      observedHolder,
-      (movedHolder) => movedHolder === undefined || movedHolder.pid === undefined || !isProcessAlive(movedHolder.pid),
-    )
+  if (tryCreateLock(path, content, fsyncWrites)) {
+    return { holder: { pid: process.pid, content }, clearedStaleMutex: false }
   }
-  return undefined
+  const observedHolder = readLockHolder(path)
+  if (observedHolder === undefined ||
+    (observedHolder.pid !== undefined && isProcessAlive(observedHolder.pid))) {
+    return { holder: undefined, clearedStaleMutex: false }
+  }
+  const clearedStaleMutex = removeObservedLock(
+    path,
+    observedHolder,
+    (movedHolder) => movedHolder === undefined || movedHolder.pid === undefined || !isProcessAlive(movedHolder.pid),
+  )
+  if (!clearedStaleMutex) return { holder: undefined, clearedStaleMutex: false }
+  // The crashed reclaimer's sentinel is gone: that is a state transition, not contention, so retry
+  // the publication once in place instead of handing a wasted poll back to the waiter.
+  if (tryCreateLock(path, content, fsyncWrites)) {
+    return { holder: { pid: process.pid, content }, clearedStaleMutex: true }
+  }
+  return { holder: undefined, clearedStaleMutex: true }
 }
 
 function removeObservedLock(
@@ -712,19 +768,30 @@ function removeObservedLock(
 ): boolean {
   if (!sameLockHolder(observedHolder, readLockHolder(path))) return false
   const quarantinePath = `${path}.${process.pid}.${randomUUID()}.stale`
-  try {
-    fs.renameSync(path, quarantinePath)
-  } catch (error) {
-    if (hasCode(error, "ENOENT")) return false
-    throw error
-  }
+  if (!quarantineStaleLock(path, quarantinePath)) return false
   const movedHolder = readLockHolder(quarantinePath)
   if (!sameLockHolder(observedHolder, movedHolder) || !canRemove(movedHolder)) {
     restoreQuarantinedLock(path, quarantinePath)
     return false
   }
-  fs.rmSync(quarantinePath, { force: true })
+  removeWindowsContendedFile(quarantinePath)
   return true
+}
+
+// Windows may keep a just-closed lock handle briefly. The lock is already exclusively owned by
+// this process at this point; retry only this cleanup, rather than turning a successful start into
+// a failure (POSIX unlink does not have this sharing violation).
+function removeWindowsContendedFile(path: string): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.rmSync(path, { force: true })
+      return
+    } catch (error) {
+      if (process.platform !== "win32" || attempt >= WINDOWS_CLEANUP_RETRIES ||
+        (!hasCode(error, "EPERM") && !hasCode(error, "EBUSY"))) throw error
+      Atomics.wait(sleeper, 0, 0, WINDOWS_CLEANUP_RETRY_MS)
+    }
+  }
 }
 
 function restoreQuarantinedLock(path: string, quarantinePath: string): void {
@@ -736,31 +803,75 @@ function restoreQuarantinedLock(path: string, quarantinePath: string): void {
   fs.rmSync(quarantinePath, { force: true })
 }
 
-function pruneRunArtifacts(paths: DagStorePaths, checkpoint: RetentionCheckpoint, runId: DagRunId): void {
+// Windows can briefly refuse the quarantining rename of a stale lock with a sharing violation
+// (EPERM/EBUSY) while antivirus or the indexer still holds the file open - the same class
+// removeWindowsContendedFile below tolerates for the final unlink, which POSIX rename does not
+// have. Retry the rename so a stale sentinel clears on a loaded runner instead of crashing the
+// reclaim, then surface a persistent refusal instead of hiding it.
+function quarantineStaleLock(path: string, quarantinePath: string): boolean {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.renameSync(path, quarantinePath)
+      return true
+    } catch (error) {
+      if (hasCode(error, "ENOENT")) return false
+      if (attempt >= WINDOWS_CLEANUP_RETRIES || (!hasCode(error, "EPERM") && !hasCode(error, "EBUSY"))) throw error
+      Atomics.wait(sleeper, 0, 0, WINDOWS_CLEANUP_RETRY_MS)
+    }
+  }
+}
+
+type RunArtifactIndex = {
+  readonly keyFilesByRun: ReadonlyMap<string, readonly string[]>
+  readonly lockFilesByRun: ReadonlyMap<string, readonly string[]>
+}
+
+function appendTo(index: Map<string, string[]>, runId: unknown, name: string): void {
+  if (typeof runId !== "string") return
+  const existing = index.get(runId)
+  if (existing === undefined) index.set(runId, [name])
+  else existing.push(name)
+}
+
+function indexRunArtifacts(paths: DagStorePaths): RunArtifactIndex {
+  const keyFilesByRun = new Map<string, string[]>()
+  for (const entry of readDagDirectory(paths.keys)) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue
+    const value = readJsonFile(join(paths.keys, entry.name))
+    if (isRecord(value)) appendTo(keyFilesByRun, value.runId, entry.name)
+  }
+  const lockFilesByRun = new Map<string, string[]>()
+  for (const entry of readDagDirectory(paths.locks)) {
+    if (!entry.isFile() || !entry.name.endsWith(".lock")) continue
+    try {
+      const value = JSON.parse(fs.readFileSync(join(paths.locks, entry.name), "utf8")) as unknown
+      if (isRecord(value)) appendTo(lockFilesByRun, value.runId, entry.name)
+    } catch (error) {
+      if (!hasCode(error, "ENOENT") && !(error instanceof SyntaxError)) throw error
+    }
+  }
+  return { keyFilesByRun, lockFilesByRun }
+}
+
+function pruneRunArtifacts(
+  paths: DagStorePaths,
+  checkpoint: RetentionCheckpoint,
+  runId: DagRunId,
+  artifacts: RunArtifactIndex,
+): void {
   fs.rmSync(paths.event(runId), { force: true })
   fs.rmSync(join(paths.results, runId), { recursive: true, force: true })
   fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
   fs.rmSync(paths.runLock(runId), { force: true })
-  for (const entry of fs.readdirSync(paths.keys, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith(".json")) continue
-    const keyPath = join(paths.keys, entry.name)
-    const value = readJsonFile(keyPath)
-    if (!isRecord(value) || value.runId !== runId) continue
-    fs.rmSync(keyPath, { force: true })
-    fs.rmSync(join(paths.locks, `key-${entry.name.slice(0, -5)}.lock`), { force: true })
+  for (const name of artifacts.keyFilesByRun.get(runId) ?? []) {
+    fs.rmSync(join(paths.keys, name), { force: true })
+    fs.rmSync(join(paths.locks, `key-${name.slice(0, -5)}.lock`), { force: true })
   }
   for (const node of checkpoint.nodes ?? []) {
     if (node.taskId !== undefined) fs.rmSync(paths.taskOwnerLock(node.taskId), { force: true })
   }
-  for (const entry of fs.readdirSync(paths.locks, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith(".lock")) continue
-    const lockPath = join(paths.locks, entry.name)
-    try {
-      const value = JSON.parse(fs.readFileSync(lockPath, "utf8")) as unknown
-      if (isRecord(value) && value.runId === runId) fs.rmSync(lockPath, { force: true })
-    } catch (error) {
-      if (!hasCode(error, "ENOENT") && !(error instanceof SyntaxError)) throw error
-    }
+  for (const name of artifacts.lockFilesByRun.get(runId) ?? []) {
+    fs.rmSync(join(paths.locks, name), { force: true })
   }
   fs.rmSync(paths.run(runId), { force: true })
 }

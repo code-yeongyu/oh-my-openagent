@@ -93,13 +93,16 @@ describe("syncPollTimeoutMs threading", () => {
             messages: async () => {
               messageCallCount++
               return {
-                data: [
-                  { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
-                  {
-                    info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
-                    parts: [{ type: "text", text: "done" }],
-                  },
-                ],
+                data:
+                  statusCallCount >= 3
+                    ? [
+                        { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                        {
+                          info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                          parts: [{ type: "text", text: "done" }],
+                        },
+                      ]
+                    : [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }],
               }
             },
             status: async () => {
@@ -122,7 +125,120 @@ describe("syncPollTimeoutMs threading", () => {
           expect(result).toBeNull()
           expect(abortCount).toBe(0)
           expect(statusCallCount).toBe(3)
-          expect(messageCallCount).toBe(1)
+          expect(messageCallCount).toBe(3)
+        })
+      })
+
+      test("#then a busy session whose messages already look complete is not cut short until it goes idle", async () => {
+        const { pollSyncSession } = require("./sync-session-poller")
+        let statusCallCount = 0
+        const completeMessages = [
+          { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+          {
+            info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+            parts: [{ type: "text", text: "done" }],
+          },
+        ]
+        const mockClient = {
+          session: {
+            abort: async () => {},
+            messages: async () => ({ data: completeMessages }),
+            status: async () => {
+              statusCallCount++
+              return { data: { ses_busy_complete: { type: statusCallCount < 5 ? "busy" : "idle" } } }
+            },
+          },
+        }
+
+        await withMockedDateNow(1_000, async () => {
+          const result = await pollSyncSession(createMockCtx(), mockClient, {
+            sessionID: "ses_busy_complete",
+            agentToUse: "oracle",
+            toastManager: null,
+            taskId: undefined,
+          }, 120_000)
+
+          expect(result).toBeNull()
+          expect(statusCallCount).toBe(5)
+        })
+      })
+
+      test("#then message progress under a constant busy status keeps resetting the inactivity timeout", async () => {
+        const { pollSyncSession } = require("./sync-session-poller")
+        let abortCount = 0
+        let statusCallCount = 0
+        let messageCallCount = 0
+        const mockClient = {
+          session: {
+            abort: async () => {
+              abortCount++
+            },
+            messages: async () => {
+              messageCallCount++
+              const turns = Array.from({ length: messageCallCount }, (_, index) => ({
+                info: { id: `msg_a${String(index + 2).padStart(3, "0")}`, role: "assistant", time: { created: 2000 + index }, finish: "tool-calls" },
+                parts: [{ type: "text", text: `step ${index}` }],
+              }))
+              const done = statusCallCount >= 300
+                ? [{ info: { id: "msg_a999", role: "assistant", time: { created: 9000 }, finish: "stop" }, parts: [{ type: "text", text: "done" }] }]
+                : []
+              return { data: [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }, ...turns, ...done] }
+            },
+            status: async () => {
+              statusCallCount++
+              return { data: { ses_progress: { type: statusCallCount < 300 ? "busy" : "idle" } } }
+            },
+          },
+        }
+
+        await withMockedDateNow(1_000, async () => {
+          const result = await pollSyncSession(createMockCtx(), mockClient, {
+            sessionID: "ses_progress",
+            agentToUse: "oracle",
+            toastManager: null,
+            taskId: undefined,
+            maxAssistantTurns: 1_000,
+          }, 120_000)
+
+          expect(result).toBeNull()
+          expect(abortCount).toBe(0)
+          expect(statusCallCount).toBe(300)
+          expect(messageCallCount).toBeGreaterThan(20)
+        })
+      })
+
+      test("#then a child looping through turns while busy is stopped by the assistant turn budget", async () => {
+        const { pollSyncSession } = require("./sync-session-poller")
+        let abortCount = 0
+        let messageCallCount = 0
+        const mockClient = {
+          session: {
+            abort: async () => {
+              abortCount++
+            },
+            messages: async () => {
+              messageCallCount++
+              const turns = Array.from({ length: messageCallCount }, (_, index) => ({
+                info: { id: `msg_a${String(index + 2).padStart(3, "0")}`, role: "assistant", time: { created: 2000 + index }, finish: "tool-calls" },
+                parts: [{ type: "text", text: `loop ${index}` }],
+              }))
+              return { data: [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }, ...turns] }
+            },
+            status: async () => ({ data: { ses_loop: { type: "busy" } } }),
+          },
+        }
+
+        await withMockedDateNow(1_000, async () => {
+          const result = await pollSyncSession(createMockCtx(), mockClient, {
+            sessionID: "ses_loop",
+            agentToUse: "oracle",
+            toastManager: null,
+            taskId: undefined,
+            maxAssistantTurns: 3,
+          }, 120_000)
+
+          expect(result).toContain("exceeded 3 assistant turns")
+          expect(abortCount).toBe(1)
         })
       })
     })

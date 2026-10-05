@@ -4,9 +4,6 @@ import type { GitMemoryRepo, MemoryToolProvenance } from "@oh-my-opencode/memory
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import {
-  MEMORY_APPLY_PATCH_TOOL_NAME,
-  MEMORY_MCP_APPLY_PATCH_TOOL_NAME,
-  MEMORY_MCP_TOOL_NAME,
   MEMORY_TOOL_NAME,
 } from "./tool-metadata"
 import { joinFields, noticeComponent } from "./worker/entry-renderers"
@@ -135,7 +132,12 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
       if (state === undefined) return undefined
       const settings = options.resolveSettings(identity)
       if (!settings.enabled) return undefined
-      const history = await repo.head() === null ? [] : await repo.log()
+      // Ask git for the commits that carry both trailers instead of reading the whole history and
+      // filtering here: a long-lived identity has thousands of commits and this runs on every prompt.
+      // The predicate below still decides, so a prefix collision in the grep cannot widen the answer.
+      const history = await repo.head() === null
+        ? []
+        : await repo.log({ grep: [`Omo-Writer: memory-tool`, `Omo-Session: ${sessionId}`] })
       const lastSave = history.find((commit) =>
         commit.trailers["Omo-Writer"] === "memory-tool"
         && commit.trailers["Omo-Session"] === sessionId
@@ -211,9 +213,6 @@ function isMemoryToolName(value: unknown): boolean {
   // The MCP surface exposes the same tools under senpi's catalog names (mcp_<server>_<tool>);
   // matching only the bare names would skip provenance injection on the search exposure.
   return value === MEMORY_TOOL_NAME
-    || value === MEMORY_APPLY_PATCH_TOOL_NAME
-    || value === MEMORY_MCP_TOOL_NAME
-    || value === MEMORY_MCP_APPLY_PATCH_TOOL_NAME
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

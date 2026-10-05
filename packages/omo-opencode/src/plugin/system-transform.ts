@@ -3,6 +3,10 @@ import { reconcileSisyphusRuntimePrompt } from "../agents/sisyphus-runtime-promp
 
 const ULTRAWORK_MODE_TAG = "<ultrawork-mode>"
 
+type UltraworkRestoration = {
+  getSystemTransformGuidance?: (sessionID: string, modelID?: string) => string | undefined
+}
+
 /**
  * Collapse the opencode hook model record into the canonical
  * `"<providerID>/<id>"` string used throughout OMO (model ids arrive bare for
@@ -20,6 +24,7 @@ function toCanonicalModel(
 export function createSystemTransformHandler(
   defaultMode?: DefaultModeConfig,
   getUltraworkMessage?: (agentName?: string, modelID?: string) => string,
+  ultraworkRestoration?: UltraworkRestoration | null,
 ): (
   input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
   output: { system: string[] },
@@ -30,6 +35,16 @@ export function createSystemTransformHandler(
     // is the only seam that knows the model actually selected at runtime, so
     // rebuild the whole body for the runtime model here (issue #5297/#6966).
     reconcileSisyphusRuntimePrompt(output.system, toCanonicalModel(input.model))
+
+    const restoredGuidance = input.sessionID
+      ? ultraworkRestoration?.getSystemTransformGuidance?.(input.sessionID, input.model?.id)
+      : undefined
+    if (restoredGuidance) {
+      if (!output.system.some((part) => part.includes(ULTRAWORK_MODE_TAG))) {
+        output.system.push(restoredGuidance)
+      }
+      return
+    }
 
     if (!defaultMode?.ultrawork || !getUltraworkMessage) return
 

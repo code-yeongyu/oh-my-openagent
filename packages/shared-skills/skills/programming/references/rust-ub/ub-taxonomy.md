@@ -140,7 +140,7 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 - Passing a Rust `enum` to C without `#[repr(C)]` or `#[repr(i32)]`.
 - Null pointer passed where C expects non-null (and Rust wraps it in `&T`).
 - C code writing to Rust-owned memory through a pointer Rust considers immutable.
-- Forgetting to mark FFI functions as `unsafe extern "C"`.
+- Declaring a foreign function `safe fn` inside `unsafe extern` when it has caller preconditions (null, length, lifetime), so safe code can violate them.
 - longjmp/setjmp across Rust frames (unwinding UB).
 
 **Miri detection:** LIMITED — Miri cannot execute foreign code. It detects UB in the Rust-side handling of FFI return values.
@@ -236,12 +236,15 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 **Root cause:** A Rust panic unwinding through a frame that uses the C calling convention.
 
 **Canonical triggers:**
-- `panic!()` inside a `#[no_mangle] extern "C" fn` callback passed to C code.
+- `panic!()` inside a `#[unsafe(no_mangle)] extern "C" fn` callback passed to C code.
 - `unwrap()` inside FFI callbacks.
+- Foreign code unwinding (C++ exceptions, `longjmp`) through a Rust frame declared `extern "C"`.
+
+Since Rust 1.81 a Rust panic that reaches an `extern "C"` boundary aborts the process instead of unwinding into foreign frames: no longer UB, but still a crash.
 
 **Miri detection:** PARTIAL — Miri does not model foreign unwinding, but it can detect the immediate UB if the panic reaches the FFI boundary.
 
-**Fix pattern:** Use `std::panic::catch_unwind` at every FFI entry point. Mark FFI callbacks as `extern "C-unwind"` when panic propagation is intentional (nightly). Prefer returning `Result`-like error codes from FFI callbacks.
+**Fix pattern:** Use `std::panic::catch_unwind` at every FFI entry point and return an error code. Declare the ABI `extern "C-unwind"` (stable since 1.71) only when both sides are built to let unwinding cross.
 
 ---
 

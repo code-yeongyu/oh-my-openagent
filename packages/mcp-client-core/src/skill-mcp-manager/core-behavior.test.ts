@@ -18,23 +18,15 @@ describe("skill MCP core behavior", () => {
 
   it("#given ambient secrets and declared MCP env #when cleaning env #then only ambient secrets are stripped", () => {
     // given
-    const originalToken = process.env["OPENAI_API_KEY"]
-    process.env["OPENAI_API_KEY"] = "ambient-secret"
+    // when
+    const cleaned = createCleanMcpEnvironment(
+      { OPENAI_API_KEY: "declared-secret", SAFE_FLAG: "1" },
+      { OPENAI_API_KEY: "ambient-secret" },
+    )
 
-    try {
-      // when
-      const cleaned = createCleanMcpEnvironment({ OPENAI_API_KEY: "declared-secret", SAFE_FLAG: "1" })
-
-      // then
-      expect(cleaned["OPENAI_API_KEY"]).toBe("declared-secret")
-      expect(cleaned["SAFE_FLAG"]).toBe("1")
-    } finally {
-      if (originalToken === undefined) {
-        delete process.env["OPENAI_API_KEY"]
-      } else {
-        process.env["OPENAI_API_KEY"] = originalToken
-      }
-    }
+    // then
+    expect(cleaned["OPENAI_API_KEY"]).toBe("declared-secret")
+    expect(cleaned["SAFE_FLAG"]).toBe("1")
   })
 
   it("#given token-bearing text #when redacting #then secret values are removed", () => {
@@ -47,6 +39,18 @@ describe("skill MCP core behavior", () => {
     // then
     expect(redacted).toContain("[REDACTED]")
     expect(redacted).not.toContain("sk-123456789012345678901234")
+  })
+
+  it("#given Slack token-bearing text #when redacting #then Slack token values are removed", () => {
+    // given
+    const message = "mcp args: --token=xoxp-1234567890-1234567890-1234567890"
+
+    // when
+    const redacted = redactSensitiveData(message)
+
+    // then
+    expect(redacted).toContain("[REDACTED]")
+    expect(redacted).not.toContain("xoxp-1234567890-1234567890-1234567890")
   })
 
   it("#given CDP option #when building key #then session skill and server isolation is preserved", () => {

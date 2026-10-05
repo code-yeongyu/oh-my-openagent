@@ -1,7 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
 
-import { normalizeUlwLoopSessionId, ulwLoopDir } from "./paths.js";
+import { readLedgerAt } from "./ledger.js";
+import { normalizeUlwLoopSessionId, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
+import { readUlwLoopPlanSync } from "./plan-io.js";
+import { isStateLockTimeout, withStateLockSync } from "./state-lock.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 
 // Turn-death recovery only: Codex emits Stop when a turn ends, so a run that
@@ -34,12 +37,13 @@ export function runStopResumeHook(input: unknown): string {
 	if (payload === null || payload.stop_hook_active) return "";
 	if (transcriptShowsContextPressure(payload.transcript_path)) return "";
 	if (boulderContinuationWillFire(payload.cwd, payload.session_id)) return "";
-	const stateDir = ulwLoopDir(payload.cwd, { sessionId: payload.session_id });
-	const plan = readPlan(join(stateDir, "goals.json"));
+	const scope = { sessionId: payload.session_id } as const;
+	const stateDir = ulwLoopDir(payload.cwd, scope);
+	const plan = readPlan(payload.cwd, payload.session_id);
 	if (plan === null || plan.aggregateCompletion?.status === "complete") return "";
 	const goal = resumableGoal(plan);
 	if (goal === undefined) return "";
-	if (!consumeResumeBudget(stateDir, goal.id)) return "";
+	if (!consumeResumeBudgetLocked(ulwLoopStateLockPath(payload.cwd, scope), stateDir, goal.id)) return "";
 	const output: { decision: "block"; reason: string } = {
 		decision: "block",
 		reason: renderResumeDirective(plan, goal, payload.session_id),
@@ -68,11 +72,21 @@ function isResumableStatus(status: UlwLoopItem["status"]): boolean {
 	return status === "pending" || status === "in_progress";
 }
 
-// Two-strike cap keyed on ledger movement: an unchanged ledger.jsonl line
-// count across resumes means the loop is not progressing. The stuck marker is
-// a separate file — a ledger append would change the count and self-reset.
+// A resume is a budgeted side effect; when the session lock cannot be taken the
+// hook stays silent (fail closed) instead of charging the counter unlocked.
+function consumeResumeBudgetLocked(lockPath: string, stateDir: string, goalId: string): boolean {
+	try {
+		return withStateLockSync(lockPath, () => consumeResumeBudget(stateDir, goalId));
+	} catch (error) {
+		if (isStateLockTimeout(error)) return false;
+		throw error;
+	}
+}
+
+// Hook budget counters are exempt from plan/audit commits. Count reconciled
+// entries, not cache lines: a writer dying after link still made progress.
 function consumeResumeBudget(stateDir: string, goalId: string): boolean {
-	const ledgerLineCount = countLedgerLines(join(stateDir, "ledger.jsonl"));
+	const ledgerLineCount = readLedgerAt(stateDir).length;
 	const counterPath = resolve(stateDir, `auto-resume-${goalId}.json`);
 	const stuckPath = resolve(stateDir, `auto-resume-${goalId}.stuck`);
 	// goals.json is untrusted input: a crafted goal id (e.g. `../../x`) must
@@ -106,20 +120,11 @@ function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: 
 	].join("\n");
 }
 
-function readPlan(goalsPath: string): UlwLoopPlan | null {
+function readPlan(repoRoot: string, sessionId: string): UlwLoopPlan | null {
 	try {
-		return JSON.parse(readFileSync(goalsPath, "utf8")) as UlwLoopPlan;
+		return readUlwLoopPlanSync(repoRoot, { sessionId });
 	} catch (error) {
 		if (error instanceof Error) return null;
-		throw error;
-	}
-}
-
-function countLedgerLines(ledgerPath: string): number {
-	try {
-		return readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean).length;
-	} catch (error) {
-		if (error instanceof Error) return 0;
 		throw error;
 	}
 }

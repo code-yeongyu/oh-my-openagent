@@ -21,6 +21,10 @@
       "types": "./src/xdg-data-dir.ts",
       "import": "./src/xdg-data-dir.ts"
     },
+    "./logger": {
+      "types": "./src/logger.ts",
+      "import": "./src/logger.ts"
+    },
     "./record-type-guard": {
       "types": "./src/record-type-guard.ts",
       "import": "./src/record-type-guard.ts"
@@ -32,14 +36,6 @@
     "./classify-path-environment": {
       "types": "./src/classify-path-environment.ts",
       "import": "./src/classify-path-environment.ts"
-    },
-    "./codegraph": {
-      "types": "./src/codegraph/index.ts",
-      "import": "./src/codegraph/index.ts"
-    },
-    "./codegraph/resolve": {
-      "types": "./src/codegraph/resolve.ts",
-      "import": "./src/codegraph/resolve.ts"
     },
     "./command-executor": {
       "types": "./src/command-executor.ts",
@@ -117,7 +113,7 @@
   },
   "dependencies": {
     "@oh-my-opencode/omo-config-core": "workspace:*",
-    "js-yaml": "^5.0.0",
+    "js-yaml": "^5.4.2",
     "jsonc-parser": "^3.3.1"
   },
   "sideEffects": [

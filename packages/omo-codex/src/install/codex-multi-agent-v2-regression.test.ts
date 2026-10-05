@@ -68,8 +68,8 @@ describe("codex MultiAgentV2 release blockers", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain("max_threads = 1000")
-    expect(content).toContain("max_concurrent_threads_per_session = 16")
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+    expect(content).not.toMatch(/^\s*max_concurrent_threads_per_session\s*=/m)
   })
 
   test("#given root gpt-5.6 model without catalog #when updating config #then removes stale V2 disable", async () => {

@@ -16,6 +16,7 @@ const SENSITIVE_PATTERNS: RegExp[] = [
   /sk-[a-zA-Z0-9]{20,}/g, // OpenAI-style secret keys
   /gh[pousr]_[a-zA-Z0-9]{20,}/gi, // GitHub tokens
   /glpat-[a-zA-Z0-9_-]{20,}/gi, // GitLab tokens
+  /xox[baprs]-[a-zA-Z0-9-]{10,}/gi, // Slack tokens
   /[A-Za-z0-9_]{20,}-[A-Za-z0-9_]{10,}-[A-Za-z0-9_]{10,}/g, // Common JWT-like patterns
 ]
 

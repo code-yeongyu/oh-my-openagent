@@ -3,7 +3,7 @@ import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-r
 
 // Default-lane policy guards: vercel stays out of every builtin fallback lane (same as
 // openrouter/opencode-zen), the quotio-openai provider id is gone from the codebase, and any rung
-// that lists the openai lane always carries openai-codex alongside it.
+// that lists the openai lane always carries chatgpt-subscription alongside it.
 
 describe("builtin fallback lane policy", () => {
   test("no builtin category rung lists vercel as a provider", () => {
@@ -22,11 +22,11 @@ describe("builtin fallback lane policy", () => {
     }
   })
 
-  test("every category rung listing openai also lists openai-codex", () => {
+  test("every category rung listing openai also lists chatgpt-subscription", () => {
     for (const [name, requirement] of Object.entries(CATEGORY_MODEL_REQUIREMENTS)) {
       for (const rung of requirement.fallbackChain) {
         if (rung.providers.includes("openai")) {
-          expect(rung.providers, `${name} rung ${rung.model} lists openai without openai-codex`).toContain("openai-codex")
+          expect(rung.providers, `${name} rung ${rung.model} lists openai without chatgpt-subscription`).toContain("chatgpt-subscription")
         }
       }
     }
@@ -48,11 +48,11 @@ describe("builtin fallback lane policy", () => {
     }
   })
 
-  test("every agent rung listing openai also lists openai-codex", () => {
+  test("every agent rung listing openai also lists chatgpt-subscription", () => {
     for (const [name, requirement] of Object.entries(AGENT_MODEL_REQUIREMENTS)) {
       for (const rung of requirement.fallbackChain) {
         if (rung.providers.includes("openai")) {
-          expect(rung.providers, `${name} rung ${rung.model} lists openai without openai-codex`).toContain("openai-codex")
+          expect(rung.providers, `${name} rung ${rung.model} lists openai without chatgpt-subscription`).toContain("chatgpt-subscription")
         }
       }
     }

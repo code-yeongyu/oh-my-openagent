@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { Readable, Writable } from "node:stream";
-import { runMcpStdioServer } from "./mcp";
+import { DEFAULT_AST_GREP_IDLE_TIMEOUT_MS, runMcpStdioServer } from "./mcp";
 
 describe("ast_grep MCP startup", () => {
-  it("#given an initialize line on stdin #when the stdio server runs #then it answers with serverInfo ast_grep and no idle timeout", async () => {
+  it("#given an initialize line on stdin #when the stdio server runs #then it answers with serverInfo ast_grep and the default idle timeout", async () => {
     // given
     const capture = captureStdout();
     const lifecycle: Array<{ readonly event: string; readonly data?: unknown }> = [];
@@ -18,7 +18,7 @@ describe("ast_grep MCP startup", () => {
 
     // then
     expect(capture.read()).toContain('"serverInfo":{"name":"ast_grep"');
-    expect(lifecycle).toContainEqual({ event: "stdio_started", data: expect.objectContaining({ idle_timeout_ms: 0 }) });
+    expect(lifecycle).toContainEqual({ event: "stdio_started", data: expect.objectContaining({ idle_timeout_ms: DEFAULT_AST_GREP_IDLE_TIMEOUT_MS }) });
   });
 
   it("#given a missing sg binary #when the stdio server starts #then the protocol still answers (resolution is per-call)", async () => {

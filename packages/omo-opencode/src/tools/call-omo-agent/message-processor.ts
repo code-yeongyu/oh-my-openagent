@@ -37,7 +37,6 @@ export async function processMessages(
 
   log(`[call_omo_agent] Found ${relevantMessages.length} relevant messages`)
 
-  // Sort by time ascending (oldest first) to process messages in order
   const sortedMessages = [...relevantMessages].sort((a: SDKMessage, b: SDKMessage) => {
     const timeA = a.info?.time?.created ?? 0
     const timeB = b.info?.time?.created ?? 0

@@ -89,6 +89,20 @@ describe("compileMemoryBlock", () => {
     })
   }, 30_000)
 
+  it("#given a compiled projection #when the reminder is read #then it states exactly once that recalled memory arrives on its own with no tool to call", async () => {
+    // given
+    const { repo } = await repoWith([
+      { relativePath: "system/persona.md", content: memory("PERSONA_DESCRIPTION", "PERSONA_BODY\n") },
+    ])
+    const sentence = "Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call."
+
+    // when
+    const block = await compileMemoryBlock(repo, { agentId: "reminder-agent" })
+
+    // then
+    expect(block.split(sentence)).toHaveLength(2)
+  }, 30_000)
+
   it("#given only a committed persona #when compiled #then its body is projected without its description", async () => {
     // given
     const { repo } = await repoWith([

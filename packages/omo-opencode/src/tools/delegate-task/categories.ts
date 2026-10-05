@@ -1,10 +1,11 @@
 import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, BUILTIN_CATEGORY_REQUIRES_MODEL } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, builtinCategoryGateModels } from "./constants"
 import { resolveModel } from "../../shared/model-resolver"
 import { fuzzyMatchModel, isModelAvailable } from "../../shared/model-availability"
 import { normalizeModel } from "../../shared/model-normalization"
 import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { isAnyFallbackModelAvailable } from "../../shared/fallback-model-availability"
 import { log } from "../../shared/logger"
 
 export interface ResolveCategoryConfigOptions {
@@ -74,12 +75,23 @@ export function resolveCategoryConfig(
   }
 
   const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
-  const requiredModel = categoryReq?.requiresModel ?? BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName]
-  if (requiredModel && availableModels && !hasExplicitUserConfig) {
-    if (!isModelAvailable(requiredModel, availableModels)) {
-      log(`[resolveCategoryConfig] Category ${categoryName} requires ${requiredModel} but not available`)
+  const requiredModels = builtinCategoryGateModels(categoryName, categoryReq?.requiresModel)
+  if (requiredModels.length > 0 && availableModels && !hasExplicitUserConfig) {
+    if (!requiredModels.some((requiredModel) => isModelAvailable(requiredModel, availableModels))) {
+      log(`[resolveCategoryConfig] Category ${categoryName} requires ${requiredModels.join(" or ")} but not available`)
       return null
     }
+  }
+  // requiresAnyModel: the lane opens only on one of its own chain models. Without this check the executor
+  // walks the chain, finds nothing, and lands on the session's system default model.
+  if (
+    categoryReq?.requiresAnyModel &&
+    availableModels &&
+    !hasExplicitUserConfig &&
+    !isAnyFallbackModelAvailable(categoryReq.fallbackChain, availableModels)
+  ) {
+    log(`[resolveCategoryConfig] Category ${categoryName} has no available model in its fallback chain`)
+    return null
   }
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
 

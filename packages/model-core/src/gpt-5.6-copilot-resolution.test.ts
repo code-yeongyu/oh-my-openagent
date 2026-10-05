@@ -3,7 +3,27 @@ import { describe, expect, test } from "bun:test"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 import { resolveModelWithFallback } from "./model-resolver"
 
-describe("GitHub Copilot GPT-5.6 resolution", () => {
+describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
+  test("ultrabrain and deep-high prefer Copilot Astra when available", () => {
+    const availableModels = new Set(["github-copilot/gpt-6-astra", "github-copilot/gpt-5.6-sol"])
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-6-astra", variant: "max" })
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-6-astra", variant: "high" })
+  })
+
+  test("unspecified-high never borrows Copilot Astra: it takes the Copilot Opus 5.5 rung, and without it falls to the system default", () => {
+    const withOpus = new Set(["github-copilot/gpt-6-astra", "github-copilot/claude-opus-5-5"])
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["unspecified-high"].fallbackChain, availableModels: withOpus, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/claude-opus-5-5", variant: "medium" })
+
+    const gptOnly = new Set(["github-copilot/gpt-6-astra", "github-copilot/gpt-5.6-sol"])
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["unspecified-high"].fallbackChain, availableModels: gptOnly, systemDefaultModel: "system/default" })).toMatchObject({ model: "system/default" })
+  })
+
+  test("ultrabrain falls back to Copilot GPT-5.6 Sol when Astra is absent and deep-low runs it at medium, while deep-high never uses it", () => {
+    const availableModels = new Set(["github-copilot/gpt-5.6-sol"])
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "max" })
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "medium" })
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "system/default" })
+  })
   const selectionCases = [
     {
       name: "hephaestus",
@@ -14,20 +34,26 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     {
       name: "momus",
       requirement: AGENT_MODEL_REQUIREMENTS.momus,
-      expectedModel: "github-copilot/gpt-5.6-terra",
+      expectedModel: "github-copilot/gpt-6-astra",
       expectedVariant: "high",
     },
     {
       name: "ultrabrain",
       requirement: CATEGORY_MODEL_REQUIREMENTS.ultrabrain,
-      expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedModel: "github-copilot/gpt-6-astra",
       expectedVariant: "max",
     },
     {
-      name: "deep",
-      requirement: CATEGORY_MODEL_REQUIREMENTS.deep,
+      name: "deep-low",
+      requirement: CATEGORY_MODEL_REQUIREMENTS["deep-low"],
       expectedModel: "github-copilot/gpt-5.6-sol",
       expectedVariant: "medium",
+    },
+    {
+      name: "deep-high",
+      requirement: CATEGORY_MODEL_REQUIREMENTS["deep-high"],
+      expectedModel: "github-copilot/gpt-6-astra",
+      expectedVariant: "high",
     },
     {
       name: "unspecified-low",
@@ -38,7 +64,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
   ] as const
 
   for (const { name, requirement, expectedModel, expectedVariant } of selectionCases) {
-    test(`${name} selects its Copilot GPT-5.6 model with its configured variant`, () => {
+    test(`${name} selects its Copilot GPT model with its configured variant`, () => {
       // given
       const availableModels = new Set([expectedModel, "github-copilot/gpt-5.5"])
 
@@ -58,9 +84,9 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   }
 
-  test("warm cache does not pick up transformed Vercel GPT-5.6 now that vercel left the default lanes", () => {
+  test("warm cache does not pick up a transformed Vercel Astra now that vercel left the default lanes", () => {
     // given
-    const availableModels = new Set(["vercel/openai/gpt-5.6-terra"])
+    const availableModels = new Set(["vercel/openai/gpt-6-astra"])
 
     // when
     const result = resolveModelWithFallback({
@@ -77,11 +103,11 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   })
 
-  test("warm cache prefers the Copilot rung over a transformed Vercel terra", () => {
+  test("warm cache prefers the Copilot rung over a transformed Vercel astra", () => {
     // given
     const availableModels = new Set([
-      "github-copilot/gpt-5.6-terra",
-      "vercel/openai/gpt-5.6-terra",
+      "github-copilot/gpt-6-astra",
+      "vercel/openai/gpt-6-astra",
     ])
 
     // when
@@ -93,10 +119,15 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "github-copilot/gpt-5.6-terra",
+      model: "github-copilot/gpt-6-astra",
       source: "provider-fallback",
       variant: "high",
     })
+  })
+
+  test("Copilot keeps the GPT-6 Astra max tier because no Copilot cap applies", () => {
+    const entries = CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain.filter(({ model, providers }) => model === "gpt-6-astra" && providers.includes("github-copilot"))
+    expect(entries).toEqual([{ providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" }])
   })
 
   test("Copilot is never included in a GPT-5.6 xhigh rung", () => {
@@ -118,9 +149,9 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     expect(copilotXhighEntries).toEqual([])
   })
 
-  test("momus uses high for its Copilot Sol fallback when Terra is unavailable", () => {
+  test("momus prefers native Astra xhigh over the Copilot Astra rung when both are available", () => {
     // given
-    const availableModels = new Set(["github-copilot/gpt-5.6-sol"])
+    const availableModels = new Set(["chatgpt-subscription/gpt-6-astra", "github-copilot/gpt-6-astra"])
 
     // when
     const result = resolveModelWithFallback({
@@ -131,20 +162,40 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "github-copilot/gpt-5.6-sol",
+      model: "chatgpt-subscription/gpt-6-astra",
       source: "provider-fallback",
-      variant: "high",
+      variant: "xhigh",
+    })
+  })
+
+  test("momus falls to claude-opus-5-5 max when no Astra rung is available", () => {
+    // given
+    const availableModels = new Set(["github-copilot/gpt-5.6-sol", "anthropic/claude-opus-5-5"])
+
+    // when
+    const result = resolveModelWithFallback({
+      fallbackChain: AGENT_MODEL_REQUIREMENTS.momus.fallbackChain,
+      availableModels,
+      systemDefaultModel: "system/default",
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "anthropic/claude-opus-5-5",
+      source: "provider-fallback",
+      variant: "max",
     })
   })
 
   const fallbackCases = [
     { name: "hephaestus", requirement: AGENT_MODEL_REQUIREMENTS.hephaestus },
     { name: "momus", requirement: AGENT_MODEL_REQUIREMENTS.momus },
-    { name: "deep", requirement: CATEGORY_MODEL_REQUIREMENTS.deep },
+    { name: "deep-low", requirement: CATEGORY_MODEL_REQUIREMENTS["deep-low"] },
+    { name: "deep-high", requirement: CATEGORY_MODEL_REQUIREMENTS["deep-high"] },
   ] as const
 
   for (const { name, requirement } of fallbackCases) {
-    test(`${name} ignores GPT-5.5 when its GPT-5.6 rungs are unavailable`, () => {
+    test(`${name} ignores GPT-5.5 when its frontier GPT rungs are unavailable`, () => {
       // given
       const availableModels = new Set(["github-copilot/gpt-5.5"])
 

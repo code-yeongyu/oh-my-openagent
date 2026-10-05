@@ -17,10 +17,10 @@
  * this file needs to know where those node_modules live.
  */
 import { spawn } from "node:child_process"
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createConnection } from "node:net"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -35,9 +35,32 @@ const THREAD_COMPONENTS = join(OMO_ROOT, "packages", "omo-senpi", "src", "compon
 
 const qaEnv = await import(join(SENPI_QA_LIB, "env.mjs"))
 const qaCleanup = await import(join(SENPI_QA_LIB, "cleanup.mjs"))
+// The capability profile the engine pins on every host it ensures, read from the same checkout
+// the host runs, so the harness host is shaped like a real one without restating the list here.
+const SENPI_RPC = join(SENPI_ROOT, "packages", "coding-agent", "src", "modes", "rpc")
+const { PINNED_HOST_CLIENT_CAPABILITIES } = await import(join(SENPI_RPC, "host-launch.ts"))
+const { RPC_CLIENT_CAPABILITIES_ENV } = await import(join(SENPI_RPC, "custom-capability.ts"))
 
-export const { makeScratch, startFakeModelServer, writeMockModelsJson, hermeticEnv } = qaEnv
+export const { startFakeModelServer, writeMockModelsJson, hermeticEnv } = qaEnv
 export const { installCleanupHooks, cleanupAllAndWait, trackChild, trackCloser, shouldDetachChildren } = qaCleanup
+
+/**
+ * Variables a supervised omo/senpi session (desktop host, `omo --mode rpc` child) carries about
+ * ITS OWN host: the orphan-watch fd, the supervisor pid, the scratch dir, and the public socket.
+ * A QA host that inherits them treats the caller's supervisor as its own - with `WATCH_FD` naming
+ * an fd this child never received, the 2026.9.x watchdog stalls before it answers a single frame -
+ * and the components under test would resolve the caller's live socket instead of the scratch one.
+ * The caller's `*_RPC_CLIENT_CAPABILITIES` is its own host's profile too; inheriting it made a
+ * harness host's capabilities depend on the shell the run was started from.
+ */
+const CALLER_HOST_ENV = /^(?:OMO|SENPI|PI)_RPC_(?:HOST_|SOCKET|CLIENT_CAPABILITIES)/
+
+/** Senpi's scratch, minus the caller's host identity, so the run is hermetic from inside a live session too. */
+export function makeScratch(label) {
+  const scratch = qaEnv.makeScratch(label)
+  for (const key of Object.keys(scratch.env)) if (CALLER_HOST_ENV.test(key)) delete scratch.env[key]
+  return scratch
+}
 
 /** Load one thread component module from the omo worktree (no barrel wiring yet). */
 export function threadComponent(name) {
@@ -61,6 +84,7 @@ export function desktopDependency(specifier) {
 export function createReport(label) {
   const lines = []
   let failures = 0
+  let skipped = 0
   return {
     lines,
     log(line) {
@@ -74,8 +98,20 @@ export function createReport(label) {
       this.log(`${status} ${label}/${name}${detail === undefined ? "" : ` ${detail}`}`)
       return ok
     },
+    /**
+     * Records a check whose precondition the current environment cannot satisfy. A skip never
+     * marks the script failed; the summary carries `skipped=N` so a green run never reads as full
+     * coverage. The reason names the unmet precondition so the log stays honest, not silent.
+     */
+    skip(name, reason) {
+      skipped += 1
+      this.log(`SKIP ${label}/${name} ${reason}`)
+    },
     get failures() {
       return failures
+    },
+    get skipped() {
+      return skipped
     },
     write(outPath) {
       if (outPath === undefined) return
@@ -104,7 +140,14 @@ export async function startRealHost(scratch, { socketPath, extraArgs = [] } = {}
     [SENPI_CLI, "--mode", "rpc", "--multi-session", "--listen", `unix://${socket}`, ...extraArgs],
     // detached matches spawnCli: the cleanup hooks signal the whole process GROUP, which is
     // the only way a host that re-execs under another runtime is guaranteed to die with us.
-    { cwd: scratch.cwd, detached: shouldDetachChildren(), env: scratch.env, stdio: ["pipe", "pipe", "pipe"] },
+    // The host gets the engine's pinned client capabilities, exactly as `host ensure` spawns one
+    // (senpi `host-spawn-environment.ts`); without `extension_events` the desktop refuses it.
+    {
+      cwd: scratch.cwd,
+      detached: shouldDetachChildren(),
+      env: { ...scratch.env, [RPC_CLIENT_CAPABILITIES_ENV]: PINNED_HOST_CLIENT_CAPABILITIES.join(",") },
+      stdio: ["pipe", "pipe", "pipe"],
+    },
   )
   trackChild(child)
   const stderr = []
@@ -135,24 +178,17 @@ function waitForOutput(child, needle, stderr, timeoutMs = 60_000) {
 }
 
 /**
- * Register the host that a DESKTOP-shaped client starts for itself. That host is spawned
- * detached by `ensureOmoSocketHost`, so the QA cleanup hooks never see it; the pid file the
- * desktop writes is the only handle, and this closer is what keeps the run leak-free.
+ * Register the host that a DESKTOP-shaped client gets for itself. The desktop asks the engine
+ * CLI to `host ensure` one, and that host runs detached, so the QA cleanup hooks never see it.
+ * The desktop no longer writes a pid file; the engine reports the serving pid in its ensure
+ * answer, which `makeOmoSharedProcess` hands to its `onHostEnsured` option. Pass
+ * `observe` there. This closer is what keeps the run leak-free.
  */
-export function trackDesktopManagedHost(agentDir, socketPath) {
-  const pidFile = join(agentDir, "rpc-host-daemon", "desktop-host.json")
-  // The pid is cached as soon as it is first observed: the scratch tree (pid file included)
-  // is removed by an earlier-registered closer, so reading the file at cleanup time is a race
-  // this closer must not depend on.
-  let cachedPid
-  const readPid = () => {
-    try {
-      const pid = JSON.parse(readFileSync(pidFile, "utf8")).pid
-      if (typeof pid === "number") cachedPid = pid
-    } catch {
-      // Absent or malformed pid file: the desktop client has not started a host yet.
-    }
-    return cachedPid
+export function trackDesktopManagedHost(socketPath) {
+  let observedPid
+  /** `onHostEnsured` payload: the engine's `host` record for the socket it ensured. */
+  const observe = (host) => {
+    if (typeof host?.pid === "number") observedPid = host.pid
   }
   const terminate = (pid) => {
     for (const signal of ["SIGTERM", "SIGKILL"]) {
@@ -173,17 +209,17 @@ export function trackDesktopManagedHost(agentDir, socketPath) {
     }
   }
   const stop = () => {
-    const pid = readPid()
-    if (typeof pid === "number") terminate(pid)
+    if (typeof observedPid === "number") terminate(observedPid)
     // Second, independent handle on the same host: its argv carries this run's socket path,
-    // which is unique to this scratch dir. This keeps the closer correct even when the pid
-    // file was never observed, and it can never match a host from another run or checkout.
+    // which is unique to this scratch dir. This also stops the supervisor the engine keeps
+    // around the host, keeps the closer correct when no ensure answer was observed, and can
+    // never match a host from another run or checkout.
     if (socketPath !== undefined) {
       for (const survivor of pgrepPids(socketPath)) terminate(Number(survivor))
     }
   }
   trackCloser(stop)
-  return { stop, pid: readPid }
+  return { stop, observe, pid: () => observedPid }
 }
 
 /**
@@ -359,7 +395,31 @@ export async function liveAddressBook(client, socketPath, sessionsDir) {
 }
 
 /** Mailbox port bound to one live host session, used for ordered delivery + steering. */
-export function mailboxPortFor(client, routingId) {
+/**
+ * The auto delivery a thread send used to make before the session gateway: steer the target's
+ * active turn, otherwise start one. The cross-surface drivers use it to prove a message crosses
+ * a transport exactly once; the gateway path itself is covered by the thread suite and the real
+ * TUI QA. A host still finishing the previous turn answers "already processing" for a moment, so
+ * that one refusal is retried (bounded, 50 ms apart, the retry the mailbox used); anything else throws.
+ */
+export async function deliverAuto(port, message, attempts = 40) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const state = await port.snapshot()
+      if (state.active) {
+        await port.steer(message, state.turn_id)
+        return { kind: "ok", delivery: "steered", ...(state.turn_id === undefined ? {} : { turn_id: state.turn_id }) }
+      }
+      const started = await port.start(message)
+      return { kind: "ok", delivery: "started", turn_id: started.turn_id }
+    } catch (error) {
+      if (attempt >= attempts || !/already processing/i.test(error instanceof Error ? error.message : String(error))) throw error
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
+}
+
+export function deliveryPortFor(client, routingId) {
   return {
     snapshot: async () => {
       const state = await client.request({ type: "get_state", sessionId: routingId })
@@ -423,6 +483,84 @@ export function verifyCleanup(report, { scratchDir, socketPaths = [] }) {
     `survivor_pids=${JSON.stringify(survivors)} socket_holders=${JSON.stringify(holders)} scratch_present=${scratchLeft}`,
   )
   return { survivors, holders, scratchLeft }
+}
+
+/**
+ * Stop the per-parent shard hosts a session of this run started for itself. A host that loads the
+ * omo plugin pre-warms a `p-*` task shard at session start; the engine detaches its supervisor
+ * (ppid 1) under an alt root `/tmp/omo-rpc-<hash>/`, so neither the tracked children nor a pgrep on
+ * the scratch dir can see it, and it would outlive the run for the engine's 15-minute idle window.
+ * The shard's `meta.json` names the owning session file, which lives under this run's scratch dir:
+ * that is the only handle, and it can never match a shard of another run. Returns the swept sockets
+ * so the cleanup receipt can prove them released.
+ */
+export function stopOwnedShardHosts(scratchDir) {
+  const sockets = []
+  let roots
+  try {
+    roots = readdirSync("/tmp").filter((name) => name.startsWith("omo-rpc-"))
+  } catch {
+    return sockets
+  }
+  for (const name of roots) {
+    const root = join("/tmp", name)
+    let files
+    try {
+      files = readdirSync(root).filter((file) => file.endsWith(".meta.json"))
+    } catch {
+      continue
+    }
+    let owned = false
+    for (const file of files) {
+      let meta
+      try {
+        meta = JSON.parse(readFileSync(join(root, file), "utf8"))
+      } catch {
+        continue
+      }
+      // Separator-bounded: `/tmp/run` must not own a session file under a sibling `/tmp/run-other`.
+      if (typeof meta.owner_session_file !== "string" || !meta.owner_session_file.startsWith(scratchDir.endsWith(sep) ? scratchDir : `${scratchDir}${sep}`)) continue
+      owned = true
+      if (typeof meta.socket !== "string") continue
+      sockets.push(meta.socket)
+      // SIGTERM to the supervisor ends its host child too; SIGKILL only if it ignores that.
+      for (const signal of ["SIGTERM", "SIGKILL"]) {
+        const pids = pgrepPids(meta.socket)
+        if (pids.length === 0) break
+        for (const pid of pids) {
+          try {
+            process.kill(Number(pid), signal)
+          } catch {
+            // Already gone.
+          }
+        }
+        const deadline = Date.now() + 5000
+        while (Date.now() < deadline && pgrepPids(meta.socket).length > 0) Bun.sleepSync(50)
+      }
+    }
+    if (owned) rmSync(root, { recursive: true, force: true })
+  }
+  // A short scratch path (a bare `/tmp` run, no TMPDIR) keeps the shard in its PRIMARY root,
+  // `<agentDir>/rpc/shards`, inside the scratch dir. That tree and its meta are gone once the run
+  // cleans up, so the supervisor is found by its argv: a `--socket` inside this run's scratch dir
+  // belongs to this run and to nothing else. `[-]` keeps pgrep from reading the pattern as a flag.
+  const inTree = `[-]-socket ${scratchDir}/`
+  for (const signal of ["SIGTERM", "SIGKILL"]) {
+    const pids = pgrepPids(inTree)
+    if (pids.length === 0) break
+    for (const pid of pids) {
+      const socket = /--socket (\S+)/.exec(runCapture("ps", ["-o", "command=", "-p", pid]))?.[1]
+      if (socket !== undefined && !sockets.includes(socket)) sockets.push(socket)
+      try {
+        process.kill(Number(pid), signal)
+      } catch {
+        // Already gone.
+      }
+    }
+    const deadline = Date.now() + 5000
+    while (Date.now() < deadline && pgrepPids(inTree).length > 0) Bun.sleepSync(50)
+  }
+  return sockets
 }
 
 export function readTextIfPresent(path) {

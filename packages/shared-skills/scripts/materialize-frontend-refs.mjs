@@ -34,7 +34,7 @@ function materializedContent(relTarget, sourcePath) {
 	return content;
 }
 
-export function materializeFrontendRefs({ strict = false } = {}) {
+export function materializeFrontendRefs({ strict = false, targetRoot = frontendSkillRoot } = {}) {
 	const map = thirdPartyMaterializeMap();
 	const requiredUpstreams = new Set(Object.values(map).map((entry) => entry.upstream));
 
@@ -46,8 +46,8 @@ export function materializeFrontendRefs({ strict = false } = {}) {
 		return { materialized: 0, skipped: true };
 	}
 
-	rmSync(join(frontendSkillRoot, "references", "ui-ux-db"), { recursive: true, force: true });
-	rmSync(join(frontendSkillRoot, "references", "designpowers", "vendor"), { recursive: true, force: true });
+	rmSync(join(targetRoot, "references", "ui-ux-db"), { recursive: true, force: true });
+	rmSync(join(targetRoot, "references", "designpowers", "vendor"), { recursive: true, force: true });
 
 	let materialized = 0;
 	for (const [relTarget, { upstream, source }] of Object.entries(map)) {
@@ -55,7 +55,7 @@ export function materializeFrontendRefs({ strict = false } = {}) {
 		if (!existsSync(sourcePath)) {
 			throw new Error(`[materialize] missing upstream source: ${upstream}/${source} for ${relTarget}`);
 		}
-		const targetPath = join(frontendSkillRoot, relTarget);
+		const targetPath = join(targetRoot, relTarget);
 		mkdirSync(dirname(targetPath), { recursive: true });
 		writeFileSync(targetPath, materializedContent(relTarget, sourcePath));
 		materialized += 1;

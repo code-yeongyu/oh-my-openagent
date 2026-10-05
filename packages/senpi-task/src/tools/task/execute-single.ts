@@ -3,13 +3,14 @@ import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/sen
 import { createChildProgress } from "../../progress"
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import type { TaskRecord } from "../../state"
+import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import { buildStartSpec } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
 import { partialDetails, recordDetails, startedDetails, type SingleSpawnParams } from "./result-details"
 import { appendMissingSkills } from "./skill-result"
 import { evaluateSpawnPolicy } from "./spawn-policy"
-import { backgroundConversionText, backgroundStartText } from "./start-presentation"
+import { backgroundConversionText, backgroundStartText, type StartLabels } from "./start-presentation"
 import type { TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
 import { validateTaskTarget } from "./validation"
 
@@ -18,6 +19,8 @@ type RunSpawnInput = ForegroundWaitOptions & {
   readonly signal: AbortSignal | undefined
   readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails> | undefined
   readonly ctx: TaskToolContext
+  // Transient grant resolved by the caller against the parent's live kernel-tool capability.
+  readonly kernelTools?: KernelToolGrant
 }
 
 function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToolDetails> {
@@ -66,10 +69,14 @@ export async function runSpawn(
   }
   const effectiveParams = policy?.kind === "force" ? { ...params, prompt: policy.prompt, load_skills: [] } : params
   const target = selection.kind === "category" ? { category: selection.category } : { subagentType: selection.subagentType }
+  const startLabels: StartLabels = {
+    taskSummary: params.task_summary,
+    description: params.description,
+  }
   // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously, so the
   // barrel is warmed here (memoized: a cache hit once the engine barrel is loaded).
   await loadSenpiBarrel()
-  const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd)
+  const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd, input.kernelTools)
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {
     const agents = started.error.availableAgents
@@ -102,6 +109,8 @@ export async function runSpawn(
       model: started.model,
       ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
       run_in_background: started.run_in_background,
+      ...(started.failure_kind === undefined ? {} : { failure_kind: started.failure_kind }),
+      ...(started.failure_reason === undefined ? {} : { failure_reason: started.failure_reason }),
       reason: started.error_message,
       ...(spec.skills === undefined ? {} : { skills: spec.skills }),
     })
@@ -109,13 +118,13 @@ export async function runSpawn(
   if (started.kind === "residency_denied") {
     return result(started.reason, { task_id: "", status: "residency_denied", mode: "spawn", reason: started.reason })
   }
+  // What the started child actually runs as. The spec names no mode only when omo.json says `auto`
+  // and this wiring has no daemon gate at all, which IS in-process.
+  const executionMode = spec.execution_mode ?? "in-process"
   if (params.run_in_background === true) {
     return result(
-      appendMissingSkills(
-        backgroundStartText(started, { taskSummary: params.task_summary, description: params.description }),
-        spec.skills,
-      ),
-      startedDetails(started, params, spec.execution_mode, spec.skills),
+      appendMissingSkills(backgroundStartText(started, startLabels), spec.skills),
+      startedDetails(started, params, executionMode, spec.skills),
     )
   }
 
@@ -142,7 +151,7 @@ export async function runSpawn(
     emittedAt = Date.now()
     onUpdate({
       content: [{ type: "text", text: progress.contentText() }],
-      details: partialDetails(started, params, spec.execution_mode, progress.details(), spec.skills),
+      details: partialDetails(started, params, executionMode, progress.details(), spec.skills),
     })
   }
   const schedule = (): void => {
@@ -169,7 +178,7 @@ export async function runSpawn(
   if (started.status === "pending") {
     onUpdate?.({
       content: [{ type: "text", text: "" }],
-      details: partialDetails(started, params, spec.execution_mode, {
+      details: partialDetails(started, params, executionMode, {
         progress: { activity: "queued · waiting for slot", startedAt },
         childId: started.task_id,
         turns: 0,
@@ -178,6 +187,9 @@ export async function runSpawn(
   } else {
     emit()
   }
+  const parent = deps.manager.findTaskByChildSession?.(ctx.sessionManager.getSessionId())
+  const parked = parent === undefined ? undefined : deps.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
+  let promoted = false
   try {
     const waited = await waitForForegroundTask({
       manager: deps.manager,
@@ -188,15 +200,12 @@ export async function runSpawn(
       ...(scheduleDeadline !== undefined && { scheduleDeadline }),
     })
     if (waited.kind === "promoted") {
+      promoted = true
       return result(appendMissingSkills(
-        backgroundConversionText(
-          started,
-          { taskSummary: params.task_summary, description: params.description },
-          waited.budgetSeconds,
-        ),
+        backgroundConversionText(started, startLabels, waited.budgetSeconds),
         spec.skills,
       ), {
-        ...startedDetails(started, params, spec.execution_mode, spec.skills),
+        ...startedDetails(started, params, executionMode, spec.skills),
         run_in_background: true,
       })
     }
@@ -211,7 +220,7 @@ export async function runSpawn(
     const reason = "parent turn aborted"
     await deps.manager.cancelTask(started.task_id, reason)
     return result(`Task ${started.task_id} cancelled: ${reason}.${continuationFooter(started.task_id)}`, {
-      ...startedDetails(started, params, spec.execution_mode, spec.skills),
+      ...startedDetails(started, params, executionMode, spec.skills),
       status: "cancelled",
       reason,
     })
@@ -219,5 +228,6 @@ export async function runSpawn(
     closed = true
     if (timer !== undefined) clearTimeout(timer)
     unsubscribe()
+    await deps.manager.concurrency?.unpark(parked, signal, { overflow: promoted })
   }
 }

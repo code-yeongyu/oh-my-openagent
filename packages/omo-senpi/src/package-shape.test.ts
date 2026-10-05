@@ -73,24 +73,20 @@ describe("omo-senpi package shape", () => {
     const devDependencies = readStringRecord(manifest, "devDependencies")
     const peerDependencies = readStringRecord(manifest, "peerDependencies")
     const peerDependenciesMeta = readObjectRecord(manifest, "peerDependenciesMeta")
-    const rootPatchedDependencies = readStringRecord(rootManifest, "patchedDependencies")
 
     // then
     expect(readString(manifest, "name")).toBe("@oh-my-opencode/omo-senpi")
     expect(readBoolean(manifest, "private")).toBe(true)
     expect(readString(manifest, "type")).toBe("module")
     expect(readString(manifest, "version")).toBe(readString(rootManifest, "version"))
-    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./extension", "./install"])
+    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install"])
     expect(scripts).toMatchObject({
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
     })
-    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.8.28")
+    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.10")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
-    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.8.28")
-    expect(rootPatchedDependencies["@code-yeongyu/senpi@2026.8.28"]).toBe(
-      "patches/@code-yeongyu%2Fsenpi@2026.8.28.patch",
-    )
+    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.10")
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -114,6 +110,9 @@ describe("omo-senpi package shape", () => {
     expect(files).toContain("extensions")
     expect(files).toContain("skills")
     expect(files).toContain("runtime")
+    // The task daemon's only argv source ships with the plugin; without it `omo daemon run`
+    // fails closed (exit 5) on every npm install.
+    expect(files).toContain("daemon-launch-spec.json")
     expect(files).toContain("README.md")
     expect(files).toContain("NOTICE")
     expect(files).toContain("LICENSE")

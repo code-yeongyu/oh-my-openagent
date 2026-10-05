@@ -4,37 +4,45 @@ import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-r
 import type { FallbackEntry } from "./model-requirement-types"
 
 const LUNA_LOW = {
-  providers: ["openai-codex"],
-  model: "gpt-5.6-luna-fast",
+  providers: ["openai", "chatgpt-subscription"],
+  model: "gpt-6-luna-fast",
   variant: "low",
 } satisfies FallbackEntry
 
 const DEEPSEEK_OFF = {
   providers: ["deepseek"],
-  model: "deepseek-v4-flash",
+  model: "deepseek-flash",
   variant: "off",
 } satisfies FallbackEntry
 
 const DEEPSEEK_MAX = {
   providers: ["deepseek"],
-  model: "deepseek-v4-flash",
+  model: "deepseek-flash",
   variant: "max",
 } satisfies FallbackEntry
 
+const KIMI_HIGHSPEED_OFF = {
+  providers: ["kimi-for-coding"],
+  model: "kimi-for-coding-highspeed",
+  variant: "off",
+} satisfies FallbackEntry
+
 describe("Luna and DeepSeek chain policy", () => {
-  test("quick places non-reasoning DeepSeek V4 Flash immediately after Luna", () => {
+  test("quick leads with Luna low and places non-reasoning DeepSeek V4.1 Flash right after it", () => {
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain
 
-    expect(quick.slice(1, 3)).toEqual([LUNA_LOW, DEEPSEEK_OFF])
+    expect(quick.map((entry) => entry.model)).not.toContain("kimi-for-coding-highspeed")
+    expect(quick.slice(0, 2)).toEqual([LUNA_LOW, DEEPSEEK_OFF])
   })
 
   test.each(["explore", "librarian"])(
-    "%s places max-reasoning DeepSeek V4 Flash immediately after Luna",
+    "%s leads with no-thinking Kimi HighSpeed, then Luna, then max-reasoning DeepSeek V4.1 Flash",
     (agentName) => {
       const chain = AGENT_MODEL_REQUIREMENTS[agentName].fallbackChain
 
-      expect(chain.slice(0, 2)).toEqual([
-        { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
+      expect(chain.slice(0, 3)).toEqual([
+        KIMI_HIGHSPEED_OFF,
+        { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
         DEEPSEEK_MAX,
       ])
     },

@@ -13,11 +13,16 @@ import type {
 } from "@oh-my-opencode/telemetry-core"
 
 import type { OmoSenpiComponent } from "../../extension/types"
-import { resolveStateDir } from "@oh-my-opencode/senpi-task"
+import { isHostWarmupSession, resolveStateDir } from "@oh-my-opencode/senpi-task"
 
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "../task/terminal-observers"
+import {
+  type ComputerUseTelemetryObservers,
+  registerOmoNativeComputerUseTelemetry,
+} from "./omo-native-computer-use"
 import { createOmoNativeDelegationCapture } from "./omo-native-delegation"
 import { createOmoNativeNoticeRegistration } from "./omo-native-notice"
+import { registerOmoNativeKibitzerSummary } from "./omo-native-kibitzer-summary"
 import { registerOmoNativeParallelSummary } from "./omo-native-parallel-summary"
 import { createOmoNativePromptComponent } from "./omo-native-prompt"
 import {
@@ -48,6 +53,7 @@ export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
   readonly taskTerminalObservers?: TaskTerminalObservers
   /** Where senpi-task keeps its records and per-task event logs. Defaults to the session's project. */
   readonly taskStateDir?: string
+  readonly computerUseTelemetryObservers?: ComputerUseTelemetryObservers
 }
 
 export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryComponentOptions = {}): OmoSenpiComponent {
@@ -68,6 +74,10 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
   return {
     name: "telemetry",
     register(pi, ctx) {
+      // The throwaway session that warms a fresh task host is no session of anyone's: it must not be
+      // counted as one, nor report the crashes and daily activity the real session reports.
+      if (isHostWarmupSession(pi)) return
+
       // Must precede the session component: its `session_shutdown` handler shuts the client down,
       // which clears `state.capture`, after which `parallelism_summary` would capture nothing.
       registerOmoNativeParallelSummary(pi, {
@@ -75,10 +85,29 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         hashSessionId: options.hashSessionId ?? hashSessionId,
       })
 
+      // Same ordering constraint as the parallelism summary: the session component's shutdown
+      // handler clears `state.capture`, so this registration must precede it. Its own detach runs
+      // after the emission because it is registered second.
+      const detachKibitzerSummary = registerOmoNativeKibitzerSummary(pi, {
+        captureEvent: client.captureEvent,
+        hashSessionId: options.hashSessionId ?? hashSessionId,
+      })
+      pi.on("session_shutdown", () => {
+        detachKibitzerSummary()
+      })
+
       createOmoNativePromptComponent({
         client,
         hashSessionId: options.hashSessionId,
       }).register(pi, ctx)
+
+      registerOmoNativeComputerUseTelemetry(pi, {
+        captureEvent: client.captureEvent,
+        hashSessionId: options.hashSessionId,
+        ...(options.computerUseTelemetryObservers === undefined
+          ? {}
+          : { observers: options.computerUseTelemetryObservers }),
+      })
 
       createOmoNativeSessionComponent({
         ...options,

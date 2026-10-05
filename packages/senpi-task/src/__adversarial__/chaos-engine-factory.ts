@@ -8,6 +8,7 @@ import type { DestructionPort } from "../steering"
 import type { TaskRecordStore } from "../store"
 import { ChaosProcessTable, ChaosRpcRespawnRunner, ChaosRunner } from "./chaos-engine"
 import type { LifecycleChaosObservations } from "./chaos-engine"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 export type ChaosEngine = {
   readonly id: string
@@ -72,6 +73,7 @@ export function buildChaosEngines(input: {
       processes: input.processes, observations: input.observations,
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store: input.store, registry, config: input.config, now: input.clock,
       signaller: input.processes, hostPid, orphanKillDelayMs: 0,
       respawn: (record, sessionPath) => getManager().respawn(record, sessionPath),

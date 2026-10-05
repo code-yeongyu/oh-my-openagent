@@ -5,9 +5,12 @@ import { join } from "node:path"
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
+import type { SuspensionReason } from "../../state"
 import type { ManagedChildEvent, ManagedChildListener } from "../child-handle"
 import { createTaskRecordStore } from "../../store"
+import type { TaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
+import type { ExecutionModeGate } from "../execution-mode"
 import { createTaskManager } from "../manager"
 import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
 
@@ -35,8 +38,11 @@ export type FakeHandle = {
   readonly followUpCalls: string[]
   subscribeCount(): number
   unsubscribeCount(): number
+  parkWatchCount(): number
+  park(reason: SuspensionReason): void
   waitForSubscription(): Promise<void>
   waitForUnsubscription(): Promise<void>
+  selfResume(): void
 }
 
 export function makeHandle(taskId: string, pid?: number): FakeHandle {
@@ -49,10 +55,12 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   const steerCalls: string[] = []
   const followUpCalls: string[] = []
   const listeners = new Set<ManagedChildListener>()
+  const parkWatches = new Set<(event: { readonly reason: SuspensionReason }) => void>()
   let subscribeCalls = 0
   let unsubscribeCalls = 0
   const subscriptionWaiters: Array<() => void> = []
   const unsubscriptionWaiters: Array<() => void> = []
+  const resumedListeners = new Set<() => void>()
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -74,7 +82,15 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
         listeners.delete(listener)
       }
     },
+    onParked: (listener) => {
+      parkWatches.add(listener)
+      return () => parkWatches.delete(listener)
+    },
     waitForOutcome: () => outcome,
+    onSelfResumed: (listener) => {
+      resumedListeners.add(listener)
+      return () => resumedListeners.delete(listener)
+    },
     lastAssistantText: () => undefined,
     dispose: async () => {},
   }
@@ -95,12 +111,19 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     followUpCalls,
     subscribeCount: () => subscribeCalls,
     unsubscribeCount: () => unsubscribeCalls,
+    parkWatchCount: () => parkWatches.size,
+    park: (reason) => {
+      for (const listener of [...parkWatches]) listener({ reason })
+    },
     waitForSubscription: () => subscribeCalls > 0
       ? Promise.resolve()
       : new Promise((resolve) => subscriptionWaiters.push(resolve)),
     waitForUnsubscription: () => unsubscribeCalls > 0
       ? Promise.resolve()
       : new Promise((resolve) => unsubscriptionWaiters.push(resolve)),
+    selfResume: () => {
+      for (const listener of [...resumedListeners]) listener()
+    },
   }
 }
 
@@ -144,16 +167,19 @@ export function flush(): Promise<void> {
 
 export function makeManager(options: {
   project?: string
+  // A caller-owned store (e.g. a wrapper that injects persistence faults) over the same project dir.
+  store?: TaskRecordStore
   config?: OmoTaskSettings
   planner?: ChildPlanner
   inProcess?: FakeRunner
-  process?: FakeRunner
+  process?: ManagedRunner
   admit?: AdmitResident
+  executionModeGate?: ExecutionModeGate
 } = {}) {
   const project = options.project ?? tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = options.store ?? createTaskRecordStore({ project_dir: project })
   const inProcess = options.inProcess ?? new FakeRunner()
-  const processRunner = options.process ?? new FakeRunner()
+  const processRunner: ManagedRunner = options.process ?? new FakeRunner()
   const manager = createTaskManager({
     store,
     runners: { "in-process": inProcess, process: processRunner },
@@ -161,6 +187,7 @@ export function makeManager(options: {
     config: options.config ?? settings({ default_concurrency: 5, max_depth: 1 }),
     cwd: project,
     ...(options.admit !== undefined && { admit: options.admit }),
+    ...(options.executionModeGate !== undefined && { executionModeGate: options.executionModeGate }),
   })
   return { manager, store, inProcess, process: processRunner, project }
 }

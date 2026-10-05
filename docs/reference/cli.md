@@ -17,11 +17,11 @@ All published packages expose the same compiled CLI with these bin entries:
 - `lazycodex` (Light edition shortcut; install defaults to `--platform=codex`)
 - `lazycodex-ai` (Light edition shortcut; install defaults to `--platform=codex`)
 
-The former `omo` bin was removed from these packages in this major release. The name now belongs to the senpi-native edition:
+The former `omo` bin was removed from these packages in this major release. The name now belongs to the OmO Native edition:
 
 | Bin | Package | Channel | What it is |
 | --- | --- | --- | --- |
-| `omo` | `omo-ai` | npm beta channel only (`npm i -g omo-ai@beta`) | Launches the pinned senpi release with the full OMO extension loaded. A bare `npm i -g omo-ai` fails by design; see the [omo-ai publishing runbook](./omo-ai-publishing.md). |
+| `omo` | `omo-ai` | bun (recommended): `bun add -g omo-ai`; npm fallback: `npm i -g omo-ai` | Launches the pinned senpi release with the full OMO extension loaded. Prerelease builds live on `omo-ai@beta`; see the [omo-ai publishing runbook](./omo-ai-publishing.md). |
 
 The `omo-agent-toolkit` npm bin stays with the wrapper packages above; `omo-ai` never declares it.
 
@@ -49,7 +49,7 @@ bunx oh-my-opencode
 | `worktree-sweep` | Report (and optionally remove) stale linked git worktrees: SWEEP when merged into the default branch and clean, KEEP when locked/external/unmerged/dirty, PRUNE when the path is gone. Dry-run by default; `--apply` removes with `git worktree remove` (never forced) and prunes; `--older-than <days>` adds an age fallback, `--repo <path>` is repeatable, `--json` emits machine-readable output |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
 | `update` | `lazycodex` / `lazycodex-ai` bins only: refresh the installed Codex Light edition in place (`--dry-run`, `--repo-root <path>`) |
-| `boulder` | Inspect Sisyphus boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |
+| `boulder` | Inspect boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
 
@@ -83,7 +83,7 @@ bunx oh-my-openagent install
 | `--minimax-cn-coding-plan <value>` | MiniMax Coding Plan through minimaxi.com: `no`, `yes` (Ultimate only) |
 | `--minimax-coding-plan <value>` | MiniMax Coding Plan through minimax.io: `no`, `yes` (Ultimate only) |
 | `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
-| `--codex-autonomous` | Default for Light/Both installs: writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` unless `--no-codex-autonomous` is passed; passing this flag explicitly is redundant |
+| `--codex-autonomous` | Default for Light/Both installs: writes `approval_policy = "never"` and `sandbox_mode = "danger-full-access"` (and removes a legacy top-level `network_access` key) unless `--no-codex-autonomous` is passed; passing this flag explicitly is redundant |
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
@@ -156,6 +156,13 @@ bunx oh-my-openagent doctor
 
 - The current minimum OpenCode version check is `>= 1.4.0`.
 - The doctor command warns when legacy plugin registration (`oh-my-opencode`) is still present in `opencode.json`.
+- OmO Native's `doctor` subcommand also reports computer use (experimental) without opening a desktop session or requesting OS permissions. It prints:
+  - whether the effective Native config enables computer use and whether the host is supported;
+  - the selected engine path and its version, protocol, and ABI, or the engine-location diagnostic and every path tried;
+  - the backend plus capture, input, and accessibility permission state;
+  - display count and screen-lock state;
+  - the stop path, reported as not armed until computer use starts input, because the engine arms the stop chord only then.
+  The probe sends only the read-only `engine.hello` and `capabilities` requests and is bounded by the doctor's timeout.
 
 ---
 
@@ -194,7 +201,10 @@ bunx oh-my-openagent run <message>
 1. `--agent`
 2. `OPENCODE_DEFAULT_AGENT`
 3. `default_run_agent` in plugin config
-4. `Sisyphus`
+
+`--agent` accepts config keys (`sisyphus`, `prometheus`) and remapped display names (`Sisyphus - ultraworker`). Builtin categories (`quick`, `deep`, `ultrabrain`, `unspecified-high`, and the others used by `task(category=...)`) are not CLI agents; `oh-my-openagent run --agent quick` errors with the runnable names.
+
+`opencode run --agent` does exact-key lookup in the host. Prefer `oh-my-openagent run --agent`, or pass the remapped display name. Unknown host `--agent` values should fail closed (see the OpenCode CLI).
 
 ---
 

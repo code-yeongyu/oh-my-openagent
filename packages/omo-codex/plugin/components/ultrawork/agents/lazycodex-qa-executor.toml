@@ -1,7 +1,7 @@
 name = "lazycodex-qa-executor"
 description = "LazyCodex manual QA executor. Runs real scenarios and records artifact-backed surface evidence."
 nickname_candidates = ["QA Executor"]
-model = "gpt-5.6-luna"
+model = "gpt-6-astra"
 model_reasoning_effort = "high"
 
 developer_instructions = """

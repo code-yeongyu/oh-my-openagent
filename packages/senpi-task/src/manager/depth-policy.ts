@@ -26,6 +26,8 @@ export function decideDepthPolicy(input: DepthPolicyInput): DepthDecision {
 
   return {
     allowed: false,
-    reason: `Task nesting depth ${input.childDepth} exceeds maxDepth ${input.maxDepth}.`,
+    reason:
+      `Subagent nesting limit reached: this spawn would run at depth ${input.childDepth}, beyond max_depth ${input.maxDepth}. ` +
+      "Do not delegate further - do this work yourself with the tools you already have.",
   }
 }

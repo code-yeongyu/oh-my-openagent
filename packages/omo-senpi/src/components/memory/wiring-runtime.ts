@@ -2,6 +2,7 @@ import { join } from "node:path"
 
 import { TranscriptJournal, sanitizeToSlug, type ReservedRun } from "@oh-my-opencode/memory-core"
 
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { MemoryIdentityContext } from "./context"
 import type { DreamTriggerSession } from "./dream-trigger"
 import { FactsExtractorRunner } from "./facts-runner"
@@ -19,12 +20,12 @@ import {
   resolveParentCacheReusable as resolveParentCacheReusableFromCtx,
   resolveParentContextTokens as resolveParentContextTokensFromCtx,
   resolveParentSessionFile as resolveParentSessionFileFromCtx,
+  resolveSessionAgentDir,
 } from "./session-context-resolver"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
 import { isRecord, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { ReflectionLiveSession, ReflectionSessionModel } from "./worker"
-import { buildFactsSandboxTransform, type SandboxPolicy } from "./sandbox"
 
 export interface MemoryRuntimeWiring {
   resolveContext(sessionId: string): MemoryIdentityContext | undefined
@@ -77,6 +78,11 @@ export function createMemoryRuntimeWiring(
     return resolveParentCacheReusableFromCtx(lastEventCtx.current)
   }
 
+  /** The engine's own answer for this session; detection is the fallback for hosts without it. */
+  function resolveAgentDir(): string {
+    return resolveSessionAgentDir(lastEventCtx.current) ?? resolveAgentHome({ env: process.env })
+  }
+
   function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
     const cached = journals.get(identity.identity)
     if (cached !== undefined) return cached
@@ -92,8 +98,6 @@ export function createMemoryRuntimeWiring(
     const cached = factsWirings.get(identity.identity)
     if (cached !== undefined) return cached
     const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-    const sandboxPolicy = settings.agents[identity.identity]?.reflection?.sandbox
-      ?? settings.reflection.sandbox
     const createExtractor = options.createFactsExtractor
       ?? ((extractorOptions) => new FactsExtractorRunner(extractorOptions))
     const extractor = createExtractor({
@@ -106,14 +110,6 @@ export function createMemoryRuntimeWiring(
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
       resolveModelRegistry,
       env: options.env,
-      sandbox: buildFactsSandboxTransform({
-        policy: sandboxPolicy as SandboxPolicy,
-        onWarning: (warning, spawnArgs) => options.logger?.warn("memory facts sandbox degraded", {
-          identity: identity.identity,
-          runId: spawnArgs.runId,
-          warning,
-        }),
-      }),
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
     const wiring = createMemoryFactsWiring({
@@ -148,15 +144,17 @@ export function createMemoryRuntimeWiring(
       resolveParentContextTokens,
       resolveParentSessionFile,
       resolveParentCacheReusable,
+      resolveAgentDir,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
       ...(liveSession === undefined
         ? {}
         : {
             liveSession: () => {
               const live = liveSession()
-              if (live === undefined || hooks.onLiveCompletion === undefined) return live
+              if (live === undefined) return live
               return {
                 ...live,
+                identityContext: identity,
                 onCompletion: (runId: string) => hooks.onLiveCompletion?.(identity.identity, runId),
               }
             },

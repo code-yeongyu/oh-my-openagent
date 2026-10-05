@@ -1,7 +1,7 @@
 import { afterEach, expect } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { existsSync, writeFileSync } from "node:fs"
-import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { appendFile, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -14,21 +14,21 @@ import {
   type TranscriptEntry,
 } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
-import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import type { ChildHandle, ChildModelRegistry, ChildSpec, InProcessRunnerLike, SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
+import { ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import { FactsExtractorRunner, type FactsExtractorRunnerOptions } from "./facts-runner"
+import { createFactsRecordTool } from "./facts-record-tool"
 import type { FactsRunLedger } from "./facts-runner-types"
 
 export const AVAILABLE_MODEL: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
-export const childFixture = join(import.meta.dir, "worker", "__fixtures__", "facts-child.ts")
-export const supervisorFixture = join(import.meta.dir, "worker", "memory-run-supervisor.ts")
 const tempDirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
-export async function fixture() {
+export async function fixture(now?: () => Date) {
   const root = await mkdtemp(join(tmpdir(), "omo-facts-runner-"))
   tempDirs.push(root)
   const identity: MemoryIdentity = {
@@ -36,9 +36,34 @@ export async function fixture() {
     safeSlug: "facts-agent",
     paths: buildIdentityPaths(root, "facts-agent"),
   }
-  const queue = new FactsQueue({ identityPaths: identity.paths })
+  const queue = new FactsQueue({ identityPaths: identity.paths, ...(now === undefined ? {} : { now }) })
   await enqueue(queue, identity, "session-1", "m1", "The project uses Bun.")
   return { root, identity, queue }
+}
+
+/**
+ * The registry snapshot as production captures it: the parent session's concrete ModelRegistry.
+ * The runtime is created catalog-free (modelsPath: null) so the fixture owns exactly which models
+ * exist - the shipped catalog would otherwise satisfy the quick chain on its own. An in-process
+ * child shares this exact instance, so the facts child cannot drift onto another engine's model set.
+ */
+export function registrySnapshot(models: readonly { readonly id: string; readonly contextWindow?: number; readonly maxTokens?: number }[] = [{ id: "mock-1" }]): ChildModelRegistry {
+  const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
+  registry.registerProvider("omo-mock", {
+    api: "openai-completions",
+    baseUrl: "https://example.test",
+    apiKey: "test-key",
+    models: models.map((model) => ({
+      id: model.id,
+      name: `Mock ${model.id}`,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: model.contextWindow ?? 1,
+      maxTokens: model.maxTokens ?? 1,
+    })),
+  })
+  return registry
 }
 
 export async function enqueue(
@@ -67,20 +92,11 @@ export function runnerOptions(
   root: string,
   identity: MemoryIdentity,
   queue: FactsQueue,
-  mode: "fact" | "empty" | "malformed" | "fail" | "person" | "model-fallback",
+  mode: "fact" | "empty" | "malformed" | "fail" | "person" | "model-fallback" | "timeout",
   overrides: Partial<FactsExtractorRunnerOptions> = {},
 ): FactsExtractorRunnerOptions {
-  const fallbackModels: readonly SenpiModelPort[] = [
-    { provider: "extension-only", id: "primary" },
-    AVAILABLE_MODEL,
-  ]
-  const models = mode === "model-fallback" ? fallbackModels : [AVAILABLE_MODEL]
-  const senpiLauncher = join(root, "fake-senpi.mjs")
-  writeFileSync(
-    senpiLauncher,
-    `process.stdout.write(${JSON.stringify(`${models.map((candidate) => `${candidate.provider}/${candidate.id}`).join("\n")}\n`)})\n`,
-    "utf8",
-  )
+  const models = [AVAILABLE_MODEL]
+  let inProcessAttempts = 0
   return {
     identity,
     queue,
@@ -107,24 +123,39 @@ export function runnerOptions(
       find: (provider, modelId) => models.find((candidate) =>
         provider === candidate.provider && modelId === candidate.id
       ),
+      getProviderAuth: () => undefined,
     }),
     deadlineMs: 10_000,
-    terminationGraceMs: 100,
-    supervisorPath: supervisorFixture,
-    senpiCommand: process.execPath,
-    senpiPrefixArgs: [senpiLauncher],
     // Fresh per launch, exactly like production `randomUUID`: a pinned batchId would hide the
     // failure-identity collision that pruned-name reuse used to cause.
     createBatchId: () => randomUUID(),
-    sandbox: (args) => ({
-      ...args,
-      command: process.execPath,
-      args: [
-        childFixture,
-        mode === "model-fallback"
-          ? args.args.includes("extension-only/primary") ? "model-not-found" : "fact"
-          : mode,
-      ],
+    createRunner: (): InProcessRunnerLike => ({
+      start: async (spec: ChildSpec): Promise<ChildHandle> => {
+        inProcessAttempts += 1
+        if (mode === "fail") throw new Error("facts child failed")
+        if (mode === "timeout") return await new Promise<ChildHandle>(() => undefined)
+        const tool = createFactsRecordTool({ extractionPath: join(spec.cwd, "extraction.jsonl") })
+        const payloadStart = spec.prompt.indexOf("\n\n")
+        const payload = JSON.parse(spec.prompt.slice(payloadStart + 2)) as { readonly entries: readonly unknown[] }
+        if (mode === "fact" || mode === "model-fallback") {
+          await tool.execute("fact-1", { scope: "project", text: `fixture consumed ${payload.entries.length} queue entries`, date: "2026-08-10" })
+        } else if (mode === "person") {
+          await tool.execute("fact-1", { scope: "person", person: { name: "Mina", aliases: ["Min"] }, text: "Mina prefers concise reviews.", date: "2026-08-10" })
+        } else if (mode === "malformed") {
+          await appendFile(join(spec.cwd, "extraction.jsonl"), '{"scope":"project","person":{"name":"Mina","aliases":[]},"text":"bad","date":"2026-08-10"}\n')
+        }
+        return {
+          task_id: spec.taskId,
+          sessionId: `session-${spec.taskId}`,
+          steer: async () => undefined,
+          followUp: async () => undefined,
+          abort: async () => undefined,
+          subscribe: () => () => undefined,
+          waitForIdle: async () => ({ status: "completed", finalResponse: "" }),
+          lastAssistantText: () => undefined,
+          dispose: async () => undefined,
+        }
+      },
     }),
     now: () => new Date("2026-08-10T12:00:00.000Z"),
     ...overrides,

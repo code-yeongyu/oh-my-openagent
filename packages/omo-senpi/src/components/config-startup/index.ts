@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { posix, win32 } from "node:path"
 
 import {
@@ -13,9 +14,10 @@ import {
   type ConfigMigrationDiscoveryFileSystem,
   type ConfigMigrationPathOperations,
 } from "@oh-my-opencode/omo-opencode/config-migration"
-
+import { DEVIN_SWE2_SERVED_LANES, isUnservedDevinSWE2Selector } from "@oh-my-opencode/model-core"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"
+import { createOpenCodeRoutingNoticePlan } from "./opencode-routing-notice"
 
 export type SenpiStartupMigrationOptions = {
   readonly backupTimestamp?: string
@@ -73,6 +75,8 @@ export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions):
     }
   }
 
+  const pathOperations = options.pathOperations ?? (options.platform === "win32" ? win32 : posix)
+  const environment = options.environment ?? process.env
   try {
     const batch = runMigrations({
       ...(options.clock === undefined ? {} : { clock: options.clock }),
@@ -81,15 +85,23 @@ export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions):
       ...(options.isProcessAlive === undefined ? {} : { isProcessAlive: options.isProcessAlive }),
       ...(options.onBoundary === undefined ? {} : { onBoundary: options.onBoundary }),
       ...(options.pid === undefined ? {} : { pid: options.pid }),
-      discover: () => createLegacyConfigMigrationPlans({
-        ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
-        cwd: options.cwd,
-        ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
-        environment: options.environment ?? process.env,
-        homeDir,
-        pathOperations: options.pathOperations ?? (options.platform === "win32" ? win32 : posix),
-        ...(options.platform === undefined ? {} : { platform: options.platform }),
-      }),
+      discover: () => [
+        ...createLegacyConfigMigrationPlans({
+          ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
+          cwd: options.cwd,
+          ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
+          environment,
+          homeDir,
+          pathOperations,
+          ...(options.platform === undefined ? {} : { platform: options.platform }),
+        }),
+        // Native-only: what it reports is what the native harness ignores.
+        createOpenCodeRoutingNoticePlan({
+          environment,
+          homeDir,
+          targetPath: userConfigPath(homeDir, pathOperations, options.fileSystem),
+        }),
+      ],
     })
     return {
       ...(batch.status === "locked" ? { error: "Configuration migration is already running" } : {}),
@@ -105,6 +117,19 @@ export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions):
       results: [],
     }
   }
+}
+
+// The file omo-config-core's loader reads as the user layer: omo.jsonc, else omo.json; the
+// unification plan creates omo.jsonc.
+function userConfigPath(
+  homeDir: string,
+  pathOperations: ConfigMigrationPathOperations,
+  fileSystem: MigrationFileSystem | undefined,
+): string {
+  const exists = fileSystem?.existsSync ?? existsSync
+  const jsonc = pathOperations.join(homeDir, ".omo", "omo.jsonc")
+  const json = pathOperations.join(homeDir, ".omo", "omo.json")
+  return exists(jsonc) || !exists(json) ? jsonc : json
 }
 
 export function createConfigStartupComponent(options: ConfigStartupComponentOptions = {}): OmoSenpiComponent {
@@ -128,27 +153,69 @@ export function createConfigStartupComponent(options: ConfigStartupComponentOpti
   }
 }
 
-function notificationMessages(
+export type StartupNotice = {
+  readonly message: string
+  readonly type: "info" | "warning"
+}
+
+export function notificationMessages(
   migration: SenpiStartupMigrationResult,
   config: SenpiOmoConfigResult,
-): readonly { readonly message: string; readonly type: "info" | "warning" }[] {
-  const messages: { message: string; type: "info" | "warning" }[] = []
-  if (migration.error !== undefined) messages.push({ message: `omo-senpi: configuration migration: ${migration.error}`, type: "warning" })
+): readonly StartupNotice[] {
+  const messages: StartupNotice[] = []
+  if (migration.error !== undefined) messages.push({ message: `OmO Native: configuration migration: ${migration.error}`, type: "warning" })
   else if (migration.migratedFrom.length > 0) messages.push({
-    message: `omo-senpi: migrated legacy configuration from ${migration.migratedFrom.join(", ")}`,
+    message: `OmO Native: migrated legacy configuration from ${migration.migratedFrom.join(", ")}`,
     type: "info",
   })
-  else if (migration.journalResumed) messages.push({ message: "omo-senpi: recovered an interrupted configuration migration", type: "info" })
+  else if (migration.journalResumed) messages.push({ message: "OmO Native: recovered an interrupted configuration migration", type: "info" })
   const migrationDiagnostics = migration.results.flatMap((result) => result.diagnostics)
   if (migrationDiagnostics.length > 0) messages.push({
-    message: `omo-senpi: configuration migration: ${migrationDiagnostics.join("; ")}`,
+    message: `OmO Native: configuration migration: ${migrationDiagnostics.join("; ")}`,
     type: "warning",
   })
   if (config.diagnostics.length > 0) messages.push({
-    message: `omo-senpi: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,
+    message: `OmO Native: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,
+    type: "warning",
+  })
+  const unserved = unservedDevinSelectors(config.config)
+  if (unserved.length > 0) messages.push({
+    message: `OmO Native: Devin does not serve ${unserved.map((entry) => `${entry.selector} (${entry.path})`).join(", ")}; SWE-2 runs as ${servedDevinLanes()}`,
     type: "warning",
   })
   return messages
+}
+
+type ConfiguredSelector = { readonly selector: string; readonly path: string }
+
+// A category or agent pinned to a Devin SWE-2 id Cascade does not serve resolves like any other
+// model and then fails every request with permission_denied; say so once at startup instead.
+function unservedDevinSelectors(config: SenpiOmoConfigResult["config"]): readonly ConfiguredSelector[] {
+  const selectors: ConfiguredSelector[] = []
+  for (const [section, entries] of [["categories", config.categories], ["agents", config.agents]] as const) {
+    for (const [name, entry] of Object.entries(entries ?? {})) {
+      if (entry === undefined) continue
+      const base = `${section}.${name}`
+      if (entry.model !== undefined) selectors.push({ selector: entry.model, path: `${base}.model` })
+      selectors.push(...listSelectors(entry.models, `${base}.models`))
+      if ("fallback_models" in entry) selectors.push(...listSelectors(entry.fallback_models, `${base}.fallback_models`))
+    }
+  }
+  return selectors.filter((entry) => isUnservedDevinSWE2Selector(entry.selector))
+}
+
+function listSelectors(value: unknown, path: string): readonly ConfiguredSelector[] {
+  if (typeof value === "string") return [{ selector: value, path }]
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item: unknown, index): readonly ConfiguredSelector[] => {
+    const selector = typeof item === "string" ? item : typeof item === "object" && item !== null ? Reflect.get(item, "model") : undefined
+    return typeof selector === "string" ? [{ selector, path: `${path}[${index}]` }] : []
+  })
+}
+
+function servedDevinLanes(): string {
+  const lanes = DEVIN_SWE2_SERVED_LANES.map((lane) => `devin/${lane}`)
+  return `${lanes.slice(0, -1).join(", ")} or ${lanes.at(-1)}`
 }
 
 function notificationUi(value: unknown): NotificationUi | undefined {

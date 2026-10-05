@@ -1,299 +1,492 @@
-# Oh My OpenAgent Web — Design System
+# OmO Web — Design System v3 ("Phosphor Ledger", spoken plainly)
 
-> **Extracted from existing code and rendered baseline evidence. Refreshed 2026-06-24.** This document is the implementation contract for the current site. The dark + cyan terminal/hacker identity is the brand and stays. This contract preserves the current rendered experience first; consolidation ideas are design debt unless a later PR explicitly changes the visual language.
+> **v3 delta (2026-09-13).** The v2 visual system below (ink + phosphor, cyan = live, hairlines, 0px panels, no motion library) stays in force. v3 changes the **voice** and the **reader**: the site now speaks to someone who is interested in tech, not fluent in it. Copy is benefit-first ("Your tool for real work. But it's an agent."), jargon lives behind a scroll-revealed "still curious?" fold, chapter numerals and host/edition tabs are gone, one install command ships everywhere, and Korean gets a proper gothic web font fallback plus line-break and rhythm rules from the design review. New §10 story primitives are the only additions to the component set.
 
-## 0. Implementation Contract
+> **Redesign contract. Written 2026-09-08 from runtime extraction of three reference sites, StyleGallery pattern contracts, the frontend skill's Layer A/B references, and three imagen concept drafts.** This document replaces the 2026-06-24 extraction contract. Every color, size, spacing value, motion value, and component the site renders must trace to a token or primitive named here. If a value is missing, add it here first, then use it.
 
-- CSS source of truth: `app/styles/design-system.css` owns the Tailwind entrypoint, theme mappings, root tokens, base rules, shared utilities, docs prose styles, and motion primitives. `app/globals.css` is a filesystem alias to that entry so Next/Tailwind continue to read the same single global stylesheet surface without an import-wrapper layer.
-- Component primitives: `components/ui/*` provide shadcn-style Button, Badge, Card, Input, Section, and Separator variants. New repeated UI patterns must use these primitives or document a new primitive here first.
-- Page surfaces: `app/_components/landing-page.tsx`, `components/landing/**`, `components/docs/docs-shell.tsx`, `components/nav-header.tsx`, and `components/footer.tsx` consume the contract.
-- Current PR intent: no redesign, no copy change, no interaction change. Extraction work must be pixel-identical to the baseline screenshots under `.omo/ultrawork/design-system-fidelity/evidence/baseline/screenshots/`.
-- Pre-existing accepted debt for this extraction: `/docs` at 390x844 has horizontal overflow in the baseline (`scrollWidth - innerWidth = 538`). Do not worsen it in this PR; fixing it requires a docs-shell layout PR with fresh design review.
+## 0. Research Log
+
+One line per lane. A lane with no line did not run.
+
+- **Reference site — omp.sh** (runtime `getComputedStyle`, 330 elements × 3 viewports, 17 hover targets driven): single-viewport poster console; substrate `#09090b`, hairlines `rgba(255,255,255,0.08)`, **0px radii everywhere**, Geist 500 display `clamp(2.4rem, 1.2rem + 3.8vw, 4.4rem)` / lh 0.98 / tracking -0.03em, uppercase Geist captions 10–12px tracking 2.2–2.6px, the install command bar IS the CTA (accent prompt cell + mono command + fixed-width COPY), nav underline `scaleX(0→1)` 320ms `cubic-bezier(0.2,0.8,0.2,1)`, color transitions 150ms `cubic-bezier(0.4,0,0.2,1)`, scrolled header `black/72% + blur(12px)`; focal object is a procedural Canvas2D grain horizon (not 3D). Report: `/tmp/omo-web-research/omp-sh/report.md`, tokens `tokens.json`, screenshots 375/768/1280 + hero.
+- **Reference site — factory.ai** (runtime extraction, 12→4 track grid measured): pale industrial paper inverted for us; 1440px frame, 24/16px gutters, 3px controls vs 6–12px panels, `box-shadow: none` everywhere, header diffusion `backdrop-filter: blur(64px) saturate(1.5)` without a hard glass card, primary CTA inverts over 150ms, section separation by generous margins (96–160px), one real product demonstration (video) instead of decorative WebGL, headline text-resolution reveal with immediately readable fallback. Report: `/tmp/omo-web-research/factory-ai/report.md`.
+- **Reference site — herdr.dev** (runtime extraction, 28 baseline colors): ink `#17171a`, 1440px frame with 1px side rules, gutters 16/20/34px, Archivo 900 display with heavy negative tracking, lavender single accent used sparingly, **stats strip** (large tabular numerals + 10px mono uppercase labels, 4 → 2×2 columns), feature rows as an **index / explanation / evidence ledger** (130 + 1fr + 1fr at 1280, evidence stacks below at ≤768), row hover tint accent/4%, 120ms feature hovers, 2200ms status-dot pulse, interactive HTML terminal as the product visual. Report: `/tmp/omo-web-research/herdr-dev/report.md`. (herdr shows a "backed by" investor line — explicitly NOT copied; see §12.)
+- **StyleGallery spatial patterns** (curl, raw.githubusercontent.com/changeroa/StyleGallery): adopted `sticky-header` (nav; no internal scroll), `cover` (hero: `grid-template-rows: auto 1fr auto; min-block-size: 100dvh`), `grid-wrapper` (page frame: `1fr minmax(0, 90rem) 1fr` with full-bleed breakout tracks), `sticky-aside` (mass-ulw section: sticky title column beside the terminal), `reel` (reviews: horizontal scroll container OWNS scroll), `content-limiter` (manifesto prose 68ch), `fixed-sidenav-shell` (docs: `16rem minmax(0,1fr)` grid, `min-block-size: 0`, **`<main>` owns the scroll**). Structural decisions restated in our words; upstream prose not copied.
+- **Embedded refs**: shortlisted `linear.app`, `warp`, `vercel`; picked **Layer A `gpt-tasteskill`** (AIDA chapters, 2-line hero rule, gapless bento, massive section spacing; GSAP replaced by CSS scroll-driven animation + IntersectionObserver per §6) + **Layer B `linear.app`** (luminance ladder, `rgba(255,255,255,0.05–0.08)` borders, single chromatic accent, weight ~500 UI text) with `warp` for the mono uppercase editorial labels. `redesign-skill` audit list applied to the existing UI (findings in §11).
+- **Imagen concept drafts** (gpt-image-2 via Quotio, 1536×1024): `/tmp/omo-web-research/concepts/a-centered-graph.png`, `b-editorial-split.png`, `c-canvas-bottom-left.png` → **picked B (editorial split)** as the hero reference-fidelity contract: left text column (eyebrow → 2-line display → tagline → command bar → primary + text link), right two-thirds a lit DAG of icosahedral nodes in three waves with a numbered wave rail. A contributes the glass command pill; C contributes pulses travelling along edges.
+- **Prior art (own)**: `planet-simulator/src/components/asteroid/Asteroid3D.tsx` — R3F scene with IntersectionObserver defer, WebGL probe + static image fallback, `prefers-reduced-motion` gate, `dpr=[1,2]`, Suspense SVG fallback; LHCI 100/100/100/100 mobile asserts; size-limit budgets. Adopted and tightened in §9.
+- **Lazyweb**: skipped — the three user-supplied live references already cover real shipped agent-tool landing pages; recorded as intentional.
+
+- **Motion study (2026-09-27)** — a public motion-design prompt template (one shape never cut; springs as closed-form step responses summed per retarget; the leading and trailing edges on different springs; blur content swap with separate enter/exit timing; a cursor driving every change; frames as a pure function of time; no `will-change` on scaled text) plus beui.dev `dynamic-island`, `action-swap` and `tabs` sources read via the curl recipe. It produced MorphStage (§5) and the §6 spring tokens. Ink + cyan, 0 radius and the transform-only rule are unchanged.
 
 ## 1. Atmosphere & Identity
 
-A senior engineer's command center, glowing in the dark. Surfaces are near-black with a faint cool undertone; cyan punctuation marks the live wires of the system — install commands, primary CTAs, terminal cursors, hover affordances. Density is purposeful: stats bar, code blocks, agent cards. Whitespace exists but is _engineered_, never decorative.
+An operations ledger read at night. The whole site is one framed sheet of ink ruled by hairlines; content lives in rows and cells, never in floating cards. Everything is still until it is _live_: the only light on the page comes from wires that carry work — the edges of the agent graph, the prompt glyph in the install bar, the active node, the cursor in the terminal — and that light is OmO cyan with a white-hot core.
 
-**Signature**: cyan-on-near-black with razor-thin borders and a single hero photograph receding into the canvas — like a screenshot of `htop` lit by a moon. The terminal mockup in the Ultrawork section is the visual anchor: this product _is_ the terminal, not a marketing site about the terminal.
+**Signature material: ink + phosphor.** Flat ink surfaces step by luminance (`ink-0 → ink-3`), separated by 1px `line` hairlines with square corners. Cyan appears only where something is running, selectable, or verified. No gradients as decoration, no purple, no drop shadows.
+
+**The memorable moment:** the hero's agent graph lights up wave by wave — the orchestrator, then the planners, then the workers — and you can grab it and orbit it. Two sections later the same wave grammar plays inside a terminal as `mass ulw` runs. The product's idea (a DAG of specialised agents scheduled in waves and verified at the end) is understood before a paragraph is read.
 
 ## 2. Color
 
-### Palette
+### Palette (dark only — the site has no light theme)
 
-| Role                    | Token                     | Hex                       | Usage                                         |
-| ----------------------- | ------------------------- | ------------------------- | --------------------------------------------- |
-| Surface / 0             | `--surface-0`             | `#0a0a0a`                 | Page background                               |
-| Surface / 1             | `--surface-1`             | `rgba(255,255,255,0.018)` | Subtle section/card tint                      |
-| Surface / 2             | `--surface-2`             | `rgba(255,255,255,0.035)` | Default elevated tint                         |
-| Surface / 3             | `--surface-3`             | `rgba(255,255,255,0.055)` | Hover/elevated tint                           |
-| Text / primary          | `--text-primary`          | `#ededed`                 | Headlines, body emphasis                      |
-| Text / secondary        | `--text-secondary`        | `#a1a1a1`                 | Body copy (current `--muted-foreground`)      |
-| Text / tertiary         | `--text-tertiary`         | `#71717a`                 | Captions, metadata (zinc-500)                 |
-| Border / default        | `--border-default`        | `#262626`                 | Card borders, dividers (current `--border`)   |
-| Border / subtle         | `--border-subtle`         | `rgba(255,255,255,0.06)`  | Whisper-thin separators (used in nav/footer)  |
-| Accent / primary        | `--accent-primary`        | `#00d4ff`                 | Brand cyan — CTAs, links, focus, terminal `$` |
-| Accent / primary-soft   | `--accent-primary-soft`   | `rgba(0,212,255,0.10)`    | Cyan backgrounds, glow tints                  |
-| Accent / primary-border | `--accent-primary-border` | `rgba(0,212,255,0.20)`    | Cyan-tinted borders on badges                 |
-| Accent / secondary      | legacy `--secondary`      | `#7c3aed`                 | Reserved — currently overused (see below)     |
-| Status / success        | `--status-success`        | `#10b981`                 | Success indicators only                       |
-| Status / warning        | `--status-warning`        | `#f59e0b`                 | Cautions only                                 |
-| Status / error          | `--status-error`          | `#ef4444`                 | Errors / destructive only                     |
-| Code / bg               | `--code-bg`               | `#1e1e2e`                 | Code block backgrounds                        |
-| Code / fg               | `--code-text`             | `#cdd6f4`                 | Code text                                     |
+| Role          | Token           | Value                    | Usage                                                                                                                 |
+| ------------- | --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Ink / 0       | `--ink-0`       | `#09090b`                | Page substrate                                                                                                        |
+| Ink / 1       | `--ink-1`       | `#0e0e11`                | Ledger rows, section bands, command bar                                                                               |
+| Ink / 2       | `--ink-2`       | `#14141a`                | Hovered row / tile, terminal chrome                                                                                   |
+| Ink / 3       | `--ink-3`       | `#1b1b22`                | Popover, mobile nav sheet, terminal sidebar                                                                           |
+| Text / hi     | `--text-hi`     | `#f5f5f7`                | Display, H1–H3, numerals, primary UI                                                                                  |
+| Text / mid    | `--text-mid`    | `#c3c4c9`                | Body copy, nav links                                                                                                  |
+| Text / lo     | `--text-lo`     | `#8b8c95`                | Captions, metadata, eyebrows                                                                                          |
+| Text / faint  | `--text-faint`  | `#55565e`                | Wave rail numerals, disabled, quiet indices — decorative only (2.7:1), never for text that carries meaning on its own |
+| Line / strong | `--line-strong` | `rgba(255,255,255,0.12)` | Focused cell, active tab underline base                                                                               |
+| Line          | `--line`        | `rgba(255,255,255,0.08)` | Frame, rows, dividers (the default hairline)                                                                          |
+| Line / faint  | `--line-faint`  | `rgba(255,255,255,0.04)` | Dot grid, quiet cell separators                                                                                       |
+| Accent        | `--accent`      | `#00d4ff`                | Prompt glyph, live wires, active state, links on hover, primary CTA fill                                              |
+| Accent / hot  | `--accent-hot`  | `#e6fdff`                | White-hot node core, cursor block, verified flash                                                                     |
+| Accent / dim  | `--accent-dim`  | `#0ea5c4`                | Primary CTA hover fill, edge idle color in the 3D scene                                                               |
+| Accent / 4    | `--accent-4`    | `rgba(0,212,255,0.04)`   | Row hover tint                                                                                                        |
+| Accent / 8    | `--accent-8`    | `rgba(0,212,255,0.08)`   | Selected tile fill, glass chip fill                                                                                   |
+| Accent / 16   | `--accent-16`   | `rgba(0,212,255,0.16)`   | Node halo, glow wash center                                                                                           |
+| Accent / 32   | `--accent-32`   | `rgba(0,212,255,0.32)`   | 1px inset selection ring, focus ring                                                                                  |
+| Status / ok   | `--status-ok`   | `#10b981`                | Done dots, health                                                                                                     |
+| Status / busy | `--status-busy` | `#f5c451`                | Working dots (terminal, team grid)                                                                                    |
+| Status / err  | `--status-err`  | `#ef4444`                | Blocked / failed dots only                                                                                            |
+| Code / bg     | `--code-bg`     | `#0b0b0e`                | Code blocks, terminal body                                                                                            |
+| Code / fg     | `--code-fg`     | `#cdd6f4`                | Code text                                                                                                             |
 
-### Rules
+### Ramp rules
 
-- **Cyan is the only chromatic brand color.** Every interactive element should resolve through it.
-- **Surface hierarchy via luminance, not borders where possible.** `0a0a0a` → `111111` → `1a1a1a` is the depth stack. Borders are the punctuation, not the wall.
-- **Never use pure `#000000`** — `#0a0a0a` or `#08090a` is the floor. Pure black is too harsh and signals "AI dark mode".
-- **Never use pure `#ffffff`** for text — `#ededed` is the ceiling. Pure white screams.
-- **No purple/blue "AI gradient"** decoratively. The `--accent-secondary` purple (`#7c3aed`) exists as a token but should be reserved for genuine semantic moments (Sisyphus / agent identity), not as eye candy on CTAs or backgrounds.
-
-### Inconsistencies to consolidate (design debt, not this extraction)
-
-The current landing page assigns a distinct accent color _per section_ — purple, orange, pink, fuchsia, teal, indigo, amber, green, blue. Because this PR must preserve the current rendered baseline, these colors remain in component class names for now. Refinement target:
-
-- **Cyan**: Primary CTA, install command, hero, CTA section, default link/hover.
-- **Legacy `--secondary` / future `--accent-secondary` (single muted indigo `#7c3aed`)**: Agent identity (Sisyphus, sub-agents) — when an agent name appears, it gets the secondary accent badge. Not the whole card.
-- **Status colors**: ONLY for actual status (success/warning/error). NOT for decorative section accents.
-- **Everything else**: monochrome (white opacity ladder for surfaces, zinc/neutral for text).
-
-Target for a future visual-refinement PR: 2 chromatic colors total (cyan + indigo), all per-section colors removed. This extraction PR does not apply that visual change because it must preserve the current rendered baseline exactly.
+- **Cyan is the only chromatic brand color** and it always means _live_: running, selectable, focused, verified. Decorative cyan is a defect. The ramp above is the only way cyan appears; never re-tint `#00d4ff` at an opacity that is not in the table.
+- **Status colors mean status.** Green/amber/red appear as 8px dots or 1px indicators next to a state label, never as fills or headings.
+- **Depth is luminance, not shadow.** `ink-0 → ink-3` is the elevation stack. `box-shadow` is banned except the two glow recipes in §7.
+- **No pure `#000000` or `#ffffff`.** Floor `#09090b`, ceiling `#f5f5f7`.
+- **Per-section accent colors are removed** (the violet/orange/pink/fuchsia/teal/indigo/amber/green/blue classes of the previous site). Agent identity is carried by the icon, the mono label, and position in the graph — not by a color.
 
 ## 3. Typography
 
-### Font Stack
+### Stack
 
-- **Primary sans**: `var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif` (Geist via `next/font/sans`)
-- **Mono**: `var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace` (Geist Mono via `next/font/mono`)
-- **No serif**: Banned for this product — technical dev tool, not editorial.
-
-`next/font` is used → fonts are self-hosted, `display: swap` is the default, CLS is zero.
+- Sans: `var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif` (Geist via `next/font`, self-hosted, `display: swap`).
+- Sans / ko (v3): `var(--font-geist-sans), "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", …` — Latin glyphs stay Geist, Hangul falls back to Pretendard (dynamic-subset web font linked from the root layout `<head>` with a preconnect; a CSS `@import` is dropped by the browser once Tailwind emits `@layer` first). Gothic only; never a serif or brush face for Korean.
+- Mono: `var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace`.
+- No serif. No Inter. Two Latin families only.
 
 ### Scale
 
-| Level      | Class                  | Size    | Weight | Line | Tracking            | Usage                           |
-| ---------- | ---------------------- | ------- | ------ | ---- | ------------------- | ------------------------------- |
-| Display XL | `text-7xl md:text-8xl` | 72→96px | 700    | 1.00 | `-0.04em` (tighter) | Reserved — manifesto only       |
-| Display    | `text-5xl md:text-7xl` | 48→72px | 700    | 1.05 | `-0.03em`           | Hero H1                         |
-| H1         | `text-4xl md:text-5xl` | 36→48px | 700    | 1.10 | `-0.025em`          | Section headlines               |
-| H2         | `text-3xl md:text-4xl` | 30→36px | 700    | 1.15 | `-0.02em`           | Sub-section headlines           |
-| H3         | `text-2xl md:text-3xl` | 24→30px | 600    | 1.25 | `-0.015em`          | Card titles                     |
-| H4         | `text-xl md:text-2xl`  | 20→24px | 600    | 1.30 | `-0.01em`           | Subheads                        |
-| Lead       | `text-xl md:text-2xl`  | 20→24px | 300    | 1.50 | normal              | Hero subtitle                   |
-| Body L     | `text-lg`              | 18px    | 400    | 1.60 | normal              | Long-form paragraphs            |
-| Body       | `text-base`            | 16px    | 400    | 1.60 | normal              | Default                         |
-| Body S     | `text-sm`              | 14px    | 400    | 1.55 | normal              | Card descriptions               |
-| Caption    | `text-xs`              | 12px    | 500    | 1.45 | `0.02em`            | Metadata, badges                |
-| Overline   | `text-xs uppercase`    | 12px    | 600    | 1.40 | `0.10em`            | Section labels (PHASE 1, BADGE) |
-| Mono       | `font-mono text-sm`    | 14px    | 400    | 1.50 | normal              | Install command, code labels    |
+| Level      | CSS                                       | Weight | Line | Tracking                                      | Usage                                                              |
+| ---------- | ----------------------------------------- | ------ | ---- | --------------------------------------------- | ------------------------------------------------------------------ |
+| Display    | `clamp(2.5rem, 1.35rem + 4.4vw, 5.25rem)` | 500    | 0.98 | -0.03em                                       | Hero H1 (2 lines max, `text-wrap: balance`, container `max-w-6xl`) |
+| Title      | `clamp(2rem, 1.3rem + 2.4vw, 3.25rem)`    | 500    | 1.04 | -0.025em                                      | Manifesto H2, page-level titles                                    |
+| Feature    | `clamp(2rem, 1.5rem + 1.6vw, 2.5rem)`     | 500    | 1.1  | -0.025em                                      | Landing section headlines via `SectionHeader` (§15)                |
+| Heading    | `1.5rem`                                  | 500    | 1.2  | -0.015em                                      | Ledger row titles, bento card titles                               |
+| Subheading | `1.125rem`                                | 500    | 1.35 | -0.01em                                       | Agent names, terminal pane titles                                  |
+| Numeral    | `clamp(2rem, 1.4rem + 2vw, 2.75rem)`      | 500    | 1.0  | -0.03em, `font-variant-numeric: tabular-nums` | Proof strip                                                        |
+| Lead       | `1.125rem` / `1.25rem` ≥ md               | 400    | 1.6  | 0                                             | Hero tagline, section intros                                       |
+| Body       | `1rem`                                    | 400    | 1.6  | 0                                             | Default                                                            |
+| Body / sm  | `0.875rem`                                | 400    | 1.55 | 0                                             | Row descriptions, review text                                      |
+| Eyebrow    | `0.6875rem` mono, uppercase               | 500    | 1.4  | 0.2em                                         | Section labels with meaning ("PRIMARY ORCHESTRATOR"), wave rail    |
+| Meta       | `0.75rem` mono                            | 400    | 1.45 | 0.04em                                        | Model chips, timestamps, footer                                    |
+| Command    | `0.875rem` mono (`0.8125rem` < sm)        | 400    | 1.55 | -0.01em                                       | Install bar, terminal body                                         |
 
 ### Rules
 
-- **Body never below 14px.** Captions at 12px must be uppercase or tabular.
-- **Display sizes always run negative tracking.** From `-0.04em` at 72px down to `-0.015em` at 24px.
-- **Geist 700 is the workhorse weight** for headlines. 600 for sub-heads, 400 reading. Avoid 800/900 — Geist's heaviest weights are too thick at small sizes.
-- **CJK locales** (ko/ja/zh) reset `letter-spacing: normal`, use `text-wrap: pretty`, and apply `word-break: keep-all` (Korean) or `word-break: normal; line-break: strict` (Japanese/Chinese). Already in `globals.css:183-219`.
-- **No serif. No Inter.** Geist Sans + Geist Mono only.
+- Display and Title always carry negative tracking; body never does.
+- Body never below 14px; the 11px eyebrow is uppercase mono with 0.2em tracking, which is the readability floor for that role.
+- Eyebrows are content labels, not chapter numerals. "SECTION 01" / "ABOUT" style meta-labels are banned; v3 removes the numbered wave rail too — no numeral labels anywhere on the landing page.
+- CJK locales keep the existing base-layer rules: `letter-spacing: normal` on headings, `text-wrap: pretty`, `word-break: keep-all` (ko), `line-break: strict` (ja/zh). Display size for CJK drops one clamp step (`clamp(2.25rem, 1.25rem + 3.6vw, 4.5rem)`) so two lines still hold.
+- Korean (v3, from the design review): H1/H2 weight 700 so the message carries; story prose uses `.prose-cjk` (line-height 1.8, 1.25em paragraph gap) so lines and paragraphs read as separate; a particle or ending never starts a line — keep `mass ulw를` together and let the following word wrap instead. Section boundaries are made by size and weight, not by more hairlines.
 
 ## 4. Spacing & Layout
 
-### Base Unit
+### Base unit: 4px
 
-4px grid (Tailwind default). All multiples derived from `--space-1 = 4px`.
+| Token        | Value | Usage                                           |
+| ------------ | ----- | ----------------------------------------------- |
+| `--space-1`  | 4px   | icon-to-label                                   |
+| `--space-2`  | 8px   | inline groups, dot-to-label                     |
+| `--space-3`  | 12px  | chip padding, cell padding (compact)            |
+| `--space-4`  | 16px  | mobile gutter, cell padding                     |
+| `--space-5`  | 20px  | tablet gutter                                   |
+| `--space-6`  | 24px  | row padding, bento card padding                 |
+| `--space-8`  | 32px  | desktop gutter, command bar height rhythm       |
+| `--space-12` | 48px  | block gap inside a section                      |
+| `--space-16` | 64px  | section padding (mobile)                        |
+| `--space-24` | 96px  | section padding (desktop)                       |
+| `--space-40` | 160px | hero → proof strip separation, final CTA margin |
 
-| Token        | Tailwind | Value | Usage                                  |
-| ------------ | -------- | ----- | -------------------------------------- |
-| `--space-1`  | `p-1`    | 4px   | Icon-to-label                          |
-| `--space-2`  | `p-2`    | 8px   | List items, inline groups              |
-| `--space-3`  | `p-3`    | 12px  | Form padding                           |
-| `--space-4`  | `p-4`    | 16px  | Card padding (compact)                 |
-| `--space-6`  | `p-6`    | 24px  | Card padding (default)                 |
-| `--space-8`  | `p-8`    | 32px  | Card padding (featured)                |
-| `--space-10` | `p-10`   | 40px  | Section inner                          |
-| `--space-12` | `p-12`   | 48px  | Hero vertical                          |
-| `--space-16` | `p-16`   | 64px  | Section vertical                       |
-| `--space-24` | `py-24`  | 96px  | Major section breaks (current default) |
-| `--space-32` | `py-32`  | 128px | Hero top padding                       |
+### Frame and grid
 
-### Grid
-
-- Max content width: `container mx-auto` resolves to `max-w-7xl` (1280px). Hero/manifesto use `max-w-4xl` (896px) or `max-w-5xl` (1024px) for typographic density.
-- Breakpoints: Tailwind defaults — sm 640, md 768, lg 1024, xl 1280, 2xl 1536.
-- Padding: `px-4 md:px-6` on every container — never `px-8` on mobile (cramped).
+- **Frame** (`grid-wrapper`): `grid-template-columns: 1fr minmax(0, 90rem) 1fr`; content sits in the center track (max 1440px) and is bounded by 1px `--line` side rules at ≥ lg; full-bleed sections (hero glow, CTA band) span all three tracks.
+- Gutters: 16px (< sm) → 20px (sm–lg) → 32px (≥ lg). Never `px-8` on mobile.
+- Inner grid: 12 tracks / 24px gap at ≥ lg; 4 tracks / 16px gap below.
+- Breakpoints: Tailwind defaults (sm 640, md 768, lg 1024, xl 1280, 2xl 1536). The hero switches from stacked to editorial split at **lg**.
+- Section rhythm: `py-16 lg:py-24`; the hero → proof strip and reviews → CTA gaps use `--space-40`. Sections are chapters; do not cramp.
+- Hero: `cover` pattern, `min-h-[100dvh]` (never `h-screen`), `grid-template-rows: auto 1fr auto` with nav / content / proof-strip anchor.
+- Docs shell: `fixed-sidenav-shell` — `grid-template-columns: 16rem minmax(0, 1fr)`, `min-block-size: 0` on the grid and both children, `<main>` is the scroll owner (`overflow: auto`), sidebar sticky inside its column. On < lg the sidebar collapses into a top disclosure; `<main>` keeps `min-inline-size: 0` and prose gets `overflow-wrap: anywhere`, code blocks `overflow-x: auto` — this fixes the recorded 390px horizontal overflow debt instead of carrying it.
+- Manifesto: `content-limiter` at 68ch for prose; section breaks are ruled by `--line`, not by background swaps. The 2026-09-14 text (`/manifesto`) is read, not scanned: title (Display) → two-line subtitle (Title, `--text-mid`) → byline in Meta mono (`author · date`) → series note (Body/sm italic) → four chapters whose every paragraph is its own `lit-read` block in reveal mode (§10: a scroll-driven window reveal moves a bright edge down the block — everything above the edge stays fully lit, words near the edge carry the emphasis, and words below the edge rest crisp at the unread floor — so a whole screenful is readable and the reveal never gates reading on scroll) at Lead+1 (`text-xl` / `text-2xl` ≥ md, lh 1.7, `.prose-cjk`), `space-y-8` between paragraphs, `space-y-10` under the chapter Title → closing lead as one more reading block, `just ulw ulw` in mono Display, the CTA button, and a Body/sm footnote ruled by `--line` that links the archive. The January 2026 text lives at `/manifesto/2026-01` unchanged in look, under a ruled `ink-1` banner (`archive-banner.tsx`: Eyebrow `Old version · date`, one Body line on what it argued, link back).
 
 ### Rules
 
-- **No `h-screen`.** Always `min-h-[100dvh]` — current `min-h-screen` and `min-h-[90vh]` should migrate to `dvh` for iOS Safari stability.
-- **No flexbox percentage math.** CSS Grid for multi-column.
-- **Container** wraps every section content. No edge-bleed except hero background image.
-- **3-column equal card grids** for _features_ are banned. The current Reviews and Architecture sections use 3-column — acceptable for testimonial/principle tiles where uniformity is the point. The Hephaestus 5-column step row is also acceptable (sequential numbered steps).
+- Grid for multi-column; no flexbox percentage math.
+- Radius scale: **0px** for panels, rows, cards, terminals; **2px** for buttons, chips, inputs; **50%** for status dots only. The work-media and message exceptions in §15 do not change this default.
+- Cards exist only as bento cells inside a ruled grid (agents). No free-floating cards with borders + shadows.
 
-## 5. Components
+## 5. Components (primitives + states)
 
-### Hero
+All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or `components/ledger/*` (new). Every state below must be visible in the primitive showcase route (`/design` in dev builds, excluded from the sitemap) at 375/768/1280 before any product screen uses it.
 
-- **Structure**: `<section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden pt-16">` with absolute-positioned background image (decorative, ~30% opacity) and gradient overlay.
-- **Background**: `hero.webp` preloaded `fetchPriority="low"` so the headline is the LCP. Image fades in via CSS keyframe over 600ms, respects `prefers-reduced-motion`.
-- **Variants**: Landing hero (centered), manifesto hero (centered with stronger gradient).
-- **Spacing**: `gap-8` between stack items, max-width `max-w-3xl` for headline.
-- **Motion**: CSS-only fade-in on the background.
+### Frame (`components/ledger/frame.tsx`)
 
-### Button (shadcn-based)
+- `grid-wrapper` implementation; renders the two side rules at ≥ lg. Props: `bleed?: boolean` for full-bleed children.
 
-- **Structure**: cva variants `default | secondary | ghost | outline | link | destructive` × sizes `sm | default | lg | icon`.
-- **Primary CTA**: `bg-cyan-500 text-black hover:bg-cyan-600` — black-on-cyan reads as a primary "system action".
-- **Outline**: `border-zinc-700 text-white hover:bg-zinc-800` — secondary.
-- **States**: default, hover (color shift), focus-visible (`ring-1 ring-ring`), disabled (`pointer-events-none opacity-50`). Active translation is not part of the current implementation.
-- **Radius**: 6px (`rounded-md`).
-- **Primitive sizes**: lg = `h-10 px-8`, default = `h-9 px-4 py-2`, sm = `h-8 px-3 text-xs`, icon = `h-9 w-9`.
-- **Hero/CTA overrides**: primary hero buttons add `h-12 px-8 text-lg font-bold` and outline hero buttons add `h-12 px-8 text-lg`.
+### Nav (`components/nav-header.tsx`)
 
-### Card (shadcn-based)
+- Sticky (`sticky-header`), height 60px, `--ink-0/72%` + `backdrop-filter: blur(12px)` after `scrollY > 24px` (transparent before), bottom hairline `--line`.
+- Left: OmO mark (24px SVG from `.github/assets/omo-icon-light.svg` re-exported to `public/brand/omo-mark.svg`) + wordmark `OmO` (Geist 500 15px, -0.02em). The brand is `OmO` on every surface (nav, footer, titles, OG, JSON-LD); the old long-form name is never rendered.
+- Center/right: links `Features · Docs · Manifesto` in `--text-mid` mono 12px uppercase 0.12em; hover → `--text-hi` with a 1px underline growing `scaleX(0→1)` 320ms.
+- Right: GitHub chip (mono `★ 68.8k` live count, `--ink-1` fill, `--line` border) and primary button `Install` (sm size).
+- Mobile: hamburger 44×44; sheet `--ink-3` with `--line` top rule; items 44px tall.
+- States: default, scrolled, open (mobile), link hover/focus-visible (2px `--accent-32` outline offset 2px), active route (underline visible at scaleX(1), `--text-hi`).
 
-- **Structure**: `Card / CardHeader / CardTitle / CardDescription / CardContent`.
-- **Background**: primitive default is `bg-card`; landing sections commonly override with `bg-zinc-900/30`, `bg-black/40`, or related white-alpha tints. New shared surfaces should map to `--surface-1/2/3`.
-- **Border**: primitive default is `border`; landing sections commonly override with `border-zinc-800`, `border-white/10`, and `border-border`. New shared surfaces should map to `--border-default` or `--border-subtle`.
-- **Radius**: primitive default is 12px (`rounded-xl`); section-local cards may use `rounded-lg`, `rounded-xl`, or `rounded-3xl` where currently rendered.
-- **Shadow**: primitive default includes Tailwind `shadow`; many landing card usages visually rely on border + translucent surface more than strong shadows. Do not remove the primitive shadow in this extraction.
-- **Hover**: Optional border-color shift to `border-cyan-500/30` for interactive cards.
-- **States**: default, hover (border lifts), focus-within (cyan border).
+### Button (`components/ui/button.tsx`)
 
-### Badge
+- Variants: `primary` (fill `--accent`, text `#09090b`, hover fill `--accent-dim`, active `translateY(1px)`), `secondary` (fill `--ink-1`, border `--line-strong`, text `--text-hi`, hover border `--accent-32` + text `--accent`), `ghost` (text `--text-mid`, hover `--text-hi`), `link` (mono uppercase 12px with arrow, underline scaleX on hover).
+- Sizes: sm `h-9 px-3 text-sm`, md `h-11 px-5 text-sm`, lg `h-12 px-6 text-base`. Radius 2px. Focus-visible: 2px `--accent-32` outline, offset 2px. Disabled: opacity .5, no pointer.
+- Transitions: color/background/border 150ms `cubic-bezier(0.4,0,0.2,1)`; transform 150ms.
 
-- **Structure**: cva variants `default | secondary | outline | destructive`.
-- **Primary**: `border-cyan-500/20 bg-cyan-500/10 text-cyan-400` — cyan-tinted pill.
-- **Outline**: `border-zinc-700 text-zinc-400` — neutral.
-- **Radius**: 9999px (`rounded-full`) for status pills, `rounded-md` (6px) for badges.
+### CommandBar (`components/landing/install-command.tsx`)
 
-### Install Command
+- The primary CTA of the site (omp.sh grammar). Row: prompt cell (40px wide, `--accent` `$`/`>` glyph on `--ink-2`), mono command in `--text-hi` on `--ink-1`, fixed-width COPY cell (mono uppercase 11px, `--text-lo` → `--text-hi` on hover). A click grows an `--accent-8` wash across the cell (`scaleX 0 → 1` on `--ease-spring`), blur-swaps COPY out (`--dur-swap-out`, blur `--swap-blur`) and a check (springing `scale .4 → 1`) + "COPIED" in (`--dur-swap-in`) in `--accent` for 2s. An `aria-live=polite` status announces the copy. The cell width never changes. 1px `--line` border, 0px radius, height 48px; on < sm the command scrolls horizontally inside the cell (no wrap) and COPY stays reachable. The command cell is `w-0 flex-1`, so a long command never widens the column around the bar.
+- The prompt glyph names the shell: `$` (sh), `PS>` (PowerShell), `>` (CMD). CommandBars on the site only appear inside InstallTabs.
 
-- **Structure**: `<div className="relative rounded-lg border bg-black/50 backdrop-blur-sm p-4 font-mono">` with copy button.
-- **States**: default (copy icon), copied (check icon, 2s timeout).
-- **Glow**: `shadow-2xl shadow-cyan-500/10` — restrained.
+### InstallTabs (`components/landing/install-tabs.tsx`)
 
-### Terminal Mockup (Ultrawork section)
+- Every install surface (hero, CTA, `/docs/install`) renders one CommandBar per shell under a tab row (2026-09-29, replaces v3's single `bun install -g omo-ai` bar): `macOS, Linux, WSL` → `curl -fsSL https://get.omo.dev/install.sh | bash`, `Windows PowerShell` → `irm … | iex`, `Windows CMD` → `powershell -ExecutionPolicy Bypass -c "irm … | iex"`. Commands live in `lib/install-targets.ts` (never in messages); below `sm` the labels drop the `Windows` prefix.
+- Tab row: eyebrow type, 44px tall, `--line` hairline under the row; the selected tab is `--text-hi` with a 1px `--accent` underline over that hairline, others `--text-lo` → `--text-hi` on hover (color only, `--dur-micro`). `role=tablist` with roving tabindex; arrow keys, Home and End select and focus (automatic activation).
+- Detection: `detectInstall()` reads `navigator.userAgentData.platform` first, then the UA string (plus `maxTouchPoints` for iPadOS asking for the desktop site). Windows → PowerShell; macOS, Linux, ChromeOS → sh; phones, tablets and unknown agents → sh plus the caption "run this on your computer".
+- No flash, no shift: a script in `<head>` (root layout) runs `detectInstall()` before the body is parsed and marks `<html>` with `data-install` (and `data-install-hint`); CSS picks the visible panel, the selected tab and the caption from it until the visitor picks a tab, which sets the widget's own `data-show`. Nothing inside the hero blocks the parser (an inline script there let Chrome paint a half-parsed hero, CLS 0.11). Panels are equal height, and both captions share one grid cell so the taller one reserves the space.
+- No JavaScript: a `<noscript>` style hides the tab row and shows all three panels, each under its label.
+- Glow: none by default; `focus-within` adds the inset ring `0 0 0 1px var(--accent-32)`.
 
-- **Structure**: rounded card with `chrome dots`, title bar, content with monospace text + animated typewriter for the command input.
-- **Border**: `border-zinc-800`.
-- **Background**: pure black to mimic terminal.
-- **Motion**: TerminalTypewriter via IntersectionObserver — once visible, types out at 40ms/char. No motion library dep — pure JS.
+### MorphStage (`components/landing/crafted/morph-stage.tsx`)
 
-### Nav
+- The crafted section's demonstration: one `--ink-1` cell with the dot grid. Inside it, one shape never cuts. Four 1px `--line-strong` edges and an `--ink-2` fill morph between the eight crafted states. Content swaps in the shape's center.
+- Geometry is a pure function of a virtual clock (`lib/morph-spring.ts`). Every edge is a sum of closed-form spring steps, one per target change, so a retarget mid-flight never snaps. The edge that grows in the direction of travel rides `--spring-lead` and the edge that follows rides `--spring-trail`, so the shape stretches before it settles.
+- Only transforms change per frame (translate + scaleX/scaleY on the edges and fill, translate on content and cursor). There is no `will-change`; text is never scaled.
+- Content swap: the outgoing scene leaves in `--dur-swap-out` with no blur, and the incoming one enters after 60ms over `--dur-swap-in` from `blur(--swap-blur) scale(.94)`. Separate enter and exit timing keeps text from overlapping.
+- Live moment: `monitor` (build finished), `reload` (config applied) and `computer` (a click landed in a native app while the reader's focus stayed put) turn the fill `--accent-8` and the edges `--accent-32`. Cyan appears only when something woke, was applied, or was done.
+- A scripted cursor (`--text-hi` arrow, `--ink-0` stroke) travels to the next state on a softer spring (ω 7.5, ζ .92), presses (scale .86 for 140ms), and the stage advances. Each state holds 2.8s.
+- The list beside it (`crafted-list`) is the control. Hover (mouse only), focus, or click on an item moves the stage there, hides the scripted cursor, and holds for 6s before autoplay resumes. The active item gets `aria-current`, an `--accent-4` wash and an `--accent` dot that springs to full size.
+- The clock advances only while the stage is ≥20% on screen and the tab is visible. Reduced motion: no frame loop and no cursor; the stage jumps to the selected state and shows its live moment statically.
 
-- **Structure**: sticky header `border-b border-white/10 bg-black/50 backdrop-blur-xl`.
-- **Brand**: `text-lg font-bold tracking-tight`.
-- **Links**: `text-sm font-medium text-zinc-400 hover:text-cyan-400 transition-colors`.
-- **Mobile**: hamburger toggles a max-height transition panel (`transition-[max-height,opacity] duration-200`).
+### Eyebrow (`components/ledger/eyebrow.tsx`)
 
-### Footer
+- Mono 11px uppercase 0.2em `--text-lo`; optional leading 24px hairline rule (`--line-strong`) like a ledger tab. Optional trailing status dot.
 
-- **Structure**: `border-t border-white/10 bg-black py-12`.
-- **Links**: matched nav style — zinc-400 → cyan-400 on hover.
+### ProofStrip (`components/landing/proof-strip.tsx`)
+
+- 4 cells (2×2 < lg) separated by `--line`; each cell: Numeral (live from `/api/stats`, tabular, `--text-hi`) + Eyebrow label + icon 14px. Hover: cell fill `--accent-4`. Numbers count up once on enter (600ms) — meaning: they are live; reduced motion renders the final value.
+
+### LedgerRow (`components/ledger/ledger-row.tsx`)
+
+- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-faint`. Used by the `/design` showcase; the landing page (v3) no longer renders ledger rows.
+- States: default, hover, focus-within (index turns `--accent`), `data-active` (left 2px `--accent` rule) when linked from the graph.
+
+### BentoCell (`components/ledger/bento-cell.tsx`)
+
+- Cells of the agents grid (`grid-flow-dense`, 1px gaps revealing `--line`, so the grid itself draws the rules). Cell fill `--ink-1`, hover `--ink-2` + icon `--accent`, spans: orchestrator 2×2, planner 2×1, others 1×1; mobile 1 column, tablet 2. Content: icon 20px (Lucide/Phosphor SVG), name (Subheading), role (Body/sm `--text-mid`), model chip (Meta mono on `--ink-2`, `--line` border, 2px radius).
+- Gapless verification: 4 columns × 4 rows desktop = 16 units: orchestrator 4 + planner 2 + 10 singles = 16. Tablet 2 columns: orchestrator 2×2, planner 2×1, 10 singles → 4 + 2 + 10 = 16 = 2 × 8 rows. No holes.
+
+### Terminal (`components/landing/terminal.tsx`)
+
+- HTML/CSS terminal (herdr grammar): chrome bar (`--ink-2`, three 8px status dots `--text-faint`, title mono meta), sidebar `--ink-3` at ≥ md listing waves, body `--code-bg` mono 13px `--code-fg`. Cursor block `--accent-hot` blinking 1s steps(1). Scroll-gated typewriter of `mass ulw …` at 40ms/char once 40% visible; then wave rows render one by one with status dots `--status-busy → --status-ok`; final line `verified ✓` flashes `--accent-hot` → `--text-hi`. Reduced motion: renders the final frame immediately.
+- Interactive: clicking a wave row highlights that wave's nodes in the hero graph if the hero is mounted (shared `useGraphFocus` store), otherwise it is inert but styled as `data-active`.
+
+### Reel (`components/ledger/reel.tsx`)
+
+- `display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 34%); overflow-x: auto; scroll-snap-type: x mandatory;` the reel owns the scroll; edge fade masks 32px; keyboard: cells are focusable, arrow keys scroll by one cell. Used by Reviews.
+
+### Chip (`components/ui/badge.tsx` → `Chip`)
+
+- Mono Meta text, `--ink-2` fill, `--line` border, 2px radius, 24px tall; `accent` variant fills `--accent-8` with `--accent` text (live/selected only).
+
+### DocsShell (`components/docs/docs-shell.tsx`)
+
+- `fixed-sidenav-shell` as in §4; sidebar: search input (Chip-styled, focus ring), section list with active item marked by a 2px `--accent` left rule; main: prose with `--line` ruled H2s, code blocks `--code-bg` with `overflow-x: auto`.
+
+### Footer (`components/footer.tsx`)
+
+- Top hairline, `py-12`, grid 2 → 4 columns: brand + copyright (mono meta: "© {year} Sisyphus Labs · Source-available under SUL-1.0"), Product (Docs, Manifesto, Releases), Community (GitHub, Discord, X @justsisyphus), Legal (Privacy, Terms). Links `--text-lo` → `--text-hi`. No investor/affiliation lines.
 
 ## 6. Motion & Interaction
 
-### Timing
-
-| Type       | Duration  | Easing                          | Usage                                           |
-| ---------- | --------- | ------------------------------- | ----------------------------------------------- |
-| Micro      | 150ms     | `ease-out`                      | Hover color shift, button press                 |
-| Standard   | 200ms     | `ease-in-out`                   | Mobile nav reveal, accordion                    |
-| Emphasis   | 400-600ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Hero background fade, scroll-triggered entrance |
-| Typewriter | 40ms/char | linear                          | Terminal command typing                         |
+| Token              | Value                            | Usage                                                    |
+| ------------------ | -------------------------------- | -------------------------------------------------------- |
+| `--ease-standard`  | `cubic-bezier(0.4, 0, 0.2, 1)`   | color/opacity                                            |
+| `--ease-out-quart` | `cubic-bezier(0.16, 1, 0.3, 1)`  | entrance                                                 |
+| `--ease-underline` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | link underline                                           |
+| `--dur-micro`      | 150ms                            | hover color, press                                       |
+| `--dur-underline`  | 320ms                            | nav/link underline                                       |
+| `--dur-reveal`     | 600ms                            | section entrance (`translate3d(0,16px,0) → 0` + opacity) |
+| `--dur-count`      | 600ms                            | proof-strip count-up                                     |
+| `--dur-type`       | 40ms/char                        | terminal typewriter                                      |
+| `--dur-pulse`      | 2200ms                           | status dot pulse (opacity 1 → .55 → 1)                   |
+| `--dur-wave`       | 12s cycle                        | graph wave loop (shared by 3D scene and terminal)        |
+| `--dur-swap-out`   | 80ms                             | outgoing content in a morph (no blur)                    |
+| `--dur-swap-in`    | 220ms (+60ms delay)              | incoming content in a morph, from `blur(--swap-blur)`    |
+| `--swap-blur`      | 6px                              | blur on content entering a morph                         |
+| `--dur-spring`     | 900ms                            | CSS spring window for `--ease-spring`                    |
+| `--ease-spring`    | `linear()` from `--spring-lead`  | CSS-driven springs (copy wash, active dot)               |
+| `--spring-lead`    | ω 10 rad/s, ζ 0.78 (~2% over)    | MorphStage edge moving with the travel                   |
+| `--spring-trail`   | ω 6.6 rad/s, ζ 0.95              | MorphStage edge following behind                         |
 
 ### Rules
 
-- **Only `transform` and `opacity`** for animation. Never `width / height / top / left / margin / padding`.
-- **No motion library imports.** The site uses CSS keyframes + Tailwind's `animate-pulse` + a custom typewriter component. Adding `motion/react` is allowed ONLY for shared layout transitions (`<motion.div layoutId>`) — and never the full `framer-motion` package.
-- **`prefers-reduced-motion: reduce`** disables non-essential animation. The hero background already respects this.
-- **Scroll-triggered animation** uses `IntersectionObserver`, never scroll listeners.
-- **Stagger on entrance**: section entries get `animation-delay: calc(var(--index) * 80ms)` for cascaded fade-in-up on first paint.
-
-### Forbidden
-
-- Scroll-jacking (smooth-scroll hijacking).
-- Parallax on images.
-- Magnetic buttons.
-- Cursor trails / custom cursors.
-- GSAP / Lottie / Three.js — overkill for a marketing page.
+- Only `transform`, `opacity`, `filter` and the color family (`color`, `background-color`, `border-color`, `fill`, `stroke`) animate — never layout properties (`width`, `height`, `top`, `left`, margin, padding). Height morphs (mobile nav) use `grid-template-rows: 0fr → 1fr` on a wrapper, not `max-height`.
+- Entrance: `.reveal` content is visible by default — motion only enhances it, so server HTML, no-JS and browsers without scroll timelines (Firefox) never hide content. It uses `animation-timeline: view()` (`animation-range: entry 0% entry 40%`) when `@supports (animation-timeline: view())`; otherwise the `Reveal` component arms `data-reveal="pending"` only on elements that start below the fold, after hydration, and an IntersectionObserver clears it once. Stagger `calc(var(--index) * 60ms)`. Each element reveals once.
+- Every motion maps to a state or affordance: hover → underline/tint, press → 1px translate, live data → count-up, scene progress → wave lights. Motion on non-interactive decoration is banned (this includes floating shapes, parallax, cursor trails, magnetic buttons, scroll-jacking).
+- Springs are closed-form step responses (`lib/morph-spring.ts`), not a library. A value that retargets is the sum of one step per change, so it stays continuous and interruptible. CSS springs use `--ease-spring`, the same lead spring sampled into `linear()` with a cubic-bezier fallback declared first.
+- No motion library. GSAP, Lottie, `framer-motion` are banned; `motion/react` is allowed only for a `layoutId` shared-layout need, currently unused.
+- `prefers-reduced-motion: reduce`: reveals render final state, count-ups render final numbers, terminal renders its final frame, typewriter and pulses stop, the 3D scene is not mounted (poster only).
+- Interaction mechanics traced to beui.dev catalog patterns: `action-swap` blur preset (COPY → check + COPIED: exit fast and blur-free, enter from blur), `dynamic-island` (MorphStage: one shell springing between views, content blur crossfade, exit 80ms before the enter), `tabs` (the active crafted dot: spring indicator), `number` (count-up), `tabs` underline indicator (command bar tabs, CSS-only), `tooltip`-style label chip for hovered graph nodes (opacity 150ms).
 
 ## 7. Depth & Surface
 
-**Strategy**: `tonal-shift` primary, with `border` as the punctuation.
+Strategy: **tonal shift + hairline**. Surfaces are flat ink; separation is 1px `--line`; elevation is one ink step.
 
-Surfaces stack by background opacity (luminance), not by shadow:
+| Level | Fill      | Rule            | Usage                          |
+| ----- | --------- | --------------- | ------------------------------ |
+| 0     | `--ink-0` | —               | page                           |
+| 1     | `--ink-1` | `--line`        | rows, command bar, bento cells |
+| 2     | `--ink-2` | `--line`        | hover, terminal chrome, chips  |
+| 3     | `--ink-3` | `--line-strong` | mobile sheet, terminal sidebar |
 
-| Level                 | Background                                                               | Border            | Usage               |
-| --------------------- | ------------------------------------------------------------------------ | ----------------- | ------------------- |
-| 0 (page)              | `#0a0a0a`                                                                | none              | Body background     |
-| 1 (section bg accent) | `rgba(255,255,255,0.01)` or `bg-[#0a0a0a]` with border-top/border-bottom | `border-white/5`  | Section separations |
-| 2 (card)              | `rgba(255,255,255,0.02)` (`bg-zinc-900/30`)                              | `border-zinc-800` | Default card        |
-| 3 (elevated)          | `rgba(255,255,255,0.05)`                                                 | `border-zinc-700` | Hover state on card |
-| 4 (popover)           | `#1a1a1a` solid                                                          | `border-zinc-800` | Mobile nav drawer   |
+Allowed glow recipes (the only `box-shadow`/gradient decoration on the site):
 
-Shadows are reserved for the cyan glow accent on the install command (`shadow-2xl shadow-cyan-500/10`) and on the primary CTA (`shadow-sm`). No generic black drop-shadows.
+- **Selection ring**: `box-shadow: inset 0 0 0 1px var(--accent-32)` (focus-within, selected tile).
+- **Hero wash**: `radial-gradient(circle at 70% 45%, var(--accent-16), transparent 46%)` behind the graph, plus a `--line-faint` dot grid (`radial-gradient(var(--line-faint) 1px, transparent 1px)` at 28px) — both static.
+- **Scrolled nav**: `--ink-0/72%` + `backdrop-filter: blur(12px)`.
+- The 3D node halos are additive sprites inside the canvas, not CSS.
 
-## 8. Accessibility (mandatory checks)
+Grain is not used (omp.sh's canvas grain and factory's texture PNG would fight the 3D scene); the dot grid is the texture.
 
-- Root `<html lang="en">` plus locale wrapper `lang`/`data-locale` for localized routes.
-- `<title>` per route (`generateMetadata` provides).
-- Every `<button>` and `<a>` has a discernible name (icon-only buttons require `aria-label`).
-- Skip link to `#main-content` at the top of `<body>`.
-- Focus-visible ring on all interactive elements.
-- Contrast ≥ 4.5:1 for body text, ≥ 3:1 for large text. Current cyan `#00d4ff` on `#0a0a0a` = 11.4:1 (AAA). Text-zinc-400 on `#0a0a0a` = 7.2:1 (AAA). Text-zinc-500 = 5.0:1 (AA).
-- Touch targets ≥ 44px on mobile (`h-12` buttons meet this; `h-9` small buttons need vertical padding).
-- `prefers-reduced-motion: reduce` disables animations.
-- Form fields: label above input, helper/error below.
+## 8. Accessibility
 
-## 9. Inclusive Personas & Adaptive Constraints
+- `<html lang>` per locale; unique `<title>` per route; skip link to `#main-content`; landmarks `header/nav/main/footer/section[aria-labelledby]`.
+- Contrast: `--text-hi` on `--ink-0` 17.8:1, `--text-mid` 11.5:1, `--text-lo` 5.9:1 (AA for 11px+ mono uppercase is met because eyebrows are ≥ 11px 500 with tracking; body never uses `--text-faint`), `--accent` on `--ink-0` 11.4:1, primary button `#09090b` on `--accent` 11.4:1.
+- Focus-visible ring on every interactive element (2px `--accent-32`, offset 2px); the canvas wrapper is focusable with arrow-key orbit and is `aria-hidden` for AT while the poster `<img alt>` describes the scene.
+- Touch targets ≥ 44px on mobile (nav items, COPY cell, bento cells are ≥ 44px tall).
+- Reduced motion honored everywhere (§6). Reduced data (`navigator.connection.saveData`) and low memory skip the 3D chunk (§9).
+- Reel and docs main announce as scroll regions (`role="region"` + `aria-label`, `tabindex=0`).
+- Personas: terminal power user (keyboard-first, copyable commands, dense reference), mobile evaluator (no horizontal overflow on `/`, `/manifesto`, `/docs` at 375), CJK reader (heading tracking reset, keep-all), motion-sensitive user (poster hero, static terminal).
 
-- **Terminal power user**: keyboard-first, scans dense command/reference content, expects instant docs section navigation and copyable commands. Pass criteria: nav/search/focus states are visible and keyboard reachable; code blocks remain readable.
-- **Mobile evaluator**: checks the project from a narrow viewport before installing. Pass criteria: landing and manifesto have no horizontal overflow; docs mobile behavior is preserved and its known overflow debt is not worsened.
-- **CJK reader**: reads Korean/Japanese/Chinese localized pages. Pass criteria: heading letter spacing resets to normal, CJK line breaking avoids clipped glyphs, and body text can wrap without layout breakage.
-- **Motion-sensitive user**: uses reduced motion. Pass criteria: hero/background/reveal motion respects `prefers-reduced-motion`; no layout-property animation is required for comprehension.
+## 9. The Graph — 3D interactive hero scene
 
-Adaptive preferences:
+### Meaning
 
-- Honor `prefers-reduced-motion`.
-- Maintain dark color scheme and current contrast ratios.
-- Preserve visible focus rings and 44px mobile hit targets where current components provide them.
-- Preserve locale-aware CJK line-breaking rules in the design-system base layer.
+The GitHub one-liner calls the user "the master of graph engineering". The focal object is that graph: a directed acyclic graph of agent nodes scheduled in waves by `mass ulw`. Wave 1 = orchestrator (lead) → wave 2 = Ultrawork Planner, Plan Consultant, Plan Reviewer (plan + gates) → wave 3 = Kibitzer, Architect, Deep, Quick, Visual Engineering, Explore, Librarian (categories and curated agents, execution). A 12s loop lights the waves in order, pulses travel down the edges, and a final "verified" flash settles the graph.
+
+### Content and geometry
+
+- Desktop 11 nodes / mobile 7 (drop Plan Consultant, Kibitzer, Quick, Visual Engineering). Positions precomputed in `components/landing/graph/graph-data.ts` (seeded, three planes along -Z).
+- Node = icosahedron (detail 1) `MeshStandardMaterial` (`--ink-3` base, emissive `--accent-dim`, emissiveIntensity 0.2 idle → 1.6 lit) + one additive-blended halo sprite (shared 64×64 radial CanvasTexture, `--accent-16` → transparent). No bloom / postprocessing.
+- Edges = one `LineSegments` geometry, `--accent-dim` at 0.35 opacity; lit edge 0.8.
+- Pulses = one `Points` object (≤ 48 desktop / 24 mobile) whose `t` along its edge advances per frame in a typed array; size 6px, `--accent-hot`.
+- Labels: a single drei `<Html>` chip (Chip primitive, mono) for the hovered/focused node only.
+- Lights: 1 ambient (0.25) + 1 directional (1.2, cool). No shadows, no env map.
+
+### Interaction
+
+- Drag/touch-drag orbits (OrbitControls: `enableZoom=false`, `enablePan=false`, `enableDamping`, `dampingFactor 0.08`, polar angle clamped to `[π/3, 2π/3]`). Auto-rotate 0.15 rad/s when idle; pauses on interaction, resumes 4s after the last input.
+- Hover → node halo brightens + label chip; click/tap → camera eases to the node (600ms `--ease-out-quart`) and the matching agent bento cell receives `data-active`; Escape / empty click resets.
+- Keyboard: wrapper is focusable; ← → rotate 15°, Enter focuses the nearest node, Escape resets.
+
+### Performance contract (planet-simulator pattern, tightened)
+
+- `next/dynamic(() => import("./graph-scene"), { ssr: false })` mounted only when ALL hold: hero IntersectionObserver hit; `requestIdleCallback` fired (fallback 200ms timeout); `!matchMedia("(prefers-reduced-motion: reduce)").matches`; WebGL2 context probe succeeded; `navigator.deviceMemory` ≥ 2 when present; `navigator.connection?.saveData !== true`.
+- Poster `/images/graph-poster.webp` (1600×1000, ≤ 60 KB, rendered from the scene) is the LCP: explicit `width/height`, `fetchPriority="high"`, `sizes` per breakpoint. The canvas fades in over it (opacity 400ms) after its first frame; the poster stays as the fallback for reduced-motion / no-WebGL / low-end / runtime error (ErrorBoundary).
+- Canvas: `dpr={[1, isMobile ? 1.25 : 1.75]}`, `gl={{ antialias: !isMobile, powerPreference: "high-performance", alpha: true }}`, `frameloop="always"` only while the hero is on screen and the tab visible, otherwise `"demand"`; after 20s without interaction, `"demand"` with one `invalidate()` per second to keep the wave loop alive.
+- Budget: the lazy renderer chunks (three core + @react-three/fiber + react-reconciler + the two drei modules) ≤ 224 KB gzip total, asserted by `scripts/check-graph-budget.mjs` (`bun run check:graph-budget`); three must not appear in the first-load JS of `/` (checked against the app build manifest). Measured 2026-09-08: 209.3 KB gzip across two chunks (163.4 + 45.9); three's core alone is ~150 KB gzip and is irreducible, so the budget is set at measured + 7% headroom rather than the 190 KB first estimate. drei is imported per module, never the barrel.
+- Lighthouse guard: chunk loads after LCP; TBT contribution ≤ 50ms on the mobile preset; the poster keeps CLS at 0.
+
+## 9b. Landing story (v3) and the §10 story primitives
+
+### Section order (`app/_components/landing-page.tsx`)
+
+`hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta`. Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
+
+- **secret**: the fold. The body alone owns the word sweep, from its top at 80vh until its bottom reaches 50vh. Every word then remains fully lit for `--lit-read-hold: 18vh` of additional scroll with the follow-up fully hidden. The follow-up has an independent opacity/rise animation over `--lit-follow-fade: 22vh`, starting only after both the reading hold and its untransformed top crossing the viewport midpoint. `--lit-follow-gap: 1.25em` preserves the existing prose paragraph gap (40px mobile, about 64px desktop); `--lit-follow-rise: var(--space-6)` preserves the 24px rise. No extra layout space or time-based delay is added. Anchoring completion to the body's bottom, not the combined block or its containment range, keeps taller Korean mobile paragraphs correct and the follow-up on-screen while appearing.
+- The secret body preserves authored newline boundaries with `white-space: pre-line`. English uses three short sentences, one per line on desktop; each sentence may wrap naturally on mobile. Whitespace stays outside animated word spans, preserving both readable spacing and the continuous sweep.
+- **ultrawork**: prompt line with the keyword as a `--accent-16` mark + three revealed steps. No product jargon in the copy.
+- **multi-model**: two `Marquee` rows of tuned profile chips (opposite directions, 36s / 44s, pause on hover). The chip list is data (`story-data.ts`) and never names families outside Claude / GPT / Kimi / Grok / GLM / DeepSeek.
+- **mass-ulw**: the existing desktop-app DAG (`dag/`) on a research → dataset → model → deck scenario (`scenario-data.ts`).
+- **kibitzer**: two concurrent loops, a narrow inexpensive memory-watching sidecar and a larger expensive frontier agent. Independent active markers run on `--kib-watch-cycle: 4.5s` (three beats) and `--kib-main-cycle: 14s` (four beats); the main turn counter advances on each animation iteration. A `--kib-cycle: 14s` story sends one nudge from memory across the gutter into a reserved slot between acting and verifying, replacing the skipped migration test with running it first at 50% of the story. The loops continue throughout. One IntersectionObserver pauses the stage offscreen. Below md, the sidecar becomes a compact top strip and the nudge travels vertically. Reduced motion shows the inserted nudge and corrected step, without animation.
+  - Stage geometry: desktop columns `minmax(0, 1fr) minmax(0, 2fr)`, gap `--space-12`, padding `--space-5`; mobile gap `--space-8`, padding `--space-4`. Ruled loop rows use `--space-12` minimum height, insertion slot `--space-24` minimum height. Nudge starts at `translateX(calc(-50% - var(--space-12))) scale(.5)` on desktop; mobile starts at `translateY(calc(-1 * (var(--space-40) + var(--space-24)))) scale(.8)`. Transform origin is left center; 0–30% hidden at source, 32–38% produced, 38–50% in flight, 50–94% inserted, 98–100% reset. Text stays full opacity except hidden/replaced story states; only the active row changes color. All other dimensions, type, colors and rules reuse §§2–6.
+- **skills**: a vertical `Ticker` of `name · blurb` rows (30s, pause on hover) next to the copy.
+- **crafted**: sticky copy column + a single-column rise-up list (`Reveal` with `--index` stagger); the docs link is the only CTA.
+- **platforms**: title with a `RotatingWord` (13 platforms, 1.6s per word, `steps()`), then every platform once as a `Chip`, revealed with stagger, and a footnote-style "coming soon" line under the list.
+
+### §10 primitives (`components/landing/story-primitives.tsx`, `lit-text.tsx`; CSS in `design-system.css` §10)
+
+| Primitive                  | Motion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Reduced motion                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Marquee`                  | `translateX(-100%)` linear, duplicated track, pause on hover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | static wrapped row, duplicate hidden                                                  |
+| `Ticker`                   | `translateY(-50%)` linear, duplicated list, pause on hover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | static list, duplicate hidden, height cap released                                    |
+| `LitProgress` / `LitWords` | JS registers interpolated `--lit-p` before enabling the named body view timeline; longhand range `cover 20vh → cover calc(100% - 50vh)` works for short and taller-than-viewport bodies. Independent follow range starts after `max(--lit-read-hold, --lit-follow-gap)` beyond word completion and lasts `--lit-follow-fade`. Per-word gradient sweep + `--lit-blur` 4px→0 with a 3-unit overlap (react-bits `ScrollReveal` mechanism, no tilt). If registration or either timeline is unavailable/inactive, an IntersectionObserver gates animation-frame geometry sampling while the block intersects; it does not rely on intersection-ratio changes, which stop for fully visible or viewport-spanning blocks. The `.lit-follow` element is optional (a block without one sweeps its words alone). `LitWords` accepts `parts` so a run of words can sit inside an external link (`.lit-link`: accent underline, thicker on hover/focus) while the sweep continues across it. **`lit-read` reveal variant** (manifesto paragraphs): a per-word scroll reveal. A single document-level driver (rAF-batched scroll/resize/scrollend, never a per-block observer that can go stale) lights each word as its own bottom crosses the full line (`--lit-line: 78vh` - `--lit-band: 8vh` = 70vh), with a small per-word stagger so words on a shared line light one at a time (word-by-word, never a whole line at once); already-revealed text stays lit and the lit frontier is monotonic, so reading is never gated on scroll. The block renders `[data-lit-mode="pending"]` (which forces `--lit-p: 1`, so the page reads in full before hydration and under JS failure) until the driver's first pass flips it to `observer`. Unread words sit at `--text-lo` instead of `--text-faint` (5.95:1 on `--ink-0`, WCAG AA) and are **not** blurred (`--lit-blur: 0px` — a readable floor, not a smeared one). The landing `secret` paragraph mode is unchanged: a block-level `view()` timeline sweep with the optional `.lit-follow`. | `--lit-p: 1`, follow fully visible, plain `--text-hi`, no gradient, blur or transform |
+| `.kib-stage`               | Independent 4.5s watch / 14s main loops; 14s traveling nudge inserts before verification; iteration-driven turn counter                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | both loops visible, nudge inserted, corrected next step, no animation                 |
+| `RotatingWord`             | `steps(n)` vertical track, 1.6s per word, 1.1em clip                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | first word only                                                                       |
+
+All five use CSS keyframes or IntersectionObserver. The landing `secret` paragraph sweep adds no scroll listener; the manifesto `lit-read` reveal is driven by a single document-level rAF-batched scroll/resize/`scrollend` listener (one listener for the whole page, never a per-block observer), which is the one allowed exception for a per-word geometry that a block-level `view()` timeline cannot express. Its progress is reversible and based on scroll distance, never elapsed time.
 
 ## 10. Verification Matrix
 
-This contract is valid only when implementation evidence proves the current surface still matches it:
+| Scenario           | Surface                                           | Evidence                                                                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primitive showcase | `/design` (dev) at 375/768/1280                   | Screenshot per primitive state before product screens                                                                                                                                                                         |
+| Landing fidelity   | `/` at 375/768/1280 (+ `/ko`)                     | Screenshots; hero matches concept B structure; `scrollWidth <= innerWidth` at 375                                                                                                                                             |
+| Manifesto          | `/manifesto` and `/manifesto/2026-01` at 375/1280 | Screenshots (header, chapters mid-sweep, closing, archive banner); words above the reading line lit and below it `--text-lo`; reduced motion fully lit; footnote link reaches the archive; no overflow at 375 on either route |
+| Docs shell         | `/docs` at 375/1280                               | Screenshots; sidebar toggle, search, hash nav; **no horizontal overflow at 375** (debt closed)                                                                                                                                |
+| 3D hero            | `/` desktop                                       | Canvas present; drag before/after screenshots; poster-only with `prefers-reduced-motion` and with WebGL disabled; chunk size + route-table proof                                                                              |
+| Motion             | `/`                                               | Reveal fires once; terminal typewriter gated by visibility; reduced-motion final frames                                                                                                                                       |
+| Gates              | `packages/web`                                    | `format:check`, `lint`, `type-check`, `opennextjs-cloudflare build`, Playwright e2e, Lighthouse (real Chromium, prod build): perf ≥ 90 mobile / ≥ 95 desktop, a11y/BP/SEO ≥ 95                                                |
+| Token compliance   | `packages/web`                                    | `rg` for raw hex outside `DESIGN.md` and `app/styles/design-system.css` returns only `lib/og/palette.ts` (satori has no CSS variables; it mirrors §2)                                                                         |
 
-| Scenario                  | Surface                              | Evidence                                                                          |
-| ------------------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
-| Landing visual fidelity   | `/` at 1280x800 and 390x844          | Baseline/after screenshots plus image diff                                        |
-| Docs visual fidelity      | `/docs` at 1280x800 and 390x844      | Baseline/after screenshots plus image diff; mobile overflow delta must not worsen |
-| Manifesto visual fidelity | `/manifesto` at 1280x800 and 390x844 | Baseline/after screenshots plus image diff                                        |
-| Docs interactions         | `/docs` mobile and desktop           | Sidebar toggle, search filtering, section/hash navigation                         |
-| Landing navigation        | `/` mobile and desktop               | Mobile nav toggle and Docs/Manifesto navigation                                   |
-| Regression gates          | `packages/web`                       | format, lint, type-check, build, Playwright e2e; Lighthouse when available        |
+## 11. Redesign audit (what the previous site got wrong, per `redesign-skill`)
 
-## 11. Refinement Targets
-
-The 5 areas the refinement PR will improve while keeping the soul:
-
-1. **Consolidate per-section accents**: Replace purple/orange/pink/fuchsia/teal/indigo/amber/green section colors with cyan (primary) + indigo (agent identity) + neutral grays. The dev-tool feel sharpens; the rainbow goes away.
-2. **Tighten typography rhythm**: Move display from `text-5xl md:text-7xl` to a more disciplined scale with consistent negative tracking. Set `text-wrap: balance` on H1/H2.
-3. **Decompose the 832-LOC landing monolith**: Each section → its own file ≤250 LOC. Composition shell stays under 100 LOC.
-4. **Dynamic OG image**: Static `hero.webp` (1024×683) → `app/opengraph-image.tsx` via `next/og` at 1200×630, brand-aligned.
-5. **Motion choreography**: Add cascaded fade-in-up on section entry via CSS + IntersectionObserver. Respect `prefers-reduced-motion`. No motion library.
+- Per-section rainbow accents (violet/orange/pink/fuchsia/teal/indigo/amber/green/blue) — removed (§2).
+- Three-equal-column feature grids (Reviews, Architecture) and 5-column step rows — replaced by ledger rows, a gapless bento, and a reel (§5).
+- `rounded-xl/3xl` cards with `bg-zinc-900/30` + border + shadow — replaced by ruled ink cells with 0px radius (§4, §7).
+- Stats crammed into the hero — moved to the proof strip; the hero carries one statement, one tagline, one command, two actions (§5, gpt-tasteskill hero rule).
+- Static hero photograph fading behind text — replaced by the meaningful 3D graph with a poster LCP (§9).
+- Bold-everywhere headlines (`font-bold` 700 at 72px) — Geist 500 with -0.03em tracking (§3).
+- Docs horizontal overflow at 390px carried as debt — fixed by the shell contract (§4).
+- Static OG PNG — dynamic `next/og` image using the same palette, Geist subsets, and the graph glyph (`app/opengraph-image.tsx`).
 
 ## 12. Banned Patterns (project-specific)
 
-- New or changed UI hardcoding raw hex outside this file or `app/styles/design-system.css`. Existing rendered class names such as `bg-[#0a0a0a]`, `text-[#ededed]`, and gradient stops remain accepted debt in this extraction because this PR preserves the current pixels.
-- Pure `#000000` or `#ffffff`.
-- Per-section accent colors not in the consolidated palette.
-- `h-screen` (use `min-h-[100dvh]`).
-- 3-column equal feature card grids (use 2-col zig-zag or 1-col + visual).
-- Emojis in JSX, alt text, or visible UI.
-- Any-casts and TypeScript suppression directives.
-- `export const runtime = "edge"` (incompatible with `@opennextjs/cloudflare`).
-- Animating `width / height / top / left / margin / padding`.
-- Importing the full `framer-motion` package (use `motion/react` + `LazyMotion` if needed; currently not needed).
-- Generic hype copy. Use concrete product language instead.
-- Lorem ipsum or "John Doe" placeholders.
+- Any mention of investors, accelerators, or "backed by" lines anywhere on the site, in OG images, or in metadata. (Confidential; the reference site herdr.dev carries one — do not mirror it.)
+- Raw hex or rgba outside this file, `app/styles/design-system.css`, and `lib/og/palette.ts`.
+- `#000000`, `#ffffff`, purple/blue gradients, decorative cyan, per-section accent colors.
+- Border radius other than 0 / 2px / 50%, except the scoped work-media and message tokens in §15.
+- `h-screen`; `max-height` animations; animating layout properties.
+- Three-equal-column feature card grids; floating bordered cards with shadows.
+- Emojis in JSX, alt text, or visible UI. Icons are SVG (Lucide / Phosphor).
+- Meta-labels ("SECTION 01", "ABOUT US"); generic hype copy ("seamless", "unleash", "next-gen").
+- `framer-motion`, GSAP, Lottie; `export const runtime = "edge"`; `any` casts and TS suppressions.
+- Importing the `@react-three/drei` barrel; mounting the 3D scene before the gates in §9 pass; shipping the scene without the poster.
+- Serif or Inter typefaces; Korean serif fallbacks.
+
+## 13. Accepted debt
+
+- `/design` showcase route is dev-only and not localized.
+- The 3D poster is rendered once per design change by `scripts/render-graph-poster.mjs` (Playwright screenshot of the mounted scene); it is a committed asset, not generated at build.
+- Satori cannot read CSS variables, so `lib/og/palette.ts` duplicates §2 values; a `scripts/check-og-palette.mjs` diff against `design-system.css` guards drift.
+
+## 14. Brand OG image (2026-09-14)
+
+The supplied Figma OG composition supersedes the dark graph OG in §11, for
+social images only. Its API geometry supplies the original cat and designed-vector
+OmO wordmark. The wordmark is not typeset. The new headline uses the source's
+Roboto Mono family, Regular 400 followed by Bold 700.
+
+- Canvas: 1200 x 630 PNG. White `#ffffff` paper and `#0a0a0a` ink are explicit
+  reference-specific exceptions to §2/§12. No gradient, border, shadow, or graph.
+- Composition: cat at (162, 196), width 282, original 325.0923:289.9436 aspect.
+  Wordmark at (494, 204), width 390, original 499:156 aspect.
+- Headline: (494, 349), Roboto Mono 36 px, 46 px line height, zero tracking.
+  Two unbroken lines: “Your tool for real work.” (400), “But it's an agent.” (700).
+  The original tagline's special capital-O glyph does not occur in the new copy.
+- Proof: top-left (48, top 42), Roboto Mono 48 px, one row of two items 44 px
+  apart, each a 52 px mark + 18 px gap + label. Stars: GitHub mark, whole-thousand
+  floor, uppercase K and plus, e.g. 69,999 → `69K+ Stars`. Downloads: npm mark,
+  all-time npm total of `oh-my-opencode` + `oh-my-openagent` + `omo-ai` +
+  `lazycodex-ai` (`lib/npm-downloads.ts`) plus every `omo-*` compiled binary
+  downloaded from GitHub releases (`lib/native-downloads.ts`), the same figure
+  as the site total, floored to
+  0.1 M, e.g. 4,032,665 → `4M+ Downloads`, 3,894,680 → `3.8M+ Downloads`.
+  Counts below 1,000 remain exact. No website label.
+- Star states: fresh/cached for up to 5 minutes; last known good for at most
+  24 hours on GitHub failure; otherwise `GitHub` without an invented count.
+  Download states: fetched independently of stars (an npm outage never freezes
+  stars), fresh for 1 hour, last known good for at most 24 hours, otherwise the
+  downloads item is omitted. Each refresh makes two attempts, and every good
+  figure is also kept in the colo-shared Workers Cache API (24 h), so a freshly
+  started isolate (the one a crawler usually hits) reuses it instead of dropping
+  the figure. Any degraded figure makes the response `no-store`;
+  otherwise `s-maxage` is the smallest remaining freshness.
+- Both social routes render on demand, not as build snapshots. Fonts and artwork
+  are bundled into the renderer; no runtime font CDN, Figma URL, or npm request.
+- Accessibility/QA: descriptive metadata alt, high-contrast text, native-size
+  PNG plus 600/375 px preview inspection; check full vector silhouettes and
+  unbroken text at every scale. No client JavaScript or interaction is added.
+
+## 15. Readable work surfaces (2026-09-14)
+
+This is a restrained visual refinement of the existing landing, informed by
+the readable conversation illustrations and selective softness at
+`sisyphuslabs.ai/en`. The reference contributes local presentation, not its
+copy, persona, rounded navigation or waitlist positioning.
+
+The headline, authored locale copy, section order, cat/wordmark, cyan palette,
+install controls, DAG nodes and Secret reading sequence stay unchanged.
+The hero remains the editorial split and the actual desktop DAG, not the
+historical 3D concept described in §9.
+
+### Type and whitespace
+
+- Feature titles rendered by `SectionHeader` use `.type-feature`:
+  `clamp(2rem, 1.5rem + 1.6vw, 2.5rem)`, weight 500, line-height 1.1,
+  tracking -0.025em and balanced wrapping. Hero, Secret and CTA display
+  roles do not change. Existing CJK heading rules still apply.
+- Feature introductions use the existing 18px Lead role with 1.7 leading
+  and a 60ch measure, rather than increasing to 20px beside the work media.
+- The ultrawork request uses the existing 16px Body role and wraps in a
+  shrinking grid track; its keyword remains an unbroken inline mark.
+  Request and response rows use 20px padding, rising to 24px horizontally
+  above the small breakpoint.
+- The desktop illustration's request and assistant response use the
+  existing 14px Body/sm role with 1.625 leading. Human text is not
+  truncated; graph metadata and graph-node geometry stay compact.
+- Kibitzer memory and nudge prose use the 16px Body role with 1.6 leading.
+  The stage padding is 20px on mobile and 32px from the medium breakpoint,
+  retaining the current 32px/48px column gaps and insertion slot.
+
+### Scoped surface tokens
+
+- `--radius-work: 12px`: outside shell of the ultrawork exchange, hero
+  graph panel, desktop work illustration and Kibitzer stage only.
+- `--radius-message: 8px`: the existing user message bubble and Kibitzer
+  nudge only. Nested controls, graph nodes, rows and install bars retain
+  their existing radii.
+- Reuse ink surfaces and hairlines; no new color, shadow, glow or image.
+  Clip the terminal/exchange shells at their rounded outside edge.
+  The Kibitzer stage must not clip its travelling nudge.
+
+### Motion, accessibility and verification
+
+All existing work-progress and memory-intervention clocks, visibility gates,
+states and reduced-motion alternatives are preserved. Surface softness adds
+no animation or JavaScript.
+
+Feature labels rendered by `SectionHeader` keep their status colors but do
+not pulse: the labels name capabilities, not live work. Use the existing
+Eyebrow `className` hook for this local override; other status indicators
+and the shared Eyebrow component keep their current behavior.
+
+Reduced-motion model tracks take the available width before wrapping.
+Stopping the animation while retaining `max-content` width would leave
+profiles outside the viewport. Normal-motion marquee sizing is unchanged.
+
+The mobile evaluator must read the entire request and keyword without
+horizontal clipping. The CJK reader must retain authored copy and wrapping.
+The motion-sensitive reader must see the completed graph, inserted memory
+nudge and corrected verification step.
+
+Use before/after Chromium screenshots at 375/768/1440 for English and Korean,
+plus Japanese/Chinese smoke. Check each changed panel's own scroll width,
+not just the root's clipped overflow. Exercise Copy, navigation, DAG controls,
+normal progress/memory and reduced-motion states. Keep frame and nudge
+containment visible in the evidence. No new accessibility debt is accepted.

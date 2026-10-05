@@ -1,9 +1,19 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { homedir, tmpdir } from "node:os"
-import { dirname, isAbsolute, join, relative, sep } from "node:path"
+import { delimiter, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { describe, expect, test } from "bun:test"
 
-import { buildChildArgs, buildRpcSpawn, detectBunBinary, resolveChildSessionDir, resolveSenpiExecutable } from "./spawn"
+import {
+  buildChildArgs,
+  buildRpcSpawn,
+  detectBunBinary,
+  detectCompiledEngine,
+  readEngineVersionFromResolvePaths,
+  readRunningEngineVersion,
+  resolveChildSessionDir,
+  resolveSenpiExecutable,
+} from "./spawn"
 
 const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 
@@ -123,49 +133,228 @@ describe("resolveSenpiExecutable", () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  test("#given a script-hosted test run #when the compiled-engine probe runs #then it reports false", () => {
+    // bun test is a script host: no embedded files, so PATH/sibling resolution stays in force
+    expect(detectCompiledEngine()).toBe(false)
+  })
+
+  test("#given a compiled engine with a senpi on PATH #when resolving #then the running executable wins over PATH", () => {
+    // given: the omo binary embeds the engine; a different senpi install sits on PATH
+    const root = mkdtempSync(join(tmpdir(), "senpi-compiled-engine-"))
+    const execPath = join(root, "omo")
+    const foreign = join(root, "path", "senpi")
+    mkdirSync(dirname(foreign), { recursive: true })
+    writeFileSync(execPath, "")
+    writeFileSync(foreign, "")
+    try {
+      // when
+      const resolved = resolveSenpiExecutable({ ...runtime, isCompiledEngine: true, execPath, parentEnv: { PATH: dirname(foreign) } })
+
+      // then
+      expect(resolved).toBe(realpathSync.native(execPath))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  const installSenpiPackage = (version: string) => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-engine-parity-"))
+    const pkgDir = join(root, "node_modules", "@code-yeongyu", "senpi")
+    const cliPath = join(pkgDir, "dist", "cli.js")
+    const binDir = join(root, "node_modules", ".bin")
+    mkdirSync(join(pkgDir, "dist"), { recursive: true })
+    mkdirSync(binDir, { recursive: true })
+    writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "@code-yeongyu/senpi", version }))
+    writeFileSync(cliPath, "")
+    symlinkSync(cliPath, join(binDir, "senpi"))
+    return { root, binDir, cliPath }
+  }
+
+  test("#given a PATH senpi whose package version differs from the engine #when resolving #then it is rejected", () => {
+    const install = installSenpiPackage("2026.8.27")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: install.binDir },
+      })
+      expect(resolved).toBeNull()
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain("2026.8.27")
+      expect(warnings[0]).toContain("2026.9.4")
+    } finally {
+      rmSync(install.root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a PATH senpi whose package version matches the engine #when resolving #then that path is used", () => {
+    const install = installSenpiPackage("2026.9.4")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: install.binDir },
+      })
+      expect(resolved).toBe(realpathSync.native(install.cliPath))
+      expect(warnings).toHaveLength(0)
+    } finally {
+      rmSync(install.root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a PATH senpi with no package manifest #when resolving #then it is accepted", () => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-engine-parity-bare-"))
+    const executable = join(root, "senpi")
+    writeFileSync(executable, "")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: root },
+      })
+      expect(resolved).toBe(realpathSync.native(executable))
+      expect(warnings).toHaveLength(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a stale PATH senpi then a matching one #when resolving #then the matching executable wins", () => {
+    const stale = installSenpiPackage("2026.8.27")
+    const matching = installSenpiPackage("2026.9.4")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: [stale.binDir, matching.binDir].join(delimiter) },
+      })
+      expect(resolved).toBe(realpathSync.native(matching.cliPath))
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain("2026.8.27")
+    } finally {
+      rmSync(stale.root, { recursive: true, force: true })
+      rmSync(matching.root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given SENPI_BIN pointing at a stale-version cli #when resolving #then the override is used verbatim", () => {
+    const install = installSenpiPackage("2026.8.27")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { SENPI_BIN: install.cliPath },
+      })
+      expect(resolved).toBe(realpathSync.native(install.cliPath))
+      expect(warnings).toHaveLength(0)
+    } finally {
+      rmSync(install.root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("readEngineVersionFromResolvePaths", () => {
+  test("#given a later path with the senpi manifest #when reading #then it returns that version", () => {
+    const tmpA = mkdtempSync(join(tmpdir(), "senpi-engine-version-empty-"))
+    const tmpB = mkdtempSync(join(tmpdir(), "senpi-engine-version-hit-"))
+    mkdirSync(join(tmpB, "@code-yeongyu", "senpi"), { recursive: true })
+    writeFileSync(
+      join(tmpB, "@code-yeongyu", "senpi", "package.json"),
+      JSON.stringify({ name: "@code-yeongyu/senpi", version: "1.2.3" }),
+    )
+    try {
+      expect(readEngineVersionFromResolvePaths([tmpA, tmpB])).toBe("1.2.3")
+    } finally {
+      rmSync(tmpA, { recursive: true, force: true })
+      rmSync(tmpB, { recursive: true, force: true })
+    }
+  })
+
+  test("#given only a different-name manifest #when reading #then it returns undefined", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "senpi-engine-version-other-"))
+    mkdirSync(join(tmp, "@code-yeongyu", "senpi"), { recursive: true })
+    writeFileSync(
+      join(tmp, "@code-yeongyu", "senpi", "package.json"),
+      JSON.stringify({ name: "not-senpi", version: "9.9.9" }),
+    )
+    try {
+      expect(readEngineVersionFromResolvePaths([tmp])).toBeUndefined()
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("readRunningEngineVersion", () => {
+  test("#given the installed engine manifest #when reading #then it matches the package version", () => {
+    const require = createRequire(import.meta.url)
+    let expected: string | undefined
+    for (const dir of require.resolve.paths("@code-yeongyu/senpi") ?? []) {
+      const manifest = join(dir, "@code-yeongyu", "senpi", "package.json")
+      if (!existsSync(manifest)) continue
+      const pkg = JSON.parse(readFileSync(manifest, "utf8")) as { version?: unknown }
+      if (typeof pkg.version === "string" && pkg.version.length > 0) {
+        expected = pkg.version
+        break
+      }
+    }
+    expect(expected).toBeDefined()
+    expect(readRunningEngineVersion()).toBe(expected)
+  })
 })
 
 describe("buildChildArgs", () => {
-  test("#given a spec with model and extensions #when building child args #then no-extensions leads, each -e follows, then --model", () => {
+  test("#given a spec with model and extensions #when building child args #then no-extensions then no-ask-user lead, each -e follows, then --model", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", extensions: ["/tmp/a.ts", "/tmp/b.ts"] })
     // then
-    expect(args).toEqual(["--no-extensions", "--extension", "/tmp/a.ts", "--extension", "/tmp/b.ts", "--model", "omo-mock/mock-1"])
+    expect(args).toEqual(["--no-extensions", "--no-ask-user", "--extension", "/tmp/a.ts", "--extension", "/tmp/b.ts", "--model", "omo-mock/mock-1"])
   })
 
-  test("#given a spec with neither model nor extensions #when building child args #then only no-extensions is present", () => {
+  test("#given a spec with neither model nor extensions #when building child args #then no-extensions then no-ask-user are present", () => {
     // when
     const args = buildChildArgs(baseSpec)
     // then
-    expect(args).toEqual(["--no-extensions"])
+    expect(args).toEqual(["--no-extensions", "--no-ask-user"])
   })
 
   test("#given a spec with a valid variant #when building child args #then --thinking follows --model", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "xhigh" })
     // then
-    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1", "--thinking", "xhigh"])
+    expect(args).toEqual(["--no-extensions", "--no-ask-user", "--model", "omo-mock/mock-1", "--thinking", "xhigh"])
   })
 
   test("#given a spec with high reasoning effort #when building child args #then it maps to senpi high", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "high" })
     // then
-    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1", "--thinking", "high"])
+    expect(args).toEqual(["--no-extensions", "--no-ask-user", "--model", "omo-mock/mock-1", "--thinking", "high"])
   })
 
   test("#given the omo.json reasoningEffort none as variant #when building child args #then it maps to senpi off", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, variant: "none" })
     // then
-    expect(args).toEqual(["--no-extensions", "--thinking", "off"])
+    expect(args).toEqual(["--no-extensions", "--no-ask-user", "--thinking", "off"])
   })
 
   test("#given an unknown variant #when building child args #then no --thinking flag is emitted", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "ultra" })
     // then
-    expect(args).toEqual(["--no-extensions", "--model", "omo-mock/mock-1"])
+    expect(args).toEqual(["--no-extensions", "--no-ask-user", "--model", "omo-mock/mock-1"])
   })
 })
 
@@ -199,6 +388,7 @@ describe("buildRpcSpawn spawn strategy", () => {
         "--mode",
         "rpc",
         "--no-extensions",
+        "--no-ask-user",
         "--model",
         "omo-mock/mock-1",
       ])
@@ -236,6 +426,70 @@ describe("buildRpcSpawn spawn strategy", () => {
     }
   })
 
+  test("#given a compiled engine on Windows whose binary has no .exe suffix #when building an RPC child #then it still launches itself", () => {
+    // given: a compiled single-file executable may be named anything; on Windows the shim reader used
+    // to claim any non-.exe candidate, discard the engine, and fall through to the rpc-entry guess.
+    const root = mkdtempSync(join(tmpdir(), "senpi-compiled-engine-win-"))
+    const execPath = join(root, "omo")
+    writeFileSync(execPath, "")
+    try {
+      // when
+      const descriptor = buildRpcSpawn(
+        { ...baseSpec, model: "omo-mock/mock-1" },
+        {
+          isBunBinary: false,
+          isCompiledEngine: true,
+          execPath,
+          platform: "win32",
+          parentEnv: { PATH: "" },
+          resolveRpcEntry: () => "/fallback/rpc-entry.js",
+        },
+      )
+
+      // then
+      expect(descriptor.command).toBe(realpathSync.native(execPath))
+      expect(descriptor.args.slice(0, 3)).toEqual(["--mode", "rpc", "--no-extensions"])
+      expect(descriptor.args).not.toContain("/fallback/rpc-entry.js")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a compiled engine with a senpi on PATH #when building an RPC child #then the child is the running executable in rpc mode", () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "senpi-compiled-engine-rpc-"))
+    const execPath = join(root, "omo")
+    const foreign = join(root, "path", "senpi")
+    mkdirSync(dirname(foreign), { recursive: true })
+    writeFileSync(execPath, "")
+    writeFileSync(foreign, "")
+    try {
+      // when
+      const descriptor = buildRpcSpawn(
+        { ...baseSpec, model: "omo-mock/mock-1", extensions: ["/opt/omo-runtime/plugin"] },
+        {
+          isBunBinary: false,
+          isCompiledEngine: true,
+          execPath,
+          platform: "linux",
+          parentEnv: { PATH: dirname(foreign) },
+          resolveRpcEntry: () => "/fallback/rpc-entry.js",
+        },
+      )
+
+      // then: the compiled binary is its own engine, launched in rpc mode with the caller's extension
+      // list; PATH and the rpc-entry fallback are never consulted. The full child argv belongs to the
+      // buildChildArgs tests above.
+      expect(descriptor.command).toBe(realpathSync.native(execPath))
+      expect(descriptor.args.slice(0, 3)).toEqual(["--mode", "rpc", "--no-extensions"])
+      expect(descriptor.args).toContain("/opt/omo-runtime/plugin")
+      expect(descriptor.args).not.toContain("/fallback/rpc-entry.js")
+      expect(descriptor.args).not.toContain(foreign)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given a resolvable senpi executable #when building #then it spawns the EXECUTABLE in rpc mode (not the loader-hijacked rpc-entry)", () => {
     // when
     const descriptor = buildRpcSpawn(
@@ -250,6 +504,8 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.args).toContain("omo-mock/mock-1")
     expect(descriptor.args).toContain("--extension")
     expect(descriptor.args).toContain("/tmp/mock.ts")
+    expect(descriptor.args).toContain("--no-ask-user")
+    expect(descriptor.args.indexOf("--no-ask-user")).toBe(descriptor.args.indexOf("--no-extensions") + 1)
     expect(descriptor.args.some((a) => a.includes("rpc-entry"))).toBe(false)
   })
 
@@ -261,7 +517,7 @@ describe("buildRpcSpawn spawn strategy", () => {
     )
     // then
     expect(descriptor.command).toBe(join("/opt/senpi/bin", "senpi"))
-    expect(descriptor.args).toEqual(["--mode", "rpc", "--no-extensions", "--model", "omo-mock/mock-1"])
+    expect(descriptor.args).toEqual(["--mode", "rpc", "--no-extensions", "--no-ask-user", "--model", "omo-mock/mock-1"])
     expect(descriptor.cwd).toBe(baseSpec.cwd)
   })
 
@@ -283,6 +539,7 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.args).toEqual([
       "/pkg/@code-yeongyu/senpi/dist/rpc-entry.js",
       "--no-extensions",
+      "--no-ask-user",
       "--extension",
       "/tmp/mock.ts",
       "--model",

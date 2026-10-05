@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ulwLoopCommand } from "../src/cli-commands.ts";
 import { ulwLoopLedgerPath } from "../src/paths.ts";
+import { CLI_TEST_SCOPE, CLI_TEST_SESSION_ID } from "./fixtures/cli-session.js";
 
 let testDir: string;
 let out: string[];
@@ -21,6 +22,7 @@ beforeEach(async () => {
 	delete process.env["CODEX_SESSION_ID"];
 	delete process.env["CODEX_THREAD_ID"];
 	delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+	process.env["OMO_ULW_LOOP_SESSION_ID"] = CLI_TEST_SESSION_ID;
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -48,7 +50,7 @@ function stdoutJson(): Record<string, unknown> {
 }
 
 async function ledgerKinds(): Promise<string[]> {
-	const raw = await readFile(ulwLoopLedgerPath(testDir), "utf8");
+	const raw = await readFile(ulwLoopLedgerPath(testDir, CLI_TEST_SCOPE), "utf8");
 	return raw
 		.split(/\r?\n/)
 		.filter(Boolean)

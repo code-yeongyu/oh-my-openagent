@@ -1,12 +1,11 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { stripQuotedRegions } from "../skill-pointers/strip-quoted-regions"
 import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 
-// Generous, exception-free matching by design ("하이ulw", "ulw_helper.ts", "ulw-plan"):
-// overlapping keywords all fire, so a skill-name mention like "ulw-loop" arms ultrawork
-// while the skill-pointers component loads that skill in the same turn. Only structural
-// dedup remains: /skill: name-only, /skill:ultrawork expansion, and an embedded
-// <ultrawork-mode> tag pair never re-inject.
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i
+// Match complete words so prose such as "ulwfoo" and identifiers such as "ulw_helper" do not
+// arm ultrawork. Hyphens and spaces remain boundaries, so skill names like "ulw-loop" and phrases
+// like "ulw loop" still arm. Quoted and injected regions are blanked before this pattern runs.
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = /\b(?:ultrawork|ulw)\b/i
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
 const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
 const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
@@ -143,7 +142,7 @@ export function createUltraworkComponent(arming: SessionArming = sharedSessionAr
 }
 
 export function isUltraworkInput(text: string): boolean {
-  return ULTRAWORK_CURRENT_PROMPT_PATTERN.test(text)
+  return ULTRAWORK_CURRENT_PROMPT_PATTERN.test(stripQuotedRegions(text))
 }
 
 export function armingSnapshot(sessionId: string | undefined): ArmingSnapshot {
@@ -159,7 +158,8 @@ export function classifyUltraworkInput(
   input: { readonly text: string; readonly source: SenpiInputEvent["source"] },
   snapshot: ArmingSnapshot,
 ): UltraworkClassification {
-  const matches = [...input.text.matchAll(new RegExp(ULTRAWORK_CURRENT_PROMPT_PATTERN.source, "gi"))]
+  const visibleText = stripQuotedRegions(input.text)
+  const matches = [...visibleText.matchAll(new RegExp(ULTRAWORK_CURRENT_PROMPT_PATTERN.source, "gi"))]
   let matchedUlw = false
   let matchedUltrawork = false
   for (const match of matches) {

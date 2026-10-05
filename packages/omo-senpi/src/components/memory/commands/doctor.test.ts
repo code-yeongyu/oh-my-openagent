@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
@@ -16,13 +16,14 @@ import {
   type FakeDeps,
 } from "./commands.test-support"
 import { registerDoctorCommand } from "./doctor"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 const SEEDS = [
@@ -74,6 +75,16 @@ Changes to these files only take effect after a git commit. Use the memory tools
 const V1_PERSONA_SEED = `---\ndescription: Persona - who I am\n---\n${V1_PERSONA_BODY}`
 
 describe("/doctor", () => {
+  test("#given registration #when doctor is not invoked #then no identity or settings are resolved", () => {
+    const pi = new MemoryFakeExtensionAPI()
+    registerDoctorCommand(pi, {
+      contextForSession: () => { throw new Error("registration resolved identity") },
+      bustPromptCache: () => { throw new Error("registration cleared prompt cache") },
+      loadSettings: () => { throw new Error("registration loaded settings") },
+    })
+    expect(pi.commands.find((command) => command.name === "doctor")?.options.description).toBe("Run deterministic memory health checks and repair skill frontmatter.")
+  })
+
   test("#given a healthy repository #when doctor runs #then every deterministic check passes", async () => {
     // given
     const { pi, ctx } = await harness()
@@ -227,6 +238,28 @@ describe("/doctor", () => {
   // on, one case would pass by calendar coincidence, which is how dev run 32209640837 went green.
   const WARN_NOW_MS = Date.parse("2026-08-12T05:00:00.000Z")
   const OK_NOW_MS = Date.parse("2126-08-12T05:00:00.000Z")
+
+  test("#given automatic reflection is parked #when doctor runs #then reflection health reports the pause and the manual retry", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => WARN_NOW_MS } })
+    await seedReflectionFailureStreak(identity.identityPaths.reflection, WARN_NOW_MS - 60 * 60_000)
+    await mkdir(identity.identityPaths.reflection, { recursive: true })
+    await writeFile(join(identity.identityPaths.reflection, "park.json"), JSON.stringify({
+      version: 1,
+      streak: 3,
+      parkedAt: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(),
+      lastFailure: { runId: "run-3", at: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(), fingerprint: "spawn_failed:Model not found", retryable: false, reason: "spawn_failed", detail: "Model not found" },
+    }))
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toContain("[warn] reflection-health")
+    expect(text).toContain("automatic reflection paused since")
+    expect(text).toContain("next probe")
+    expect(text).toContain("/reflect")
+  })
 
   test("#given a failure streak one hour before the injected now #when doctor runs #then reflection health warns with the live streak", async () => {
     // given

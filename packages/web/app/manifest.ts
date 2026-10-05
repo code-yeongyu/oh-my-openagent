@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Oh My OpenAgent",
+    name: "OmO",
     short_name: "OMO",
     description:
-      "The Best Agent Harness. Meet Sisyphus: The batteries-included agent that codes like you.",
+      "The Best Agent Harness. Meet OmO: the batteries-included agent harness that codes like you.",
     start_url: "/",
     display: "standalone",
     background_color: "#0a0a0a",
@@ -15,6 +15,30 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icon.svg",
         sizes: "any",
         type: "image/svg+xml",
+      },
+      {
+        src: "/icon-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-maskable-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icon-maskable-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   }

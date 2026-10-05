@@ -1,6 +1,7 @@
 ---
 name: init-deep
-description: "(builtin) Initialize hierarchical AGENTS.md knowledge base"
+description: "Initializes a hierarchical AGENTS.md knowledge base for a project. Use when a repo needs its structure, commands, and conventions documented for agents."
+argument-hint: "[--create-new] [--max-depth=N]"
 ---
 # /init-deep
 
@@ -36,7 +37,7 @@ Generate hierarchical AGENTS.md files: root + complexity-scored subdirectories, 
 
 Measure and compute in ONE eval cell - code, not mental arithmetic:
 
-```python
+```js
 # Measure (tracked files minus vendored/generated: node_modules, .git, dist,
 # build, out, vendor, target, coverage, lockfiles, minified and binary files)
 S        = total source bytes after exclusions

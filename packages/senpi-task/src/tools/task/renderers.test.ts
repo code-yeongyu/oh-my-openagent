@@ -36,7 +36,7 @@ describe("statusThemeColor", () => {
 describe("taskCallLines", () => {
   test("#given current spawn arguments #when rendered #then the plain row includes task, target, actual prompt, and mode", () => {
     // given
-    const args = { prompt: "ship it", subagent_type: "atlas", run_in_background: false }
+    const args = { prompt: "ship it", subagent_type: "builder", run_in_background: false }
 
     // when
     const lines = taskCallLines(args)
@@ -287,13 +287,13 @@ describe("taskResultLines", () => {
       task_id: "st_0000000d",
       status: "completed",
       mode: "spawn",
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "openai/manual",
       run_in_background: false,
     }).join(" ")
 
     // then
-    expect(row).toContain("agent:momus(openai/manual)")
+    expect(row).toContain("agent:plan-reviewer(openai/manual)")
     expect(row).toContain("foreground")
     expect(row).not.toContain("prompt:")
     expect(row).not.toContain("reason:")
@@ -361,7 +361,7 @@ describe("taskResultLines", () => {
       mode: "spawn" as const,
       category: "quick",
       resolved_model: {
-        provider: "openai-codex",
+        provider: "chatgpt-subscription",
         model_id: "gpt-5.6-luna-fast",
         display: "gpt-5.6-luna-fast",
         reasoning_effort: "high",
@@ -369,7 +369,7 @@ describe("taskResultLines", () => {
       },
       fallback_attempts: [
         { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed", display: "kimi-for-coding-highspeed", source: "category" as const },
-        { provider: "openai-codex", model_id: "gpt-5.6-luna-fast", display: "gpt-5.6-luna-fast", reasoning_effort: "high", source: "category" as const },
+        { provider: "chatgpt-subscription", model_id: "gpt-5.6-luna-fast", display: "gpt-5.6-luna-fast", reasoning_effort: "high", source: "category" as const },
       ],
       run_in_background: false,
     }
@@ -380,7 +380,7 @@ describe("taskResultLines", () => {
 
     // then
     for (const row of [plain, compact]) {
-      expect(row).toContain("category:quick(openai-codex/gpt-5.6-luna-fast:high)")
+      expect(row).toContain("category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high)")
       expect(row).toContain("fallback:2")
     }
     expect(rendererVisibleWidth(compact)).toBeLessThanOrEqual(120)

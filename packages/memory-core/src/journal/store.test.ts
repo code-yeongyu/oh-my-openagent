@@ -1,16 +1,18 @@
 import { afterEach, describe, expect, it } from "bun:test"
+import { Buffer } from "node:buffer"
 import { spawn } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { TranscriptJournal, withLocalJournalLock } from "./store"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createJournal(): Promise<{ dir: string; journal: TranscriptJournal }> {
@@ -56,6 +58,7 @@ describe("transcript journal store", () => {
       total_completed_steps: 3,
       reflected_completed_steps: 0,
       steps_since_last_successful_reflection: 3,
+      unreflected_bytes: Buffer.byteLength(transcript, "utf8"),
     })
   })
 
@@ -261,5 +264,27 @@ describe("stale journal lock recovery", () => {
 
     // then
     expect(existsSync(join(dir, "state.lock"))).toBe(false)
+  })
+})
+
+describe("transcript journal state writes", () => {
+  it("#given the platform refuses the state rename #when state is written #then the write rejects and leaves no temporary file", async () => {
+    // given
+    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-refused-")))
+    tempDirs.push(dir)
+    const journal = new TranscriptJournal({
+      journalDir: dir,
+      now: () => new Date("2026-08-09T12:00:00.000Z"),
+      renameFile: async () => {
+        throw Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" })
+      },
+    })
+
+    // when
+    const written = journal.setPendingCompaction(true)
+
+    // then
+    await expect(written).rejects.toMatchObject({ code: "EPERM" })
+    expect((await readdir(dir)).filter((name) => name.startsWith("state.json.tmp-"))).toEqual([])
   })
 })

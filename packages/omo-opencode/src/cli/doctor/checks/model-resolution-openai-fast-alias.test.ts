@@ -4,7 +4,7 @@ import { buildModelResolutionDetails } from "./model-resolution-details"
 import { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } from "./model-resolution"
 import type { OmoConfig } from "./model-resolution-types"
 
-describe("doctor OpenAI GPT-5.6 fast capability diagnostics", () => {
+describe("doctor OpenAI GPT fast capability diagnostics", () => {
   test("preserves the configured model and variant while reporting alias-backed capabilities", () => {
     const config: OmoConfig = {
       agents: {
@@ -27,7 +27,7 @@ describe("doctor OpenAI GPT-5.6 fast capability diagnostics", () => {
         resolutionMode: "alias-backed",
         canonicalization: {
           source: "pattern-alias",
-          ruleID: "openai-gpt-5.6-fast-service-tier-alias",
+          ruleID: "openai-gpt-fast-service-tier-alias",
         },
       },
     })

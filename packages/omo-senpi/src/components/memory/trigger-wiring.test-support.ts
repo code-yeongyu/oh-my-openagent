@@ -44,6 +44,7 @@ export async function fixture(options: {
   readonly withoutLaunchHandler?: boolean
   readonly session?: ReflectionTriggerSession | undefined
   readonly enabled?: boolean
+  readonly onCompactionAccepted?: (conversationId: string) => void
 } = {}): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), "omo-trigger-wiring-"))
   roots.push(root)
@@ -84,6 +85,7 @@ export async function fixture(options: {
     ...(options.withoutLaunchHandler === true
       ? {}
       : { onLaunch: options.onLaunch ?? ((request: ReflectionRequest) => void launches.push(request)) }),
+    ...(options.onCompactionAccepted === undefined ? {} : { onCompactionAccepted: options.onCompactionAccepted }),
     logger: {
       info: (message, details) => logs.push({ level: "info", message, details }),
       warn: (message, details) => logs.push({ level: "warn", message, details }),

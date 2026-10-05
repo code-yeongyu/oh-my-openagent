@@ -118,6 +118,42 @@ describe("OmO Native prompt telemetry", () => {
     }
   })
 
+  test("#given quoted and embedded keywords #when submitted #then telemetry matches the arming filter", async () => {
+    const testHarness = await harness({ withUltrawork: true })
+    try {
+      const texts = [
+        "ulwfoo",
+        "explain `ulw`",
+        "```text\nulw\n```",
+        "<omo-ulw-loop-pointer>ulw loop</omo-ulw-loop-pointer>",
+        "<ultrawork-mode>ulw</ultrawork-mode>",
+        "<omo-ultrawork-reminder>ultrawork</omo-ultrawork-reminder>",
+        "ulw loop",
+      ]
+      for (const [index, text] of texts.entries()) {
+        const inputId = `filtered-${index}`
+        await input(testHarness.pi, inputId, text, "session-filtered")
+        await disposition(testHarness.pi, inputId, "started")
+      }
+
+      expect(testHarness.captures.map(({ properties }) => ({
+        keyword: properties["keyword_ulw_abbrev"],
+        any: properties["keyword_any"],
+        effective: properties["is_effective_ultrawork_invocation"],
+        stage: properties["invocation_stage"],
+      }))).toEqual(texts.map((_, index) => ({
+        keyword: index === texts.length - 1,
+        any: index === texts.length - 1,
+        effective: index === texts.length - 1,
+        stage: index === texts.length - 1 ? "first_arm" : "none",
+      })))
+      expect(testHarness.pi.messages).toHaveLength(1)
+      expect(testHarness.pi.messages[0]?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
+    } finally {
+      testHarness.restore()
+    }
+  })
+
   test("#given queued steering and duplicate dispositions #when handled #then queue semantics emit exactly once", async () => {
     const testHarness = await harness()
     try {

@@ -11,6 +11,7 @@ import {
 	parseJsonEvents,
 	snapshotDir,
 } from "./task-e2e-analysis.mjs";
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const mockProvider = join(scriptDir, "variant-thinking-mock-provider.ts");
@@ -18,14 +19,23 @@ const realSenpiAgentDir = join(homedir(), ".senpi", "agent");
 const capturesFile = "variant-thinking-captures.jsonl";
 
 const CASES = [
-	{ agent: "momus", prompt: "review the variant qa fixture plan", expected: "xhigh" },
-	{ agent: "metis", prompt: "gap-analyze the variant qa fixture plan", expected: "medium" },
+	{ agent: "plan-reviewer", prompt: "review the variant qa fixture plan", expected: "xhigh" },
+	{ agent: "plan-consultant", prompt: "gap-analyze the variant qa fixture plan", expected: "medium" },
 ];
+
+// Both agents are plan-gated: the parent must touch a .omo/plans artifact after the user prompt
+// requested ulw-plan (see plan-gated-agents-e2e.mjs) before the spawn is admitted.
+const PLAN_WRITE_STEP = {
+	type: "tool_call",
+	name: "write",
+	arguments: { path: ".omo/plans/variant-qa-plan.md", content: "# Variant QA Plan\n\n- review me\n" },
+};
 
 function mockScript(agent) {
 	return {
 		childSteps: [{ type: "text", text: "variant qa child done" }],
 		parentSteps: [
+			PLAN_WRITE_STEP,
 			{
 				type: "tool_call",
 				name: "task",
@@ -53,7 +63,7 @@ function seedScenario(agent) {
 	return {
 		sandbox,
 		sessionDir,
-		stateDir: join(sandbox.cwd, ".omo", "senpi-task"),
+		stateDir: sandboxStateDir(sandbox),
 		capturesPath: join(sandbox.cwd, capturesFile),
 	};
 }
@@ -73,12 +83,13 @@ function driveSenpi(senpiBin, scenario, agent) {
 			"mock-1",
 			"--session-dir",
 			scenario.sessionDir,
-			`run the ${agent} variant child`,
+			// The hyphenated form arms the user-request channel without tripping the ultrawork /ulw(?!-)/ trigger.
+			`please run the ulw-plan ${agent} variant child`,
 		],
 		{
 			cwd: scenario.sandbox.cwd,
 			env: {
-				...process.env,
+				...isolatedChildEnv(process.env, scenario.sandbox.agentDir),
 				SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
 				XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,
 				SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
@@ -106,7 +117,6 @@ function readAgentVariant(stateDir, agent) {
 			statuses.push(record?.status ?? "unknown");
 			if (record?.status === "completed") {
 				found = record?.resolved_model?.variant ?? null;
-				writeFileSync("/tmp/metis-record-dump.json", JSON.stringify(record, null, 2));
 			}
 		}
 	}

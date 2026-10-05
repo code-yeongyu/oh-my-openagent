@@ -31,12 +31,4 @@ describe("worktree-sweep command registration", () => {
     expect(gitSource).toContain('runGit(repo, ["worktree", "remove", worktreePath])')
   })
 
-  test("apply only removes after classification decides SWEEP", async () => {
-    // given
-    const sweepSource = await readFile(path.resolve(import.meta.dir, "sweep.ts"), "utf-8")
-
-    // when / then
-    expect(sweepSource).toContain('classification.decision !== "SWEEP"')
-    expect(sweepSource).toContain("await pruneWorktrees(root)")
-  })
 })

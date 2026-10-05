@@ -1,4 +1,4 @@
-import { lstatSync, realpathSync } from "node:fs";
+import { lstatSync, realpathSync } from "../fs/resilient";
 import {
   dirname,
   extname,
@@ -11,9 +11,16 @@ import {
  * Confined memory path validation.
  *
  * Dual-copy verdict: Letta's memory.ts:346-454 and
- * memory-apply-patch.ts:509-643 implementations are behaviorally identical.
+ * Both memory write paths use this shared validation.
  * They differ only in tool-name error prefixes, comments, and formatting.
  */
+const MEMORY_CONTENT_PATH_RE = /^(?:memory\/)?(?:(?:system|reference|people)\/.*\.md|skills\/.+\/SKILL\.md)$/
+
+/** Paths whose frontmatter is under the memory contract (the same set the pre-commit hook validates). */
+export function isMemoryContentPath(path: string): boolean {
+  return MEMORY_CONTENT_PATH_RE.test(path.replace(/\\/g, "/"))
+}
+
 export class MemoryPathError extends Error {
   override readonly name = "MemoryPathError";
 }

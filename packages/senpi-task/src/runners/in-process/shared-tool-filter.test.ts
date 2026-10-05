@@ -10,9 +10,10 @@ import {
 
 const sampleParameters = createReadToolDefinition(process.cwd()).parameters
 
-function makeTool(name: string): ToolDefinition {
+function makeTool(name: string, exposure?: ToolDefinition["exposure"]): ToolDefinition {
   return {
     name,
+    ...(exposure === undefined ? {} : { exposure }),
     label: name,
     description: `test tool ${name}`,
     parameters: sampleParameters,
@@ -21,8 +22,8 @@ function makeTool(name: string): ToolDefinition {
 }
 
 describe("shared parent tool family filter", () => {
-  test("#given task, team, and dag orchestration names #when classified #then only orchestration names match", () => {
-    expect(isTaskOrTeamFamilyTool("dag")).toBe(true)
+  test("#given task, team, and workflow orchestration names #when classified #then only orchestration names match", () => {
+    expect(isTaskOrTeamFamilyTool("workflow")).toBe(true)
     expect(isTaskOrTeamFamilyTool("task")).toBe(true)
     expect(isTaskOrTeamFamilyTool("task_create")).toBe(true)
     expect(isTaskOrTeamFamilyTool("task_send")).toBe(true)
@@ -31,31 +32,56 @@ describe("shared parent tool family filter", () => {
     expect(isTaskOrTeamFamilyTool("taskmaster")).toBe(false)
   })
 
-  test("#given shared tools with family and ui-only entries #when filtered #then family and ui-only removed", () => {
-    const shared = [makeTool("grep"), makeTool("task_create"), makeTool("team_create"), makeTool("render_widget")]
+  test("#given shared task, team, workflow, and ui-only entries #when filtered #then process-child task tools remain while lead-only and ui-only tools are removed", () => {
+    const shared = [makeTool("grep"), makeTool("task_create"), makeTool("workpool"), makeTool("team_create"), makeTool("workflow"), makeTool("render_widget")]
 
-    const filtered = filterSharedParentTools(shared, { uiOnlyToolNames: ["render_widget"] })
+    const filtered = filterSharedParentTools(shared, { uiOnlyToolNames: ["render_widget"], includeTaskTools: true })
 
-    expect(filtered.map((tool) => tool.name)).toEqual(["grep"])
+    expect(filtered.map((tool) => tool.name)).toEqual(["grep", "task_create", "workpool"])
   })
 
-  test("#given family tool in shared and in member-scoped #when merged #then only member-scoped family crosses the exclusion", () => {
+  test("#given task tools in shared and member-scoped sets #when merged #then both remain available", () => {
     const shared = [makeTool("grep"), makeTool("task")]
     const memberScoped = [makeTool("task_send")]
 
-    const merged = mergeChildCustomTools(shared, memberScoped)
+    const merged = mergeChildCustomTools(shared, memberScoped, { includeTaskTools: true })
 
-    expect(merged.map((tool) => tool.name)).toEqual(["grep", "task_send"])
+    expect(merged.map((tool) => tool.name)).toEqual(["grep", "task", "task_send"])
     for (const tool of merged) {
       expect(typeof tool.execute).toBe("function")
     }
   })
 
-  test("#given no member-scoped tools #when merged #then result is only the filtered shared set", () => {
+  test("#given no member-scoped tools #when merged #then process-child task tools remain in the shared set", () => {
     const shared = [makeTool("glob"), makeTool("task_update")]
 
-    const merged = mergeChildCustomTools(shared, undefined)
+    const merged = mergeChildCustomTools(shared, undefined, { includeTaskTools: true })
 
-    expect(merged.map((tool) => tool.name)).toEqual(["glob"])
+    expect(merged.map((tool) => tool.name)).toEqual(["glob", "task_update"])
+  })
+
+  test("#given x_search and thread_create search-exposed tools #when filtered #then only x_search is direct and copied", () => {
+    const xSearch = makeTool("x_search", "search")
+    const threadCreate = makeTool("thread_create", "search")
+
+    const filtered = filterSharedParentTools([xSearch, threadCreate])
+
+    expect(filtered[0]?.exposure).toBe("direct")
+    expect(filtered[0]).not.toBe(xSearch)
+    expect(xSearch.exposure).toBe("search")
+    expect(filtered[1]).toBe(threadCreate)
+    expect(filtered.map((tool) => tool.name)).toEqual(["x_search", "thread_create"])
+  })
+
+  test("#given a parent list with ask_user_question #when filtered without vs with the name in uiOnly #then the filter is the only gate", () => {
+    const shared = [makeTool("grep"), makeTool("ask_user_question"), makeTool("request_user_input")]
+
+    const without = filterSharedParentTools(shared)
+    const withUiOnly = filterSharedParentTools(shared, {
+      uiOnlyToolNames: ["ask_user_question", "request_user_input"],
+    })
+
+    expect(without.map((tool) => tool.name)).toEqual(["grep", "ask_user_question", "request_user_input"])
+    expect(withUiOnly.map((tool) => tool.name)).toEqual(["grep"])
   })
 })

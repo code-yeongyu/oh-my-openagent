@@ -84,7 +84,7 @@ function appender(target: Engine, runId: DagRunId) {
   let transitions = 0
   return () => {
     transitions += 1
-    return journal.append(
+    const event = journal.append(
       transitions === 1
         ? dagRunStartedEvent({ generation: 1 })
         : dagNodeTransitionedEvent({
@@ -93,7 +93,9 @@ function appender(target: Engine, runId: DagRunId) {
             to: "running",
             reason: { kind: "started" },
           }),
-    ).seq
+    )
+    if (event === undefined) throw new Error("append was deduped unexpectedly")
+    return event.seq
   }
 }
 

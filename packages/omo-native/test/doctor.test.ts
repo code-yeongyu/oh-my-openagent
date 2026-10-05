@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { delimiter, dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
@@ -11,7 +11,6 @@ const artifacts = [
   ["plugin manifest", "plugin/package.json"],
   ["extension", "plugin/extensions/omo.js"],
   ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-  ["agent-toolkit runtime", "plugin/runtime/agent-toolkit/cli.js"],
 ] as const
 
 type Fixture = { root: string; packageRoot: string; launcher: string; agentDir: string }
@@ -49,10 +48,22 @@ function createFixture(): Fixture {
   return { root, packageRoot, launcher: join(packageRoot, "bin", "omo.js"), agentDir }
 }
 
+function writeFakePs(dir: string, output: string): string {
+  writeFile(join(dir, "ps"), `#!/bin/sh\nprintf '%s' ${JSON.stringify(output)}\n`)
+  chmodSync(join(dir, "ps"), 0o755)
+  return dir
+}
+
+// Doctor lists engines with `ps`; an empty fake first on PATH keeps the host's processes out.
+function withoutHostProcesses(fixture: Fixture, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const fakeBin = writeFakePs(join(fixture.root, "no-host-ps"), "")
+  return { ...env, PATH: `${fakeBin}${delimiter}${env.PATH ?? ""}` }
+}
+
 function run(fixture: Fixture, env: NodeJS.ProcessEnv = {}) {
   return spawnSync(process.execPath, [fixture.launcher, "doctor"], {
     encoding: "utf8",
-    env: { ...process.env, SENPI_CODING_AGENT_DIR: fixture.agentDir, ...env },
+    env: withoutHostProcesses(fixture, { ...process.env, SENPI_CODING_AGENT_DIR: fixture.agentDir, ...env }),
   })
 }
 
@@ -158,6 +169,23 @@ function envWithoutAgentDir(home: string): NodeJS.ProcessEnv {
 }
 
 describe("omo doctor", () => {
+  describe("#given the host is running a stale engine", () => {
+    describe("#when diagnostics run", () => {
+      test("#then the fixture's output never reports a host pid", () => {
+        const fixture = createFixture()
+        const hostBin = writeFakePs(
+          join(fixture.root, "host-ps"),
+          "  4242     1  2-00:00:00 ttys001 node /opt/host/senpi/dist/cli.js\n",
+        )
+
+        const result = run(fixture, { PATH: `${hostBin}${delimiter}${process.env.PATH ?? ""}` })
+
+        expect(result.stdout).toContain("PASS senpi CLI")
+        expect(result.stdout).not.toContain("engine pid")
+      })
+    })
+  })
+
   describe("#given no agent directory is configured", () => {
     describe("#when diagnostics run", () => {
       test("#then the canonical branded directory is the one inspected", () => {
@@ -170,7 +198,7 @@ describe("omo doctor", () => {
 
         const result = spawnSync(process.execPath, [fixture.launcher, "doctor"], {
           encoding: "utf8",
-          env: envWithoutAgentDir(home),
+          env: withoutHostProcesses(fixture, envWithoutAgentDir(home)),
         })
 
         expect(result.stdout).toContain("WARN duplicate @code-yeongyu/omo-senpi package entry")

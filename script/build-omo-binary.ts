@@ -20,24 +20,47 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs"
-import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
-import ptyFixture from "./release-binary-pty-fixture.json"
+import { z } from "zod"
+import { engineSidecarSources, resolvePackageDir, senpiPackageDir, type SidecarSource } from "./engine-sidecar-sources"
+import { CLAUDE_CODE_PIN_REL_PATH, claudeCodePinFor } from "./claude-code-pin"
+import nativeFixture from "./release-binary-native-fixture.json"
+import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
+import { parseBuildInfo, type EngineBuildStamp, type OmoBuildInfo } from "../packages/omo-native/build-info"
+import {
+  compileDefinesForOmoBinary,
+  engineBuildDefineArgs,
+  omoBinaryEngineStamp,
+  releaseEngineBuildStamp,
+} from "./engine-build-defines"
+import { desktopEngineTarget, stageCompiledDesktopEngine } from "./release-desktop-engine-target"
+import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
+import { reportEmbeddedPayload } from "./embedded-payload-probe"
+
+export { compileDefinesForOmoBinary, reportEmbeddedPayload }
+export type { EmbeddedPayloadReport } from "./embedded-payload-probe"
+export {
+  EMBEDDED_PAYLOAD_ROOT,
+  embeddedNameForRelPath,
+  relPathForEmbeddedName,
+  RUNTIME_MANIFEST_REL_PATH,
+} from "./embedded-payload-naming"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
-const senpiPackageDir = join(repoRoot, "node_modules", "@code-yeongyu", "senpi")
-const senpiRequire = createRequire(join(senpiPackageDir, "package.json"))
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
-/** Directory name that prefixes every embedded asset name. */
-export const EMBEDDED_PAYLOAD_ROOT = "omo-runtime"
-/** Relative path of the embedded runtime manifest inside the payload root. */
-export const RUNTIME_MANIFEST_REL_PATH = "runtime-manifest.json"
 /** Hard per-binary size budget (150MB). */
 export const MAX_BINARY_BYTES = 150 * 1024 * 1024
+
+export interface NativePrebuild {
+  readonly fileStem: "senpi_pty" | "senpi_grep"
+  readonly packageName: string
+  readonly pin: string
+  readonly host: string
+}
 
 export interface ReleaseBinaryTarget {
   /** Release asset platform slug, e.g. `darwin-arm64`. */
@@ -50,18 +73,31 @@ export interface ReleaseBinaryTarget {
   readonly binaryName: string
   /** Pinned engine version (@code-yeongyu/senpi). */
   readonly enginePin: string
-  /** Pinned senpi-pty version. */
-  readonly ptyPin: string
-  /** `native/prebuilds/<host>` directory when upstream ships a prebuild, else undefined. */
-  readonly ptyPrebuildHost: string | undefined
+  /** Native addon files upstream promises for this target. */
+  readonly nativePrebuilds: readonly NativePrebuild[]
 }
 
-interface PtyFixtureEntry {
-  readonly ptyAvailable: boolean
-  readonly prebuildHost: string | null
-}
-
-const PTY_FIXTURE_TARGETS = ptyFixture.targets as Readonly<Record<string, PtyFixtureEntry>>
+const nativeFixtureTargets = z.record(z.string(), z.object({
+  available: z.boolean(),
+  prebuildHost: z.string().min(1).nullable(),
+}))
+const nativeFixtureSchema = z.object({
+  $comment: z.string(),
+  generatedAt: z.string(),
+  prebuilds: z.object({
+    senpi_pty: z.object({
+      packageName: z.literal("@code-yeongyu/senpi-pty"),
+      pinSource: z.literal("ptyPin"),
+      pin: z.string().min(1),
+      targets: nativeFixtureTargets,
+    }),
+    senpi_grep: z.object({
+      packageName: z.literal("@code-yeongyu/senpi"),
+      pinSource: z.literal("enginePin"),
+      targets: nativeFixtureTargets,
+    }),
+  }),
+})
 
 function readEnginePin(): string {
   // packages/omo-native is the npm channel that ships the engine, so its pin is
@@ -95,38 +131,56 @@ const TARGET_DEFINITIONS: readonly (readonly [string, ReleaseBinaryTarget["os"],
   ["windows-arm64", "windows", "bun-windows-arm64"],
 ]
 
-export const RELEASE_BINARY_TARGETS: readonly ReleaseBinaryTarget[] = TARGET_DEFINITIONS.map(
-  ([target, os, bunTarget]) => {
-    const fixture = PTY_FIXTURE_TARGETS[target]
-    if (fixture === undefined) {
-      throw new Error(`release-binary-pty-fixture.json is missing target ${target}`)
+/** Validates the per-package fixture and resolves each available addon's pin. */
+export function loadReleaseBinaryTargets(
+  input: unknown,
+  enginePin = ENGINE_PIN,
+): readonly ReleaseBinaryTarget[] {
+  const fixture = nativeFixtureSchema.parse(input)
+  return TARGET_DEFINITIONS.map(([target, os, bunTarget]) => {
+    const nativePrebuilds: NativePrebuild[] = []
+    for (const fileStem of ["senpi_pty", "senpi_grep"] as const) {
+      const prebuild = fixture.prebuilds[fileStem]
+      const entry = prebuild.targets[target]
+      if (entry === undefined) {
+        throw new Error(`release-binary-native-fixture.json: ${fileStem} is missing target ${target}`)
+      }
+      if (!entry.available) continue
+      if (entry.prebuildHost === null) {
+        throw new Error(`release-binary-native-fixture.json: ${fileStem} ${target} is available without a prebuildHost`)
+      }
+      nativePrebuilds.push({
+        fileStem,
+        packageName: prebuild.packageName,
+        pin: prebuild.pinSource === "enginePin" ? enginePin : prebuild.pin,
+        host: entry.prebuildHost,
+      })
     }
     return {
       target,
       bunTarget,
       os,
       binaryName: os === "windows" ? `omo-${target}.exe` : `omo-${target}`,
-      enginePin: ENGINE_PIN,
-      ptyPin: ptyFixture.ptyPin,
-      ptyPrebuildHost: fixture.ptyAvailable ? (fixture.prebuildHost ?? undefined) : undefined,
+      enginePin,
+      nativePrebuilds,
     }
-  },
-)
-
-/** Maps a payload-relative path to the name bun assigns the embedded asset. */
-export function embeddedNameForRelPath(relPath: string): string {
-  return `${EMBEDDED_PAYLOAD_ROOT}/${relPath}`
+  })
 }
 
-/** Inverse of {@link embeddedNameForRelPath}; undefined for non-payload assets. */
-export function relPathForEmbeddedName(embeddedName: string): string | undefined {
-  const prefix = `${EMBEDDED_PAYLOAD_ROOT}/`
-  if (!embeddedName.startsWith(prefix)) return undefined
-  return embeddedName.slice(prefix.length)
-}
+export const RELEASE_BINARY_TARGETS = loadReleaseBinaryTargets(nativeFixture)
 
 /** Stamped sibling package.json the engine reads for its version contract. */
-export function createStampedPackageJson(omoAiVersion: string): string {
+export function createStampedPackageJson(
+  omoAiVersion: string,
+  buildInfo?: OmoBuildInfo,
+  engineBuild?: EngineBuildStamp,
+): string {
+  if (buildInfo !== undefined) {
+    return `${JSON.stringify({ name: "omo", version: omoAiVersion, omoBuild: buildInfo }, null, 2)}\n`
+  }
+  if (engineBuild !== undefined && engineBuild.scheme === "epoch") {
+    return `${JSON.stringify({ name: "omo", version: omoAiVersion, engineBuild }, null, 2)}\n`
+  }
   return `${JSON.stringify({ name: "omo", version: omoAiVersion }, null, 2)}\n`
 }
 
@@ -158,6 +212,8 @@ export interface RuntimeManifest {
   readonly omoAiVersion: string
   readonly enginePin: string
   readonly manifestSha: string
+  readonly buildInfo?: OmoBuildInfo
+  readonly engineBuild?: EngineBuildStamp
   readonly entries: readonly RuntimeManifestEntry[]
 }
 
@@ -168,7 +224,12 @@ function sha256OfFile(filePath: string): string {
 /** Builds the embedded runtime manifest for a staged payload directory. */
 export async function buildRuntimeManifest(
   stageDir: string,
-  options: { readonly omoAiVersion: string; readonly enginePin: string },
+  options: {
+    readonly omoAiVersion: string
+    readonly enginePin: string
+    readonly buildInfo?: OmoBuildInfo
+    readonly engineBuild?: EngineBuildStamp
+  },
 ): Promise<RuntimeManifest> {
   const entries: RuntimeManifestEntry[] = collectStagedFiles(stageDir)
     .filter((relPath) => relPath !== RUNTIME_MANIFEST_REL_PATH)
@@ -178,20 +239,37 @@ export async function buildRuntimeManifest(
       return {
         relPath,
         sha256: sha256OfFile(absolutePath),
-        mode: stats.mode & 0o777,
+        // Native addons must extract executable even from non-executable source
+        // archives or build hosts that do not expose POSIX permission bits.
+        mode: relPath.startsWith("native/prebuilds/") ? 0o755 : stats.mode & 0o777,
         size: stats.size,
       }
     })
-  const manifestSha = createHash("sha256")
-    .update(
-      JSON.stringify({
-        omoAiVersion: options.omoAiVersion,
-        enginePin: options.enginePin,
-        entries,
-      }),
-    )
-    .digest("hex")
+  const releaseEngineBuild =
+    options.engineBuild !== undefined && options.engineBuild.scheme === "epoch"
+      ? options.engineBuild
+      : undefined
+  const digestPayload = options.buildInfo === undefined
+    ? releaseEngineBuild === undefined
+      ? { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, entries }
+      : { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, engineBuild: releaseEngineBuild, entries }
+    : { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, buildInfo: options.buildInfo, entries }
+  const manifestSha = createHash("sha256").update(JSON.stringify(digestPayload)).digest("hex")
+  if (options.buildInfo !== undefined) {
+    return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, buildInfo: options.buildInfo, entries }
+  }
+  if (releaseEngineBuild !== undefined) {
+    return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, engineBuild: releaseEngineBuild, entries }
+  }
   return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, entries }
+}
+
+/**
+ * The embedded runtime-manifest.json. `releaseTarget` names the release asset this binary was built as
+ * (musl / baseline included) so `omo update` fetches the same flavor; it is outside the payload digest.
+ */
+export function runtimeManifestFileContent(manifest: RuntimeManifest, releaseTarget: string): string {
+  return `${JSON.stringify({ marker: "OMO_RUNTIME_MANIFEST_V1", ...manifest, releaseTarget })}\n`
 }
 
 /** Fails loud when a compiled binary exceeds the per-binary size budget. */
@@ -209,144 +287,9 @@ export function assertBinarySizeBudget(
   }
 }
 
-const EMBEDDED_PROBE_SOURCE = `import { embeddedFiles } from "bun"
-const names = []
-let manifest = null
-for (const file of embeddedFiles) {
-  names.push(file.name)
-  if (file.name.endsWith("${RUNTIME_MANIFEST_REL_PATH}")) manifest = JSON.parse(await file.text())
-}
-console.log(JSON.stringify({ names, manifest }))
-`
-
-export interface EmbeddedPayloadReport {
-  /** Embedded asset names exactly as bun assigned them. */
-  readonly names: readonly string[]
-  /** Payload-relative paths recovered from the embedded names. */
-  readonly relPaths: readonly string[]
-  /** The embedded runtime manifest. */
-  readonly manifest: RuntimeManifest
-}
-
-/**
- * Reports what a staged payload actually embeds, by compiling a host-target
- * probe against the very same `--asset` directory and running it. The probe
- * shares the build's toolchain, so it also catches a bun that silently drops
- * assets (e.g. a stale bun shadowing PATH).
- */
-export function reportEmbeddedPayload(stageDir: string): EmbeddedPayloadReport {
-  const probeRoot = mkdtempSync(join(tmpdir(), "omo-embed-probe-"))
-  try {
-    const probeEntry = join(probeRoot, "probe.ts")
-    const probeBinary = join(probeRoot, "probe")
-    writeFileSync(probeEntry, EMBEDDED_PROBE_SOURCE, "utf8")
-    runCommand(
-      "bun",
-      ["build", "--compile", `--asset=${stageDir}`, probeEntry, "--outfile", probeBinary],
-      probeRoot,
-    )
-    const probed = spawnSync(probeBinary, [], { encoding: "utf8" })
-    if (probed.status !== 0) {
-      throw new Error(`embedded payload probe failed: ${probed.stderr}`)
-    }
-    const parsed = JSON.parse(probed.stdout) as {
-      names: string[]
-      manifest: RuntimeManifest | null
-    }
-    if (parsed.manifest === null) {
-      throw new Error(
-        `embedded payload probe found no runtime manifest (${parsed.names.length} files embedded). The bun on PATH likely predates directory --asset support, which is accepted silently and dropped - resolve a bun >= 1.4 and retry.`,
-      )
-    }
-    const relPaths = parsed.names
-      .map((name) => relPathForEmbeddedName(name))
-      .filter((relPath): relPath is string => relPath !== undefined)
-    return { names: parsed.names, relPaths, manifest: parsed.manifest }
-  } finally {
-    rmSync(probeRoot, { recursive: true, force: true })
-  }
-}
-
-interface SidecarSource {
-  /** Absolute source path (file or directory). */
-  readonly from: string
-  /** Payload-relative destination path. */
-  readonly to: string
-  /** When true a missing source aborts the build. */
-  readonly required: boolean
-}
-
-function resolveFromSenpi(specifier: string): string | undefined {
-  try {
-    return senpiRequire.resolve(specifier)
-  } catch {
-    return undefined
-  }
-}
-
-function resolvePackageDir(packageName: string): string | undefined {
-  const packageJsonPath = resolveFromSenpi(`${packageName}/package.json`)
-  return packageJsonPath === undefined ? undefined : dirname(packageJsonPath)
-}
-
-/**
- * Sidecar parity set = senpi's own copy-binary-assets manifest (re-read from
- * node_modules/@code-yeongyu/senpi/package.json scripts.copy-binary-assets)
- * mapped from the published npm layout onto the flattened binary layout the
- * engine resolves next to process.execPath.
- */
-function engineSidecarSources(): SidecarSource[] {
-  const dist = join(senpiPackageDir, "dist")
-  const sources: SidecarSource[] = [
-    { from: join(senpiPackageDir, "README.md"), to: "README.md", required: true },
-    { from: join(senpiPackageDir, "CHANGELOG.md"), to: "CHANGELOG.md", required: true },
-    { from: join(dist, "modes", "interactive", "theme"), to: "theme", required: true },
-    { from: join(dist, "modes", "interactive", "assets"), to: "assets", required: true },
-    { from: join(dist, "core", "export-html"), to: "export-html", required: true },
-    { from: join(senpiPackageDir, "docs"), to: "docs", required: true },
-    { from: join(senpiPackageDir, "examples"), to: "examples", required: true },
-    { from: join(senpiPackageDir, "vendor"), to: "vendor", required: true },
-  ]
-  for (const packageName of ["css-tree", "mdn-data", "source-map-js"]) {
-    const packageDir = resolvePackageDir(packageName)
-    if (packageDir === undefined) {
-      throw new Error(`sidecar dependency ${packageName} is not installed under the senpi package`)
-    }
-    sources.push({ from: packageDir, to: `node_modules/${packageName}`, required: true })
-  }
-  const codemodeDir = resolvePackageDir("@code-yeongyu/senpi-codemode")
-  if (codemodeDir === undefined) {
-    throw new Error("codemode sidecar @code-yeongyu/senpi-codemode is not installed")
-  }
-  sources.push({
-    from: codemodeDir,
-    to: "node_modules/@code-yeongyu/senpi-codemode",
-    required: true,
-  })
-  const photonDir = resolvePackageDir("@silvia-odwyer/photon-node")
-  if (photonDir === undefined) {
-    throw new Error("@silvia-odwyer/photon-node is not installed under the senpi package")
-  }
-  sources.push({
-    from: join(photonDir, "photon_rs_bg.wasm"),
-    to: "photon_rs_bg.wasm",
-    required: true,
-  })
-  const tuiDir = resolvePackageDir("@earendil-works/pi-tui")
-  if (tuiDir !== undefined) {
-    for (const platform of ["darwin", "win32"]) {
-      const prebuilds = join(tuiDir, "native", platform, "prebuilds")
-      if (existsSync(prebuilds)) {
-        sources.push({ from: prebuilds, to: `native/${platform}/prebuilds`, required: false })
-      }
-    }
-  }
-  return sources
-}
-
-// Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts.
-const PLUGIN_PAYLOAD_DIRECTORIES = ["extensions", "skills", "runtime"] as const
-const PLUGIN_PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
+// Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts (locked by build-omo-binary.test.ts).
+export const PLUGIN_PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
+export const PLUGIN_PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json"] as const
 
 const EXPORT_HTML_KEEP = new Set([
   "template.html",
@@ -405,8 +348,8 @@ function stageSource(source: SidecarSource, stageDir: string, staged: Set<string
 
 /**
  * The payload-relative paths the built binary for `target` must embed:
- * engine sidecars UNION plugin payload UNION pty prebuild UNION stamped package.json.
- * Resolved from the installed sources, so it doubles as the parity expectation.
+ * engine sidecars UNION plugin payload UNION native prebuilds UNION stamped package.json.
+ * Native files come from the fixture, even when they must be fetched at staging time.
  */
 export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): string[] {
   const relPaths = new Set<string>(["package.json"])
@@ -432,15 +375,11 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
     collectFrom(join(pluginDir, name), `plugin/${name}`)
   }
   collectFrom(join(pluginDir, "scripts", "install.mjs"), "plugin/scripts/install.mjs")
-  if (target.ptyPrebuildHost !== undefined) {
-    const ptyDir = resolvePackageDir("@earendil-works/pi-pty")
-    if (ptyDir !== undefined) {
-      collectFrom(
-        join(ptyDir, "native", "prebuilds", target.ptyPrebuildHost),
-        `native/prebuilds/${target.ptyPrebuildHost}`,
-      )
-    }
+  for (const entry of target.nativePrebuilds) {
+    relPaths.add(nativePrebuildRelPath(entry))
   }
+  const desktopEngine = desktopEngineTarget(target.target).payload
+  if (desktopEngine !== null) relPaths.add(desktopEngine)
   return [...relPaths].sort()
 }
 
@@ -504,31 +443,48 @@ function stagePluginPayload(stageDir: string, staged: Set<string>): void {
   }
 }
 
-function stagePtyPrebuild(
-  target: ReleaseBinaryTarget,
+function nativePrebuildRelPath(entry: NativePrebuild): string {
+  return `native/prebuilds/${entry.host}/${entry.fileStem}.${entry.host}.node`
+}
+
+function resolveNativePackageDir(packageName: string): string | undefined {
+  if (packageName === "@code-yeongyu/senpi") return senpiPackageDir
+  const packageDir = resolvePackageDir(packageName)
+  // The installed engine currently declares senpi-pty through this npm alias.
+  return packageDir ?? (packageName === "@code-yeongyu/senpi-pty"
+    ? resolvePackageDir("@earendil-works/pi-pty")
+    : undefined)
+}
+
+/** Stages exactly the promised addon, preferring the installed package over npm. */
+export function stageNativePrebuild(
+  entry: NativePrebuild,
   stageDir: string,
   staged: Set<string>,
+  dependencies: {
+    readonly resolvePackageDir?: (packageName: string) => string | undefined
+    readonly runCommand?: typeof runCommand
+  } = {},
 ): void {
-  if (target.ptyPrebuildHost === undefined) return
-  const host = target.ptyPrebuildHost
-  const payloadRelPath = `native/prebuilds/${host}`
-  const localPtyDir = resolvePackageDir("@earendil-works/pi-pty")
-  const localPrebuild =
-    localPtyDir === undefined ? undefined : join(localPtyDir, "native", "prebuilds", host)
-  if (localPrebuild !== undefined && existsSync(localPrebuild)) {
+  const payloadRelPath = nativePrebuildRelPath(entry)
+  const localPackageDir = (dependencies.resolvePackageDir ?? resolveNativePackageDir)(entry.packageName)
+  const localPrebuild = localPackageDir === undefined ? undefined : join(localPackageDir, payloadRelPath)
+  if (localPrebuild !== undefined && existsSync(localPrebuild) && statSync(localPrebuild).isFile()) {
     stageSource({ from: localPrebuild, to: payloadRelPath, required: true }, stageDir, staged)
     return
   }
-  const packRoot = mkdtempSync(join(tmpdir(), "omo-pty-pack-"))
+  const execute = dependencies.runCommand ?? runCommand
+  const packageSpec = `${entry.packageName}@${entry.pin}`
+  const packRoot = mkdtempSync(join(tmpdir(), "omo-native-pack-"))
   try {
-    runCommand("npm", ["pack", `@code-yeongyu/senpi-pty@${target.ptyPin}`], packRoot)
+    execute("npm", ["pack", packageSpec], packRoot)
     const tarball = readdirSync(packRoot).find((name) => name.endsWith(".tgz"))
-    if (tarball === undefined) throw new Error("npm pack produced no senpi-pty tarball")
-    runCommand("tar", ["xzf", tarball], packRoot)
-    const extracted = join(packRoot, "package", "native", "prebuilds", host)
-    if (!existsSync(extracted)) {
+    if (tarball === undefined) throw new Error(`npm pack produced no tarball for ${packageSpec}`)
+    execute("tar", ["xzf", tarball], packRoot)
+    const extracted = join(packRoot, "package", payloadRelPath)
+    if (!existsSync(extracted) || !statSync(extracted).isFile()) {
       throw new Error(
-        `senpi-pty@${target.ptyPin} ships no prebuild for ${host}, but release-binary-pty-fixture.json marks ${target.target} as pty-available`,
+        `missing required sidecar source: ${payloadRelPath}; ${packageSpec} ships no such file, but release-binary-native-fixture.json marks ${entry.fileStem} as available`,
       )
     }
     stageSource({ from: extracted, to: payloadRelPath, required: true }, stageDir, staged)
@@ -545,14 +501,28 @@ export function stageSidecarPayload(
   target: ReleaseBinaryTarget,
   stageDir: string,
   omoAiVersion: string,
+  buildInfo?: OmoBuildInfo,
+  desktopEngineSourceRoot?: string,
 ): string[] {
   mkdirSync(stageDir, { recursive: true })
   const staged = new Set<string>()
-  writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion), "utf8")
+  const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
+  writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")
-  for (const source of engineSidecarSources()) stageSource(source, stageDir, staged)
+  const claudeCodePin = claudeCodePinFor(target.target, repoRoot)
+  if (claudeCodePin !== undefined) {
+    writeFileSync(join(stageDir, CLAUDE_CODE_PIN_REL_PATH), claudeCodePin, "utf8")
+    staged.add(CLAUDE_CODE_PIN_REL_PATH)
+  }
+  for (const source of engineSidecarSources()) {
+    const excluded = process.env.OMO_SIDECAR_EXCLUDE
+    if (excluded && (source.to.endsWith(`/node_modules/${excluded}`) || source.to.includes(`/node_modules/${excluded}/`))) continue
+    stageSource(source, stageDir, staged)
+  }
   stagePluginPayload(stageDir, staged)
-  stagePtyPrebuild(target, stageDir, staged)
+  for (const entry of target.nativePrebuilds) stageNativePrebuild(entry, stageDir, staged)
+  const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
+  if (desktopEngine !== null) staged.add(desktopEngine)
   return [...staged].sort()
 }
 
@@ -560,6 +530,7 @@ export interface BuildReleaseBinaryOptions {
   readonly omoVersion: string
   readonly omoAiVersion: string
   readonly outDir?: string
+  readonly buildInfo?: OmoBuildInfo
 }
 
 export interface BuildReleaseBinaryResult {
@@ -589,17 +560,16 @@ export async function buildReleaseBinary(
     // spelling. Basename is preserved, so embedded names stay
     // `${EMBEDDED_PAYLOAD_ROOT}/<relPath>`.
     const stageDir = realpathSync(stagedRoot)
-    stageSidecarPayload(target, stageDir, options.omoAiVersion)
+    const stamp = omoBinaryEngineStamp(options.buildInfo, senpiPackageDir)
+    stageSidecarPayload(target, stageDir, options.omoAiVersion, options.buildInfo)
 
     const manifest = await buildRuntimeManifest(stageDir, {
       omoAiVersion: options.omoAiVersion,
       enginePin: target.enginePin,
+      buildInfo: options.buildInfo,
+      engineBuild: releaseEngineBuildStamp(stamp),
     })
-    writeFileSync(
-      join(stageDir, RUNTIME_MANIFEST_REL_PATH),
-      `${JSON.stringify({ marker: "OMO_RUNTIME_MANIFEST_V1", ...manifest })}\n`,
-      "utf8",
-    )
+    writeFileSync(join(stageDir, RUNTIME_MANIFEST_REL_PATH), runtimeManifestFileContent(manifest, target.target), "utf8")
 
     mkdirSync(outDir, { recursive: true })
     const binaryPath = join(outDir, target.binaryName)
@@ -628,11 +598,14 @@ export async function buildReleaseBinary(
           "build",
           "--compile",
           `--target=${target.bunTarget}`,
+          "--minify-whitespace",
           "--compile-autoload-package-json",
           "--no-compile-autoload-dotenv",
           "--no-compile-autoload-bunfig",
           `--asset=${stageDir}`,
           compileEntry,
+          ...senpiWorkerCompileArgs(repoRoot),
+          ...engineBuildDefineArgs(stamp),
           "--outfile",
           binaryPath,
         ],
@@ -659,6 +632,13 @@ interface CliOptions {
   readonly omoVersion: string
   readonly omoAiVersion: string
   readonly outDir: string | undefined
+  readonly buildInfo: OmoBuildInfo | undefined
+}
+
+function parseBuildInfoValue(raw: string): OmoBuildInfo {
+  const parsed = parseBuildInfo(JSON.parse(raw))
+  if (parsed === undefined) throw new Error("--build-info is not a valid OmoBuildInfo payload")
+  return parsed
 }
 
 function parseArgs(argv: readonly string[]): CliOptions {
@@ -666,6 +646,7 @@ function parseArgs(argv: readonly string[]): CliOptions {
   let omoVersion: string | undefined
   let omoAiVersion: string | undefined
   let outDir: string | undefined
+  let buildInfo: OmoBuildInfo | undefined
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
     const value = argv[index + 1]
@@ -680,6 +661,10 @@ function parseArgs(argv: readonly string[]): CliOptions {
     } else if (argument === "--omo-ai-version") {
       if (value === undefined) throw new Error("--omo-ai-version requires a value")
       omoAiVersion = value
+      index += 1
+    } else if (argument === "--build-info") {
+      if (value === undefined) throw new Error("--build-info requires a value")
+      buildInfo = parseBuildInfoValue(value)
       index += 1
     } else if (argument === "--out-dir") {
       if (value === undefined) throw new Error("--out-dir requires a value")
@@ -696,7 +681,7 @@ function parseArgs(argv: readonly string[]): CliOptions {
       ? RELEASE_BINARY_TARGETS
       : RELEASE_BINARY_TARGETS.filter((entry) => entry.target === targetName)
   if (targets.length === 0) throw new Error(`unknown target: ${targetName}`)
-  return { targets, omoVersion, omoAiVersion, outDir }
+  return { targets, omoVersion, omoAiVersion, outDir, buildInfo }
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -706,6 +691,7 @@ async function main(argv: readonly string[]): Promise<number> {
       omoVersion: options.omoVersion,
       omoAiVersion: options.omoAiVersion,
       outDir: options.outDir,
+      buildInfo: options.buildInfo,
     })
     console.log(
       `built ${result.target}: ${result.binaryPath} (${result.size} bytes, ${result.manifest.entries.length} embedded sidecar files)`,

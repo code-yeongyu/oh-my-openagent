@@ -17,7 +17,6 @@ Executable Node ESM scripts driving the plugin build pipeline, SessionStart conf
 | `build-bundled-mcp-runtimes.mjs`, `materialize-shared-upstreams.mjs` | Bundled MCP runtime dists; shared upstream copies |
 | `auto-update.mjs` (+ `-plan`, `-release-notes`, `-state`) | SessionStart update throttle/lock/notice flow |
 | `migrate-codex-config.mjs` + `migrate-codex-config/` | `~/.codex/config.toml` migration: reasoning profile sync, MultiAgentV2 guard, subagent limits, Context7 placeholder guard, root settings |
-| `migrate-omo-sot.mjs` + `migrate-omo-sot/` | `~/.omo/omo.jsonc` SoT migration (`editor`, `jsonc`, `scaffold`) |
 | `entry-guard.mjs` | `isCliEntry()` — the mandatory CLI guard |
 | `hook-status-message.mjs`, `install-flow.mjs`, `spawn-command.mjs` | Shared helpers (status formatting, install-flow detection, spawn invocation resolution) |
 

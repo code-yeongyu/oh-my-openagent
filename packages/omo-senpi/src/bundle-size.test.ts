@@ -32,13 +32,78 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,000,377 bytes; 1,050,000 preserves explicit headroom per this comment's own rule (never the failing
 // value). Still no new third-party dependency - bundle-purity green against the merged manifest.
 // Raised 710,000 -> 880,000 for plan letta-memory-parity-port: the new `memory` component ports the
-// full Letta-Code local memory engine (git-backed MemFS, memory/memory_apply_patch tools, prompt
+// full Letta-Code local memory engine (git-backed MemFS, memory tool, prompt
 // compiler, reflection/dreaming worker + state machine, palace viewer, transcript search, git sync
 // mirror) plus the harness-neutral `@oh-my-opencode/memory-core` package. It is a single self-contained
 // user feature wired into the extension entry; the imports span the whole engine (nothing accidental
 // inlined, no new third-party dependency added). Measured 863,893 bytes after minification. Headroom to
 // 880,000 leaves margin for follow-up memory polish without inviting unrelated bloat.
-const BUDGET_BYTES = 1_050_000
+// Raised 1,050,000 -> 1,100,000 for plan omo-thread-tools (PR #7456): registering the six-tool `thread`
+// family (tools, live socket surface, component) pulls the already-shipped addressing, address-book,
+// reader, receipts, mailbox and metadata seams into the entry for the first time. First-party code only -
+// bundle-purity stays green with no new third-party dependency inlined. Measured 1,068,655 bytes after
+// minification on top of dev's 1,031,755; 1,100,000 keeps ~2.9% headroom rather than the failing value.
+// Raised 1,100,000 -> 1,140,000 for plan omo-senpi-role-names (model profiles): the `model-profile`
+// component (builtin profile table, chain resolver, session-apply wiring) enters the entry for the
+// first time. First-party code only - `bundle purity` stays green on both cases and no dependency
+// manifest changed (`git diff origin/dev...HEAD -- package.json packages/omo-senpi/package.json` is
+// empty). Measured 1,105,921 bytes after minification on top of dev's 1,098,205; 1,140,000 keeps ~3%
+// headroom rather than the failing value.
+// Raised 1,140,000 -> 1,180,000 for memory strict-YAML frontmatter (#8179): the memory-core writer
+// grew a scalar grammar, a shared validation gate, and the one-time legacy normalizer, all first-party
+// (the `yaml` package was rejected for the runtime precisely because it would have cost ~119 KB here;
+// it is a devDependency oracle only). bundle-purity stays green and no third-party dependency was
+// inlined. Measured 1,144,862 bytes after minification on top of dev's 1,136,265 (linux/amd64, bun
+// 1.4.2); 1,180,000 keeps ~3% headroom rather than the failing value.
+// Raised 1,180,000 -> 1,220,000 for the Kibitzer bounds wave (#8335 incremental candidate collection,
+// #8336 sidecar grep budgets, #8337 shutdown and wake caps): the per-entry mention index, the
+// normalized-haystack memo, the stat-gated HEAD and ledger probes, the grep budget/abort/gitignore
+// paths and the drain race plus wake clamps are all first-party code, and the dependency manifests are
+// byte-identical to pre-wave dev (`git diff 879a8b791...HEAD -- package.json bun.lock
+// packages/*/package.json` is empty). The wave grew the minified bundle 1,175,406 -> 1,181,607
+// (linux/amd64, node 24 + bun 1.4.2), and the previous ceiling had only 4,594 bytes of slack left
+// before it. 1,220,000 keeps ~3.2% headroom rather than the failing value.
+// Raised 1,220,000 -> 1,300,000 for the within-minor dependency refresh: this is the first raise caused
+// by third-party growth rather than first-party code, so it is recorded as such. No dependency was ADDED
+// - bundle-purity stays green and the inlined set is unchanged - but the refresh moves versions the
+// extension already inlines, and zod dominates: 4.4.3 -> 4.6.5 alone grows 4,558,122 -> 6,140,311 bytes
+// unpacked, with js-yaml 5.0.0 -> 5.4.2 (+158,792) and posthog-node 5.51.1 -> 5.52.4 (+17,303) behind it.
+// Measured in a node:24-bookworm container on bun 1.4.2 by building the SAME source tree twice, once with
+// dev's manifests and once with this branch's: dev rebuilds byte-identically to the committed 1,202,188
+// and this branch rebuilds to 1,260,200 (+58,012, +4.8%), so the growth is attributable to the versions
+// and not to the build host. 1,300,000 keeps ~3.2% headroom rather than the failing value. Trimming it
+// back needs a lazy-load or split of the inlined validator, which is a refactor and not a version bump.
+// Raised 1,300,000 -> 1,340,000 for model-profile request-auth (#8881): the session-start walk gains
+// the two-stage credential probe (`request-auth.ts`: per-account resolution honoring a pin, then the
+// model's request configuration, plus the redacting diagnostic) and the surface-aware notice module
+// (`notice.ts`). First-party code only - the dependency manifests are unchanged and bundle-purity stays
+// green. dev measured 1,297,500 with 2,500 bytes of slack left under the previous ceiling; this branch
+// measures 1,301,126 after minification (macOS arm64, bun 1.4.2). 1,340,000 keeps ~3% headroom rather
+// than the failing value.
+// Raised 1,340,000 -> 1,420,000 for computer use (#8893): the `computer-use` component and the first-party
+// `@oh-my-opencode/senpi-desktop-{protocol,engine,prelude,service,tool}` workspaces enter the entry (the
+// computer tool, its eval-kernel prelude assets, the engine client and runtime). Their only third-party
+// dependency, typebox, was already inlined; bundle-purity stays green. Measured 1,380,186 bytes after
+// minification (darwin/arm64, bun 1.4.2); 1,420,000 keeps ~2.9% headroom rather than the failing value.
+// Raised 1,420,000 -> 1,460,000 for per-session task hosts (#9110): shard routing and socket naming, the
+// per-host crash notice, host pre-warm, endpoint-aware thread tools and crash telemetry. First-party code
+// only - no manifest changes, bundle-purity stays green. dev measured 1,414,341 (5,659 bytes of slack left
+// under the previous ceiling); this branch measures 1,420,760 (+6,419) after minification (linux/amd64 and
+// darwin/arm64, bun 1.4.2). 1,460,000 keeps ~2.8% headroom rather than the failing value.
+// Raised 1,460,000 -> 1,500,000 because the ceiling ran out under queued work: dev measured 1,458,902 (1,098
+// bytes of slack) and the next bundled PR (#9506) measured 1,460,040. First-party code only: the third-party
+// bytes inlined into omo.js are identical since #9110 (410,624 before minification on both trees), and
+// bundle-purity stays green. Rebuilding #9110's merge (473e8f3582) and dev (4fef77bd3f) today, the growth is
+// mostly the session gateway (thread component, +79,263 bytes before minification), then memory-core
+// (+16,326), omo-native (+12,852), the memory component (+9,517) and claude-code (+6,535). dev rebuilds to
+// 1,458,902 in a linux/amd64 node 24 + bun 1.4.2 container and on darwin/arm64 (bun 1.4.2) alike. The queued
+// bundled PRs add about 15 KB (#9429 +11,018 measured), so 1,500,000 keeps ~2.8% headroom over dev and ~1.7%
+// after that queue, rather than the failing value. Splitting the largest components is tracked separately
+// in #9515 so this ceiling stops moving with every feature.
+// Reduced for #9515: lazy /doctor and /memfs keep maintenance code in sidecars.
+// Bun 1.4.2: tracked dev 1,451,838 -> 1,443,567 bytes (8,271 removed);
+// 1,487,000 leaves approximately 3% headroom. Other memory/thread/LSP slices remain follow-up.
+const BUDGET_BYTES = 1_487_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

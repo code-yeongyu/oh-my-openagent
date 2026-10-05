@@ -7,6 +7,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -22,8 +23,11 @@ import {
   ENGINE_MINIMUM_MODULES,
   MAX_BINARY_BYTES,
   parseBundledModuleCount,
+  PLUGIN_PAYLOAD_DIRECTORIES,
+  PLUGIN_PAYLOAD_FILES,
   RELEASE_BINARY_TARGETS,
   buildRuntimeManifest,
+  runtimeManifestFileContent,
   collectStagedFiles,
   createStampedPackageJson,
   embeddedNameForRelPath,
@@ -31,9 +35,9 @@ import {
   reportEmbeddedPayload,
   resolveExpectedSidecarRelPaths,
   RUNTIME_MANIFEST_REL_PATH,
-  stageSidecarPayload,
 } from "./build-omo-binary"
-import ptyFixture from "./release-binary-pty-fixture.json"
+import { PAYLOAD_DIRECTORIES, PAYLOAD_FILES } from "./build-omo-native"
+import * as binaryBuilder from "./build-omo-binary"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
@@ -41,6 +45,82 @@ const repoRoot = resolve(scriptDir, "..")
 function makeTempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
 }
+
+function stageParityFixture(stageDir: string, relPaths: readonly string[]): void {
+  for (const relPath of relPaths) {
+    const filePath = join(stageDir, ...relPath.split("/"))
+    mkdirSync(dirname(filePath), { recursive: true })
+    const contents = relPath.endsWith("runtime-manifest.json") ? "{}\n" : `fixture:${relPath}\n`
+    writeFileSync(filePath, contents, "utf8")
+  }
+}
+
+const GREP_HOSTS: Readonly<Record<string, string | null>> = {
+  "darwin-arm64": "darwin-arm64",
+  "darwin-x64": "darwin-x64",
+  "darwin-x64-baseline": "darwin-x64",
+  "linux-x64": "linux-x64",
+  "linux-x64-baseline": "linux-x64",
+  "linux-arm64": "linux-arm64",
+  "linux-x64-musl": null,
+  "linux-x64-musl-baseline": null,
+  "linux-arm64-musl": null,
+  "windows-x64": "win32-x64",
+  "windows-x64-baseline": "win32-x64",
+  "windows-arm64": "win32-arm64",
+}
+
+function nativeFixture() {
+  return {
+    $comment: "Native prebuild test fixture",
+    generatedAt: "2026-09-14",
+    prebuilds: {
+      senpi_pty: {
+        packageName: "@code-yeongyu/senpi-pty",
+        pinSource: "ptyPin",
+        pin: "2026.8.24",
+        targets: Object.fromEntries(Object.keys(GREP_HOSTS).map((target) => [target, {
+          available: target === "darwin-arm64",
+          prebuildHost: target === "darwin-arm64" ? target : null,
+        }])),
+      },
+      senpi_grep: {
+        packageName: "@code-yeongyu/senpi",
+        pinSource: "enginePin",
+        targets: Object.fromEntries(Object.entries(GREP_HOSTS).map(([target, prebuildHost]) => [target, {
+          available: false,
+          prebuildHost,
+        }])),
+      },
+    },
+  }
+}
+
+function runStagingCommand(command: string, args: readonly string[], cwd: string): void {
+  const result = spawnSync(command, [...args], { cwd, encoding: "utf8" })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`${command} failed: ${result.stdout}\n${result.stderr}`)
+}
+
+// Replace only the registry boundary: the fallback still finds and extracts a real tarball.
+function packedPrebuildDependencies(packageDir: string, archiveRoot: string, packageSpec: string) {
+  const commands: string[] = []
+  return {
+    commands,
+    resolvePackageDir: () => packageDir,
+    runCommand(command: string, args: readonly string[], cwd: string): void {
+      commands.push(command)
+      if (command === "npm") {
+        expect(args).toEqual(["pack", packageSpec])
+        runStagingCommand("tar", ["czf", join(cwd, "fixture.tgz"), "-C", archiveRoot, "package"], cwd)
+      } else {
+        runStagingCommand(command, args, cwd)
+      }
+    },
+  }
+}
+
+const unexpectedPack = (): never => { throw new Error("local prebuild must not invoke npm pack") }
 
 describe("RELEASE_BINARY_TARGETS", () => {
   test("#given the release target map #when inspected #then it lists the twelve published targets", () => {
@@ -104,30 +184,75 @@ describe("RELEASE_BINARY_TARGETS", () => {
     expect(posixNames).toEqual(posixTargets.map((entry) => `omo-${entry.target}`))
   })
 
-  test("#given the pty expectation fixture #when compared to the target map #then every target has an entry", () => {
-    // given
-    const fixtureTargets = Object.keys(ptyFixture.targets)
-
-    // when
-    const mapTargets = RELEASE_BINARY_TARGETS.map((entry) => entry.target)
-
-    // then
-    expect(fixtureTargets.slice().sort()).toEqual(mapTargets.slice().sort())
-    expect(ptyFixture.ptyPin).toBe(RELEASE_BINARY_TARGETS[0]!.ptyPin)
+  test("#given the native fixture on disk #when loaded #then every package covers all targets without changing either pin", () => {
+    const fixture = JSON.parse(
+      readFileSync(join(scriptDir, "release-binary-native-fixture.json"), "utf8"),
+    ) as ReturnType<typeof nativeFixture>
+    expect(fixture.prebuilds).toEqual(nativeFixture().prebuilds)
+    const nativePackage = JSON.parse(readFileSync(join(repoRoot, "packages/omo-native/package.json"), "utf8"))
+    expect(binaryBuilder.loadReleaseBinaryTargets(fixture)).toEqual(RELEASE_BINARY_TARGETS)
+    expect(RELEASE_BINARY_TARGETS.every((target) => target.enginePin === nativePackage.dependencies["@code-yeongyu/senpi"])).toBe(true)
+    for (const prebuild of Object.values(fixture.prebuilds)) {
+      expect(Object.keys(prebuild.targets).sort()).toEqual(RELEASE_BINARY_TARGETS.map((entry) => entry.target).sort())
+    }
   })
 
-  test("#given the pty fixture #when a target is marked available #then it names the prebuild host directory", () => {
-    // given
-    const entries = Object.entries(ptyFixture.targets)
+  test("#given the native fixture #when loaded #then available entries resolve their own pin source", () => {
+    const fixture = nativeFixture()
+    fixture.prebuilds.senpi_grep.targets["darwin-arm64"]!.available = true
+    const target = binaryBuilder.loadReleaseBinaryTargets(fixture, "1.2.3-test")[0]!
+    expect(target.nativePrebuilds).toEqual([
+      { fileStem: "senpi_pty", packageName: "@code-yeongyu/senpi-pty", pin: "2026.8.24", host: "darwin-arm64" },
+      { fileStem: "senpi_grep", packageName: "@code-yeongyu/senpi", pin: "1.2.3-test", host: "darwin-arm64" },
+    ])
+    expect(target.enginePin).toBe("1.2.3-test")
+  })
 
-    // when
-    const available = entries.filter(([, value]) => value.ptyAvailable)
-    const absent = entries.filter(([, value]) => !value.ptyAvailable)
+  test("#given the old fixture shape #when loaded #then it is rejected instead of silently dropping native prebuilds", () => {
+    const oldFixture = {
+      ptyPin: "2026.8.24",
+      packageName: "@code-yeongyu/senpi-pty",
+      targets: { "darwin-arm64": { ptyAvailable: true, prebuildHost: "darwin-arm64" } },
+    }
+    expect(() => binaryBuilder.loadReleaseBinaryTargets(oldFixture)).toThrow(/prebuilds/)
+  })
 
-    // then
-    expect(available.every(([, value]) => typeof value.prebuildHost === "string")).toBe(true)
-    expect(absent.every(([, value]) => value.prebuildHost === null)).toBe(true)
-    expect(available.map(([name]) => name)).toContain("darwin-arm64")
+  test("#given unavailable native entries with known hosts #when loaded #then they do not require payload files", () => {
+    const targets = binaryBuilder.loadReleaseBinaryTargets(nativeFixture())
+    expect(targets[0]!.nativePrebuilds.map((entry) => entry.fileStem)).toEqual(["senpi_pty"])
+    expect(targets.slice(1).every((target) => target.nativePrebuilds.length === 0)).toBe(true)
+  })
+
+  test("#given a missing native target #when loaded #then it fails naming the package and target", () => {
+    const fixture = nativeFixture()
+    delete fixture.prebuilds.senpi_grep.targets["linux-x64"]
+    expect(() => binaryBuilder.loadReleaseBinaryTargets(fixture)).toThrow(/senpi_grep.*linux-x64/)
+  })
+
+  test("#given an available entry without a host #when loaded #then it is rejected", () => {
+    const fixture = nativeFixture()
+    fixture.prebuilds.senpi_grep.targets["linux-x64-musl"]!.available = true
+    expect(() => binaryBuilder.loadReleaseBinaryTargets(fixture)).toThrow(/prebuildHost/)
+  })
+
+  test("#given baseline and musl targets #when their native hosts are inspected #then baseline shares the base host and musl never uses glibc", () => {
+    const fixture = JSON.parse(
+      readFileSync(join(scriptDir, "release-binary-native-fixture.json"), "utf8"),
+    ) as ReturnType<typeof nativeFixture>
+    const grepHosts = Object.fromEntries(Object.entries(fixture.prebuilds.senpi_grep.targets)
+      .map(([target, entry]) => [target, entry.prebuildHost]))
+    expect(grepHosts).toEqual(GREP_HOSTS)
+    for (const prebuild of Object.values(fixture.prebuilds)) {
+      for (const [target, entry] of Object.entries(prebuild.targets)) {
+        if (target.endsWith("-baseline")) {
+          expect(entry.prebuildHost).toBe(prebuild.targets[target.replace(/-baseline$/, "")]!.prebuildHost)
+        }
+        if (target.includes("-musl")) {
+          expect(entry.prebuildHost).toBeNull()
+          expect(entry.available).toBe(false)
+        }
+      }
+    }
   })
 })
 
@@ -140,6 +265,7 @@ describe("embedded asset naming", () => {
       "node_modules/@code-yeongyu/senpi-codemode/package.json",
       "plugin/skills/ast-grep/SKILL.md",
       "native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node",
+      "native/prebuilds/darwin-arm64/senpi_grep.darwin-arm64.node",
     ]
 
     // when
@@ -229,6 +355,21 @@ describe("runtime manifest", () => {
   })
 })
 
+describe("embedded runtime manifest file", () => {
+  test("#given a musl target #when the manifest file is written #then it names that release asset flavor outside the digest", async () => {
+    const stageDir = makeTempDir("omo-manifest-target-")
+    writeFileSync(join(stageDir, "package.json"), createStampedPackageJson("1.2.3"), "utf8")
+    const manifest = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+
+    const written = JSON.parse(runtimeManifestFileContent(manifest, "linux-x64-musl"))
+
+    expect(written.releaseTarget).toBe("linux-x64-musl")
+    expect(written.marker).toBe("OMO_RUNTIME_MANIFEST_V1")
+    expect(written.manifestSha).toBe(manifest.manifestSha)
+    rmSync(stageDir, { recursive: true, force: true })
+  })
+})
+
 describe("size budget", () => {
   test("#given a synthetic oversize binary #when the budget is enforced #then it fails loud naming the target", () => {
     // given
@@ -252,6 +393,84 @@ describe("size budget", () => {
   })
 })
 
+describe("native prebuild staging", () => {
+  for (const fileStem of ["senpi_pty", "senpi_grep"] as const) {
+    const entry = {
+      fileStem,
+      packageName: fileStem === "senpi_pty" ? "@code-yeongyu/senpi-pty" : "@code-yeongyu/senpi",
+      pin: fileStem === "senpi_pty" ? "2026.8.24" : "1.2.3-test",
+      host: "darwin-arm64",
+    }
+    const relPath = `native/prebuilds/${entry.host}/${entry.fileStem}.${entry.host}.node`
+
+    test(`#given local ${fileStem} #when staged #then only its exact file is copied without packing`, () => {
+      const root = makeTempDir("omo-local-prebuild-")
+      try {
+        const packageDir = join(root, "local")
+        const stageDir = join(root, "stage")
+        stageParityFixture(packageDir, [relPath, "native/prebuilds/darwin-arm64/unrelated.node"])
+        const staged = new Set<string>()
+        binaryBuilder.stageNativePrebuild(entry, stageDir, staged, { resolvePackageDir: () => packageDir, runCommand: unexpectedPack })
+        expect([...staged]).toEqual([relPath])
+        expect(collectStagedFiles(stageDir)).toEqual([relPath])
+        expect(readFileSync(join(stageDir, relPath))).toEqual(readFileSync(join(packageDir, relPath)))
+        expect(statSync(join(stageDir, relPath)).mode & 0o777).toBe(statSync(join(packageDir, relPath)).mode & 0o777)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    test(`#given ${fileStem} absent locally #when staged #then npm packs its own package and pin and extracts its file`, () => {
+      const root = makeTempDir("omo-packed-prebuild-")
+      try {
+        const archiveRoot = join(root, "archive")
+        stageParityFixture(join(archiveRoot, "package"), [relPath, "native/prebuilds/darwin-arm64/unrelated.node"])
+        const dependencies = packedPrebuildDependencies(join(root, "missing"), archiveRoot, `${entry.packageName}@${entry.pin}`)
+        const staged = new Set<string>()
+        binaryBuilder.stageNativePrebuild(entry, join(root, "stage"), staged, dependencies)
+        expect(dependencies.commands).toEqual(["npm", "tar"])
+        expect([...staged]).toEqual([relPath])
+        expect(collectStagedFiles(join(root, "stage"))).toEqual([relPath])
+        expect(readFileSync(join(root, "stage", relPath))).toEqual(readFileSync(join(archiveRoot, "package", relPath)))
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    test(`#given available ${fileStem} with a missing file #when the host directory exists #then staging fails loudly`, () => {
+      const root = makeTempDir("omo-missing-prebuild-")
+      try {
+        const archiveRoot = join(root, "archive")
+        const localDir = join(root, "local")
+        // A directory or a neighboring addon is not proof that the promised file exists.
+        const otherFile = "native/prebuilds/darwin-arm64/unrelated.node"
+        stageParityFixture(localDir, [otherFile])
+        stageParityFixture(join(archiveRoot, "package"), [otherFile])
+        const dependencies = packedPrebuildDependencies(localDir, archiveRoot, `${entry.packageName}@${entry.pin}`)
+        const staged = new Set<string>()
+        expect(() => binaryBuilder.stageNativePrebuild(entry, join(root, "stage"), staged, dependencies)).toThrow(`missing required sidecar source: ${relPath}`)
+        expect(dependencies.commands).toEqual(["npm", "tar"])
+        expect([...staged]).toEqual([])
+        expect(existsSync(join(root, "stage", relPath))).toBe(false)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+  }
+
+  test("#given an installed PTY alias #when staged #then local resolution avoids the registry", () => {
+    const root = makeTempDir("omo-installed-prebuild-")
+    try {
+      const entry = RELEASE_BINARY_TARGETS[0]!.nativePrebuilds[0]!
+      const staged = new Set<string>()
+      binaryBuilder.stageNativePrebuild(entry, root, staged, { runCommand: unexpectedPack })
+      expect([...staged]).toEqual(["native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node"])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("sidecar parity set", () => {
   test("#given the host target #when the expected sidecar set is resolved #then it unions engine assets, plugin payload, pty and the stamped package.json", () => {
     // given
@@ -271,16 +490,28 @@ describe("sidecar parity set", () => {
     expect(relPaths.some((relPath) => relPath.startsWith("docs/"))).toBe(true)
     expect(relPaths.some((relPath) => relPath.startsWith("examples/"))).toBe(true)
     expect(relPaths.some((relPath) => relPath.startsWith("vendor/"))).toBe(true)
-    expect(relPaths.some((relPath) => relPath.startsWith("node_modules/css-tree/"))).toBe(true)
-    expect(relPaths.some((relPath) => relPath.startsWith("node_modules/mdn-data/"))).toBe(true)
-    expect(relPaths.some((relPath) => relPath.startsWith("node_modules/source-map-js/"))).toBe(true)
     expect(relPaths).toContain("node_modules/@code-yeongyu/senpi-codemode/package.json")
     expect(relPaths).toContain("plugin/extensions/omo.js")
     expect(relPaths).toContain("plugin/skills/ast-grep/SKILL.md")
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node")
   })
 
-  test("#given a pty-absent target #when the expected sidecar set is resolved #then no pty prebuild is required", () => {
+  test("#given an available grep entry #when expected paths are resolved #then its exact file is required even before installation", () => {
+    const target = RELEASE_BINARY_TARGETS[0]!
+    const relPaths = resolveExpectedSidecarRelPaths({
+      ...target,
+      nativePrebuilds: [
+        ...target.nativePrebuilds,
+        { fileStem: "senpi_grep", packageName: "@code-yeongyu/senpi", pin: target.enginePin, host: "darwin-arm64" },
+      ],
+    })
+    expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node")
+    expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_grep.darwin-arm64.node")
+    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(3)
+    expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi-desktop-engine")
+  })
+
+  test("#given a native-addon-absent target #when expected paths are resolved #then the desktop engine remains required", () => {
     // given
     const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "linux-x64")
     expect(target).toBeDefined()
@@ -289,7 +520,9 @@ describe("sidecar parity set", () => {
     const relPaths = resolveExpectedSidecarRelPaths(target!)
 
     // then
-    expect(relPaths.some((relPath) => relPath.startsWith("native/prebuilds/"))).toBe(false)
+    expect(relPaths.filter((relPath) => relPath.startsWith("native/prebuilds/"))).toEqual([
+      "native/prebuilds/linux-x64/senpi-desktop-engine",
+    ])
     expect(relPaths).toContain("package.json")
   })
 })
@@ -304,7 +537,8 @@ describe("embedded manifest parity (darwin-arm64)", () => {
       const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "darwin-arm64")!
       const stageRoot = makeTempDir("omo-parity-")
       const stageDir = join(stageRoot, "omo-runtime")
-      stageSidecarPayload(target, stageDir, "0.0.0-0.test")
+      const expectedRelPaths = resolveExpectedSidecarRelPaths(target)
+      stageParityFixture(stageDir, expectedRelPaths)
       const manifest = await buildRuntimeManifest(stageDir, {
         omoAiVersion: "0.0.0-0.test",
         enginePin: target.enginePin,
@@ -323,7 +557,7 @@ describe("embedded manifest parity (darwin-arm64)", () => {
         .filter((relPath) => relPath !== RUNTIME_MANIFEST_REL_PATH)
         .slice()
         .sort()
-      expect(embeddedRelPaths).toEqual(resolveExpectedSidecarRelPaths(target).slice().sort())
+      expect(embeddedRelPaths).toEqual(expectedRelPaths.slice().sort())
       expect(embedded.manifest.enginePin).toBe(target.enginePin)
       expect(embedded.manifest.omoAiVersion).toBe("0.0.0-0.test")
       rmSync(stageRoot, { recursive: true, force: true })
@@ -374,6 +608,22 @@ describe("plugin staging isolation guard", () => {
 })
 
 describe("engine graph bundling", () => {
+  test("#given the compiled OMO entry #when its engine imports are inspected #then both retain the standard patched engine literal", () => {
+    // given
+    const compileEntrySource = readFileSync(
+      join(repoRoot, "packages", "omo-native", "compile-entry.ts"),
+      "utf8",
+    )
+
+    // when
+    const engineImports = compileEntrySource.match(
+      /import\("\.\.\/\.\.\/node_modules\/@code-yeongyu\/senpi\/dist\/cli\.js"\)/g,
+    )
+
+    // then
+    expect(engineImports).toHaveLength(2)
+  })
+
   test("#given real bun build output #when parsed #then the module count is extracted", () => {
     // given
     const output = "\n [447ms]  bundle  3995 modules\n\n [132ms]  compile  /tmp/x\n"
@@ -411,6 +661,16 @@ describe("engine graph bundling", () => {
   })
 })
 
+// Regression: this list mirrors build-omo-native's payload allowlist by hand, so a directory added
+// there (skills-conditional) silently stayed out of the compiled binary's embedded plugin.
+describe("plugin payload mirror", () => {
+  test("#given the native payload lists #when compared with the binary's copies #then both stay identical", () => {
+    // when / then
+    expect(PLUGIN_PAYLOAD_DIRECTORIES).toEqual(PAYLOAD_DIRECTORIES)
+    expect(PLUGIN_PAYLOAD_FILES).toEqual(PAYLOAD_FILES)
+  })
+})
+
 describe("staged file collection", () => {
   test("#given a nested stage directory #when collected #then relative POSIX paths are returned sorted", () => {
     // given
@@ -427,4 +687,156 @@ describe("staged file collection", () => {
     expect(readdirSync(stageDir).length).toBe(2)
     rmSync(stageDir, { recursive: true, force: true })
   })
+})
+
+describe("omob build info stamping", () => {
+  const buildInfo = {
+    command: "omob",
+    omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
+    engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+  }
+
+  test("#given build info #when the sidecar package.json is stamped #then it carries omoBuild", () => {
+    const stamped = JSON.parse(createStampedPackageJson("0.0.0-omob.c6e7dd7.7fd18df", buildInfo)) as Record<string, unknown>
+    expect(stamped.omoBuild).toEqual(buildInfo)
+  })
+
+  test("#given no build info #when stamped #then the release shape stays byte-identical", () => {
+    expect(createStampedPackageJson("9.9.9-0.test")).toBe(`${JSON.stringify({ name: "omo", version: "9.9.9-0.test" }, null, 2)}\n`)
+  })
+
+  test("#given a senpi-package engineBuild #when stamped #then package.json carries engineBuild", () => {
+    const engineBuild = { scheme: "epoch" as const, epoch: 1788486552, sha7: "7fd18df", source: "senpi-package" as const }
+    const stamped = JSON.parse(createStampedPackageJson("9.9.9-0.test", undefined, engineBuild)) as Record<string, unknown>
+    expect(stamped.engineBuild).toEqual(engineBuild)
+    expect(stamped).not.toHaveProperty("omoBuild")
+  })
+
+  test("#given build info #when the runtime manifest is built #then it records build info and changes the digest", async () => {
+    const stageDir = makeTempDir("omo-manifest-buildinfo-")
+    mkdirSync(join(stageDir, "theme"), { recursive: true })
+    writeFileSync(join(stageDir, "theme", "dark.json"), "{}\n")
+    const bare = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+    const stamped = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24", buildInfo })
+    expect(stamped.buildInfo).toEqual(buildInfo)
+    expect(stamped.manifestSha).not.toBe(bare.manifestSha)
+  })
+
+  test("#given no build info #when the runtime manifest is built #then its key order matches the release contract", async () => {
+    const stageDir = makeTempDir("omo-manifest-keyorder-")
+    mkdirSync(join(stageDir, "theme"), { recursive: true })
+    writeFileSync(join(stageDir, "theme", "dark.json"), "{}\n")
+
+    const bare = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+
+    // release manifest key order — a reordering would change the embedded JSON bytes
+    expect(Object.keys(bare)).toEqual(["omoAiVersion", "enginePin", "manifestSha", "entries"])
+    expect("buildInfo" in bare).toBe(false)
+  })
+})
+
+describe("engine build identity compile defines", () => {
+  const buildInfo = {
+    command: "omob",
+    omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
+    engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+  }
+
+  test("#given buildInfo #when compile defines are resolved #then SENPI_BUILD_EPOCH and SENPI_BUILD_SHA7 are present", () => {
+    const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo })
+    expect(args).toEqual([
+      "--define",
+      "SENPI_BUILD_EPOCH=1788486552",
+      "--define",
+      "SENPI_BUILD_SHA7=\"7fd18df\"",
+    ])
+  })
+
+  test("#given no buildInfo and no senpi git metadata #when compile defines are resolved #then they are omitted", () => {
+    const args = binaryBuilder.compileDefinesForOmoBinary({
+      senpiPackage: { name: "@code-yeongyu/senpi", version: "2026.9.17" },
+    })
+    expect(args).toEqual([])
+  })
+
+  test("#given no buildInfo and senpi gitHead plus committedAt #when compile defines are resolved #then they come from the package", () => {
+    const args = binaryBuilder.compileDefinesForOmoBinary({
+      senpiPackage: {
+        name: "@code-yeongyu/senpi",
+        version: "2026.9.17",
+        gitHead: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7",
+        committedAt: "2026-09-04T10:49:12+09:00",
+      },
+    })
+    expect(args).toEqual([
+      "--define",
+      "SENPI_BUILD_EPOCH=1788486552",
+      "--define",
+      "SENPI_BUILD_SHA7=\"7fd18df\"",
+    ])
+  })
+
+  test("#given gitHead without a committedAt #when compile defines are resolved #then they are omitted rather than inventing an epoch", () => {
+    const args = binaryBuilder.compileDefinesForOmoBinary({
+      senpiPackage: {
+        name: "@code-yeongyu/senpi",
+        version: "2026.9.17",
+        gitHead: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7",
+      },
+    })
+    expect(args).toEqual([])
+  })
+
+  test("#given the currently pinned senpi package #when compile defines are resolved #then they are omitted (no gitHead)", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(repoRoot, "node_modules/@code-yeongyu/senpi/package.json"), "utf8"),
+    ) as { gitHead?: unknown }
+    expect(pkg.gitHead).toBeUndefined()
+    expect(binaryBuilder.compileDefinesForOmoBinary({ senpiPackage: pkg })).toEqual([])
+  })
+
+  test("#given buildInfo define args #when bun compiles a probe #then the binary reports scheme epoch", () => {
+    const root = makeTempDir("omo-define-probe-")
+    const entry = join(root, "probe.ts")
+    const outfile = join(root, "probe")
+    writeFileSync(entry, [
+      "declare const SENPI_BUILD_EPOCH: number | undefined",
+      "declare const SENPI_BUILD_SHA7: string | undefined",
+      "const epoch = typeof SENPI_BUILD_EPOCH === \"number\" ? SENPI_BUILD_EPOCH : 0",
+      "const sha7 = typeof SENPI_BUILD_SHA7 === \"string\" ? SENPI_BUILD_SHA7 : \"\"",
+      "const scheme = epoch > 0 ? \"epoch\" : \"nodef\"",
+      "console.log(JSON.stringify({ epoch, sha7, scheme }))",
+      "",
+    ].join("\n"), "utf8")
+    const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo })
+    const built = spawnSync("bun", ["build", "--compile", ...args, entry, "--outfile", outfile], { encoding: "utf8" })
+    expect(built.status).toBe(0)
+    const ran = spawnSync(outfile, [], { encoding: "utf8" })
+    expect(JSON.parse(ran.stdout)).toEqual({ epoch: 1788486552, sha7: "7fd18df", scheme: "epoch" })
+    rmSync(root, { recursive: true, force: true })
+  }, 60_000)
+
+  test("#given no define args #when bun compiles a probe #then the binary reports scheme nodef", () => {
+    const root = makeTempDir("omo-nodef-probe-")
+    const entry = join(root, "probe.ts")
+    const outfile = join(root, "probe")
+    writeFileSync(entry, [
+      "declare const SENPI_BUILD_EPOCH: number | undefined",
+      "declare const SENPI_BUILD_SHA7: string | undefined",
+      "const epoch = typeof SENPI_BUILD_EPOCH === \"number\" ? SENPI_BUILD_EPOCH : 0",
+      "const sha7 = typeof SENPI_BUILD_SHA7 === \"string\" ? SENPI_BUILD_SHA7 : \"\"",
+      "const scheme = epoch > 0 ? \"epoch\" : \"nodef\"",
+      "console.log(JSON.stringify({ epoch, sha7, scheme }))",
+      "",
+    ].join("\n"), "utf8")
+    const args = binaryBuilder.compileDefinesForOmoBinary({
+      senpiPackage: { name: "@code-yeongyu/senpi", version: "2026.9.17" },
+    })
+    expect(args).toEqual([])
+    const built = spawnSync("bun", ["build", "--compile", ...args, entry, "--outfile", outfile], { encoding: "utf8" })
+    expect(built.status).toBe(0)
+    const ran = spawnSync(outfile, [], { encoding: "utf8" })
+    expect(JSON.parse(ran.stdout)).toEqual({ epoch: 0, sha7: "", scheme: "nodef" })
+    rmSync(root, { recursive: true, force: true })
+  }, 60_000)
 })

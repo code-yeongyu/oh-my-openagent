@@ -165,7 +165,7 @@ describe("createDagJournal WAL ordering and replay", () => {
 
     // then
     expect(deliveredBeforeDurability).toEqual([])
-    expect(second.seq).toBe(2)
+    expect(second?.seq).toBe(2)
     expect(deliveredAfterReopen).toEqual([2])
     expect(reopened.snapshot()).toEqual({
       schemaVersion: 1,
@@ -217,7 +217,7 @@ describe("createDagJournal WAL ordering and replay", () => {
     const event = reopened.append(dagRunStartedEvent({ generation: 3 }))
 
     // then
-    expect(event.seq).toBe(3)
+    expect(event?.seq).toBe(3)
     expect(reopened.snapshot().checkpointSeq).toBe(3)
   })
 })
@@ -365,7 +365,7 @@ describe("createDagJournal subscribers", () => {
     const second = journal.append(dagRunStartedEvent({ generation: 2 }))
 
     // then
-    expect(second.seq).toBe(2)
+    expect(second?.seq).toBe(2)
     expect(journal.snapshot().checkpointSeq).toBe(2)
     release.resolve()
     await journal.whenIdle()
@@ -500,5 +500,22 @@ describe("createDagJournal new event replay", () => {
       { seq: 1, type: "dag.node.retried" },
       { seq: 2, type: "dag.node.steered" },
     ])
+  })
+})
+
+describe("DAG journal refresh", () => {
+  test("#given a foreign instance committed #when refresh is called #then the cached snapshot catches up without an own append", () => {
+    // given - two instances over one run: caches are instance-local by design (#7412).
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const first = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
+    const second = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
+
+    // when - only the second instance appends.
+    second.append(dagRunStartedEvent({ generation: 7 }))
+
+    // then - the first instance's cache is stale until it explicitly refreshes.
+    expect(first.snapshot().generations).toEqual([])
+    expect(first.refresh().generations).toEqual([7])
+    expect(first.snapshot().generations).toEqual([7])
   })
 })

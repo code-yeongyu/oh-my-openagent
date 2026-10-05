@@ -90,7 +90,7 @@ export function fakeCreateResult(overrides: Partial<CreateTeamResult> = {}): Cre
     memberTaskIds: { alpha: "st_a", beta: "st_b" },
     members: [
       fakeCreatedMember(),
-      fakeCreatedMember({ name: "beta", taskId: "st_b", status: "idle", role: { kind: "subagent_type", subagentType: "sisyphus" } }),
+      fakeCreatedMember({ name: "beta", taskId: "st_b", status: "idle", role: { kind: "subagent_type", subagentType: "writer" } }),
     ],
     ...overrides,
   }

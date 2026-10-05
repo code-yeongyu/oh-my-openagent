@@ -141,6 +141,10 @@ function optionalToken(label: string, value: string | undefined): string | undef
 
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
+      return { color: "warning", text: `task_send ${details.kind} ${details.task_id}: ${details.reason}` }
     case "steered":
       return {
         color: statusThemeColor(details.status),
@@ -148,6 +152,8 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       }
     case "revived":
       return { color: "success", text: `task_send revived ${details.task_id} epoch ${details.run_epoch}` }
+    case "delivery_uncertain":
+      return { color: "warning", text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
     case "capacity_deferred":
@@ -213,6 +219,8 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
         color: statusThemeColor(details.status),
         text: `task_cancel cancelled ${details.task_id} (${details.previous_status} -> ${details.status})`,
       }
+    case "cancel_pending":
+      return { color: "warning", text: `task_cancel pending ${details.task_id}: ${details.reason}` }
     case "noop":
       return { color: statusThemeColor(details.status), text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}` }
     case "not_found":

@@ -1,23 +1,20 @@
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import {
   loadDreamPersona,
-  loadFactsPersona,
   loadReflectionPersona,
-  serializeFactsPayload,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
 import { estimateSystemTokens } from "../commands/tokens"
 import type {
-  FactsSpawnArgs,
-  PrepareFactsSpawnInput,
   PrepareReflectionSpawnInput,
   ReflectionSpawnArgs,
   ReflectionSpawnPaths,
 } from "./spawn-types"
-import { resolveMemoryChildLaunch, resolveSenpiLaunch } from "./senpi-command"
+import { resolveMemoryChildLaunch, withoutForeignPackageDirEnv } from "./senpi-command"
+import { OMO_SENPI_DISABLED_ENV } from "../../../extension/disable-env"
 
 export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput): Promise<ReflectionSpawnArgs> {
   const sessionDir = join(input.reflectionSessionsDir, safeRunId(input.run.runId))
@@ -79,8 +76,9 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...dreamPaths,
     ...(dreamTarget === undefined ? {} : { dreamTarget }),
   }
+  const launch = resolveMemoryChildLaunch(input)
   const env: NodeJS.ProcessEnv = {
-    ...input.env,
+    ...withoutForeignPackageDirEnv(input.env, launch),
     MEMORY_DIR: input.worktree.dir,
     TRANSCRIPT_PATH: transcript,
     ...(dreamPaths === undefined ? {} : {
@@ -94,6 +92,9 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
       ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),
     }),
     SENPI_MEMORY_REFLECTION: "1",
+    // Extensions load only for the provider one of them registers; omo's own components would
+    // write runtime state into the memory worktree and dirty it (#9175).
+    ...(input.loadExtensions === true ? { [OMO_SENPI_DISABLED_ENV]: "1" } : {}),
     // A detached child has no controlling terminal, so senpi's PTY-backed bash session fails with
     // "Native PTY session handle is missing write()" and the child could never git-commit its
     // reflection. pi-pty's documented non-interactive override selects the pipe session backend.
@@ -101,14 +102,16 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   }
   // Verified against senpi packages/coding-agent/src/cli/args.ts and cli/file-processor.ts:
   // -p selects print mode; --system-prompt reads a file path; --tools is a comma allowlist;
-  // --no-extensions/--no-skills/--no-prompt-templates/--no-context-files disable discovery;
+  // --no-extensions/--no-skills/--no-prompt-templates/--no-context-files disable discovery, except
+  // that a model only an extension-registered provider serves keeps extensions (#9175; the
+  // SENPI_MEMORY_REFLECTION sentinel still disables memory inside the child);
   // --session-dir isolates JSONL storage; --model/--thinking select the category result; @file
   // loads the mechanics prompt as the initial non-interactive message.
   const args = [
     "-p",
     "--system-prompt", persona,
     "--tools", "bash,edit",
-    "--no-extensions",
+    ...(input.loadExtensions === true ? [] : ["--no-extensions"]),
     "--no-skills",
     "--no-prompt-templates",
     "--no-context-files",
@@ -117,7 +120,6 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${prompt}`,
   ]
-  const launch = resolveMemoryChildLaunch(input)
   return {
     runId: input.run.runId,
     attempt: input.attempt ?? 1,
@@ -167,63 +169,13 @@ export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnIn
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${base.paths.prompt}`,
   ]
+  const { [OMO_SENPI_DISABLED_ENV]: _omoDisabled, ...env } = base.env
   return {
     ...base,
     fork: { parentSessionFile },
     args,
-    cwd: input.parentCwd ?? base.cwd,
-  }
-}
-
-export async function prepareFactsSpawn(input: PrepareFactsSpawnInput): Promise<FactsSpawnArgs> {
-  await mkdir(input.runDir, { recursive: true, mode: 0o700 })
-  const payload = join(input.runDir, "facts-payload.json")
-  const extraction = join(input.runDir, "extraction.jsonl")
-  try {
-    await (input.chmodFile ?? chmod)(payload, 0o600)
-  } catch (error) {
-    if (errorCode(error) !== "ENOENT") throw error
-  }
-  // ONE serializer, shared with the byte cap's measurement: a second stringify here would let
-  // the written bytes drift past the cap the selection proved.
-  await writeFile(payload, serializeFactsPayload(input.payload), { encoding: "utf8", mode: 0o600 })
-  await chmod(payload, 0o400)
-  const env: NodeJS.ProcessEnv = {
-    ...input.env,
-    FACTS_PAYLOAD_PATH: payload,
-    FACTS_EXTRACTION_PATH: extraction,
-    SENPI_MEMORY_FACTS: "1",
-    SENPI_PTY_FORCE_PIPE: "1",
-  }
-  const args = [
-    "-p",
-    "--system-prompt", loadFactsPersona(),
-    "--tools", "read,write",
-    "--no-extensions",
-    "--no-skills",
-    "--no-prompt-templates",
-    "--no-context-files",
-    "--session-dir", input.runDir,
-    "--model", input.model,
-    ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
-    `Read ${payload} and write only ${extraction} according to the system prompt.`,
-  ]
-  const launch = input.senpiCommand === undefined
-    ? resolveSenpiLaunch(input.env)
-    : { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
-  return {
-    runId: input.runId,
-    attempt: input.attempt ?? 1,
-    hardDeadlineAt: input.hardDeadlineAt ?? Date.now() + 15 * 60_000,
-    model: input.model,
-    ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
-    ...(input.nextAttempt === undefined ? {} : { nextAttempt: input.nextAttempt }),
-    command: launch.command,
-    args: [...launch.prefixArgs, ...args],
-    cwd: input.runDir,
     env,
-    detached: true,
-    paths: { runDir: input.runDir, payload, extraction },
+    cwd: input.parentCwd ?? base.cwd,
   }
 }
 

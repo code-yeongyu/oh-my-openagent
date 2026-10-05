@@ -2,10 +2,31 @@ import { describe, expect, test } from "bun:test"
 import { createShutdownDrain } from "./shutdown-drain"
 import { DREAM_VOLUME_GATE_BYTES, evaluateDreamGates, resolveDreamTriggerSettings, type DreamTriggerSession } from "./dream-trigger"
 import { fireDream } from "./dream-trigger-fire"
+import { loadConversations } from "./dream-selector"
 import { memorySettings } from "./memory.test-support"
 import { CONVERSATION, NOW_MS, fireTimer, fixture, gateProbe, noopSteps, settle, triggerSettings } from "./dream-trigger.test-support"
 
 describe("dream shutdown evaluator", () => {
+  test("#given every gate passing #when shutdown fireDream uses an injected loader #then the loader runs exactly once", async () => {
+    let loads = 0
+    const f = await fixture()
+    const outcome = await fireDream({
+      session: f.session,
+      origin: "shutdown",
+      settings: triggerSettings(),
+      request: {},
+      now: () => NOW_MS,
+      warnLaunchFailure: () => {},
+      loadConversations: async (transcriptsDir) => {
+        loads += 1
+        return loadConversations(transcriptsDir)
+      },
+    })
+
+    expect(outcome.fired).toBe(true)
+    expect(loads).toBe(1)
+  })
+
   test("#given every gate passing #when a quit drains through the registered evaluator #then a shutdown dream launches", async () => {
     const f = await fixture()
     const drain = createShutdownDrain({ steps: noopSteps })

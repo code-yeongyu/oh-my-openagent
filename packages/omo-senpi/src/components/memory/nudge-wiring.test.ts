@@ -256,7 +256,7 @@ describe("createMemoryNudgeWiring", () => {
       toolCallId: string
       toolName: string
       input: Record<string, unknown>
-    } = { type: "tool_call", toolCallId: "call-mcp-1", toolName: "mcp_omo-memory_memory_apply_patch", input: { reason: "save" } }
+    } = { type: "tool_call", toolCallId: "call-memory-1", toolName: "memory", input: { reason: "save" } }
 
     // when
     await pi.dispatch("tool_call", call, ctx)
@@ -267,7 +267,7 @@ describe("createMemoryNudgeWiring", () => {
       userTurns: 4,
       identityId: context.identity,
       repoPath: context.identityPaths.repo,
-      toolCallId: "call-mcp-1",
+      toolCallId: "call-memory-1",
     })
   }, 30_000)
 })

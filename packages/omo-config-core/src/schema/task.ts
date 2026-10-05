@@ -2,6 +2,13 @@ import { availableParallelism } from "node:os"
 
 import * as z from "zod"
 
+// Task children have no residency cap by default (#8999): a parent may keep every child it
+// started. A bound held at the cap refused the next spawn while every resident still ran, and
+// limited how many suspended children a resumed parent revived. Residents cost memory in the
+// process that hosts them; a user who needs a bound sets a number, and concurrency lanes still
+// queue starts - they never refuse one.
+const DEFAULT_RESIDENCY_MAX_CHILDREN = "unlimited" as const
+
 // 0 is the numeric spelling of "unlimited" for every cap below: the senpi-task engine maps a 0
 // concurrency limit to Infinity and treats a 0 residency cap exactly like the "unlimited" literal.
 const ResidencyMaxChildrenInputSchema = z.union([z.number().int().nonnegative(), z.literal("unlimited")])
@@ -22,6 +29,29 @@ export const OmoTaskWarningsSchema = z.object({
   unavailable_categories: z.boolean().default(true),
 }).strict()
 
+export const IsolationBackendKindSchema = z.enum([
+  "auto", "apfs", "btrfs", "zfs", "reflink", "overlayfs", "block-clone", "rcopy",
+])
+export type IsolationBackendKind = z.infer<typeof IsolationBackendKindSchema>
+
+export const OmoTaskIsolationSchema = z.object({
+  enabled: z.boolean().default(false),
+  backend: IsolationBackendKindSchema.default("auto"),
+  apply: z.boolean().default(true),
+  merge: z.enum(["patch", "branch"]).default("patch"),
+  commits: z.enum(["generic", "ai"]).default("generic"),
+}).strict()
+
+const isolationDefaults = OmoTaskIsolationSchema.parse({})
+
+export const OmoTaskIsolationLayerSchema = z.object({
+  enabled: z.boolean().optional(),
+  backend: IsolationBackendKindSchema.optional(),
+  apply: z.boolean().optional(),
+  merge: z.enum(["patch", "branch"]).optional(),
+  commits: z.enum(["generic", "ai"]).optional(),
+}).strict()
+
 // Bounds for the dag orchestration subsystem. The whole block is optional, but once present every
 // key falls back to the engine default in senpi-task's DAG_SETTINGS_DEFAULTS.
 export const OmoTaskDagSettingsSchema = z.object({
@@ -36,13 +66,33 @@ export const OmoTaskDagSettingsSchema = z.object({
 }).strict()
 
 export const OmoTaskSettingsSchema = z.object({
-  default_execution_mode: z.enum(["in-process", "process"]).default("in-process"),
+  isolation: OmoTaskIsolationSchema.default(isolationDefaults),
+  // "auto" defers the choice to the shared task daemon: `process` when this platform can host
+  // children as daemon sessions and the ensured daemon advertises the session capabilities, else
+  // `in-process`. It is resolved ONCE per parent session, so a child's mode never depends on daemon
+  // health at spawn time; an explicit "in-process"/"process" always wins.
+  default_execution_mode: z.enum(["auto", "in-process", "process"]).default("auto"),
+  // Which runner a `process` child gets: a session of the machine-wide daemon ("host"), or its own
+  // OS process ("child-process", and always so on win32). There is no socket key - the host socket
+  // is derived from the session; `OMO_RPC_SHARD_ROOT` only moves the directory.
+  process_runner: z.enum(["host", "child-process"]).default("host"),
+  // How an engine difference on the running daemon is resolved: hand the daemon over to the newer
+  // build ("upgrade"), or leave it alone and run children as their own processes ("fallback").
+  host_engine_policy: z.enum(["upgrade", "fallback"]).default("upgrade"),
+  // Idle lifetime handed to a daemon this client starts; omitted keeps the launch spec's tunable.
+  host_idle_exit_ms: z.number().int().positive().optional(),
+  // When this session's own task host boots ahead of its first child: "first-turn" (default) overlaps the
+  // boot with the first model call, "session-start" also warms sessions that never prompt, "off" waits for
+  // the first process child. Child sessions and `default_execution_mode: "in-process"` never warm.
+  // Under "first-turn", sessions in a Desktop thread host warm on the first delegation intent instead.
+  host_shard_prewarm: z.enum(["off", "first-turn", "session-start"]).default("first-turn"),
   default_concurrency: z.number().int().nonnegative().default(5),
   global_concurrency: z.number().int().nonnegative().default(8),
   provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   max_depth: z.number().int().nonnegative().default(1),
-  residency_max_children: ResidencyMaxChildrenInputSchema.default(8),
+  residency_max_children: ResidencyMaxChildrenInputSchema.default(DEFAULT_RESIDENCY_MAX_CHILDREN),
+  resident_idle_timeout_ms: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).default(900000),
   ttl_ms: z.number().int().positive().default(86400000),
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
@@ -85,13 +135,19 @@ export const OmoTaskWarningsLayerSchema = z.object({
 }).strict()
 
 export const OmoTaskSettingsLayerSchema = z.object({
-  default_execution_mode: z.enum(["in-process", "process"]).optional(),
+  isolation: OmoTaskIsolationLayerSchema.optional(),
+  default_execution_mode: z.enum(["auto", "in-process", "process"]).optional(),
+  process_runner: z.enum(["host", "child-process"]).optional(),
+  host_engine_policy: z.enum(["upgrade", "fallback"]).optional(),
+  host_idle_exit_ms: z.number().int().positive().optional(),
+  host_shard_prewarm: z.enum(["off", "first-turn", "session-start"]).optional(),
   default_concurrency: z.number().int().nonnegative().optional(),
   global_concurrency: z.number().int().nonnegative().optional(),
   provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
   max_depth: z.number().int().nonnegative().optional(),
   residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
+  resident_idle_timeout_ms: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   ttl_ms: z.number().int().positive().optional(),
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
@@ -113,7 +169,7 @@ export function resolveOmoTaskSettings(
   const record = z.record(z.string(), z.unknown()).parse(input)
   return OmoTaskSettingsSchema.parse({
     ...record,
-    residency_max_children: record["residency_max_children"] ?? Math.max(8, resolveParallelism() * 3),
+    residency_max_children: record["residency_max_children"] ?? DEFAULT_RESIDENCY_MAX_CHILDREN,
     global_concurrency: record["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2),
   })
 }

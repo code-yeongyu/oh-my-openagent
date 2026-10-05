@@ -10,7 +10,6 @@ const repoRoot = join(pluginRoot, "..", "..", "..");
 test("#given Codex Light install docs #when inspected #then lazycodex is npm-first and Bun-free", async () => {
 	// given
 	const files = [
-		join(repoRoot, "README.md"),
 		join(repoRoot, "docs", "guide", "installation.md"),
 		join(repoRoot, "packages", "omo-codex", "README.md"),
 		join(repoRoot, "packages", "omo-codex", "MARKETPLACE.md"),

@@ -14,6 +14,16 @@ describe("person slug (IC-14)", () => {
     })
   })
 
+  describe("#given Korean display names", () => {
+    it("#then sanitizePersonSlug keeps the Hangul instead of collapsing to the fallback", async () => {
+      const { sanitizePersonSlug } = await import("./format")
+
+      expect(sanitizePersonSlug("김철수")).toBe("김철수")
+      expect(sanitizePersonSlug("홍길동")).not.toBe(sanitizePersonSlug("김철수"))
+      expect(sanitizePersonSlug("박 영규 (Sionic)")).toBe("박-영규-sionic")
+    })
+  })
+
   describe("#given the reserved slug 'human'", () => {
     it("#then isReservedSlug returns true for 'human'", async () => {
       const { isReservedSlug } = await import("./format")

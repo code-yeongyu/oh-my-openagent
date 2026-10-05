@@ -37,9 +37,9 @@ export function createEventHookRunner(): EventHookRunner {
 export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafely: EventHookRunner) {
   return async (input: EventInput): Promise<void> => {
     await runEventHookSafely("autoUpdateChecker", hooks.autoUpdateChecker?.event, input);
-    await runEventHookSafely("codegraphBootstrap", hooks.codegraphBootstrap?.event, input);
     await runEventHookSafely("astGrepSgProvision", hooks.astGrepSgProvision?.event, input);
     await runEventHookSafely("legacyPluginToast", hooks.legacyPluginToast?.event, input);
+    await runEventHookSafely("nativeEditionNudge", hooks.nativeEditionNudge?.event, input);
     await runEventHookSafely("claudeCodeHooks", hooks.claudeCodeHooks?.event, input);
     await runEventHookSafely("backgroundNotificationHook", hooks.backgroundNotificationHook?.event, input);
     await runEventHookSafely("sessionNotification", hooks.sessionNotification, input);
@@ -49,6 +49,7 @@ export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafel
     await runEventHookSafely("directoryAgentsInjector", hooks.directoryAgentsInjector?.event, input);
     await runEventHookSafely("directoryReadmeInjector", hooks.directoryReadmeInjector?.event, input);
     await runEventHookSafely("rulesInjector", hooks.rulesInjector?.event, input);
+    await runEventHookSafely("keywordDetector", hooks.keywordDetector?.event, input);
     await runEventHookSafely("hephaestusAgentsMdInjector", hooks.hephaestusAgentsMdInjector?.event, input);
     await runEventHookSafely("thinkMode", hooks.thinkMode?.event, input);
     await runEventHookSafely(

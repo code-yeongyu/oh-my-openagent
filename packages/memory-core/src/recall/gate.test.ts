@@ -1,0 +1,319 @@
+import { afterEach, describe, expect, it } from "bun:test"
+import { realpathSync } from "node:fs"
+import { mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { PendingNudges, validateNudges } from "./gate"
+import { removeTree } from "../../../../test-support/remove-tree"
+
+const tempDirs: string[] = []
+
+async function createPendingDir(): Promise<string> {
+  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "recall-pending-")))
+  tempDirs.push(dir)
+  return dir
+}
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
+  )
+})
+
+describe("validateNudges", () => {
+  const candidates = new Set(["reference/a.md", "notes/b.md", "reference/c.md"])
+
+  it("#given a path outside the candidate set #when validated #then it is rejected", () => {
+    // given / when
+    const accepted = validateNudges(
+      [
+        { path: "reference/unknown.md", hint: "stranger" },
+        { path: "reference/a.md", hint: "alpha" },
+      ],
+      { candidates, surfaced: new Set(), maxItems: 5 },
+    )
+
+    // then
+    expect(accepted).toEqual([{ path: "reference/a.md", hint: "alpha" }])
+  })
+
+  it("#given an already surfaced path #when validated #then it is rejected", () => {
+    // given / when
+    const accepted = validateNudges(
+      [{ path: "notes/b.md", hint: "beta" }],
+      { candidates, surfaced: new Set(["notes/b.md"]), maxItems: 5 },
+    )
+
+    // then
+    expect(accepted).toEqual([])
+  })
+
+  it("#given an oversized or multiline hint #when validated #then it is rejected", () => {
+    // given
+    const long = "x".repeat(201)
+
+    // when
+    const accepted = validateNudges(
+      [
+        { path: "reference/a.md", hint: long },
+        { path: "notes/b.md", hint: "line one\nline two" },
+        { path: "reference/c.md", hint: "y".repeat(200) },
+      ],
+      { candidates, surfaced: new Set(), maxItems: 5 },
+    )
+
+    // then
+    expect(accepted).toEqual([{ path: "reference/c.md", hint: "y".repeat(200) }])
+  })
+
+  it("#given more nudges than maxItems #when validated #then the cap is enforced in order", () => {
+    // given / when
+    const accepted = validateNudges(
+      [
+        { path: "reference/a.md", hint: "alpha" },
+        { path: "notes/b.md", hint: "beta" },
+        { path: "reference/c.md", hint: "gamma" },
+      ],
+      { candidates, surfaced: new Set(), maxItems: 2 },
+    )
+
+    // then
+    expect(accepted).toEqual([
+      { path: "reference/a.md", hint: "alpha" },
+      { path: "notes/b.md", hint: "beta" },
+    ])
+  })
+
+  it("#given a repeated path in one batch #when validated #then only the first occurrence survives", () => {
+    // given / when
+    const accepted = validateNudges(
+      [
+        { path: "reference/a.md", hint: "alpha" },
+        { path: "reference/a.md", hint: "alpha again" },
+      ],
+      { candidates, surfaced: new Set(), maxItems: 5 },
+    )
+
+    // then
+    expect(accepted).toEqual([{ path: "reference/a.md", hint: "alpha" }])
+  })
+})
+
+describe("PendingNudges", () => {
+  it("#given written nudges #when taken #then they return once and the file is gone", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    await store.write("session-1", [{ path: "reference/a.md", hint: "alpha" }])
+
+    // when
+    const first = await store.take("session-1")
+    const second = await store.take("session-1")
+
+    // then
+    expect(first).toEqual([{ path: "reference/a.md", hint: "alpha" }])
+    expect(second).toEqual([])
+    expect(await readdir(dir)).toEqual([])
+  })
+
+  it("#given a written file #when inspected #then the self-describing payload and mode are pinned", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+
+    // when
+    await store.write("session-1", [{ path: "reference/a.md", hint: "alpha" }])
+
+    // then
+    const filePath = join(dir, "session-1.json")
+    const parsed = JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>
+    expect(Object.keys(parsed).sort()).toEqual(["nudges", "sessionId", "version", "writtenAt"])
+    expect(parsed.version).toBe(1)
+    expect(parsed.sessionId).toBe("session-1")
+    expect(parsed.writtenAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(parsed.nudges).toEqual([{ path: "reference/a.md", hint: "alpha" }])
+    if (process.platform !== "win32") {
+      expect((await stat(filePath)).mode & 0o777).toBe(0o600)
+    }
+  })
+
+  it("#given a payload written for another session #when taken #then nothing returns and the file survives", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    await writeFile(
+      join(dir, "session-1.json"),
+      `${JSON.stringify({
+        version: 1,
+        sessionId: "session-2",
+        writtenAt: new Date().toISOString(),
+        nudges: [{ path: "reference/a.md", hint: "alpha" }],
+      })}\n`,
+      { encoding: "utf8", mode: 0o600 },
+    )
+
+    // when
+    const taken = await store.take("session-1")
+
+    // then
+    expect(taken).toEqual([])
+    expect(await readdir(dir)).toEqual(["session-1.json"])
+  })
+
+  it("#given a payload written 25 hours ago #when taken #then nothing returns and the file is deleted", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    const stale = new Date(Date.now() - 25 * 60 * 60_000).toISOString()
+    await writeFile(
+      join(dir, "session-1.json"),
+      `${JSON.stringify({
+        version: 1,
+        sessionId: "session-1",
+        writtenAt: stale,
+        nudges: [{ path: "reference/a.md", hint: "alpha" }],
+      })}\n`,
+      { encoding: "utf8", mode: 0o600 },
+    )
+
+    // when
+    const taken = await store.take("session-1")
+
+    // then
+    expect(taken).toEqual([])
+    expect(await readdir(dir)).toEqual([])
+  })
+
+  it("#given a malformed or unknown-version file #when taken #then nothing returns and nothing throws", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    await writeFile(join(dir, "session-1.json"), "{not json", "utf8")
+    await writeFile(
+      join(dir, "session-2.json"),
+      JSON.stringify({ version: 99, sessionId: "session-2", writtenAt: new Date().toISOString(), nudges: [] }),
+      "utf8",
+    )
+
+    // when / then
+    expect(await store.take("session-1")).toEqual([])
+    expect(await store.take("session-2")).toEqual([])
+    expect(await store.take("never-written")).toEqual([])
+  })
+
+  it("#given stale siblings and tmp orphans #when a new payload is written #then only fresh files remain", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    const stalePath = join(dir, "old-session.json")
+    const orphanPath = join(dir, "session-9.json.tmp-4242")
+    const freshPath = join(dir, "fresh-session.json")
+    await writeFile(stalePath, JSON.stringify({ version: 1, sessionId: "old-session", writtenAt: "x", nudges: [] }), "utf8")
+    await writeFile(orphanPath, "{}", "utf8")
+    await writeFile(freshPath, JSON.stringify({ version: 1, sessionId: "fresh-session", writtenAt: "y", nudges: [] }), "utf8")
+    const old = new Date(Date.now() - 25 * 60 * 60_000)
+    await utimes(stalePath, old, old)
+    await utimes(orphanPath, old, old)
+
+    // when
+    await store.write("session-1", [{ path: "reference/a.md", hint: "alpha" }])
+
+    // then
+    expect((await readdir(dir)).sort()).toEqual(["fresh-session.json", "session-1.json"])
+  })
+
+  it("#given an unsafe session id #when written and taken #then the file stays inside the pending dir", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+
+    // when
+    await store.write("a:b?c", [{ path: "reference/a.md", hint: "alpha" }])
+
+    // then
+    const names = await readdir(dir)
+    expect(names).toHaveLength(1)
+    expect(names[0]).not.toMatch(/[:\\/?*]/)
+    expect(await store.take("a:b?c")).toEqual([{ path: "reference/a.md", hint: "alpha" }])
+  })
+
+  it("#given a written payload #when deleted #then only that session's file is removed", async () => {
+    // given: delivery retracts its OWN just-written payload
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    await store.write("session-1", [{ path: "reference/a.md", hint: "alpha" }])
+    await store.write("session-2", [{ path: "reference/b.md", hint: "beta" }])
+
+    // when
+    await store.delete("session-1")
+
+    // then
+    expect(await readdir(dir)).toEqual(["session-2.json"])
+    expect(await store.take("session-2")).toEqual([{ path: "reference/b.md", hint: "beta" }])
+  })
+
+  it("#given no payload for the session #when deleted #then it is a silent no-op", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+
+    // when / then: retraction must never throw on the write path it guards
+    await store.delete("session-1")
+    expect(await readdir(dir)).toEqual([])
+  })
+
+  it("#given no nudges #when written #then nothing is stored", async () => {
+    // given
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+
+    // when
+    await store.write("session-1", [])
+
+    // then
+    expect(await readdir(dir)).toEqual([])
+    expect(await store.take("session-1")).toEqual([])
+  })
+
+  it("#given a colliding filename owned by another session #when deleted #then the file survives", async () => {
+    // given: "a:b" and "a/b" sanitize to the same filename, so an unguarded unlink would let one
+    // session retract the other session's payload
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    await store.write("a:b", [{ path: "reference/a.md", hint: "alpha" }])
+    const namesBefore = await readdir(dir)
+
+    // when
+    await store.delete("a/b")
+
+    // then
+    expect(await readdir(dir)).toEqual(namesBefore)
+    expect(await store.take("a:b")).toEqual([{ path: "reference/a.md", hint: "alpha" }])
+  })
+})
+
+describe("PendingNudges pre-resident payloads", () => {
+  it("#given a payload stamped by the retired one-shot writer #when taken #then the nudges are still consumed", async () => {
+    // given: a file written before the compaction epoch was removed carries the retired field
+    const dir = await createPendingDir()
+    const store = new PendingNudges(dir)
+    await writeFile(
+      join(dir, "session-1.json"),
+      `${JSON.stringify({
+        version: 1,
+        sessionId: "session-1",
+        compactionEpoch: 7,
+        writtenAt: new Date().toISOString(),
+        nudges: [{ path: "reference/a.md", hint: "alpha" }],
+      })}\n`,
+      { encoding: "utf8", mode: 0o600 },
+    )
+
+    // when
+    const taken = await store.take("session-1")
+
+    // then
+    expect(taken).toEqual([{ path: "reference/a.md", hint: "alpha" }])
+    expect(await readdir(dir)).toEqual([])
+  })
+})

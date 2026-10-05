@@ -11,8 +11,8 @@
     "test:all": "bun run test:basic && bun run test:edge"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^2.0.47",
-    "ai": "^6.0.184",
-    "zod": "^4.4.3"
+    "@ai-sdk/openai-compatible": "^3.0.53",
+    "ai": "^7.0.107",
+    "zod": "^4.6.5"
   }
 }

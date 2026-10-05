@@ -65,7 +65,7 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 	}))
 
 	// Provider-gated skill names that should be filtered based on browserProvider
-	const providerGatedSkillNames = new Set(["agent-browser", "playwright"])
+	const providerGatedSkillNames = new Set(["playwright"])
 
 	// Filter discovered skills to exclude provider-gated names that don't match the selected provider
 	const filteredDiscoveredSkills = discoveredSkills.filter((skill) => {

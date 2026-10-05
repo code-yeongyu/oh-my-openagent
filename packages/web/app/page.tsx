@@ -1,4 +1,4 @@
-export { landingMetadata as metadata } from "@/app/_components/landing-page"
+export { generateLandingMetadata as generateMetadata } from "@/app/_components/landing-page"
 
 import type { JSX } from "react"
 import { setRequestLocale } from "next-intl/server"

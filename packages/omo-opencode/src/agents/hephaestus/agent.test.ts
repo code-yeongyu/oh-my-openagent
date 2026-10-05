@@ -47,6 +47,12 @@ describe("isHephaestusSupportedModel with a hosted vendor prefix", () => {
       ["opencode/gpt-5.3-codex-spark", true],
       ["openai/gpt-4o", false],
       ["anthropic/claude-opus-4-7", false],
+      ["opencode-go/qwen3.7-plus", false],
+      ["opencode-go/qwen3.7PLUS", false],
+      ["qwen3.7PLUS", false],
+      ["bailian-coding-plan/qwen3.7PLUS", false],
+      ["Qwen3.7PLUS", false],
+      ["opencode-go/qwen3.5-plus", false],
       ["gpt-5.10", false],
       ["some-gpt-5.4-tune", false],
     ];
@@ -134,6 +140,11 @@ describe("getHephaestusPromptSource", () => {
     expect(source1).toBe("gpt-5-5");
     expect(source2).toBe("gpt-5-5");
   });
+
+  test("returns 'gpt-5-6' for GPT-6 Astra models", () => {
+    expect(getHephaestusPromptSource("openai/gpt-6-astra")).toBe("gpt-5-6")
+    expect(getHephaestusPromptSource("github-copilot/gpt-6-astra-fast")).toBe("gpt-5-6")
+  })
 
   test("returns 'gpt-5-6' for gpt-5.6 family models", () => {
     // given

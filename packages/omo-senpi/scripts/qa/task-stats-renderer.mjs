@@ -2,9 +2,14 @@
 
 import { renderTaskCompletion } from "../../src/components/task/renderers.ts"
 import { backgroundWidgetRows } from "../../src/components/task/status-row-format.ts"
+import { loadPiTui } from "../../../senpi-task/src/lazy/pi-tui.ts"
 import { createRunStatsTracker } from "../../../senpi-task/src/run-stats.ts"
 import { renderTaskOutputResult } from "../../../senpi-task/src/tools/output/renderers.ts"
 import { renderTaskResultComponent } from "../../../senpi-task/src/tools/task/renderers.ts"
+
+// The renderer paths below read the pi-tui barrel synchronously; the lazy boundary must be
+// warmed first, exactly like composeOmoSenpiExtension does before registering components.
+await loadPiTui()
 
 const WIDTH = 140
 const RESET = "\u001b[0m"
@@ -19,6 +24,7 @@ const COLORS = {
 
 const THEME = {
   fg: (color, text) => `${COLORS[color] ?? ""}${text}${RESET}`,
+  bg: (_color, text) => text,
   italic: (text) => `\u001b[3m${text}\u001b[23m`,
 }
 
@@ -112,6 +118,36 @@ function backgroundLines() {
   return [...live, ...completed]
 }
 
+function failedLines() {
+  const now = Date.parse("2026-08-03T03:00:00.000Z")
+  const record = {
+    task_id: "st_failed",
+    name: "failed-stats",
+    task_summary: "Failed provider attempts",
+    status: "running",
+    category: "deep-low",
+    execution_mode: "in-process",
+    model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+    resolved_model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+    created_at: new Date(now - 41_000).toISOString(),
+    updated_at: new Date(now).toISOString(),
+  }
+  return backgroundWidgetRows(
+    [record],
+    new Map(),
+    now,
+    () => ({
+      runtime_ms: 41_000,
+      turns: 0,
+      tool_calls: 0,
+      failed_turns: 2,
+      token_status: "unavailable",
+      cost_status: "unavailable",
+    }),
+    WIDTH,
+  )
+}
+
 function teamLines() {
   return renderTaskCompletion({
     role: "custom",
@@ -129,12 +165,15 @@ function teamLines() {
       final_response: "team statistics member complete",
       continuation_hint: 'Use task_send({ to: "stats-member", message: "..." }) to continue.',
     }],
-  }).render(WIDTH)
+  }, { expanded: false }, THEME).render(WIDTH)
 }
 
 function scenario(name) {
   if (name === "foreground") {
-    return { lines: foregroundLines(), required: ["foreground completed", "ran:2m5s", "tools:7", "tps:64"] }
+    return {
+      lines: foregroundLines(),
+      required: ["foreground completed", "id:st_foreground", "ran:2m5s", "tools:7", "cost:$0.1303", "ch:44%"],
+    }
   }
   if (name === "background") {
     return {
@@ -145,26 +184,43 @@ function scenario(name) {
     }
   }
   if (name === "team") {
-    return { lines: teamLines(), required: ["name:stats-member", "status:completed", "duration:1m 5s", "tools:4", "tps:250"] }
+    return {
+      lines: teamLines(),
+      required: ["Task complete", "stats-member", "id st_team_member", "duration 1m 5s", "tools 4", "tps 250"],
+    }
   }
-  throw new Error("usage: bun packages/omo-senpi/scripts/qa/task-stats-renderer.mjs <foreground|background|team>")
+  if (name === "failed") {
+    return {
+      lines: failedLines(),
+      required: ["failed 2", "retrying", "41s"],
+      runningForbidden: ["turn ", "$"],
+    }
+  }
+  throw new Error("usage: bun packages/omo-senpi/scripts/qa/task-stats-renderer.mjs <foreground|background|team|failed>")
 }
 
-const selected = scenario(process.argv[2])
-const visible = selected.lines.join("\n")
-const plain = visible.replace(/\u001b\[[0-9;]*m/gu, "")
-for (const token of selected.required) {
-  if (!plain.includes(token)) throw new Error(`missing required renderer token: ${token} in ${JSON.stringify(plain)}`)
-}
-const [runningLine = "", completedLine = ""] = selected.lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ""))
-for (const token of selected.runningForbidden ?? []) {
-  if (runningLine.includes(token)) {
-    throw new Error(`unexpected running-row token: ${token} in ${JSON.stringify(runningLine)}`)
+const names = process.argv[2] === undefined
+  ? ["foreground", "background", "team", "failed"]
+  : [process.argv[2]]
+const blocks = []
+for (const name of names) {
+  const selected = scenario(name)
+  const visible = selected.lines.join("\n")
+  const plain = visible.replace(/\u001b\[[0-9;]*m/gu, "")
+  for (const token of selected.required) {
+    if (!plain.includes(token)) throw new Error(`missing required renderer token: ${token} in ${JSON.stringify(plain)}`)
   }
-}
-for (const token of selected.completedRequired ?? []) {
-  if (!completedLine.includes(token)) {
-    throw new Error(`missing completed-row token: ${token} in ${JSON.stringify(completedLine)}`)
+  const [runningLine = "", completedLine = ""] = selected.lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ""))
+  for (const token of selected.runningForbidden ?? []) {
+    if (runningLine.includes(token)) {
+      throw new Error(`unexpected running-row token: ${token} in ${JSON.stringify(runningLine)}`)
+    }
   }
+  for (const token of selected.completedRequired ?? []) {
+    if (!completedLine.includes(token)) {
+      throw new Error(`missing completed-row token: ${token} in ${JSON.stringify(completedLine)}`)
+    }
+  }
+  blocks.push(`# ${name}\n${visible}`)
 }
-process.stdout.write(`${visible}\n`)
+process.stdout.write(blocks.join("\n") + "\n")

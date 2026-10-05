@@ -19,11 +19,19 @@ export interface TaskSkillLoaderOptions {
   readonly loadSettings?: (cwd: string) => OmoGitMasterSettings
 }
 
-function packagedSkillDirs(moduleUrl: string): readonly string[] {
+/**
+ * Both candidate pairs cover the two layouts this module ships in: the source tree
+ * (`packages/omo-senpi/src/components/task`) and the bundled runtime (`plugin/extensions`).
+ * `skills-conditional` holds credential-gated skills (x-search); it is offered to every
+ * `load_skills` request unconditionally because the PARENT decides what to pass.
+ */
+export function packagedSkillDirs(moduleUrl: string): readonly string[] {
   const moduleDir = dirname(fileURLToPath(moduleUrl))
   return [
     resolve(moduleDir, "../../../plugin/skills"),
     resolve(moduleDir, "../skills"),
+    resolve(moduleDir, "../../../plugin/skills-conditional"),
+    resolve(moduleDir, "../skills-conditional"),
   ].filter(existsSync)
 }
 

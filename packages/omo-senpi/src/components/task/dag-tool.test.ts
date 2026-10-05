@@ -9,7 +9,7 @@ import { createDagFileStore, createDagManager, DagManagerError, type DagManager,
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 
-import { DAG_TOOL_NAME, createDagTool, runDagTool, type DagToolDefinitionInput } from "./dag-tool"
+import { WORKFLOW_TOOL_NAME, createDagTool, runDagTool, type DagToolDefinitionInput } from "./dag-tool"
 
 const parentSessionId = "ses_parent"
 const rootSessionId = "ses_root"
@@ -46,7 +46,9 @@ function fixture(): {
   return {
     manager,
     store,
-    runFileCount: () => fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length,
+    runFileCount: () => fs.existsSync(store.paths.runs)
+      ? fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length
+      : 0,
   }
 }
 
@@ -67,7 +69,7 @@ function deps(manager: DagManager) {
 }
 
 describe("dag tool registration", () => {
-  test("#given the dag tool factory #when a tool is created #then it registers exactly one tool named dag", () => {
+  test("#given the workflow tool factory #when a tool is created #then it registers exactly one tool named workflow", () => {
     // given
     const { manager } = fixture()
 
@@ -75,8 +77,8 @@ describe("dag tool registration", () => {
     const tool = createDagTool(deps(manager))
 
     // then
-    expect(tool.name).toBe("dag")
-    expect(DAG_TOOL_NAME).toBe("dag")
+    expect(tool.name).toBe("workflow")
+    expect(WORKFLOW_TOOL_NAME).toBe("workflow")
   })
 })
 
@@ -175,7 +177,7 @@ describe("dag tool definition validation", () => {
     // given
     const { manager, runFileCount } = fixture()
     const conflicted = definition({
-      nodes: [{ id: "plan", prompt: "draft", category: "quick", subagent_type: "momus" }],
+      nodes: [{ id: "plan", prompt: "draft", category: "quick", subagent_type: "plan-reviewer" }],
     })
 
     // when
@@ -207,7 +209,7 @@ describe("dag tool definition validation", () => {
     // given
     const { manager } = fixture()
     const explicit = definition({
-      nodes: [{ id: "plan", prompt: "draft", subagent_type: "momus", model: "anthropic/claude-opus-4" }],
+      nodes: [{ id: "plan", prompt: "draft", subagent_type: "plan-reviewer", model: "anthropic/claude-opus-4" }],
     })
 
     // when
@@ -217,7 +219,7 @@ describe("dag tool definition validation", () => {
     expect(result.details.kind).toBe("started")
     if (result.details.kind !== "started") throw new Error("Expected subagent_type+model to be accepted")
     const node = result.details.snapshot.nodes[0]
-    expect(node?.route).toEqual({ kind: "agent", agent: "momus", model: "anthropic/claude-opus-4" })
+    expect(node?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "anthropic/claude-opus-4" })
   })
 })
 
@@ -491,6 +493,30 @@ describe("dag tool start warnings", () => {
     // then
     expect(result.details.kind).toBe("started")
     if (result.details.kind !== "started") throw new Error("Expected start to succeed")
+    expect(result.details.warnings).toEqual([])
+  })
+
+  test("#given a node targeting the retired momus id #when start runs #then the route keeps the submitted id and no deprecation warning is emitted", async () => {
+    // given
+    const { manager } = fixture()
+    const retired = definition({
+      nodes: [
+        {
+          id: "review",
+          prompt: "TASK: review the plan. DELIVERABLE: findings. SCOPE: read-only. VERIFY: findings listed. STOP WHEN: findings are written.",
+          subagent_type: "momus",
+          model: "anthropic/claude-opus-4",
+        },
+      ],
+    })
+
+    // when
+    const result = await runDagTool(deps(manager), { action: "start", definition: retired })
+
+    // then
+    expect(result.details.kind).toBe("started")
+    if (result.details.kind !== "started") throw new Error("Expected the retired id to start as an ordinary agent name")
+    expect(result.details.snapshot.nodes[0]?.route).toEqual({ kind: "agent", agent: "momus", model: "anthropic/claude-opus-4" })
     expect(result.details.warnings).toEqual([])
   })
 })

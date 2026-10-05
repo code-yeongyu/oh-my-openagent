@@ -30,11 +30,13 @@ function resolved(
 }
 
 const scenarios = {
-  visualPrimary: resolved("visual-engineering", [model("anthropic", "claude-opus-5")]),
+  visualPrimary: resolved("visual-engineering", [model("anthropic", "claude-fable-5-1")]),
+  visualOpusFallback: resolved("visual-engineering", [model("anthropic", "claude-opus-5")]),
   visualKimiFallback: resolved("visual-engineering", [model("kimi-coding", "k3")]),
-  visualGlmFallback: resolved("visual-engineering", [model("zai-coding-plan", "glm-5.2")]),
-  quickPrimary: resolved("quick", [model("kimi-coding", "kimi-for-coding-highspeed")]),
-  quickMiniFallback: resolved("quick", [model("openai-codex", "gpt-5.6-luna-fast")]),
+  writingPrimary: resolved("writing", [model("anthropic", "claude-opus-5-5")]),
+  writingOpus46Fallback: resolved("writing", [model("anthropic", "claude-opus-4-6")]),
+  quickPrimary: resolved("quick", [model("openai-codex", "gpt-6-luna-fast")]),
+  quickDeepseekFallback: resolved("quick", [model("deepseek", "deepseek-flash")]),
   quickGrokFallback: resolved("quick", [model("xai", "grok-4.20-0309-non-reasoning")]),
   unspecifiedHighPrimary: resolved("unspecified-high", [model("kimi-coding", "k3")]),
   unspecifiedHighOpusFallback: resolved("unspecified-high", [model("anthropic", "claude-opus-5")]),

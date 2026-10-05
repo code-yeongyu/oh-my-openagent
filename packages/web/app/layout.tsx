@@ -3,82 +3,91 @@ import type { JSX, ReactNode } from "react"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import Script from "next/script"
+import { installDetectScript } from "@/lib/install-targets"
+import { getStats, FALLBACK_DESCRIPTION } from "@/lib/stats"
 import "./globals.css"
 
 const primarySiteUrl = "https://omo.dev"
 
-export const metadata: Metadata = {
-  metadataBase: new URL(primarySiteUrl),
-  title: {
-    default: "Oh My OpenAgent — The Best Agent Harness",
-    template: "%s | Oh My OpenAgent",
-  },
-  description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 60+ lifecycle hooks.",
-  keywords: [
-    "opencode",
-    "oh-my-opencode",
-    "openagent",
-    "oh-my-openagent",
-    "ai agent",
-    "code agent",
-    "sisyphus",
-    "multi-model",
-    "team mode",
-    "agent orchestration",
-    "claude",
-    "gpt",
-    "gemini",
-    "coding assistant",
-    "lazycodex",
-    "lazycodex-ai",
-    "codex cli",
-    "codex plugin",
-  ],
-  authors: [{ name: "Yeongyu Kim", url: "https://github.com/code-yeongyu" }],
-  creator: "Yeongyu Kim",
-  alternates: {
-    canonical: "/",
-    languages: {
-      en: "/",
-      ko: "/ko",
-      ja: "/ja",
-      zh: "/zh",
+export const revalidate = 3600
+
+export async function generateMetadata(): Promise<Metadata> {
+  let description = FALLBACK_DESCRIPTION
+  try {
+    description = (await getStats()).description
+  } catch (error) {
+    console.warn("Unable to refresh site metadata; using fallback description", error)
+  }
+
+  return {
+    metadataBase: new URL(primarySiteUrl),
+    title: {
+      default: "OmO — Your tool for real work. But it's an agent.",
+      template: "%s | OmO",
     },
-  },
-  openGraph: {
-    type: "website",
-    locale: "en_US",
-    alternateLocale: ["ko_KR", "ja_JP", "zh_CN"],
-    url: primarySiteUrl,
-    siteName: "Oh My OpenAgent",
-    title: "Oh My OpenAgent — The Best Agent Harness",
-    description:
-      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 60+ lifecycle hooks.",
-    // og:image is supplied by app/opengraph-image.tsx via Next.js file-based metadata convention.
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Oh My OpenAgent — The Best Agent Harness",
-    description: "Meet Sisyphus: The batteries-included agent that codes like you.",
-    // twitter:image is supplied by app/twitter-image.tsx via the file-based convention.
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
+    description,
+    keywords: [
+      "opencode",
+      "oh-my-opencode",
+      "openagent",
+      "oh-my-openagent",
+      "ai agent",
+      "code agent",
+      "multi-model",
+      "team mode",
+      "agent orchestration",
+      "claude",
+      "gpt",
+      "coding assistant",
+      "lazycodex",
+      "lazycodex-ai",
+      "codex cli",
+      "codex plugin",
+    ],
+    authors: [{ name: "Yeongyu Kim", url: "https://github.com/code-yeongyu" }],
+    creator: "Yeongyu Kim",
+    alternates: {
+      canonical: "/",
+      languages: {
+        en: "/",
+        ko: "/ko",
+        ja: "/ja",
+        zh: "/zh",
+      },
+    },
+    openGraph: {
+      type: "website",
+      locale: "en_US",
+      alternateLocale: ["ko_KR", "ja_JP", "zh_CN"],
+      url: primarySiteUrl,
+      siteName: "OmO",
+      title: "OmO — Your tool for real work. But it's an agent.",
+      description,
+      // Next.js supplies the dynamic image from app/opengraph-image.tsx.
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "OmO — Your tool for real work. But it's an agent.",
+      description,
+      // app/twitter-image.tsx shares the Open Graph image generator.
+    },
+    robots: {
       index: true,
       follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
     },
-  },
+  }
 }
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Oh My OpenAgent",
+  name: "OmO",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS, Linux, Windows",
   url: primarySiteUrl,
@@ -88,7 +97,7 @@ const jsonLd = {
     url: "https://github.com/code-yeongyu",
   },
   description:
-    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 60+ lifecycle hooks.",
+    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 55 lifecycle hooks.",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -106,7 +115,30 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
       className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: installDetectScript }} />
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="flex min-h-screen flex-col bg-[#0a0a0a] text-[#ededed] antialiased">
+        {process.env.NODE_ENV === "development" && (
+          <>
+            <Script
+              src="//unpkg.com/react-grab/dist/index.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+            <Script
+              src="//unpkg.com/react-scan/dist/auto.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+          </>
+        )}
         <Script id="google-analytics-loader" strategy="lazyOnload">
           {`if (typeof window !== 'undefined' && window.location.hostname === '${gaTrackedDomain}') {
   var s = document.createElement('script');

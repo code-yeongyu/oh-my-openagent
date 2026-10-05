@@ -1,8 +1,9 @@
+import { isolationDetails, type IsolationDetails } from "../../isolation/details"
 import type { ExecutionMode, StartResult } from "../../manager"
 import type { ToolProgressDetails } from "../../progress"
 import type { TaskRecord } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
-import type { TaskSkillSummary, TaskToolDetails, TaskToolMode } from "./types"
+import type { TaskHandleDetails, TaskSkillSummary, TaskToolDetails, TaskToolMode } from "./types"
 
 export type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
@@ -16,6 +17,8 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
     execution_mode: record.execution_mode,
     model: record.model,
     run_stats: record.run_stats,
+    failure_kind: record.failure_kind,
+    failure_reason: record.failure_reason,
     ...(includeLifecycle && {
           description: record.description,
           agent_type: record.agent_type,
@@ -27,14 +30,20 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
   }
 }
 
-export function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails {
+export function recordDetails(
+  record: TaskRecord,
+  mode: TaskToolMode,
+): Omit<TaskToolDetails, "isolation"> & TaskHandleDetails & { readonly isolation?: IsolationDetails } {
+  const isolation = isolationDetails(record)
   return {
     ...recordSummary(record),
+    run_epoch: record.notification.run_epoch,
     mode,
     subagent_type: record.agent_type,
     resolved_model: record.resolved_model,
     fallback_attempts: record.fallback_attempts,
     run_in_background: false,
+    ...(isolation === undefined ? {} : { isolation }),
   }
 }
 
@@ -46,6 +55,7 @@ export function startedDetails(
 ): TaskToolDetails {
   return {
     task_id: started.task_id,
+    ...(started.run_epoch === undefined ? {} : { run_epoch: started.run_epoch }),
     status: started.status,
     mode: "spawn",
     task_summary: params.task_summary,
@@ -57,6 +67,7 @@ export function startedDetails(
     resolved_model: started.resolved_model,
     run_in_background: params.run_in_background === true,
     queue_position: started.queue_position,
+    ...(started.isolation === undefined ? {} : { isolation: started.isolation }),
     ...(skills === undefined ? {} : { skills }),
   }
 }

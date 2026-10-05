@@ -6,9 +6,7 @@ declare function setInterval(callback: () => void, delay?: number): TimerHandle
 declare function clearInterval(timeout: TimerHandle): void
 declare function clearTimeout(timeout: TimerHandle): void
 
-// TTL for idle session state entries (10 minutes)
 const SESSION_STATE_TTL_MS = 10 * 60 * 1000
-// Prune interval (every 2 minutes)
 const SESSION_STATE_PRUNE_INTERVAL_MS = 2 * 60 * 1000
 
 interface TrackedSessionState {

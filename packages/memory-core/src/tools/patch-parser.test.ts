@@ -18,7 +18,7 @@ describe("memory patch parser", () => {
 
       // #then
       expect(parse).toThrow(MemoryPatchParseError)
-      expect(parse).toThrow(`memory_apply_patch: ${message}`)
+      expect(parse).toThrow(`memory apply_patch: ${message}`)
     })
   }
 

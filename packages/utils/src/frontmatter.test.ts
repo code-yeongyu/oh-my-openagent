@@ -112,6 +112,15 @@ Body`,
       "Body",
     ],
     [
+      "handles UTF-8 BOM before frontmatter",
+      `\uFEFF---
+description: BOM-safe
+---
+Body`,
+      { description: "BOM-safe" },
+      "Body",
+    ],
+    [
       "handles invalid YAML gracefully",
       `---
 invalid: yaml: syntax: here

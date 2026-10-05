@@ -1,8 +1,10 @@
 import { resolveContext } from "./context"
 import { destroyResidentTask } from "./destroy"
-import type { DestroyCause, LifecycleDeps } from "./port"
-import { admitResident } from "./residency"
+import { parkHostSessionOnDaemonLoss, retryDeferredHostSessions, type HostSessionParkOptions } from "./host-session-revive"
+import { registerLifecycleDetachedRevival, registerLifecycleDetachedRevivalRollback, type DestroyCause, type LifecycleDeps } from "./port"
+import { admitResident, reclaimIdleResidents, startIdleResidentReclaimer } from "./residency"
 import { reconcileOnSessionStart } from "./reconcile"
+import { rollbackDetachedRevival, reviveDetachedTerminal } from "./revive-detached"
 import { suspendOnSessionShutdown } from "./shutdown"
 import { cleanupExpiredRecords } from "./ttl"
 import type { SuspendInput, TaskLifecycle } from "./types"
@@ -14,11 +16,29 @@ import type { SuspendInput, TaskLifecycle } from "./types"
  */
 export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
   const context = resolveContext(deps)
+  const cleanup = () => cleanupExpiredRecords(context)
+  registerLifecycleDetachedRevival(context.store, (taskId) => reviveDetachedTerminal(context, taskId))
+  registerLifecycleDetachedRevivalRollback(context.store, (prior) => rollbackDetachedRevival(context, prior))
+  const stopIdleReclaimer = startIdleResidentReclaimer(context, cleanup)
   return {
     destroyResidentTask: (taskId: string, cause: DestroyCause) => destroyResidentTask(context, taskId, cause),
+    rollbackDetachedRevival: (prior) => rollbackDetachedRevival(context, prior),
+    reclaimIdleResidents: () => reclaimIdleResidents(context),
+    // Parent shutdown: the kernel that owns every granted closure dies with this engine, so the
+    // whole runtime binding map goes too - no strong reference to a disposed kernel survives.
+    dispose: () => {
+      stopIdleReclaimer()
+      context.kernelToolBindings?.releaseAll()
+    },
     admitResident: (parentSessionId: string) => admitResident(context, parentSessionId),
-    reconcileOnSessionStart: (parentSessionId?: string) => reconcileOnSessionStart(context, parentSessionId),
-    cleanupExpiredRecords: () => cleanupExpiredRecords(context),
+    reconcileOnSessionStart: async (parentSessionId?: string) => {
+      const result = await reconcileOnSessionStart(context, parentSessionId)
+      retryDeferredHostSessions(context, result.outcomes)
+      return result
+    },
+    parkHostSessionOnDaemonLoss: (taskId: string, options?: HostSessionParkOptions) =>
+      parkHostSessionOnDaemonLoss(context, taskId, options),
+    cleanupExpiredRecords: cleanup,
     suspendOnSessionShutdown: (input: SuspendInput) => suspendOnSessionShutdown(context, input),
   }
 }

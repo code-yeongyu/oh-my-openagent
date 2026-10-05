@@ -8,8 +8,8 @@ import { parseRuleFrontmatter } from "./parser";
 const corpusPaths = [
   ".agents/skills/opencode-qa/SKILL.md",
   ".agents/skills/security-research/SKILL.md",
-  "packages/omo-opencode/src/features/builtin-skills/dev-browser/SKILL.md",
-  "packages/omo-opencode/src/features/builtin-skills/git-master/SKILL.md",
+  "packages/skills-loader-core/src/features/builtin-skills/dev-browser/SKILL.md",
+  "packages/skills-loader-core/src/features/builtin-skills/git-master/SKILL.md",
   ".omo/rules/test-discipline.md",
 ] as const;
 

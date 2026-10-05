@@ -6,7 +6,7 @@ import {
   messageHasWaitingTool,
   messageIsSyntheticOrInternalUser,
   messageRole,
-} from "../../shared/prompt-async-gate/prompt-message-state"
+} from "@oh-my-opencode/utils/prompt-async-gate/prompt-message-state"
 import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { isRecord } from "./error-classifier"
 import { getParentWakeMessageActivityAt, getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"

@@ -33,6 +33,12 @@ describe("TaskToolParams", () => {
     expect(TaskToolParams.required).toBeUndefined()
   })
 
+  test("#given the run_in_background schema text #when read #then it no longer labels false as the default", () => {
+    const description = String(Reflect.get(TaskToolParams.properties.run_in_background, "description") ?? "")
+    expect(description).not.toContain("(default)")
+    expect(description).toContain("message")
+  })
+
   test("#given batch task parameters #when schema is inspected #then a finite maximum is enforced", () => {
     expect(TaskToolParams.properties.tasks).toMatchObject({ maxItems: MAX_TASK_BATCH_ITEMS })
   })

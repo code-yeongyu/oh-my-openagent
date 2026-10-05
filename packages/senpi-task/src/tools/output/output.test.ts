@@ -246,3 +246,36 @@ describe("runTaskOutput", () => {
     expect(firstText(result)).not.toContain("suspended")
   })
 })
+
+// The shared daemon's loud fallback has to reach the human who asked for the child, not just a log
+// file: a status view carries the session's deduped runner notices.
+describe("runTaskOutput runner notices", () => {
+  test("#given a session that fell back to in-process children #when a status view is read #then the reason appears once", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_noticed", status: "running" })
+    const deps: TaskOutputDeps = {
+      ...depsFrom([record]),
+      notices: () => ["host_unavailable:capability - task children run in this process: the daemon is older"],
+    }
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_noticed" }, "session-parent")
+
+    // then
+    const text = firstText(result)
+    expect(text.match(/host_unavailable:capability/g)).toHaveLength(1)
+    expect(text).toContain("st_noticed")
+  })
+
+  test("#given a session with no runner notices #when a status view is read #then the text is unchanged", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_quiet", status: "running" })
+
+    // when
+    const withNotices = await runTaskOutput({ ...depsFrom([record]), notices: () => [] }, { task_id: "st_quiet" }, "session-parent")
+    const without = await runTaskOutput(depsFrom([record]), { task_id: "st_quiet" }, "session-parent")
+
+    // then
+    expect(firstText(withNotices)).toBe(firstText(without))
+  })
+})

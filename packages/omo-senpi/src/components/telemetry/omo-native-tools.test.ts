@@ -139,15 +139,15 @@ describe("OmO Native tool telemetry", () => {
     const { pi, events } = fixture()
 
     await pi.dispatch("tool_result", result("omo/task", {
-      category: "deep",
+      category: "deep-low",
       run_in_background: true,
       tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }],
     }), context())
 
     expect(eventProperties(events, "delegation_started")).toEqual([
-      { $session_id: "hashed:session-a", kind: "category", name: "deep", background: true, batch_size_bucket: "2_4" },
-      { $session_id: "hashed:session-a", kind: "category", name: "deep", background: true, batch_size_bucket: "2_4" },
-      { $session_id: "hashed:session-a", kind: "category", name: "deep", background: true, batch_size_bucket: "2_4" },
+      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
+      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
+      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
     ])
   })
 
@@ -163,9 +163,24 @@ describe("OmO Native tool telemetry", () => {
     ])
   })
 
+  test("#given a retired curated agent id spawn #when task completes #then the delegation reports it as custom, like any unknown name", async () => {
+    const { pi, events } = fixture()
+
+    await pi.dispatch("tool_result", result("task", { prompt: "review", subagent_type: "momus" }), context())
+    await pi.dispatch("tool_result", result("task", {
+      tasks: [{ prompt: "consult", subagent_type: "metis" }, { prompt: "scan", subagent_type: "explore" }],
+    }), context())
+
+    expect(eventProperties(events, "delegation_started")).toEqual([
+      { $session_id: "hashed:session-a", kind: "subagent", name: "custom", background: false, batch_size_bucket: "1" },
+      { $session_id: "hashed:session-a", kind: "subagent", name: "custom", background: false, batch_size_bucket: "2_4" },
+      { $session_id: "hashed:session-a", kind: "subagent", name: "explore", background: false, batch_size_bucket: "2_4" },
+    ])
+  })
+
   test("#given feature tools across two sessions #when repeated #then each feature emits once per session", async () => {
     const { pi, events } = fixture()
-    const tools = ["create_goal", "team_create", "memory", "memory_apply_patch"]
+    const tools = ["create_goal", "team_create", "memory"]
 
     for (const toolName of tools) await pi.dispatch("tool_result", result(toolName, {}), context("session-a"))
     for (const toolName of tools) await pi.dispatch("tool_result", result(toolName, {}), context("session-a"))

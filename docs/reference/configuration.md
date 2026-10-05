@@ -13,10 +13,9 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
   - [Agents](#agents)
   - [Categories](#categories)
   - [Model Resolution](#model-resolution)
+  - [Model Profiles](#model-profiles)
 - [Task System](#task-system)
   - [Background Tasks](#background-tasks)
-  - [Sisyphus Agent](#sisyphus-agent)
-  - [Sisyphus Tasks](#sisyphus-tasks)
 - [Features](#features)
   - [Skills](#skills)
   - [Memory](#memory)
@@ -29,7 +28,6 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
   - [Notification](#notification)
   - [MCPs](#mcps)
   - [LSP](#lsp)
-  - [CodeGraph](#codegraph)
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
   - [Model Capabilities](#model-capabilities)
@@ -45,7 +43,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
 
 ### File Locations
 
-One unified file configures every omo harness: the OpenCode plugin, Senpi (task, codegraph, config-watch), and the Codex codegraph loader. The legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration](#migration)).
+One unified file configures every omo harness: the OpenCode plugin, Senpi (task, config-watch), and Codex. The legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration](#migration)).
 
 1. User layer (lowest precedence): `~/.omo/omo.jsonc` on every platform (`omo.json` is accepted as a fallback basename).
 2. Project layers: `.omo/omo.jsonc` (then `.omo/omo.json`) in every directory from the working directory up to `$HOME`. Farther ancestors merge first, so the nearest project file wins and beats the user layer. `$HOME` itself is skipped by the walk because `~/.omo` is already the user layer. If the working directory is outside `$HOME`, the walk continues to the filesystem root.
@@ -55,7 +53,7 @@ One unified file configures every omo harness: the OpenCode plugin, Senpi (task,
 Within the merged document each harness resolves its own view VSCode-style, later layers winning:
 
 1. Shared base keys
-2. The `[harness]` block: `[opencode]`, `[senpi]`, or `[codex]`
+2. The `[harness]` block: `[opencode]`, `[native]`, or `[codex]` (`[senpi]` is the accepted legacy spelling of `[native]`)
 3. `profiles.<name>`
 4. `profiles.<name>.[harness]`
 
@@ -75,6 +73,17 @@ Activating a profile that does not exist produces a diagnostic and falls back to
 #### Model Catalog
 
 A top-level `models` record maps a short name to the canonical shape `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs are accepted for compatibility and normalized to `reasoning`. When an agent or category `model` string matches a catalog key, it resolves to the entry's model id and fills any unset `reasoning` from the entry; tuning written at the use site always wins. `[harness]` blocks can override individual catalog entries for one harness.
+
+#### Model Profiles
+
+Two more shared base keys, read by the Senpi harness, pick the main session model by lane instead of by model id. They live at the top level, inside `[native]`, or inside a `profiles.<name>` layer, like any other base key.
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `model_profiles` | record<string, `{ display_name?, family?, tier?, models? }`> | Named ordered model chains. A name matching a builtin (`recommended`, `daily-normal`, `daily-heavy`, `geeky-normal`, `geeky-heavy`) replaces it wholesale; any other name adds one. Entries use the same string or object shape as a category chain and may reference `models.<catalog>` entries. |
+| `model_profile` | string | Which chain starts the session: a lane id such as `daily-normal`, or a literal `provider/model` that pins one exact model. Unset applies Recommended (`recommended`) on a fresh session. |
+
+Don't confuse these with `profiles.<name>` above: that key swaps configuration layers via `OMO_PROFILE`, while `model_profile` chooses a model within the loaded configuration. Builtin chains, session-start behavior, and override rules are in the [omo.json reference](./omo-json.md#model-profiles-native-harness).
 
 #### Security Invariants
 
@@ -97,8 +106,9 @@ Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to li
 The first time a current harness starts (and again on install or via the CLI), a lock-and-journal migration engine imports the legacy files into the unified file:
 
 - Sources: `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` in the OpenCode user config directory, in each of its `profiles/<name>/` directories, and in walked project `.opencode/` directories, plus `~/.omo/config.jsonc`.
-- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its shared `codegraph` settings plus its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[senpi]`.
+- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[native]`.
 - OpenCode legacy files import only model/provider controls (`disabled_providers`, `model_fallback`, `models`, and `omo_agent` renamed to `sisyphus_agent`); agent and category registries, agent disable lists, hooks, and unrelated plugin settings are not imported.
+- OmO Native's first start then reports, once, every OpenCode edition agent or category model choice (from the legacy files, their migration backups, or the `[opencode]` block) that Native does not use, each with the `"[native]": { ... }` member that would set it (`metis` as `plan-consultant`, `momus` as `plan-reviewer`, OpenCode provider ids as omo's) and a pointer to `omo setup`, which carries them over with your consent. It writes only the `2026-09-opencode-routing-notice` marker; `omo doctor` repeats the line while the gap exists.
 - Conflict policy: no-clobber. A value already present in the target wins, and every skipped legacy value is reported as a diagnostic instead of overwriting. Prior legacy migration history is preserved under the target's `legacy_migrations` key.
 - Markers: each applied migration records its id in the target's `_migrations` array, so re-runs are no-ops. `2026-07-opencode-config-unification` covers the `oh-my-*` files; `2026-07-codex-config-jsonc` covers `~/.omo/config.jsonc`; `2026-08-reasoning-unification` rewrites persisted model and reasoning fields. Codex startup runs only the second group; OpenCode plugin startup, Senpi startup, install, and the CLI run both groups, so whichever side runs first applies each group exactly once.
 - Backups: sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`). An interrupted run resumes from its journal on the next start.
@@ -115,41 +125,31 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
 
   "[opencode]": {
     "agents": {
-      // Main orchestrator: Claude Opus or Kimi K3 work best
-      "sisyphus": {
-        "model": "kimi-for-coding/kimi-k3",
-        "ultrawork": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
-      },
-
       // Research agents: cheap fast models are fine
       "librarian": { "model": "google/gemini-3.6-flash" },
       "explore": { "model": "github-copilot/grok-code-fast-1" },
 
-      // Architecture consultation: GPT-5.6 Sol or Claude Opus
-      "oracle": { "model": "openai/gpt-5.6-sol", "reasoning": "high" },
-
-      // Prometheus inherits sisyphus model; just add prompt guidance
-      "prometheus": {
-        "prompt_append": "Leverage deep & quick agents heavily, always in parallel.",
-      },
+      // Plan-gated reviewers: keep the builtin prompt, pin the model
+      "plan-consultant": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
+      "plan-reviewer": { "model": "openai/gpt-6-astra", "reasoning": "high" },
     },
 
     "categories": {
       // quick - Kimi high-speed by default
-      "quick": { "model": "kimi-for-coding/kimi-for-coding-highspeed" },
+      "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
       // unspecified-low - moderate tasks
-      "unspecified-low": { "model": "xai/grok-4.6", "reasoning": "xhigh" },
+      "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
       // unspecified-high - complex work
-      "unspecified-high": { "model": "kimi-for-coding/kimi-k3", "reasoning": "max" },
+      "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
       // writing - docs/prose
-      "writing": { "model": "kimi-for-coding/kimi-k3", "reasoning": "low" },
+      "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
 
-      // visual-engineering - Opus 5, then Kimi K3 and GLM 5.2
+      // visual-engineering - Fable 5.1 max, then Opus 5 max and Kimi K3 max
       "visual-engineering": {
-        "model": "anthropic/claude-opus-5",
+        "model": "anthropic/claude-opus-5-5",
         "reasoning": "max",
       },
 
@@ -170,7 +170,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
         "zai-coding-plan": 10,
       },
       "modelConcurrency": {
-        "anthropic/claude-opus-5": 2,
+        "anthropic/claude-opus-5-5": 2,
         "opencode/gpt-5-nano": 20,
       },
     },
@@ -187,26 +187,20 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
 
 ### Agents
 
-Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`, `sisyphus-junior`.
+Override built-in agent settings. The main agent runs in your session on your session model and has no `agents` entry. Available builtin agents: `explore`, `librarian`, `plan-consultant`, `plan-reviewer`. Any other key under `agents` defines a user-defined agent.
 
 ```json
 {
   "agents": {
     "explore": { "model": "anthropic/claude-haiku-4-5", "temperature": 0.5 },
-    "multimodal-looker": { "disable": true }
+    "plan-reviewer": { "disable": true }
   }
 }
 ```
 
-Disable agents entirely: `{ "disabled_agents": ["oracle", "multimodal-looker"] }`
+> **Removed**: the retired keys `agents.metis` and `agents.momus` no longer resolve to `plan-consultant` and `plan-reviewer`. Their one-release alias window closed after 5.0.0-beta.51, so such a key now defines an ordinary custom agent under that name. Rename it to the canonical id. <!-- retired-name-allowed -->
 
-Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override known agent ordering with `agent_order`; omitted core agents keep their default relative order. Unknown or duplicate names are ignored and reported with a config toast.
-
-```json
-{
-  "agent_order": ["hephaestus", "sisyphus", "prometheus", "atlas"]
-}
-```
+The OpenCode edition adds `disabled_agents`, `agent_order`, and its own core-agent overrides. See [OpenCode edition configuration (legacy)](./opencode-config.md).
 
 #### Agent Options
 
@@ -240,14 +234,12 @@ This table is the `[opencode].agents` surface only. Shared-base agents use the c
 | `ultrawork`       | object                  | Per-message ultrawork model and reasoning override              |
 | `compaction`      | object                  | Compaction model and reasoning override                         |
 
-Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
-
 #### Anthropic Extended Thinking
 
 ```json
 {
   "agents": {
-    "oracle": {
+    "plan-consultant": {
       "reasoning": "high",
       "providerOptions": { "thinking": { "type": "enabled", "budgetTokens": 200000 } }
     }
@@ -278,6 +270,7 @@ Control what tools an agent can use:
 | `edit`               | `ask` / `allow` / `deny`                                                    |
 | `bash`               | `ask` / `allow` / `deny` or per-command: `{ "git": "allow", "rm": "deny" }` |
 | `webfetch`           | `ask` / `allow` / `deny`                                                    |
+| `task`               | `ask` / `allow` / `deny`                                                    |
 | `doom_loop`          | `ask` / `allow` / `deny`                                                    |
 | `external_directory` | `ask` / `allow` / `deny`                                                    |
 
@@ -289,8 +282,8 @@ Control what tools an agent can use:
 ```jsonc
 {
   "agents": {
-    "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+    "plan-consultant": {
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         // Simple string fallback
         "openai/gpt-5.6-sol",
@@ -316,15 +309,13 @@ Object entries support canonical `model`, `reasoning`, `temperature`, `top_p`, a
 
 Both `prompt` and `prompt_append` support loading content from files via `file://` URIs. Category-level `prompt_append` supports the same URI forms.
 
-For Prometheus, file-backed `prompt` content is appended after the mandatory base prompt; it does not replace the base prompt.
-
 ```jsonc
 {
   "agents": {
-    "sisyphus": {
+    "librarian": {
       "prompt_append": "file:///absolute/path/to/prompt.txt"
     },
-    "oracle": {
+    "reviewer": {
       "prompt": "file://./relative/to/project/prompt.md"
     },
     "explore": {
@@ -344,20 +335,21 @@ Paths can be absolute (`file:///abs/path`), relative to project root (`file://./
 
 ### Categories
 
-Domain-specific model delegation used by the `task()` tool. When Sisyphus delegates work, it picks a category, not a model name.
+Domain-specific model delegation used by the `task()` tool. When the main agent delegates work, it picks a category, not a model name.
 
 #### Built-in Categories
 
 | Category             | Default Model                   | Description                                    |
 | -------------------- | ------------------------------- | ---------------------------------------------- |
-| `visual-engineering` | `anthropic/claude-opus-5` (max) | Frontend, UI/UX, design, animation            |
-| `ultrabrain`         | `openai/gpt-5.6-sol` (xhigh)    | Deep logical reasoning, complex architecture. The fallback-chain primary rung runs at (max). |
-| `deep`               | `openai/gpt-5.6-sol` (medium)   | Autonomous problem-solving, thorough research  |
-| `artistry`           | `anthropic/claude-fable-5` (xhigh) | Creative/unconventional approaches             |
-| `quick`              | `kimi-for-coding/kimi-for-coding-highspeed` | Trivial tasks, typo fixes, single-file changes |
-| `unspecified-low`    | `xai/grok-4.6` (xhigh)          | General tasks, low effort                      |
-| `unspecified-high`   | `kimi-for-coding/k3` (max)  | General tasks, high effort                     |
-| `writing`            | `kimi-for-coding/k3` (low)  | Documentation, prose, technical writing        |
+| `visual-engineering` | `anthropic/claude-fable-5-1` (max) | Visual design, UI/UX, frontend, styling, animation, design systems |
+| `ultrabrain`         | `openai/gpt-6-astra` (max)      | Deep logical reasoning, complex architecture. Falls back to `gpt-5.6-sol` (max). |
+| `deep-low`           | `openai/gpt-6.1-sol` (medium) | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research whose decisions the child can settle from evidence. Falls back to the Fast tier `gpt-6.1-sol-fast`, then `gpt-5.6-sol` (the only rung GitHub Copilot and OpenCode Zen serve), then `gpt-5.6-sol-fast`, all at medium; unavailable without a GPT-6.1 Sol or GPT-5.6 Sol tier. |
+| `deep-high`          | `openai/gpt-6-astra` (high)     | Escalation deep lane for a goal whose central decision cannot be settled from evidence. Single rung, no model fallback. |
+| `artistry`           | `anthropic/claude-fable-5-1` (max) | Creative/unconventional approaches             |
+| `quick`              | `openai/gpt-6-luna-fast` (low) | Trivial tasks, typo fixes, single-file changes |
+| `unspecified-low`    | `anthropic/claude-sonnet-5-5` (medium) | General tasks, low effort                      |
+| `unspecified-high`   | `anthropic/claude-opus-5-5` (medium) | General tasks, high effort                     |
+| `writing`            | `anthropic/claude-opus-5-5` (low)      | Documentation, prose, technical writing. Unavailable when none of its Claude models (`claude-opus-5-5`, `claude-opus-4-6`) is connected; it never falls back to another family, and the installer leaves it out. |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
@@ -401,6 +393,8 @@ Runtime priority:
 
 The same resolved chain drives spawn-time selection and runtime retry fallback, so a recovered task stays on the same category chain.
 
+In the Senpi harness, `model_profile` applies to OmO Desktop and headless sessions; the interactive TUI keeps the model it started with. An explicit `--model`, scoped model or resumed session is preserved. A fresh session otherwise uses `model_profile` as a literal pin or a named chain; unset config selects Recommended. If no candidate is available, a notice explains the unavailable profile and the current model stays. `categories.*` and `agents.*` overrides do not select the main session model, and `model_profile` does not select delegated children. See [Model Profiles](#model-profiles).
+
 In the OpenCode plugin, every merged category appears in `availableCategories`; hiding categories with a dead fallback chain is not implemented here. That dead-chain filtering, the `model_unavailable` spawn failure, and the `task.warnings.unavailable_categories` flag belong to the Senpi/core `task` system, documented in the [omo.json reference](./omo-json.md).
 
 #### Model Settings Compatibility
@@ -427,34 +421,30 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 
 #### Agent Provider Chains
 
+The main agent has no chain of its own: it runs on your session model (Claude Opus 5.5 or GPT 5.6 Sol recommended). The four curated agents resolve through these chains (`packages/senpi-task/src/agents/builtin/fallback-chains.ts`):
+
 | Agent | Default Model | Provider Priority |
 | --- | --- | --- |
-| **Sisyphus** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5.2` → `opencode/big-pickle` |
-| **Hephaestus** | `gpt-5.6-sol` | `openai\|github-copilot\|vercel\|opencode/gpt-5.6-sol (medium)` |
-| **Oracle** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `opencode-go\|vercel/glm-5.2` |
-| **Librarian** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
-| **Explore** | `gpt-5.6-luna-fast` | `openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
-| **Multimodal Looker** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (low)` → `opencode-go\|vercel/kimi-k3` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
-| **Prometheus** | `claude-fable-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (max)` |
-| **Metis** | `claude-opus-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (high)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 (low)` |
-| **Momus** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (high)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2` |
-| **Atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-5` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
-| **Sisyphus Junior** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-5` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
+| **explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
+| **librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
+| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **plan-reviewer** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 
 #### Category Provider Chains
 
-This table mirrors the authoritative hardcoded category fallback chains: the chain's primary rung and its remaining provider priority. A chain's primary rung can carry a different reasoning level than the category config default (for example `ultrabrain`: config default xhigh, chain primary max).
+This table mirrors the authoritative hardcoded category fallback chains: the chain's primary rung and its remaining provider priority. The built-in chains list no `vercel` or `quotio-openai` rungs; Vercel AI Gateway stays a manual provider choice.
 
 | Category | Provider Chain Primary | Provider Priority |
 | --- | --- | --- |
-| **Visual Engineering** | `claude-opus-5` | `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `zai-coding-plan\|opencode-go\|vercel/glm-5.2 (max)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` |
-| **Ultrabrain** | `gpt-5.6-sol` | `openai\|quotio-openai\|vercel/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|opencode\|vercel/gpt-5.6-sol (max)` |
-| **Deep** | `gpt-5.6-sol` | `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` |
-| **Artistry** | `claude-fable-5` | `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (xhigh)` |
-| **Quick** | `kimi-for-coding-highspeed` | `kimi-for-coding/kimi-for-coding-highspeed` → `openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan\|vercel/qwen3.6-flash (low)` → `opencode-go\|vercel/minimax-m3 (max)` → `opencode-go\|vercel/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot\|vercel/claude-haiku-4-5 (off)` |
-| **Unspecified Low** | `grok-4.6` | `xai\|github-copilot\|opencode\|vercel/grok-4.6 (xhigh)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go\|vercel/deepseek-v4-pro (max)` → `xiaomi\|opencode-go\|vercel/mimo-v2.5-pro (max)` |
-| **Unspecified High** | `kimi-k3` | `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (xhigh)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` |
-| **Writing** | `kimi-k3` | `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (low)` → `google\|github-copilot\|opencode\|vercel/gemini-3.6-flash` |
+| **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Ultrabrain** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (max)` → `openai\|chatgpt-subscription/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (max)` |
+| **Deep Low** | `gpt-6.1-sol` | `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription/gpt-6.1-sol-fast (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `openai\|chatgpt-subscription/gpt-5.6-sol-fast (medium)` |
+| **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (high)` |
+| **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
+| **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` → `zai-coding-plan/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
+| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
 Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
 
@@ -472,7 +462,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
     "defaultConcurrency": 5,
     "staleTimeoutMs": 2700000,
     "providerConcurrency": { "anthropic": 3, "openai": 5, "google": 10 },
-    "modelConcurrency": { "anthropic/claude-opus-5": 2 }
+    "modelConcurrency": { "anthropic/claude-opus-5-5": 2 }
   }
 }
 ```
@@ -494,60 +484,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
 
 Priority: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
 
-### Sisyphus Agent
-
-Configure the main orchestration system.
-
-```json
-{
-  "sisyphus_agent": {
-    "disabled": false,
-    "default_builder_enabled": false,
-    "planner_enabled": true,
-    "replace_plan": true
-  }
-}
-```
-
-| Option                    | Default | Description                                                     |
-| ------------------------- | ------- | --------------------------------------------------------------- |
-| `disabled`                | `false` | Disable all Sisyphus orchestration, restore original build/plan |
-| `tdd`                     | `true`  | TDD mode for Sisyphus orchestration                             |
-| `default_builder_enabled` | `false` | Enable OpenCode-Builder agent (off by default)                  |
-| `planner_enabled`         | `true`  | Enable Prometheus (Planner) agent                               |
-| `replace_plan`            | `true`  | Demote default plan agent to subagent mode                      |
-
-Sisyphus agents can also be customized under `agents` using their names: `Sisyphus`, `OpenCode-Builder`, `Prometheus (Planner)`, `Metis (Plan Consultant)`.
-
-### Sisyphus Tasks
-
-File-based task persistence with dependency tracking, used for cross-session task management. The task system is controlled by `experimental.task_system` (defaults to `false`). When enabled, `TodoWrite`/`TodoRead` are intercepted and replaced with the Task tools (`task_create`, `task_get`, `task_list`, `task_update`).
-
-The `sisyphus.tasks` section configures **storage options** only:
-
-```json
-{
-  "sisyphus": {
-    "tasks": {
-      "claude_code_compat": false
-    }
-  }
-}
-```
-
-| Option               | Default           | Description                                |
-| -------------------- | ----------------- | ------------------------------------------ |
-| `storage_path`       | OpenCode config dir `/tasks/<list-id>` | Optional override; relative paths join the working directory |
-| `task_list_id`       | -                 | Force task list ID (alternative to env `ULTRAWORK_TASK_LIST_ID`) |
-| `claude_code_compat` | `false`           | Enable Claude Code path compatibility mode |
-
-To disable the task system entirely, set `experimental.task_system` to `false`:
-
-```json
-{
-  "experimental": { "task_system": false }
-}
-```
+The OpenCode edition's orchestration key (`sisyphus_agent`) and its file-based task storage options are documented on the legacy page linked from [Agents](#agents).
 
 ---
 
@@ -557,9 +494,9 @@ To disable the task system entirely, set `experimental.task_system` to `false`:
 
 Skills bring domain-specific expertise and embedded MCPs.
 
-Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend`, `review-work`, `remove-ai-slops`, `init-deep`, `debugging`, `security-research`, `security-review`, `visual-qa`, `team-mode`. The `team-mode` skill is only rendered when `team_mode.enabled` is true.
+Selected built-in skills: `playwright`, `playwright-cli`, `dev-browser`, `git-master`, `frontend`, `review-work`, `remove-ai-slops`, `init-deep`, `debugging`, `security-research`, `security-review`, `visual-qa`, `team-mode`. The `team-mode` skill is only rendered when `team_mode.enabled` is true.
 
-Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
+Disable built-in skills: `{ "disabled_skills": ["playwright"] }`. `disabled_skills` is also a shared base key of `~/.omo/omo.jsonc`, honored by every harness including OmO Native (for example `{ "disabled_skills": ["frontend", "visual-qa"] }`); user and project layers are unioned. `skills.enable` below only filters config-sourced skills, not builtin, native, or bundled ones - use `disabled_skills` to hide those.
 
 #### Skills Configuration
 
@@ -598,8 +535,9 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 ### Memory
 
 Persistent, per-agent memory stored as a git repository. Memory is on by default and learns
-actively: it reflects on its own, nudges when durable facts go unsaved, extracts facts in the
-background, consolidates during a dream pass, and keeps records about people.
+actively: it reflects on its own, nudges when durable facts go unsaved, recalls a stored memory
+mid-session when it would change the next step, extracts facts in the background, consolidates
+during a dream pass, and keeps records about people.
 
 Configured under `memory` in `omo.json`, with per-agent overrides under `memory.agents.<name>`.
 
@@ -608,7 +546,6 @@ Configured under `memory` in `omo.json`, with per-agent overrides under `memory.
   "memory": {
     "enabled": true,
     "agent": "auto",
-    "tool_exposure": "direct",
     "reflection": { "trigger": { "step_count": 25 } },
     "nudge": { "every_user_turns": 10 },
     "dream": { "idle_minutes": 30 },
@@ -623,17 +560,15 @@ Configured under `memory` in `omo.json`, with per-agent overrides under `memory.
 | -------------------- | ---------- | ------------------------------------------------------------------------------- |
 | `enabled`            | `true`     | Master switch for the whole memory component                                     |
 | `agent`              | `"auto"`   | Which agent identity owns the memory repository                                  |
-| `tool_exposure`      | `"direct"` | `direct` registers the memory tools always-on; `search` opts into the MCP server |
 | `compile_warn_tokens`| `30000`    | Warn when the compiled memory block exceeds this many tokens                     |
 | `agents`             | `{}`       | Per-agent overrides; any block below may be overridden field by field            |
 
-`tool_exposure` defaults to `direct` deliberately. The `search` value moves the tools behind
-senpi's `tool_search` catalog through an extension-declared MCP server, which keeps the tool list
-smaller but removes memory entirely if that server fails to start.
-
 #### Reflection
 
-Reflection reviews the conversation and writes durable notes back into memory.
+Reflection reviews the conversation and writes durable notes back into memory. An automatic run
+that fails (step-count or compaction trigger) is not retried on the very next trigger: the
+conversation backs off for 5 seconds, doubling per consecutive failure up to 5 minutes, and a
+successful reflection clears the backoff. `/reflect` ignores it, so you can always force a run.
 
 | Option                     | Default  | Description                                               |
 | -------------------------- | -------- | --------------------------------------------------------- |
@@ -653,6 +588,82 @@ Reminds the agent to save when durable facts have gone unwritten.
 | ------------------------- | ------- | ---------------------------------------------------- |
 | `nudge.enabled`           | `true`  | Emit the nudge line in the memory metadata block      |
 | `nudge.every_user_turns`  | `10`    | Nudge after this many user turns without a save       |
+
+#### Recall (recollections)
+
+The nudge above asks the agent to write. Recall is the other direction: a read-only judge called
+Kibitzer runs as one resident sidecar session per main agent session. It is fed the session's
+prompts, tool calls and tool results as bounded, redacted events, and hands back a hint only when
+a stored memory would change the next step (a constraint being ignored, a past failure of the same
+approach, an answer about to be re-derived). Silence is the default. Most turns produce nothing,
+and a sidecar that finds nothing leaves no trace.
+
+The sidecar only spends a model turn (a "wake") when a prompt or tool call surfaces a memory
+candidate it has not judged yet in its lifetime; unchanged candidates never wake it. Wakes are
+admitted through a lease held as lock files under the memory identity's runtime directory, shared
+by every omo process on the machine that uses that memory, so at most `max_concurrent_wakes` run
+at once - a session that finds every slot busy keeps buffering events and tries again at its next
+hook. Inside a wake the sidecar has exactly five read-only tools:
+`read` and `grep` over the workspace, `session_entries` over the parent transcript, `memory` with
+`search` and `read` only, and `nudge`. It has no tool that writes memory or files, no shell, and
+each wake is limited to `tool_budget` tool calls and 90 seconds. When its own context passes 60%
+of `sidecar_max_tokens` it is replaced by a fresh sidecar seeded with what it already delivered
+or rejected, so a long session never runs the judge out of context. A sidecar whose model fails
+is disposed and recreated after an exponential backoff (1 s doubling to 5 min); nothing it had
+buffered is lost. When no provider serving the `recall.category` chain is connected at all, that
+is a configuration state, not a failure: the session gets one warning notice naming the category
+and its unconnected providers - run `/login <provider>` to connect one, or pin
+`categories.<name>.model` (or `recall.category`) in `omo.json` to a connected model - and judging
+resumes by itself once a chain provider connects.
+
+When it does fire, you see a recollection in the transcript identified as Kibitzer advice: a
+single fixed `Kibitzer` title, then `recalled memory: <hint>`,
+with the memory path beneath it. It's a transcript entry, not a
+toast. The hint is one sentence of at most 200 characters, and the same memory surfaces at most
+once per session. Treat it as a hint, not current state: the agent is told to verify before
+relying on it, and expanding the entry shows that caveat.
+
+| Option              | Default | Description                                                     |
+| ------------------- | ------- | --------------------------------------------------------------- |
+| `recall.enabled`    | `true`  | Run the Kibitzer sidecar and surface recollections; `false` is the only off switch |
+| `recall.max_items`  | `2`     | Most memories one wake may surface (1-5)                        |
+| `recall.category` | `quick` | Model category the sidecar runs on (it never leaves that category's chain) |
+| `recall.event_caps` | `tool_args: 400`, `result_head: 600`, `assistant: 1500`, `prompt: 4000` | Per-event character caps, applied after secret redaction |
+| `recall.sidecar_max_tokens` | `48000` | Sidecar context budget; the sidecar reseeds itself at 60% of it |
+| `recall.max_concurrent_wakes` | `2` | Machine-wide cap on wakes running at once |
+| `recall.tool_budget` | `8` | Read-only tool calls one wake may make before it is cut off |
+| `recall.query_expansion` | `false` | Let the sidecar add synonyms, keywords in your other languages and related terms to its own memory searches; each counts for less than a query word |
+
+Like the other memory blocks, every recall option can be overridden per agent under
+`memory.agents.<name>.recall`; `event_caps` merges field by field.
+
+How candidate memories are picked before the sidecar judges them is not a setting. Recall picks
+it from the terms it plans from the conversation and from your memory repository: English terms over
+an English memory of fewer than 200 notes match every query word verbatim, as before. When a planned
+term contains Korean, Chinese or Japanese text, or at least a tenth of the letters in your notes are,
+candidates are scored by word rarity with the text split into two-character pieces, so `퍼블리시할`
+still finds a note about `퍼블리시`. The planned terms include terms taken from tool arguments and
+are not the raw message, so the switch goes both ways: a Korean word the planner does not keep leaves
+a mostly English message on verbatim matching, and a Korean file path in a tool argument such as
+`docs/배포-절차.md` switches the selection to word rarity. From 200 notes on, both are combined so a
+memory either one finds can still reach the sidecar, which decides what is worth a nudge, and the
+note that matches an English phrase from the conversation word for word keeps first place. Word
+rarity treats common English endings as one word, so `rollback` still finds a note that says
+`rollbacks`. Chinese characters and Japanese kanji also count one by one, so a question can find a
+note it shares only single characters with.
+
+With `recall.query_expansion` on, the sidecar's own `memory` search takes four optional fields next
+to the query: `synonyms`, `keywords` (the topic in your other working languages), `related`, and one
+`note_line` written like a line of the note it is looking for. The sidecar model writes them in the
+same tool call; nothing is stored and no other model is called. A match on a synonym or keyword
+scores 0.75 of the same match on a query word and a match on a related term or the note line 0.4
+(a rare added term can still outscore a common query word), and a note that holds every word of the
+query stays ahead of the notes only an added term found, in the order it has without them. Each list
+is capped at 16 terms of 80 characters, and `note_line` at 300 characters; invalid added terms are
+reported in the result while the query still runs as plain recall. It is off by default because the
+sidecar spends extra output tokens on every search it widens. Off, the tool and its results are exactly
+what they are without the option. The candidates picked from the conversation before the
+sidecar wakes are not widened either way: no model runs at that step.
 
 #### Facts
 
@@ -691,7 +702,7 @@ Records about individuals, stored as cards with an observation ledger.
 
 | Option             | Default | Description                                            |
 | ------------------ | ------- | ------------------------------------------------------ |
-| `soul.edit_notice` | `true`  | Surface a notice when the persona or identity changes   |
+| `soul.edit_notice` | `true`  | Surface a notice when the persona, identity, or boundaries block changes |
 
 #### Write Notice
 
@@ -718,14 +729,15 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `codegraph-bootstrap`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `hephaestus-agents-md-injector`, `ulw-execute`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `team-tool-gating`, `ulw-execute`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
 
-Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, and `tool-pair-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
+Hooks that exist only in the OpenCode edition are listed on the legacy page linked from [Agents](#agents).
+
+Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `rules-injector`, and `tool-pair-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
 **Notes:**
 
 - `directory-agents-injector` - auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
-- `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing GPT-5.4 and the shared model-aware GPT-5.5/GPT-5.6 Sol prompt paths.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
 
 ### Commands
@@ -740,18 +752,26 @@ Available commands: `goal`, `refactor`, `ulw-execute`, `stop-continuation`, `rem
 
 ### Browser Automation
 
+`browser_automation_engine.provider` accepts only the three values below.
+Unsupported values fail schema validation and `oh-my-opencode doctor` reports
+both the rejected value and the replacement: use the built-in browser path:
+Bun.WebView / playwright-core scripts. Remove the obsolete provider override
+from the active `[opencode]` block in `omo.jsonc` (including project/profile
+layers); it is not silently mapped to another provider.
+
 | Provider               | Interface | Installation                                        |
 | ---------------------- | --------- | --------------------------------------------------- |
 | `playwright` (default) | MCP tools | Auto-installed via npx                              |
-| `agent-browser`        | Bash CLI  | `bun add -g agent-browser && agent-browser install` |
 | `dev-browser`          | Skill     | Uses persistent dev-browser state                   |
 | `playwright-cli`       | Bash CLI  | Uses the token-efficient `@playwright/cli`           |
 
-Switch provider:
-
-```json
-{ "browser_automation_engine": { "provider": "agent-browser" } }
-```
+Browser skills use two tiers from js eval: `new Bun.WebView()` on Bun >= 1.4
+(macOS default; Linux/Windows require installed Chrome/Chromium/Edge), otherwise
+write and run a `playwright-core` script against local Chrome (`channel: "chrome"`).
+Use the script tier for Chrome semantics, stealth, traces, and authenticated
+profiles; `launchPersistentContext` receives a CLONED profile, never the live one.
+Codex uses `browser:control-in-app-browser` for ordinary page control. These are
+skill execution paths, not new values of `browser_automation_engine.provider`.
 
 ### Tmux Integration
 
@@ -784,10 +804,12 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 Configure git commit behavior:
 
 ```json
-{ "git_master": { "commit_footer": true, "include_co_authored_by": true } }
+{ "git_master": { "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
 ```
 
-This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-senpi-harness).
+`commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Commits keep your own git author and committer, and omo never adds a `Co-authored-by` trailer; `include_co_authored_by` is a deprecated no-op kept so existing configs still validate.
+
+This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-native-harness).
 
 `git_env_prefix` (default `"GIT_MASTER=1"`) is prepended to git commands; set it to `""` to disable.
 
@@ -813,12 +835,14 @@ Force-enable session notifications:
 
 `force_enable` (`false`) - force session-notification even if external notification plugins are detected.
 
+OpenCode also has native TUI Attention notifications in `tui.json`. Use either native Attention or OmO `session-notification` for the same events, not both, or you may receive duplicate desktop notifications. OmO auto-disables `session-notification` when it detects known external notification plugins such as `opencode-notifier`, but native Attention is OpenCode TUI config rather than a plugin entry, so OmO cannot detect it through the plugin list. Keep `session-notification` enabled when you want OmO's richer idle notification body with session title and recent message context; otherwise prefer native Attention for basic TUI notification and sound events.
+
 ### MCPs
 
-Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), `lsp` (local language-server tools), and `codegraph`. Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
+Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), and `lsp` (local language-server tools). Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
 
 ```json
-{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp", "codegraph"] }
+{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp"] }
 ```
 
 #### Web search provider
@@ -872,53 +896,7 @@ To disable the LSP MCP entirely:
 { "disabled_mcps": ["lsp"] }
 ```
 
-### CodeGraph
-
-The `codegraph` MCP ships a pinned CodeGraph 1.5.0 binary; managed installs provisioned at 1.0.1 or 1.4.1 upgrade automatically, and project stores built by older versions remain compatible without a manual re-index. The OpenCode plugin block supports the full surface below:
-
-| Option | Type | Default |
-| ------ | ---- | ------- |
-| `auto_init` | boolean | `true` |
-| `auto_provision` | boolean | `true` |
-| `daemon` | boolean | `true` |
-| `enabled` | boolean | `true` |
-| `excluded_roots` | string[] | - |
-| `install_dir` | string | - |
-| `telemetry` | boolean | - |
-| `watch_debounce_ms` | number >= 0 | - |
-
-```jsonc
-{
-  "codegraph": {
-    "auto_init": true,
-    "auto_provision": true,
-    "daemon": true,
-    "enabled": true,
-    "excluded_roots": ["~/scratch/codegraph"],
-    "install_dir": "~/.omo/codegraph/bin",
-    "telemetry": false,
-    "watch_debounce_ms": 500
-  }
-}
-```
-
-`auto_init` is an OpenCode-only key; it does not exist in the shared/core `codegraph` schema. At the shared/core level, `codegraph.telemetry` defaults to `false`.
-
-`session_start_cooldown_ms` is not an OpenCode plugin `codegraph` key. It is a Codex-only shared key, so place it under top-level `codegraph` or `[codex].codegraph` in the unified file:
-
-```jsonc
-{
-  "[codex]": {
-    "codegraph": { "session_start_cooldown_ms": 900000 }
-  }
-}
-```
-
-The Codex SessionStart bootstrap checks only `<projectRoot>/.codegraph/codegraph.db`; it never calls `codegraph status`. An ancestor database covers nested projects, while per-project locks and persistent cooldown stamps suppress duplicate or repeatedly failing background initializers. Suppressions are recorded in `~/.omo/codegraph/session-start.jsonl` as actions including `skipped-cooldown`, `skipped-locked`, and `skipped-nested-root`.
-
-An ambient `CODEGRAPH_NO_DAEMON=1` forces daemon-off even when `codegraph.daemon` is `true`. Inspect or stop running daemons with the upstream `codegraph daemon` command, an interactive picker that lists running daemons and stops the one you select.
-
-Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
+Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
 
 ---
 
@@ -985,8 +963,8 @@ Define `fallback_models` per agent or category:
 ```json
 {
   "agents": {
-    "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+    "plan-consultant": {
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -1004,8 +982,8 @@ Define `fallback_models` per agent or category:
 ```json
 {
   "agents": {
-    "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+    "plan-consultant": {
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -1062,7 +1040,7 @@ Use strings when you only need an ordered fallback chain:
 ```json
 {
   "agents": {
-    "atlas": {
+    "reviewer": {
       "model": "anthropic/claude-sonnet-5",
       "fallback_models": [
         "anthropic/claude-haiku-4-5",
@@ -1081,10 +1059,10 @@ If the primary model already establishes the provider, fallback entries can omit
 ```json
 {
   "agents": {
-    "atlas": {
+    "reviewer": {
       "model": "openai/gpt-5.6-sol",
       "fallback_models": [
-        "gpt-5.6-luna-fast",
+        "gpt-6-luna-fast",
         {
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
@@ -1096,7 +1074,7 @@ If the primary model already establishes the provider, fallback entries can omit
 }
 ```
 
-In this example OmO treats `gpt-5.6-luna-fast` and `gpt-5.6-sol` as OpenAI fallback entries because the current/default provider is already `openai`.
+In this example OmO treats `gpt-6-luna-fast` and `gpt-5.6-sol` as OpenAI fallback entries because the current/default provider is already `openai`.
 
 **3. Mixed cross-provider chain**
 
@@ -1105,8 +1083,8 @@ Mix string entries and object entries when only some fallback models need specia
 ```json
 {
   "agents": {
-    "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+    "plan-consultant": {
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -1130,7 +1108,7 @@ Mix string entries and object entries when only some fallback models need specia
 ```json
 {
   "categories": {
-    "deep": {
+    "deep-low": {
       "model": "openai/gpt-5.6-sol",
       "fallback_models": [
         {
@@ -1139,7 +1117,7 @@ Mix string entries and object entries when only some fallback models need specia
           "maxTokens": 12000
         },
         {
-          "model": "anthropic/claude-opus-5",
+          "model": "anthropic/claude-opus-5-5",
           "reasoning": "max",
           "temperature": 0.2
         },
@@ -1157,7 +1135,7 @@ This shows every supported object-style parameter in one place:
 ```json
 {
   "agents": {
-    "oracle": {
+    "plan-reviewer": {
       "model": "openai/gpt-5.6-sol",
       "fallback_models": [
         {
@@ -1252,7 +1230,7 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `truncate_all_tool_outputs`              | `false`    | Truncate all tool outputs (not just whitelisted)                                     |
 | `aggressive_truncation`                  | `false`    | Aggressively truncate when token limit exceeded                                      |
 | `disable_omo_env`                        | `false`    | Disable auto-injected `<omo-env>` block (date/time/locale). Improves cache hit rate. |
-| `task_system`                            | `false`    | Enable Sisyphus task system                                                          |
+| `task_system`                            | `false`    | Enable the file-based task system                                                    |
 | `dynamic_context_pruning.enabled`        | `false`    | Auto-prune old tool outputs to manage context window                                 |
 | `dynamic_context_pruning.notification`   | `detailed` | Pruning notifications: `off` / `minimal` / `detailed`                                |
 | `turn_protection.turns`                  | `3`        | Recent turns protected from pruning (1–10)                                           |
@@ -1300,6 +1278,7 @@ The shared base and Senpi use an object:
 | --------------------- | ----------------------------------------------------------------- |
 | `OPENCODE_CONFIG_DIR` | Override OpenCode config directory (useful for profile isolation) |
 | `OPENGATEWAY_API_KEY` | API key for the OpenGateway provider; without this or an `opengateway` auth entry, the plugin does not inject the provider |
+| `OMO_DEBUG` | Set to `1` (any non-empty value) to print omo-senpi component `info` diagnostics on stderr. Unset, those lines are silent. `warn` and `error` still print. Component logs never go to stdout. |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry |
 | `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1`, `true`, or `yes` to disable PostHog |
 | `OMO_CODEX_DISABLE_POSTHOG` | Set to `1`, `true`, or `yes` to disable PostHog telemetry for the `omo-codex` adapter. Global `OMO_DISABLE_POSTHOG` also disables Codex telemetry. |
@@ -1344,18 +1323,14 @@ Install [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-anti
 
 ##### Split Claude Routing
 
-Provider path affects the effective Claude context limit. Antigravity Claude
-models are the stable 200k lane. Direct Anthropic Claude models are the 1M lane
-for accounts and model IDs that support long context.
+Provider path can change Claude context limits. Confirm the active model's context window with `bunx oh-my-openagent doctor --verbose` rather than assuming 200k vs 1M.
 
-Use Antigravity for cheaper or quota-balanced work where 200k context is enough.
-Use direct Anthropic for long-context planning, review, and research sessions
-where early compaction would lose important context.
+Use Antigravity for cheaper or quota-balanced work. Use direct Anthropic for long-context planning, review, and research sessions when the account, model, and required beta/header setup support a larger window.
 
 ```jsonc
 {
   "agents": {
-    // 200k lane: Google Antigravity Claude.
+    // Google Antigravity Claude.
     "explore": {
       "model": "google/antigravity-claude-sonnet-4-6"
     },
@@ -1363,13 +1338,13 @@ where early compaction would lose important context.
       "model": "google/antigravity-claude-sonnet-4-6"
     },
 
-    // 1M lane: direct Anthropic, only for eligible long-context accounts/models.
-    "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+    // Direct Anthropic, only for eligible long-context accounts/models.
+    "plan-consultant": {
+      "model": "anthropic/claude-opus-5-5",
       "reasoning": "max"
     },
-    "oracle": {
-      "model": "anthropic/claude-opus-5"
+    "plan-reviewer": {
+      "model": "anthropic/claude-opus-5-5"
     }
   }
 }
@@ -1378,8 +1353,8 @@ where early compaction would lose important context.
 If you see an error like `prompt is too long ... > 200000`, check whether the
 agent is routed through `google/antigravity-*`. Move that agent to a direct
 `anthropic/*` model only when the account, model, and required beta/header setup
-support 1M context. Keep the Antigravity lane explicit when you want predictable
-200k behavior.
+support a larger context window. Keep the Antigravity path explicit when you want
+that provider's quota and routing behavior.
 
 #### Ollama
 

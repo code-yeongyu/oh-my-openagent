@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { spawn } from "@oh-my-opencode/utils/runtime"
 
 export const REPLY_LISTENER_DAEMON_IDENTITY_MARKER = "--openclaw-reply-listener-daemon"
@@ -35,6 +36,28 @@ const REPLY_LISTENER_DAEMON_ENV_ALLOWLIST = [
   "windir",
   "COMSPEC",
 ] as const
+
+// Windows has no ps and no /proc, so the daemon marker has to come from the process command line,
+// which Win32_Process is the only supported way to read. PATH can be missing System32 (#6747), so
+// PowerShell is addressed absolutely. pid is a number, so it cannot escape the filter string.
+async function windowsProcessCommandLineHasMarker(pid: number, deps: ReplyListenerProcessDeps): Promise<boolean> {
+  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows"
+  const powershell = join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+  const processInfo = deps.spawn(
+    [
+      powershell,
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" | Select-Object -ExpandProperty CommandLine`,
+    ],
+    { stdout: "pipe", stderr: "ignore" },
+  )
+  const stdout = await new Response(processInfo.stdout).text()
+  await processInfo.exited
+  if (processInfo.exitCode !== 0) return false
+  return stdout.includes(REPLY_LISTENER_DAEMON_IDENTITY_MARKER)
+}
 
 function ignoreReplyListenerProcessProbeError(error: unknown): void {
   if (error instanceof Error) return
@@ -95,6 +118,10 @@ export async function isReplyListenerDaemonProcessWithDeps(
         ((targetPid) => readFileSync(`/proc/${targetPid}/cmdline`, "utf-8"))
       const cmdline = readProcCmdline(pid)
       return cmdline.includes(REPLY_LISTENER_DAEMON_IDENTITY_MARKER)
+    }
+
+    if (platform === "win32") {
+      return await windowsProcessCommandLineHasMarker(pid, deps)
     }
 
     const processInfo = deps.spawn(["ps", "-p", String(pid), "-o", "args="], {

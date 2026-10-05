@@ -105,20 +105,20 @@ function firstContentText(response) {
 
 export async function start(name, options) {
   const definition = await load(name, options)
-  const response = throwIfToolError("start", await kernel("tool").dag({ action: "start", definition }))
+  const response = throwIfToolError("start", await kernel("tool").workflow({ action: "start", definition }))
   const runId = response?.details?.run_id ?? response?.run_id
   if (typeof runId !== "string" || runId === "") {
     throw new Error("dag library: the dag start response did not include a run_id.")
   }
-  const dag = kernel("tool").dag
+  const workflow = kernel("tool").workflow
   return {
     ...response,
     run_id: runId,
     // done() blocks for the final result, opting out of the tool's detached default.
-    done: () => dag({ action: "wait", run_id: runId, detach: false }),
+    done: () => workflow({ action: "wait", run_id: runId, detach: false }),
     cancel: (reason) =>
       reason === undefined
-        ? dag({ action: "cancel", run_id: runId })
-        : dag({ action: "cancel", run_id: runId, reason }),
+        ? workflow({ action: "cancel", run_id: runId })
+        : workflow({ action: "cancel", run_id: runId, reason }),
   }
 }

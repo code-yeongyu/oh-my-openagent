@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { afterAll, describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseFrontmatter } from "@oh-my-opencode/utils";
 import { isSkillMarkdownSourcePath, materializeFrontendRefs } from "./scripts/materialize-frontend-refs.mjs";
-import { brandStems, designpowersThirdPartyRelativePaths, frontendSkillRoot, tasteSkillArtifactFiles, thirdPartyRelativePaths, uiUxDbScripts, upstreamsRoot } from "./scripts/frontend-refs-manifest.mjs";
+import { brandStems, designpowersThirdPartyRelativePaths, tasteSkillArtifactFiles, thirdPartyRelativePaths, uiUxDbScripts, upstreamsRoot } from "./scripts/frontend-refs-manifest.mjs";
 
 type SkillFrontmatter = {
 	readonly name?: unknown
@@ -11,14 +12,19 @@ type SkillFrontmatter = {
 }
 
 describe("materialize-frontend-refs", () => {
-	const result = materializeFrontendRefs({ strict: false });
+	// Materialize into a private root: the checkout's shipped references are read concurrently by
+	// other test files (script/package-layout.test.ts packs them), so this suite must never
+	// delete and rewrite them.
+	const materializeRoot = mkdtempSync(join(tmpdir(), "omo-frontend-refs-"));
+	afterAll(() => rmSync(materializeRoot, { recursive: true, force: true }));
+	const result = materializeFrontendRefs({ strict: false, targetRoot: materializeRoot });
 
 	test("materializes the full third-party reference set when submodules are present", () => {
 		// given the upstream submodules are initialized in this checkout
 		if (result.skipped) return;
 		// then every manifest target lands on disk
 		for (const relPath of thirdPartyRelativePaths()) {
-			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
+			expect(existsSync(join(materializeRoot, relPath))).toBe(true);
 		}
 	});
 
@@ -26,17 +32,17 @@ describe("materialize-frontend-refs", () => {
 		if (result.skipped) return;
 		// then the 69 brand files exist alongside the ui-ux-db scripts
 		for (const brand of brandStems as string[]) {
-			expect(existsSync(join(frontendSkillRoot, "references", "design", `${brand}.md`))).toBe(true);
+			expect(existsSync(join(materializeRoot, "references", "design", `${brand}.md`))).toBe(true);
 		}
 		for (const script of uiUxDbScripts as string[]) {
-			expect(existsSync(join(frontendSkillRoot, "references", "ui-ux-db", "scripts", script))).toBe(true);
+			expect(existsSync(join(materializeRoot, "references", "ui-ux-db", "scripts", script))).toBe(true);
 		}
 	});
 
 	test("materializes the designpowers reference corpus", () => {
 		if (result.skipped) return;
 		for (const relPath of designpowersThirdPartyRelativePaths()) {
-			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
+			expect(existsSync(join(materializeRoot, relPath))).toBe(true);
 		}
 	});
 
@@ -45,7 +51,7 @@ describe("materialize-frontend-refs", () => {
 		const failures: string[] = [];
 		for (const relPath of designpowersThirdPartyRelativePaths()) {
 			if (!relPath.endsWith("/reference.md")) continue;
-			const content = await Bun.file(join(frontendSkillRoot, relPath)).text();
+			const content = await Bun.file(join(materializeRoot, relPath)).text();
 			const parsed = parseFrontmatter<SkillFrontmatter>(content);
 			if (!parsed.hadFrontmatter || parsed.parseError) {
 				failures.push(`${relPath}: invalid frontmatter`);
@@ -66,7 +72,7 @@ describe("materialize-frontend-refs", () => {
 		expect(referencePaths).toHaveLength(27);
 		expect(nestedSkillPaths).toEqual([]);
 		for (const relPath of referencePaths) {
-			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
+			expect(existsSync(join(materializeRoot, relPath))).toBe(true);
 		}
 	});
 
@@ -81,7 +87,7 @@ describe("materialize-frontend-refs", () => {
 		// given the non-SKILL.md taste-skill artifacts (the stitch worked-example DESIGN.md)
 		for (const [fileName, source] of Object.entries(tasteSkillArtifactFiles)) {
 			const upstream = readFileSync(join(upstreamsRoot, "taste-skill", source), "utf8");
-			const materialized = readFileSync(join(frontendSkillRoot, "references", "design", fileName), "utf8");
+			const materialized = readFileSync(join(materializeRoot, "references", "design", fileName), "utf8");
 			// then the artifact ships verbatim - no frontmatter normalization applies to non-SKILL.md sources
 			expect(materialized).toBe(upstream);
 		}
@@ -90,7 +96,7 @@ describe("materialize-frontend-refs", () => {
 	test("materialized brand reference is byte-identical to its upstream source", () => {
 		if (result.skipped) return;
 		const upstream = readFileSync(join(upstreamsRoot, "open-design", "design-systems", "apple", "DESIGN.md"), "utf8");
-		const materialized = readFileSync(join(frontendSkillRoot, "references", "design", "apple.md"), "utf8");
+		const materialized = readFileSync(join(materializeRoot, "references", "design", "apple.md"), "utf8");
 		expect(materialized).toBe(upstream);
 	});
 

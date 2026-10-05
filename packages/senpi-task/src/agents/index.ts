@@ -1,4 +1,11 @@
-export { BUILTIN_AGENTS, BUILTIN_AGENT_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "./builtin"
+export {
+  BUILTIN_AGENTS,
+  BUILTIN_AGENT_DEFAULTS,
+  CURATED_READONLY_AGENT_DEFAULTS,
+  CURATED_READONLY_AGENT_NAMES,
+  ULW_REVIEWER_AGENT_DEFAULTS,
+  ULW_REVIEWER_AGENT_NAMES,
+} from "./builtin"
 export {
   AGENT_INTERACTION_POLICIES,
   ONE_SHOT_AGENT_NAMES,
@@ -13,6 +20,7 @@ export {
   invocationConditionForAgent,
 } from "./invocation-guard"
 export type { AgentInvocationCondition, InvocationGuardVerdict, PlanArtifactReference, SkillInvocationState } from "./invocation-guard"
+export { agentToolPolicy, type AgentToolPolicy } from "./agent-tool-policy"
 export { loadAgents } from "./loader"
 export { mapOmoConfigAgents } from "./omo-config-agents"
 export { resolveAgent } from "./resolve-agent"

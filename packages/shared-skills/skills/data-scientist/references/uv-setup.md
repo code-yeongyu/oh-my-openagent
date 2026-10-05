@@ -1,6 +1,6 @@
 # uv Setup — Per-Platform
 
-This skill runs every data operation through `uv run --with ...`. If `uv --version` fails, set uv up with the automated scripts or the manual commands below, then verify.
+This skill's uv lane (kernel-less harnesses, isolated one-shots) runs through `uv run --with ...`, and `scripts/ensure-py-deps.sh` uses uv as its installer. If `uv --version` fails, set uv up with the automated scripts or the manual commands below, then verify.
 
 ## Automated (recommended)
 

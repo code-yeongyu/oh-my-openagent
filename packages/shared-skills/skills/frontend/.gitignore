@@ -9,6 +9,7 @@ references/design/*.md
 # Project-original design docs (ATTRIBUTION section 5) stay committed.
 !references/design/README.md
 !references/design/_INDEX.md
+!references/design/ambience-skill.md
 !references/design/aside.md
 !references/design/clone-from-url.md
 !references/design/design-system-architecture.md

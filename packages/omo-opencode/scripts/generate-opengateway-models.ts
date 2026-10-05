@@ -111,7 +111,7 @@ const MODEL_OVERRIDES: Readonly<Record<string, OpenGatewayModelOverride>> = {
     name: "Kimi K3 Ultrafast",
     reasoning: true,
     cost: { input: 3, output: 15, cache_read: 0.3, cache_write: 0 },
-    context: 1048576,
+    context: 262144,
     output: 131072,
   },
   "z-ai/glm-5.2-ultrafast": {

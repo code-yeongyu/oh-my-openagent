@@ -28,7 +28,6 @@ function extractMessage(error: unknown): string {
     try {
       return JSON.stringify(error)
     } catch (stringifyError) {
-      stringifyError instanceof Error
       return ""
     }
   }

@@ -111,6 +111,19 @@ describe("buildCompletionDetails", () => {
     expect(details.continuation_hint).not.toContain("prompt:")
   })
 
+  test("#given killed terminal error process record #when details built #then no continuation hint is emitted", () => {
+    const details = buildCompletionDetails(completedRecord({
+      status: "error",
+      execution_mode: "process",
+      residency_state: "rpc_detached",
+      killed: true,
+      final_response: undefined,
+      error_message: "child killed",
+    }))
+
+    expect(details.continuation_hint).toBe("")
+  })
+
   test("#given error record #when details built #then error message feeds the full result", () => {
     // given
     const record = completedRecord({

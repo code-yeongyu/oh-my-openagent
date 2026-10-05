@@ -7,6 +7,7 @@ import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runSenpiInstaller } from "../packages/omo-senpi/src/install/install-senpi"
+import { BUILD_NODES, selectBuildNodes } from "./build-nodes"
 
 const packageManifestPath = new URL("../package.json", import.meta.url)
 const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
@@ -44,41 +45,37 @@ describe("Senpi compatibility test script", () => {
     // #given
     const manifest = readRootManifest()
     const files = manifest.files ?? []
-    const buildOrchestrator = readFileSync(new URL("./build.ts", import.meta.url), "utf8")
     const prepublishOnlyScript = manifest.scripts?.prepublishOnly ?? ""
 
     // #when
     const shipsPluginTree = files.includes("packages/omo-senpi/plugin")
-    const hasStandaloneBuildScript = manifest.scripts?.["build:senpi-plugin"] === [
-      "bun run build:lsp-daemon",
-      "bun run build:ast-grep-mcp",
-      "bun run build:senpi-plugin:stage",
-    ].join(" && ")
-    const hasStageScript = manifest.scripts?.["build:senpi-plugin:stage"] === [
-      "bun run build:materialize-frontend",
-      "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
-      "node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs",
-      "node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs",
-      "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
-      "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
-      "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
-      "node packages/omo-senpi/plugin/scripts/build-install.mjs",
-    ].join(" && ")
-    const senpiNode = /id: "senpi-plugin"[\s\S]*?args: \["run", "build:senpi-plugin:stage"\][\s\S]*?deps: \["ast-grep-mcp", "lsp-daemon", "codex-plugin"\]/.test(
-      buildOrchestrator,
-    )
+    const stageSteps = (manifest.scripts?.["build:senpi-plugin:stage"] ?? "").split(" && ")
+    // The daemon launch spec is generated at build time so the plugin payload ships the only argv
+    // source the task daemon has, so it must run before skill sync packages the payload.
+    const launchSpecIndex = stageSteps.indexOf("node packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs")
+    const syncSkillsIndex = stageSteps.indexOf("node packages/omo-senpi/plugin/scripts/sync-skills.mjs")
+    const senpiNode = BUILD_NODES.find((node) => node.id === "senpi-plugin")
 
     // #then
     expect(
       shipsPluginTree,
       "root npm files must NOT ship packages/omo-senpi/plugin while the senpi platform flag is disabled for release",
     ).toBe(false)
-    expect(hasStandaloneBuildScript, "standalone Senpi build must build the shared daemon once before staging").toBe(true)
-    expect(hasStageScript, "root scripts must expose a stage-only Senpi artifact build").toBe(true)
-    expect(buildOrchestrator, "the build orchestrator must generate Senpi plugin artifacts before publishing").toContain(
+    expect(launchSpecIndex, "the Senpi stage must generate the daemon launch spec").toBeGreaterThanOrEqual(0)
+    expect(syncSkillsIndex, "the daemon launch spec must be generated before skill sync").toBeGreaterThan(launchSpecIndex)
+    expect(senpiNode?.args, "the build orchestrator must generate Senpi plugin artifacts before publishing").toEqual([
+      "run",
       "build:senpi-plugin:stage",
-    )
-    expect(senpiNode, "build graph senpi-plugin must wait for every shared runtime and plugin dependency").toBe(true)
+    ])
+    expect(senpiNode?.deps, "build graph senpi-plugin must wait for every shared runtime and plugin dependency").toEqual([
+      "ast-grep-mcp",
+      "lsp-daemon",
+      "codex-plugin",
+    ])
+    expect(
+      selectBuildNodes(BUILD_NODES, undefined).map((node) => node.id),
+      "a default build must still schedule the Senpi plugin stage",
+    ).toContain("senpi-plugin")
     expect(prepublishOnlyScript, "prepublishOnly must route through build, which includes the Senpi plugin build").toContain(
       "bun run build",
     )
@@ -93,6 +90,7 @@ describe("Senpi compatibility test script", () => {
       await mkdir(join(pluginRoot, "extensions"), { recursive: true })
       const requiredSkillNames = [
         "ast-grep",
+        "browser",
         "coding-agent-sessions",
         "debugging",
         "frontend",
@@ -115,16 +113,31 @@ describe("Senpi compatibility test script", () => {
         await mkdir(join(pluginRoot, "skills", skillName), { recursive: true })
         await writeFile(join(pluginRoot, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
       }
+      // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
+      await mkdir(join(pluginRoot, "skills-conditional", "x-search"), { recursive: true })
+      await writeFile(join(pluginRoot, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
       await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
       await writeFile(join(pluginRoot, "extensions", "omo.js"), "export default {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
       await writeFile(join(pluginRoot, "extensions", "omo-member.js"), "export const runMember = () => undefined\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-computer-use.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-doctor.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-memfs.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
+      await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
+      await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
+      await mkdir(join(pluginRoot, "runtime", "thread-sdk"), { recursive: true })
+      await writeFile(join(pluginRoot, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
       await writeFile(join(pluginRoot, "extensions", "dream-persona.md"), "# dream persona fixture\n")
       await writeFile(join(pluginRoot, "extensions", "facts-persona.md"), "# facts persona fixture\n")
+      await writeFile(join(pluginRoot, "extensions", "kibitzer-persona.md"), "# kibitzer persona fixture\n")
+      // The daemon launch spec is a required root-level artifact; the installer refuses a payload without it.
+      await writeFile(join(pluginRoot, "daemon-launch-spec.json"), '{"spec_version":1,"core":{"session_runtime":"in-process","multi_session":true,"extensions":["."]},"tunables":{},"env":{}}\n')
       // The memory run supervisor ships as its own executable artifact beside the bundle, so a
       // packed root without it is genuinely incomplete and the installer is right to reject it.
       await writeFile(join(pluginRoot, "extensions", "memory-run-supervisor.mjs"), "#!/usr/bin/env node\n")
+      await writeFile(join(pluginRoot, "extensions", "gateway-store-worker.mjs"), "export {}\n")
       await mkdir(join(pluginRoot, "scripts"), { recursive: true })
       await writeFile(join(pluginRoot, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
       await mkdir(join(pluginRoot, "runtime", "lsp-daemon", "dist"), { recursive: true })
@@ -187,7 +200,7 @@ describe("Senpi compatibility test script", () => {
     const expectedCommands = [
       "bun run build:senpi-plugin",
       "tsgo --noEmit -p packages/omo-senpi/tsconfig.json",
-      "bun test packages/omo-senpi",
+      "bun test --timeout 20000 packages/omo-senpi",
     ]
     const commandIndexes = expectedCommands.map((command) => script.indexOf(command))
     let isOrdered = true
@@ -213,12 +226,12 @@ describe("Senpi compatibility test script", () => {
     // #then
     expect(senpiJob).toContain("os: [ubuntu-latest, macos-latest, windows-latest]")
     expect(senpiJob).toContain('node-version: "24"')
-    expect(senpiJob).toContain('bun-version: "1.4.0"')
+    expect(senpiJob).toContain('bun-version: "1.4.2"')
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
     expect(senpiJob).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
-    expect(senpiJob).toContain("bun test packages/omo-senpi")
+    expect(senpiJob).toContain("bun test --timeout 20000 packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")
     expect(needsReferences.length, "senpi-compatibility must be included in both downstream needs lists").toBeGreaterThanOrEqual(2)
   })

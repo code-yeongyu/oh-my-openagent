@@ -11,6 +11,8 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | File | Purpose |
 |------|---------|
 | `build-binaries.ts` | Writes 12 generated Node launcher packages for darwin/linux/windows (AVX2 + baseline) |
+| `build-omo-binary.ts` + `release-desktop-engine-fixture.json` | Embed release sidecars, including `native/prebuilds/<host>/senpi-desktop-engine[.exe]` on declared-available targets; preserve executable mode, fail on a missing promised engine, and explicitly omit unsupported hosts |
+| `build-omob.ts` + `omob-desktop-engine.ts` | Maintainer dev binary (`bun run omob`); before `build-omo-binary.ts` it builds the cache clone's `senpi-desktop-engine` with the release cargo flags, keyed on a `crates/` + `Cargo.*` + `rust-toolchain.toml` tree fingerprint stamped beside the binary, so an unchanged engine skips cargo |
 | `build-cli-node.ts` | Node-runtime CLI bundle (`dist/cli-node`) for environments without Bun |
 | `build.ts` | Main build entry (`bun run build`) |
 | `build-codex-install.ts` | Bundle the Codex installer entrypoints into `packages/omo-codex/scripts/install-dist/`. Also embeds a source-freshness marker (`// omo-codex-install:<sourceDigest>:<bodyDigest>`) as line 2 of the generated bundle and exports `buildCodexInstaller()` / `digestCodexInstallerSources()` / `parseCodexInstallerArtifact()` for non-destructive freshness checks; guarded by `import.meta.main` |
@@ -18,18 +20,21 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `build-omo-native.ts` | Build the native omo runtime artifacts |
 | `ensure-vendored-lsp-daemon.ts` | Build/watch the vendored LSP daemon (daemon bin + lock-dir watch) |
 | `verify-omo-ai-payload.mjs` | omo-ai npm payload gate: required artifact list, 18-skill minimum, 30 MB unpacked cap, no nested `node_modules`/source paths |
-| `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml` |
-| `ci-fast-path.mjs` | CI skip classifier (`classifyCiMode`): platform-sensitive paths and the `ci:full-matrix` label force the full OS matrix |
+| `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml`. Groups run detached (own process groups) and are killed with the parent on SIGINT/SIGTERM; a spawned group inherits `OMO_TEST_FAST_ACTIVE=1` and re-entry refuses to recurse |
+| `ci-fast-path.mjs` | CI skip classifier (`classifyCiMode`): runtime-touching paths (`isRuntimePath`: every path except an explicit allowlist of web, prose such as top-level Markdown and README/CHANGELOG/AGENTS-style Markdown outside `packages/*/src`, and listed repository metadata), platform-sensitive paths, and the `ci:full-matrix` label force the full OS matrix |
+| `ci-leg-tests-guard.mjs` | Last step of every OS test leg (`judgeLeg`): fails a leg whose test steps were all skipped though the change needed them (`tests not run: add ci:full-matrix`), passes an intended skip with a `tests intentionally not run` notice and job-summary line |
 | `telemetry-schema-block.mjs` | Generate the telemetry schema doc block (`generateTelemetrySchemaBlock`) |
 | `remove-stale-self-package-tests.ts` | Prune self-package tests that reference deleted sources |
 | `agent-command-string-scan.ts` | Scan tracked sources for unsafe agent command strings; allowlisted exceptions live in `agent-command-string-audit.allowlist.json` |
 | `verify-npm-payload.mjs` | npm payload verification |
 | `build-help-schemas.ts` | Generate CLI help schemas |
 | `build-schema.ts` + `build-schema-document.ts` | Zod schema to JSON Schema for `assets/oh-my-opencode.schema.json` |
+| `json-schema-defaulted-optional.ts` | Drops Zod-defaulted fields from generated `required` so both config schemas accept configs that omit them (#6445) |
 | `build-model-capabilities.ts` | Refresh the generated model-capabilities artifact consumed by `packages/model-core/` |
 | `patch-node-require-shim.ts` | Patches `dist/index.js` for Node/Electron require compatibility |
 | `publish.ts` | Local multi-package publish alternative (platform packages + npm) |
-| `generate-changelog.ts` | Release notes from git log, filters bot commits |
+| `generate-changelog.ts` | Release notes from git log, filters bot commits (imports `RELEASE_VERSION_PATTERN` from `release-latest-flag.ts`) |
+| `release-latest-flag.ts` | Owns the GitHub **Latest** badge rule for every release-creation path (`publish.yml` omo + LazyCodex steps, `publish.ts`): `resolveLatestFlag(version, publishedTags)` -> `--latest` unless an already published tag has a higher semver, then `--latest=false`. CLI reads tags on stdin: `gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' \| bun script/release-latest-flag.ts <version>`. The pipeline never passes `--prerelease` |
 | `stats.ts` | npm + GitHub-release download counts (`gh api --paginate --slurp`; weekly `stats.yml`) |
 | `sync-lazycodex-marketplace.ts` | Copy plugin + marketplace payload into the `code-yeongyu/lazycodex` repo (publish.yml stable releases) |
 | `lazycodex-marketplace-validation.ts` | Validate the synced marketplace payload (runtime path args incl. Windows/absolute/`components/*/dist/*.js`) |
@@ -39,13 +44,13 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 
 ## SUBDIRS
 
-- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (renders TUI evidence through real xterm.js + node-pty in a browser, true color; NEVER tmux capture-pane), `xterm-live-terminal.mjs` (live capture core), `strip-ansi.mjs`, `web-terminal-redaction.mjs`, `omo-native-telemetry-qa.mjs` (end-to-end telemetry privacy QA: sandbox, capture server, redaction; `--evidence-dir <dir> --senpi-bin <path>`).
+- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (renders TUI evidence through real xterm.js + node-pty in a browser, true color; NEVER tmux capture-pane), `xterm-live-terminal.mjs` (live capture core), `strip-ansi.mjs`, `web-terminal-redaction.mjs`, `omo-native-telemetry-qa.mjs` (end-to-end telemetry privacy QA; `--evidence-dir <dir> --senpi-bin <path>`). Its adjacent `omo-native-telemetry-{provider,drive,capture,assertions,evidence}.mjs` modules own the scripted provider, isolated RPC lifecycle, capture server, privacy checks, and evidence output. Prompt progression waits for `agent_settled`; failure termination reserves a one-second grace inside the 120-second total drive budget, then escalates to SIGKILL without losing the original error. Evidence includes each session JSONL, redacted payloads, opt-out checks, and cleanup receipts.
 - `fixtures/` -- shared script test fixtures (vendored LSP build owner).
 - `agent/` -- dev-env contract: `setup.sh`, `cleanup.sh`, `cleanup-hook.sh`, `docker-dev.sh`, `qa-sandbox.sh`, `qa-docker.sh` (see root AGENTS.md DEVELOPMENT ENVIRONMENT).
 
 ## TESTS (61 `*.test.ts`)
 
-Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `publish-lazycodex-workflow.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
+Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
 
 | File | Invariant |
 |------|-----------|

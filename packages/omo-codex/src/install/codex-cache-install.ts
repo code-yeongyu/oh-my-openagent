@@ -36,6 +36,7 @@ export async function installCachedPlugin(input: {
     const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath })
+    await copyCanonicalPromptSources({ pluginRoot: tempPath, sourcePath: input.sourcePath })
     // Rewriting local file: dependencies desyncs package.json from package-lock.json, and npm ci
     // aborts with EUSAGE on that drift (lazycodex#137; approach credited to the community fix in
     // oh-my-openagent#6202). The temp cache dir is throwaway, so let npm install reconcile the lock
@@ -51,6 +52,13 @@ export async function installCachedPlugin(input: {
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
     await assertHookCommandTargets(tempPath)
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
+    // Codex prefers a leftover "local" cache over every versioned install.
+    const versions = await readdir(dirname(targetPath), { withFileTypes: true })
+    for (const entry of versions) {
+      if (!entry.isDirectory() || entry.name === input.version || entry.name.startsWith(".")) continue
+      if (!/^[a-zA-Z0-9_+-][a-zA-Z0-9._+-]*$/.test(entry.name)) continue
+      await rm(join(dirname(targetPath), entry.name), { recursive: true, force: true })
+    }
   } catch (error) {
     await rm(tempPath, { recursive: true, force: true })
     throw error
@@ -201,6 +209,25 @@ async function copyRootRuntimeDists(input: { readonly pluginRoot: string; readon
     if (!(await fileExistsStrict(join(sourcePath, "index.js")))) continue
     await mkdir(dirname(join(input.pluginRoot, runtimePath)), { recursive: true })
     await cp(sourcePath, join(input.pluginRoot, runtimePath), { recursive: true })
+  }
+}
+
+// sync-skills.mjs runs again inside the flattened cache (maybeRunNpmSyncSkills) and composes the
+// ultrawork skill from the canonical prompts-core directive. In the repo layout it resolves
+// <plugin>/../../../packages/prompts-core/...; in the cache that path dangles under plugins/cache/,
+// so the directive is materialized inside the plugin root and sync-skills falls back to that copy
+// (plugin/scripts/canonical-ultrawork-directive.mjs). Keep both path lists in lockstep.
+const canonicalPromptRelativePaths = [join("packages", "prompts-core", "prompts", "ultrawork", "codex.md")] as const
+
+async function copyCanonicalPromptSources(input: { readonly pluginRoot: string; readonly sourcePath: string }): Promise<void> {
+  const repoRoot = repoRootForCodexPluginSource(input.sourcePath)
+  if (repoRoot === null) return
+  for (const relativePath of canonicalPromptRelativePaths) {
+    const sourceFile = join(repoRoot, relativePath)
+    if (!(await fileExistsStrict(sourceFile))) continue
+    const targetFile = join(input.pluginRoot, relativePath)
+    await mkdir(dirname(targetFile), { recursive: true })
+    await cp(sourceFile, targetFile)
   }
 }
 

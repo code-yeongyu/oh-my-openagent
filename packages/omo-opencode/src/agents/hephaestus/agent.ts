@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_5Model, isGpt5_6Model } from "../types";
+import { isGpt5_5Model, isGpt5_6Model, isGpt6Model } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -20,6 +20,7 @@ const GPT_5_3_CODEX_RE = /^gpt-5[.-]3-codex(?:$|[.-])/i;
 const GPT_5_4_RE = /^gpt-5[.-]4(?:$|[.-])/i;
 const GPT_5_5_RE = /^gpt-5[.-]5(?:$|[.-])/i;
 const GPT_5_6_RE = /^gpt-5[.-]6(?:$|[.-])/i;
+const GPT_6_RE = /^gpt-6(?:$|[.-])/i;
 const HOSTED_VENDOR_PREFIX_RE = /^(?:[^./]+\.)+(gpt-5[.-].*)$/i;
 
 export type HephaestusPromptSource = "gpt-5-6" | "gpt-5-5" | "gpt-5-4" | "gpt";
@@ -48,7 +49,8 @@ export function isHephaestusSupportedModel(model: string | undefined): boolean {
     GPT_5_3_CODEX_RE.test(modelName) ||
     GPT_5_4_RE.test(modelName) ||
     GPT_5_5_RE.test(modelName) ||
-    GPT_5_6_RE.test(modelName)
+    GPT_5_6_RE.test(modelName) ||
+    GPT_6_RE.test(modelName)
   );
 }
 
@@ -62,7 +64,7 @@ export function getHephaestusPromptSource(
   model?: string,
 ): HephaestusPromptSource {
   assertHephaestusSupportedModel(model);
-  if (model && isGpt5_6Model(model)) {
+  if (model && (isGpt5_6Model(model) || isGpt6Model(model))) {
     return "gpt-5-6";
   }
   if (model && isGpt5_5Model(model)) {

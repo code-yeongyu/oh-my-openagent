@@ -16,6 +16,31 @@ import {
 } from "./ultrawork.test-support"
 
 describe("omo-senpi ultrawork once-per-session arming", () => {
+  it("#given quoted-only inputs #when a real request follows #then only that request arms the ledger", async () => {
+    for (const text of [
+      "ulwfoo",
+      "ulw_helper.ts",
+      "explain ``ulw `status` ``",
+      "```text\nulw\n```",
+      "<omo-ulw-loop-pointer>ulw loop</omo-ulw-loop-pointer>",
+      "<ultrawork-mode>ulw</ultrawork-mode>",
+      "<omo-ultrawork-reminder>ultrawork</omo-ultrawork-reminder>",
+    ]) {
+      const pi = new FakeExtensionAPI()
+      const arming = createSessionArming()
+      await createUltraworkComponent(arming).register(pi, createTestContext(pi))
+      const eventCtx = sessionEventCtx("session-filtered")
+
+      await dispatchInput(pi, text, "interactive", undefined, eventCtx)
+      expect(pi.messages).toHaveLength(0)
+      expect(arming.isArmed("session-filtered")).toBe(false)
+
+      const result = await dispatchInput(pi, "ulw loop", "interactive", undefined, eventCtx)
+      expectHiddenInjection(pi, result)
+      expect(arming.isArmed("session-filtered")).toBe(true)
+    }
+  })
+
   it("#given an armed session #when a second trigger dispatches #then injects a short reminder instead of the full directive", async () => {
     // given: the first trigger of a session arms the full directive once
     const pi = new FakeExtensionAPI()

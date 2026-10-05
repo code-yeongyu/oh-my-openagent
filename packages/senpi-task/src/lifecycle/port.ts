@@ -2,8 +2,12 @@ import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
+import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
+import type { HostEndpointPort, HostSessionCloser, HostSessionProbe, HostSessionRetryPolicy } from "./host-session"
 import type { BatchAdmissionOptions } from "./residency"
+import type { RevivePolicyPort } from "./revive-policy"
 
 // Why a task is being torn down. Cancel (todo 10), LRU eviction, TTL cleanup, and session_start
 // reconciliation ALL route their destruction through the single-writer port. Session shutdown is
@@ -16,19 +20,23 @@ export type DestroyCause =
   | "ttl"
   | "reconcile_lost"
   | "fallback_handoff"
+  | "revive_failure"
 
 // The teardown surface the destruction port operates against. In production this wraps a live
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle
 // code ever calls abort/dispose/terminate on it - that is the single-writer rule.
 export type ResidentHandle = {
   readonly task_id: string
-  readonly kind: "in-process" | "rpc"
+  // "host-session" is a SESSION of the shared daemon: it has no pid, so nothing may signal it.
+  readonly kind: "in-process" | "rpc" | "host-session"
   readonly pid: number | undefined
   // Interrupt an in-flight turn. Safe to call on an already-idle child.
   abort(): Promise<void>
   // In-process: tear down the child session. Rpc: detach the protocol client + heartbeat.
+  // Host-session: DETACH - the session keeps running on the daemon and the record parks.
   dispose(): Promise<void>
-  // Rpc only: SIGTERM then SIGKILL escalation. In-process: no-op (no OS process to signal).
+  // Rpc: SIGTERM then SIGKILL escalation. Host-session: abort + close_session, never a signal.
+  // In-process: no-op (no OS process to signal).
   terminate(): Promise<void>
 }
 
@@ -40,6 +48,13 @@ export type ResidencyRegistry = {
   forget(taskId: string): void
   // A terminal resident with a queued send must NOT be evicted (codex is_unloadable parity).
   hasPendingSends(taskId: string): boolean
+  // Synchronous per-task arbitration held across async teardown. Eviction and sends are mutually
+  // exclusive; callers that lose the race must not touch the child handle.
+  tryClaimEviction?(taskId: string): boolean
+  releaseEviction?(taskId: string): void
+  isEvicting?(taskId: string): boolean
+  tryBeginSend?(taskId: string): boolean
+  endSend?(taskId: string): void
 }
 
 // Injectable OS-process signalling so unit tests never spawn real children. Defaults use
@@ -55,6 +70,13 @@ export type RespawnFailureCode =
   | "spawn_spec_unavailable"
   | "session_unavailable"
   | "team_inactive"
+  // A previous generation of the daemon still holds this session path while it drains. Retryable
+  // by construction: the child is NEVER lost for it.
+  | "host_draining"
+  // The agent-dir store index could not be written, or the recorded host is incompatible: the child
+  // was opened nowhere and waits for the next reconcile.
+  | "store_index_unavailable"
+  | "host_incompatible"
   | "respawn_failed"
 
 export type RespawnResult =
@@ -64,11 +86,25 @@ export type RespawnResult =
       readonly disposition: "retryable" | "unrecoverable"
       readonly code: RespawnFailureCode
       readonly reason: string
+      // How long the host asked the caller to wait before retrying (`host_draining` only).
+      readonly retryAfterMs?: number
     }
 
 export type ReattachResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly kind: "already_attached" | "failed"; readonly reason: string }
+
+export type DetachedRevivalReservation = {
+  commit(): void
+  release(): void
+}
+
+export type ColdRevivalFailureCode = "admission_refused" | "cwd_unavailable" | "config_generation_mismatch"
+export type DetachedRevivalResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: string; readonly code?: ColdRevivalFailureCode }
+
+export type DetachedRevivalRollbackResult = "rolled_back" | "not_owner"
 
 export type CapacityReservation =
   | { readonly ok: false }
@@ -85,6 +121,8 @@ export type LifecycleReattachPorts = {
 }
 
 const registeredReattachPorts = new WeakMap<TaskRecordStore, LifecycleReattachPorts>()
+const registeredDetachedRevivals = new WeakMap<TaskRecordStore, (taskId: string, reservation: DetachedRevivalReservation) => Promise<DetachedRevivalResult>>()
+const registeredDetachedRevivalRollbacks = new WeakMap<TaskRecordStore, (prior: TaskRecord) => DetachedRevivalRollbackResult>()
 
 export function registerLifecycleReattachPorts(
   store: TaskRecordStore,
@@ -97,12 +135,51 @@ export function getLifecycleReattachPorts(store: TaskRecordStore): LifecycleReat
   return registeredReattachPorts.get(store)
 }
 
+export function registerLifecycleDetachedRevival(
+  store: TaskRecordStore,
+  revive: (taskId: string, reservation: DetachedRevivalReservation) => Promise<DetachedRevivalResult>,
+): void {
+  registeredDetachedRevivals.set(store, revive)
+}
+
+export function getLifecycleDetachedRevival(
+  store: TaskRecordStore,
+): ((taskId: string, reservation: DetachedRevivalReservation) => Promise<DetachedRevivalResult>) | undefined {
+  return registeredDetachedRevivals.get(store)
+}
+
+export function registerLifecycleDetachedRevivalRollback(
+  store: TaskRecordStore,
+  rollback: (prior: TaskRecord) => DetachedRevivalRollbackResult,
+): void {
+  registeredDetachedRevivalRollbacks.set(store, rollback)
+}
+
+export function getLifecycleDetachedRevivalRollback(
+  store: TaskRecordStore,
+): ((prior: TaskRecord) => DetachedRevivalRollbackResult) | undefined {
+  return registeredDetachedRevivalRollbacks.get(store)
+}
+
+export type IdleReclaimerTimer = {
+  unref?(): void
+}
+
+export type IdleReclaimerScheduler = {
+  setInterval(callback: () => void, delayMs: number): IdleReclaimerTimer
+  clearInterval(timer: IdleReclaimerTimer): void
+}
+
 export type LifecycleDeps = {
+  readonly revivePolicy?: RevivePolicyPort
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
   readonly config: OmoTaskSettings
   readonly now?: () => number
   readonly signaller?: ProcessSignaller
+  // Row 17: reclaims stale clones and salvages a crashed host's isolated deltas at session start.
+  readonly isolation?: IsolationRuntime
+  readonly isolationProbe?: OwnerProbe
   readonly reserveReattach?: ReserveReattachPort
   readonly respawn?: RespawnPort
   readonly reattach?: ReattachPort
@@ -116,6 +193,22 @@ export type LifecycleDeps = {
   readonly dequeuePending?: (taskId: string) => void
   // Test seam for bounded admission-lease timing and deterministic contention.
   readonly reconcileAdmission?: BatchAdmissionOptions
+  // Injectable timer seam keeps lifecycle tests deterministic and prevents test-created timers.
+  readonly idleReclaimerScheduler?: IdleReclaimerScheduler
+  // The engine's runtime-only parent kernel-tool map. Destruction and expunge release a child's
+  // binding through it; idle parking keeps the binding so a same-host revive still reaches it.
+  readonly kernelToolBindings?: KernelToolBindingRegistry
+  // Daemon-hosted children: liveness, the single close writer, and the two bounded waits. Defaults
+  // never reach a daemon, so a deployment without one behaves exactly as it does today.
+  readonly hostSessionProbe?: HostSessionProbe
+  readonly hostSessionClose?: HostSessionCloser
+  readonly hostRetry?: HostSessionRetryPolicy
+  // REQUIRED so a composition cannot silently drop the revival ensure and the own-host guard. A
+  // lifecycle without a task host passes `NO_HOST_ENDPOINT` explicitly.
+  readonly hostEndpoint: HostEndpointPort
+  // How long a close this process must see confirmed (a failed rung, an expired record) waits for the
+  // daemon's answer before it counts as unconfirmed. Defaults to 10s.
+  readonly hostCloseTimeoutMs?: number
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {

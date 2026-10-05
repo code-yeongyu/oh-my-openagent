@@ -122,8 +122,7 @@ Every `task()` prompt MUST include ALL 6 sections:
 
 ## 3. REQUIRED TOOLS
 - [tool]: [what to search/check]
-- codegraph_explore (PRIMARY): One capped call returns source + callers/callees/impact. Use FIRST when codegraph_* tools are available. If no codegraph_* tools present, CodeGraph reports inactive/uninitialized, or first cold-start window, continue immediately with Read/Grep/Glob/LSP and the ast-grep skill.
-- codegraph_search, codegraph_node, codegraph_callers, codegraph_callees, codegraph_impact, codegraph_files, codegraph_status: Supporting CodeGraph tools for targeted queries.
+- lsp_* (PRIMARY for symbols): lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics for definitions, callers, and impact. Fall back to Read/Grep/Glob only for plain text.
 - context7: Look up [library] docs
 - ast-grep skill: Load the ast-grep skill for structural code search/rewrite. Use `sg --pattern '[pattern]' --lang [lang]` or `python3 scripts/ast_grep_helper.py search`.
 

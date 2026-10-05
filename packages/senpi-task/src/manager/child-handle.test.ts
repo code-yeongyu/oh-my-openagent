@@ -165,3 +165,16 @@ describe("adaptRpcHandle", () => {
     expect(outcome.failure.message).toContain("boom")
   })
 })
+
+describe("adapted handle kind", () => {
+  test("#given each runner's handle #when adapted #then the kind states which runner owns the child", () => {
+    // given / when
+    const inProcess = adaptInProcessHandle(fakeInProcessHandle({ status: "completed", finalResponse: "done" }))
+    const rpc = adaptRpcHandle(fakeRpcHandle())
+    const hostSession = adaptRpcHandle({ ...fakeRpcHandle(), kind: "host-session", pid: undefined } as RpcChildHandle)
+
+    // then - lifecycle teardown branches on this, and a daemon session has no pid to derive it from.
+    expect([inProcess.kind, rpc.kind, hostSession.kind]).toEqual(["in-process", "rpc", "host-session"])
+    expect(hostSession.pid).toBeUndefined()
+  })
+})

@@ -9,6 +9,7 @@ export {
   applyFactsBatch,
   FactsExtractionValidationError,
   parseFactsExtractionJsonl,
+  parseFactsExtractionRecord,
   validateFactsRecovery,
   type ApplyFactsBatchOptions,
   type ApplyFactsBatchResult,

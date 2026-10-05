@@ -8,9 +8,10 @@ Source root of the Senpi adapter package. The package barrel (`index.ts`) export
 |------|----------|-------|
 | Extension entry / composition | `extension/` | `index.ts` (source entry, eager task), `bundled-index.ts` (built entry, lazy task runtime). Own AGENTS.md. |
 | Install / uninstall | `install/` | `runSenpiInstaller` / `runSenpiUninstaller`, local launcher, atomic settings writes. |
-| Memory MCP server | `mcp/memory-server.ts` | Standalone stdio JSON-RPC server exposing the memory tools under exposure `"search"` (senpi `tool_search` catalog). Plain Node, no senpi runtime; the extension injects bound identity + accepted-turn provenance, cwd-based auto identity retained for standalone calls. |
 | Real host modules for tests | `senpi-test-runtime.ts` | Resolves the installed `@code-yeongyu/senpi` dist and imports real theme/ModelRegistry/ModelRuntime at load time. |
 | Deep components | `components/{task,memory,lsp,telemetry,init-deep-advisor}/` | Each has its own AGENTS.md; `memory/` additionally documents `worker/`, `commands/`, `palace/`. |
+| Bundled remote MCPs | `components/builtin-mcps/` | `context7` + `grep_app` HTTP declarations, `CONTEXT7_API_KEY` bearer gating, and the disable switches. Own AGENTS.md. |
+| X search | `components/x-search/` | Credential-gated `x_search` tool and conditional skill (files, gating, contract, error codes, backtest pointer). Own AGENTS.md. |
 | Small components | `components/*` | Single-purpose factories (ulw-loop, config-watch, onboarding, fallback-architect, ...) documented in `../AGENTS.md`. |
 
 ## Root audit gates
@@ -26,6 +27,7 @@ Colocated at `src/` root. These are executable package-contract tests, not docum
 - `extension-node-runtime-audit.test.ts` - extension loads under plain Node/jiti: no Bun-only module properties (`import.meta.dir` / `import.meta.file`) at module scope (v5.0.0-beta.1 regression).
 - `senpi-main-runtime-import-audit.test.ts`, `omo-native-capture-path.audit.test.ts` - import/capture-path surface audits.
 - `skills-sync.test.ts` - synced skills carry no foreign harness tokens (`codex`, `multi_agent`, `spawn_agent`, case-insensitive).
+- `windows-console-hide.test.ts` - every production `node:child_process` call in the package passes `windowsHide: true`, so no spawn opens a console window that steals the user's focus on win32. It resolves the entry points each file imports (the whole `spawn`/`exec`/`fork` family, aliases included) and walks the source tree, because the hand-listed `spawn(`-only predecessor missed the `execFile` probes behind #8501. A foreground process that must keep the user's console opts out with a `windowsHide-exempt:` comment stating why, at the call site.
 
 ## CONVENTIONS
 

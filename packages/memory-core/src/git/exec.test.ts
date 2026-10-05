@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -9,6 +9,7 @@ import {
   type GitExecResult,
   type NodeGitExecRuntime,
 } from "./exec"
+import { removeTreeSync } from "../../../../test-support/remove-tree"
 
 type CommandRunner = NonNullable<NodeGitExecRuntime["runCommand"]>
 
@@ -79,7 +80,7 @@ describe("createNodeGitExec", () => {
           exec.run(["--version"], { cwd: dir, timeoutMs: 5000, env: { PATH: "/nonexistent" } }),
         ).rejects.toBeInstanceOf(GitNotFoundError)
       } finally {
-        rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+        removeTreeSync(dir, { maxRetries: 10, retryDelay: 200 })
       }
     })
   })
@@ -308,7 +309,7 @@ describe("createNodeGitExec", () => {
       expect(result.code).toBe(0)
       expect(result.stdout).toBe(expected.stdout)
     } finally {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+      removeTreeSync(dir, { maxRetries: 10, retryDelay: 200 })
     }
   })
 

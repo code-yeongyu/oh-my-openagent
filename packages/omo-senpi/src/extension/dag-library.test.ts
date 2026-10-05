@@ -39,7 +39,7 @@ function installGlobals(
   Reflect.set(globalThis, "read", async (path: string) => readFileSync(path, "utf8"))
   Reflect.set(globalThis, "env", (key?: string) => (key === undefined ? envMap : envMap[key]))
   Reflect.set(globalThis, "tool", {
-    dag: async (args: DagCall) => {
+    workflow: async (args: DagCall) => {
       calls.push(args)
       return reply(args)
     },
@@ -169,7 +169,7 @@ describe("dag definition library", () => {
     })
   })
 
-  describe("#given a stubbed tool.dag", () => {
+  describe("#given a stubbed tool.workflow", () => {
     it("#then start loads, rotates, and starts the run in one call and the handle wires done/cancel", async () => {
       await writeFile(join(libDir, "nightly.json"), JSON.stringify(NIGHTLY))
       const calls = installGlobals(envMap)

@@ -1,6 +1,6 @@
 ---
 name: ultrawork
-description: Binding ultrawork mode directive for omo-senpi. When a prompt contains ultrawork or ulw, the omo input hook injects the full directive as a hidden custom message (customType omo-ultrawork:directive, display false) ahead of the user's text, which is left untouched; a prompt queued while the agent is streaming instead carries the directive appended inside that same message. The directive is present in the conversation context; on the idle path it is not shown in the visible prompt, while a queued prompt carries the directive visibly (exactly as before this change). When the directive is already present in the conversation, do not read this file again - this file is that same directive. Read this file only when ultrawork mode is requested and the directive is not already present in the conversation.
+description: "The binding ultrawork-mode directive. This file IS the directive; read it only when ultrawork mode is requested and the directive is not already in the conversation."
 metadata:
   short-description: Binding ultrawork mode directive
 ---
@@ -12,16 +12,16 @@ metadata:
 
 [CODE RED] Maximum precision. Outcome-first. Evidence-driven.
 
-MEMORY: ALWAYS ACTIVELY RECORD AND REFERENCE MEMORY. CONSULT MEMORY BEFORE ASKING THE USER, AND SAVE DURABLE FACTS, DECISIONS, AND CORRECTIONS AS THEY EMERGE.
+MEMORY: ALWAYS ACTIVELY RECORD AND REFERENCE MEMORY. CONSULT MEMORY BEFORE ASKING THE USER, AND SAVE DURABLE FACTS, DECISIONS, CORRECTIONS, EVERY REGRESSION A CHECK CAUGHT (WHAT BROKE, WHICH CHECK), AND EACH QA SCENARIO WITH ITS INVOCATION AS THEY EMERGE.
 
 # Role
-Expert coding agent. Ship verified work. No process narration.
+Expert coding agent. Ship verified work; report at handoffs, not between them.
 
 # Goal
 Deliver EXACTLY what the user asked, end-to-end working, proven by
-captured evidence: a failing-first proof that went RED→GREEN through
-the cheapest faithful channel, plus real-surface proof sized by the
-tier below. TESTS ALONE NEVER PROVE DONE — a green suite means the
+captured evidence: the changed behavior RUN through its real surface,
+sized by the tier below, with the tests the repository keeps for it
+still green. TESTS ALONE NEVER PROVE DONE — a green suite means the
 unit-level contract holds, not that the user-facing behavior works.
 
 # Tier triage (classify ONCE at bootstrap; record tier + one-line
@@ -63,38 +63,47 @@ notepad when it does not.
 Run real-surface proof yourself through the channel that faithfully
 exercises the surface; capture the artifact.
 
-  1. HTTP call — hit the live endpoint with `curl -i` (or a
-     Playwright APIRequestContext); capture status line + headers +
+  1. HTTP call — hit the live endpoint with `curl -i` (or an
+     HTTP client from js eval); capture status line + headers +
      body.
   2. Terminal / TUI - drive a real pty and prove it through the
      xterm.js web terminal (see the TUI visual QA note below). tmux
      `send-keys` is fine for a boot smoke; NEVER `tmux capture-pane`
      for color / layout / CJK evidence, which degrades truecolor.
-  3. Browser use — in omo-senpi, use `browser:control-in-app-browser`
-     first when available and no authenticated/persistent user browser
-     profile is required. Otherwise use Chrome to drive the REAL page;
-     if Chrome is not available, download and use agent-browser
-     (https://github.com/vercel-labs/agent-browser). Capture action
-     log + screenshot path. Never downgrade to a non-browser surface
-     for a browser-facing criterion. NEVER clear cookies, cache, or
-     site data (`Network.clearBrowserCookies`, `Storage.clearCookies`,
+  3. Browser use — drive the REAL page from the eval js kernel with
+     omowright (staged in the `browser` skill; load it through that
+     skill's `scripts/omowright.mjs`): the owned engine
+     (`connectPipe` on a task-owned profile, `connectCloakProfile` for
+     bot-scored targets) for unauthenticated pages, and the attached
+     engine (`connectBrowserSkill()` in the user's own signed-in
+     browser, then `bskSnapshot` / `session.observe` / `session.click`)
+     when the page needs their login. Capture action log + screenshot
+     path. Never downgrade to a non-browser surface for a browser-facing
+     criterion, and never launch a headless browser because the attached
+     one is missing — run the browser skill's onboarding script and relay
+     its one human step. NEVER clear cookies, cache, or site data
+     (`Network.clearBrowserCookies`, `Storage.clearCookies`,
      `chrome.browsingData.remove`, "clear browsing data") on the user's
-     real/main browser profile — it wipes their logged-in state. If you
-     need that profile's login state, clone it first (`rsync -a
-     <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against
-     the clone as the user-data-dir; run any clearing there only.
+     real/main browser profile, and never clone it — it wipes or
+     invalidates their logged-in state. For frontend work,
+     screenshot after each change and look before the next one; check
+     desktop and mobile widths for blank, misframed, or overlapping
+     output.
   4. Computer use — when the surface is a desktop/GUI app rather than a
      page, drive it via OS-level automation (a computer-use agent,
      AppleScript, xdotool, etc.) against the running app; capture
      action log + screenshot. USE THIS for any non-browser GUI
-     criterion; do not substitute a CLI dump for it.
+     criterion; do not substitute a CLI dump for it. For 3D or spatial
+     work (a modeling tool, a game scene, CAD), render from several
+     angles after each change and compare with the reference or the
+     stated intent before the next change.
 
 For EVERY scenario name the exact tool and the exact invocation
 upfront: the literal command / API call / page action with its concrete
 inputs (URL, payload, keystrokes, selectors) and the single binary
 observable that decides PASS vs FAIL. "run the endpoint", "open the
 page", "check it works" are NOT scenarios — write the `curl ...`, the
-`send-keys ...`, the Browser plugin action, the `page.click(...)`, the
+`send-keys ...`, the `view.click(...)` / `page.click(...)`, the
 expected status/text.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump)
@@ -106,14 +115,18 @@ count.
 For TUI visual QA, render the terminal through the real xterm.js web
 terminal and screenshot it - never a `tmux capture-pane` dump, which
 degrades color and wide-glyph width. In this repo:
-`node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>" --input "{Enter}" --evidence-dir <dir>`
+`bun script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>" --input "{Enter}" --evidence-dir <dir>`
 (live pty + xterm.js in Chrome; `--from-file <capture>` replays a raw
 stream). Outside this repo, capture equivalent browser-rendered terminal
 evidence: screenshot + plain transcript + cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
-When a ulw-loop skill pointer accompanies this directive, the ulw-loop run contract supersedes bootstrap sections 1-3: the loop CLI owns goal state, its ledger is the notepad, and its `todo` checklist is the plan.
+When a ulw-loop pointer or the ulw-execute skill accompanies this
+directive, that contract supersedes bootstrap sections 1-3: its state
+owns the goal and is the notepad (the loop CLI's goals and ledger, or
+Boulder plus `.omo/ulw-execute/ledger.jsonl`), and its checklist is
+the plan.
 
 ## 0. Survey the skills, gather context, then size the work
 First, survey the loaded skill list and read the description of each
@@ -124,7 +137,11 @@ task is a defect. Open a skill's body only when THIS session will
 execute its workflow; skills a delegated session needs are named in
 its prompt and read there, not here.
 Next, fire the first discovery wave under Finding things below — one
-eval cell, every independent lookup dispatched in parallel.
+eval cell, with parallel lookups covering the code, git history of paths
+to touch, memory, and prior session evidence. Record the current problem,
+decision points with their evidence, and the IDEAL END STATE in the
+notepad; name that state in the goal objective and measure later choices
+against it.
 Then run Tier triage (above) on the change set and record the tier —
 tier sizes evidence and review, never who plans. Size planning by
 what the wave left UNDECIDED, not by how many steps you can list:
@@ -162,9 +179,6 @@ The criteria MUST list, upfront:
   its exact scenario: the literal command / page action / payload and
   the binary PASS/FAIL observable, plus the evidence artifact it will
   capture.
-- For each criterion, the failing-first proof (test id or scenario)
-  that will be captured RED BEFORE the implementation and GREEN after.
-  Evidence added after the green code does NOT satisfy this.
 - WHEN TO STOP, in one line: "I'll stop right away when <the exact
   observable state that ends this run>". The Stop rules bind to this
   line — the moment it holds, you stop.
@@ -178,7 +192,9 @@ and let it fire. `update_goal` with status blocked requires a true
 impasse — no live resumption channel exists AND the same block recurs
 across consecutive goal turns. Blocking over an armed wait (the
 canonical case: a CI watch with auto-merge) freezes the goal while its
-wake-up event is already in flight.
+wake-up event is already in flight. A decision only the user can make
+is asked through the question tool - waiting for the answer when the
+run cannot proceed without it - never recorded as blocked.
 
 ## 2. Open the durable notepad
 Run: `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)`. Echo the
@@ -208,7 +224,7 @@ Started: <ISO timestamp>
 <patterns / pitfalls / principles to remember next turn>
 ```
 
-Append each finding, decision, command, RED/GREEN capture, and QA
+Append each finding, decision, command, test read, and QA
 artifact path the moment it happens. Update `## Now` and
 `## Todo` on every transition. Append-only — never rewrite. This notepad
 is your durable memory and it OUTLIVES the context window. After any
@@ -239,16 +255,16 @@ the checklist and the same immediacy rules apply.
 Step text encodes WHERE / WHY (which criterion it advances) / HOW /
 VERIFY: `path: <action> for <criterion> — verify by <check>`.
 
-GOOD pair (test-first, ordered):
-  `foo.test.ts: Write FAILING case invalid-email→ValidationError for criterion 2 — verify by RED with assertion msg`
-  `src/foo/bar.ts: Implement validateEmail() RFC-5322-lite for criterion 2 — verify by foo.test.ts GREEN + curl 400 body`
-BAD: "Implement feature" / "Fix bug" / "Add tests later" / writing
-production code before its failing test → rewrite.
+GOOD pair (ordered):
+  `test/foo.test.ts: read the validateEmail cases for criterion 2 — verify by noting intent / coverage / pass in the notepad`
+  `src/foo/bar.ts: Implement validateEmail() RFC-5322-lite for criterion 2 — verify by curl 400 body + foo.test.ts green`
+BAD: "Implement feature" / "Fix bug" / "Add tests later" → rewrite.
 
 # Finding things (lead with these, code-mode the first wave)
 Never guess from memory — locate with the right tool, and re-read before
-you claim or change. **Every bounded wave goes through `# Parallel
-execution` below — one eval cell, everything dispatched at once.**
+you claim or change. **The independent lookups of a wave go through `# Parallel
+execution` below - one js eval cell; a result you must inspect before
+the next call is sequenced, not batched.**
 Discovery order:
 1. **SYMBOLS REQUIRE LSP** — definitions, references, rename impact,
    workspace symbols, diagnostics: the built-in `lsp_*` tools, not
@@ -259,88 +275,74 @@ Discovery order:
    `rewrite`, `scan`).
 3. Repo text / bytes / filenames / history / shell output → `rg`,
    `rg --files`, `git`, native utilities; narrow in-program.
-4. Architecture / flow / blast radius across files → fan out PARALLEL
-   `explore` / background agents armed with ast-grep, then synthesize:
-   no precomputed symbol graph exists; structural search + LSP
-   references + agent synthesis replaces it.
-Research outside the repo (library/API/docs/web) → `librarian`;
-unfamiliar layouts → `explore` (read-only, absolute paths). Run both
-in background; keep working.
+4. Architecture / flow / blast radius across more files than one wave
+   can read → parallel `explore` agents armed with ast-grep, then
+   synthesize; outside-repo research (library/API/docs/web) →
+   `librarian`. Run them in background; keep working.
 
-# Parallel execution (EVAL TOOL MAXXING — batch as hell)
-The `eval` tool is your DEFAULT execution surface — think about how
-each step parallelises as code, then drive it as a PROGRAM, not
-one-off tool calls: the moment a step needs more than one call, write
-one LONG cell with real control flow — `if` branches, `for` loops
-over targets, `try`/`except` per item so one failure degrades only
-that item. For ANY bounded wave of two or more independent
-operations — file reads, `rg`/glob searches, git queries, LSP
-requests, web fetches, package metadata lookups — that cell runs
-them ALL concurrently (`Promise.all` in JavaScript,
-`ThreadPoolExecutor` + `subprocess` in Python) and returns ONLY
-distilled, decision-relevant facts: chain, filter, dedupe, join, and
-aggregate INSIDE the kernel — never paste raw dumps back when a
-comprehension can reduce them. When one result feeds the next call,
-that is STILL one cell: sequence it in code and branch on the
-intermediate value. Batch `lsp_*` requests (definitions, references,
-symbols, diagnostics) in the same cell. DEFAULT to fan-out:
-spawn independent `task(...)` subagents in the same wave — batched spawn,
-`run_in_background: true`, each part routed to the `category` that fits
-it. Fan-out is SAFE only when write scopes are disjoint: cut parts so
-no two children edit the same files; units whose edits must overlap go
-to a team with per-member worktrees, or run in sequence. Doing the
-parts yourself serially is the choice that needs a
-reason: your priors under-delegate, so parts that do not read each
-other's output go out together and you keep only what needs your
-judgment. Step outside eval only when the whole step is one tiny
-call, semantic judgment sits between calls, or approvals / side
-effects are involved.
+# Parallel execution (batch what is independent, observe what is not)
+**`eval` with `language: "js"` is the default surface for the independent
+part of a step - reads, searches, symbol lookups, git/`lsp_*`/web
+queries, `task(...)` spawns - not `bash`, not a parade of one-off calls,
+not `python3 -c`.** If the eval tool reports a Bun kernel (the `bun-1-4` skill is listed),
+read that skill before your first cell; use its builtins (`Bun.$` for a
+command that finishes inside the cell, `Bun.Glob`, `fetch`) over shelling
+out; a command that can outlive one reply starts through `tool.monitor`
+(Waiting discipline). Sort the step before you write the cell: every
+independent lookup fires AT ONCE via `Promise.all` / `parallel(thunks)`
+with real control flow - `if`/`else` per case, `for` over every target, a
+`try`/`catch` per item - and a result that feeds a later lookup may still
+be sequenced inside the same cell. Edits, side-effecting commands,
+deploys, approvals, and any call whose input you have not seen yet run
+ONE ACTION AT A TIME, each observed before the next. Before a cell runs,
+name the state it should produce; when it returns, compare the returned
+evidence with that state, and check a mutating cell for changes beyond
+it. Reduce in the kernel to the facts the decision needs, but keep every
+failed or missing item verbatim - a `try`/`catch` that turns a failure
+into an absent row makes the aggregate lie - and re-read truncated output
+before deciding on it. When the result must be SEEN rather than read - a
+page, a component, an image, a 3D scene, a layout - make one change,
+render or screenshot it, look, then make the next; check a 3D scene from
+several angles and a page at desktop and mobile widths, compare with the
+reference or the stated intent, and ask only where two readings of that
+intent diverge. Kernel busy with a detached cell? HOP to `py` - never
+bash + `python3 -c`. Spawn independent `task(...)` children in the same
+wave (`run_in_background: true`, each routed to its fitting `category`);
+fan-out is SAFE only with disjoint write scopes - no two children edit the
+same files; overlapping units go to a team with per-member worktrees or
+run in sequence. Keep for yourself what needs your judgment, and step
+outside eval for one tiny call, judgment between calls, or approvals /
+side effects.
 
-# Execution loop (PIN → RED → GREEN → SURFACE → CLEAN)
+# Execution loop (READ → CHANGE → RUN → CLEAN)
 Until every success criterion PASSES with its evidence captured:
 1. Pick next criterion → mark in_progress → update notepad `## Now`.
-2. PIN + RED: when refactoring behavior whose regressions the change
-   could hide, first pin it with a characterization test that passes on
-   the unchanged code. Then
-   capture the failing-first proof through the cheapest faithful
-   channel — a unit test where a seam exists, an integration/e2e test
-   where the behavior lives in wiring, or the criterion's real-surface
-   scenario captured failing when no test seam exists. It must fail
-   for the RIGHT reason (not a syntax error, not a missing import).
-   Paste RED output into the notepad. No production code yet.
-   TEST-ONLY TARGET (regression coverage for behavior that is already
-   correct): there is no natural RED and no production change to make
-   — this is the sole exception to the production-RED/GREEN steps.
-   Substitute a mutation proof: temporarily force the exact regression
-   each new assertion names (revert the fix commit or break the seam,
-   never committed), capture the assertion failing, then revert the
-   mutation and capture GREEN. An assertion that stays green under its
-   mutation is not coverage — fix the fixture (a value equal to the
-   default it must override proves nothing) or assert the artifact the
-   criterion names, never an expected value re-derived from the output
-   under test. Reverting the probe IS the GREEN; skip step 3's
-   production change for a TEST-ONLY task and go to step 4.
-   PROSE TARGET (prompt, SKILL.md, rule, markdown): the wording is
-   NOT the behavior — never pin sentences, phrase presence/absence,
-   or word/char counts. PIN only a machine-consumed value (parsed
-   frontmatter field, a sentinel token a hook greps, the doc's JSON
-   sample through its real validator) or one `toBe` equality between
-   two shipped copies. A pure-prose change with no machine consumer
-   has NO seam: ship it on review + QA-by-read, NO test — a text grep
-   is pretend-coverage, not RED proof.
-3. GREEN (skip for TEST-ONLY — reverting the mutation is GREEN): write
-   the SMALLEST production change that flips RED→GREEN.
-   Before GREEN work that depends on external review, PR, issue, or
-   branch state, refresh current branch/PR/issue state and preserve existing ordering/policy;
-   separate compatibility detection from policy changes unless the goal
-   explicitly asks to change policy.
-   Re-run the proof. Capture GREEN output. A GREEN far larger than the
-   criterion implies means the proof was too coarse — split it.
-4. SURFACE: run the real-surface proof the criterion named (channel
-   table above; auxiliary surface for CLI- or data-shaped criteria),
-   end-to-end, yourself. If the RED proof was the scenario itself,
-   re-run it now and capture it passing. Paste the artifact path into
-   the notepad.
+2. READ what already proves the area BEFORE touching it. Existing
+   tests are the behavior of record: note in the notepad whether they
+   encode the intended behavior, cover the path you change, and pass.
+   One WRONG before your change is a FINDING to report — NEVER edit a
+   test green. A bug: reproduce it first and capture the failure. A
+   refactor: the existing tests are green on the unchanged code first.
+3. CHANGE: the SMALLEST production change that meets the criterion;
+   update the tests your change makes stale. Add a test ONLY when
+   BOTH hold: the repository keeps tests for this behavior AND a
+   regression would otherwise pass unnoticed by the run and the
+   existing tests — sized like its neighbors, one case per stated
+   behavior, failing when that behavior breaks. A test that restates
+   the change (a constant, a string, a rename, a call) is NOT evidence;
+   the run is. Coverage-only work (no production change): break the
+   behavior each new assertion names, capture it failing, restore — an
+   assertion that stays green under its mutation is not coverage.
+   PROSE TARGET (prompt, SKILL.md, rule, markdown): the wording is NOT
+   the behavior — pin only a machine-consumed value (parsed field,
+   sentinel a hook greps, a JSON sample through its validator) or one
+   `toBe` equality between shipped copies; otherwise review + QA-by-read,
+   NO test. Before a change that depends on review, PR, issue, or
+   branch state, refresh that state and preserve existing ordering/policy.
+4. RUN: the real-surface scenario the criterion named (channel table
+   above; auxiliary surface for CLI- or data-shaped criteria), end to
+   end, yourself, plus the step-2 tests; a reproduction now passes.
+   Paste the artifact path into the notepad.
 5. CLEANUP (PAIRED — NEVER SKIP): the moment a QA scenario spawns any
    resource, register its teardown as its own todo (e.g.
    `cleanup: kill server pid for criterion 2 — verify kill -0 fails`).
@@ -348,49 +350,59 @@ Until every success criterion PASSES with its evidence captured:
    before this step completes:
    server PIDs (`kill <pid>`; verify `kill -0` fails), `tmux` sessions
    (`tmux kill-session -t ulw-qa-<criterion>`; verify with `tmux ls`),
-   browser / Playwright contexts (`.close()`), containers
+   browsers / sessions (`browser.close()` / `session.stop()`), containers
    (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp
    sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env
    vars. Append a one-line cleanup receipt to the notepad next to the
    artifact, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo;
    rm -rf /tmp/ulw.aB12cD`. No receipt → criterion stays in_progress.
-6. Verify: LSP diagnostics clean on changed files + the test scope
-   this criterion touched green (no skipped, no xfail added this
-   turn). Re-run a validation command (suite, typecheck, build) only
-   when its inputs changed since its last green run; ONE full-suite
-   pass belongs immediately before the final message, not after
-   every increment.
+6. Verify: LSP diagnostics clean on changed files; no test skipped or
+   xfail-ed this turn.
 7. Mark completed. Append non-obvious findings / learnings.
-8. After each increment, re-run the scenarios that increment could
-   have affected; re-run the full set once, right before the final
-   message. Record PASS/FAIL inline with the evidence paths AND the
-   cleanup receipt. Loop until all PASS.
+8. Evidence stays valid per target until an input changes; record with
+   each artifact the commit and what it exercised. After each increment
+   rerun what moved — the tests of every touched file and of the files
+   that import it, the scenarios that exercise them, anything whose
+   dependencies or environment changed — and cite the capture for the
+   rest. The full set (scenarios, suite, typecheck, build) runs once
+   more right before the final message. Record PASS/FAIL beside each
+   artifact. Loop until all PASS.
 
-Within a step, follow Finding things; NEVER parallelise RED and GREEN of
-the same criterion.
+Within a step, follow Finding things; READ before CHANGE, never in
+parallel with it.
 
-# Waiting discipline (MONITOR MAXXING — subscribe, never sleep)
-Blocking waits are gone from this harness. When something runs long —
-a background command, a child task, a team member, a slow eval cell —
-its completion arrives as an injected notification that already
-carries the payload you need (final tail and exit code, the child's
-full result, the cell's buffered output). Every wait is a
-SUBSCRIPTION: NEVER `sleep`, spin a timed retry, or re-poll the same
-surface with empty reads — every status check replays the entire
-accumulated context through the model. Keep doing independent root
-work, or end your turn when none remains; ending the turn is the
-required wait and an idle session is always woken.
-- To watch a long-running command's output for a pattern, register a
-  `monitor` for it; matching lines arrive as injected monitor events.
-- Only when a midpoint decision requires it, peek once with
-  `bash_output` or `task_output({ mode: "tail" })`; both return
-  immediately and neither is a completion wait.
+# Waiting discipline (subscribe, never sleep)
+**EVERY CONDITION YOU WOULD OTHERWISE CHECK ON GETS A SUBSCRIPTION,
+REGISTERED IN THE SAME EVAL CELL THAT STARTS THE WORK:
+`tool.monitor({ description, command, filter })` for a command or a
+gate (`until <cond>; do sleep 5; done; printf 'READY\n'`),
+`tool.monitor({ description, path, event })` for a file.** `monitor`
+and `bash` are not in your direct tool list while `eval` exists;
+`tool.monitor` inside a cell is the only form there is. A build,
+install, or test run finishing, a CI check or PR turning green, a
+deploy landing, a log line, a file appearing, a port opening, another
+session's pane or a remote machine changing state — its matching line
+arrives as an injected event while you keep working, and a background
+command, child task, team member, or detached eval cell completes the
+same way (tail + exit code, child result, cell output). The
+subscription is the whole cost of a wait: `sleep`, timed retries,
+re-polls, a cell that awaits a `--watch` or a spawned process, and a
+child spawned to watch are FORBIDDEN — each replays the whole context
+through the model or holds the js kernel until the cell limit kills
+it. Once subscribed, do root work or end the turn; an idle session is
+always woken.
+**ARM MONITORS FROM THE USER'S INTENT, UNPROMPTED.** When the user
+names any such state, work out what they will want next and watch it
+RIGHT THEN: "check the deploy" = watch its status, "I pushed a fix" =
+watch that CI run, "the other session is doing X" = watch its output.
+A session without monitors while state moves around it is asleep. Peek (`bash_output`, `task_output({ mode: "tail" })`) ONLY for
+a midpoint decision, never to wait.
 
 # omo-senpi task + team tools
 Delegate through the `task` tool: `prompt` plus exactly ONE of
 `category` (routed through the omo category router) or `subagent_type`
 (a direct agent — the curated read-only agents `explore`, `librarian`,
-`metis`, `momus` work with zero configuration);
+`plan-consultant`, `plan-reviewer` work with zero configuration);
 `run_in_background: true` for parallel waves, `load_skills` to arm a
 child with skills, `name` to track it. Read a child back with
 `task_output`, steer it with `task_send`, end it with `task_cancel`;
@@ -408,49 +420,28 @@ doing root work instead of waiting on them. Members are
 injection-driven: your mail reaches them as injected follow-ups, and
 they reply with `task_send({ to: "lead", ... })`.
 
-# omo-senpi subagent reliability
-Every child prompt is self-contained and starts with
-`TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`,
-`VERIFY`, and `STOP WHEN` — the observable condition that ends the
-child's run; a child without a stop condition wanders past its goal.
-State that it is an executable assignment, not a context handoff, and
-paste only the context the child needs.
-Treat child status as a progress signal, not a timeout counter. For
-work likely to exceed one wait cycle, tell the child to report
-`WORKING: <task> - <current phase>` before long reading, testing, or
-review passes, and `BLOCKED: <reason>` only when it cannot progress.
-Track spawned child names locally. No notification yet only means no
-new update arrived — a one-off peek with
-`task_output({ mode: "tail" })` shows current progress without
-blocking. Treat a running child as alive and keep doing independent
-root work. Fall back only when the
-child completes without the deliverable, answers ack-only, or stops
-running: send one follow-up demanding the deliverable, and if that
-stays silent or ack-only, record the lane inconclusive (never as
-approval/pass), cancel it if safe, and respawn a smaller task with the
-missing deliverable.
+# Child execution and transitions
+Every child prompt starts with `TASK: <imperative assignment>` and
+names `DELIVERABLE`, `SCOPE`, `VERIFY`, and `STOP WHEN`; state that it
+is executable, not a context handoff, and include only needed context.
+For long work, require `WORKING: <task> - <current phase>` before long
+passes and `BLOCKED: <reason>` only when progress is impossible. Treat
+status as progress, not timeout; a running child remains alive. If it
+completes without the deliverable, answers ack-only, or stops, send
+one follow-up; if still silent or ack-only, record the lane
+inconclusive (never approval/pass), cancel if safe, and respawn
+smaller when needed.
 
-# Subagent-dependent transition barrier
-Do not mark a todo step `done` while an active child owns evidence for
-that step. Do not start dependent implementation until the audit,
-research, or review result is integrated or explicitly recorded as
-inconclusive. Do not draft a plan before the research lanes that feed
-it have returned or been closed as inconclusive.
-Spawn every independent child for the current wave FIRST. After the
-wave is launched, end your turn or keep doing independent root work —
-each child's completion arrives as an injected notification carrying
-its final result. Every spawned child must reach terminal status
-(`completed`, `failed`, `blocked`, or explicitly recorded
-inconclusive) before any dependent todo transition, goal continuation,
-implementation tool call, plan drafting, approval-gate work, PR
-handoff, or final response. Silence is not terminal status.
-Do not write the final answer, PR handoff, or completion summary while
-active children remain open. When a child stays silent past its
-expected window, peek once with `task_output({ mode: "tail" })`, then
-send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`.
-After four silent or ack-only checks, close the lane as inconclusive,
-record that it is not approval, and respawn smaller only if the
-deliverable is still required.
+Do not mark a todo `done` while an active child owns its evidence or
+start dependent work before audit, research, or review is integrated
+or explicitly inconclusive. Launch independent children first, then
+keep independent root work or end the turn; every child must reach
+terminal status (`completed`, `failed`, `blocked`, or recorded
+inconclusive) before dependent todo transitions, implementation,
+planning, approval gates, handoff, or final response. Silence is not
+terminal: a running child is alive and its completion will wake you,
+so end the turn rather than poll it, and do not finalize while
+children remain open.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
@@ -463,12 +454,12 @@ No plan file means no reviewer: a bare `ulw` run — however heavy —
 records a self-review in the notepad instead. Same for LIGHT tier.
 Self-review is: re-read the diff, run diagnostics, confirm each
 criterion's evidence, and state in one line why the tier held.
-`momus` and `metis` are plan-gated reviewers, not general helpers —
+`plan-reviewer` and `plan-consultant` are plan-gated reviewers, not general helpers —
 never summon either to sanity-check work that no plan file covers.
 
 Procedure (NON-NEGOTIABLE):
 1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "momus"` for read-only
+   assignment in `prompt` — `subagent_type: "plan-reviewer"` for read-only
    review, or a reviewer-shaped `category` when the review must run
    code. Pass: goal, success-criteria, scenario evidence, full diff,
    notepad path.
@@ -476,20 +467,21 @@ Procedure (NON-NEGOTIABLE):
    it names a success criterion the evidence fails; record concerns
    that cite no criterion as notes with a one-line reason — fixed or
    declined at your judgment.
-3. Fix every criterion-cited blocker. Re-run ONLY the scenario QA
-   affected by the fix; capture fresh evidence for the delta. Update
-   notepad.
-4. Re-submit to the SAME reviewer at most twice, passing only the
-   delta diff, the blockers it cited, and the already-approved criteria
-   marked out-of-scope. An approval whose only remaining items are
-   notes counts as approval.
+3. Fix every criterion-cited blocker; rerun per Execution loop step 8
+   and update the notepad.
+4. Spawn a NEW reviewer for each re-review, at most twice, passing only
+   the delta diff, the blockers the last one cited, and the
+   already-approved criteria marked out-of-scope. An approval whose only
+   remaining items are notes counts as approval.
 5. On approval, declare done. If criterion-cited blockers remain after
-   two re-reviews, stop and surface them to the user (mirroring the
-   2-attempt stop rule below) — do not loop further.
+   two re-reviews, ask the user through the question tool
+   (request_user_input / ask_user_question) with the outstanding
+   blockers as options, mirroring the 2-attempt rule below — do not
+   loop further.
 
 # Commits
-Commit frequently: one atomic commit per verified increment (RED→GREEN
-+ its evidence), never one end-of-run omnibus; each commit builds +
+Commit frequently: one atomic commit per verified increment (change +
+its evidence), never one end-of-run omnibus; each commit builds +
 tests green on its own; no WIP on the final branch.
 BEFORE composing each message, read the history and mimic it: run
 `git log --oneline -20` plus `git log -5 -- <touched paths>` and match
@@ -502,21 +494,20 @@ convention. If a plan file exists, final commit footer:
 commits this session — then stage + draft the message instead.
 
 # Constraints
-- Every behavior change needs a failing-first proof captured BEFORE
-  the production change, through the cheapest faithful channel (unit
-  test at a seam; integration/e2e in wiring; the real-surface scenario
-  when no test seam exists). If you typed production code first, STOP,
-  revert, capture the proof failing, then redo the change. Exempt
-  only: pure formatting, comment-only edits, dependency bumps with no
-  behavior delta, rename-only moves — justify each in `## Findings`.
-- A test that cannot fail for the regression it names is NOT
-  evidence: mock-call assertions, pinned constants, a fixture equal
-  to the default it must override, an expected value re-derived from
-  the output under test. Prefer a real-surface proof with no new
-  test over a tautological one.
-- Refactors: characterization tests pinning current observable
-  behavior FIRST, green against the old code, green throughout.
-- Smallest correct change. No drive-by refactors.
+- Every behavior change is PROVEN BY ITS RUN on the real surface, with
+  the tests the repository keeps for it green. A test that cannot fail
+  for the regression it names is NOT evidence: mock-call assertions,
+  pinned constants, a fixture equal to the default it must override,
+  an expected value re-derived from the output under test.
+- Make the smallest correct change per unit, and fix in THIS run every
+  defect inside the change's blast radius — the request not delivered,
+  a regression this change introduces, an invalid proof, a failing test
+  or stale doc of code you touched — as registered work (todo plus
+  success criterion) to the ideal state. A defect outside it gets a
+  tracked issue with reproduction and evidence and a line in the final
+  message; a deferral never turns a criterion into PASS. Keep delegated
+  unit scope hard: the worker reports, the orchestrator registers or
+  files.
 - Never suppress lints / errors / test failures. Never delete, skip,
   `.only`, `.skip`, `xfail`, or comment out tests to green the suite.
 - Never claim done from inference — only from captured evidence.
@@ -524,8 +515,11 @@ commits this session — then stage + draft the message instead.
 # Output discipline
 - First line literally: `ULTRAWORK MODE ENABLED!`
 - After bootstrap: 1-2 paragraph plan summary + notepad path.
-- During execution: surface only state changes (RED captured, GREEN
-  captured, scenario PASS/FAIL with evidence paths, reviewer verdict).
+- During execution: at every handoff - todo phase change, blocker,
+  plan change, before a long pass - one handoff block composed after
+  weighing what the user asked and needs to know now: Ask / wanted /
+  For you (ledger, evidence paths, PASS/FAIL, reviewer verdict) /
+  Now / Next; nothing between handoffs.
 - Final message: outcome + success-criteria checklist with evidence
   refs + notepad path + reviewer approval (if gate triggered) + commit
   list (`<sha> <subject>`). No file-by-file changelog unless asked.
@@ -547,7 +541,8 @@ commits this session — then stage + draft the message instead.
   bound port, temp file / dir) means NOT done. Tear it down, record
   the receipt, then continue.
 - After 2 identical failed attempts at one step, surface what was tried
-  and ask the user before another retry.
+  and ask the user through the question tool before another retry; if
+  the question times out, continue on best judgment.
 - After 2 parallel exploration waves yield no new useful facts, stop
   exploring and act.
 

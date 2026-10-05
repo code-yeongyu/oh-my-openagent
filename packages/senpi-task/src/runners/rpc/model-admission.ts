@@ -1,4 +1,5 @@
 import { RunnerError } from "../in-process/runner-error"
+import type { RunnerFailureReason } from "../in-process/child-handle"
 import type { RpcRunnerSpec } from "../types"
 import { type ModelCatalogProbeResult, parseModelCatalog, probeModelCatalog } from "./model-catalog-probe"
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "./spawn"
@@ -49,19 +50,29 @@ function profileKey(descriptor: RpcSpawnDescriptor): string {
   ])
 }
 
-function admissionFailure(model: string, message: string, cause?: unknown): RunnerError {
+function admissionFailure(
+  model: string,
+  reason: RunnerFailureReason,
+  message: string,
+  cause?: unknown,
+): RunnerError {
   return new RunnerError({
     kind: "model_unavailable",
+    reason,
     message: `process model admission failed for ${model}: ${message}`,
     ...(cause === undefined ? {} : { cause }),
   })
 }
 
 function readCatalog(model: string, result: ModelCatalogProbeResult): ProbedCatalog {
-  if (result.timedOut) throw admissionFailure(model, "catalog probe timed out")
+  if (result.timedOut) throw admissionFailure(model, "catalog_probe_timed_out", "catalog probe timed out")
   if (result.code !== 0) {
     const detail = result.stderr.trim().slice(-2_000)
-    throw admissionFailure(model, `catalog probe exited ${result.code}${detail.length === 0 ? "" : `: ${detail}`}`)
+    throw admissionFailure(
+      model,
+      "catalog_probe_failed",
+      `catalog probe exited ${result.code}${detail.length === 0 ? "" : `: ${detail}`}`,
+    )
   }
   return { models: parseModelCatalog(result.stdout), stderrTail: result.stderr.trim().slice(-1_000) }
 }
@@ -69,6 +80,7 @@ function readCatalog(model: string, result: ModelCatalogProbeResult): ProbedCata
 function absenceFailure(model: string, confirmed: ProbedCatalog): RunnerError {
   return admissionFailure(
     model,
+    "model_not_in_child_profile",
     `model is not visible in the child profile after a confirming re-probe (probed catalog has ${confirmed.models.size} models${
       confirmed.stderrTail.length === 0 ? "" : `; child stderr: ${confirmed.stderrTail}`
     }); forward its provider extension or child-visible settings`,

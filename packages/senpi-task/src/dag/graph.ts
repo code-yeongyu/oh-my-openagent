@@ -36,6 +36,7 @@ export const DAG_COMPILE_ERROR_CODES = [
   "node_count_exceeded",
   "prompt_bytes_exceeded",
   "dependency_fanout_exceeded",
+  "empty_graph",
 ] as const
 
 export type DagCompileErrorCode = (typeof DAG_COMPILE_ERROR_CODES)[number]
@@ -84,7 +85,11 @@ function compareSequences(a: readonly DagNodeId[], b: readonly DagNodeId[]): num
 function routeOf(input: DagNodeInput): DagRoute {
   return input.category !== undefined
     ? { kind: "category", category: input.category }
-    : { kind: "agent", agent: input.subagent_type, ...(input.model === undefined ? {} : { model: input.model }) }
+    : {
+        kind: "agent",
+        agent: input.subagent_type.trim(),
+        ...(input.model === undefined ? {} : { model: input.model }),
+      }
 }
 
 function failure(errors: readonly DagCompileError[], at: string): DagCompileResult {
@@ -149,6 +154,14 @@ export function compileDag(definition: DagDefinition, options?: DagCompileOption
   const at = options?.at ?? EMPTY_AT
   const settings: DagSettings = { ...DAG_SETTINGS_DEFAULTS, ...options?.settings }
   const errors: DagCompileError[] = []
+
+  if (definition.nodes.length === 0) {
+    errors.push({
+      code: "empty_graph",
+      message: "dag has no nodes; a run needs at least one node",
+      nodeIds: [],
+    })
+  }
 
   if (definition.nodes.length > settings.max_nodes_per_run) {
     errors.push({

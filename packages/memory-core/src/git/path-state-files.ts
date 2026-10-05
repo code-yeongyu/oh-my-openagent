@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { chmod, link, lstat, mkdir, open, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises"
+import { chmod, link, lstat, mkdir, open, readFile, rename, rm, rmdir, writeFile, writeHandleAll } from "../fs/resilient"
 import { basename, dirname, join } from "node:path"
 import { GitPathStateError } from "./path-state"
 
@@ -18,7 +18,7 @@ export async function writeWorktreeFile(
   const temporary = join(dirname(target), `.${basename(target)}.omo-${process.pid}-${randomUUID()}`)
   const file = await open(temporary, "wx", mode)
   try {
-    await file.writeFile(content, "utf8")
+    await writeHandleAll(file, content, "utf8")
     await chmod(temporary, mode)
     await file.sync()
   } catch (error) {

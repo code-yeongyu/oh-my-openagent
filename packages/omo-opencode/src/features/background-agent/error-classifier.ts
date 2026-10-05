@@ -6,6 +6,24 @@ export function isAbortedSessionError(error: unknown): boolean {
   return message.toLowerCase().includes("aborted")
 }
 
+const TRANSPORT_UNREACHABLE_PATTERNS: readonly RegExp[] = [
+  /unable to connect/i,
+  /econnrefused/i,
+  /econnreset/i,
+  /enotfound/i,
+  /socket hang up/i,
+  /fetch failed/i,
+  /network(?:\s|_)?error/i,
+  /not connected/i,
+  /connection (?:closed|refused|reset)/i,
+]
+
+export function isTransportUnreachableError(error: unknown): boolean {
+  const text = extractErrorMessage(error) ?? getErrorText(error)
+  if (!text) return false
+  return TRANSPORT_UNREACHABLE_PATTERNS.some((pattern) => pattern.test(text))
+}
+
 export function getErrorText(error: unknown): string {
   if (!error) return ""
   if (typeof error === "string") return error

@@ -20,6 +20,7 @@ Skills are not the default. A one-off task, a fact, or a preference belongs in m
 
 Your memory repo root is `$MEMORY_DIR`. The transcript payload to review is at `$TRANSCRIPT_PATH`. Keep all filesystem writes under the memory repo and run all git commands from inside it. Do not inspect or modify `.git` internals and do not change git config; use normal `git status`, `git diff`, `git add`, and `git commit` commands only.
 
+- The payload may be only a partial window of the backlog (a non-zero `backlog_remaining` in the payload JSON means older-first coverage continues in later reflection runs), so reflect on what you were given and do not assume it is the whole conversation.
 - Inspect transcripts with bounded reads. Determine file size first with `wc -c "$TRANSCRIPT_PATH"`. If the file is small enough, a full read is fine; otherwise use targeted reads (`head`, `tail`, `grep`, `sed -n`).
 - Inspect memory with concise commands: `find`, `grep`, `head`, targeted `cat`.
 - If a temp file is needed, put it under `$MEMORY_DIR/.tmp/` and remove it before committing.
@@ -29,7 +30,7 @@ Your memory repo root is `$MEMORY_DIR`. The transcript payload to review is at `
 The primary agent's context (its prompts, skills, and external memory files) is stored in a memory filesystem rooted at `$MEMORY_DIR`. Changes to these files reach the primary agent's context after they're committed to the memory git repo.
 
 The filesystem contains:
-- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory.
+- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory. `system/boundaries.md` is the user's exact words about what the agent must not do: leave it as you found it. `system/self-aware.md` is yours: promote a line from `reference/self/observations.md` when a later outcome confirmed it, edit entries in place, keep at most 12, and move expired or disconfirmed ones to `reference/self/ARCHIVE.md`. Identity stays in persona; the user's words stay in boundaries.
 - **Skills** (`skills/`): procedural memory for specialized workflows. Add or update only when the workflow is reusable across future conversations.
 - **External memory** (everything else): reference material retrieved on demand by name and description. Use for project details, historical records, and anything not needed every turn.
 

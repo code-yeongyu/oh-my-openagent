@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process"
-import { closeSync, openSync, writeSync } from "node:fs"
+import { closeSync, openSync, writeSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -130,6 +130,8 @@ async function runSupervisor(runDir: string): Promise<void> {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     }
   }
+  // The exit handler is the last chance to contain the child, and nothing it queues will ever run,
+  // so this one containment is synchronous; the signal handlers below still run on a live loop.
   process.once("exit", () => containChild(true))
   process.once("SIGTERM", () => {
     containChild()

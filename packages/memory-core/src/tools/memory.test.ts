@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { execFile } from "node:child_process"
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
@@ -9,6 +9,7 @@ import { parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
 import { runMemoryTool, type MemoryToolLock, type MemoryToolParams } from "./memory"
 import { MemoryToolError } from "./tool-errors"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const exec = promisify(execFile)
 const AUTHOR: GitCommitAuthor = {
@@ -20,7 +21,7 @@ const AUTHOR: GitCommitAuthor = {
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function fixture(): Promise<{
@@ -71,6 +72,27 @@ async function git(repo: GitMemoryRepo, args: string[]): Promise<string> {
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 describe("runMemoryTool", () => {
+  it("#given a codex patch #when apply_patch runs #then it applies and commits through the memory tool", async () => {
+    const setup = await fixture()
+    const result = await run(setup, {
+      command: "apply_patch",
+      reason: "add patch note",
+      input: [
+        "*** Begin Patch",
+        "*** Add File: reference/patch.md",
+        "+---",
+        "+description: Patch note",
+        "+---",
+        "+written through memory",
+        "*** End Patch",
+      ].join("\n"),
+    })
+
+    expect(result.message).toMatch(/^Memory apply_patch committed locally \([0-9a-f]{7}\)\.$/)
+    expect(await body(setup.repo, "reference/patch.md")).toBe("written through memory")
+    expect(setup.domains).toEqual(["memory-write"])
+  })
+
   it("#given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local", async () => {
     const setup = await fixture()
     const result = await run(setup, {

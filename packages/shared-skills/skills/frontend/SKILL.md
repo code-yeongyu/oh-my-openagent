@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: "MUST USE for frontend/web UI/UX/visual work: building, styling, redesigning pages/components, React setup, performance audits, visual QA, taste, and polish. Routes four rulesets: design taste router and brand references; perfection for Playwright/Chromium Lighthouse/Core Web Vitals; ui-ux-db palettes/fonts/guidelines; designpowers personas/accessibility/critique/handoff; plus curl-only lazyweb real-app-screen research and the beui.dev interaction catalog. Triggers: frontend, UI, UX, design, redesign, styling, layout, animation, motion, interaction, micro-interaction, make it feel alive, premium, luxury, minimal, brutalist, Awwwards, DESIGN.md, mockup, React, Lighthouse, accessibility, WCAG, Core Web Vitals, looks generic, make it pretty, like X brand, lazyweb, design research."
+description: "Builds, styles, and polishes web UI and UX. Use for any frontend, page, component, styling, layout, animation, or visual-quality task, or when asked to make an interface look or feel a certain way."
 ---
 
 # Frontend
@@ -17,6 +17,7 @@ This file is a router, not a rulebook. The rules live in four rulesets under `re
 | Spatial structure — app shells, scroll ownership, "what goes where", "this layout breaks at X" | ALSO `references/design/layout-skill.md` for the mechanics, then `references/design/stylegallery.md` to fetch a named pattern contract for that exact spatial problem. Both stack on the style skill and add no visual direction. |
 | Paged output — a PDF report, a print stylesheet, a headless-Chrome print pipeline, an HTML deck printed to paper, or any "why is this page half empty" break defect | ALSO `references/design/print-paged-media.md` for the page box, the fragmentation properties, the atomic-block set, and the keep-together side effect that strands a block on a near-empty page. It adds no visual direction and stacks on the routed style skill. |
 | Interaction or motion work — micro-interactions, animated components, transitions, gestures, hover/press/state feedback, "make it feel alive" | ALSO `references/design/interaction-skill.md`. The beui.dev catalog is the mandatory interaction reference: find the nearest pattern, read its real source through the file's curl recipe, and adapt the mechanism to `DESIGN.md` motion tokens. It stacks on the routed style skill — never replaces it. |
+| Hero atmosphere or ambience — an animated, shader, particle, or grid background; a typographic reveal (split, blur, shimmer, typewriter, count-up, marquee); scroll storytelling; spotlight / tilt / glare / glowing-border card surfaces; "make the hero stunning", "add a living background", "animate the headline" | ALSO `references/design/ambience-skill.md`. The react-bits catalog is the mandatory ambience reference: find the nearest pattern in its intent map, read its real source through the file's curl recipe, extract the mechanism, and run its retrofit checklist (reduced motion, off-screen pause, compositor-only, tokens, budget) before shipping. It stacks on the routed style skill — never replaces it, and never vendors react-bits code. |
 | Writing or modifying frontend code, OR auditing performance / SEO / accessibility / quality | ALSO `references/perfection/README.md`. Lighthouse 100 in every category, measured on real Playwright Chromium (never the `lighthouse` CLI), achieved through architecture — never by dropping animations or hiding content. |
 | Looking up a concrete style, palette, font pairing, chart type, landing structure, or UX guideline — or generating a design system from keywords | `references/ui-ux-db/README.md`. A searchable CSV database with a CLI: a lookup tool, not a posture. `design` stays the source of truth for taste and the `DESIGN.md` contract. |
 | ANY implementation or redesign that creates or updates `DESIGN.md` — plus explicit operating-layer asks (personas, critique, debt, handoff, synthetic user testing) | `references/designpowers/README.md` + `lane-c-review.md`. lane-c is the Phase Final flatness/critique reviewer and fills the accessibility-constraint and accepted-debt sections `DESIGN.md` requires. Load other lanes only when their phase applies. |
@@ -66,6 +67,7 @@ The reference library has one architecture file, 12 taste skills (Layer A — *h
 | `output-skill.md` | Stacks on any style skill when output is incomplete — placeholders, `// TODO`, half-done components. |
 | `stitch-skill.md` | Stacks on any style skill for Google Stitch compatibility or a `DESIGN.md` doc export. A complete worked export ships as `stitch-design-example.md`. |
 | `interaction-skill.md` | Stacks on any style skill when work adds or changes interaction or motion. beui.dev-anchored: read the mapped component's source before designing an interaction; reduced motion always. |
+| `ambience-skill.md` | Stacks on any style skill when work adds a hero atmosphere, animated background, typographic reveal, scroll chapter, or card surface effect. react-bits-anchored: read the mapped component's source, extract the mechanism, run the retrofit checklist; one atmosphere per hero, cursor effects quarantined. |
 | `imagegen-frontend-web.md` / `imagegen-frontend-mobile.md` / `imagegen-brandkit.md` | Image-only output (mockup, app-screen concepts, brand board). These NEVER write code — switch to `image-to-code-skill.md` if code is wanted. |
 
 ### Layer B — brand design systems (orthogonal to Layer A; stack freely)
@@ -119,6 +121,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 | "Premium SaaS hero like Stripe" | `design/README.md` + `design/stripe.md` + `design/soft-skill.md` + `perfection/README.md` |
 | "Improve this existing dashboard" | `design/README.md` + `design/redesign-skill.md` + `perfection/README.md` |
 | "Add micro-interactions" / "animate this" / "make it feel alive" / "polish the interactions" | `design/README.md` + `design/interaction-skill.md` on top of the current style skill + `perfection/README.md` |
+| "Make the hero stunning" / "add an animated background" / "animate the headline" / "count-up / typewriter / marquee" / "spotlight or tilt cards" | `design/README.md` + `design/ambience-skill.md` on top of the current style skill + `perfection/README.md` |
 | "Build this screenshot / Imagen mock / Stitch output exactly" | `design/README.md` + `design/image-to-code-skill.md` + `perfection/README.md` + `/visual-qa` reference-fidelity mode |
 | "Audit my site" / "make this page faster" | `perfection/README.md` (+ `perfection/react-perf-tooling.md` if React) |
 | "Mockup image of a fintech app" — no code | `design/imagegen-frontend-mobile.md` (+ a Layer B brand if named) |
@@ -134,16 +137,17 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 - **Concrete reference = contract.** When a screenshot, mockup, or annotated reference exists, match its pixels, copy, component structure, and responsive intent unless the user accepts a deviation.
 - **Never weaken UX OR flatten the surface to buy points.** No dropping animations, hiding content, simplifying interactions, or replacing rendered/lit material with flat fills and flat geometric primitives for a Lighthouse score or a deadline. Hit 100 AND keep the surface dimensional — both, or neither.
 - **No emojis as icons.** SVG icon sets only (Lucide, Heroicons, Radix, Phosphor).
+- **No coloured accent borders on rounded surfaces.** A `border-l-2 border-primary` stripe on a selected row, a primary-tinted outline on a focused card — any `border-{side}-{primary|warning|destructive|success}` or accent-width rule used to mark selected/focused/active is the most recognizable AI-slop tell in shipped UI. Encode state the way `DESIGN.md` systems do: one ink at many alphas (hover/selected/active wash ramps), a glyph (check) for selection, tonal layering for focus. Keyboard `focus-visible` rings are the only coloured edge allowed. Applies to code you write AND to pre-existing instances on any surface you touch — sweep them out.
 - **GPU-composited animation only** — `transform`, `opacity`, `filter`; never animate layout properties.
 - **Slop animation is forbidden — motion serves meaning.** Every animation or hover must map to a real interaction, state change, or affordance. A hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop — do not add it.
-- **Done is the `/visual-qa` dual-oracle gate, not your own glance.** A frontend design task is verified through `/visual-qa` (real browser at 375 / 768 / 1280px, every page, with interaction states and motion driven and inspected) until the dual-oracle completion gate passes on fresh evidence.
+- **Done is the `/visual-qa` gate, not your own glance.** A frontend design task is verified through `/visual-qa` - its HIG-based checklist, its capture matrix (every page and every sibling surface, phone and desktop, light and dark, scrolled-end, motion driven and inspected) and its dual-oracle completion gate on fresh evidence. This skill does not keep its own list of visual checks; the verifier owns it.
 
 ## When to load something else instead
 
 | Situation | Load |
 |---|---|
 | Brand/style not among the 70 in `references/design/`, or the user says "Open Design" | `open-design` skill — the local nexu-io/open-design library (137+ design skills, 150+ design systems) |
-| Driving a browser for the Design QA phase | `agent-browser` skill |
+| Driving a browser for the Design QA phase | `visual-qa` skill: omowright from js eval (owned engine for renders, attached engine for signed-in pages) |
 | Pure TypeScript/logic work with zero visual surface | `programming` skill alone — this skill adds nothing there |
 
 ## Activation

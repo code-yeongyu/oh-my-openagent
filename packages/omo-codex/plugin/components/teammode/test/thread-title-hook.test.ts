@@ -119,7 +119,7 @@ describe("thread title PostToolUse guidance", () => {
 			tool_name: "codex_app.create_thread",
 			tool_use_id: "tool-create-thread",
 			tool_input: {
-				prompt: "Fix CodeGraph provisioned launcher skip on Node 25",
+				prompt: "Fix LSP provisioned launcher skip on Node 25",
 				target: {
 					type: "project",
 					projectId: "/repo",

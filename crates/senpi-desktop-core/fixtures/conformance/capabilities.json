@@ -1,0 +1,57 @@
+{
+  "description": "capabilities needs no open session and reports the fake backend with the scenario's two displays and no live stop path.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "capabilities",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "backend": "fake",
+              "displayServer": null,
+              "capture": true,
+              "input": true,
+              "ax": true,
+              "backgroundWindowInput": true,
+              "deliveryModes": [
+                "background",
+                "foreground"
+              ],
+              "capturePermission": "granted",
+              "inputPermission": "granted",
+              "axPermission": "granted",
+              "displayCount": 2,
+              "focusGuard": true,
+              "stopPath": "none",
+              "stopReason": null,
+              "integrityLevel": null,
+              "screenLocked": false
+            }
+          },
+          "variable": [
+            "/result/displayServer",
+            "/result/ax",
+            "/result/backgroundWindowInput",
+            "/result/deliveryModes",
+            "/result/capturePermission",
+            "/result/inputPermission",
+            "/result/axPermission",
+            "/result/focusGuard",
+            "/result/stopReason",
+            "/result/integrityLevel",
+            "/result/screenLocked"
+          ]
+        }
+      ]
+    }
+  ]
+}

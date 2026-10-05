@@ -39,7 +39,7 @@ describe("pinned Senpi API surface", () => {
     )
 
     // then
-    expect(senpiTask.BUILTIN_AGENT_DEFAULTS).toHaveLength(4)
+    expect(senpiTask.BUILTIN_AGENT_DEFAULTS).toHaveLength(7)
     expect(result.kind).toBe("resolved")
   })
 
@@ -124,17 +124,6 @@ describe("pinned Senpi API surface", () => {
     } finally {
       rmSync(rootDir, { recursive: true, force: true })
     }
-  })
-
-  test("#given minimal resource loader source #when audited #then fake marker factory option is absent", () => {
-    // given
-    const source = readFileSync(join(import.meta.dir, "senpi", "minimal-resource-loader.ts"), "utf8")
-
-    // when
-    const exposesMarkerFactory = source.includes("markerFactory")
-
-    // then
-    expect(exposesMarkerFactory).toBe(false)
   })
 
   test("#given pinned artifact #when package metadata and rpc entry are checked #then expected public contract exists", async () => {

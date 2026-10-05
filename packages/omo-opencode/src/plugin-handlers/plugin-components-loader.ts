@@ -1,5 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
-import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
+import { loadAllPluginComponents } from "@oh-my-opencode/claude-code-compat-core/claude-code-plugin-loader";
 import type { PluginHooksConfig } from "../hooks/claude-code-hooks/types";
 import { addConfigLoadError, log } from "../shared";
 

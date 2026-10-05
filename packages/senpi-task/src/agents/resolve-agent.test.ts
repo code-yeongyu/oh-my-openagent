@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { BUILTIN_AGENTS } from "./builtin"
 import { resolveAgent } from "./resolve-agent"
 import type { AgentDefinition } from "./types"
 
@@ -52,7 +53,7 @@ describe("resolveAgent", () => {
       prompt: "Inspect the codebase",
       disallowedTools: ["bash", "write"],
     })
-    const models = registry([model("openai", "gpt-5.6-luna-fast")])
+    const models = registry([model("openai", "gpt-6-luna-fast")])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
@@ -64,7 +65,7 @@ describe("resolveAgent", () => {
   test("#given an agent without disallowedTools #when resolved #then no denylist is forced onto the persona", () => {
     // given
     const agents = roster({ name: "explore", prompt: "Inspect the codebase" })
-    const models = registry([model("openai", "gpt-5.6-luna-fast")])
+    const models = registry([model("openai", "gpt-6-luna-fast")])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
@@ -80,18 +81,18 @@ describe("resolveAgent", () => {
       prompt: "Inspect the codebase",
       executionMode: "in-process",
     })
-    const models = registry([model("openai", "gpt-5.6-luna-fast")])
+    const models = registry([model("openai", "gpt-6-luna-fast")])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.6-luna-fast")
+    expect(result.model).toBe("openai/gpt-6-luna-fast")
     expect(result.resolved_model).toEqual({
       source: "agent",
       provider: "openai",
-      model_id: "gpt-5.6-luna-fast",
-      display: "openai/gpt-5.6-luna-fast",
+      model_id: "gpt-6-luna-fast",
+      display: "openai/gpt-6-luna-fast",
       variant: "low",
       reasoning: "low",
     })
@@ -190,15 +191,15 @@ describe("resolveAgent", () => {
     // given
     const agents = roster({ name: "explore", models: ["anthropic/claude-haiku-4-5"] })
     const models = catalogRegistry(
-      [model("openai", "gpt-5.6-luna-fast")],
-      [model("anthropic", "claude-haiku-4-5"), model("openai", "gpt-5.6-luna-fast")],
+      [model("openai", "gpt-6-luna-fast")],
+      [model("anthropic", "claude-haiku-4-5"), model("openai", "gpt-6-luna-fast")],
     )
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.6-luna-fast")
+    expect(result.model).toBe("openai/gpt-6-luna-fast")
   })
 
   test("#given a disabled agent #when resolved #then it is hidden as not_found", () => {
@@ -249,10 +250,32 @@ describe("resolveAgent", () => {
     })
   })
 
+  test("#given curated tool rules #when resolved #then explicit denies become child exclusions while librarian keeps x_search", () => {
+    const explore = expectResolved(resolveAgent("explore", roster({
+      name: "explore",
+      tools: [
+        { pattern: "read", allow: true },
+        { pattern: "x_search", allow: false },
+      ],
+    }), undefined, { modelOverride: "openai/explicit" }))
+    const librarian = expectResolved(resolveAgent("librarian", roster({
+      name: "librarian",
+      tools: [
+        { pattern: "read", allow: true },
+        { pattern: "x_search", allow: true },
+      ],
+    }), undefined, { modelOverride: "openai/explicit" }))
+
+    expect(explore.toolAllowlist).toEqual(["read"])
+    expect(explore.toolDenylist).toEqual(["x_search"])
+    expect(librarian.toolAllowlist).toEqual(["read", "x_search"])
+    expect(librarian.toolDenylist).toBeUndefined()
+  })
+
   test("#given a model override without a registry #when resolved #then it returns persona fields and filters the tool allowlist", () => {
     // given
     const agents = roster({
-      name: "momus",
+      name: "plan-reviewer",
       prompt: "Advise only",
       executionMode: "in-process",
       allowedSubagents: ["explore"],
@@ -268,7 +291,7 @@ describe("resolveAgent", () => {
 
     // when
     const result = expectResolved(
-      resolveAgent("momus", agents, undefined, { modelOverride: "openai/explicit" }),
+      resolveAgent("plan-reviewer", agents, undefined, { modelOverride: "openai/explicit" }),
     )
 
     // then
@@ -279,5 +302,89 @@ describe("resolveAgent", () => {
     expect(result.agentExecutionMode).toBe("in-process")
     expect(result.allowedSubagents).toEqual(["explore"])
     expect(result.maxDepth).toBe(2)
+  })
+})
+
+describe("resolveAgent curated explore/librarian chain", () => {
+  // Every model any past or present explore/librarian rung named is served, so the winner and the
+  // runtime fallback list prove chain order and rung membership rather than availability.
+  const everyRungModel = registry([
+    model("kimi-coding", "kimi-for-coding-highspeed"),
+    model("chatgpt-subscription", "gpt-6-luna-fast"),
+    model("deepseek", "deepseek-v4-flash"),
+    model("deepseek", "deepseek-flash"),
+    model("opencode-go", "qwen3.7-plus"),
+    model("opencode-go", "minimax-m3"),
+    model("minimax-coding-plan", "MiniMax-M3"),
+    model("opencode-go", "minimax-m2.7"),
+    model("anthropic-subscription", "claude-haiku-4-5"),
+    model("chatgpt-subscription", "gpt-5.4-nano"),
+  ])
+
+  for (const agent of ["explore", "librarian"] as const) {
+    test(`#given every rung model is available #when ${agent} resolves #then it runs Kimi HighSpeed, Luna Fast, DeepSeek V4.1 Flash, Qwen 3.7 Plus, M2.7, then Haiku`, () => {
+      // when
+      const result = expectResolved(resolveAgent(agent, BUILTIN_AGENTS, everyRungModel))
+
+      // then
+      expect(result.model).toBe("kimi-coding/kimi-for-coding-highspeed")
+      expect(result.fallback_models?.map((record) => record.display)).toEqual([
+        "chatgpt-subscription/gpt-6-luna-fast",
+        "deepseek/deepseek-flash",
+        "opencode-go/qwen3.7-plus",
+        "opencode-go/minimax-m2.7",
+        "anthropic-subscription/claude-haiku-4-5",
+      ])
+    })
+  }
+})
+
+describe("resolveAgent retired curated ids", () => {
+  test("#given a retired curated id #when resolved #then it is not_found and never lands on the canonical agent", () => {
+    // given
+    const agents = roster(
+      { name: "plan-reviewer", prompt: "Advise only" },
+      { name: "plan-consultant", prompt: "Consult only" },
+    )
+
+    // when
+    const momus = resolveAgent("momus", agents, undefined, { modelOverride: "openai/explicit" })
+    const metis = resolveAgent("metis", agents, undefined, { modelOverride: "openai/explicit" })
+
+    // then
+    expect(momus).toEqual({
+      kind: "not_found",
+      agent: "momus",
+      availableAgents: ["plan-consultant", "plan-reviewer"],
+    })
+    expect(metis).toEqual({
+      kind: "not_found",
+      agent: "metis",
+      availableAgents: ["plan-consultant", "plan-reviewer"],
+    })
+  })
+
+  test("#given the canonical id #when resolved #then the result names the canonical id", () => {
+    // given
+    const agents = roster({ name: "plan-reviewer", prompt: "Advise only" })
+
+    // when
+    const result = resolveAgent("plan-reviewer", agents, undefined, { modelOverride: "openai/explicit" })
+
+    // then
+    expect(result.kind).toBe("resolved")
+    if (result.kind !== "resolved") throw new Error("expected resolved")
+    expect(result.agent).toBe("plan-reviewer")
+  })
+
+  test("#given an unknown id #when resolved #then it stays unknown and untouched", () => {
+    // given
+    const agents = roster({ name: "plan-reviewer", prompt: "Advise only" })
+
+    // when
+    const result = resolveAgent("missing", agents, undefined, { modelOverride: "openai/explicit" })
+
+    // then
+    expect(result).toEqual({ kind: "not_found", agent: "missing", availableAgents: ["plan-reviewer"] })
   })
 })

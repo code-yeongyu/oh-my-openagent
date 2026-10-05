@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { dispatchRunEnd, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
 import { createUlwExecuteContinuationComponent } from "./index"
 
@@ -56,7 +56,7 @@ describe("ulw-execute continuation hidden delivery", () => {
       config: { getFlag: () => false },
     })
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx(root))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root))
 
     expect(pi.userMessages).toEqual([])
     expect(pi.messages).toEqual([

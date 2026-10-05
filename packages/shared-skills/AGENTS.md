@@ -8,13 +8,15 @@ Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex 
 
 ## SKILLS (17 under `skills/<name>/`)
 
-`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git-master`, `refactor`, `review-work`, `ulw-execute`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
+`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git-master`, `refactor`, `review-work`, `ulw-execute`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`, `browser`.
+
+`browser` carries a staged runtime: `stage-omowright-runtime.mjs` bundles the root `omowright` devDependency (one ESM file plus its `page-bundle.js` and a digest manifest) into `skills/browser/runtime/omowright/` at build/prepack time (`materialize-shared-upstreams.mjs` calls it). The directory is gitignored and packed through the skill's `.npmignore`; `--check` is the freshness gate. Every shipped browser instruction (visual-qa, debugging, frontend, review-work, ulw-*, ultimate-browsing Tier 2, the ultrawork directives) routes to that runtime through the skill's `scripts/omowright.mjs` loader.
 
 `ultimate-browsing` is the one skill carrying a real sub-project: `skills/ultimate-browsing/engine/` is a 17-module Python package with its own CLI, config schemas, and test suite. It is a deliberately pinned, locally diverged snapshot of `fivetaku/insane-search`, not a follow-HEAD mirror. Before changing or re-vendoring it, read [`skills/ultimate-browsing/engine/AGENTS.md` §UPSTREAM BASELINE AND VERSION POLICY](skills/ultimate-browsing/engine/AGENTS.md#upstream-baseline-and-version-policy).
 
 The Codex-only `lcx-report-bug`, `lcx-contribute-bug-fix`, and `lcx-doctor` skills live under `packages/omo-codex/plugin/components/lcx/skills/`; they are no longer authored in this package.
 
-Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (3 skills carry the Codex agent role declaration).
+Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (3 skills carry the Codex agent role declaration). `ulw-research/scripts/` is a zero-dependency Node CLI (`report-tools.mjs`) for the deliverable phase, documented in `skills/ulw-research/AGENTS.md`; the senpi native `ulw-research` skill has no copy of it and receives `scripts/` plus `references/report-gates.md` and `references/deliverable-phase.md` byte-for-byte at senpi sync time.
 
 ## PIPELINE
 

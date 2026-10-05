@@ -1,4 +1,4 @@
-import { join } from "node:path"
+import { isAbsolute, join, relative, sep } from "node:path"
 
 /**
  * Senpi-native skills authored directly against the omo-senpi tool surface (not ported from Codex or
@@ -12,6 +12,8 @@ import { join } from "node:path"
  * @typedef {Object} SkillSource
  * @property {string} name
  * @property {string} source
+ * @property {string[]} [sharedAssets] - Paths relative to `shared-skills/skills/<name>` copied byte-for-byte
+ *   over the shipped native skill after its own copy; they must not exist in the native source.
  */
 
 /**
@@ -61,12 +63,37 @@ export function createNativeSkillSources(repoRoot) {
       source: join(nativeSkillsRoot, "ulw-plan"),
     },
     {
+      // The deliverable runtime and its gate reference are edition-neutral, so they live once in the
+      // shared pool and are overlaid at sync time instead of being duplicated into the native source.
       name: "ulw-research",
       source: join(nativeSkillsRoot, "ulw-research"),
+      sharedAssets: ["scripts", "references/report-gates.md", "references/deliverable-phase.md"],
     },
   ]
 
   const names = new Set(sources.map(({ name }) => name))
 
   return { sources, names }
+}
+
+/**
+ * Map a path inside a native skill's source dir that falls under one of its `sharedAssets` to the
+ * shared source file the sync overlays there. The native source intentionally has no copy of those
+ * assets, so repo-wide checks (the markdown link audit) resolve them here instead of reporting them
+ * missing. Returns null for any path outside a listed asset.
+ *
+ * @param {string} repoRoot - The same root `createNativeSkillSources` takes (the packages directory).
+ * @param {string} targetPath - Absolute path as written relative to the native skill source.
+ * @returns {string | null}
+ */
+export function sharedAssetSourceFor(repoRoot, targetPath) {
+  for (const { name, source, sharedAssets = [] } of createNativeSkillSources(repoRoot).sources) {
+    const fromSkill = relative(source, targetPath)
+    if (fromSkill === "" || fromSkill.startsWith("..") || isAbsolute(fromSkill)) continue
+    const portable = fromSkill.split(sep).join("/")
+    if (sharedAssets.some((asset) => portable === asset || portable.startsWith(`${asset}/`))) {
+      return join(repoRoot, "shared-skills", "skills", name, fromSkill)
+    }
+  }
+  return null
 }

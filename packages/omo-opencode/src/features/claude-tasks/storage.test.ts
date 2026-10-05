@@ -468,12 +468,12 @@ describe("acquireLock", () => {
     }
   })
 
-  test("acquires lock when no lock exists", () => {
+  test("acquires lock when no lock exists", async () => {
     //#given
     const dirPath = TEST_DIR_ABS
 
     //#when
-    const lock = acquireLock(dirPath)
+    const lock = await acquireLock(dirPath)
 
     //#then
     expect(lock.acquired).toBe(true)
@@ -483,13 +483,13 @@ describe("acquireLock", () => {
     lock.release()
   })
 
-  test("fails to acquire lock when fresh lock exists", () => {
+  test("fails to acquire lock when fresh lock exists and no wait budget is given", async () => {
     //#given
     const dirPath = TEST_DIR
-    const firstLock = acquireLock(dirPath)
+    const firstLock = await acquireLock(dirPath)
 
     //#when
-    const secondLock = acquireLock(dirPath)
+    const secondLock = await acquireLock(dirPath, { waitTimeoutMs: 0 })
 
     //#then
     expect(secondLock.acquired).toBe(false)
@@ -498,7 +498,46 @@ describe("acquireLock", () => {
     firstLock.release()
   })
 
-  test("acquires lock when stale lock exists (>30s)", () => {
+  test("acquires a lock released while waiting within the bound", async () => {
+    //#given
+    const dirPath = TEST_DIR
+    const firstLock = await acquireLock(dirPath)
+
+    //#when
+    // acquireLock runs its first attempt synchronously, so the lock is still held when it fails;
+    // releasing here can only be observed by a retry.
+    const pendingLock = acquireLock(dirPath, { waitTimeoutMs: 2000, retryDelayMs: 5 })
+    firstLock.release()
+    const secondLock = await pendingLock
+
+    //#then
+    expect(secondLock.acquired).toBe(true)
+
+    //#cleanup
+    secondLock.release()
+  })
+
+  test("reports failure only after the wait bound is exhausted", async () => {
+    //#given
+    const dirPath = TEST_DIR
+    const holder = await acquireLock(dirPath)
+    const waitTimeoutMs = 60
+
+    //#when
+    const startedAt = Date.now()
+    const contender = await acquireLock(dirPath, { waitTimeoutMs, retryDelayMs: 5 })
+    const elapsed = Date.now() - startedAt
+
+    //#then
+    expect(contender.acquired).toBe(false)
+    expect(elapsed).toBeGreaterThanOrEqual(waitTimeoutMs)
+    expect(existsSync(join(dirPath, ".lock"))).toBe(true)
+
+    //#cleanup
+    holder.release()
+  })
+
+  test("acquires lock when stale lock exists (>30s)", async () => {
     //#given
     const dirPath = TEST_DIR
     const lockPath = join(dirPath, ".lock")
@@ -506,7 +545,7 @@ describe("acquireLock", () => {
     writeFileSync(lockPath, JSON.stringify({ timestamp: staleTimestamp }), "utf-8")
 
     //#when
-    const lock = acquireLock(dirPath)
+    const lock = await acquireLock(dirPath)
 
     //#then
     expect(lock.acquired).toBe(true)
@@ -515,10 +554,26 @@ describe("acquireLock", () => {
     lock.release()
   })
 
-  test("release removes lock file", () => {
+  test("reclaims a stale lock without spending the wait bound", async () => {
     //#given
     const dirPath = TEST_DIR
-    const lock = acquireLock(dirPath)
+    const lockPath = join(dirPath, ".lock")
+    writeFileSync(lockPath, JSON.stringify({ id: "crashed", timestamp: Date.now() - 31000 }), "utf-8")
+
+    //#when
+    const lock = await acquireLock(dirPath, { waitTimeoutMs: 0 })
+
+    //#then
+    expect(lock.acquired).toBe(true)
+
+    //#cleanup
+    lock.release()
+  })
+
+  test("release removes lock file", async () => {
+    //#given
+    const dirPath = TEST_DIR
+    const lock = await acquireLock(dirPath)
     const lockPath = join(dirPath, ".lock")
 
     //#when
@@ -528,10 +583,10 @@ describe("acquireLock", () => {
     expect(existsSync(lockPath)).toBe(false)
   })
 
-  test("release is safe to call multiple times", () => {
+  test("release is safe to call multiple times", async () => {
     //#given
     const dirPath = TEST_DIR
-    const lock = acquireLock(dirPath)
+    const lock = await acquireLock(dirPath)
 
     //#when
     lock.release()

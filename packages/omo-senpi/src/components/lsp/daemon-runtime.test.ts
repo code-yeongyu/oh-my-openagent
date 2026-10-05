@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { realpathSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
+import { lspInstallDecisionsPath, userLspConfigPath } from "./config-paths"
 import { callPackagedDaemonTool } from "./daemon-tool-client"
 import { resolveSenpiDaemonRuntime, resolveSenpiPackagedDaemonRuntime } from "./daemon-runtime"
 
@@ -43,7 +44,7 @@ describe("Senpi packaged daemon runtime resolver", () => {
     expect(runtime).toEqual({ cliPath: fixture.cliPath, version: "0.1.0" })
   })
 
-  test("#given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .pi context are forwarded", async () => {
+  test("#given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .omo-first context are forwarded", async () => {
     // given
     const fixture = await makePackagedExtensionFixture()
     await writeFile(
@@ -56,43 +57,57 @@ describe("Senpi packaged daemon runtime resolver", () => {
     const projectDir = await mkdtemp(join(tmpdir(), "omo-senpi-context-project-"))
     const homeDir = await mkdtemp(join(tmpdir(), "omo-senpi-context-home-"))
     tempDirs.push(projectDir, homeDir)
-    const originalCwd = process.cwd()
-    const originalHome = process.env.HOME
     const signal = AbortSignal.abort("test-abort")
 
-    try {
-      process.chdir(projectDir)
-      process.env.HOME = homeDir
+    // when
+    const result = await callPackagedDaemonTool(
+      "lsp_goto_definition",
+      { filePath: "x.ts", line: 1, character: 0 },
+      { cwd: projectDir, homeDir, signal },
+      pathToFileURL(fixture.extensionPath).href,
+    )
 
-      // when
-      const result = await callPackagedDaemonTool(
-        "lsp_goto_definition",
-        { filePath: "x.ts", line: 1, character: 0 },
-        { signal },
-        pathToFileURL(fixture.extensionPath).href,
-      )
-
-      // then
-      expect(result?.content[0]?.text).toBe(
+    // then
+    expect(result?.content[0]?.text).toBe(
         JSON.stringify({
           name: "goto_definition",
           args: { filePath: "x.ts", line: 1, character: 0 },
           context: {
             cwd: realpathSync(resolve(projectDir)),
-            projectConfigPaths: [join(realpathSync(resolve(projectDir)), ".pi", "lsp-client.json")],
-            userConfigPath: join(resolve(homeDir), ".pi", "lsp-client.json"),
-            installDecisionsPath: join(resolve(homeDir), ".pi", "lsp-install-decisions.json"),
+            projectConfigPaths: [
+              join(realpathSync(resolve(projectDir)), ".omo", "lsp-client.json"),
+              join(realpathSync(resolve(projectDir)), ".pi", "lsp-client.json"),
+            ],
+            userConfigPath: join(resolve(homeDir), ".omo", "lsp-client.json"),
+            installDecisionsPath: join(resolve(homeDir), ".omo", "lsp-install-decisions.json"),
             capabilities: { installDecisionTool: false },
           },
           signalAborted: true,
           signalReason: "test-abort",
         }),
-      )
-    } finally {
-      process.chdir(originalCwd)
-      if (originalHome === undefined) delete process.env.HOME
-      else process.env.HOME = originalHome
-    }
+    )
+  })
+
+  test("#given whitespace HOME input #when building a daemon context #then user config stays under the actual home directory", async () => {
+    const fixture = await makePackagedExtensionFixture()
+    await writeFile(
+      join(fixture.distPath, "client.js"),
+      "export async function callToolViaDaemon(_name, _args, options) { return { content: [{ type: 'text', text: JSON.stringify(options.context) }] } }\n",
+      "utf8",
+    )
+    const projectDir = await mkdtemp(join(tmpdir(), "omo-senpi-home-project-"))
+    tempDirs.push(projectDir)
+
+    const result = await callPackagedDaemonTool(
+      "lsp_diagnostics",
+      {},
+      { cwd: projectDir, env: { HOME: "   " } },
+      pathToFileURL(fixture.extensionPath).href,
+    )
+
+    const context = JSON.parse(result.content[0]?.text ?? "null") as { userConfigPath: string; installDecisionsPath: string }
+    expect(context.userConfigPath).toBe(userLspConfigPath(homedir()))
+    expect(context.installDecisionsPath).toBe(lspInstallDecisionsPath(homedir()))
   })
 
   test("#given all six Senpi LSP names #when executing through the packaged client #then canonical Core tool names are used", async () => {

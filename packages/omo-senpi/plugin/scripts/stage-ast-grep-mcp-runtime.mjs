@@ -9,8 +9,8 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = resolve(packageRoot, "..", "..")
-const defaultSourceEntry = join(repoRoot, "packages", "ast-grep-mcp", "dist", "cli.js")
-const defaultTargetEntry = join(pluginRoot, "runtime", "ast-grep-mcp", "cli.js")
+const defaultSourceEntry = process.env.OMO_AST_GREP_MCP_ENTRY ?? join(repoRoot, "packages", "ast-grep-mcp", "dist", "cli.js")
+const defaultTargetEntry = process.env.OMO_AST_GREP_MCP_TARGET ?? join(pluginRoot, "runtime", "ast-grep-mcp", "cli.js")
 
 export async function stageAstGrepMcpRuntime(options = {}) {
   const sourceEntry = resolve(options.sourceEntry ?? defaultSourceEntry)

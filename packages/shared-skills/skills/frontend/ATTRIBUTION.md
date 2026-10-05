@@ -217,6 +217,16 @@ documentation text, or component implementations are vendored. beui.dev names re
 property of their owner, and the guide instructs reading component source for mechanism
 extraction only, not vendoring it into references or projects.
 
+`frontend/references/design/ambience-skill.md` is a project-original, curl-only operating
+guide for consulting the react-bits (reactbits.dev) animated-component registry during hero
+atmosphere, background, typographic-motion, and card-surface work, written from live endpoint
+verification; no react-bits source code, documentation text, or component implementations are
+vendored. react-bits is distributed under MIT plus the Commons Clause, which permits use inside
+applications but forbids redistributing or porting the components themselves; the guide
+therefore instructs reading component source for mechanism extraction only and never vendoring
+it into references, design documents, or this repository. React Bits names remain the property
+of their owner.
+
 `frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
 workflow guide. Its browser + `getComputedStyle` clone approach follows the same
 MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that `aside.md`

@@ -10,10 +10,11 @@ export type StartLabels = {
 export function backgroundStartText(started: StartedResult, labels: StartLabels): string {
   const queue = started.queue_position !== undefined ? ` queued at position ${started.queue_position}` : ""
   const label = labels.taskSummary ?? labels.description ?? started.name
-  if (label === started.task_id) {
-    return `Started task ${started.task_id} (${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
-  }
-  return `Started task ${label} (${started.task_id}, ${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
+  const base =
+    label === started.task_id
+      ? `Started task ${started.task_id} (${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
+      : `Started task ${label} (${started.task_id}, ${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
+  return base
 }
 
 export function backgroundConversionText(

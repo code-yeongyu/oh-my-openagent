@@ -96,7 +96,7 @@ function isStopInput(value: unknown): value is StopInput {
 }
 
 function isStopHookEventName(value: unknown): value is StopHookEventName {
-	return value === "Stop" || value === "SubagentStop";
+	return value === "Stop";
 }
 
 function optionalString(value: unknown): boolean {

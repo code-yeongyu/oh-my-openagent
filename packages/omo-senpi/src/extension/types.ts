@@ -1,6 +1,22 @@
-import type { ToolDefinition } from "@code-yeongyu/senpi"
+import type { EvalHandleHost, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import type { StartupWork } from "./startup-deferral"
+
+export interface CompactReadClassification {
+  readonly kind: "docs" | "resource" | "skill" | "memory"
+  readonly label: string
+  readonly headline?: string
+}
+
+export type ReadClassifier = (input: {
+  readonly absolutePath: string
+  readonly cwd: string
+}) => CompactReadClassification | undefined
+
+export interface BeforeAgentStartHandlerOptions {
+  previewSafe?: boolean
+}
 
 export interface SenpiExtensionAPI {
   /**
@@ -9,7 +25,18 @@ export interface SenpiExtensionAPI {
    * older than the release that added it do not report one; consumers fall back to process.cwd().
    */
   readonly cwd?: string
-  on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
+  /**
+   * Opaque labels the opener attached to THIS session (senpi `open_session.context`). One extension
+   * set serves every session of the shared daemon, so components gate themselves on the role here
+   * instead of on process-wide environment variables. Optional: hosts older than the release that
+   * added it report none, and consumers fall back to the per-child process env.
+   */
+  readonly sessionContext?: unknown
+  on(
+    event: string,
+    handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>,
+    options?: BeforeAgentStartHandlerOptions,
+  ): void
   rpc?: {
     emit(name: string, data: unknown): void
     handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
@@ -31,13 +58,26 @@ export interface SenpiExtensionAPI {
   getFlag(name: string): boolean | string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
+  getCommands?(): readonly {
+    readonly name: string
+    readonly description?: string
+    readonly source: string
+    readonly sourceInfo?: { readonly path?: string }
+  }[]
+  /** Feature-detected until the pinned Senpi runtime exports read classifiers. */
+  registerReadClassifier?(classifier: ReadClassifier): () => void
   registerRemovedToolHint?(name: string, hint: string): void
+  /** Feature-detected: senpi runtimes before 2026.10.7 have no eval-handle capability slot. */
+  provideEvalHandleHost?(host: EvalHandleHost): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
   appendEntry?(customType: string, data?: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
 }
 
 export interface ComponentLogger {
+  /** Optional: hosts without a debug channel simply drop expected-state diagnostics. */
+  debug?(message: string, details?: unknown): void
   info(message: string, details?: unknown): void
   warn(message: string, details?: unknown): void
   error(message: string, details?: unknown): void
@@ -54,6 +94,10 @@ export interface ComponentContext {
   // Single-queue idle-edge injection arbiter (todo 17). When present, ulw-loop continuation and task
   // completion wakes route through it so one idle edge yields exactly one injection.
   idleCoordinator?: IdleInjectionCoordinator
+  // Off-critical-path scheduler for startup work that must happen but is not needed before the
+  // first user turn (see startup-deferral.ts). Absent in isolated component unit tests, where
+  // `deferUntilAfterFirstPaint` runs the work inline instead.
+  deferStartupWork?: (label: string, work: StartupWork) => void
 }
 
 export interface OmoSenpiComponent {

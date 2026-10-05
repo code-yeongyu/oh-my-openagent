@@ -172,4 +172,32 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
     }
   })
 
+  test("#given session error payloads retained in maps #when dispose is called #then idle recovery does not keep those payloads", async () => {
+    //#given
+    const { restore } = setupDelayedTimeoutMocks()
+    const hook = createRecoveryHook()
+
+    try {
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID: "session-dispose-maps", error: "prompt is too long" },
+        },
+      })
+
+      //#when
+      hook.dispose()
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-dispose-maps" },
+        },
+      })
+
+      //#then
+      expect(executeCompactMock).not.toHaveBeenCalled()
+    } finally {
+      restore()
+    }
+  })
 })

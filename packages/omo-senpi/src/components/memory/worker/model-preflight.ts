@@ -1,20 +1,22 @@
 import { spawn } from "node:child_process"
-import { stat } from "node:fs/promises"
+import { stat } from "@oh-my-opencode/memory-core/fs"
 
 import type { SenpiLauncher } from "@oh-my-opencode/senpi-task"
 
+import { OMO_SENPI_DISABLED_ENV } from "../../../extension/disable-env"
 import type { MemoryModelChain } from "./memory-model-attempts"
 import type { ReflectionModelCandidate } from "./resolve-model"
 
 const PREFLIGHT_TIMEOUT_MS = 10_000
 const CATALOG_CACHE_TTL_MS = 2 * 60_000
-const DISCOVERY_DISABLED_MODEL_LIST_ARGS = [
-  "--no-extensions",
-  "--no-skills",
-  "--no-prompt-templates",
-  "--no-context-files",
-  "--list-models",
-] as const
+const EXTENSION_MODEL_LIST_ARGS = ["--no-skills", "--no-prompt-templates", "--no-context-files", "--list-models"] as const
+const CATALOG_ARGS = {
+  "discovery-disabled": ["--no-extensions", ...EXTENSION_MODEL_LIST_ARGS],
+  // A provider an extension registers exists only in a child that loads extensions (#9175).
+  extensions: EXTENSION_MODEL_LIST_ARGS,
+} as const
+
+type CatalogMode = keyof typeof CATALOG_ARGS
 
 export type ModelPreflightRejection = {
   readonly model: string
@@ -25,10 +27,6 @@ export type ModelPreflightResult =
   | {
       readonly kind: "filtered"
       readonly candidates: MemoryModelChain
-      readonly rejected: readonly ModelPreflightRejection[]
-    }
-  | {
-      readonly kind: "none_visible"
       readonly rejected: readonly ModelPreflightRejection[]
     }
   | {
@@ -53,34 +51,68 @@ type CatalogCacheEntry = {
 
 const catalogCache = new Map<string, CatalogCacheEntry>()
 
+/**
+ * Route each candidate to the cheapest child that can see it. The discovery-disabled catalog is the
+ * default; a candidate it omits is looked up in a catalog with extensions loaded and, when listed
+ * there, launched in a child that loads extensions, so core-provider models never pay for them.
+ */
 export async function preflightMemoryModels(input: ModelPreflightInput): Promise<ModelPreflightResult> {
-  const cacheKey = await modelCatalogCacheKey(input.launch, input.configSources)
-  const now = (input.now ?? Date.now)()
-  const cached = catalogCache.get(cacheKey)
-  const current = cached !== undefined && now - cached.probedAt < CATALOG_CACHE_TTL_MS ? cached : undefined
-  let visible = current?.visible
-  if (visible === undefined) {
-    try {
-      visible = await probeChildModels(input.launch, input.env, input.timeoutMs ?? PREFLIGHT_TIMEOUT_MS)
-      catalogCache.set(cacheKey, { visible, probedAt: now })
-    } catch (error) {
-      input.warn?.("memory child model preflight failed; falling back to reactive model retries", {
-        error: describe(error),
-      })
-      return { kind: "unavailable", candidates: input.candidates }
-    }
+  let core: ReadonlySet<string>
+  try {
+    core = await visibleModels(input, "discovery-disabled")
+  } catch (error) {
+    input.warn?.("memory child model preflight failed; falling back to reactive model retries", {
+      error: describe(error),
+    })
+    return { kind: "unavailable", candidates: input.candidates }
+  }
+  if (input.candidates.every((candidate) => core.has(candidate.model))) {
+    return { kind: "filtered", candidates: input.candidates, rejected: [] }
   }
 
-  const candidates = input.candidates.filter((candidate) => visible.has(candidate.model))
+  const extended = await extensionModels(input)
+  const candidates = input.candidates.flatMap((candidate): ReflectionModelCandidate[] => {
+    if (core.has(candidate.model)) return [candidate]
+    return extended.has(candidate.model) ? [{ ...candidate, loadExtensions: true }] : []
+  })
   const rejected = input.candidates
-    .filter((candidate) => !visible.has(candidate.model))
+    .filter((candidate) => !core.has(candidate.model) && !extended.has(candidate.model))
     .map((candidate): ModelPreflightRejection => ({ model: candidate.model, cause: "model_not_visible" }))
   if (candidates.length === 0) {
-    return current === undefined
-      ? { kind: "none_visible", rejected }
-      : { kind: "unavailable", candidates: input.candidates }
+    // A parseable catalog that lists none of the candidates is not proof the child cannot run
+    // them: `--list-models` intermittently omits whole providers (#7923). The reactive
+    // `model_not_visible` classifier makes the final call after a real spawn, in the most
+    // permissive child, so a miss there proves no memory child can see the model.
+    input.warn?.("memory child model catalog omits every candidate; falling back to reactive model retries", {
+      rejected,
+    })
+    return {
+      kind: "unavailable",
+      candidates: asMemoryModelChain(input.candidates.map((candidate) => ({ ...candidate, loadExtensions: true }))),
+    }
   }
   return { kind: "filtered", candidates: asMemoryModelChain(candidates), rejected }
+}
+
+async function extensionModels(input: ModelPreflightInput): Promise<ReadonlySet<string>> {
+  try {
+    return await visibleModels(input, "extensions")
+  } catch (error) {
+    input.warn?.("memory child model preflight with extensions failed; extension-registered models stay unrouted", {
+      error: describe(error),
+    })
+    return new Set()
+  }
+}
+
+async function visibleModels(input: ModelPreflightInput, mode: CatalogMode): Promise<ReadonlySet<string>> {
+  const cacheKey = await modelCatalogCacheKey(input.launch, input.configSources, mode)
+  const now = (input.now ?? Date.now)()
+  const cached = catalogCache.get(cacheKey)
+  if (cached !== undefined && now - cached.probedAt < CATALOG_CACHE_TTL_MS) return cached.visible
+  const visible = await probeChildModels(input.launch, mode, input.env, input.timeoutMs ?? PREFLIGHT_TIMEOUT_MS)
+  catalogCache.set(cacheKey, { visible, probedAt: now })
+  return visible
 }
 
 export function resetModelPreflightCacheForTests(): void {
@@ -89,14 +121,16 @@ export function resetModelPreflightCacheForTests(): void {
 
 async function probeChildModels(
   launch: SenpiLauncher,
+  mode: CatalogMode,
   env: NodeJS.ProcessEnv,
   timeoutMs: number,
 ): Promise<ReadonlySet<string>> {
   const child = spawn(launch.command, [
     ...launch.prefixArgs,
-    ...DISCOVERY_DISABLED_MODEL_LIST_ARGS,
+    ...CATALOG_ARGS[mode],
   ], {
-    env,
+    // Same child shape as the reflection spawn: extensions load, omo's own components stay off.
+    env: mode === "extensions" ? { ...env, [OMO_SENPI_DISABLED_ENV]: "1" } : env,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   })
@@ -144,6 +178,7 @@ function parseModelCatalog(output: string): ReadonlySet<string> {
 async function modelCatalogCacheKey(
   launch: SenpiLauncher,
   sources: readonly { readonly path: string; readonly exists: boolean }[],
+  mode: CatalogMode,
 ): Promise<string> {
   const sourceMtimes = await Promise.all(sources.filter((source) => source.exists).map(async (source) => {
     try {
@@ -152,7 +187,7 @@ async function modelCatalogCacheKey(
       return `${source.path}:missing`
     }
   }))
-  return JSON.stringify([launch.command, launch.prefixArgs, sourceMtimes])
+  return JSON.stringify([mode, launch.command, launch.prefixArgs, sourceMtimes])
 }
 
 function asMemoryModelChain(candidates: readonly ReflectionModelCandidate[]): MemoryModelChain {

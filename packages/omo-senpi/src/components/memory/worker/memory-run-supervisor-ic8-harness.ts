@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process"
-import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { existsSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { mkdir, mkdtemp, readFile, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -84,6 +84,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     const child = spawn(process.execPath, [supervisorPath, runDir], {
       detached: true,
       stdio: "ignore",
+      windowsHide: true,
       env: {
         ...process.env,
         OMO_MEMORY_SUPERVISOR_ALLOW_TEST_SEAMS: "1",
@@ -163,7 +164,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     for (const pid of groups) {
       if (!processGroupIsAlive(pid)) continue
       try {
-        terminateProcessGroup(pid)
+        await terminateProcessGroup(pid)
       } catch (error) {
         if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") {
           cleanupError ??= asError(error)

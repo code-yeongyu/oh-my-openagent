@@ -8,13 +8,13 @@ It reads `.omo/boulder.json` in the hook payload `cwd`, resolves the active work
 {"decision":"block","reason":"<directive>"}
 ```
 
-The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when `last_assistant_message` starts with `<ulw-execute-blocked-external>` (or places it immediately after the mandatory `ULTRAWORK MODE ENABLED!` opener), when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when the plan has no readable top-level checklist. An active plan whose checklist is fully checked still blocks Stop until the final gate runs and Boulder is marked completed.
+The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when `last_assistant_message` starts with `<ulw-execute-blocked-external>` (or places it immediately after the mandatory `ULTRAWORK MODE ENABLED!` opener), when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when the plan has no readable top-level checklist. An active plan whose checklist is fully checked still blocks Stop until the final gate runs and Boulder is marked completed. SubagentStop is deliberately de-wired: the compatibility CLI subcommand returns no output and never injects a root plan.
 
 ## External blocker escape hatch
 
 A plan can stall on something no amount of retrying fixes: a missing credential, missing hardware, a revoked authorization, an unavailable third-party service. `directive.md` instructs the agent to write `<ulw-execute-blocked-external>` as the entire first line of its answer in that case, or as the entire second line when ultrawork's mandatory opener occupies the first. The hook recognizes those structural forms and lets the turn end so the user can act, instead of continuing the same unchanged external-state check forever. Merely discussing the marker later in an answer still continues the plan.
 
-This pairs with the `ulw-execute` skill at `plugin/skills/ulw-execute/SKILL.md`. That skill writes `.omo/boulder.json` with Codex session ids prefixed as `codex:` so the hook can continue only its own active Codex session.
+This pairs with the `ulw-execute` skill at `plugin/skills/ulw-execute/SKILL.md`. That skill writes `.omo/boulder.json` with Codex session ids prefixed as `codex:` so the hook can continue only its own active Codex session. The continuation gate performs self-review and own manual QA by default; it escalates to one gate reviewer only when the user explicitly demands strict, rigorous, or high-accuracy review.
 
 ## Counted plan checkboxes
 
@@ -48,7 +48,7 @@ echo "$PAYLOAD_LOOP" | node dist/cli.js hook stop
 rm -rf "$TMP"
 ```
 
-Expect the first command to print JSON containing `"decision":"block"`; expect the anti-loop command to print nothing.
+Expect the first command to print JSON containing `"decision":"block"`; expect the anti-loop command to print nothing. A `SubagentStop` payload passed to `hook subagent-stop` also prints nothing.
 
 ## License
 

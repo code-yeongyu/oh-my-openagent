@@ -10,18 +10,16 @@ import { shouldLoadMcpServer } from "./scope-filter"
 // blocks until the hook budget expires ("a beforeEach/afterEach hook timed out").
 let testDir = ""
 let testHome = ""
-const ORIGINAL_HOME = process.env.HOME
-const ORIGINAL_USERPROFILE = process.env.USERPROFILE
-const ORIGINAL_CLAUDE_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR
+
+function loaderOptions(cwd = testDir) {
+  return { cwd, homeDir: testHome, claudeConfigDir: join(testHome, ".claude") }
+}
 
 describe("loadMcpConfigs", () => {
   beforeEach(() => {
     testDir = realpathSync(mkdtempSync(join(tmpdir(), "mcp-scope-filtering-test-")))
     testHome = join(testDir, "home")
     mkdirSync(testHome, { recursive: true })
-    process.env.HOME = testHome
-    process.env.USERPROFILE = testHome
-    process.env.CLAUDE_CONFIG_DIR = join(testHome, ".claude")
     mock.module("../../shared/logger", () => ({
       log: () => {},
     }))
@@ -29,21 +27,6 @@ describe("loadMcpConfigs", () => {
 
   afterEach(() => {
     mock.restore()
-    if (ORIGINAL_HOME === undefined) {
-      delete process.env.HOME
-    } else {
-      process.env.HOME = ORIGINAL_HOME
-    }
-    if (ORIGINAL_USERPROFILE === undefined) {
-      delete process.env.USERPROFILE
-    } else {
-      process.env.USERPROFILE = ORIGINAL_USERPROFILE
-    }
-    if (ORIGINAL_CLAUDE_CONFIG_DIR === undefined) {
-      delete process.env.CLAUDE_CONFIG_DIR
-    } else {
-      process.env.CLAUDE_CONFIG_DIR = ORIGINAL_CLAUDE_CONFIG_DIR
-    }
     rmSync(testDir, { recursive: true, force: true })
   })
 
@@ -128,12 +111,8 @@ describe("loadMcpConfigs", () => {
         })
       )
 
-      const originalCwd = process.cwd()
-      process.chdir(testDir)
-
-      try {
-        const { loadMcpConfigs } = await import("./loader")
-        const result = await loadMcpConfigs()
+      const { loadMcpConfigs } = await import("./loader")
+      const result = await loadMcpConfigs([], loaderOptions())
 
         expect(result.servers).toHaveProperty("globalServer")
         expect(result.servers).toHaveProperty("matchingLocal")
@@ -144,9 +123,6 @@ describe("loadMcpConfigs", () => {
           "globalServer",
           "matchingLocal",
         ])
-      } finally {
-        process.chdir(originalCwd)
-      }
     })
   })
 })

@@ -2,7 +2,7 @@ import { isSyntheticOrInternalUserMessage, log } from "../../shared"
 import {
   latestAssistantTurnBlocksInternalPrompt,
   latestAssistantTurnHasUnansweredQuestion,
-} from "../../shared/prompt-async-gate/pending-tool-turn"
+} from "@oh-my-opencode/utils/prompt-async-gate/pending-tool-turn"
 import {
   latestAssistantTurnHasFreshToolActivity,
   latestAssistantTurnHasStaleUnknownSubstantiveOutput,

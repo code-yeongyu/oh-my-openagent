@@ -5,7 +5,7 @@ import type { ExperimentalConfig, OhMyOpenCodeConfig } from "../../config"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { attemptDeduplicationRecovery } from "./deduplication-recovery"
-import { clearSessionState } from "./state"
+import { clearAllSessionState, clearSessionState } from "./state"
 import { clearAllSessionTimeouts, clearSessionTimeout } from "./session-timeout-map"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
@@ -197,7 +197,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
     event: eventHandler,
     dispose: (): void => {
       clearAllSessionTimeouts(pendingCompactionTimeoutBySession)
-      clearAllSessionTimeouts(autoCompactState.retryTimerBySession)
+      clearAllSessionState(autoCompactState)
     },
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: dag-library
-description: "Store a dag definition once and re-run it in one or two lines, instead of pasting the full definition JSON into every eval cell. MUST USE whenever the user wants to save a DAG for reuse, run a previously saved/named DAG, schedule the same graph repeatedly (nightly/weekly audits, recurring multi-agent pipelines), or asks where to put a dag definition file. Triggers: dag library, save this dag, reuse a dag, run the saved dag, stored dag definition, recurring dag, nightly dag, dag 정의 저장, 저장된 dag 실행, dag 반복 실행, DAG 만들어두고 여러 번."
+description: "Stores a DAG definition once and re-runs it by name, instead of pasting the definition into every run. Use when the user wants to save a DAG, run a saved one, or schedule the same multi-agent graph repeatedly."
 metadata:
   short-description: Store and re-run named dag definitions
 ---
@@ -52,7 +52,7 @@ The dag engine keys idempotency on `key` + graph fingerprint: re-starting the sa
 
 ## Python cells
 
-Python cannot import the ESM library. Reproduce the same semantics with plain dicts — read the file, rotate the key, fill placeholders, call `tool.dag`:
+Python cannot import the ESM library. Reproduce the same semantics with plain dicts — read the file, rotate the key, fill placeholders, call `tool.workflow`:
 
 ```python
 import json
@@ -61,8 +61,8 @@ defn = json.loads(read(f"{env('HOME')}/.omo/dags/nightly-audit.json"))
 stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 defn["key"] = f"{defn['key']}-{stamp}"
 text = json.dumps(defn).replace("{{key}}", defn["key"]).replace("{{date}}", stamp[:8]).replace("{{datetime}}", stamp)
-run = tool.dag({"action": "start", "definition": json.loads(text)})
-result = tool.dag({"action": "wait", "run_id": run["run_id"], "detach": False})  # detach=False keeps the cell-blocking wait; the bare tool action detaches against a live run
+run = tool.workflow({"action": "start", "definition": json.loads(text)})
+result = tool.workflow({"action": "wait", "run_id": run["run_id"], "detach": False})  # detach=False keeps the cell-blocking wait; the bare tool action detaches against a live run
 ```
 
 ## Saving a new definition

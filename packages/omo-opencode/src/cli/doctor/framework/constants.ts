@@ -1,5 +1,6 @@
 import color from "picocolors"
 import { PUBLISHED_PACKAGE_NAME } from "../../../shared"
+import type { DoctorTarget } from "./types"
 
 export const SYMBOLS = {
   check: color.green("\u2713"),
@@ -50,3 +51,20 @@ export const MIN_OPENCODE_VERSION = "1.4.0"
 export const PACKAGE_NAME = PUBLISHED_PACKAGE_NAME
 
 export const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
+
+export const EDITION_LABELS: Record<DoctorTarget, string> = {
+  opencode: "OpenCode",
+  codex: "Codex",
+}
+
+export const EDITION_PACKAGE_NAMES: Record<DoctorTarget, string> = {
+  opencode: PUBLISHED_PACKAGE_NAME,
+  codex: "lazycodex-ai",
+}
+
+export const UPDATE_COMMANDS: Record<DoctorTarget, string> = {
+  opencode: `bunx ${PUBLISHED_PACKAGE_NAME} install`,
+  codex: "npx lazycodex-ai install --no-tui --codex-autonomous",
+}
+
+export const LATEST_UNAVAILABLE_TEXT = "could not check"

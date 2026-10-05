@@ -2,7 +2,7 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { refreshMemoryStatus } from "./status"
 import { isRecord, readUi, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
-import { MEMORY_APPLY_PATCH_TOOL_NAME, MEMORY_TOOL_NAME } from "./tools"
+import { MEMORY_TOOL_NAME } from "./tools"
 
 export function registerMemoryWriteListener(
   pi: SenpiExtensionAPI,
@@ -49,7 +49,7 @@ function isMemoryToolResult(value: unknown): boolean {
     || typeof value.toolName !== "string"
   ) return false
   return matchesToolName(value.toolName, MEMORY_TOOL_NAME)
-    || matchesToolName(value.toolName, MEMORY_APPLY_PATCH_TOOL_NAME)
+    || matchesToolName(value.toolName, MEMORY_TOOL_NAME)
 }
 
 function matchesToolName(toolName: string, expected: string): boolean {

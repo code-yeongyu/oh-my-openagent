@@ -62,7 +62,8 @@ if (targetPath !== undefined) {
       `ATTRIBUTE: ${String(index + 1).padStart(2, "0")} ${"x".repeat(policy.people.max_entry_chars)}`.slice(0, policy.people.max_entry_chars),
     )
     await mkdir(join(memoryDir, "people", "fixture"), { recursive: true })
-    await writeFile(join(memoryDir, "people", "fixture", "card.md"), `${entries.join("\n")}\n`)
+    const cardFrontmatter = "---\ndescription: Person - Fixture\nkind: person\naliases: []\n---\n"
+    await writeFile(join(memoryDir, "people", "fixture", "card.md"), `${cardFrontmatter}${entries.join("\n")}\n`)
   }
 }
 await git(memoryDir, ["add", "-A"])

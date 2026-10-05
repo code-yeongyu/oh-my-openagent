@@ -1,16 +1,16 @@
 ---
 name: pre-publish-review
-description: "Nuclear-grade 16-agent pre-publish release gate. Runs /get-unpublished-changes to detect all changes since last npm release, spawns up to 10 ultrabrain agents for deep per-change analysis, invokes /review-work (5 agents) for holistic review, and 1 oracle for overall release synthesis. Runs ONLY when the user explicitly asks for a pre-publish review — a plain publish/release request MUST NOT trigger this; /publish ships directly. Triggers: 'pre-publish review', 'review before publish', 'release review', 'pre-release review', 'ready to publish?', 'can I publish?', 'pre-publish', 'safe to publish', 'publishing review', 'pre-publish check'."
+description: "Nuclear-grade 12-agent pre-publish release gate. Runs /get-unpublished-changes to detect all changes since last npm release, spawns up to 10 ultrabrain agents for deep per-change analysis, invokes /review-work (orchestrator manual QA plus one gate reviewer) for holistic review, and 1 oracle for overall release synthesis. Runs ONLY when the user explicitly asks for a pre-publish review — a plain publish/release request MUST NOT trigger this; /publish ships directly. Triggers: 'pre-publish review', 'review before publish', 'release review', 'pre-release review', 'ready to publish?', 'can I publish?', 'pre-publish', 'safe to publish', 'publishing review', 'pre-publish check'."
 ---
 
-# Pre-Publish Review — 16-Agent Release Gate
+# Pre-Publish Review — 12-Agent Release Gate
 
 Three-agent-layer review before publishing to npm. Every layer covers a different angle, and every result is mapped onto the release layers below.
 
 | Layer | Agents | Type | What They Check |
 |-------|--------|------|-----------------|
 | Per-Change Deep Dive | up to 10 | ultrabrain | Each logical change group individually — correctness, edge cases, pattern adherence |
-| Holistic Review | 5 | review-work | Goal compliance, QA execution, code quality, security, context mining across full changeset |
+| Holistic Review | 1 (+ orchestrator QA) | review-work | Manual QA by the review orchestrator, then one gate reviewer covering goal compliance, code quality, security, and missed context across the full changeset |
 | Release Synthesis | 1 | oracle | Overall release readiness, version bump, breaking changes, deployment risk |
 
 ## Release Layer Taxonomy
@@ -159,9 +159,9 @@ OUTPUT FORMAT:
 """)
 ```
 
-### Layer 2: Holistic Review via /review-work (5 agents)
+### Layer 2: Holistic Review via /review-work (one gate reviewer)
 
-Spawn a sub-agent that loads the `/review-work` skill. The review-work skill internally launches 5 parallel agents: Oracle (goal verification), unspecified-high (QA execution), Oracle (code quality), Oracle (security), unspecified-high (context mining). All 5 must pass for the review to pass.
+Spawn a sub-agent that loads the `/review-work` skill. The review-work skill runs manual QA on the real surface itself, then launches ONE gate reviewer (oracle) that audits goal compliance, code quality, security, missed context, and the QA evidence. The review passes only on a clean QA matrix plus APPROVE.
 
 ```
 task(
@@ -186,7 +186,7 @@ BACKGROUND: Pre-publish review of oh-my-opencode, an OpenCode plugin with 1268 T
 
 The diff base is: git diff v{PUBLISHED}..HEAD
 
-Follow the /review-work skill flow exactly — launch all 5 review agents and collect results. Do NOT skip any of the 5 agents.
+Follow the /review-work skill flow exactly — run the manual QA phase, launch the gate reviewer, and collect its verdict. Do NOT skip the QA phase or the reviewer.
 """)
 ```
 
@@ -228,7 +228,7 @@ task(
 {Read and include full content of KEY changed files — focus on public API surfaces, config schemas, agent definitions, hook registrations, tool registrations}
 </file_contents>
 
-You are the final gate before an npm publish. 10 ultrabrain agents are reviewing individual changes and 5 review-work agents are doing holistic review. Your job is the bird's-eye view that those focused reviews might miss.
+You are the final gate before an npm publish. 10 ultrabrain agents are reviewing individual changes and the review-work gate reviewer is doing the holistic review. Your job is the bird's-eye view that those focused reviews might miss.
 
 SYNTHESIS CHECKLIST:
 
@@ -378,11 +378,8 @@ Compile the final report:
 
 | # | Review Area | Verdict | Confidence |
 |---|------------|---------|------------|
-| 1 | Goal & Constraint Verification | PASS/FAIL | HIGH/MED/LOW |
-| 2 | QA Execution | PASS/FAIL | HIGH/MED/LOW |
-| 3 | Code Quality | PASS/FAIL | HIGH/MED/LOW |
-| 4 | Security | PASS/FAIL | Severity |
-| 5 | Context Mining | PASS/FAIL | HIGH/MED/LOW |
+| 1 | Manual QA (orchestrator, real surface) | PASS/FAIL | - |
+| 2 | Gate Review (goal, code quality, security, context, QA audit) | APPROVE/REJECT | HIGH/MED/LOW |
 
 ### Blocking Issues from Holistic Review
 {Aggregated from review-work}

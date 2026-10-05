@@ -3,8 +3,10 @@ preload = ["./test-env.ts", "./test-setup.ts"]
 pathIgnorePatterns = [
   "dist/**",
   "packages/web/**",
+  "packages/get-worker/**",
   "packages/lsp-tools-mcp/**",
   "packages/lsp-daemon/**",
+  "packages/senpi-desktop-*/**",
   "packages/omo-codex/plugin/**",
   "packages/omo-codex/scripts/**",
   "packages/shared-skills/upstreams/**",
@@ -12,13 +14,20 @@ pathIgnorePatterns = [
   "packages/omo-opencode/**",
   "packages/memory-core/**",
   "packages/senpi-task/src/runners/rpc-process.windows.test.ts",
-  "packages/utils/src/codegraph-provision-upgrade.test.ts",
   "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts",
   "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts",
   "script/codex-installer-version.test.ts",
   "packages/shared-skills/provenance-gate.test.ts",
   "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts",
   "packages/senpi-task/src/dag/scheduler.test.ts",
+  "packages/omo-native/test/payload.test.ts",
+  "script/build-omo-binary.test.ts",
+  "packages/senpi-task/src/team/member-extension/residency.test.ts",
+  "script/omob-refresh.test.ts",
+  "script/release-version.test.ts",
+  "packages/senpi-task/src/store/record-lock.test.ts",
+  "packages/senpi-task/src/store/record-lock-reap-window.test.ts",
+  "packages/senpi-task/src/runners/rpc-host/durable-json.test.ts",
 ]
 
 [loader]

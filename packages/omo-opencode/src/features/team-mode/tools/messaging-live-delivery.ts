@@ -48,6 +48,8 @@ export async function deliverLive(
       reservation,
       config,
       directory,
+      settleMs: deps.liveDeliverySettleMs,
+      dispatchTiming: deps.dispatchTiming,
     })
   }
 }

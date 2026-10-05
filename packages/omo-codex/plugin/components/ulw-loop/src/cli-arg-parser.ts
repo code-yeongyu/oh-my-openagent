@@ -65,11 +65,17 @@ export async function readJsonInput(value: string | undefined): Promise<unknown 
 
 export async function parseCodexGoalJson(value: string | undefined): Promise<string | undefined> {
 	if (value === undefined) return undefined;
-	const raw = looksLikeJson(value) ? value : await readFile(value, "utf8");
-	try { JSON.parse(raw); return raw; }
-	catch (error) {
+	try {
+		const raw = looksLikeJson(value) ? value : await readFile(value, "utf8");
+		JSON.parse(raw);
+		return raw;
+	} catch (error) {
 		const message = error instanceof Error ? error.message : "unknown error";
-		throw new UlwLoopError(`Invalid --codex-goal-json: ${message}`, "ULW_LOOP_CODEX_GOAL_JSON_INVALID", { cause: error });
+		throw new UlwLoopError(
+			`Invalid --codex-goal-json: ${looksLikeJson(value) ? message : "neither valid JSON nor a readable path"}`,
+			"ULW_LOOP_CODEX_GOAL_JSON_INVALID",
+			{ cause: error },
+		);
 	}
 }
 

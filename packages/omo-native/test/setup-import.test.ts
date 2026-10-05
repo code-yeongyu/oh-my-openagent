@@ -7,8 +7,12 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { teardownRoots, withDatabase } from "./teardown.test-support"
+
+function sqlLiteral(value: string | null): string {
+  return value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`
+}
 
 // Older Bun runtimes ship no node:sqlite at all, so the module loads lazily and the fixtures that
 // need a real database skip there. Production degrades the same way: setup-import.js reports the
@@ -36,9 +40,21 @@ const transcripts: string[] = []
 const secrets = [
   "SK-SENTINEL-DO-NOT-LOG-1", "SK-SENTINEL-DO-NOT-LOG-2",
   "SK-SENTINEL-DO-NOT-LOG-3", "SK-SENTINEL-DO-NOT-LOG-4",
+  "SK-SENTINEL-DO-NOT-LOG-5", "SK-SENTINEL-DO-NOT-LOG-6",
+  "SK-SENTINEL-DO-NOT-LOG-7", "SK-SENTINEL-DO-NOT-LOG-8",
+  "SK-SENTINEL-DO-NOT-LOG-9",
 ]
 
+// The engine's own config-value resolver: every api_key the engine reads from auth.json goes through it.
+const senpiPackageRoot = dirname(dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))))
+const { resolveConfigValue } = await import(
+  pathToFileURL(join(senpiPackageRoot, "dist", "core", "resolve-config-value.js")).href
+) as { resolveConfigValue(config: string, env?: Record<string, string>): Promise<string | undefined> }
+
 type Fixture = { root: string; home: string; agentDir: string; xdg: string; launcher: string }
+type DatabaseHandle = { readonly isOpen: boolean }
+
+const databaseHandles: DatabaseHandle[] = []
 
 function write(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -48,10 +64,12 @@ function write(path: string, content: string): void {
 async function database(path: string, version: number, rows: Array<[string, string, string, string | null]>): Promise<void> {
   mkdirSync(dirname(path), { recursive: true })
   const DatabaseSync = await loadDatabaseSync()
+  const db = new DatabaseSync(path)
+  databaseHandles.push(db)
   // withDatabase closes the handle on every exit path (including a throwing exec/run) and tracks it
   // for teardown, so no Windows file handle inside the temp root can outlive the fixture.
-  withDatabase(new DatabaseSync(path), (db) => {
-    db.exec(`
+  withDatabase(db, (database) => {
+    database.exec(`
       CREATE TABLE auth_schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL);
       INSERT INTO auth_schema_version VALUES (1, ${version});
       CREATE TABLE auth_credentials (
@@ -59,9 +77,11 @@ async function database(path: string, version: number, rows: Array<[string, stri
         data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
       );
     `)
-    const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
+    // exec() with literal values: a prepared INSERT would leave this writer's handle open past
+    // close() under Bun 1.4 (oven-sh/bun#40001), and the reader that opens the same file next
+    // would then block on the Windows file lock.
     for (const [provider, type, key, disabled] of rows) {
-      insert.run(provider, type, JSON.stringify({ key }), disabled)
+      database.exec(`INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, ${sqlLiteral(JSON.stringify({ key }))}, ${sqlLiteral(disabled)})`)
     }
   })
 }
@@ -81,15 +101,17 @@ function fixture(): Fixture {
 
 function run(item: Fixture, args: string[], ttyInput?: string) {
   const before = sourceSnapshot(item)
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env, HOME: item.home, USERPROFILE: item.home, SENPI_CODING_AGENT_DIR: item.agentDir,
     XDG_DATA_HOME: item.xdg,
   }
+  delete env.OMO_CODING_AGENT_DIR
+  delete env.PI_CODING_AGENT_DIR
   // spawnSync only returns after the child exited and was reaped, so teardown never races a live
   // child; a surfaced spawn error must fail here instead of being read as empty output.
   const result = ttyInput === undefined
     ? spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env })
-    : spawnSync("python3", [TTY_DRIVER, ttyInput, "[y/N]", process.execPath, item.launcher, ...args], { encoding: "utf8", env })
+    : spawnSync("python3", [TTY_DRIVER, ttyInput, "[Y/n]", process.execPath, item.launcher, ...args], { encoding: "utf8", env })
   if (result.error) throw result.error
   transcripts.push(`${result.stdout}${result.stderr}`)
   expectSourcesUntouched(before)
@@ -129,19 +151,22 @@ afterEach(() => {
   } finally {
     // A leaking-secret assertion must not also leak the temp roots for the rest of the run.
     transcripts.length = 0
+    databaseHandles.length = 0
     teardownRoots(roots)
   }
 })
 
 describe("omo setup credential inheritance", () => {
-  test("#given opencode api oauth mapped and gateway entries #when accepted #then only safe api ids import", () => {
+  test("#given opencode api oauth mapped and gateway entries #when accepted #then every usable api id imports", () => {
     const item = fixture()
     write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
       google: { type: "api", key: secrets[0] },
       "anthropic-api": { type: "api", key: secrets[1] },
       xai: { type: "oauth", access: secrets[2] },
       opencode: { type: "api", key: secrets[3] },
-      "unknown-gateway": { type: "api", key: secrets[3] },
+      "opencode-go": { type: "api", key: secrets[4] },
+      "zai-coding-plan": { type: "api", key: secrets[5] },
+      "unknown-gateway": { type: "api", key: secrets[6] },
     }))
     const before = sourceSnapshot(item)
 
@@ -151,12 +176,103 @@ describe("omo setup credential inheritance", () => {
     expect(auth(item)).toEqual({
       google: { type: "api_key", key: secrets[0] },
       anthropic: { type: "api_key", key: secrets[1] },
+      opencode: { type: "api_key", key: secrets[3] },
+      "opencode-go": { type: "api_key", key: secrets[4] },
+      zai: { type: "api_key", key: secrets[5] },
     })
+    expect(result.stdout).toContain("imported: 5")
     expect(result.stdout).toContain("skipped-oauth: 1")
-    expect(result.stdout).toContain("skipped-unmapped: 2")
-    expect(result.stdout).toContain("xai")
-    expect(result.stdout).toContain("opencode")
+    expect(result.stdout).toContain("skipped-unmapped: 1")
+    expect(result.stdout).toContain("unknown-gateway")
     expectSourcesUntouched(before)
+  })
+
+  test("#given opencode keys holding config-value syntax #when imported #then the engine resolves them to the exact source bytes", async () => {
+    const item = fixture()
+    const commandShaped = `!${secrets[7]} {env:HOME} \\ ü`
+    const templateShaped = `${secrets[8]}$HOME\${HOME}$$$!!`
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
+      openai: { type: "api", key: commandShaped },
+      google: { type: "api", key: templateShaped },
+    }))
+
+    const result = run(item, ["setup", "--yes"])
+
+    expect(result.status).toBe(0)
+    const stored = auth(item) as Record<string, { key: string }>
+    const env = { HOME: item.home }
+    expect(await resolveConfigValue(stored.openai.key, env)).toBe(commandShaped)
+    expect(await resolveConfigValue(stored.google.key, env)).toBe(templateShaped)
+  })
+
+  test("#given a skipped oauth provider #when setup reports #then it names the real sign-in command", () => {
+    const item = fixture()
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
+      openai: { type: "oauth", access: secrets[0] },
+      google: { type: "api", key: secrets[1] },
+    }))
+
+    const result = run(item, ["setup", "--yes"])
+
+    expect(result.status).toBe(0)
+    // `omo auth` only prints or checks stored credentials; the sign-in surface is /login.
+    expect(result.stdout).not.toContain("omo auth")
+    expect(result.stdout).toContain("/login chatgpt-subscription")
+  })
+
+  test("#given a skipped oauth provider and keys to import #when accepted #then the sign-in guidance is printed exactly once", () => {
+    const item = fixture()
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
+      openai: { type: "oauth", access: secrets[0] },
+      google: { type: "api", key: secrets[1] },
+    }))
+
+    const result = run(item, ["setup", "--yes"])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout.split("/login chatgpt-subscription").length - 1).toBe(1)
+  })
+
+  test("#given a skipped oauth provider and nothing to import #when setup runs #then the sign-in guidance is printed exactly once", () => {
+    const item = fixture()
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({ openai: { type: "oauth", access: secrets[0] } }))
+
+    const result = run(item, ["setup", "--yes"])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout.split("/login chatgpt-subscription").length - 1).toBe(1)
+  })
+
+  test("#given the user already signed in to the omo provider #when setup re-runs #then it does not ask for that sign-in again", () => {
+    const item = fixture()
+    write(join(item.agentDir, "auth.json"), JSON.stringify({
+      "chatgpt-subscription": { type: "oauth", access: "EXISTING", refresh: "EXISTING", expires: 1 },
+    }))
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
+      openai: { type: "oauth", access: secrets[0] },
+      anthropic: { type: "oauth", access: secrets[1] },
+    }))
+
+    const result = run(item, ["setup", "--yes"])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).not.toContain("/login chatgpt-subscription")
+    expect(result.stdout).toContain("/login anthropic")
+  })
+
+  test("#given a dry run with skipped credentials #when setup previews #then the same guidance is shown", () => {
+    const item = fixture()
+    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
+      openai: { type: "oauth", access: secrets[0] },
+      "unknown-gateway": { type: "api", key: secrets[1] },
+    }))
+
+    const result = run(item, ["setup", "--dry-run"])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain("DRY RUN")
+    expect(result.stdout).toContain("/login chatgpt-subscription")
+    expect(result.stdout).toContain("models.json")
   })
 
   test.skipIf(!SQLITE_AVAILABLE)("#given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed", async () => {
@@ -185,6 +301,7 @@ describe("omo setup credential inheritance", () => {
     expect(unknownResult.status).toBe(0)
     expect(unknownResult.stdout).toContain("auth schema version 99 is unknown")
     expect(existsSync(join(unknown.agentDir, "auth.json"))).toBe(false)
+    expect(databaseHandles.map((database) => database.isOpen)).toEqual([false, false, false])
   })
 
   test("#given an existing senpi provider #when other keys import #then its entry stays structurally byte-identical", () => {

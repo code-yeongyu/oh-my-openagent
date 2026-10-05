@@ -17,14 +17,12 @@ export const TARGET_TOOLS = new Set([
   "websearch_web_search_exa",
   "websearch_web_search",
   "websearch_web_fetch",
-  "context7_get-library-docs",
   "grep_app_searchgithub",
 ]);
 
 export const AGENT_TOOLS = new Set([
   "task",
   "call_omo_agent",
-  "task",
 ]);
 
 export const REMINDER_MESSAGE = `

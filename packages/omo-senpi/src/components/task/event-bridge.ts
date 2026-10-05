@@ -1,4 +1,5 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -7,7 +8,7 @@ import type { LiveTaskContext } from "./runtime-context"
 import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
-import { wireTaskRpcBridge } from "./task-rpc-bridge"
+import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -18,6 +19,11 @@ type EventBridgeState = {
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
   // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
   readonly dagReloadSource?: ReloadGuardDagSource
+}
+
+// Test-only seams; production wiring omits this and every dependency falls back to its real default.
+type EventBridgeDeps = {
+  readonly taskRpc?: TaskRpcBridgeDeps
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -33,15 +39,19 @@ export function wireEventBridge(
   statusUi: TaskStatusUi,
   transitions: SessionTransitionBridge,
   state: EventBridgeState,
+  deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
-  const taskRpc = wireTaskRpcBridge(pi, engine)
+  const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
+    // A child session that has not reported its own id yet has nothing to reconcile: its records
+    // belong to the parent. The role comes from the session (shared daemon), else from the env.
+    if (readSessionRole(pi) !== undefined && sessionId === undefined) return
     transitions.onSessionStart(sessionId)
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
@@ -70,6 +80,7 @@ export function wireEventBridge(
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
     }
     await tickLeadPollersBestEffort(ctx, state)
+    if (sessionId !== undefined) engine.manager.workpools?.attach({ sessionId, rootSessionId: sessionId, depth: 0, cwd: engine.runtime.cwd() })
     statusUi.scheduleSync()
     taskRpc.attach()
   })
@@ -104,14 +115,25 @@ export function wireEventBridge(
     const shutdownEvent = payload as SessionShutdownEvent
     const parentSessionId = engine.runtime.sessionId()
     const reason = shutdownEvent.reason
-    if (parentSessionId === undefined || typeof reason !== "string") {
+    engine.lifecycle.dispose?.()
+    if (typeof reason !== "string") {
       ctx.logger.warn(
-        "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",
+        "omo-senpi task session_shutdown skipped: malformed reason",
         { parentSessionId, reason },
       )
       return
     }
-    await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason })
+    // The context can lose its session id during teardown. Only this engine's live handles
+    // establish fallback ownership; scanning every record would suspend sibling host sessions.
+    const parentSessionIds = parentSessionId === undefined
+      ? new Set(engine.manager.residentTaskIds().flatMap((taskId) => {
+        const record = engine.manager.get(taskId)
+        return record === undefined ? [] : [record.parent_session_id]
+      }))
+      : new Set([parentSessionId])
+    for (const sessionId of parentSessionIds) {
+      await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
+    }
   })
 
   pi.on("model_select", (_payload, eventCtx) => {
@@ -129,7 +151,8 @@ export function wireEventBridge(
     )
   })
 
-  pi.on("before_agent_start", (_payload, eventCtx) => {
+  pi.on("before_agent_start", (payload, eventCtx) => {
+    if (isPreview(payload)) return undefined
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"
@@ -139,7 +162,7 @@ export function wireEventBridge(
       {},
     )
     return undefined
-  })
+  }, { previewSafe: true })
 }
 
 async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
@@ -168,4 +191,8 @@ function asLiveContext(value: unknown): LiveTaskContext {
 
 function isLiveContext(value: unknown): value is LiveTaskContext {
   return typeof value === "object" && value !== null
+}
+
+function isPreview(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }

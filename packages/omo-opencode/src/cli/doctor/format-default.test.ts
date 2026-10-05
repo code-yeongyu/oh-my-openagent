@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { formatDefault } from "./framework/format-default"
 import { stripAnsi } from "./framework/format-shared"
-import type { DoctorResult } from "./framework/types"
+import type { CodexDoctorSummary, DoctorResult } from "./framework/types"
 
 function createBaseResult(): DoctorResult {
   return {
@@ -29,20 +29,64 @@ function createBaseResult(): DoctorResult {
     },
     summary: { total: 2, passed: 2, failed: 0, warnings: 0, skipped: 0, duration: 10 },
     exitCode: 0,
+    latestVersion: null,
+  }
+}
+
+function createCodexSummary(): CodexDoctorSummary {
+  return {
+    codexPath: "/usr/local/bin/codex",
+    codexSource: "cli",
+    codexAppId: null,
+    marketplaceName: "sisyphuslabs",
+    pluginName: "omo",
+    pluginVersion: "4.7.5",
+    pluginVersionStamped: true,
+    installerVersion: "4.7.5",
+    packageName: "lazycodex-ai",
+    packageVersion: "4.7.5",
+    pluginRoot: "/tmp/omo",
+    configPath: "/tmp/config.toml",
+    config: {
+      exists: true,
+      marketplaceConfigured: true,
+      pluginEnabled: true,
+      pluginsFeatureEnabled: true,
+      pluginHooksFeatureEnabled: true,
+      companionPluginEnabled: false,
+      companionLifecycleHookStateEvents: [],
+    },
+    linkedBins: ["omo"],
+    agents: ["plan"],
   }
 }
 
 describe("formatDefault", () => {
-  it("prints a single System OK line when no issues exist", () => {
+  it("prints the OpenCode edition, installed, latest, and update command when no issues exist", () => {
     //#given
     const result = createBaseResult()
+    result.latestVersion = "3.5.0"
 
     //#when
     const output = stripAnsi(formatDefault(result))
 
     //#then
-    expect(output).toContain("System OK (opencode 1.0.200")
+    expect(output).toContain("System OK · Edition: OpenCode · Installed: 3.4.0 · Latest: 3.5.0")
+    expect(output).toContain("Update: bunx oh-my-openagent install")
     expect(output).not.toContain("found:")
+  })
+
+  it("prints 'could not check' for Latest when the OpenCode registry lookup failed", () => {
+    //#given
+    const result = createBaseResult()
+    result.latestVersion = null
+
+    //#when
+    const output = stripAnsi(formatDefault(result))
+
+    //#then
+    expect(output).toContain("System OK · Edition: OpenCode · Installed: 3.4.0 · Latest: could not check")
+    expect(output).toContain("Update: bunx oh-my-openagent install")
   })
 
   it("prints numbered issue list when issues exist", () => {
@@ -78,41 +122,34 @@ describe("formatDefault", () => {
     expect(output).toContain("2. Loaded plugin is outdated")
   })
 
-  it("prints LazyCodex OK line for Codex doctor results", () => {
+  it("prints the Codex edition, installed, latest, and update command for Codex doctor results", () => {
     //#given
     const result = createBaseResult()
     result.target = "codex"
-    result.codex = {
-      codexPath: "/usr/local/bin/codex",
-      codexSource: "cli",
-      codexAppId: null,
-      marketplaceName: "sisyphuslabs",
-      pluginName: "omo",
-      pluginVersion: "4.7.5",
-      pluginVersionStamped: true,
-      installerVersion: "4.7.5",
-      packageName: "lazycodex-ai",
-      packageVersion: "4.7.5",
-      pluginRoot: "/tmp/omo",
-      configPath: "/tmp/config.toml",
-      config: {
-        exists: true,
-        marketplaceConfigured: true,
-        pluginEnabled: true,
-        pluginsFeatureEnabled: true,
-        pluginHooksFeatureEnabled: true,
-        companionPluginEnabled: false,
-        companionLifecycleHookStateEvents: [],
-      },
-      linkedBins: ["omo"],
-      agents: ["plan"],
-    }
+    result.codex = createCodexSummary()
+    result.latestVersion = "4.8.0"
 
     //#when
     const output = stripAnsi(formatDefault(result))
 
     //#then
-    expect(output).toContain("LazyCodex OK (codex /usr/local/bin/codex · omo 4.7.5 · lazycodex-ai 4.7.5)")
+    expect(output).toContain("LazyCodex OK · Edition: Codex · Installed: 4.7.5 · Latest: 4.8.0")
+    expect(output).toContain("Update: npx lazycodex-ai install --no-tui --codex-autonomous")
     expect(output).not.toContain("opencode")
+  })
+
+  it("prints 'could not check' for Latest when the Codex registry lookup failed", () => {
+    //#given
+    const result = createBaseResult()
+    result.target = "codex"
+    result.codex = createCodexSummary()
+    result.latestVersion = null
+
+    //#when
+    const output = stripAnsi(formatDefault(result))
+
+    //#then
+    expect(output).toContain("LazyCodex OK · Edition: Codex · Installed: 4.7.5 · Latest: could not check")
+    expect(output).toContain("Update: npx lazycodex-ai install --no-tui --codex-autonomous")
   })
 })

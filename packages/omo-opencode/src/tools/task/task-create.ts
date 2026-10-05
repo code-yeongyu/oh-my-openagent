@@ -65,12 +65,13 @@ async function handleCreate(
   try {
     const validatedArgs = TaskCreateInputSchema.parse(args);
     const taskDir = getTaskDir(config);
-    const lock = acquireLock(taskDir);
+    const lock = await acquireLock(taskDir);
 
     if (!lock.acquired) {
-      return JSON.stringify({ error: "task_lock_unavailable" });
+      return JSON.stringify({ error: "task_lock_unavailable", retryable: true });
     }
 
+    let validatedTask: TaskObject;
     try {
       const taskId = generateTaskId();
       const task: TaskObject = {
@@ -87,20 +88,22 @@ async function handleCreate(
         threadID: context.sessionID,
       };
 
-      const validatedTask = TaskObjectSchema.parse(task);
+      validatedTask = TaskObjectSchema.parse(task);
       writeJsonAtomic(join(taskDir, `${taskId}.json`), validatedTask);
-
-      await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
-
-      return JSON.stringify({
-        task: {
-          id: validatedTask.id,
-          subject: validatedTask.subject,
-        },
-      });
     } finally {
       lock.release();
     }
+
+    // Todo sync talks to the OpenCode session API and needs no mutual exclusion, so it runs
+    // outside the critical section to keep the hold window at one atomic write.
+    await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
+
+    return JSON.stringify({
+      task: {
+        id: validatedTask.id,
+        subject: validatedTask.subject,
+      },
+    });
   } catch (error) {
     if (error instanceof Error && error.message.includes("Required")) {
       return JSON.stringify({

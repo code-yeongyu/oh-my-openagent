@@ -1,3 +1,4 @@
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import {
   sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemonVersions,
@@ -12,8 +13,6 @@ import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
 // runs and each family self-throttles via its stamp file inside the sweep
 // functions. Mirrors the codex best-effort process-sweep pattern
 // (packages/omo-codex/plugin/components/ — codex hook-sweep.ts).
-
-export const SENPI_RPC_CHILD_MARKER_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 
 export type OmoFamilySweep = () => Promise<unknown>
 
@@ -50,8 +49,11 @@ export function wireSessionStartProcessSweep(
   })
 
   pi.on("session_start", () => {
-    if (env[SENPI_RPC_CHILD_MARKER_ENV] !== undefined) {
-      ctx.logger.info("omo-senpi process sweep skipped: running inside a senpi-task RPC child")
+    // Machine hygiene belongs to the process the USER launched. A task child - its own process, or
+    // a session of the shared daemon - never sweeps: on the daemon it would sweep for every child.
+    const role = readSessionRole(pi, env)
+    if (role !== undefined) {
+      ctx.logger.info("omo-senpi process sweep skipped: running as a senpi-task child session", { role })
       return undefined
     }
     runSweepBestEffort(sweep, ctx)

@@ -1,14 +1,29 @@
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import { log } from "@oh-my-opencode/utils"
 
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { TaskRecordStore } from "../store"
+import {
+  DEFAULT_HOST_SESSION_RETRY_POLICY,
+  type HostEndpointPort,
+  type HostSessionCloser,
+  type HostSessionProbe,
+  type HostSessionRetryPolicy,
+} from "./host-session"
+import { defaultHostSessionCloser, defaultHostSessionProbe } from "./host-session-default"
 import { injectedLifecycleReattachPorts } from "./port"
-import type { LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
+import type { IdleReclaimerScheduler, LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
 import type { BatchAdmissionOptions } from "./residency"
 
+import { defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
+export { createIdleReclaimerScheduler, defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
+
 const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
+const DEFAULT_HOST_CLOSE_TIMEOUT_MS = 10_000
 
 export type LifecycleContext = {
+  readonly revivePolicy?: LifecycleDeps["revivePolicy"]
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
   readonly config: OmoTaskSettings
@@ -19,6 +34,19 @@ export type LifecycleContext = {
   readonly dequeuePending: (taskId: string) => void
   readonly reattachPorts: LifecycleReattachPorts | undefined
   readonly reconcileAdmission: BatchAdmissionOptions
+  readonly idleReclaimerScheduler: IdleReclaimerScheduler
+  // Runtime-only parent kernel-tool map (item 6). Deliberate destruction and record expunge release
+  // a child's binding here; idle parking deliberately does NOT.
+  readonly kernelToolBindings: KernelToolBindingRegistry | undefined
+  // Liveness of daemon-hosted children: ONE probeHost + ONE list_sessions per pass, matched by
+  // session path. `hostSessionClose` is the ONLY way a session this process does not hold is ended.
+  readonly hostSessionProbe: HostSessionProbe
+  readonly hostSessionClose: HostSessionCloser | undefined
+  readonly hostRetry: HostSessionRetryPolicy
+  readonly hostEndpoint: HostEndpointPort
+  readonly hostCloseTimeoutMs: number
+  readonly isolation: IsolationRuntime | undefined
+  readonly isolationProbe: OwnerProbe | undefined
 }
 
 // The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so
@@ -45,6 +73,7 @@ export const defaultSignaller: ProcessSignaller = {
 export function resolveContext(deps: LifecycleDeps): LifecycleContext {
   return {
     store: deps.store,
+    revivePolicy: deps.revivePolicy,
     registry: deps.registry,
     config: deps.config,
     now: deps.now ?? Date.now,
@@ -54,6 +83,15 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     dequeuePending: deps.dequeuePending ?? (() => {}),
     reattachPorts: injectedLifecycleReattachPorts(deps),
     reconcileAdmission: deps.reconcileAdmission ?? {},
+    idleReclaimerScheduler: deps.idleReclaimerScheduler ?? defaultIdleReclaimerScheduler,
+    kernelToolBindings: deps.kernelToolBindings,
+    hostSessionProbe: deps.hostSessionProbe ?? defaultHostSessionProbe(),
+    hostSessionClose: deps.hostSessionClose ?? defaultHostSessionCloser,
+    hostRetry: deps.hostRetry ?? DEFAULT_HOST_SESSION_RETRY_POLICY,
+    hostEndpoint: deps.hostEndpoint,
+    hostCloseTimeoutMs: deps.hostCloseTimeoutMs ?? DEFAULT_HOST_CLOSE_TIMEOUT_MS,
+    isolation: deps.isolation,
+    isolationProbe: deps.isolationProbe,
   }
 }
 

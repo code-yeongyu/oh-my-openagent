@@ -19,6 +19,7 @@ export interface UlwLoopSuccessCriterion {
 	status: UlwLoopCriterionStatus;
 	capturedAt?: string;
 	notes?: string;
+	artifacts?: string[];
 }
 
 export interface UlwLoopItem {
@@ -63,6 +64,9 @@ export interface UlwLoopValidationBatch {
 
 export interface UlwLoopPlan {
 	version: 1;
+	revision?: number;
+	brief?: string;
+	ledgerResetRevision?: number;
 	evidenceLayoutVersion?: 2;
 	createdAt: string;
 	updatedAt: string;
@@ -72,6 +76,7 @@ export interface UlwLoopPlan {
 	codexGoalMode?: UlwLoopCodexGoalMode;
 	codexObjective?: string;
 	codexObjectiveAliases?: string[];
+	acknowledgedDriverObjectives?: string[];
 	aggregateCompletion?: UlwLoopAggregateCompletion;
 	activeGoalId?: string;
 	validationBatches?: readonly UlwLoopValidationBatch[];
@@ -107,15 +112,7 @@ export interface UlwLoopManualQaAdversarialCase {
 	readonly artifactRefs: readonly string[];
 }
 
-export interface UlwLoopQualityGate {
-	readonly codeReview: {
-		readonly by: string;
-		readonly recommendation: "APPROVE";
-		readonly codeQualityStatus: "CLEAR" | "WATCH";
-		readonly reportPath: string;
-		readonly evidence: string;
-		readonly blockers: readonly [];
-	};
+interface UlwLoopQualityGateCommon {
 	readonly manualQa: {
 		readonly by: string;
 		readonly status: "passed";
@@ -147,7 +144,27 @@ export interface UlwLoopQualityGate {
 	};
 }
 
+export interface UlwLoopQualityGateLazycodex extends UlwLoopQualityGateCommon {
+	readonly surface: "lazycodex";
+	readonly codeReview?: {
+		readonly by: string;
+		readonly recommendation: "APPROVE";
+		readonly codeQualityStatus: "CLEAR" | "WATCH";
+		readonly reportPath: string;
+		readonly evidence: string;
+		readonly blockers: readonly [];
+	};
+}
+
+export interface UlwLoopQualityGateSenpi extends UlwLoopQualityGateCommon {
+	readonly surface: "omo-senpi";
+}
+
+export type UlwLoopQualityGate = UlwLoopQualityGateLazycodex | UlwLoopQualityGateSenpi;
+
 export interface UlwLoopLedgerEntry {
+	revision?: number;
+	id?: string;
 	at: string;
 	kind: UlwLoopLedgerEventKind;
 	goalId?: string;
@@ -158,6 +175,7 @@ export interface UlwLoopLedgerEntry {
 	codexGoal?: unknown;
 	evidence?: string;
 	capturedEvidence?: string;
+	artifacts?: string[];
 	qualityGate?: unknown;
 	steering?: UlwLoopSteeringAudit;
 	before?: unknown;

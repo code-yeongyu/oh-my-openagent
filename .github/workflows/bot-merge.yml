@@ -1,0 +1,44 @@
+name: Bot Merge
+
+# Deterministic merge-as-bot: merges one PR with the sisyphus-dev-ai PAT so the
+# merge commit is authored by the bot identity. Exists because the full
+# sisyphus-agent pipeline is an LLM agent and cannot be relied on for the
+# mechanical act of merging (see run 33353727892: plugin load failure).
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to merge (merge commit)"
+        required: true
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    # workflow_dispatch is already restricted to users with write access;
+    # this guard additionally pins it to the repository owner.
+    if: github.actor == 'code-yeongyu'
+    permissions:
+      contents: read
+    steps:
+      - name: Merge PR as sisyphus-dev-ai
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh pr view "${{ inputs.pr }}" --repo "${{ github.repository }}" \
+            --json state,mergeable,statusCheckRollup \
+            --jq '{state,mergeable,failing:[.statusCheckRollup[]|select(.conclusion=="FAILURE")|.name]}'
+          gh pr merge "${{ inputs.pr }}" --repo "${{ github.repository }}" --merge
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Bot Merge"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| PR | \`#${{ inputs.pr }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

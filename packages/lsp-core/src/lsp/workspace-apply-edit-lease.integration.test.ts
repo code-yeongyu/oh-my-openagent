@@ -7,6 +7,7 @@ import {
 	readEvents,
 	renameTextEdit,
 	waitForEventCount,
+	waitForEventCountBySubscription,
 } from "./workspace-apply-edit-test-support.js";
 
 const harness = createWorkspaceEditTestHarness();
@@ -17,13 +18,16 @@ afterEach(async () => {
 
 describe("LspClient workspace mutation lease", () => {
 	it("#given no mutating request #when the server calls applyEdit #then the request is rejected as unscoped", async () => {
-		const context = await harness.makeClient({ unscopedApplyEdit: renameTextEdit("before", "after", { version: 1 }) });
-
-		const responses = await waitForEventCount(
+		const context = await harness.makeClient({
+			unscopedApplyEditOnDidOpen: renameTextEdit("before", "after", { version: 1 }),
+		});
+		const response = waitForEventCountBySubscription(
 			context.events,
 			(event) => event.type === "clientResponse" && event.method === "workspace/applyEdit",
 			1,
 		);
+		await context.client.openFile(context.source);
+		const responses = await response;
 
 		expect(responses[0]?.result).toEqual({
 			applied: false,

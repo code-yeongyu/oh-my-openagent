@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -9,6 +9,8 @@ const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const CHILD_PROCESS_MODULE = join(SOURCE_ROOT, "bin", "lib", "child-process.js")
 const BUN_RUNTIME_MODULE = join(SOURCE_ROOT, "bin", "lib", "bun-runtime.js")
 const roots: string[] = []
+const fixturePids: number[] = []
+const allFixturePids: number[] = []
 
 function writeFile(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -28,7 +30,8 @@ function createRoot(): string {
  */
 function gracefulChildSource(options: { exitCode: number; drainMs: number }): string {
   return `
-import { appendFileSync } from "node:fs"
+import { appendFileSync, writeFileSync } from "node:fs"
+writeFileSync(process.env.PID_FILE, String(process.pid))
 const record = process.env.SIGNAL_LOG
 for (const signal of ["SIGTERM", "SIGHUP", "SIGINT"]) {
   process.on(signal, () => {
@@ -46,7 +49,8 @@ setInterval(() => {}, 1000)
  */
 function ignoringChildSource(): string {
   return `
-import { appendFileSync } from "node:fs"
+import { appendFileSync, writeFileSync } from "node:fs"
+writeFileSync(process.env.PID_FILE, String(process.pid))
 for (const signal of ["SIGTERM", "SIGHUP"]) {
   process.on(signal, () => {
     appendFileSync(process.env.SIGNAL_LOG, signal + "\\n")
@@ -63,7 +67,8 @@ setInterval(() => {}, 1000)
  */
 function signalDeathChildSource(): string {
   return `
-import { appendFileSync } from "node:fs"
+import { appendFileSync, writeFileSync } from "node:fs"
+writeFileSync(process.env.PID_FILE, String(process.pid))
 appendFileSync(process.env.READY_FILE, "ready\\n")
 setInterval(() => {}, 1000)
 `
@@ -99,6 +104,15 @@ function startParent(parentPath: string, env: NodeJS.ProcessEnv): ParentRun {
   return { pid: child.pid ?? -1, exit }
 }
 
+async function waitForProcessGone(pid: number, timeoutMs = 15_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try { process.kill(pid, 0) } catch { return }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 10))
+  }
+  throw new Error(`process ${pid} is still alive`)
+}
+
 async function waitForFile(path: string, timeoutMs = 15_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -125,6 +139,7 @@ type Harness = {
   signalLog: string
   readyFile: string
   parentLog: string
+  pidFile: string
   env: NodeJS.ProcessEnv
 }
 
@@ -137,16 +152,25 @@ function createHarness(childSource: string): Harness {
   const signalLog = join(root, "signals.log")
   const readyFile = join(root, "ready")
   const parentLog = join(root, "parent.log")
+  const pidFile = join(root, "child.pid")
   return {
     parentPath,
     signalLog,
     readyFile,
     parentLog,
-    env: { SIGNAL_LOG: signalLog, READY_FILE: readyFile, PARENT_LOG: parentLog },
+    pidFile,
+    env: { SIGNAL_LOG: signalLog, READY_FILE: readyFile, PARENT_LOG: parentLog, PID_FILE: pidFile },
   }
 }
 
-afterEach(() => {
+afterEach(async () => {
+  for (const pid of fixturePids) {
+    try {
+      process.kill(pid, "SIGKILL")
+    } catch {}
+    await waitForProcessGone(pid)
+  }
+  fixturePids.splice(0)
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
@@ -175,6 +199,8 @@ describePosix("launcher child signal forwarding", () => {
         const harness = createHarness(ignoringChildSource())
         const parent = startParent(harness.parentPath, { ...harness.env, OMO_SIGNAL_GRACE_MS: "400" })
         await waitForFile(harness.readyFile)
+        fixturePids.push(parent.pid, Number(readFileSync(harness.pidFile, "utf8")))
+        allFixturePids.push(...fixturePids.slice(-2))
 
         process.kill(parent.pid, signal)
 
@@ -194,6 +220,8 @@ describePosix("launcher child signal forwarding", () => {
       const harness = createHarness(gracefulChildSource({ exitCode: 0, drainMs: 200 }))
       const parent = startParent(harness.parentPath, harness.env)
       await waitForFile(harness.readyFile)
+      fixturePids.push(parent.pid, Number(readFileSync(harness.pidFile, "utf8")))
+      allFixturePids.push(...fixturePids.slice(-2))
 
       process.kill(parent.pid, "SIGINT")
       await new Promise((resolveWait) => setTimeout(resolveWait, 500))
@@ -205,6 +233,10 @@ describePosix("launcher child signal forwarding", () => {
       process.kill(parent.pid, "SIGKILL")
       await parent.exit
     }, 30_000)
+  })
+
+  afterAll(async () => {
+    for (const pid of allFixturePids) await waitForProcessGone(pid)
   })
 
   describe("#given an engine child that exits on its own #when it returns a non-zero code", () => {
@@ -229,8 +261,11 @@ describePosix("launcher child signal forwarding", () => {
       const parentPath = join(root, "parent.mjs")
       writeFile(parentPath, parentSource(childPath))
       const readyFile = join(root, "ready")
-      const parent = startParent(parentPath, { READY_FILE: readyFile, PARENT_LOG: join(root, "parent.log") })
+      const pidFile = join(root, "child.pid")
+      const parent = startParent(parentPath, { READY_FILE: readyFile, PARENT_LOG: join(root, "parent.log"), PID_FILE: pidFile })
       await waitForFile(readyFile)
+      fixturePids.push(parent.pid, Number(readFileSync(pidFile, "utf8")))
+      allFixturePids.push(...fixturePids.slice(-2))
 
       // The child is the only member of the launcher's descendant tree here, so killing it by pid
       // exercises the death-by-signal path without signaling the launcher.
@@ -264,7 +299,7 @@ import { maybeReexecUnderBun } from ${JSON.stringify(BUN_RUNTIME_MODULE)}
 await maybeReexecUnderBun({
   scriptPath: ${JSON.stringify(childPath)},
   argv: ["node", ${JSON.stringify(childPath)}],
-  env: { OMO_RUNTIME: "bun", PATH: ${JSON.stringify(binDir)} },
+  env: { OMO_RUNTIME: "bun", PATH: ${JSON.stringify(binDir)}, PID_FILE: ${JSON.stringify(join(root, "child.pid"))} },
   versions: {},
   homedir: () => ${JSON.stringify(join(root, "home"))},
 })
@@ -276,8 +311,11 @@ await maybeReexecUnderBun({
         SIGNAL_LOG: signalLog,
         READY_FILE: readyFile,
         PARENT_LOG: join(root, "parent.log"),
+        PID_FILE: join(root, "child.pid"),
       })
       await waitForFile(readyFile)
+      fixturePids.push(parent.pid, Number(readFileSync(join(root, "child.pid"), "utf8")))
+      allFixturePids.push(...fixturePids.slice(-2))
 
       process.kill(parent.pid, "SIGTERM")
 

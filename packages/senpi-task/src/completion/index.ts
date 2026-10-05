@@ -19,6 +19,7 @@ export type {
   ParentState,
   ReconcileFailedNotificationsInput,
   ReconcileUnnotifiedNotificationsInput,
+  RecordDeliveryFailureInput,
   RoutingDecision,
   SkipReason,
   TransitionReason,

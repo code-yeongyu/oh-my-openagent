@@ -6,12 +6,13 @@ import { parseJsoncSafe } from "./jsonc-parser"
 import { log } from "./logger"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"
 import { isCanonicalEntry, isLegacyEntry, toCanonicalEntry } from "./plugin-entry-migrator"
+import type { PluginEntry } from "./plugin-entry-shape"
 
 interface OpenCodeConfig {
-  plugin?: string[]
+  plugin?: PluginEntry[]
 }
 
-function normalizePluginEntries(entries: string[]): string[] {
+function normalizePluginEntries(entries: PluginEntry[]): PluginEntry[] {
   const hasCanonical = entries.some(isCanonicalEntry)
 
   if (hasCanonical) {
@@ -21,7 +22,7 @@ function normalizePluginEntries(entries: string[]): string[] {
   return entries.map((entry) => (isLegacyEntry(entry) ? toCanonicalEntry(entry) : entry))
 }
 
-function updateJsoncPluginArray(content: string, pluginEntries: string[]): string | null {
+function updateJsoncPluginArray(content: string, pluginEntries: PluginEntry[]): string | null {
   const edits = modify(content, ["plugin"], pluginEntries, {
     formattingOptions: {
       insertSpaces: true,

@@ -28,7 +28,7 @@ export function createCrashOperations(overrides = {}) {
     pollUntil,
     readCrashTarget,
     readCrashReservationState,
-    readMemberTerminal: (cwd, target) => readMemberTerminal(cwd, target, processAlive),
+    readMemberTerminal: (sandbox, target) => readMemberTerminal(sandbox, target, processAlive),
     readPostCrashMailbox,
     ageCrashReservation,
     isProcessAlive: processAlive,
@@ -39,16 +39,16 @@ export function createCrashOperations(overrides = {}) {
   }
 }
 
-export function replacementMemberEnv(cwd, target) {
+export function replacementMemberEnv(sandbox, target) {
   return {
     SENPI_TASK_MEMBER: `${target.runId}::crash`,
     SENPI_TASK_MEMBER_TASK_ID: target.taskId,
-    SENPI_CODING_AGENT_SESSION_DIR: memberSessionDir(cwd, target.taskId),
+    SENPI_CODING_AGENT_SESSION_DIR: memberSessionDir(sandbox, target.taskId),
     SENPI_TASK_TEAM_CONFIG: JSON.stringify({
       enabled: true,
       tmux_visualization: false,
-      base_dir: teamBaseDir(cwd),
-      stateDir: taskStateDir(cwd),
+      base_dir: teamBaseDir(sandbox),
+      stateDir: taskStateDir(sandbox),
       members: ["crash"],
       max_members: 8,
       max_parallel_members: 4,
@@ -85,48 +85,48 @@ export function writeRunLogs(outDir, prefix, result) {
   writeFileSync(join(outDir, `${prefix}-stderr.log`), result.stderr)
 }
 
-function readCrashReservationState(cwd, target) {
+function readCrashReservationState(sandbox, target) {
   if (!target.ready) return { reservedExists: false, processedExists: false, eventCount: 0 }
   return {
-    reservedExists: existsSync(reservedMessagePath(cwd, target.runId, "crash", target.messageId)),
-    processedExists: existsSync(processedMessagePath(cwd, target.runId, "crash", target.messageId)),
-    eventCount: deliveredEventCount(cwd, target.taskId, target.messageId),
+    reservedExists: existsSync(reservedMessagePath(sandbox, target.runId, "crash", target.messageId)),
+    processedExists: existsSync(processedMessagePath(sandbox, target.runId, "crash", target.messageId)),
+    eventCount: deliveredEventCount(sandbox, target.taskId, target.messageId),
   }
 }
 
-function readPostCrashMailbox(cwd, target) {
+function readPostCrashMailbox(sandbox, target) {
   if (!target.ready) return emptyMailboxState(target)
   return {
-    ...inboxCounts(memberInboxDir(cwd, target.runId, "crash")),
-    reservedExists: existsSync(reservedMessagePath(cwd, target.runId, "crash", target.messageId)),
-    unreadExists: existsSync(unreadMessagePath(cwd, target.runId, "crash", target.messageId)),
-    processedExists: existsSync(processedMessagePath(cwd, target.runId, "crash", target.messageId)),
-    eventCount: deliveredEventCount(cwd, target.taskId, target.messageId),
-    envelopeCount: sessionEnvelopeCount(cwd, target.taskId, target.messageId),
+    ...inboxCounts(memberInboxDir(sandbox, target.runId, "crash")),
+    reservedExists: existsSync(reservedMessagePath(sandbox, target.runId, "crash", target.messageId)),
+    unreadExists: existsSync(unreadMessagePath(sandbox, target.runId, "crash", target.messageId)),
+    processedExists: existsSync(processedMessagePath(sandbox, target.runId, "crash", target.messageId)),
+    eventCount: deliveredEventCount(sandbox, target.taskId, target.messageId),
+    envelopeCount: sessionEnvelopeCount(sandbox, target.taskId, target.messageId),
   }
 }
 
-function readMemberTerminal(cwd, target, processAlive) {
-  const record = target.taskId === undefined ? undefined : taskRecord(cwd, target.taskId)
+function readMemberTerminal(sandbox, target, processAlive) {
+  const record = target.taskId === undefined ? undefined : taskRecord(sandbox, target.taskId)
   if (record !== undefined && ABNORMAL_MEMBER_STATES.has(record.status)) return { kind: "record", status: record.status }
   if (target.pid !== undefined && !processAlive(target.pid)) return { kind: "exit" }
   return { kind: undefined }
 }
 
-function ageCrashReservation(cwd, target) {
-  const path = reservedMessagePath(cwd, target.runId, "crash", target.messageId)
+function ageCrashReservation(sandbox, target) {
+  const path = reservedMessagePath(sandbox, target.runId, "crash", target.messageId)
   if (!existsSync(path)) return false
   const aged = (Date.now() - STALE_RESERVATION_AGE_MS) / 1000
   utimesSync(path, aged, aged)
   return true
 }
 
-function readCrashTarget(cwd, markerPath) {
+function readCrashTarget(sandbox, markerPath) {
   const marker = readJsonIfPresent(markerPath)
   const messageId = typeof marker?.messageId === "string" ? marker.messageId : undefined
-  const runId = discoverRunIds(cwd)[0]
-  const taskId = runId === undefined ? undefined : memberTaskId(cwd, runId, "crash")
-  const record = taskId === undefined ? undefined : taskRecord(cwd, taskId)
+  const runId = discoverRunIds(sandbox)[0]
+  const taskId = runId === undefined ? undefined : memberTaskId(sandbox, runId, "crash")
+  const record = taskId === undefined ? undefined : taskRecord(sandbox, taskId)
   const pid = typeof record?.pid === "number" ? record.pid : undefined
   const leadSessionId = typeof record?.parent_session_id === "string" ? record.parent_session_id : undefined
   return {

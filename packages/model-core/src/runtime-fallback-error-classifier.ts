@@ -33,6 +33,8 @@ export interface RuntimeFallbackRetryOptions {
   }) => void
 }
 
+type UnknownRecord = Readonly<Record<string, unknown>>
+
 function isStatusCodeRetrySafe(code: number, retryOnErrors: readonly number[]): boolean {
   return retryOnErrors.includes(code) || (code >= 500 && code < 600) || code === 408 || code === 425 || code === 429
 }
@@ -44,8 +46,57 @@ function isLocalizedQuotaExhaustionMessage(message: string): boolean {
   )
 }
 
+function isUnknownRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null
+}
+
+function getUnknownProperty(value: unknown, key: string): unknown {
+  if (!isUnknownRecord(value)) return undefined
+  try {
+    return value[key]
+  } catch (cause) {
+    // Unknown inputs may use hostile Proxy traps, so property-read failures cannot escape this boundary.
+    if (!(cause instanceof Error)) {
+      void cause
+    }
+    return undefined
+  }
+}
+
+function getDetailErrorType(error: unknown): string | undefined {
+  const data = getUnknownProperty(error, "data")
+  const detail = getUnknownProperty(error, "detail") ?? getUnknownProperty(data, "detail") ?? error
+  const detailError = getUnknownProperty(detail, "error") ?? detail
+  const type = getUnknownProperty(detailError, "type") ?? getUnknownProperty(detail, "type")
+  return typeof type === "string" ? type.toLowerCase() : undefined
+}
+
+function isTerminalQuotaMessage(message: string): boolean {
+  if (
+    /\bnon[-\s]+terminal\s+quota\b/i.test(message) ||
+    /\bnon[-\s]+terminal\s+billing\s+limit\b/i.test(message)
+  ) {
+    return false
+  }
+  return (
+    /\bterminal\s+quota\b/i.test(message) ||
+    /\bterminal\s+billing\s+limit\b/i.test(message) ||
+    /\bhard\s+billing\s+limit\b/i.test(message)
+  )
+}
+
+/** A quota the provider marks as permanent: no reset, so no fallback retry either. */
+export function isTerminalQuotaError(error: unknown): boolean {
+  return getDetailErrorType(error) === "terminal_quota_exhausted" || isTerminalQuotaMessage(getRuntimeFallbackErrorMessage(error))
+}
+
 export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErrorType | undefined {
+  if (isTerminalQuotaError(error)) {
+    return "abort"
+  }
+
   const message = getRuntimeFallbackErrorMessage(error)
+
   const errorName = getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
 
   if (errorName?.includes("messageabortederror") || errorName?.includes("aborterror")) {
@@ -81,11 +132,19 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     errorName?.includes("insufficientquota") ||
     errorName?.includes("billingerror") ||
     errorName?.includes("resourceexhausted") ||
+    errorName?.includes("insufficientcredits") ||
+    errorName?.includes("usagelimit") ||
     /quota.?exceeded/i.test(message) ||
     /exceeded.*quota/i.test(message) ||
+    /quota\b.*\breset/i.test(message) ||
     /usage\s*quota/i.test(message) ||
     /subscription.?(?:quota|limit)/i.test(message) ||
-    /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
+    /insufficient.?(?:quota|balance|funds?|credits?)/i.test(message) ||
+    /credits?\s+exhausted/i.test(message) ||
+    /\b(?:session|weekly|monthly|daily|hourly|\d+[-\s]hour|plan|call)\s+limit\b/i.test(message) ||
+    /\bhit\s+your\b[^.]*\blimit\b/i.test(message) ||
+    /\bin\s+arrears\b/i.test(message) ||
+    /\brecharge\s+and\s+try\b/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
     /resource.?exhausted/i.test(message) ||
@@ -95,6 +154,7 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /credit\s+balance.*too\s+low/i.test(message) ||
     /limit\s+exhausted/i.test(message) ||
     /使用上限/.test(message) ||
+    /用量上限/.test(message) ||
     /达到.*限制/.test(message) ||
     /额度.*不足/.test(message) ||
     /余额.*不足/.test(message) ||

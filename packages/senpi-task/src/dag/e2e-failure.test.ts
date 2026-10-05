@@ -420,8 +420,8 @@ function immediateChildSession(): ChildSession {
   return {
     sessionId: "policy-child",
     prompt: () => Promise.resolve(),
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe: () => () => undefined,
     getLastAssistantText: () => "policy complete",
@@ -603,7 +603,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     expect(fixture.taskStore.list().records).toHaveLength(tasksBefore)
   })
 
-  test("#given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and dag are absent", async () => {
+  test("#given spawn-capable parent tools #when an in-process DAG child resolves its real session options #then task, task_*, team_*, and workflow are absent", async () => {
     // given
     let captured: CreateAgentSessionOptions | undefined
     const inProcess = new InProcessRunner({
@@ -612,7 +612,7 @@ describe("DAG failure, crash, and policy end to end", () => {
         makeTool("task"),
         makeTool("task_create"),
         makeTool("team_send"),
-        makeTool("dag"),
+        makeTool("workflow"),
       ],
       createSession: async (options) => {
         captured = options
@@ -629,7 +629,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     const names = (captured?.customTools ?? []).map((tool) => tool.name)
     expect(names).toContain("read")
     expect(names).not.toContain("task")
-    expect(names).not.toContain("dag")
+    expect(names).not.toContain("workflow")
     expect(names.some((name) => name.startsWith("task_") || name.startsWith("team_"))).toBe(false)
   })
 
@@ -751,6 +751,7 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
+      env: { ...process.env },
     })
     const marker = JSON.parse(await readLine(child.stdout)) as { readonly armed: number }
     expect(marker.armed).toBe(stopAt)

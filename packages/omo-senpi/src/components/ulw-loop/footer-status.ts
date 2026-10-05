@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 const STATUS_KEY = "ulw-loop"
@@ -39,7 +39,8 @@ export interface UlwLoopFooterStatus {
 }
 
 export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = {}): UlwLoopFooterStatus {
-  const isGoalActive = options.isGoalActive ?? goalActiveFromContext
+  const goalCache = createGoalJsonCache()
+  const isGoalActive = options.isGoalActive ?? ((runtime: UlwLoopFooterRuntime) => goalActiveFromContext(runtime, goalCache))
   const timers = options.timers ?? defaultTimers
   let timer: TimerHandle | undefined
   let frameIndex = 0
@@ -89,6 +90,7 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
     dispose() {
       ulwActive = false
       stop()
+      goalCache.clear()
       runtime = undefined
     },
   }
@@ -121,26 +123,89 @@ function runtimeFromContext(value: unknown): UlwLoopFooterRuntime | undefined {
   }
 }
 
-function goalActiveFromContext(runtime: UlwLoopFooterRuntime): boolean {
-  for (const goalPath of runtime.goalPaths) {
-    try {
-      const parsed: unknown = JSON.parse(readFileSync(goalPath, "utf8"))
-      if (
-        isRecord(parsed) &&
-        parsed["version"] === 1 &&
-        isRecord(parsed["goal"]) &&
-        typeof parsed["goal"]["status"] === "string"
-      ) {
-        return parsed["goal"]["status"] === "active"
+type GoalJsonCache = {
+  read(path: string): Record<string, unknown> | undefined
+  clear(): void
+}
+
+type GoalJsonCacheEntry = {
+  readonly mtimeMs: number
+  readonly size: number
+  readonly raw: string
+  readonly parsed: Record<string, unknown> | undefined
+}
+
+// A rewrite that lands within the filesystem's timestamp granule keeps the previous mtime, so an
+// unchanged mtime+size is trusted only once it is older than this window (git's racily-clean rule).
+const RACY_MTIME_WINDOW_MS = 2_000
+
+// The footer ticks at 320ms; an idle goal file costs one stat per tick and is parsed only when its bytes change.
+export function createGoalJsonCache(): GoalJsonCache {
+  const entries = new Map<string, GoalJsonCacheEntry>()
+  return {
+    read(path) {
+      let mtimeMs: number
+      let size: number
+      try {
+        ;({ mtimeMs, size } = statSync(path))
+      } catch {
+        entries.delete(path)
+        return undefined
       }
-    } catch {
-      continue
+      const hit = entries.get(path)
+      const statUnchanged = hit !== undefined && hit.mtimeMs === mtimeMs && hit.size === size
+      if (hit !== undefined && statUnchanged && Date.now() - mtimeMs >= RACY_MTIME_WINDOW_MS) return hit.parsed
+      let raw: string
+      try {
+        raw = readFileSync(path, "utf8")
+      } catch {
+        entries.delete(path)
+        return undefined
+      }
+      if (hit !== undefined && statUnchanged && hit.raw === raw) return hit.parsed
+      const parsed = parseGoalJson(raw)
+      entries.set(path, { mtimeMs, size, raw, parsed })
+      return parsed
+    },
+    clear() {
+      entries.clear()
+    },
+  }
+}
+
+function parseGoalJson(raw: string): Record<string, unknown> | undefined {
+  try {
+    const value: unknown = JSON.parse(raw)
+    return isRecord(value) ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function readGoalJsonUncached(path: string): Record<string, unknown> | undefined {
+  try {
+    return parseGoalJson(readFileSync(path, "utf8"))
+  } catch {
+    return undefined
+  }
+}
+
+function goalActiveFromContext(runtime: UlwLoopFooterRuntime, cache?: GoalJsonCache): boolean {
+  for (const goalPath of runtime.goalPaths) {
+    const parsed = cache === undefined ? readGoalJsonUncached(goalPath) : cache.read(goalPath)
+    if (
+      parsed !== undefined &&
+      parsed["version"] === 1 &&
+      isRecord(parsed["goal"]) &&
+      typeof parsed["goal"]["status"] === "string"
+    ) {
+      return parsed["goal"]["status"] === "active"
     }
   }
   return false
 }
 
-function goalPathsFromContext(value: unknown): readonly string[] {
+export function goalPathsFromContext(value: unknown): readonly string[] {
   if (!isRecord(value)) return []
   const manager = value["sessionManager"]
   if (!isRecord(manager)) return []

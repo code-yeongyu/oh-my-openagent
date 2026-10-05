@@ -65,7 +65,7 @@ describe("model-resolution check", () => {
         info.agents.find((a) => a.name === "sisyphus"),
         "sisyphus agent resolution",
       )
-      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
+      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-5-5")
       expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 
@@ -79,7 +79,7 @@ describe("model-resolution check", () => {
         info.categories.find((c) => c.name === "visual-engineering"),
         "visual-engineering category resolution",
       )
-      expect(visual.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
+      expect(visual.requirement.fallbackChain[0]?.model).toBe("claude-fable-5-1")
       expect(visual.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
   })

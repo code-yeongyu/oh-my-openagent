@@ -46,6 +46,25 @@ function writePersistedRecord(project: string, taskId: string, fields: Record<st
   return path
 }
 
+describe("record-parse legacy team linkage", () => {
+  test("#given a legacy record without team linkage #when listed #then it still decodes without team fields", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    writePersistedRecord(project, "st_02000000", {})
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.team_run_id).toBeUndefined()
+    expect(result.records[0]?.team_name).toBeUndefined()
+    expect(result.records[0]?.team_member_name).toBeUndefined()
+    expect(result.records[0]?.team_role).toBeUndefined()
+  })
+})
+
 describe("record-parse notify_on_terminal legacy default", () => {
   test("#given a legacy record without notify_on_terminal #when listed #then the field defaults to false", () => {
     // given
@@ -323,5 +342,55 @@ describe("record-parse pending_steering with sibling records", () => {
     const warnings = result.diagnostics.filter((d) => d.type === "parse_warning")
     expect(warnings.every((w) => w.path.includes("st_02000020"))).toBe(true)
     expect(warnings.some((w) => w.path.includes("st_02000021"))).toBe(false)
+  })
+})
+
+describe("record-parse cancel_requested (omo#9403)", () => {
+  test("#given a record with a pending cancel, with and without a reason #when listed #then cancel_requested round-trips", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    writePersistedRecord(project, "st_02000100", { status: "running", cancel_requested: { requested_at: "2026-07-06T00:01:00.000Z", reason: "no longer needed" } })
+    writePersistedRecord(project, "st_02000101", { status: "running", cancel_requested: { requested_at: "2026-07-06T00:02:00.000Z" } })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    const byId = new Map(result.records.map((record) => [record.task_id, record]))
+    expect(byId.get("st_02000100")?.cancel_requested).toEqual({ requested_at: "2026-07-06T00:01:00.000Z", reason: "no longer needed" })
+    expect(byId.get("st_02000101")?.cancel_requested).toEqual({ requested_at: "2026-07-06T00:02:00.000Z" })
+  })
+
+  test("#given a legacy record without cancel_requested #when listed #then it still loads with no pending cancel", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    writePersistedRecord(project, "st_02000102", { status: "running" })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.cancel_requested).toBeUndefined()
+  })
+
+  test.each([
+    ["not an object", "cancel"],
+    ["missing requested_at", { reason: "no longer needed" }],
+  ])("#given a cancel_requested that is %s #when listed #then the record is rejected with a diagnostic", (_label, value) => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    writePersistedRecord(project, "st_02000103", { status: "running", cancel_requested: value })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.records.map((record) => record.task_id)).not.toContain("st_02000103")
+    expect(result.diagnostics.length).toBeGreaterThan(0)
   })
 })

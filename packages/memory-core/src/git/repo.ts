@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { mkdir, writeFile } from "node:fs/promises"
+import { existsSync } from "../fs/resilient"
+import { mkdir, writeFile } from "../fs/resilient"
 import { dirname, join } from "node:path"
 import { withGitLockRetry, withSerializedGitConfigMutation } from "./config-lock"
 import { DirtyRepoError, NoEffectiveChangesError } from "./errors"
@@ -8,6 +8,7 @@ import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
 import { GitPathStateStore } from "./path-state"
 import { authorFlags, commandError, normalizePathspecs, normalizeSeedPath } from "./repo-arguments"
 import { parseLogOutput, parseNulPaths } from "./repo-log"
+import { parseCatFileBatch, parseLsTreeBlobs, parseLsTreeSized } from "./repo-tree"
 import { assertNoUnrelatedChanges } from "./repo-status"
 import { withSerializedGitWorktreeMutation } from "./worktree-mutation-queue"
 import type {
@@ -16,6 +17,7 @@ import type {
   GitLogOptions,
   GitMemoryRepoOptions,
   GitMergeOptions,
+  GitTreeBlobEntry,
   GitTreeSizedEntry,
   InitializeGitRepoOptions,
   MemoryCommit,
@@ -23,7 +25,7 @@ import type {
 
 export type {
   GitCommitAuthor, GitCommitResult, GitLogOptions, GitMemoryRepoOptions,
-  GitMergeOptions, GitSeedFile, GitTreeSizedEntry, InitializeGitRepoOptions, MemoryCommit,
+  GitMergeOptions, GitSeedFile, GitTreeBlobEntry, GitTreeSizedEntry, InitializeGitRepoOptions, MemoryCommit,
 } from "./repo-types"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -48,7 +50,7 @@ export class GitMemoryRepo {
   async init(options: InitializeGitRepoOptions = {}): Promise<string> {
     await mkdir(this.dir, { recursive: true })
     if (!existsSync(join(this.dir, ".git"))) {
-      await withGitLockRetry(() => this.git(["init"]))
+      await withGitLockRetry(() => this.git(["init", "--template="]))
       await withGitLockRetry(() => this.git(["symbolic-ref", "HEAD", "refs/heads/main"]))
     }
 
@@ -120,7 +122,7 @@ export class GitMemoryRepo {
   async status(paths: readonly string[] = []): Promise<string> {
     const normalized = normalizePathspecs(paths)
     const suffix = normalized.length > 0 ? ["--", ...normalized] : []
-    return (await this.git(["status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
+    return (await this.git(["-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
   }
 
   async head(): Promise<string | null> {
@@ -147,12 +149,36 @@ export class GitMemoryRepo {
     return parseLsTreeSized(result.stdout)
   }
 
+  async lsTreeBlobs(revision = "HEAD"): Promise<readonly GitTreeBlobEntry[]> {
+    return parseLsTreeBlobs((await this.git(["ls-tree", "-r", "-z", revision])).stdout)
+  }
+
   async show(revision: string, path: string): Promise<string> {
     return (await this.git(["show", `${revision}:${path}`])).stdout
   }
 
+  /**
+   * Reads every requested blob through ONE `git cat-file --batch` process. Reading a whole tree with
+   * one `git show` per file spawned thousands of processes per HEAD move on a large memory repo.
+   * Object ids git reports missing are absent from the returned map.
+   */
+  async readBlobs(oids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const unique = [...new Set(oids)]
+    if (unique.length === 0) return new Map()
+    const argv = ["cat-file", "--batch"]
+    const result = await this.gitResult(argv, `${unique.join("\n")}\n`)
+    if (result.code !== 0) throw commandError(argv, result)
+    return parseCatFileBatch(result.stdoutBytes ?? Buffer.from(result.stdout, "utf8"))
+  }
+
   async log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> {
     const argv = ["log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI"]
+    // `--fixed-strings` because callers pass trailer literals, `--all-match` because every one of them
+    // must appear in the same commit. Filtering inside git means a caller after one trailer combination
+    // no longer parses the whole history into memory to find it.
+    if (options.grep !== undefined && options.grep.length > 0) {
+      argv.push("--fixed-strings", "--all-match", ...options.grep.map((pattern) => `--grep=${pattern}`))
+    }
     if (options.limit !== undefined) argv.push("-n", String(options.limit))
     if (options.range !== undefined) argv.push(options.range)
     if (options.paths !== undefined && options.paths.length > 0) argv.push("--", ...options.paths)
@@ -244,29 +270,12 @@ export class GitMemoryRepo {
     return result
   }
 
-  private gitResult(argv: readonly string[]): Promise<GitExecResult> {
+  private gitResult(argv: readonly string[], stdin?: string): Promise<GitExecResult> {
     return this.exec.run(argv, {
       cwd: this.dir,
       timeoutMs: GIT_TIMEOUT_MS,
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      ...(stdin === undefined ? {} : { stdin }),
     })
   }
-}
-
-function parseLsTreeSized(stdout: string): GitTreeSizedEntry[] {
-  const entries: GitTreeSizedEntry[] = []
-  for (const record of stdout.split("\0")) {
-    if (record.length === 0) continue
-    const tab = record.indexOf("\t")
-    if (tab === -1) continue
-    const meta = record.slice(0, tab).trim().split(/\s+/)
-    const path = record.slice(tab + 1)
-    if (meta.length < 4 || path.length === 0) continue
-    const size = meta[3]
-    if (size === undefined || size === "-") continue
-    const bytes = Number.parseInt(size, 10)
-    if (!Number.isSafeInteger(bytes) || bytes < 0) continue
-    entries.push({ path, bytes })
-  }
-  return entries
 }

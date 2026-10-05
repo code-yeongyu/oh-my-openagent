@@ -2,7 +2,7 @@
 // runs, narrowed to the person's name and aliases. Read-only; sessions are never
 // mutated and the hits only ever reach the dialectic child as inline evidence.
 
-import { existsSync } from "node:fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { SenpiSessionProvider, searchTranscripts, searchableText } from "@oh-my-opencode/memory-core"

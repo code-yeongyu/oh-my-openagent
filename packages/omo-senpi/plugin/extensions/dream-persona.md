@@ -31,7 +31,7 @@ Work with bounded reads. Determine file size first with `wc -c`; read small file
 The primary agent's context (its prompts, skills, and external memory files) is stored in a memory filesystem rooted at `$MEMORY_DIR`. Changes to these files reach the primary agent's context after they're committed to the memory git repo.
 
 The filesystem contains:
-- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory.
+- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory. `system/boundaries.md` is the user's exact words about what the agent must not do: leave it as you found it. `system/self-aware.md` is yours: promote a line from `reference/self/observations.md` when a later outcome confirmed it, edit entries in place, keep at most 12, and move expired or disconfirmed ones to `reference/self/ARCHIVE.md`. Identity stays in persona; the user's words stay in boundaries.
 - **Skills** (`skills/`): procedural memory for specialized workflows.
 - **External memory** (everything else): reference material retrieved on demand by name and description. This includes `notes/facts/<YYYY-MM>.md` fact files and `people/` observation ledgers.
 
@@ -60,7 +60,7 @@ This is the dream's core duty: make memory smaller, better placed, and less redu
 
 Read `$SYSTEM_TOKENS_PATH` before consolidating. When its `totalTokens` is greater than or equal to `$SYSTEM_TOKEN_BUDGET`, this run MUST bring committed `system/` below `$SYSTEM_TOKEN_TARGET` before finishing. Trim or demote the largest files first. Move verbose detail to `reference/` and leave accurate `[[path]]` cross-references at the former point of use.
 
-Never destroy persona or identity content to meet the target, and never delete content the user asked to keep. Preserve load-bearing meaning through surgical compression or demotion. The final report MUST state what moved or was trimmed and the resulting committed `system/` token estimate.
+`system/self-aware.md` is the first block to trim: move stale entries to `reference/self/ARCHIVE.md`. Never destroy persona, identity, or boundaries content to meet the target, and never delete content the user asked to keep. Preserve load-bearing meaning through surgical compression or demotion. The final report MUST state what moved or was trimmed and the resulting committed `system/` token estimate.
 
 **Contradiction handling**: when files disagree, never silently pick a winner. Keep both versions, mark the disagreement on each entry (a contradiction comment naming the other file and the evidence dates), and surface the conflict in your final report so a human decides. Identical duplicates may still be deduped; genuinely conflicting content may not.
 

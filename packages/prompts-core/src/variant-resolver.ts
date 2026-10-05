@@ -3,10 +3,11 @@ import {
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isKimiK2CodeModel,
   isKimiK2Model,
-  isKimiK27Model,
   isKimiK3Model,
   isMiniMaxModel,
+  isSWE2Model,
 } from "@oh-my-opencode/model-core"
 import type { VariantTable } from "./types"
 
@@ -24,7 +25,8 @@ const MODEL_MATCHERS: Readonly<Record<string, ModelMatcher>> = {
   gpt: isGptModel,
   gemini: isGeminiModel,
   "kimi-k3": isKimiK3Model,
-  "kimi-k2-7": isKimiK27Model,
+  "swe-2": isSWE2Model,
+  "kimi-k2-7": isKimiK2CodeModel,
   kimi: isKimiK2Model,
   glm: isGlmModel,
   "opus-4-7": isClaudeOpus47Model,

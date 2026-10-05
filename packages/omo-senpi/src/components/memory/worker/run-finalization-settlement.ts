@@ -4,6 +4,7 @@ import {
   ensureReflectionCompletion,
   readReflectionCompletion,
 } from "./completion"
+import { classifyReflectionFailure } from "./failure-policy"
 import { readReflectionHealth } from "./health"
 import {
   readRunJson,
@@ -50,14 +51,22 @@ export async function settleReservationRun(
     throw new Error(`Reflection completion identity unavailable for ${current.runId}`)
   }
   let launch
+  let park
   if (active?.runId === current.runId) {
-    const transition = await context.reservation.complete(current.runId, decision.outcome)
+    const failure = classifyReflectionFailure(decision)
+    const transition = await context.reservation.complete(current.runId, decision.outcome, failure === undefined ? undefined : { failure })
     if (transition.launch !== undefined) context.launch?.(transition.launch)
     launch = transition.launch
+    park = transition.park
   }
 
-  const healthBefore = await readReflectionHealth(completionsDir)
-  const completion = await ensureReflectionCompletion(completionsDir, {
+  // A durable record is the authority for its run id. Rebuilding one from the ledger folds in
+  // launch-dependent values (the current failure streak, `now()` when the ledger lacks a
+  // finalizedAt), so a replayed settlement can never reproduce it byte for byte; comparing
+  // would throw before final.json lands and the reconcile pass would replay this directory
+  // on every launch (#8437). Adopt it and finish the terminal artifacts instead.
+  const healthBefore = existing === null ? await readReflectionHealth(completionsDir) : undefined
+  const completion = existing ?? await ensureReflectionCompletion(completionsDir, {
     schemaVersion: 1,
     runId: current.runId,
     identity: context.identity.id,
@@ -77,7 +86,8 @@ export async function settleReservationRun(
       ? { mergedCommitSha: decision.integrationSha }
       : {}),
     ...(current.validatedChangedPaths === undefined ? {} : { filesChanged: current.validatedChangedPaths.length }),
-    consecutiveFailures: decision.outcome === "failed" ? healthBefore.streak + 1 : 0,
+    consecutiveFailures: decision.outcome === "failed" ? (healthBefore?.streak ?? 0) + 1 : 0,
+    ...(current.launcher === undefined ? {} : { launcher: current.launcher }),
     delivery: { status: "pending" },
   })
   await updateRunLedger(ledgerPath, { finalizePhase: "settled" })
@@ -95,6 +105,7 @@ export async function settleReservationRun(
     ...(decision.detail === undefined ? {} : { detail: decision.detail }),
     completion,
     ...(launch === undefined ? {} : { launch }),
+    ...(park === undefined ? {} : { park }),
   }
 }
 

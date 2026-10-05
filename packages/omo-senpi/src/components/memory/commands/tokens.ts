@@ -1,7 +1,7 @@
 // bytes/4 system-prompt token estimate over the working-tree system/ directory.
 // Shared by `/memfs tokens` and the `/doctor` compile-warn advisory.
 
-import { readdir, readFile } from "node:fs/promises"
+import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 export interface SystemTokenFileEstimate {

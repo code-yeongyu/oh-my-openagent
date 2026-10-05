@@ -1,17 +1,17 @@
 #!/usr/bin/env bun
 
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
-import { toSpawnTarget } from "../../src/components/ulw-loop/omo-command.ts"
 
 const scriptPath = fileURLToPath(import.meta.url)
 const repoRoot = join(dirname(scriptPath), "../../../..")
-const toolkitExecutable = process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit"
-const toolkitBin = join(repoRoot, "packages/omo-senpi/plugin/runtime/agent-toolkit", toolkitExecutable)
+// Native no longer stages a toolkit CLI. This probe drives the component's CLI from source with the
+// runtime already executing this script, so it needs no build step and no staged payload.
+const toolkitBin = join(repoRoot, "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts")
 // Senpi never puts a session id on the extension host's process.env, so the host-with-no-session-identity
 // scenario is the one that actually models production. It must never continue an unscoped run.
 const NO_SESSION = "--no-session"
@@ -63,16 +63,24 @@ process.stdout.write(
 )
 
 // Legacy/unscoped runs live at `.omo/ulw-loop/goals.json` and are visible to every session sharing the
-// cwd. A host that cannot name its own session must report inactive rather than adopt that run.
+// cwd. The toolkit itself no longer writes there (a scope-less call fails closed), so the fixture is
+// written by hand the way an older toolkit left it. A host that cannot name its own session must
+// report inactive rather than adopt that run.
 function runNoSessionScenario() {
   const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-no-session-"))
   try {
-    runToolkit(
+    const refusal = runToolkit(
       ["ulw-loop", "create-goals", "--brief", "- An unscoped legacy run nobody owns", "--json"],
       cwd,
       null,
-      0,
+      1,
     )
+    assert(
+      refusal.includes("ULW_LOOP_SESSION_SCOPE_REQUIRED"),
+      `toolkit without a session scope did not refuse: ${refusal}`,
+    )
+    assert(!existsSync(join(cwd, ".omo")), "a scope-less toolkit call wrote state")
+    writeLegacyUnscopedPlan(cwd)
     const unscopedPlan = existsSync(join(cwd, ".omo/ulw-loop/goals.json"))
     assert(unscopedPlan, "the unscoped legacy plan fixture was not created")
 
@@ -81,14 +89,62 @@ function runNoSessionScenario() {
       child.messageCount === 0,
       `host without session identity continued ${child.messageCount} times, expected 0`,
     )
-    return { sessionId: null, messageCount: child.messageCount, unscopedPlan }
+    return { sessionId: null, messageCount: child.messageCount, unscopedPlan, toolkitRefusedUnscoped: true }
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }
 }
 
+function writeLegacyUnscopedPlan(cwd) {
+  const now = new Date().toISOString()
+  const dir = join(cwd, ".omo/ulw-loop")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "brief.md"), "- An unscoped legacy run nobody owns\n")
+  writeFileSync(
+    join(dir, "goals.json"),
+    `${JSON.stringify(
+      {
+        version: 1,
+        evidenceLayoutVersion: 2,
+        createdAt: now,
+        updatedAt: now,
+        briefPath: ".omo/ulw-loop/brief.md",
+        goalsPath: ".omo/ulw-loop/goals.json",
+        ledgerPath: ".omo/ulw-loop/ledger.jsonl",
+        codexGoalMode: "aggregate",
+        activeGoalId: "G001-legacy",
+        goals: [
+          {
+            id: "G001-legacy",
+            title: "An unscoped legacy run nobody owns",
+            objective: "An unscoped legacy run nobody owns",
+            status: "in_progress",
+            attempt: 1,
+            createdAt: now,
+            updatedAt: now,
+            successCriteria: [
+              {
+                id: "C001",
+                scenario: "legacy",
+                userModel: "happy",
+                expectedEvidence: "legacy",
+                essential: true,
+                capturedEvidence: null,
+                status: "pending",
+              },
+            ],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  writeFileSync(join(dir, "ledger.jsonl"), `${JSON.stringify({ at: now, kind: "plan_created", message: "1 goal(s) created" })}\n`)
+}
+
 async function runExtensionChild(sessionId) {
-  const [{ FakeExtensionAPI }, { createUlwLoopComponent }] = await Promise.all([
+  const [{ dispatchRunEnd, FakeExtensionAPI }, { createUlwLoopComponent }] = await Promise.all([
     import(
       pathToFileURL(join(repoRoot, "packages/omo-senpi/test-support/fake-extension-api.ts")).href
     ),
@@ -97,9 +153,7 @@ async function runExtensionChild(sessionId) {
     ),
   ])
   const pi = new FakeExtensionAPI()
-  await createUlwLoopComponent({
-    resolveOmoBin: () => toolkitBin,
-  }).register(pi, {
+  await createUlwLoopComponent().register(pi, {
     logger: {
       info() {},
       warn() {},
@@ -108,9 +162,8 @@ async function runExtensionChild(sessionId) {
     config: { getFlag: () => false },
   })
 
-  await pi.dispatch(
-    "agent_end",
-    { type: "agent_end" },
+  await dispatchRunEnd(pi,
+    { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
     {
       cwd: process.cwd(),
       // A host with no session identity exposes no session id at all, exactly like the real extension host.
@@ -139,8 +192,7 @@ function runChild(cwd, sessionId) {
 }
 
 function runToolkit(args, cwd, sessionId, expectedStatus) {
-  const target = toSpawnTarget(toolkitBin, args)
-  const child = spawnSync(target.command, [...target.args], {
+  const child = spawnSync(process.execPath, [toolkitBin, ...args], {
     cwd,
     env: sessionEnv(sessionId),
     encoding: "utf8",

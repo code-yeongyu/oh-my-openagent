@@ -54,6 +54,9 @@ function errorCode(error: unknown): string | undefined {
   return undefined
 }
 
+// Windows file-locking codes that benefit from a teardown retry alongside EFAULT.
+const RETRYABLE_CODES = new Set(["EFAULT", "EBUSY", "EPERM", "ENOTEMPTY"])
+
 function teardownFailure(path: string, attempts: number, cause: unknown): Error {
   const error = new Error(`${TEARDOWN_FAILURE_PREFIX} EFAULT persisted after ${attempts} attempts removing ${path}`)
   error.cause = cause
@@ -75,7 +78,7 @@ export function rmSyncEfaultTolerant(
       rm(path, options)
       return
     } catch (error) {
-      if (errorCode(error) !== "EFAULT") throw error
+      if (!RETRYABLE_CODES.has(errorCode(error) ?? "")) throw error
       lastError = error
       if (attempt + 1 < attempts) sleep(delayMs)
     }
@@ -98,7 +101,7 @@ export async function rmEfaultTolerant(
       await rm(path, options)
       return
     } catch (error) {
-      if (errorCode(error) !== "EFAULT") throw error
+      if (!RETRYABLE_CODES.has(errorCode(error) ?? "")) throw error
       lastError = error
       if (attempt + 1 < attempts) await sleep(delayMs)
     }

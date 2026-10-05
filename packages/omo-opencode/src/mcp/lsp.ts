@@ -145,6 +145,7 @@ export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpC
     enabled: resolvedCommand.exists,
     cwd,
     environment: {
+      LSP_TOOLS_MCP_CWD: cwd,
       LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIGS.map((configPath) => resolve(cwd, configPath)).join(delimiter),
       LSP_TOOLS_MCP_USER_CONFIG: resolve(configDir, "lsp.json"),
       LSP_TOOLS_MCP_INSTALL_DECISIONS: resolve(configDir, "lsp-install-decisions.json"),

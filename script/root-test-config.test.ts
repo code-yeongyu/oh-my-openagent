@@ -43,7 +43,7 @@ describe("root test Bun config", () => {
 
   test("#given bun 1.3.x test argv #when CI selects the dedicated config #then --config= is passed before test", () => {
     const workflow = readFileSync(workflowPath, "utf8")
-    expect(workflow).toContain("bun --config=bunfig.win2.parallel.toml test\n")
+    expect(workflow).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000\n")
     expect(workflow).not.toContain("bun test -c")
     expect(workflow).not.toContain("format('-c {0}'")
     expect(workflow).not.toContain("--path-ignore-patterns=")
@@ -54,6 +54,24 @@ describe("root test Bun config", () => {
       "--config=bunfig.root.toml",
       "test",
       "packages/omo-senpi/src/components/memory/status.test.ts",
+    ])
+    expect(output).toContain("filters did not match any test files")
+  })
+
+  test("#given the Windows shard-2 remainder config #when bun discovers an rpc-host test #then it is left to the rpc-host invocation", () => {
+    const output = spawnBun([
+      "--config=bunfig.win2.parallel.windows.toml",
+      "test",
+      "./packages/senpi-task/src/runners/rpc-host/close.test.ts",
+    ])
+    expect(output).toContain("filters did not match any test files")
+  })
+
+  test("#given the Windows rpc-host invocation config #when bun discovers the quarantined durable-json test #then it is left to the serial quarantine", () => {
+    const output = spawnBun([
+      "--config=bunfig.win2.parallel.toml",
+      "test",
+      "./packages/senpi-task/src/runners/rpc-host/durable-json.test.ts",
     ])
     expect(output).toContain("filters did not match any test files")
   })

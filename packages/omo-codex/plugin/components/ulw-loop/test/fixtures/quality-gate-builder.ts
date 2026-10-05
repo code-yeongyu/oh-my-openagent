@@ -1,8 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { reviewerRolesFor, type UlwLoopToolkitSurface } from "../../src/surface.js";
+import { CLI_TEST_SESSION_ID } from "./cli-session.js";
+
 // v2 evidence layout: artifacts must live inside the goal's current attempt dir
-export function qaDirFor(goalId: string, attempt = 1, sessionId = "session"): string {
+export function qaDirFor(goalId: string, attempt = 1, sessionId = CLI_TEST_SESSION_ID): string {
 	return `.omo/evidence/ulw/${sessionId}/${goalId}/a${attempt}`;
 }
 
@@ -25,13 +28,15 @@ export async function qualityGateJson(
 	repoRoot: string,
 	cliArtifactPath?: string,
 	goalId = "G001-finished",
+	surface: UlwLoopToolkitSurface = "lazycodex",
 ): Promise<string> {
+	const roles = reviewerRolesFor(surface);
 	const qaDir = qaDirFor(goalId);
 	await writeQualityGateArtifacts(repoRoot, qaDir);
 	const cliPath = cliArtifactPath ?? `${qaDir}/cli-pass.txt`;
 	return JSON.stringify({
 		codeReview: {
-			by: "lazycodex-code-reviewer",
+			by: roles.codeReview,
 			recommendation: "APPROVE",
 			codeQualityStatus: "CLEAR",
 			reportPath: `${qaDir}/code-review.md`,
@@ -39,7 +44,7 @@ export async function qualityGateJson(
 			blockers: [],
 		},
 		manualQa: {
-			by: "lazycodex-qa-executor",
+			by: roles.manualQa,
 			status: "passed",
 			evidence: "Ran CLI checkpoint validation with artifact-backed evidence.",
 			surfaceEvidence: [
@@ -78,7 +83,7 @@ export async function qualityGateJson(
 			],
 		},
 		gateReview: {
-			by: "lazycodex-gate-reviewer",
+			by: roles.gateReview,
 			recommendation: "APPROVE",
 			reportPath: `${qaDir}/gate-review.md`,
 			evidence: "Verified all criteria and artifact evidence.",

@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, realpathSync } from "node:fs"
+import { accessSync, constants, existsSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
 
 /**

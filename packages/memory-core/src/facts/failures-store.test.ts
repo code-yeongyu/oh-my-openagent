@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -9,6 +9,7 @@ import { createLockRecord, factsQueueLockPath, withLock } from "../locks"
 import { factsQueuePaths } from "./schema"
 import { FactsFailuresCorruptError } from "./failures-schema"
 import { FactsFailureStore } from "./failures-store"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-failures-agent"
 const CONVERSATION = "conversation-alpha"
@@ -17,7 +18,7 @@ const tempDirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
   )
 })
 
@@ -70,7 +71,15 @@ describe("facts failure store persistence", () => {
     const raw = await readFile(layout.failuresPath, "utf8")
     expect(raw.endsWith("\n")).toBe(true)
     const info = await stat(layout.failuresPath)
-    expect(info.mode & 0o777).toBe(process.platform === "win32" ? 0o666 : 0o600)
+    const probePath = join(paths.factsQueue, "mode-probe")
+    await writeFile(probePath, "probe", "utf8")
+    await chmod(probePath, 0o600)
+    const probeMode = (await stat(probePath)).mode & 0o777
+    await rm(probePath, { force: true })
+    // Exact mode enforcement is asserted when the filesystem represents POSIX bits; otherwise
+    // compare the ledger with the platform's representable owner/group/other capabilities.
+    const representableMask = (~(probeMode ^ 0o600)) & 0o777
+    expect(info.mode & representableMask).toBe(0o600 & representableMask)
     expect((await readdir(layout.queueDir)).filter((name) => name.includes(".tmp"))).toEqual([])
   })
 

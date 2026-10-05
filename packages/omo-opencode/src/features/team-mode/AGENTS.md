@@ -144,7 +144,7 @@ team-mode/
 | [`create-tool-guard-hooks.ts`](../../plugin/hooks/create-tool-guard-hooks.ts) | Conditionally builds `teamToolGating` (`team-tool-gating` hook) — Tool Guard tier |
 | [`src/plugin/event.ts`](../../plugin/event.ts) | Registers 4 team-session-event handlers from `src/hooks/team-session-events/`: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
 | [`src/cli/doctor/checks/team-mode.ts`](../../cli/doctor/checks/team-mode.ts) | Doctor check for team-mode prerequisites |
-| [`src/features/builtin-skills/skills/team-mode.ts`](../builtin-skills/skills/team-mode.ts) | Built-in skill documenting the 12 tools — gated on `team_mode.enabled` |
+| [`skills-loader-core/src/features/builtin-skills/skills/team-mode.ts`](../../../../skills-loader-core/src/features/builtin-skills/skills/team-mode.ts) | Built-in skill documenting the 12 tools — gated on `team_mode.enabled` |
 
 ## WHERE TO LOOK
 

@@ -183,17 +183,18 @@ function loadJsonlFile(path: string): LoadedSource | "missing" {
 
 /**
  * Content revision a cursor is bound to: the entry count plus a cheap hash of
- * the last entry's identity. An append changes the count, a rewrite changes
- * the tail identity, and a truncation changes both - each invalidates the
- * cursor instead of silently re-slicing a different transcript.
+ * every entry's identity. An append changes the count, a rewrite changes an
+ * entry identity, and a truncation changes both - each invalidates the cursor
+ * instead of silently re-slicing a different transcript.
  */
 function revisionOf(entries: readonly ThreadTranscriptEntry[]): string {
-  const last = entries[entries.length - 1]
-  const tail = last === undefined ? "" : `${String(last.id ?? "")}|${String(last.timestamp ?? "")}|${JSON.stringify(last).length}`
   let hash = 2166136261
-  for (let index = 0; index < tail.length; index += 1) {
-    hash ^= tail.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
+  for (const entry of entries) {
+    const identity = `${String(entry.id ?? "")}|${String(entry.timestamp ?? "")}`
+    for (let index = 0; index < identity.length; index += 1) {
+      hash ^= identity.charCodeAt(index)
+      hash = Math.imul(hash, 16777619)
+    }
   }
   return `${entries.length}.${(hash >>> 0).toString(36)}`
 }

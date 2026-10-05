@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { rm, utimes, writeFile } from "node:fs/promises"
+import { utimes, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { TranscriptJournal, type TranscriptEntry } from "@oh-my-opencode/memory-core"
@@ -11,12 +11,13 @@ import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity } from "
 import { registerDreamCommand } from "./dream"
 import { stageDreamTranscript } from "./dream-staging"
 import type { ManualDreamCommandRequest } from "./types"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const NOW = new Date("2026-08-10T12:00:00.000Z")
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function harness() {

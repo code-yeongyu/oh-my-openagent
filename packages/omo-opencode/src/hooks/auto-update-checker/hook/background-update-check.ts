@@ -10,6 +10,8 @@ import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
 import { findPluginEntry, getCachedVersion, getLatestVersion, syncCachePackageJsonToIntent } from "../checker"
 import { findPackageJsonUp } from "../checker/package-json-locator"
+import { scheduleOpenCodeSandboxRefreshOnExit } from "../checker/sandbox-refresh"
+import { isStrictlyNewerVersion } from "../checker/semver-compare"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 /**
@@ -61,6 +63,14 @@ type BackgroundUpdateCheckDeps = {
    * layout. Used to detect OpenCode-managed sandboxes (see #4318).
    */
   getModuleHostingWorkspace: () => string | null
+  /**
+   * Schedules removal of an OpenCode-managed plugin sandbox so the next
+   * OpenCode start re-installs the channel's current version. Deferred to
+   * process exit by default so the running session keeps its files (see
+   * checker/sandbox-refresh.ts). Returns why an earlier refresh was not
+   * applied, or null.
+   */
+  scheduleSandboxRefresh: (sandboxDir: string) => string | null
 }
 
 type BackgroundUpdateCheckRunner = (
@@ -89,10 +99,15 @@ const defaultDeps: BackgroundUpdateCheckDeps = {
   showUpdateAvailableToast,
   showAutoUpdatedToast,
   getModuleHostingWorkspace: defaultGetModuleHostingWorkspace,
+  scheduleSandboxRefresh: scheduleOpenCodeSandboxRefreshOnExit,
 }
 
 function getPinnedVersionToastMessage(latestVersion: string): string {
   return `Update available: ${latestVersion} (version pinned, update manually)`
+}
+
+function getUnappliedRefreshToastMessage(latestVersion: string, reason: string, sandboxDir: string): string {
+  return `v${latestVersion} available, but the last restart could not apply it (${reason}). Close every OpenCode window and start it again; if this notice returns, delete ${sandboxDir} (known issue #5367).`
 }
 
 /**
@@ -204,8 +219,10 @@ export function createBackgroundUpdateCheckRunner(
       return
     }
 
-    if (currentVersion === latestVersion) {
-      deps.log("[auto-update-checker] Already on latest version for channel:", channel)
+    if (!isStrictlyNewerVersion(currentVersion, latestVersion)) {
+      // Equal means already current; a newer loaded version means the registry
+      // tag lags behind a local/newer install — never offer a downgrade.
+      deps.log(`[auto-update-checker] No newer version for channel ${channel} (current: ${currentVersion}, registry: ${latestVersion})`)
       return
     }
 
@@ -223,23 +240,31 @@ export function createBackgroundUpdateCheckRunner(
       return
     }
 
-    // #4318: Detect OpenCode-managed sandbox installs and skip the legacy
-    // install flow. OpenCode's `Npm.add()` reads the plugin from a per-spec
-    // sandbox (`<CACHE_ROOT>/packages/<sanitized-spec>/node_modules/<pkg>/`),
-    // not from the flat `<CACHE_ROOT>/packages/node_modules/<pkg>/` path the
-    // legacy flow writes to. Running `bun install` against the flat path
-    // succeeds but is never read on the next OpenCode start, so the user
-    // sees an "Updated!" toast while the runtime keeps loading the old
-    // version in an infinite restart loop.
+    // #4318/#5367: Detect OpenCode-managed sandbox installs and skip the
+    // legacy install flow. OpenCode's `Npm.add()` reads the plugin from a
+    // per-spec sandbox
+    // (`<CACHE_ROOT>/packages/<sanitized-spec>/node_modules/<pkg>/`), not from
+    // the flat `<CACHE_ROOT>/packages/node_modules/<pkg>/` path the legacy
+    // flow writes to, and it never re-resolves a tag while that sandbox
+    // exists — so a plain restart keeps loading the old version forever.
     //
-    // For sandbox installs we instead emit the truthful "update available"
-    // toast and rely on OpenCode's own plugin reinstall path to apply the
-    // new version.
+    // For sandbox installs we emit the truthful "update available, restart to
+    // apply" toast AND make that promise real: the stale sandbox is scheduled
+    // for removal on process exit (the running session may still lazily
+    // import from it), so the next OpenCode start re-runs `Npm.add()` against
+    // a missing sandbox and installs the channel's current version.
     const moduleWorkspace = deps.getModuleHostingWorkspace()
     if (isOpenCodeManagedSandbox(moduleWorkspace, getCacheWorkspaceDir(deps), deps.getOpenCodeConfigPaths({ binary: "opencode" }).configDir)) {
-      await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+      const unapplied = moduleWorkspace ? deps.scheduleSandboxRefresh(moduleWorkspace) : null
+      await deps.showUpdateAvailableToast(
+        ctx,
+        latestVersion,
+        unapplied && moduleWorkspace
+          ? () => getUnappliedRefreshToastMessage(latestVersion, unapplied, moduleWorkspace)
+          : getToastMessage,
+      )
       deps.log(
-        `[auto-update-checker] OpenCode-managed sandbox detected (${moduleWorkspace}); skipping auto-update install. Notification only. See #4318.`,
+        `[auto-update-checker] OpenCode-managed sandbox detected (${moduleWorkspace}); sandbox refresh scheduled for exit. See #4318/#5367.`,
       )
       return
     }

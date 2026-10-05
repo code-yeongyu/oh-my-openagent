@@ -39,6 +39,101 @@ permissions:
   id-token: write
 
 jobs:
+  desktop-engine:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: darwin-arm64, runner: macos-15, rust_target: aarch64-apple-darwin, binary: senpi-desktop-engine }
+          - { host: darwin-x64, runner: macos-15, rust_target: x86_64-apple-darwin, binary: senpi-desktop-engine }
+          - { host: linux-x64, runner: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu, binary: senpi-desktop-engine }
+          - { host: win32-x64, runner: windows-latest, rust_target: x86_64-pc-windows-msvc, binary: senpi-desktop-engine.exe }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Install pinned Rust toolchain and target
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup default "$toolchain"
+          rustup target add "${{ matrix.rust_target }}"
+
+      - name: Build desktop engine
+        env:
+          # rustc defaults x86_64-apple-darwin to macOS 10.12, which links the Swift back-deploy
+          # libraries through @rpath with no LC_RPATH: the x64 engine then aborts in dyld at launch.
+          # 11.0 is the arm64 default and keeps both Darwin engines on the OS Swift runtime.
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: cargo build --release -p senpi-desktop-engine --locked --target "${{ matrix.rust_target }}"
+
+      - name: Stage desktop engine release asset
+        run: |
+          bun script/desktop-engine-release.ts stage \
+            "${{ matrix.host }}" \
+            "target/${{ matrix.rust_target }}/release/${{ matrix.binary }}" \
+            ".omo/desktop-engine-assets"
+
+      - name: Smoke native desktop engine
+        if: matrix.host != 'darwin-x64'
+        run: "target/${{ matrix.rust_target }}/release/${{ matrix.binary }} --selftest"
+
+      - name: Smoke x64 Darwin desktop engine under Rosetta
+        if: matrix.host == 'darwin-x64'
+        run: |
+          arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
+          arch -x86_64 "target/${{ matrix.rust_target }}/release/${{ matrix.binary }}" --selftest
+
+      - name: Sign and notarize Darwin desktop engine
+        if: startsWith(matrix.host, 'darwin-')
+        timeout-minutes: 75
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
+          HOST: ${{ matrix.host }}
+        run: |
+          set -euo pipefail
+          ASSET=".omo/desktop-engine-assets/senpi-desktop-engine-${HOST}"
+          bash .github/scripts/macos-sign-and-notarize.sh --identifier ai.sisyphuslabs.senpi-desktop-engine "$ASSET"
+          if [ "$HOST" = darwin-x64 ]; then
+            arch -x86_64 "$ASSET" --selftest
+          else
+            "$ASSET" --selftest
+          fi
+
+      - name: Upload desktop engine artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-engine-${{ matrix.host }}
+          path: .omo/desktop-engine-assets/senpi-desktop-engine-*
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Desktop engine release build (${{ matrix.host }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the Rust desktop engine for the declared host.
+            - Stages the shared release asset name and signs Darwin binaries.
+            - Runs --selftest on every leg; the x64 Darwin cross-build runs it under Rosetta.
+          JOB_SUMMARY_NEXT: Check the Rust target build or signed asset staging output.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   # =============================================================================
   # Job 1: Build binaries for all platforms
   # - Windows builds on windows-latest (avoid bun cross-compile segfault)
@@ -46,6 +141,7 @@ jobs:
   # - Uploads compressed artifacts for the publish job
   # =============================================================================
   build:
+    needs: desktop-engine
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}
     defaults:
@@ -57,11 +153,16 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
+
+      - name: Set up Python for packaged eval
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.0"
+          bun-version: "1.4.2"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -165,36 +266,6 @@ jobs:
           file "$LAUNCHER"
           head -n 1 "$LAUNCHER" | grep -F "#!/usr/bin/env node"
 
-      - name: Compress binary
-        if: steps.check.outputs.skip != 'true'
-        run: |
-          PLATFORM="${{ matrix.platform }}"
-          PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
-          cd "$PACKAGE_DIR"
-          
-          if [[ "$PLATFORM" == windows-* ]]; then
-            # Windows: use 7z (pre-installed on windows-latest)
-            7z a -tzip ../../binary-${PLATFORM}.zip bin/ package.json
-          else
-            # Unix: use tar.gz
-            tar -czvf ../../binary-${PLATFORM}.tar.gz bin/ package.json
-          fi
-          
-          cd ../..
-          echo "Compressed artifact:"
-          ls -lh binary-${PLATFORM}.*
-
-      - name: Upload artifact
-        if: steps.check.outputs.skip != 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: binary-${{ matrix.platform }}
-          path: |
-            binary-${{ matrix.platform }}.tar.gz
-            binary-${{ matrix.platform }}.zip
-          retention-days: 1
-          if-no-files-found: error
-
       - name: Check release assets
         id: release-assets
         env:
@@ -202,6 +273,7 @@ jobs:
           VERSION: ${{ steps.validate.outputs.version }}
           OMO_AI_VERSION: ${{ inputs.omo_ai_version }}
         run: |
+          set -euo pipefail
           if ! [[ "$OMO_AI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
             echo "::error::Invalid omo_ai_version: $OMO_AI_VERSION"
             exit 1
@@ -212,21 +284,57 @@ jobs:
           if [[ "$PLATFORM" == windows-* ]]; then
             BINARY="omo-${PLATFORM}.exe"
           fi
+          ENGINE_ASSET="$(bun script/release-desktop-engine-target.ts --target "$PLATFORM" | jq -r '.asset // empty')"
 
           # The binary lane has its own idempotency key: the release asset on
-          # the GitHub release. It deliberately ignores the npm publish skip.
+          # the GitHub release. An available target with a missing engine must
+          # rebuild even when its omo executable is already present.
           if ASSET_NAMES="$(gh release view "v${VERSION}" --json assets --jq '.assets[].name' 2>/dev/null)"; then
-            if grep -Fxq "$BINARY" <<<"$ASSET_NAMES"; then
+            if grep -Fxq "$BINARY" <<<"$ASSET_NAMES" &&
+               { [ -z "$ENGINE_ASSET" ] || grep -Fxq "$ENGINE_ASSET" <<<"$ASSET_NAMES"; }; then
               echo "binary_exists=true" >> "$GITHUB_OUTPUT"
-              echo "✓ release asset ${BINARY} already exists on v${VERSION}"
+              echo "✓ release assets ${BINARY} and ${ENGINE_ASSET:-unavailable engine} already exist on v${VERSION}"
             else
               echo "binary_exists=false" >> "$GITHUB_OUTPUT"
-              echo "→ release asset ${BINARY} missing on v${VERSION}; building release binary"
+              echo "→ release asset ${BINARY} or ${ENGINE_ASSET:-unavailable engine} missing on v${VERSION}; building release binary"
             fi
           else
             echo "binary_exists=false" >> "$GITHUB_OUTPUT"
             echo "→ release v${VERSION} not found or lists no assets; building release binary"
           fi
+
+      - name: Resolve desktop engine availability
+        id: desktop-engine-target
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          TARGET_INFO="$(bun script/release-desktop-engine-target.ts --target "$PLATFORM")"
+          {
+            echo "host=$(jq -r '.host // empty' <<<"$TARGET_INFO")"
+            echo "asset=$(jq -r '.asset // empty' <<<"$TARGET_INFO")"
+            echo "source=$(jq -r '.source // empty' <<<"$TARGET_INFO")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download desktop engine for compiled payload
+        if: steps.desktop-engine-target.outputs.host != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: desktop-engine-${{ steps.desktop-engine-target.outputs.host }}
+          path: .omo/desktop-engine-assets
+
+      - name: Stage target-specific Rust engine for compiled payload
+        if: steps.desktop-engine-target.outputs.host != ''
+        env:
+          ENGINE_ASSET: ${{ steps.desktop-engine-target.outputs.asset }}
+          ENGINE_SOURCE: ${{ steps.desktop-engine-target.outputs.source }}
+        run: |
+          set -euo pipefail
+          test -f ".omo/desktop-engine-assets/$ENGINE_ASSET"
+          mkdir -p "$(dirname "$ENGINE_SOURCE")"
+          cp ".omo/desktop-engine-assets/$ENGINE_ASSET" "$ENGINE_SOURCE"
+          chmod +x "$ENGINE_SOURCE"
 
       - name: Build release binary
         if: steps.release-assets.outputs.binary_exists != 'true'
@@ -242,6 +350,26 @@ jobs:
           ls -lh .omo/release-binaries/
         timeout-minutes: 45
 
+      - name: Sign and notarize Darwin release binary
+        if: steps.release-assets.outputs.binary_exists != 'true' && startsWith(matrix.platform, 'darwin-')
+        timeout-minutes: 75
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
+          BINARY: omo-${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/macos-sign-and-notarize.sh \
+            --identifier ai.sisyphuslabs.omo \
+            --entitlements .github/scripts/omo-bun-executable.entitlements \
+            ".omo/release-binaries/${BINARY}"
+          # Signing rewrites the bytes the build step digested.
+          (cd .omo/release-binaries && shasum -a 256 "$BINARY" > SHA256SUMS)
+
       - name: Smoke test release binary
         if: steps.release-assets.outputs.binary_exists != 'true'
         env:
@@ -255,9 +383,11 @@ jobs:
           fi
           BIN=".omo/release-binaries/omo-${TARGET}${EXE_SUFFIX}"
           ENGINE_PIN="$(jq -r '.dependencies["@code-yeongyu/senpi"]' packages/omo-native/package.json)"
-          # Exact stamped version line: a missing sibling package.json silently
-          # stamps 0.0.0, so the full string including the engine pin is compared.
-          EXPECTED_VERSION_LINE="omo ${OMO_AI_VERSION} (engine: senpi ${ENGINE_PIN})"
+          # Stamped version line, compared as a prefix: a missing sibling package.json
+          # silently stamps 0.0.0, so the version and the engine pin are both compared.
+          # The line continues past the pin with the engine build stamp (`; scheme epoch`
+          # or `; scheme nodef`), which varies per build and is not pinned here.
+          EXPECTED_VERSION_LINE="omo ${OMO_AI_VERSION} (engine: senpi ${ENGINE_PIN}"
           test -f "$BIN"
 
           isolate() {
@@ -281,10 +411,13 @@ jobs:
           assert_version_line() {
             local actual
             actual="$($BIN --version)"
-            if [ "$actual" != "$EXPECTED_VERSION_LINE" ]; then
-              echo "version mismatch for ${TARGET}: expected '${EXPECTED_VERSION_LINE}', got '${actual}'"
-              return 1
-            fi
+            case "$actual" in
+              "${EXPECTED_VERSION_LINE}"*")") ;;
+              *)
+                echo "version mismatch for ${TARGET}: expected '${EXPECTED_VERSION_LINE}...)', got '${actual}'"
+                return 1
+                ;;
+            esac
           }
 
           assert_first_run_provisioned() {
@@ -314,12 +447,19 @@ jobs:
             # musl binaries cannot run on the glibc runner: alpine container.
             docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
               alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && ${BIN} --version" | grep -F "$EXPECTED_VERSION_LINE"
+            # Mount the parent so the driver can rename the source checkout.
+            docker run --rm -v "${PWD}/..:/workspace" -w "/workspace/$(basename "$PWD")" \
+              alpine:3.21 sh -c "apk add --no-cache libstdc++ python3 nodejs procps >/dev/null && node script/qa/omo-native-eval-smoke.mjs ${BIN}"
           }
 
           verify_checksum_and_size_only() {
             # No arm64 Windows runner exists: verify digest and size budget
             # without executing the binary.
-            ( cd .omo/release-binaries && sha256sum -c SHA256SUMS )
+            if [[ "$TARGET" == darwin-* ]]; then
+              ( cd .omo/release-binaries && shasum -a 256 -c SHA256SUMS )
+            else
+              ( cd .omo/release-binaries && sha256sum -c SHA256SUMS )
+            fi
             local size
             size="$(wc -c < "$BIN")"
             if [ "$size" -gt 157286400 ]; then
@@ -337,19 +477,15 @@ jobs:
               pty_smoke
               ;;
             darwin-x64|darwin-x64-baseline)
-              # No x64 macOS runner: Rosetta attempt, tolerated failure.
-              isolate
-              if assert_version_line; then
-                assert_first_run_provisioned
-              else
-                echo "::warning::Rosetta smoke failed for ${TARGET} (tolerated; checksum and size are still enforced by the build)"
-              fi
+              # Cross-compiled Darwin legs are digest/manifest checked, not native eval legs.
+              verify_checksum_and_size_only
               ;;
             linux-x64|linux-x64-baseline)
               # x64 Linux runner: native exec; pty + oldstable-glibc legs on the main target.
               isolate
               assert_version_line
               assert_first_run_provisioned
+              bun script/qa/omo-native-eval-smoke.mjs "$BIN"
               if [ "$TARGET" = "linux-x64" ]; then
                 pty_smoke
                 oldstable_glibc_smoke
@@ -369,6 +505,7 @@ jobs:
               isolate
               assert_version_line
               assert_first_run_provisioned
+              bun script/qa/omo-native-eval-smoke.mjs "$BIN"
               ;;
             windows-arm64)
               # No arm64 Windows runner: digest and size budget only.
@@ -381,9 +518,48 @@ jobs:
           esac
         timeout-minutes: 20
 
+      - name: Smoke eval registration in fresh binary
+        if: steps.release-assets.outputs.binary_exists != 'true' && matrix.platform == 'darwin-arm64'
+        run: |
+          bun script/qa/omo-native-eval-smoke.mjs \
+            --binary .omo/release-binaries/omo-darwin-arm64
+        timeout-minutes: 5
+
+      # The npm payload is uploaded only after this leg's release-binary smokes passed:
+      # a failed smoke leaves this platform with no payload, so only its publish stops.
+      - name: Compress binary
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          PLATFORM="${{ matrix.platform }}"
+          PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
+          cd "$PACKAGE_DIR"
+          
+          if [[ "$PLATFORM" == windows-* ]]; then
+            # Windows: use 7z (pre-installed on windows-latest)
+            7z a -tzip ../../binary-${PLATFORM}.zip bin/ package.json
+          else
+            # Unix: use tar.gz
+            tar -czvf ../../binary-${PLATFORM}.tar.gz bin/ package.json
+          fi
+          
+          cd ../..
+          echo "Compressed artifact:"
+          ls -lh binary-${PLATFORM}.*
+
+      - name: Upload artifact
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: binary-${{ matrix.platform }}
+          path: |
+            binary-${{ matrix.platform }}.tar.gz
+            binary-${{ matrix.platform }}.zip
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Upload release binary artifact
         if: steps.release-assets.outputs.binary_exists != 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-binary-${{ matrix.platform }}
           path: .omo/release-binaries/omo-*
@@ -404,7 +580,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish:
-    needs: build
+    needs: [build, smoke-linux-arm64]
     if: always() && !cancelled() && github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
     strategy:
@@ -417,6 +593,24 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
+      - name: Require the linux-arm64 smoke for arm64 legs
+        env:
+          ARM64_SMOKE_RESULT: ${{ needs.smoke-linux-arm64.result }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          case "$PLATFORM" in
+            linux-arm64*)
+              if [ "$ARM64_SMOKE_RESULT" != "success" ]; then
+                echo "::error::$PLATFORM is not published: the linux-arm64 release-binary smoke finished with '$ARM64_SMOKE_RESULT'"
+                exit 1
+              fi
+              echo "$PLATFORM: linux-arm64 release-binary smoke passed"
+              ;;
+            *)
+              echo "$PLATFORM: smoked in its own build leg"
+              ;;
+          esac
+
       - name: Validate release inputs
         id: validate
         env:
@@ -471,10 +665,24 @@ jobs:
       - name: Download artifact
         id: download
         if: steps.check.outputs.skip_all != 'true'
-        uses: actions/download-artifact@v7
+        # A missing payload is decided by the next step with a clear reason, not by an opaque download error.
+        continue-on-error: true
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.platform }}
           path: .
+
+      - name: Require this platform's smoked payload
+        if: steps.check.outputs.skip_all != 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [ -f "binary-$PLATFORM.tar.gz" ] || [ -f "binary-$PLATFORM.zip" ]; then
+            echo "$PLATFORM: payload present, its release-binary smoke passed in this run"
+          else
+            echo "::error::$PLATFORM is not published: its npm payload was never uploaded, because this platform's release-binary smoke did not pass in this run"
+            exit 1
+          fi
 
       - name: Extract artifact
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
@@ -493,7 +701,7 @@ jobs:
           ls -la "$PACKAGE_DIR/"
           ls -la "$PACKAGE_DIR/bin/"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
         with:
           node-version: "24"
@@ -587,13 +795,23 @@ jobs:
   # =============================================================================
   smoke-linux-arm64:
     needs: build
-    if: github.repository == 'code-yeongyu/oh-my-openagent' && needs.build.result == 'success'
+    # Runs even when an unrelated build leg failed, so a windows failure cannot block
+    # the arm64 publishes; a failed arm64 build still fails here (its artifact is missing).
+    if: always() && !cancelled() && github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-24.04-arm
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
 
       - name: Check release assets
         id: release-assets
@@ -615,14 +833,14 @@ jobs:
 
       - name: Download linux-arm64 release binary artifact
         if: steps.release-assets.outputs.linux_arm64_exists != 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: release-binary-linux-arm64
           path: .omo/release-binaries
 
       - name: Download linux-arm64-musl release binary artifact
         if: steps.release-assets.outputs.linux_arm64_musl_exists != 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: release-binary-linux-arm64-musl
           path: .omo/release-binaries
@@ -636,7 +854,9 @@ jobs:
         run: |
           set -euo pipefail
           ENGINE_PIN="$(jq -r '.dependencies["@code-yeongyu/senpi"]' packages/omo-native/package.json)"
-          EXPECTED_VERSION_LINE="omo ${OMO_AI_VERSION} (engine: senpi ${ENGINE_PIN})"
+          # Prefix through the engine pin; the line continues with the engine build
+          # stamp (`; scheme epoch` or `; scheme nodef`), which varies per build.
+          EXPECTED_VERSION_LINE="omo ${OMO_AI_VERSION} (engine: senpi ${ENGINE_PIN}"
 
           isolate() {
             SMOKE_ROOT="$(mktemp -d)"
@@ -656,11 +876,15 @@ jobs:
             chmod +x .omo/release-binaries/omo-linux-arm64
             isolate
             actual="$(.omo/release-binaries/omo-linux-arm64 --version)"
-            if [ "$actual" != "$EXPECTED_VERSION_LINE" ]; then
-              echo "version mismatch for omo-linux-arm64: expected '${EXPECTED_VERSION_LINE}', got '${actual}'"
-              exit 1
-            fi
+            case "$actual" in
+              "${EXPECTED_VERSION_LINE}"*")") ;;
+              *)
+                echo "version mismatch for omo-linux-arm64: expected '${EXPECTED_VERSION_LINE}...)', got '${actual}'"
+                exit 1
+                ;;
+            esac
             test -f "${HOME}/.omo/binary-runtime/${OMO_AI_VERSION}/omo"
+            bun script/qa/omo-native-eval-smoke.mjs .omo/release-binaries/omo-linux-arm64
           fi
 
           if [ "$MUSL_EXISTS" != "true" ]; then
@@ -668,6 +892,8 @@ jobs:
             docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
               alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && chmod +x .omo/release-binaries/omo-linux-arm64-musl && .omo/release-binaries/omo-linux-arm64-musl --version" \
               | grep -F "$EXPECTED_VERSION_LINE"
+            docker run --rm -v "${PWD}/..:/workspace" -w "/workspace/$(basename "$PWD")" \
+              alpine:3.21 sh -c "apk add --no-cache libstdc++ python3 nodejs procps >/dev/null && node script/qa/omo-native-eval-smoke.mjs .omo/release-binaries/omo-linux-arm64-musl"
           fi
 
       - name: Write job summary

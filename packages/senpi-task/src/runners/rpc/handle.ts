@@ -12,10 +12,12 @@ import type {
 } from "../types"
 import { type RpcStreamingBehavior, isBusyChildRejection } from "./delivery-semantics"
 import { RpcCommandError } from "./errors"
+import { recordTaskChildDeath } from "./crash-record"
 import { classifyChildExit } from "./exit-mapping"
 import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
-import { agentEndOutcome, exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
+import { exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
+import { createTurnSettlement, sessionIsIdle } from "./turn-settlement"
 
 export type CreateRpcChildHandleOptions = {
   readonly client: RpcProtocolClient
@@ -23,6 +25,10 @@ export type CreateRpcChildHandleOptions = {
   readonly taskId: string
   readonly heartbeatIntervalMs: number
   readonly now: () => number
+  /** The child's spawn env: where it keeps its agent dir, so its unexpected death is recorded there. */
+  readonly childEnv?: NodeJS.ProcessEnv
+  /** Stops the child process; defaults to terminateRpcChild. A test passes a fake so it never signals a host process. */
+  readonly terminateChild?: (child: ChildProcess, options?: TerminateOptions) => Promise<void>
 }
 
 export type TrackedRpcChildHandle = RpcChildHandle & {
@@ -49,6 +55,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   let abortedByUser = false
   let lastSeenAt: number | undefined
   let outcome: ChildExitOutcome | undefined
+  let terminationRequested = false
+  // Wall clock on purpose: the injected `now` is the heartbeat's clock, and tests observe its calls.
+  const startedAt = Date.now()
 
   const settleTurn = (settled: RunnerOutcome): void => {
     if (turnOutcome !== undefined) return
@@ -58,7 +67,21 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     for (const waiter of outcomeWaiters.splice(0)) waiter(settled)
   }
 
+  const settlement = createTurnSettlement({
+    settle: settleTurn,
+    abortedByUser: () => abortedByUser,
+    baseline: () => turnBaseline,
+    finalText: () => finalText,
+  })
+
+  const resumedListeners = new Set<() => void>()
   client.onEvent((event) => {
+    // A run the child starts on its own after its turn settled (a monitor or background job woke it)
+    // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
+    if (event.type === "agent_start" && turnOutcome !== undefined && outcome === undefined) {
+      beginTurn()
+      for (const listener of resumedListeners) listener()
+    }
     if (event.type === "message_end") {
       const terminal = extractTerminalAssistantMessage(event.message)
       if (terminal !== undefined) {
@@ -66,23 +89,26 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
         finalText = terminal.text ?? finalText
       }
     }
-    if (event.type === "agent_end" && event.willRetry === false) {
-      settleTurn(abortedByUser ? { status: "cancelled" } : agentEndOutcome(event, turnBaseline, finalText))
-    }
+    settlement.observe(event)
   })
 
   const heartbeat = setInterval(() => {
     if (client.exited || child.stdin?.writableEnded || child.stdin?.destroyed) return
-    client
-      .send({ type: "get_state" })
-      .then((response) => {
-        lastSeenAt = now()
-        sessionId = readSessionId(response) ?? sessionId
-      })
-      .catch((error: unknown) => {
-        if (client.exited || isHarmlessRpcShutdownError(error)) return
-        log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
-      })
+    try {
+      client
+        .send({ type: "get_state" })
+        .then((response) => {
+          lastSeenAt = now()
+          sessionId = readSessionId(response) ?? sessionId
+        })
+        .catch((error: unknown) => {
+          if (client.exited || isHarmlessRpcShutdownError(error)) return
+          log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+        })
+    } catch (error) {
+      if (client.exited || isHarmlessRpcShutdownError(error)) return
+      log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+    }
   }, heartbeatIntervalMs)
   heartbeat.unref?.()
 
@@ -93,14 +119,20 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     outcome = built
     clearInterval(heartbeat)
     flush(idleWaiters)
-    if (turnOutcome === undefined) settleTurn(exitTurnOutcome(built, finalText))
+    if (turnOutcome === undefined) settleTurn(settlement.pending() ?? exitTurnOutcome(built, finalText))
     for (const waiter of exitWaiters.splice(0)) {
       waiter(built)
     }
   }
 
   child.once("error", (error) => settleExit(classifyChildExit({ code: null, signal: null, error, pid: child.pid, stderr: client.stderrTail })))
-  child.once("close", (code, signal) => settleExit(classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail })))
+  child.once("close", (code, signal) => {
+    const built = classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail, terminatedByRunner: terminationRequested })
+    if (options.childEnv !== undefined) {
+      recordTaskChildDeath({ env: options.childEnv, outcome: built, terminationRequested, startedAt, now: Date.now() })
+    }
+    settleExit(built)
+  })
 
   const runCommand = async (command: Parameters<RpcProtocolClient["send"]>[0], label: string): Promise<void> => {
     const response = await client.send(command)
@@ -164,8 +196,20 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       return runCommand({ type: "abort" }, "abort")
     },
     subscribe: (listener: ChildEventListener) => client.onEvent(listener),
+    subscribeExtensionEvents: client.extensionEvents.subscribe,
+    adoptFinishedTurn: async (finalResponse) => {
+      if (turnOutcome !== undefined || settlement.pending() !== undefined) return
+      const response = await client.send({ type: "get_state" }).catch(() => undefined)
+      if (response === undefined || response.command !== "get_state" || !response.success || !sessionIsIdle(response.data)) return
+      if (turnOutcome === undefined && settlement.pending() === undefined) settleTurn({ status: "completed", finalResponse })
+    },
+    onSelfResumed: (listener) => {
+      resumedListeners.add(listener)
+      return () => resumedListeners.delete(listener)
+    },
     waitForIdle: () =>
       reachedIdle || outcome ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve)),
+    hasExited: () => client.exited,
     waitForOutcome: () =>
       turnOutcome !== undefined
         ? Promise.resolve(turnOutcome)
@@ -178,12 +222,18 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     lastSeen: () => lastSeenAt,
     exitOutcome: () => outcome,
     waitForExit: () => (outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve))),
-    dispose: () => {
+    dispose: async () => {
       clearInterval(heartbeat)
-      client.detach()
-      return Promise.resolve()
+      try {
+        await client.detach()
+      } catch (error) {
+        log("senpi-task rpc detach failed", { taskId, error: String(error) })
+      }
     },
-    terminate: (terminateOptions?: TerminateOptions) => terminateRpcChild(child, terminateOptions),
+    terminate: (terminateOptions?: TerminateOptions) => {
+      terminationRequested = true
+      return (options.terminateChild ?? terminateRpcChild)(child, terminateOptions)
+    },
     startInitialPrompt: (text) => runPrompt(text),
   }
 }

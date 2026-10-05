@@ -1,4 +1,4 @@
-import { isPlainRecord } from "@oh-my-opencode/utils"
+import { isPlainRecord } from "@oh-my-opencode/utils/record-type-guard"
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import path from "node:path"

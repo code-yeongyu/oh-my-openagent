@@ -1,3 +1,5 @@
+import { clearAllStopHookActive, clearStopHookActive } from "./stop"
+
 export const sessionFirstMessageProcessed = new Set<string>()
 
 export const sessionErrorState = new Map<string, { hasError: boolean; errorMessage?: string }>()
@@ -15,8 +17,15 @@ export function clearSessionHookState(sessionID: string): void {
 	// prompt instead of only the first one.
 }
 
+export function clearSessionEndHookState(sessionID: string): void {
+	clearSessionHookState(sessionID)
+	sessionFirstMessageProcessed.delete(sessionID)
+	clearStopHookActive(sessionID)
+}
+
 export function clearAllSessionHookState(): void {
 	sessionErrorState.clear()
 	sessionInterruptState.clear()
 	sessionFirstMessageProcessed.clear()
+	clearAllStopHookActive()
 }

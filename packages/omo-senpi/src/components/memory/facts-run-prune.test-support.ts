@@ -11,15 +11,29 @@ import { join } from "node:path"
 import type { FactsQueueEntry } from "@oh-my-opencode/memory-core"
 
 import { reserveFactsRunDir } from "./facts-run-storage"
+import { exitedWithin } from "./worker/process-liveness.test-support"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
 
 const holdLockFixture = join(import.meta.dir, "worker", "__fixtures__", "hold-lock.ts")
 const temporaryRoots: string[] = []
 const children = new Set<ChildProcessWithoutNullStreams>()
 
+const TEARDOWN_GRACE_MS = 2_000
+
 afterEach(async () => {
-  for (const child of children) child.kill("SIGKILL")
+  // Temp roots die only after every tracked child is confirmed exited: rm under a live holder strands it.
+  const tracked = [...children]
   children.clear()
+  for (const child of tracked) {
+    if (child.exitCode !== null || child.signalCode !== null) continue
+    child.kill("SIGTERM")
+    if (!(await exitedWithin(child, TEARDOWN_GRACE_MS))) {
+      child.kill("SIGKILL")
+      if (!(await exitedWithin(child, TEARDOWN_GRACE_MS))) {
+        throw new Error(`tracked lock holder pid ${String(child.pid)} survived SIGTERM and SIGKILL teardown`)
+      }
+    }
+  }
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 

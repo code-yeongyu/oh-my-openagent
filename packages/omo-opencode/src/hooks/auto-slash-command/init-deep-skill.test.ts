@@ -1,7 +1,7 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 
 import { describe, expect, test } from "bun:test"
-import { createBuiltinSkills } from "../../features/builtin-skills"
+import { createBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { executeSlashCommand } from "./executor"
 

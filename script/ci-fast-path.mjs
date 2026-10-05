@@ -12,8 +12,12 @@ const fullMatrixLabel = "ci:full-matrix"
 const platformSensitiveExactPaths = new Set([
   ".github/workflows/ci.yml",
   "script/ci-fast-path.mjs",
+  "script/ci-leg-tests-guard.mjs",
   "bunfig.win2.parallel.toml",
+  "bunfig.win2.parallel.windows.toml",
+  "script/bun-panic-retry.ts",
   "script/root-test-serial-quarantine.ts",
+  "packages/openclaw-core/src/reply-listener-process.ts",
 ])
 
 function parseArguments(argv) {
@@ -64,6 +68,36 @@ function isWebPath(path) {
   )
 }
 
+// The ONLY paths that may skip the Windows and macOS legs: an explicit
+// allowlist of prose and repository metadata no test loads. Anything not
+// matched here, including a new folder or an unknown extension, is runtime.
+// Nothing under packages/*/src is ever non-runtime: prompts and skills ship
+// from there.
+const packageSourcePath = /^packages\/[^/]+\/src\//
+const topLevelProse = /^[^/]+\.mdx?$/i
+const proseBasename =
+  /^(?:readme|changelog|changes|agents|claude|contributing|code_of_conduct|security|roadmap|third-party-notices|cla)(?:\.[a-z]{2}(?:-[a-z]{2})?)?\.mdx?$|^license(?:\.md|\.txt)?$/i
+const repositoryMetadata = [
+  /^\.github\/workflows\/(?!ci\.yml$)[^/]+\.ya?ml$/,
+  /^\.github\/ISSUE_TEMPLATE\/[^/]+\.ya?ml$/,
+  /^\.github\/assets\/[^/]+\.(?:png|jpe?g|gif|svg|webp)$/i,
+  /^\.github\/FUNDING\.yml$/,
+  /^\.github\/pull_request_template\.md$/,
+]
+
+function isProsePath(path) {
+  if (packageSourcePath.test(path)) return false
+  if (topLevelProse.test(path)) return true
+  return proseBasename.test(path.slice(path.lastIndexOf("/") + 1))
+}
+
+// A runtime-touching path can change what a test observes on any operating
+// system, so the change must run every OS leg.
+export function isRuntimePath(path) {
+  if (isWebPath(path) || isProsePath(path)) return false
+  return !repositoryMetadata.some((pattern) => pattern.test(path))
+}
+
 function isPlatformSensitivePath(path) {
   if (platformSensitiveExactPaths.has(path)) return true
   if (path.endsWith(".ps1")) return true
@@ -90,11 +124,13 @@ export function classifyCiMode({
     isRealMerge &&
     generatedReleaseMerge.test(subject)
   const webOnly = diffAvailable && changedPaths.length > 0 && changedPaths.every(isWebPath)
-  // Ubuntu-first is a pull-request optimization only, and it fails open: any
-  // event we cannot fully inspect keeps all three operating systems.
+  const runtimeTouching = !diffAvailable || changedPaths.some(isRuntimePath)
+  // Ubuntu-first is a pull-request optimization only for changes no test can
+  // observe, and it fails open: any event we cannot fully inspect keeps all
+  // three operating systems.
   const fullMatrix =
     eventName === "push" ||
-    !diffAvailable ||
+    runtimeTouching ||
     releaseStateHeadRef.test(headRef) ||
     labels.includes(fullMatrixLabel) ||
     changedPaths.some(isPlatformSensitivePath)
@@ -104,6 +140,7 @@ export function classifyCiMode({
     webOnly,
     runHeavy: !(generatedReleasePush || webOnly),
     fullMatrix,
+    runtimeTouching,
   }
 }
 

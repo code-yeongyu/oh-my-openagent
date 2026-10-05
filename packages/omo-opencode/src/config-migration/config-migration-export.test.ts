@@ -4,6 +4,8 @@ import { dirname, join, resolve, sep } from "node:path"
 
 const PACKAGE_PATH = join(import.meta.dir, "..", "..", "package.json")
 const ENTRY_POINT = join(import.meta.dir, "index.ts")
+// omo#8247: the Senpi adapter reuses the release-download primitives through this second public subpath.
+const BINARY_DOWNLOADER_ENTRY_POINT = join(import.meta.dir, "..", "shared", "binary-downloader.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
 const NEGATIVE_FIXTURE_ENTRY_POINT = join(import.meta.dir, "..", "..", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
@@ -94,7 +96,31 @@ describe("config-migration public subpath", () => {
         import: "./src/config-migration/index.ts",
         types: "./src/config-migration/index.ts",
       },
+      "./binary-downloader": {
+        import: "./src/shared/binary-downloader.ts",
+        types: "./src/shared/binary-downloader.ts",
+      },
     })
+  })
+
+  test("#given the binary-downloader entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", () => {
+    // given
+    const modules = moduleGraph(BINARY_DOWNLOADER_ENTRY_POINT)
+    const offenders: string[] = []
+
+    // when
+    for (const modulePath of modules) {
+      for (const specifier of importSpecifiers(readFileSync(modulePath, "utf-8"))) {
+        if (OPENCODE_IMPORT.test(specifier)) offenders.push(`${modulePath} imports ${specifier}`)
+      }
+      if (modulePath.includes(PLUGIN_RUNTIME_DIRECTORY) || modulePath.includes(PLUGIN_CONFIG_DIRECTORY)) {
+        offenders.push(`${modulePath} is plugin runtime code`)
+      }
+    }
+
+    // then
+    expect(modules.length).toBeGreaterThan(1)
+    expect(offenders).toEqual([])
   })
 
   test("#given the config-migration entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", () => {

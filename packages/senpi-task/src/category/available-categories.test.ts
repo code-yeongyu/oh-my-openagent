@@ -19,7 +19,7 @@ describe("resolveAvailableCategoryNames", () => {
   describe("#given no user categories and a registry exposing the architect gate model", () => {
     describe("#when the runtime category list is resolved", () => {
       it("#then the builtin architect category is exposed", () => {
-        const names = resolveAvailableCategoryNames({}, fakeRegistry([{ provider: "anthropic", id: "claude-fable-5" }]))
+        const names = resolveAvailableCategoryNames({}, fakeRegistry([{ provider: "anthropic", id: "claude-fable-5-1" }]))
         expect(names).toContain("architect")
       })
     })
@@ -39,7 +39,7 @@ describe("resolveAvailableCategoryNames", () => {
     describe("#when the registry lacks the gate model", () => {
       it("#then the explicit declaration still exposes architect", () => {
         const names = resolveAvailableCategoryNames(
-          { categories: { architect: { model: "anthropic/claude-fable-5" } } },
+          { categories: { architect: { model: "anthropic/claude-fable-5-1" } } },
           fakeRegistry([{ provider: "omo-mock", id: "mock-weak" }]),
         )
         expect(names).toContain("architect")

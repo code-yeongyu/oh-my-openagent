@@ -13,9 +13,11 @@ const BUNDLE_FILES = [
   "omo.js",
   "omo-task.js",
   "omo-member.js",
-  "omo-memory-mcp.js",
   "memory-run-supervisor.mjs",
   "omo-init-deep-advisor.js",
+  "omo-computer-use.js",
+  "omo-memory-doctor.js",
+  "omo-memory-memfs.js",
 ] as const
 
 type LazyBarrel = {
@@ -83,6 +85,10 @@ function readBundlesReaching(guardMessage: string): readonly { file: string; sou
     const source = readBundle(file)
     if (source.includes(guardMessage)) reaching.push({ file, source })
   }
+  const sdkPath = join(packageRoot, "plugin", "runtime", "agent-toolkit-sdk", "sdk.js")
+  expect(existsSync(sdkPath), `missing SDK bundle at ${sdkPath}`).toBe(true)
+  const sdkSource = readFileSync(sdkPath, "utf8")
+  if (sdkSource.includes(guardMessage)) reaching.push({ file: sdkPath, source: sdkSource })
   return reaching
 }
 

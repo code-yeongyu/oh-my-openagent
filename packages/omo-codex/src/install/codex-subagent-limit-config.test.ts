@@ -8,7 +8,7 @@ import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
 
 describe("codex subagent limit config", () => {
-  test("#given empty Codex config #when updating config #then installs the v2 thread limit without agents.max_threads", async () => {
+  test("#given empty Codex config #when updating config #then leaves both thread limits unset", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-subagent-limit-empty-"))
     const configPath = join(root, "config.toml")
@@ -27,13 +27,13 @@ describe("codex subagent limit config", () => {
     // fresh agents.max_threads while MultiAgentV2 is active.
     const content = await readFile(configPath, "utf8")
     expect(content).not.toMatch(/^\s*max_threads\s*=/m)
-    expect(content).toContain("[features.multi_agent_v2]")
-    expect(content).toContain("max_concurrent_threads_per_session = 16")
+    expect(content).not.toContain("[features.multi_agent_v2]")
+    expect(content).not.toMatch(/^\s*max_concurrent_threads_per_session\s*=/m)
   })
 
-  test("#given existing low agents max_threads #when updating config #then raises only the root cap", async () => {
+  test("#given existing low agents max_threads #when updating config #then preserves the root cap", async () => {
     // given
-    // A pinned v1 model keeps the raise path exercised; the stamped
+    // A pinned v1 model keeps user V1 cap preservation exercised; the stamped
     // v2-preferred default would remove agents.max_threads instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-subagent-limit-existing-"))
     const configPath = join(root, "config.toml")
@@ -64,10 +64,10 @@ describe("codex subagent limit config", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toMatch(/\[agents\][\s\S]*?max_threads = 1000/)
+    expect(content).toMatch(/^\s*max_threads\s*=\s*6$/m)
     expect(content).toContain("max_depth = 4")
     expect(content).toContain("[agents.explorer]")
     expect(content).toContain('config_file = "./agents/explorer.toml"')
-    expect(content).not.toMatch(/^max_threads\s*=\s*6$/m)
+    expect(content).toMatch(/^max_threads\s*=\s*6$/m)
   })
 })

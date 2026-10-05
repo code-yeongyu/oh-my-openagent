@@ -9,9 +9,12 @@ export function createPluginDispose(args: {
   skillMcpManager: {
     disconnectAll: () => Promise<void>
   }
+  tuiStateMirror?: {
+    stop: () => void
+  }
   disposeHooks: () => void
 }): PluginDispose {
-  const { backgroundManager, skillMcpManager, disposeHooks } = args
+  const { backgroundManager, skillMcpManager, tuiStateMirror, disposeHooks } = args
   let disposePromise: Promise<void> | null = null
 
   return async (): Promise<void> => {
@@ -21,6 +24,11 @@ export function createPluginDispose(args: {
     }
 
     disposePromise = (async (): Promise<void> => {
+      try {
+        tuiStateMirror?.stop()
+      } catch (error) {
+        log("[plugin-dispose] tuiStateMirror.stop() error:", error)
+      }
       try {
         await backgroundManager.shutdown()
       } catch (error) {

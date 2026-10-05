@@ -1,11 +1,13 @@
-import { existsSync } from "node:fs"
-import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises"
+import { existsSync } from "../fs/resilient"
+import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
-import { NoEffectiveChangesError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import type { GitCommitAuthor, GitMemoryRepo } from "../git"
 import { parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../memfs/frontmatter"
+import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
-import type { LockDomain } from "../locks"
-import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
+import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
+import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
+import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
 
 export type MemoryCommand =
@@ -15,6 +17,7 @@ export type MemoryCommand =
   | "delete"
   | "rename"
   | "update_description"
+  | "apply_patch"
 
 export interface MemoryToolProvenance {
   readonly sessionId: string
@@ -35,6 +38,7 @@ export interface MemoryToolParams {
   insert_text?: string
   description?: string
   file_text?: string
+  input?: string
 }
 
 /** Post-commit metadata carried to the notice channel (plan IC-4); subject is the message's first line. */
@@ -49,9 +53,7 @@ export interface MemoryToolResult {
   readonly commit?: MemoryToolCommit
 }
 
-export interface MemoryToolLock {
-  <T>(domain: LockDomain, operation: () => Promise<T>): Promise<T>
-}
+export type MemoryToolLock = MemoryWriteLock
 
 export interface RunMemoryToolOptions {
   repo: GitMemoryRepo
@@ -62,40 +64,28 @@ export interface RunMemoryToolOptions {
 type AppliedCommand = { affectedPaths: string[] }
 
 export async function runMemoryTool(options: RunMemoryToolOptions): Promise<MemoryToolResult> {
-  const { repo, lock, params } = options
+  const { repo, lock } = options
+  const { params, repairs } = repairLeakedArguments(options.params)
   try {
     const reason = required(params.reason, "reason").trim()
-    return await lock("memory-write", async () => {
-      await repo.cleanCheck()
-      const { affectedPaths } = await applyCommand(repo.dir, params)
-      if (affectedPaths.length === 0) {
-        throw toolError(`${params.command} made no changes`)
-      }
-
-      let result
-      try {
-        result = await repo.commitWrite(affectedPaths, memoryCommitMessage(reason, params.provenance), params.author)
-      } catch (error) {
-        if (error instanceof NoEffectiveChangesError) {
-          throw toolError(`${params.command} made no effective changes`, error)
-        }
-        throw error
-      }
-
-      const local = !(await hasConfiguredRemote(repo))
-      const summary = local
-        ? `Memory ${params.command} committed locally (${result.sha.slice(0, 7)}).`
-        : `Memory ${params.command} committed (${result.sha.slice(0, 7)}); harness will sync after the turn.`
-      return {
-        message: touchesSoulPath(affectedPaths) ? `${summary}\n${SOUL_EDIT_RESULT_LINE}` : summary,
-        commit: {
-          sha: result.sha,
-          subject: reason.split(/\r?\n/, 1)[0] ?? reason,
-          affectedPaths,
-        },
-      }
+    const result = await commitMemoryWrite({
+      repo,
+      lock,
+      reason,
+      author: params.author,
+      ...(params.provenance === undefined ? {} : { provenance: params.provenance }),
+      successLabel: `Memory ${params.command}`,
+      noChangesMessage: `${params.command} made no changes`,
+      apply: async () => (await applyCommand(repo.dir, params)).affectedPaths,
     })
+    return {
+      message: `${result.message}${describeRepairs(repairs)}`,
+      commit: { sha: result.sha, subject: result.subject, affectedPaths: result.affectedPaths },
+    }
   } catch (error) {
+    if (error instanceof MemoryPatchParseError || error instanceof MemoryPatchHunkError) {
+      throw toolError(error.message)
+    }
     if (error instanceof MemoryToolError) throw error
     throw toolError(errorMessage(error), error)
   }
@@ -109,12 +99,16 @@ async function applyCommand(root: string, params: MemoryToolParams): Promise<App
     case "delete": return remove(root, params)
     case "rename": return move(root, params)
     case "update_description": return updateDescription(root, params)
+    case "apply_patch": {
+      const input = required(params.input, "input", "apply_patch")
+      return { affectedPaths: await applyMemoryPatch(root, input) }
+    }
   }
 }
 
 async function create(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "create")
-  const description = required(params.description, "description", "create")
+  const description = acceptableDescription(params.description, "create")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   if (existsSync(path)) throw toolError(`create: block already exists at ${source}`)
   await mkdir(dirname(path), { recursive: true })
@@ -179,11 +173,18 @@ async function move(root: string, params: MemoryToolParams): Promise<AppliedComm
 
 async function updateDescription(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "update_description")
-  const description = required(params.description, "description", "update_description")
+  const description = acceptableDescription(params.description, "update_description")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   const file = await loadEditable(path, source)
   await writeFile(path, renderMemoryFile({ ...file.frontmatter, description }, file.body), "utf8")
   return affected(root, path)
+}
+
+function acceptableDescription(value: string | undefined, command: MemoryCommand): string {
+  const description = required(value, "description", command).replace(/\r?\n/g, " ").trim()
+  const violation = describeDescriptionViolation(description)
+  if (violation !== null) throw toolError(`${command}: ${violation}`)
+  return description
 }
 
 async function loadEditable(path: string, source: string): Promise<ParsedMemoryFile> {
@@ -245,24 +246,8 @@ function required(value: string | undefined, field: string, command?: MemoryComm
   return value
 }
 
-async function hasConfiguredRemote(repo: GitMemoryRepo): Promise<boolean> {
-  const gitConfig = await readFile(join(repo.dir, ".git", "config"), "utf8").catch(() => "")
-  return /^\s*\[remote\s+"[^"]+"\]/m.test(gitConfig)
-}
-
 function toolError(message: string, cause?: unknown): MemoryToolError {
   return new MemoryToolError(message, cause === undefined ? undefined : { cause })
-}
-
-function memoryCommitMessage(reason: string, provenance: MemoryToolProvenance | undefined): string {
-  if (provenance === undefined) return reason
-  return [
-    reason,
-    "",
-    "Omo-Writer: memory-tool",
-    `Omo-Session: ${provenance.sessionId}`,
-    `Omo-Turn: ${provenance.userTurns}`,
-  ].join("\n")
 }
 
 function errorMessage(error: unknown): string {

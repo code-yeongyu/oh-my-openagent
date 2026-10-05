@@ -34,13 +34,13 @@ function resultText(result: { content: readonly { type: string; text?: string }[
 }
 
 describe("buildTaskExecute plan-gated agents", () => {
-  test("#given no skill-invocation resolver wired #when spawning momus #then it fails closed without starting the manager", async () => {
+  test("#given no skill-invocation resolver wired #when spawning plan-reviewer #then it fails closed without starting the manager", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(makeDeps(startedManager(calls)))
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     // then
     expect(calls.count).toBe(0)
@@ -48,13 +48,13 @@ describe("buildTaskExecute plan-gated agents", () => {
     expect(resultText(result)).toContain("ulw-plan")
   })
 
-  test("#given a session with no skill invocations #when spawning momus #then it denies and names the ulw-plan requirement", async () => {
+  test("#given a session with no skill invocations #when spawning plan-reviewer #then it denies and names the ulw-plan requirement", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({}) }))
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     // then
     expect(calls.count).toBe(0)
@@ -62,13 +62,13 @@ describe("buildTaskExecute plan-gated agents", () => {
     expect(resultText(result)).toContain("ulw-plan")
   })
 
-  test("#given a session with no skill invocations #when spawning metis #then it denies and names the ulw-plan requirement", async () => {
+  test("#given a session with no skill invocations #when spawning plan-consultant #then it denies and names the ulw-plan requirement", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({}) }))
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "metis" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-consultant" }, undefined, undefined, CTX)
 
     // then
     expect(calls.count).toBe(0)
@@ -76,7 +76,7 @@ describe("buildTaskExecute plan-gated agents", () => {
     expect(resultText(result)).toContain("ulw-plan")
   })
 
-  test("#given a session with only a SKILL.md-read invocation #when spawning momus #then it stays denied", async () => {
+  test("#given a session with only a SKILL.md-read invocation #when spawning plan-reviewer #then it stays denied", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(
@@ -84,14 +84,14 @@ describe("buildTaskExecute plan-gated agents", () => {
     )
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     // then
     expect(calls.count).toBe(0)
     expect(result.details.status).toBe("denied")
   })
 
-  test("#given a user-requested ulw-plan session with a plan artifact #when spawning momus #then the gate opens and the manager starts", async () => {
+  test("#given a user-requested ulw-plan session with a plan artifact #when spawning plan-reviewer #then the gate opens and the manager starts", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(
@@ -99,14 +99,14 @@ describe("buildTaskExecute plan-gated agents", () => {
     )
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "momus", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer", run_in_background: true }, undefined, undefined, CTX)
 
     // then
     expect(calls.count).toBe(1)
     expect(result.details.status).not.toBe("denied")
   })
 
-  test("#given a user-requested plan session that then invoked ulw-execute #when spawning momus #then it denies and names ulw-execute", async () => {
+  test("#given a user-requested plan session that then invoked ulw-execute #when spawning plan-reviewer #then it denies and names ulw-execute", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(
@@ -116,7 +116,7 @@ describe("buildTaskExecute plan-gated agents", () => {
     )
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     // then
     expect(calls.count).toBe(0)
@@ -124,13 +124,13 @@ describe("buildTaskExecute plan-gated agents", () => {
     expect(resultText(result)).toContain("ulw-execute")
   })
 
-  test("#given a session that invoked only ulw-execute #when spawning momus #then the forbidden denial takes precedence", async () => {
+  test("#given a session that invoked only ulw-execute #when spawning plan-reviewer #then the forbidden denial takes precedence", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({ invoked: ["ulw-execute"] }) }))
 
     // when
-    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     // then
     expect(calls.count).toBe(0)
@@ -172,7 +172,7 @@ describe("buildTaskExecute plan-gated agents", () => {
     // when
     const result = await execute(
       "c",
-      { tasks: [{ prompt: "review the plan", subagent_type: "momus" }, { prompt: "scan", subagent_type: "explore" }], run_in_background: true },
+      { tasks: [{ prompt: "review the plan", subagent_type: "plan-reviewer" }, { prompt: "scan", subagent_type: "explore" }], run_in_background: true },
       undefined,
       undefined,
       CTX,
@@ -186,5 +186,28 @@ describe("buildTaskExecute plan-gated agents", () => {
     expect(gated?.status).toBe("error")
     expect(gated?.error_message ?? "").toContain("ulw-plan")
     expect(plain?.status).not.toBe("error")
+  })
+
+  test("#given the retired momus id and no plan gate #when spawned #then it is not plan-gated while the canonical id still is", async () => {
+    // given
+    const calls = { count: 0 }
+    const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({}) }))
+
+    // when
+    const retired = await execute(
+      "c-retired",
+      { prompt: "p", subagent_type: "momus", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+    const canonical = await execute("c-canonical", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
+
+    // then: the retired id carries no plan gate of its own, so it reaches the manager
+    expect(retired.details.status).not.toBe("denied")
+    expect(calls.count).toBe(1)
+    expect(canonical.details.status).toBe("denied")
+    expect(resultText(canonical)).toContain("plan-reviewer")
+    expect(resultText(canonical)).toContain("ulw-plan")
   })
 })

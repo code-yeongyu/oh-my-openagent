@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { lspInstallDecisionsPath, projectLspConfigPaths, userLspConfigPath } from "./config-paths.js";
 import { resolveSenpiPackagedDaemonRuntime } from "./daemon-runtime.js";
 
 interface ToolExecutionResult {
@@ -53,11 +54,16 @@ const cachedClients = new Map<string, Promise<DaemonClientModule>>();
 export async function callPackagedDaemonTool(
 		name: string,
 		args: Record<string, unknown>,
-		options: { readonly signal?: AbortSignal } = {},
+		options: {
+		readonly signal?: AbortSignal;
+		readonly cwd?: string;
+		readonly homeDir?: string;
+		readonly env?: Record<string, string | undefined>;
+	} = {},
 		importerUrl = import.meta.url,
 ): Promise<ToolExecutionResult> {
 	const client = await loadPackagedDaemonClient(importerUrl);
-	const context = currentSenpiRequestContext();
+	const context = currentSenpiRequestContext(options.cwd, options.homeDir, options.env);
 	return client.callToolViaDaemon(toDaemonToolName(name), args, { context, signal: options.signal });
 }
 
@@ -65,20 +71,24 @@ export function clearPackagedDaemonToolClientCache(): void {
 	cachedClients.clear();
 }
 
-function currentSenpiRequestContext(): LspRequestContext {
-	const cwd = canonicalCwd();
-	const home = resolve(process.env.HOME?.trim() || homedir());
+function currentSenpiRequestContext(
+	cwdInput?: string,
+	homeDir?: string,
+	env: Record<string, string | undefined> = process.env,
+): LspRequestContext {
+	const cwd = canonicalCwd(cwdInput);
+	const home = resolve(homeDir ?? (env.HOME?.trim() || homedir()));
 	return {
 		cwd,
-		projectConfigPaths: [join(cwd, ".pi", "lsp-client.json")],
-		userConfigPath: join(home, ".pi", "lsp-client.json"),
-		installDecisionsPath: join(home, ".pi", "lsp-install-decisions.json"),
+		projectConfigPaths: projectLspConfigPaths(cwd),
+		userConfigPath: userLspConfigPath(home),
+		installDecisionsPath: lspInstallDecisionsPath(home),
 		capabilities: { installDecisionTool: false },
 	};
 }
 
-function canonicalCwd(): string {
-	const cwd = resolve(process.cwd());
+function canonicalCwd(cwdInput?: string): string {
+	const cwd = resolve(cwdInput ?? process.cwd());
 	return existsSync(cwd) ? realpathSync(cwd) : cwd;
 }
 

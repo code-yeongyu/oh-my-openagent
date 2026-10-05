@@ -23,7 +23,6 @@ export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
-export { createCodegraphBootstrapHook } from "./codegraph-bootstrap";
 export { createAstGrepSgProvisionHook } from "./ast-grep-sg-provision";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
@@ -66,6 +65,7 @@ export { createReadImageResizerHook } from "./read-image-resizer"
 export { createTodoDescriptionOverrideHook } from "./todo-description-override"
 export { createWebFetchRedirectGuardHook } from "./webfetch-redirect-guard"
 export { createLegacyPluginToastHook } from "./legacy-plugin-toast"
+export { createNativeEditionNudgeHook } from "./native-edition-nudge"
 export { createFsyncSkipWarningHook } from "./fsync-skip-warning"
 export { createNotepadWriteGuardHook } from "./notepad-write-guard"
 export { createPlanFormatValidatorHook } from "./plan-format-validator"
