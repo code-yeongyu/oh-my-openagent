@@ -60,6 +60,21 @@ describe("omo doctor config lines", () => {
     expect(lines).toEqual(["WARN config: ~/.omo/omo.jsonc: agents.oracle.temperature ignored (invalid value)"])
   })
 
+  test("#given an agent prompt_append file:// value whose file does not exist #when the config report runs #then one WARN line names the config file, the agent, the value and the reason", () => {
+    const home = homeWithUserConfig(`{ "agents": { "explore": { "prompt_append": "file://./missing.md" } } }`)
+
+    expect(configDoctorLines({ cwd: home, env: { HOME: home } })).toEqual([
+      `WARN config: ~/.omo/omo.jsonc: agents.explore.prompt_append could not be resolved (file does not exist: ${join(home, "missing.md")}): file://./missing.md`,
+    ])
+  })
+
+  test("#given an agent prompt_append file:// value that resolves #when the config report runs #then no prompt_append line is reported", () => {
+    const home = homeWithUserConfig(`{ "agents": { "explore": { "prompt_append": "file://./append.md" } } }`)
+    writeFileSync(join(home, "append.md"), "Review the diff, then report.\n")
+
+    expect(configDoctorLines({ cwd: home, env: { HOME: home } })).toEqual([])
+  })
+
   test("#given the staged runtime cannot be loaded #when the launcher asks for config lines #then doctor says the check was unavailable instead of staying silent", async () => {
     const lines = await doctorConfigLines({ loadRuntime: async () => { throw new Error("missing bundle") } })
 

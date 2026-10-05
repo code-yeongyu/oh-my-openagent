@@ -97,6 +97,62 @@ describe("loadAgents", () => {
     expect(result.agents.finder?.prompt).toBe("file prompt\n")
   })
 
+  test("#given an omo config prompt_append file URI #when loading #then the overlay carries the resolved file content", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(join(fixture.project, "append.md"), "Resolved append content")
+    writeText(
+      join(fixture.project, ".omo", "omo.json"),
+      `{"agents":{"finder":{"prompt_append":"file://./append.md"}}}`,
+    )
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.agents.finder?.promptAppend).toBe("Resolved append content")
+  })
+
+  test("#given an omo config prompt_append pointing at a missing file #when loading #then a diagnostic names it and the agent keeps its base persona", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(
+      join(fixture.project, ".omo", "omo.json"),
+      `{"agents":{"finder":{"prompt_append":"file://./missing.md"}}}`,
+    )
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    const diagnostic = result.diagnostics.find((entry) => entry.kind === "prompt_append")
+    expect(diagnostic?.message).toContain("agents.finder.prompt_append")
+    expect(diagnostic?.message).toContain("file://./missing.md")
+    expect(diagnostic?.message).toContain("file does not exist")
+    expect(diagnostic?.path).toBe(join(fixture.project, ".omo", "omo.json"))
+    expect(result.agents.finder?.promptAppend).toBeUndefined()
+    expect(result.agents.finder).toBeDefined()
+  })
+
+  test("#given an omo config prompt_append pointing at a path that cannot be read #when loading #then a diagnostic is reported and nothing throws", () => {
+    // given
+    const fixture = makeFixture()
+    mkdirSync(join(fixture.project, "append.md"), { recursive: true })
+    writeText(
+      join(fixture.project, ".omo", "omo.json"),
+      `{"agents":{"finder":{"prompt_append":"file://./append.md"},"scout":{"prompt":"Scout the repo."}}}`,
+    )
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    const diagnostic = result.diagnostics.find((entry) => entry.kind === "prompt_append")
+    expect(diagnostic?.message).toContain("file could not be read")
+    expect(result.agents.finder?.promptAppend).toBeUndefined()
+    expect(result.agents.scout?.prompt).toBe("Scout the repo.")
+  })
+
   test("#given malformed and valid frontmatter #when loading #then diagnostics are per file and valid agents still load", () => {
     // given
     const fixture = makeFixture()

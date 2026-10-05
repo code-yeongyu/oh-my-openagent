@@ -20,6 +20,10 @@
       "types": "./src/components/agent-home/resolve-agent-home.ts",
       "import": "./src/components/agent-home/resolve-agent-home.ts"
     },
+    "./config-resolution": {
+      "types": "./src/components/config-resolution/index.ts",
+      "import": "./src/components/config-resolution/index.ts"
+    },
     "./install": {
       "types": "./src/install/index.ts",
       "import": "./src/install/index.ts"

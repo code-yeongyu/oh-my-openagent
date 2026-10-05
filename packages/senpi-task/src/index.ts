@@ -330,11 +330,14 @@ export {
   PLAN_GATED_AGENT_NAMES,
   defineAgent,
   evaluateInvocationGuard,
+  findPromptAppendConfigPath,
   invocationConditionForAgent,
   loadAgents,
   mapOmoConfigAgents,
+  promptAppendFailureMessage,
   registerAgent,
   resolveAgent,
+  resolvePromptAppend,
   resolveToolRule,
 } from "./agents"
 export type {

@@ -79,7 +79,13 @@ describe("omo-senpi package shape", () => {
     expect(readBoolean(manifest, "private")).toBe(true)
     expect(readString(manifest, "type")).toBe("module")
     expect(readString(manifest, "version")).toBe(readString(rootManifest, "version"))
-    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install"])
+    expect(Object.keys(exportsMap).toSorted()).toEqual([
+      ".",
+      "./agent-home",
+      "./config-resolution",
+      "./extension",
+      "./install",
+    ])
     expect(scripts).toMatchObject({
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
