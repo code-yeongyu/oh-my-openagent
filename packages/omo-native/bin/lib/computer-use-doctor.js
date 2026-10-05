@@ -1,11 +1,11 @@
-import { join } from "node:path"
+import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
-import { packageManifest, packageRoot } from "./package-paths.js"
+import { nativePluginRoot, packageManifest, packageRoot } from "./package-paths.js"
 
 export const COMPUTER_USE_RUNTIME = join("plugin", "runtime", "category-coverage", "index.js")
 
 async function loadRuntime() {
-  return import(pathToFileURL(join(packageRoot, COMPUTER_USE_RUNTIME)).href)
+  return import(pathToFileURL(join(nativePluginRoot(), relative("plugin", COMPUTER_USE_RUNTIME))).href)
 }
 
 function baseLine(report) {
