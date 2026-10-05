@@ -174,6 +174,7 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "clear_endpoint": return await ownership.clearEndpoint(ctx, args as Parameters<typeof ownership.clearEndpoint>[1])
     case "session_owner": return ownership.sessionOwner(ctx, args as string)
     case "report": return await relay.reportEvent(ctx, args as Parameters<typeof relay.reportEvent>[1])
+    case "mirror_question": return await relay.mirrorQuestion(ctx, args as Parameters<typeof relay.mirrorQuestion>[1])
     case "emit_completions": return await relay.emitCompletions(ctx, args as Parameters<typeof relay.emitCompletions>[1])
     case "pending_completion_arms": return relay.pendingCompletionArms(ctx, args as string)
     case "latest_completion_arm": return relay.latestCompletionArm(ctx, args as string)

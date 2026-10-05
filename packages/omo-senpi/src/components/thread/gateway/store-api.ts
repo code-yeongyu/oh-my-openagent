@@ -8,6 +8,8 @@ import type {
   PriorAnswer,
   BindingsFilter,
   CasRequest,
+  MirrorQuestionRequest,
+  MirrorQuestionResult,
   ReportOpRequest,
   ReportOpResult,
   ToolReceiptBegin,
@@ -74,6 +76,8 @@ export type GatewayStore = ExtensionFacade & {
   readonly clearEndpoint: (request: ClearEndpointRequest) => Promise<void>
   readonly sessionOwner: (durableId: string) => Promise<SessionOwner | null>
   readonly report: (request: ReportOpRequest) => Promise<RelayOutcome<ReportOpResult & Deduplicated>>
+  /** An ask_user question relayed by the session's own component (S1); one row per request, nothing written for an unbound session. */
+  readonly mirrorQuestion: (request: MirrorQuestionRequest) => Promise<MirrorQuestionResult>
   readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly through_arm_seq?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
   /** Completion arms waiting for the session's settle; a plain read that takes no write lock. */
   readonly pendingCompletionArms: (durableId: string) => Promise<number>

@@ -225,10 +225,11 @@ test("#given the caller creates a child with thread_create #when it opens a thre
   expect(Object.hasOwn(other.value?.received ?? {}, "caller_created_target")).toBe(false)
 })
 
-test("#given a store at the previous schema version with data #when it opens #then it migrates to the new tables and keeps every existing row", async () => {
+test("#given a store from before v10 with data #when it opens #then it migrates to the v10 tables and keeps every existing row", async () => {
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
-  const previous = GATEWAY_MIGRATIONS.length - 1
+  // The layout before v10's tables: v11's outbox columns go too, so every step after it replays.
+  const previous = 9
   {
     const seed = storeAt(agentDir)
     await seed.identity()
@@ -239,6 +240,8 @@ test("#given a store at the previous schema version with data #when it opens #th
   try {
     db.exec("DROP TABLE IF EXISTS thread_creations; DROP TABLE IF EXISTS extension_registrations;")
     db.exec("DELETE FROM extension_objects WHERE name IN ('thread_creations', 'extension_registrations')")
+    db.exec("DROP INDEX IF EXISTS outbox_question_request")
+    for (const column of ["ask_hint", "blocking", "questions_json", "options_json"]) db.exec(`ALTER TABLE outbox DROP COLUMN ${column}`)
     db.exec(`PRAGMA user_version = ${previous}`)
     db.query("INSERT INTO gateway_meta (key, value) VALUES ('fixture-keep', 'kept')").run()
   } finally { db.close() }

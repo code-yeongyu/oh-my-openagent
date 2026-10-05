@@ -286,6 +286,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     clearEndpoint: (request) => call("clear_endpoint", request),
     sessionOwner: (durableId) => call("session_owner", durableId),
     report: (request) => call("report", request),
+    mirrorQuestion: (request) => call("mirror_question", request),
     emitCompletions: (request) => call("emit_completions", request),
     pendingCompletionArms: (durableId) => call("pending_completion_arms", durableId),
     latestCompletionArm: (durableId) => call("latest_completion_arm", durableId),

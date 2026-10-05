@@ -69,6 +69,8 @@ function downgradeToV2(agentDir: string, before: (db: Database) => void = () => 
     // The store that wrote the rows still has the file open: wait for its lock like any other writer.
     db.run("PRAGMA busy_timeout = 5000")
     before(db)
+    db.run("DROP INDEX IF EXISTS outbox_question_request")
+    for (const column of ["ask_hint", "blocking", "questions_json", "options_json"]) db.run(`ALTER TABLE outbox DROP COLUMN ${column}`)
     db.run("ALTER TABLE outbox DROP COLUMN ui_request_kind")
     db.run("ALTER TABLE outbox DROP COLUMN answer_state")
     db.run("ALTER TABLE outbox DROP COLUMN answered_by")

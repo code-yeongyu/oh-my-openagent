@@ -1,3 +1,48 @@
+## 2026-10-05 - A thread can be created with skills it follows from its first turn
+
+`thread_create` and `omo thread create` take `skills`: names of installed skills the new session follows from its first turn, as if each were loaded with `/skill`. No slash command is sent, and no turn is started.
+
+How the names are handled:
+- **Checked before the session exists:** a path, raw text, or a name no skill directory the session would load from holds refuses the create with `invalid_arguments` naming it, and nothing is opened.
+- **Looked up in the session's own registry,** so scope and trust follow the usual `/skill` rules. A skill disabled since then is skipped and logged.
+- **Kept in the session's file,** so a restart applies the list again.
+
+The result echoes the attached names as `thread.skills`; an older omo that ignores the field returns none, which is how a caller detects it.
+
+Tests (`initial-skills.test.ts`):
+- a known skill opens the session with the list, sends no prompt and is echoed;
+- an unknown name, a path or raw text is refused, and no session is opened;
+- the body is in the instructions on the first turn, on later turns and in the preview;
+- a restart with no launch context re-applies the list from the session file;
+- a skill the registry no longer holds is not injected;
+- a session created without skills is unchanged.
+
+## 2026-10-05 - A bound session's ask_user question reaches its chat thread on its own, with its options
+
+A question reached a session's chat thread only when the model relayed it with `thread_report`, and the row carried text alone, so a connector could not offer numbered options or buttons, nor tell whether the session was waiting.
+
+The thread component now relays every ask_user question of a bound session itself, when senpi announces it (`ask-user:asked`). The row goes where a report would go, and only to a binding that carries questions out. An unbound session, or one whose run answers more than one thread, writes nothing. A request gets one row: when the model also relays it, whichever came first owns the row, and `thread_report` returns that row with `deduplicated: true`.
+
+Question rows now carry what a connector renders from (schema v11):
+- `options`: the labels of a one-question ask;
+- `questions`: every question of the request, with ask_user's own ids;
+- `blocking`: whether the session waits for the answer;
+- `ask_hint`: the gateway user the session suggests asking.
+
+`thread_report` accepts `options`, `blocking` and `ask_hint` for questions and refuses them on every other kind. Rows written before v11 read these as null.
+
+Dialogs that other extensions open directly (`select`, `confirm`, `input`, `editor`) emit no senpi event yet (senpi#2767), so the model still relays those with `thread_report`.
+
+Tests (`question-mirror.test.ts`):
+- a bound session's question is written once with its fields, and a chat answer claims it;
+- a multi-part, non-waiting question carries every part and `blocking: false`;
+- an unbound session, or a binding not subscribed to questions, writes nothing;
+- mirror-then-report and report-then-mirror each leave one row;
+- two stores racing a mirror and a report leave one row;
+- a local answer closes the mirrored row;
+- a non-question report with the fields is refused;
+- a pre-v11 question reads as unknown after the upgrade.
+
 ## 2026-10-05 - A store extension can declare a session op its component calls but the model never sees
 
 A session-callable op gave the model a tool (`ext_<extension>_<toolName>`). Some ops take a session id the session's own component already knows, while it assembles its prompt: a digest cursor write, a membership read. Declaring them session-callable would have handed the model tools it must not have. Leaving them public would have let any caller forge the session id.

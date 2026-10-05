@@ -8,9 +8,11 @@ import { modelProfileChoice } from "./model-control"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
+import { registerInitialSkills } from "./initial-skills"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import type { ModelRef, ModelSelectSource } from "./gateway/session-models"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import type { QuestionFields, QuestionItem } from "./gateway/store-relay-ops"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
 
@@ -180,6 +182,36 @@ function relayedQuestionOf(event: unknown): { readonly call: string; readonly re
   return kind === "question" && typeof request_id === "string" && request_id.length > 0 ? { call: toolCallId, request: request_id } : undefined
 }
 
+/** An ask_user request as its thread shows it: the rendered text and the fields a connector renders it from. */
+type AskedQuestion = { readonly requestId: string; readonly text: string; readonly fields: QuestionFields }
+
+/** senpi `ask-user:asked` `{ request: QuestionRequest }`: `{ requestId, questions: [{ id, header, question, options: [{ label }], multiSelect }], waitForAnswer }`. */
+function askedQuestionOf(payload: unknown): AskedQuestion | undefined {
+  const request = (payload as { readonly request?: unknown } | undefined)?.request as { readonly requestId?: unknown; readonly questions?: unknown; readonly waitForAnswer?: unknown } | undefined
+  if (typeof request?.requestId !== "string" || request.requestId.length === 0 || !Array.isArray(request.questions)) return undefined
+  const questions: QuestionItem[] = request.questions.flatMap((item: unknown, position: number) => {
+    const { id, header, question, options, multiSelect } = (item ?? {}) as { readonly id?: unknown; readonly header?: unknown; readonly question?: unknown; readonly options?: unknown; readonly multiSelect?: unknown }
+    if (typeof question !== "string") return []
+    const labels = Array.isArray(options) ? options.flatMap((option: unknown) => { const label = (option as { readonly label?: unknown } | null)?.label; return typeof label === "string" ? [label] : [] }) : []
+    return [{ id: typeof id === "string" && id.length > 0 ? id : `q${position + 1}`, header: typeof header === "string" ? header : "", question, options: labels, multi_select: multiSelect === true }]
+  })
+  if (questions.length === 0) return undefined
+  const only = questions.length === 1 ? questions[0] : undefined
+  const text = questions.map((item, index) => {
+    const heading = questions.length === 1 ? item.question : `${index + 1}. ${item.header.length > 0 ? `${item.header}: ` : ""}${item.question}`
+    return [heading, ...item.options.map((label, option) => `${questions.length === 1 ? "" : "   "}${option + 1}) ${label}`)].join("\n")
+  }).join("\n\n")
+  return {
+    requestId: request.requestId,
+    text,
+    fields: {
+      ...(only !== undefined && only.options.length > 0 ? { options: only.options } : {}),
+      questions,
+      ...(typeof request.waitForAnswer === "boolean" ? { blocking: request.waitForAnswer } : {}),
+    },
+  }
+}
+
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)?.sessionManager
   const id = typeof manager?.getSessionId === "function" ? manager.getSessionId() : undefined
@@ -212,6 +244,7 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     if (session === undefined) return
     void registrant.start(session).catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint registration failed: ${error instanceof Error ? error.message : String(error)}`))
   })
+  registerInitialSkills(pi, ctx)
   pi.on("session_before_compact", () => registrant.noteCompaction(true))
   pi.on("session_compact", () => registrant.noteCompaction(false))
   // A steer into a session waiting on a question is `not_steerable` (`decision.ts`): the answer comes
@@ -323,10 +356,28 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           if (closedEarly.delete(report.request)) closeRelayed(report.request, report.durableId)
           else relayed.set(report.request, report.durableId)
         })
+        // Every ask_user question of a bound session is relayed to its thread on its own (one row per
+        // request, so a thread_report for the same request returns that row). Only a store that already
+        // exists is touched: a session that never bound anything opens nothing.
+        const mirror = (asked: AskedQuestion, durableId: string): void => {
+          if (!existsSync(gatewayDatabasePath(agentDir()))) return
+          void store
+            .mirrorQuestion({ now: store.now(), session_durable_id: durableId, origin_delivery_ids: [...run.consumed], origin_local_input: run.local, ui_request_id: asked.requestId, text: asked.text, fields: asked.fields })
+            .then((mirrored) => {
+              if (mirrored.kind === "skipped") return
+              // Closed while it was being written: close the row just written, as for a report.
+              if (closedEarly.delete(asked.requestId)) closeRelayed(asked.requestId, durableId)
+              else relayed.set(asked.requestId, durableId)
+            })
+            .catch((error: unknown) => ctx.logger.warn(`thread gateway: the question ${asked.requestId} was not relayed to its thread: ${error instanceof Error ? error.message : String(error)}`))
+        }
         events.on(ASK_USER_ASKED_EVENT, (payload) => {
           // A new question under a request id that closed before it was relayed: that close is not this question's.
           const request = (payload as { readonly request?: { readonly requestId?: unknown } } | undefined)?.request?.requestId
           if (typeof request === "string") closedEarly.delete(request)
+          const asked = askedQuestionOf(payload)
+          const durableId = durableIdOf((payload as { readonly ctx?: unknown } | undefined)?.ctx)
+          if (asked !== undefined && durableId !== undefined) mirror(asked, durableId)
         })
         events.on(ASK_USER_CLOSED_EVENT, (payload) => {
           // Also fired when a relayed thread_answer resolved it: closing first is harmless, the relay's confirm then records that answer.

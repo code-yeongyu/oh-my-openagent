@@ -16,8 +16,15 @@ import {
 } from "../contracts"
 import type { ThreadErrorCode } from "../errors"
 import type { GatewayRelay } from "../gateway/relay"
+import type { QuestionFields } from "../gateway/store-relay-ops"
 import { metadata, output, resolveStoredSession, type AnyTool, type ToolOutput } from "./internals"
 import { UNKNOWN_CALLER, type ThreadHostView, type ThreadHostViewRequest, type ThreadToolSurfaceOptions } from "./ports"
+
+/** A question's render fields from `thread_report`, passed on only when the model gave them (the store refuses them on other kinds). */
+function questionFieldsOf(input: ThreadReportInput): { readonly question?: QuestionFields } {
+  if (input.options === undefined && input.blocking === undefined && input.ask_hint === undefined) return {}
+  return { question: { ...(input.options === undefined ? {} : { options: input.options }), ...(input.blocking === undefined ? {} : { blocking: input.blocking }), ...(input.ask_hint === undefined ? {} : { ask_hint: input.ask_hint }) } }
+}
 
 type RelayToolName = "thread_bind" | "thread_unbind" | "thread_rebind" | "thread_bindings" | "thread_report" | "thread_outbox" | "thread_outbox_ack" | "thread_answer"
 
@@ -147,6 +154,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         text: input.text,
         ...(input.request_id === undefined ? {} : { request_id: input.request_id }),
         ...(input.request_kind === undefined ? {} : { request_kind: input.request_kind }),
+        ...questionFieldsOf(input),
       })
       if (reported.kind !== "ok") return reported as ThreadToolResult
       // The arm's sequence number is the settle watermark, internal to the component; the result stays as documented.

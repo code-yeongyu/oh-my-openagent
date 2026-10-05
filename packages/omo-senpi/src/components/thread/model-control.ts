@@ -1,8 +1,10 @@
 import type { OmoModelProfile } from "@oh-my-opencode/omo-config-core"
 
 import { DEFAULT_MODEL_PROFILE_ID } from "../model-profile/builtin-profiles"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveModelProfile } from "../model-profile/resolve"
 import type { ThreadToolResult } from "./contracts"
+import { checkInitialSkills } from "./initial-skills"
 import { isModelSetter, MODEL_SETTERS, modelLabel, type ModelRef, type ModelSetter, type PendingChoice, type ThreadModel } from "./gateway/session-models"
 import { failure, resolution, resolveEntries, routingId, sessionPort, summary, targetSession } from "./tools/internals"
 import type { ModelCatalogEntry, ThreadHostView, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -29,6 +31,8 @@ export type CreateThreadInput = {
   readonly model?: string
   readonly thinking?: string
   readonly set_by?: ModelSetter
+  /** Names of skills the session runs with from its first turn (`initial-skills.ts`); every name must resolve, or nothing is created. */
+  readonly skills?: readonly string[]
 }
 
 type Failure = Extract<ThreadToolResult, { kind: "error" }>
@@ -177,7 +181,7 @@ async function persistEngineState(
  * opens anything: a bad setter or level, a name in use, a model no connected provider serves, a level
  * the chosen model cannot run.
  */
-export async function createThread(options: ThreadToolSurfaceOptions, current: ThreadHostView, input: CreateThreadInput, defaults: { readonly set_by: ModelSetter; readonly cwd?: string }): Promise<ThreadToolResult> {
+export async function createThread(options: ThreadToolSurfaceOptions, current: ThreadHostView, input: CreateThreadInput, defaults: { readonly set_by: ModelSetter; readonly cwd?: string; readonly agentDir?: string }): Promise<ThreadToolResult> {
   if (input.set_by !== undefined && !isModelSetter(input.set_by)) return badSetter(input.set_by)
   if (input.set_by !== undefined && input.model === undefined) return failure("invalid_arguments", "set_by names who chose a model, and no model was given.", "Pass model with set_by, or drop set_by.")
   if (input.thinking !== undefined && !isThinkingLevel(input.thinking)) return failure("invalid_arguments", `The thinking level must be one of ${THINKING_LEVELS.join(", ")}.`, "Pass one of the listed levels.")
@@ -186,14 +190,18 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
     if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
   }
   const cwd = input.cwd ?? defaults.cwd
-  const opening = { ...(cwd === undefined ? {} : { cwd }), ...(input.fork_from === undefined ? {} : { forkFrom: input.fork_from }), ...(input.name === undefined ? {} : { name: input.name }) }
+  const skills = input.skills === undefined || input.skills.length === 0 ? undefined : checkInitialSkills(input.skills, { cwd: cwd ?? process.cwd(), agentDir: defaults.agentDir ?? resolveAgentHome({ env: process.env }) })
+  if (skills !== undefined && skills.kind === "invalid") return failure("invalid_arguments", `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`, "Pass skill names as listed by the skill index.", { invalid: skills.names })
+  if (skills !== undefined && skills.kind === "unknown") return failure("invalid_arguments", `No such skill: ${skills.names.join(", ")}.`, "Pass the names of skills this workspace loads, or install the skill first.", { unknown: skills.names })
+  const loaded = skills?.kind === "ok" ? skills.names : undefined
+  const opening = { ...(cwd === undefined ? {} : { cwd }), ...(input.fork_from === undefined ? {} : { forkFrom: input.fork_from }), ...(input.name === undefined ? {} : { name: input.name }), ...(loaded === undefined ? {} : { initialSkills: loaded }) }
   const wanted = providerFilter(input.provider)
   const listCatalog = options.host.availableModels
   if (listCatalog === undefined) {
     // Without a catalog nothing can be chosen for the caller, so an explicit choice is refused rather than left to the host's default.
     if (input.model !== undefined || input.thinking !== undefined || wanted !== undefined) return failure("unsupported", "This host cannot list the models a new session could use.", "Create the thread without a provider, model or thinking level, then use thread_set_model.")
     const session = await options.host.openSession(opening)
-    return { kind: "ok", thread: summary(session), deduplicated: false }
+    return { kind: "ok", thread: { ...summary(session), ...(loaded === undefined ? {} : { skills: loaded }) }, deduplicated: false }
   }
   const catalog = await listCatalog()
   let entry: ModelCatalogEntry
@@ -219,7 +227,7 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
   const explicit = input.model !== undefined
   const model: ThreadModel = { provider: entry.provider, id: entry.id, thinking_level: thinking ?? stateThinking(session), provenance: explicit ? "set" : "auto", set_by: explicit ? (input.set_by ?? defaults.set_by) : null, reason: null }
   await options.store.recordSessionModel({ now: (options.now ?? options.store.now)(), durable_id: thread.thread_id, model })
-  return { kind: "ok", thread: { ...thread, model }, deduplicated: false }
+  return { kind: "ok", thread: { ...thread, model, ...(loaded === undefined ? {} : { skills: loaded }) }, deduplicated: false }
 }
 
 /** A set-model the engine did not apply names the requested model as `pending` (held) or `superseded` (replaced by another switch). */

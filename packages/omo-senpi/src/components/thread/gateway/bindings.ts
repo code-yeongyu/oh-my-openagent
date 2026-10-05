@@ -123,6 +123,14 @@ export type OutboxRow = {
    * connector holding the binding's later rows behind the question waits for it. Null for an unanswered question or another event.
    */
   readonly answer_state: "in_flight" | "delivered" | null
+  /** Question rows only (schema v11): the option labels of a one-question ask; null when the question named none. */
+  readonly options?: readonly string[] | null
+  /** Question rows only: every question of an ask_user request, so a multi-question ask renders without parsing its text. */
+  readonly questions?: readonly { readonly id: string; readonly header: string; readonly question: string; readonly options: readonly string[]; readonly multi_select: boolean }[] | null
+  /** Question rows only: whether the session waits for the answer; null when the reporter did not say. */
+  readonly blocking?: boolean | null
+  /** Question rows only: the gateway user the session suggests asking; the gateway still decides who is asked. */
+  readonly ask_hint?: string | null
 }
 
 export function rfc3339(ms: number): string {

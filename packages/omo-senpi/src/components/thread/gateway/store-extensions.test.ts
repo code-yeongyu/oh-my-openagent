@@ -31,6 +31,8 @@ describe("store extension migrations", () => {
       db.exec("DROP TABLE session_models")
       db.exec("DROP TABLE thread_creations")
       db.exec("DROP TABLE extension_registrations")
+      db.exec("DROP INDEX IF EXISTS outbox_question_request")
+      for (const column of ["ask_hint", "blocking", "questions_json", "options_json"]) db.exec(`ALTER TABLE outbox DROP COLUMN ${column}`)
       db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
       db.exec("PRAGMA user_version = 6")
       // Each core step after v6 on its own adds no core row beside an object the extension owns: v9's
@@ -68,6 +70,8 @@ describe("store extension migrations", () => {
       // v10's tables and the core rows reserving them (their autoindexes included) go first.
       for (const table of ["thread_creations", "extension_registrations"]) db.exec(`DROP TABLE ${table}`)
       db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND NOT EXISTS (SELECT 1 FROM sqlite_schema s WHERE s.type = extension_objects.type AND s.name = extension_objects.name)")
+      db.exec("DROP INDEX IF EXISTS outbox_question_request")
+      for (const column of ["ask_hint", "blocking", "questions_json", "options_json"]) db.exec(`ALTER TABLE outbox DROP COLUMN ${column}`)
       for (const column of ["pending_set_by", "pending_model_id", "pending_provider"]) db.exec(`ALTER TABLE session_models DROP COLUMN ${column}`)
       db.exec("INSERT INTO extension_objects (type, name, owner) VALUES ('table', 'Alpha_Items', NULL)")
       db.exec("PRAGMA user_version = 8")

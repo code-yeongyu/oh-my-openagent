@@ -45,7 +45,7 @@ const BINDING_COLUMNS = [
 
 const OUTBOX_COLUMNS = [
   "cursor", "binding_id", "revision", "event_kind", "payload", "state", "provider_message_id", "created_at", "reply_token",
-  "question_state", "outcome", "answered_by", "answer_state",
+  "question_state", "outcome", "answered_by", "answer_state", "options_json", "questions_json", "blocking", "ask_hint",
 ] as const
 
 function refused(code: StoreRefusal["code"], message: string, details?: Readonly<Record<string, unknown>>): StoreRefusal {
@@ -176,10 +176,12 @@ async function relayMutation<T extends object>(ctx: StoreContext, op: string, no
     const prior = priorOutcome<T>(ctx, key)
     if (prior !== undefined) return prior
     const outcome = body()
-    if (outcome.kind === "ok") recordOutcome(ctx, key, now, { ...outcome, deduplicated: false })
+    // A body may answer with a row an earlier call wrote (a question already relayed): it says so itself.
+    const deduplicated = outcome.kind === "ok" && (outcome as { readonly deduplicated?: unknown }).deduplicated === true
+    if (outcome.kind === "ok") recordOutcome(ctx, key, now, { ...outcome, deduplicated })
     // After the body, so what this call just wrote protects the rows it references.
     sweepRetentionIfDue(ctx, now, cleared)
-    return outcome.kind === "ok" ? ({ ...outcome, deduplicated: false } as RelayOutcome<T>) : outcome
+    return outcome.kind === "ok" ? ({ ...outcome, deduplicated } as RelayOutcome<T>) : outcome
   })
 }
 
@@ -416,6 +418,38 @@ export type ReportOpRequest = {
   readonly ui_request_id: string | null
   /** For a question: the kind of the session's pending request; null when the session declared none. */
   readonly ui_request_kind: UiRequestKind | null
+  /** For a question only: what a connector renders it from (options, blocking, ask hint); refused on every other event. */
+  readonly question?: QuestionFields
+}
+
+/** One question of an ask_user request, as a connector renders it. */
+export type QuestionItem = { readonly id: string; readonly header: string; readonly question: string; readonly options: readonly string[]; readonly multi_select: boolean }
+
+/**
+ * What a connector needs to render a question without parsing its text (schema v11, question rows
+ * only): the option labels of a one-question ask, every question of an ask_user request, whether the
+ * session waits for the answer (`blocking`; unset when the reporter did not say), and the gateway user
+ * the session suggests asking (`ask_hint`; the gateway still decides who is asked).
+ */
+export type QuestionFields = {
+  readonly options?: readonly string[]
+  readonly questions?: readonly QuestionItem[]
+  readonly blocking?: boolean
+  readonly ask_hint?: string
+}
+
+function hasQuestionFields(fields: QuestionFields | undefined): boolean {
+  return fields !== undefined && (fields.options !== undefined || fields.questions !== undefined || fields.blocking !== undefined || fields.ask_hint !== undefined)
+}
+
+/** The question row a session already has for an extension UI request, on any binding: one row per request. */
+function existingQuestion(ctx: StoreContext, sessionDurableId: string, uiRequestId: string): { readonly binding_id: string; readonly revision: number; readonly cursor: number; readonly reply_token: string | null } | undefined {
+  const row = ctx.sql.one(
+    ["binding_id", "revision", "cursor", "reply_token"],
+    "SELECT binding_id, revision, cursor, reply_token FROM outbox WHERE session_durable_id = ? AND ui_request_id = ? AND event_kind = 'question' ORDER BY cursor LIMIT 1",
+    [sessionDurableId, uiRequestId],
+  )
+  return row === undefined ? undefined : { binding_id: String(row.binding_id), revision: Number(row.revision), cursor: Number(row.cursor), reply_token: nullableString(row.reply_token) }
 }
 
 export type ReportOpResult = {
@@ -460,13 +494,33 @@ function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, origi
   return refused("invalid_arguments", `This session has ${outbound.length} active outbound bindings and its current run answers no bound message; name binding_id.`, { binding_ids: outbound })
 }
 
-export function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord; readonly event: OutboundEvent; readonly text: string; readonly now: number; readonly reply_token?: string; readonly ui_request_id?: string; readonly ui_request_kind?: UiRequestKind; readonly incarnation?: string | null; readonly outcome?: CompletionOutcome; readonly model_change?: ModelChange }): number {
+/** A question row with its reply token (minted for the session's current incarnation) and its render fields. */
+function insertQuestion(
+  ctx: StoreContext,
+  row: { readonly binding: BindingRecord; readonly session_durable_id: string; readonly ui_request_id: string; readonly ui_request_kind: UiRequestKind | null; readonly text: string; readonly now: number; readonly fields: QuestionFields | undefined },
+): { readonly cursor: number; readonly reply_token: string } {
+  const incarnation = incarnationOf(ctx, row.session_durable_id)
+  const token = mintReplyToken(meta(ctx, "token_secret"), { binding_id: row.binding.binding_id, revision: row.binding.revision, session_durable_id: row.session_durable_id, incarnation, ui_request_id: row.ui_request_id })
+  const cursor = insertOutbox(ctx, {
+    binding: row.binding, event: "question", text: row.text, now: row.now, reply_token: token, ui_request_id: row.ui_request_id,
+    ...(row.ui_request_kind === null ? {} : { ui_request_kind: row.ui_request_kind }), incarnation, ...(row.fields === undefined ? {} : { question: row.fields }),
+  })
+  return { cursor, reply_token: token }
+}
+
+export function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord; readonly event: OutboundEvent; readonly text: string; readonly now: number; readonly reply_token?: string; readonly ui_request_id?: string; readonly ui_request_kind?: UiRequestKind; readonly incarnation?: string | null; readonly outcome?: CompletionOutcome; readonly model_change?: ModelChange; readonly question?: QuestionFields }): number {
+  // The render fields belong to question rows only; every other row keeps them NULL.
+  const question = row.event === "question" ? row.question : undefined
   write(
     ctx,
-    "INSERT INTO outbox (binding_id, revision, event_kind, payload, state, provider_message_id, created_at, acked_at, session_durable_id, reply_token, ui_request_id, ui_request_kind, incarnation, question_state, answer, answered_at, outcome) VALUES (?, ?, ?, ?, 'pending', NULL, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+    "INSERT INTO outbox (binding_id, revision, event_kind, payload, state, provider_message_id, created_at, acked_at, session_durable_id, reply_token, ui_request_id, ui_request_kind, incarnation, question_state, answer, answered_at, outcome, options_json, questions_json, blocking, ask_hint) VALUES (?, ?, ?, ?, 'pending', NULL, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)",
     [
       row.binding.binding_id, row.binding.revision, row.event, JSON.stringify({ text: row.text, ...(row.model_change === undefined ? {} : { model_change: row.model_change }) }), row.now, row.binding.session_durable_id,
       row.reply_token ?? null, row.ui_request_id ?? null, row.ui_request_kind ?? null, row.incarnation ?? null, row.reply_token === undefined ? null : "pending", row.outcome ?? null,
+      question?.options === undefined ? null : JSON.stringify(question.options),
+      question?.questions === undefined ? null : JSON.stringify(question.questions),
+      question?.blocking === undefined ? null : question.blocking ? 1 : 0,
+      question?.ask_hint ?? null,
     ],
   )
   const cursor = Number(ctx.sql.one(["c"], "SELECT last_insert_rowid() AS c")?.c)
@@ -482,6 +536,14 @@ export function insertOutbox(ctx: StoreContext, row: { readonly binding: Binding
  */
 export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): Promise<RelayOutcome<ReportOpResult>> {
   return await relayMutation(ctx, "report", request.now, request.receipt, () => {
+    // One row per request: a question the session already relayed (the component mirrors every ask_user
+    // on its own) is answered with that row, whichever came first, before any binding is resolved again.
+    if (request.event === "question" && request.ui_request_id !== null) {
+      const existing = existingQuestion(ctx, request.session_durable_id, request.ui_request_id)
+      if (existing !== undefined) {
+        return { kind: "ok", binding_id: existing.binding_id, revision: existing.revision, event: "question", cursor: existing.cursor, reply_token: existing.reply_token, armed: false, arm_seq: null, deduplicated: true }
+      }
+    }
     const resolved = request.binding_id === null ? reportBindingDefault(ctx, request.session_durable_id, request.origin_delivery_ids, request.origin_local_input === true) : { binding_id: request.binding_id }
     if ("kind" in resolved) return resolved
     const bindingId = resolved.binding_id
@@ -492,6 +554,7 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
     if (!binding.direction.outbound) return refused("unsupported", "The binding carries no outbound direction.", { binding_id: bindingId, direction: binding.direction })
     if (!binding.outbound_events.includes(request.event)) return refused("unsupported", `The binding is not subscribed to ${request.event} events.`, { binding_id: bindingId, outbound_events: binding.outbound_events })
     if (request.ui_request_kind !== null && request.event !== "question") return refused("invalid_arguments", "Only a question names a request kind.")
+    if (request.event !== "question" && hasQuestionFields(request.question)) return refused("invalid_arguments", "Only a question carries options, blocking or ask_hint.")
     const base = { binding_id: bindingId, revision: binding.revision, event: request.event }
     if (request.event === "completion") {
       write(ctx, "INSERT INTO completion_arms (session_durable_id, binding_id, revision, text, armed_at) VALUES (?, ?, ?, ?, ?)", [
@@ -502,15 +565,51 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
     }
     if (request.event === "question") {
       if (request.ui_request_id === null) return refused("invalid_arguments", "A question names the session's pending extension UI request (request_id).")
-      const incarnation = incarnationOf(ctx, request.session_durable_id)
-      const token = mintReplyToken(meta(ctx, "token_secret"), { binding_id: bindingId, revision: binding.revision, session_durable_id: request.session_durable_id, incarnation, ui_request_id: request.ui_request_id })
-      const cursor = insertOutbox(ctx, { binding, event: "question", text: request.text, now: request.now, reply_token: token, ui_request_id: request.ui_request_id, ...(request.ui_request_kind === null ? {} : { ui_request_kind: request.ui_request_kind }), incarnation })
+      const cursor = insertQuestion(ctx, { binding, session_durable_id: request.session_durable_id, ui_request_id: request.ui_request_id, ui_request_kind: request.ui_request_kind, text: request.text, now: request.now, fields: request.question })
       pruneOutbox(ctx, request.now)
-      return { kind: "ok", ...base, cursor, reply_token: token, armed: false, arm_seq: null }
+      return { kind: "ok", ...base, cursor: cursor.cursor, reply_token: cursor.reply_token, armed: false, arm_seq: null }
     }
     const cursor = insertOutbox(ctx, { binding, event: request.event, text: request.text, now: request.now })
     pruneOutbox(ctx, request.now)
     return { kind: "ok", ...base, cursor, reply_token: null, armed: false, arm_seq: null }
+  })
+}
+
+export type MirrorQuestionRequest = {
+  readonly now: number
+  readonly session_durable_id: string
+  readonly origin_delivery_ids: readonly string[]
+  readonly origin_local_input: boolean
+  readonly ui_request_id: string
+  readonly text: string
+  readonly fields: QuestionFields
+}
+
+export type MirrorQuestionResult =
+  | { readonly kind: "written"; readonly binding_id: string; readonly cursor: number; readonly reply_token: string }
+  | { readonly kind: "existing"; readonly binding_id: string; readonly cursor: number; readonly reply_token: string | null }
+  | { readonly kind: "skipped"; readonly reason: string }
+
+/**
+ * A question the session asked through ask_user, relayed by the session's component on its own so it
+ * never depends on the model calling `thread_report`. It goes where a report would (`reportBindingDefault`),
+ * and only to a binding that carries questions out; anywhere else (no binding, an ambiguous run, a
+ * binding not subscribed to questions) nothing is written. One row per request: a report that already
+ * relayed it is left as it is.
+ */
+export async function mirrorQuestion(ctx: StoreContext, request: MirrorQuestionRequest): Promise<MirrorQuestionResult> {
+  return await transaction(ctx, "mirror_question", () => {
+    expireDue(ctx, request.now)
+    const existing = existingQuestion(ctx, request.session_durable_id, request.ui_request_id)
+    if (existing !== undefined) return { kind: "existing", binding_id: existing.binding_id, cursor: existing.cursor, reply_token: existing.reply_token }
+    const resolved = reportBindingDefault(ctx, request.session_durable_id, request.origin_delivery_ids, request.origin_local_input)
+    if ("kind" in resolved) return { kind: "skipped", reason: resolved.message }
+    const binding = selectBinding(ctx, resolved.binding_id)
+    if (binding === undefined || binding.status !== "active") return { kind: "skipped", reason: "The binding is not active." }
+    if (!binding.direction.outbound || !binding.outbound_events.includes("question")) return { kind: "skipped", reason: "The binding does not carry questions out." }
+    const written = insertQuestion(ctx, { binding, session_durable_id: request.session_durable_id, ui_request_id: request.ui_request_id, ui_request_kind: "question", text: request.text, now: request.now, fields: request.fields })
+    pruneOutbox(ctx, request.now)
+    return { kind: "written", binding_id: binding.binding_id, cursor: written.cursor, reply_token: written.reply_token }
   })
 }
 
@@ -580,6 +679,18 @@ function outboxRowFrom(record: SqlRow, binding: BindingRecord): OutboxRow {
     outcome: (record.outcome ?? null) as OutboxRow["outcome"],
     answered_by: authorFromColumn(record.answered_by),
     answer_state: (record.answer_state ?? null) as OutboxRow["answer_state"],
+    ...(event === "question" ? questionFieldsFrom(record) : {}),
+  }
+}
+
+/** A question row's render fields; null where the reporter did not give one or the row predates v11. */
+function questionFieldsFrom(record: SqlRow): Pick<Required<OutboxRow>, "options" | "questions" | "blocking" | "ask_hint"> {
+  const json = (value: unknown): unknown => (typeof value === "string" ? JSON.parse(value) : null)
+  return {
+    options: json(record.options_json) as OutboxRow["options"] & {},
+    questions: json(record.questions_json) as OutboxRow["questions"] & {},
+    blocking: record.blocking === null || record.blocking === undefined ? null : Number(record.blocking) === 1,
+    ask_hint: nullableString(record.ask_hint),
   }
 }
 

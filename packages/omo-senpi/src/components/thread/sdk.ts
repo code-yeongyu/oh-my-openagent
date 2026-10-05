@@ -226,7 +226,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     answer: (request) => guarded(() => relay.answer({ binding_id: request.binding_id, reply_token: request.reply_token, answer: request.answer, ...(request.author === undefined ? {} : { author: request.author }) })),
     create: (request) => guarded(async () => {
       const { all_scope: _allScope, ...input } = request
-      return await createThread(surface, await view(), input, { set_by: "user", cwd: options.cwd })
+      return await createThread(surface, await view(), input, { set_by: "user", cwd: options.cwd, agentDir: options.agentDir })
     }),
     models: (request) => guarded(async () => await listThreadModels(surface, await view(), request, UNKNOWN_CALLER)),
     setModel: (request) => guarded(async () => await setThreadModel(surface, await view(), request, UNKNOWN_CALLER, request.set_by ?? "user")),

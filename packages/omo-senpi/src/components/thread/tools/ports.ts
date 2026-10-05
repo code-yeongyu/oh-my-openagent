@@ -62,7 +62,7 @@ export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
   /** `provider`/`modelId`/`thinkingLevel` go to `open_session` as given: the session is created on them, a resume ignores them. */
-  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly provider?: string; readonly modelId?: string; readonly thinkingLevel?: string }) => Promise<ThreadHostSession>
+  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly provider?: string; readonly modelId?: string; readonly thinkingLevel?: string; readonly initialSkills?: readonly string[] }) => Promise<ThreadHostSession>
   /** The models a NEW session on this host could run; `get_available_models` is per session, so the host answers it through one. */
   readonly availableModels?: () => Promise<readonly ModelCatalogEntry[]>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>

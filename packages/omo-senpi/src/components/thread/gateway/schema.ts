@@ -248,6 +248,22 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
      SELECT s.type, s.name, NULL FROM sqlite_schema s
      WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
   ],
+  // v11 (gateway todos 38-41): what a connector needs to render a question without parsing its text.
+  // Question rows only (the insert path writes them nowhere else): the option labels of a one-question
+  // ask (`options_json`), every question of an ask_user request (`questions_json`), whether the session
+  // waits for the answer (`blocking`, 0/1; NULL when the reporter did not say), and the gateway user the
+  // session suggests asking (`ask_hint`). NULL on every row written before v11.
+  [
+    "ALTER TABLE outbox ADD COLUMN options_json TEXT",
+    "ALTER TABLE outbox ADD COLUMN questions_json TEXT",
+    "ALTER TABLE outbox ADD COLUMN blocking INTEGER CHECK (blocking IS NULL OR blocking IN (0, 1))",
+    "ALTER TABLE outbox ADD COLUMN ask_hint TEXT",
+    // One question row per request is looked up inside every question write's transaction.
+    "CREATE INDEX outbox_question_request ON outbox (session_durable_id, ui_request_id) WHERE event_kind = 'question'",
+    `INSERT OR IGNORE INTO extension_objects (type, name, owner)
+     SELECT s.type, s.name, NULL FROM sqlite_schema s
+     WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
+  ],
 ]
 
 export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "session_models", "thread_creations", "extension_registrations"] as const
