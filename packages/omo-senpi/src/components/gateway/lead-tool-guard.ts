@@ -6,6 +6,8 @@ import { gatewaySessionId, type GatewayScopeAccess } from "./scope-access"
 
 const LEAD_TOOL_NAMES = new Set([
   ...THREAD_TOOL_SEARCH_METADATA.map(({ name }) => name),
+  // tool_search only activates tools; the guard still refuses any activated tool outside this list.
+  "tool_search",
   "memory", "memory_apply_patch", "gateway_learning",
   "read", "grep", "find", "ls", "glob",
 ])
