@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, watch, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -71,7 +71,11 @@ export function createWorkspaceEditTestHarness() {
 }
 
 function createFixture(scenario: Record<string, unknown>, tempDirectories: string[]) {
-	const workspace = mkdtempSync(join(tmpdir(), "lsp-apply-edit-"));
+	// Realpath the temp root: the client opens documents under their canonical URI but sends pull
+	// requests under the path it was given, and the fake server echoes the request URI into
+	// `diagnosticRequest` publishes. On macOS tmpdir() is a /var -> /private/var symlink, so a
+	// non-canonical root made those publishes target a document the client never opened (#9476).
+	const workspace = mkdtempSync(join(realpathSync(tmpdir()), "lsp-apply-edit-"));
 	tempDirectories.push(workspace);
 	const source = join(workspace, "source.ts");
 	const destination = join(workspace, "destination.ts");
