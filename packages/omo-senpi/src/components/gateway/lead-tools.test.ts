@@ -39,7 +39,7 @@ for (const toolName of ["bash", "edit", "write", "eval"]) {
   })
 }
 
-for (const toolName of ["read", "grep", "find", "ls", "glob", "thread_create", "thread_bind", "thread_send", "thread_report", "ext_omo_gateway_thread_open", "ext_omo_gateway_work_item_status", "ext_omo_gateway_chat_read", "memory", "memory_apply_patch", "gateway_learning"]) {
+for (const toolName of ["tool_search", "read", "grep", "find", "ls", "glob", "thread_create", "thread_bind", "thread_send", "thread_report", "ext_omo_gateway_thread_open", "ext_omo_gateway_work_item_status", "ext_omo_gateway_chat_read", "memory", "memory_apply_patch", "gateway_learning"]) {
   test(`#given an enforced scope lead #when calling ${toolName} #then the tool passes through`, async () => {
     const f = await leadFixture()
     expect(await toolCall(f, "lead", toolName)).toBeUndefined()
