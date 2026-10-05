@@ -280,7 +280,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
         // #9425: thread_create with no model resolves from the same model_profile the session-start component applies.
         modelProfile: options.modelProfile ?? (() => modelProfileChoice(loadSenpiOmoConfig({ cwd: pi.cwd ?? process.cwd() }).config)),
-      })
+      }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.

@@ -1,7 +1,6 @@
-import { extname } from "node:path"
-
+import { declarationProblem, declaredOpNames, importExtensionModule, persistDescriptor, readDescriptor, toolNameTaken } from "./extension-registrations"
 import { assertExtensionName, checkExtensionSchema, ExtensionSchemaViolation, extensionSchema, extensionSql, sqliteName } from "./extension-sql"
-import { extensionTransaction } from "./extension-transaction"
+import { ExtensionArgumentError, extensionTransaction } from "./extension-transaction"
 import { singleExtensionStatement } from "./extension-statement"
 import type { GatewayResolve } from "./engine"
 import { isLockWaitExceeded } from "./lock-wait"
@@ -20,9 +19,19 @@ function refusal(code: StoreExtensionRefusal["code"], message: string): StoreExt
 
 function fromError(error: unknown): StoreExtensionRefusal {
   const message = error instanceof Error ? error.message : String(error)
-  if (error instanceof ExtensionSchemaViolation || error instanceof GatewaySchemaVersionError) return refusal(error.code, message)
+  if (error instanceof ExtensionSchemaViolation || error instanceof GatewaySchemaVersionError || error instanceof ExtensionArgumentError) return refusal(error.code, message)
   if (isLockWaitExceeded(error)) return refusal("gateway_lock_wait_exceeded", message)
   return refusal("extension_operation_failed", message)
+}
+
+/** One op run in its own transaction: the args are built inside it, and `effects` run only after COMMIT. */
+export type ExtensionRun = {
+  readonly name: string
+  readonly descriptor: Pick<StoreExtensionRegistration, "name" | "migrations">
+  readonly module: Readonly<Record<string, unknown>>
+  readonly op: string
+  readonly args: () => unknown
+  readonly effects?: readonly (() => void)[]
 }
 
 export class StoreExtensions {
@@ -30,11 +39,14 @@ export class StoreExtensions {
 
   constructor(private readonly ctx: StoreContext, private readonly resolveTarget: GatewayResolve) {}
 
-  async register(descriptor: StoreExtensionRegistration, now: number): Promise<StoreExtensionResult<{ readonly version: number }>> {
+  /** `restoredAt`: a restarted worker replaying a registration this process made then (`persistDescriptor`). */
+  async register(descriptor: StoreExtensionRegistration, now: number, restoredAt?: number): Promise<StoreExtensionResult<{ readonly version: number }>> {
     if (!/^[a-z][a-z0-9_]{1,31}$/.test(descriptor.name) || !Array.isArray(descriptor.migrations)
       || !descriptor.migrations.every((step) => Array.isArray(step) && step.every((sql) => typeof sql === "string"))) {
       return refusal("invalid_arguments", "An extension needs a valid namespace and an array of SQL migration steps.")
     }
+    const declared = declarationProblem(descriptor)
+    if (declared !== undefined) return refusal("invalid_arguments", `Extension ${descriptor.name}: ${declared}.`)
     try {
       assertExtensionName(this.ctx.sql, descriptor.name)
     } catch (error) {
@@ -42,16 +54,21 @@ export class StoreExtensions {
     }
     let module: Readonly<Record<string, unknown>>
     try {
-      const url = new URL(descriptor.moduleUrl)
-      if (url.protocol !== "file:" || ![".js", ".mjs", ".cjs"].includes(extname(url.pathname))) {
-        return refusal("extension_import_failed", "moduleUrl must name a compiled JavaScript file URL.")
-      }
-      module = await import(descriptor.moduleUrl)
+      module = await importExtensionModule(descriptor.moduleUrl)
     } catch (error) {
       return refusal("extension_import_failed", `Cannot import extension ${descriptor.name}: ${error instanceof Error ? error.message : String(error)}`)
     }
+    const exported = declarationProblem(descriptor, module)
+    if (exported !== undefined) return refusal("invalid_arguments", `Extension ${descriptor.name}: ${exported}.`)
+    // Checked before any migration runs, so a refused registration leaves the schema untouched;
+    // persistDescriptor checks again inside its own transaction.
+    const taken = toolNameTaken(this.ctx, descriptor)
+    if (taken !== undefined) return refusal("invalid_arguments", `Extension ${descriptor.name}: ${taken}.`)
     try {
       const version = await this.ensure(descriptor, now)
+      // The newest registration of a name replaces its persisted descriptor, so every process lists its session ops.
+      const raced = await transaction(this.ctx, "extension_register", () => persistDescriptor(this.ctx, descriptor, now, restoredAt))
+      if (raced !== undefined) return refusal("invalid_arguments", `Extension ${descriptor.name}: ${raced}.`)
       this.registered.set(descriptor.name, { descriptor, module })
       return { kind: "ok", value: { version } }
     } catch (error) {
@@ -66,7 +83,7 @@ export class StoreExtensions {
     return this.registered.get(descriptor.name)?.descriptor === descriptor
   }
 
-  private async ensure(descriptor: StoreExtensionRegistration, now: number): Promise<number> {
+  private async ensure(descriptor: Pick<StoreExtensionRegistration, "name" | "migrations">, now: number): Promise<number> {
     const { name, migrations } = descriptor
     for (;;) {
       const step = await transaction(this.ctx, "extension_migrate", () => {
@@ -95,16 +112,46 @@ export class StoreExtensions {
     }
   }
 
+  /** The public channel (connectors, the CLI, the SDK): a session-callable op is never reachable here, so no caller can be forged. */
   async call(name: string, op: string, args: unknown, now: number): Promise<StoreExtensionResult<unknown>> {
-    const entry = this.registered.get(name)
-    if (entry === undefined) return refusal("extension_unknown_name", `No store extension is registered as ${name}.`)
-    const operation = Object.hasOwn(entry.module, op) ? entry.module[op] : undefined
+    const own = this.registered.get(name)
+    const persisted = readDescriptor(this.ctx, name)
+    if (declaredOpNames(own?.descriptor).has(op) || declaredOpNames(persisted).has(op)) {
+      return refusal("caller_not_allowed", `${name}.${op} is session-callable: only the session's own tool reaches it, with the caller the engine resolved.`)
+    }
+    const entry = own ?? (await this.load(name, persisted))
+    if ("kind" in entry) return entry
+    return await this.run({ name, descriptor: entry.descriptor, module: entry.module, op, args: () => args }, now)
+  }
+
+  /**
+   * An extension another process registered, from its persisted descriptor, with register()'s checks
+   * (a file: .js/.mjs/.cjs URL, the namespace). Imported on each use, never cached as broken: a failed
+   * import answers this call only, and the next one imports again.
+   */
+  async load(name: string, persisted = readDescriptor(this.ctx, name)): Promise<Registered | StoreExtensionRefusal> {
+    if (persisted === undefined) return refusal("extension_unknown_name", `No store extension is registered as ${name}.`)
+    try {
+      assertExtensionName(this.ctx.sql, name)
+    } catch (error) {
+      return fromError(error)
+    }
+    try {
+      return { descriptor: { ...persisted, name }, module: await importExtensionModule(persisted.moduleUrl) }
+    } catch (error) {
+      return refusal("extension_import_failed", `Cannot import extension ${name}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  async run(request: ExtensionRun, now: number): Promise<StoreExtensionResult<unknown>> {
+    const { name, op, module } = request
+    const operation = Object.hasOwn(module, op) ? module[op] : undefined
     if (typeof operation !== "function") return refusal("extension_unknown_op", `Extension ${name} exports no operation ${op}.`)
     const effects: (() => void)[] = []
     const compensations: (() => void)[] = []
     let value: unknown
     try {
-      await this.ensure(entry.descriptor, now)
+      await this.ensure(request.descriptor, now)
       value = await transaction(this.ctx, "extension_call", async () => {
         const before = extensionSchema(this.ctx.sql)
         const scope = extensionTransaction({ ...this.ctx, afterCommit: effects, afterRollback: compensations }, name, now, this.resolveTarget)
@@ -112,7 +159,7 @@ export class StoreExtensions {
         try {
           const run = async () => {
             try {
-              return await (operation as StoreExtensionOperation)(scope.tx, args)
+              return await (operation as StoreExtensionOperation)(scope.tx, request.args())
             } finally {
               await scope.finish()
             }
@@ -126,7 +173,9 @@ export class StoreExtensions {
           const result = await Promise.race([run(), deadline])
           checkExtensionSchema(this.ctx.sql, name, before, extensionSchema(this.ctx.sql))
           // Refuse uncloneable results before commit, not in the worker's response writer afterwards.
-          return structuredClone(result)
+          const cloned = structuredClone(result)
+          effects.push(...(request.effects ?? []))
+          return cloned
         } finally {
           clearTimeout(timer)
           scope.cancel()

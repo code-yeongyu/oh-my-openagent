@@ -3,43 +3,13 @@ import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
-import type { BindingRecord, CompletionOutcome, OutboxRow, RelayOutcome } from "./bindings"
 import { GATEWAY_BUSY_TIMEOUT_MS, GATEWAY_LOCK_WAIT_MAX_MS, GATEWAY_STORE_IDLE_RETIRE_MS } from "./constants"
 import type { GatewayResolve } from "./engine"
-import type { StoreExtensionApi, StoreExtensionRefusal, StoreExtensionRegistration, StoreExtensionResult } from "./store-extensions"
-export type { StoreExtensionApi, StoreExtensionOperation, StoreExtensionRefusal, StoreExtensionRefusalCode, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionTransaction } from "./store-extensions"
-import type {
-  AnswerClaim,
-  AnswerClaimRef,
-  AnswerDelivered,
-  BindOpRequest,
-  PriorAnswer,
-  BindingsFilter,
-  CasRequest,
-  ReportOpRequest,
-  ReportOpResult,
-  ToolReceiptBegin,
-} from "./store-relay-ops"
-import type { ObserveModelRequest, ObserveModelResult, PendingChoice, SessionModelRecord, ThreadModel } from "./session-models"
-import type { DeliveryReceipt } from "./store-ops"
-import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
-import type {
-  ClaimOutcome,
-  ClaimRequest,
-  DeliveryRow,
-  EnqueueOutcome,
-  EnqueueRequest,
-  ExternalAuthor,
-  GatewayStoreConfig,
-  GatewayStoreEvent,
-  GatewayStoreStats,
-  GatewayStoreTestHooks,
-  ProcessIdentity,
-  ReconcileOutcome,
-  ReconcileRequest,
-  RecordOutcomeRequest,
-  RefusalReason,
-} from "./types"
+import type { GatewayStore } from "./store-api"
+export type { Deduplicated, DeliveryView, GatewayStore, OutboxPage, ReceiptScope } from "./store-api"
+import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
+export type { DeclaredSessionOp, SessionCallableOp, SessionCaller, StoreExtensionApi, StoreExtensionOperation, StoreExtensionRefusal, StoreExtensionRefusalCode, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionSessionApi, StoreExtensionTransaction } from "./store-extensions"
+import type { GatewayStoreConfig, GatewayStoreEvent, GatewayStoreTestHooks, ProcessIdentity } from "./types"
 
 export type GatewayStoreOptions = {
   readonly agentDir: string
@@ -58,6 +28,7 @@ export type GatewayStoreOptions = {
     readonly lockWaitMaxMs?: number
     readonly moduleUrl?: string | URL
     readonly onWorkerStarted?: (worker: Worker) => void
+    readonly onAwaitArmed?: (awaitRequestId: string) => void
     /** A shorter idle interval than `GATEWAY_STORE_IDLE_RETIRE_MS`. */
     readonly idleRetireMs?: number
     /** Runs right after an idle worker is detached and its close requested, before the close settles: a call made here lands on a fresh worker. */
@@ -79,86 +50,6 @@ export function gatewayStoreWorkerUrl(moduleUrl: string | URL = import.meta.url)
   const bundled = new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, moduleUrl)
   return existsSync(fileURLToPath(bundled)) ? bundled : new URL("./store-worker.ts", moduleUrl)
 }
-
-export type DeliveryView = { readonly row: DeliveryRow; readonly queue_position: number }
-
-export type ReceiptScope = { readonly principal: string; readonly operation: string; readonly idempotency_key: string }
-
-export type OutboxPage = { readonly binding_id: string; readonly revision: number; readonly status: BindingRecord["status"]; readonly rows: readonly OutboxRow[]; readonly next_cursor: number; readonly acked_cursor: number }
-
-/** Relay results carry `deduplicated`: true when an idempotency key replayed an earlier success. */
-export type Deduplicated = { readonly deduplicated?: boolean }
-
-export type GatewayStore = StoreExtensionApi & {
-  /** The store's busy timeout: the delay before a caller re-arms an operation that failed with a lock-wait error. */
-  readonly busyTimeoutMs: number
-  /** The clock this store's rows are stamped and expired against; drains, engines and relays built on the store default to it. */
-  readonly now: () => number
-  readonly identity: () => Promise<ProcessIdentity>
-  readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
-  readonly reconcile: (request: ReconcileRequest) => Promise<ReconcileOutcome>
-  readonly claim: (request: ClaimRequest) => Promise<ClaimOutcome>
-  readonly recordOutcome: (request: RecordOutcomeRequest) => Promise<ClaimOutcome>
-  readonly refuseQueued: (request: { readonly now: number; readonly delivery_id: string; readonly reason: RefusalReason }) => Promise<boolean>
-  readonly completeReceipt: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly result: unknown }) => Promise<boolean>
-  readonly abandonReceipt: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly error_note: string }) => Promise<boolean>
-  readonly deliveryView: (deliveryId: string) => Promise<DeliveryView | null>
-  /** A completed delivery receipt's stored result and the row facts its arguments were hashed with; a plain read. */
-  readonly deliveryReceipt: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string }) => Promise<DeliveryReceipt | null>
-  readonly recoverDelivery: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly args_hash: string }) => Promise<EnqueueOutcome | null>
-  readonly list: (filter?: { readonly target_durable_id?: string; readonly root_id?: string }) => Promise<readonly DeliveryRow[]>
-  readonly isReferenced: (durableId: string) => Promise<boolean>
-  readonly journalMode: () => Promise<string>
-  readonly stats: () => Promise<GatewayStoreStats>
-  readonly legacyMigrated: () => Promise<number>
-  readonly toolReceiptBegin: (request: ReceiptScope & { readonly now: number; readonly args_hash: string }) => Promise<ToolReceiptBegin>
-  readonly toolReceiptSettle: (request: ReceiptScope & { readonly now: number } & ({ readonly result: unknown } | { readonly error_note: string })) => Promise<boolean>
-  readonly bind: (request: BindOpRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord } & Deduplicated>>
-  readonly unbind: (request: CasRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord; readonly already_closed: boolean; readonly in_flight: readonly string[] } & Deduplicated>>
-  readonly rebind: (request: CasRequest & { readonly session_durable_id: string }) => Promise<RelayOutcome<{ readonly binding: BindingRecord; readonly closed: readonly string[] } & Deduplicated>>
-  readonly listBindings: (request: { readonly now: number; readonly filter: BindingsFilter; readonly cursor?: string; readonly limit?: number }) => Promise<RelayOutcome<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>>
-  readonly bindingView: (request: { readonly now: number; readonly binding_id: string }) => Promise<BindingRecord | null>
-  readonly registerIncarnation: (request: RegisterIncarnationRequest) => Promise<void>
-  readonly clearEndpoint: (request: ClearEndpointRequest) => Promise<void>
-  readonly sessionOwner: (durableId: string) => Promise<SessionOwner | null>
-  readonly report: (request: ReportOpRequest) => Promise<RelayOutcome<ReportOpResult & Deduplicated>>
-  readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly through_arm_seq?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
-  /** Completion arms waiting for the session's settle; a plain read that takes no write lock. */
-  readonly pendingCompletionArms: (durableId: string) => Promise<number>
-  /** The sequence number of the newest completion arm waiting for the session's settle, null when none waits; a plain read that takes no write lock. */
-  readonly latestCompletionArm: (durableId: string) => Promise<number | null>
-  readonly readOutbox: (request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayOutcome<OutboxPage>>
-  readonly ackOutbox: (request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
-  readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly answered_by?: ExternalAuthor | null }) => Promise<RelayOutcome<AnswerClaim>>
-  readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
-  readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
-  readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>
-  /** #9425: the gateway's own model choice for a session it created or re-modelled. */
-  readonly recordSessionModel: (request: { readonly now: number; readonly durable_id: string; readonly model: ThreadModel }) => Promise<ThreadModel>
-  /** Compare-and-swap variant (#9429 B2): writes only while the record is still at `expect_revision` (null: no record); `record` is the record after the call. */
-  readonly recordSessionModelIfCurrent: (request: { readonly now: number; readonly durable_id: string; readonly expect_revision: number | null; readonly model: ThreadModel; readonly pending?: PendingChoice }) => Promise<{ readonly applied: boolean; readonly record: SessionModelRecord | null }>
-  /** A new thinking level for a session with a model record; false when there is none. */
-  readonly updateSessionThinking: (request: { readonly now: number; readonly durable_id: string; readonly thinking_level: string }) => Promise<boolean>
-  /** A set-model's choice, noted before it asks the engine and waiting on the record until the switch lands (#9429); `previous` is the choice it replaced. */
-  readonly recordPendingSessionModel: (request: PendingChoice & { readonly now: number; readonly durable_id: string }) => Promise<{ readonly recorded: boolean; readonly previous: PendingChoice | null }>
-  /** Replaces that choice with `next` (null clears it) only while the record still holds `expect`. */
-  readonly replacePendingSessionModel: (request: { readonly durable_id: string; readonly expect: PendingChoice; readonly next: PendingChoice | null }) => Promise<boolean>
-  /** The session's own `model_select`: keeps its record true and writes a fallback switch's milestone rows. */
-  readonly observeModelSelect: (request: ObserveModelRequest) => Promise<ObserveModelResult>
-  /** The model records of these sessions that exist, keyed by durable id; a plain read that takes no write lock. */
-  readonly sessionModels: (durableIds: readonly string[]) => Promise<Readonly<Record<string, ThreadModel>>>
-  /** One session's model record with its revision, null when it has none; a plain read that takes no write lock. */
-  readonly sessionModelRecord: (durableId: string) => Promise<SessionModelRecord | null>
-  /** The session closed a relayed question itself (answered locally, timed out, cancelled); the questions closed. */
-  readonly closeQuestion: (request: { readonly now: number; readonly session_durable_id: string; readonly ui_request_id: string }) => Promise<number>
-  readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
-  /** Releases a `pause` test hook. */
-  readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
-  readonly dispose: () => Promise<void>
-}
-
-/** The worker's registration reply: the caller's result, and whether calls for that name now use this registration. */
-type ExtensionRegisterReply = { readonly result: StoreExtensionResult<{ readonly version: number }>; readonly retained: boolean }
 
 type Pending = { readonly worker: Worker; readonly resolve: (value: unknown) => void; readonly reject: (error: Error) => void }
 
@@ -205,7 +96,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   const idleRetireMs = options._test?.idleRetireMs ?? GATEWAY_STORE_IDLE_RETIRE_MS
   let resolveTarget = options.resolveTarget
   /** The registrations the current worker holds, restored on the next worker after one exits. */
-  const registrations = new Map<string, StoreExtensionRegistration>()
+  const registrations = new Map<string, RetainedRegistration>()
 
   const resolveExtensionTarget: GatewayResolve = async (address, request) => {
     if (resolveTarget === undefined) {
@@ -282,9 +173,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     options._test?.onWorkerStarted?.(spawned)
     const attempt = (post("init", { config, now: now() }) as Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }>).then(async (value) => {
       // A fresh worker holds no extension registrations: restore the ones its predecessor held
-      // before any call reaches it, keeping only those the new worker holds in turn.
-      for (const [name, extension] of registrations) {
-        const reply = (await post("extension_register", { extension, now: now() })) as ExtensionRegisterReply
+      // before any call reaches it, keeping only those the new worker holds in turn. Each is replayed
+      // as of its registration time, so it never overwrites a newer one another process persisted.
+      for (const [name, { extension, registeredAt }] of registrations) {
+        const reply = (await post("extension_register", { extension, now: now(), restored_at: registeredAt })) as ExtensionRegisterReply
         if (!reply.retained) registrations.delete(name)
       }
       return value
@@ -361,44 +253,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     })
   }
 
-  /** A newer core schema refuses extension requests as data; anything else stays an error. */
-  function schemaTooNew(error: unknown): StoreExtensionRefusal {
-    if (error instanceof Error && "code" in error && error.code === "gateway_schema_too_new") {
-      return { kind: "refused", code: "gateway_schema_too_new", message: error.message }
-    }
-    throw error
-  }
-
-  async function extensionRequest<T>(op: string, args: unknown): Promise<StoreExtensionResult<T>> {
-    try {
-      return await call(op, args)
-    } catch (error) {
-      return schemaTooNew(error)
-    }
-  }
-
-  async function registerExtension(extension: StoreExtensionRegistration): Promise<StoreExtensionResult<{ readonly version: number }>> {
-    let reply: ExtensionRegisterReply
-    try {
-      reply = await call("extension_register", { extension, now: now() })
-    } catch (error) {
-      return schemaTooNew(error)
-    }
-    if (reply.retained) registrations.set(extension.name, structuredClone(extension))
-    return reply.result
-  }
+  const extensions = createExtensionFacade({ agentDir: options.agentDir, now, call, registrations, ...(options._test?.onAwaitArmed === undefined ? {} : { onAwaitArmed: options._test.onAwaitArmed }) })
 
   return {
-    registerStoreExtension: registerExtension,
-    extensionCall: async (name, op, args) => {
-      let cloned: unknown
-      try {
-        cloned = structuredClone(args)
-      } catch (error) {
-        return { kind: "refused", code: "invalid_arguments", message: `Extension arguments are not cloneable: ${error instanceof Error ? error.message : String(error)}` }
-      }
-      return await extensionRequest("extension_call", { name, op, args: cloned, now: now() })
-    },
+    ...extensions,
     busyTimeoutMs: config.busy_timeout_ms,
     now,
     identity: () => track(async () => (await start()).self),

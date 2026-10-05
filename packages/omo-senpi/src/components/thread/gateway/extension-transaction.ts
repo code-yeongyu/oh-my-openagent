@@ -1,3 +1,4 @@
+import { rfc3339 } from "./bindings"
 import { createGatewayEngine, type GatewayEngineOptions, type GatewayResolve } from "./engine"
 import { checkExtensionSchema, extensionSchema, extensionSql } from "./extension-sql"
 import { singleExtensionStatement } from "./extension-statement"
@@ -11,6 +12,11 @@ export class ExtensionTransactionEndedError extends Error {
   constructor(readonly extension: string) {
     super(`The ${extension} extension transaction has ended.`)
   }
+}
+
+/** A transaction helper called with arguments it cannot serve; the op fails as `invalid_arguments`. */
+export class ExtensionArgumentError extends Error {
+  readonly code = "invalid_arguments"
 }
 
 export function extensionTransaction(ctx: ops.StoreContext, name: string, now: number, resolveTarget: GatewayResolve) {
@@ -96,6 +102,12 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
     unbind: (request) => schedule(() => api.unbind(request)),
     rebind: (request) => schedule(() => api.rebind(request)),
     bindingFor: (request) => schedule(() => relay.bindingFor(ctx, { ...request, now })),
+    // Read-only: "active" is exactly bindingFor's (status active, not expired at the transaction's now), without its expiry write.
+    bindingsForSession: (sessionDurableId) => schedule(async () => {
+      if (typeof sessionDurableId !== "string" || sessionDurableId.length === 0) throw new ExtensionArgumentError("bindingsForSession needs a non-empty session durable id.")
+      const active = relay.selectBindings(ctx, "session_durable_id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > ?)", [sessionDurableId, rfc3339(now)])
+      return active.toSorted((left, right) => (left.binding_id < right.binding_id ? -1 : left.binding_id > right.binding_id ? 1 : 0))
+    }),
     outboxPending: (request) => schedule(() => api.outbox(request)),
   }
   return {

@@ -17,6 +17,8 @@ import * as models from "./store-model-ops"
 import * as relay from "./store-relay-ops"
 import * as ownership from "./store-ownership"
 import { StoreExtensions } from "./store-extension-ops"
+import * as sessions from "./store-extension-session-ops"
+import { listSessionOps } from "./extension-registrations"
 import { ExtensionTransactionEndedError } from "./extension-transaction"
 import type { GatewayResolution, GatewayResolve } from "./engine"
 import type { StoreExtensionRegistration } from "./store-extensions"
@@ -128,21 +130,25 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
   const ctx = requireContext()
   switch (op) {
     case "extension_register": {
-      const request = args as { readonly extension: StoreExtensionRegistration; readonly now: number }
+      const request = args as { readonly extension: StoreExtensionRegistration; readonly now: number; readonly restored_at?: number }
       lastExtensionActivity = request.extension.name
-      const result = await extensions?.register(request.extension, request.now)
+      const result = await extensions?.register(request.extension, request.now, request.restored_at)
       return { result, retained: extensions?.holds(request.extension) === true }
     }
-    case "extension_call": {
+    case "extension_call":
+    case "extension_session_call": {
       const request = args as { readonly name: string; readonly op: string; readonly args: unknown; readonly now: number }
       lastExtensionActivity = request.name
       try {
-        return await extensions?.call(request.name, request.op, request.args, request.now)
+        if (extensions === undefined) return undefined
+        return op === "extension_call" ? await extensions.call(request.name, request.op, request.args, request.now) : await sessions.sessionCall(ctx, extensions, args as sessions.SessionCallRequest)
       } finally {
         for (const pending of resolutions.values()) pending.reject(new ExtensionTransactionEndedError(request.name))
         resolutions.clear()
       }
     }
+    case "session_callable_ops": return listSessionOps(ctx)
+    case "record_thread_creation": return await sessions.recordThreadCreation(ctx, args as Parameters<typeof sessions.recordThreadCreation>[1])
     case "enqueue": return await ops.enqueue(ctx, args as Parameters<typeof ops.enqueue>[1])
     case "reconcile": return await ops.reconcile(ctx, args as Parameters<typeof ops.reconcile>[1])
     case "claim": return await ops.claim(ctx, args as Parameters<typeof ops.claim>[1])
