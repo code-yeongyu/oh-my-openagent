@@ -33,7 +33,7 @@ export const SENPI_CLI_RELATIVE = join("dist", "cli.js")
 /** Mirrors worker/senpi-command.ts PACKAGE_DIR_ENV_NAMES: roots senpi reads as its own package directory. */
 export const PACKAGE_DIR_ENV_NAMES = ["OMO_PACKAGE_DIR", "SENPI_PACKAGE_DIR", "PI_PACKAGE_DIR"]
 /** The artifacts whose manifest digests must still describe the files on disk. */
-export const ARTIFACTS = ["omo.js", "omo-task.js", "kibitzer-persona.md"]
+export const ARTIFACTS = ["omo.js", "omo-task.js", "omo-kibitzer-child.js", "kibitzer-persona.md"]
 
 export function parseArgs(argv) {
   const options = { manifest: undefined, evidenceDir: undefined, pluginRoot: undefined, senpiCli: undefined, selfTest: false }

@@ -33,7 +33,8 @@ import { registerKibitzerHooks } from "./hooks"
 import { createKibitzerObservability, kibitzerSidecarSessionDir } from "./observe"
 import { resolveKibitzerSidecarSettings, type KibitzerSidecarSettings } from "./settings"
 import { createKibitzerSidecar, type KibitzerSidecar } from "./sidecar"
-import { createKibitzerSidecarChildStarter, type KibitzerSidecarChildStarterOptions } from "./sidecar-model"
+import type { KibitzerSidecarChildStarterOptions } from "./sidecar-model"
+import { createLazyKibitzerChildStarter } from "./lazy-child-starter"
 import { kibitzerOfferSignal, kibitzerWakeSignal, sharedKibitzerTelemetryObservers } from "./wake-observers"
 import type { KibitzerWakeOutcome } from "./sidecar-outcome"
 import { createKibitzerSidecarTools } from "./tools"
@@ -142,7 +143,7 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
     const cwd = options.cwd()
     const captured: CapturedSession = { branch: [], registry: undefined }
     const repo = new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity })
-    const startChild = createKibitzerSidecarChildStarter({
+    const startChild = createLazyKibitzerChildStarter({
       cwd,
       sessionDir: kibitzerSidecarSessionDir(context.identityPaths.recall, sessionId),
       agentDir: resolveAgentHome({ env: options.env }),

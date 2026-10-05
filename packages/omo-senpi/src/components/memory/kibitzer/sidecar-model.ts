@@ -24,14 +24,15 @@ import { childModelChainSpec, type ChildModelChainSpec } from "../memory-child-m
 import { resolveReflectionModel, type ReflectionModelCandidate, type ReflectionThinkingLevel } from "../worker/resolve-model"
 import type { KibitzerSidecarChildInput } from "./sidecar"
 import { orderKibitzerCandidatesByConnection } from "./sidecar-connected-order"
-import type { KibitzerWakeConfiguration } from "./sidecar-outcome"
+import { KibitzerSidecarStartError } from "./sidecar-start-error"
+import type { KibitzerSidecarModelUnavailableCause } from "./sidecar-start-error"
 import { KIBITZER_SIDECAR_TOOL_NAMES } from "./sidecar-prompt"
 import { loadKibitzerTaskRuntime, type KibitzerTaskRuntime } from "./task-runtime"
 import type { AnyKibitzerSidecarTool } from "./tools/result"
 
 export const KIBITZER_SIDECAR_DEFAULT_CATEGORY = "quick"
 
-export type KibitzerSidecarModelUnavailableCause = "registry_snapshot_unavailable" | "category_unavailable" | "beyond_category"
+export type { KibitzerSidecarModelUnavailableCause } from "./sidecar-start-error"
 
 export type KibitzerSidecarModelResolution =
   | {
@@ -154,49 +155,8 @@ export function buildKibitzerSidecarSpec(input: KibitzerSidecarSpecInput): Child
   }
 }
 
-export type KibitzerSidecarStartCode =
-  | KibitzerSidecarModelUnavailableCause
-  | "persona_unavailable"
-  | "runtime_unavailable"
-  | "session_create_failed"
-
-/** A child that could not be started, named by the stage that refused; the sidecar backs off on it. */
-export class KibitzerSidecarStartError extends Error {
-  readonly code: KibitzerSidecarStartCode
-  /** The pinned recall category a model-unavailable refusal names. */
-  readonly category?: string
-  /** The category chain's providers with no connection, when the resolver knew them. */
-  readonly missingProviders?: readonly string[]
-
-  constructor(
-    code: KibitzerSidecarStartCode,
-    message: string,
-    options?: { readonly cause?: unknown; readonly category?: string; readonly missingProviders?: readonly string[] },
-  ) {
-    super(message, options)
-    this.name = "KibitzerSidecarStartError"
-    this.code = code
-    if (options?.category !== undefined) this.category = options.category
-    if (options?.missingProviders !== undefined) this.missingProviders = options.missingProviders
-  }
-}
-
-/**
- * A permanent configuration state, not a transient start failure: the pinned recall category's
- * chain has no connected provider, or resolved only beyond the category (which the advisor
- * refuses). The wake that carries one is reported non-diagnostically and the observability lane
- * answers it with ONE actionable notice per session instead of the failure streak.
- */
-export function kibitzerConfigurationFailure(error: unknown): KibitzerWakeConfiguration | undefined {
-  if (!(error instanceof KibitzerSidecarStartError)) return undefined
-  if (error.code !== "category_unavailable" && error.code !== "beyond_category") return undefined
-  if (error.category === undefined) return undefined
-  return {
-    category: error.category,
-    cause: error.code,
-    ...(error.missingProviders === undefined ? {} : { missingProviders: error.missingProviders }),
-  }
-}
+export { KibitzerSidecarStartError, kibitzerConfigurationFailure } from "./sidecar-start-error"
+export type { KibitzerSidecarStartCode } from "./sidecar-start-error"
 
 export interface KibitzerSidecarChildStarterOptions {
   readonly cwd: string
@@ -223,6 +183,7 @@ export interface KibitzerSidecarChildStarterOptions {
  */
 export function createKibitzerSidecarChildStarter(
   options: KibitzerSidecarChildStarterOptions,
+  StartError: typeof KibitzerSidecarStartError = KibitzerSidecarStartError,
 ): (input: KibitzerSidecarChildInput) => Promise<ChildHandle> {
   return async (input) => {
     const registry = options.modelRegistry()
@@ -232,7 +193,7 @@ export function createKibitzerSidecarChildStarter(
       registry,
     })
     if (resolution.kind === "unavailable") {
-      throw new KibitzerSidecarStartError(resolution.cause, `Kibitzer sidecar model unavailable: ${resolution.category} (${resolution.cause})`, {
+      throw new StartError(resolution.cause, `Kibitzer sidecar model unavailable: ${resolution.category} (${resolution.cause})`, {
         category: resolution.category,
         ...(resolution.missingProviders === undefined ? {} : { missingProviders: resolution.missingProviders }),
       })
@@ -241,19 +202,19 @@ export function createKibitzerSidecarChildStarter(
     try {
       systemPrompt = (options.loadPersona ?? loadKibitzerPersona)()
     } catch (error) {
-      throw new KibitzerSidecarStartError("persona_unavailable", `${PERSONA_ASSET_FILENAMES.kibitzer}: ${describe(error)}`, { cause: error })
+      throw new StartError("persona_unavailable", `${PERSONA_ASSET_FILENAMES.kibitzer}: ${describe(error)}`, { cause: error })
     }
     let runtime: Pick<KibitzerTaskRuntime, "createInProcessJudgeRunner" | "findModelReference"> | undefined
     if (options.createRunner === undefined) {
       try {
         runtime = await (options.loadTaskRuntime ?? loadKibitzerTaskRuntime)()
       } catch (error) {
-        throw new KibitzerSidecarStartError("runtime_unavailable", describe(error), { cause: error })
+        throw new StartError("runtime_unavailable", describe(error), { cause: error })
       }
     }
     const runnerOptions = options.createSession === undefined ? {} : { createSession: options.createSession }
     const runner = options.createRunner?.(runnerOptions) ?? runtime?.createInProcessJudgeRunner(runnerOptions)
-    if (runner === undefined) throw new KibitzerSidecarStartError("runtime_unavailable", "no in-process runner available")
+    if (runner === undefined) throw new StartError("runtime_unavailable", "no in-process runner available")
     const spec = buildKibitzerSidecarSpec({
       sessionId: input.sessionId,
       generation: input.generation,
@@ -271,7 +232,7 @@ export function createKibitzerSidecarChildStarter(
     try {
       return await runner.start(spec)
     } catch (error) {
-      throw new KibitzerSidecarStartError("session_create_failed", describe(error), { cause: error })
+      throw new StartError("session_create_failed", describe(error), { cause: error })
     }
   }
 }

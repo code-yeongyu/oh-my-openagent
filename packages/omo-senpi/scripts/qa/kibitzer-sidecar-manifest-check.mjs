@@ -26,6 +26,7 @@ export const DEFAULT_FORBIDDEN_ALIASES = ["memory_read", "memory_search", "memor
 export const PERSONA_ASSET = "kibitzer-persona.md"
 export const PERSONA_SOURCE = join("packages", "memory-core", "src", "recall", "assets", PERSONA_ASSET)
 export const TASK_RUNTIME_SPECIFIER = "#omo-task-runtime"
+export const CHILD_RUNTIME_SPECIFIER = "#omo-kibitzer-child-runtime"
 
 /** One literal per closure: the label (or, for nudge, the description head) the closure is registered with. */
 export const TOOL_CLOSURE_MARKERS = {
@@ -43,7 +44,6 @@ export const SIDECAR_ENTRY_MARKERS = {
   "reseed-envelope": '"kibitzer-reseed"',
   "sidecar-directory": '"sidecars"',
   "wake-lock-domain": "recall-wake",
-  "sidecar-start-error": "Kibitzer sidecar model unavailable",
   "nudged-entry-type": "omo-kibitzer:nudged",
   "memory-read-only-operations": '["search","read"]',
   "memory-tool-cannot-write": "This tool cannot write",
@@ -107,16 +107,20 @@ export function checkManifest({ pluginRoot, source, expectTools, forbidAliases }
   const extensions = join(pluginRoot, "extensions")
   const bundlePath = join(extensions, "omo.js")
   const taskRuntimePath = join(extensions, "omo-task.js")
+  const childRuntimePath = join(extensions, "omo-kibitzer-child.js")
   const personaPath = join(extensions, PERSONA_ASSET)
   const manifestPath = join(pluginRoot, "package.json")
   const artifacts = {
     "omo.js": describeFile(bundlePath),
     "omo-task.js": describeFile(taskRuntimePath),
+    "omo-kibitzer-child.js": describeFile(childRuntimePath),
     [PERSONA_ASSET]: describeFile(personaPath),
     "package.json": describeFile(manifestPath),
   }
   const bundle = artifacts["omo.js"].present ? readFileSync(bundlePath, "utf8") : ""
   const taskRuntime = artifacts["omo-task.js"].present ? readFileSync(taskRuntimePath, "utf8") : ""
+  const childRuntime = artifacts["omo-kibitzer-child.js"].present ? readFileSync(childRuntimePath, "utf8") : ""
+  const shippedSidecar = `${bundle}\n${childRuntime}`
   const marker = bundle.split("\n", 1)[0] ?? ""
 
   // ---- the artifact and its runtime dependency -------------------------------------------------------
@@ -129,6 +133,12 @@ export function checkManifest({ pluginRoot, source, expectTools, forbidAliases }
   record("artifact.task-runtime-mapped", taskRuntimeMapping === "./extensions/omo-task.js" && artifacts["omo-task.js"].present && artifacts["omo-task.js"].bytes > 0, `imports[${TASK_RUNTIME_SPECIFIER}]=${JSON.stringify(taskRuntimeMapping)} omo-task.js bytes=${artifacts["omo-task.js"].bytes ?? 0}`, "missing-task-runtime")
   record("artifact.task-runtime-imported", bundle.includes(TASK_RUNTIME_SPECIFIER), `omo.js references ${TASK_RUNTIME_SPECIFIER}=${bundle.includes(TASK_RUNTIME_SPECIFIER)}`, "sidecar-runtime-import-missing")
   record("artifact.task-runtime-exports-runner", taskRuntime.includes("createInProcessJudgeRunner") && taskRuntime.includes("findModelReference"), `omo-task.js exports createInProcessJudgeRunner=${taskRuntime.includes("createInProcessJudgeRunner")} findModelReference=${taskRuntime.includes("findModelReference")}`, "in-process-runner-missing")
+
+  const childMapping = manifest?.imports?.[CHILD_RUNTIME_SPECIFIER]
+  record("artifact.child-runtime-mapped", childMapping === "./extensions/omo-kibitzer-child.js" && artifacts["omo-kibitzer-child.js"].present && artifacts["omo-kibitzer-child.js"].bytes > 0, `imports[${CHILD_RUNTIME_SPECIFIER}]=${JSON.stringify(childMapping)}`, "missing-child-runtime")
+  record("artifact.child-runtime-imported", bundle.includes(`import("${CHILD_RUNTIME_SPECIFIER}")`), "main bundle dynamically imports the child starter", "child-runtime-import-missing")
+  record("artifact.child-runtime-build-marker", childRuntime.startsWith("// omo:"), "child runtime has a source digest marker", "child-runtime-marker-missing")
+  record("sidecar.sidecar-start-error", childRuntime.includes("Kibitzer sidecar model unavailable"), "typed startup refusal lives in the child runtime", "sidecar-marker-missing:sidecar-start-error")
 
   // ---- the persona asset -------------------------------------------------------------------------------------
   const personaSource = describeFile(join(source, PERSONA_SOURCE))
@@ -143,7 +153,7 @@ export function checkManifest({ pluginRoot, source, expectTools, forbidAliases }
 
   // ---- the five read-only tool closures, no aliases -------------------------------------------------------------
   const registryLiteral = JSON.stringify(expectTools)
-  record("tools.registry-exact", bundle.includes(registryLiteral), `omo.js contains ${registryLiteral}=${bundle.includes(registryLiteral)}`, "tool-registry-mismatch")
+  record("tools.registry-exact", childRuntime.includes(registryLiteral), `omo-kibitzer-child.js contains ${registryLiteral}=${childRuntime.includes(registryLiteral)}`, "tool-registry-mismatch")
   const closures = {}
   for (const name of expectTools) {
     const literal = TOOL_CLOSURE_MARKERS[name]
@@ -152,13 +162,13 @@ export function checkManifest({ pluginRoot, source, expectTools, forbidAliases }
   }
   // Every string-array literal that names the sidecar-only tools is a sidecar registry; each must be
   // exactly the expected list, and no forbidden name may own a Kibitzer-labelled closure.
-  const registries = [...bundle.matchAll(/\[(?:"[A-Za-z0-9_-]+",)*"[A-Za-z0-9_-]+"\]/gu)]
+  const registries = [...shippedSidecar.matchAll(/\[(?:"[A-Za-z0-9_-]+",)*"[A-Za-z0-9_-]+"\]/gu)]
     .map((match) => JSON.parse(match[0]))
     .filter((names) => names.includes("session_entries") && names.includes("nudge"))
   const registriesWithAlias = registries.filter((names) => names.some((name) => forbidAliases.includes(name)))
-  const aliasClosures = forbidAliases.filter((alias) => bundle.includes(`label:"Kibitzer ${alias}"`))
+  const aliasClosures = forbidAliases.filter((alias) => shippedSidecar.includes(`label:"Kibitzer ${alias}"`))
   record("tools.no-aliases", registries.length > 0 && registriesWithAlias.length === 0 && aliasClosures.length === 0 && registries.every((names) => JSON.stringify(names) === registryLiteral) && forbidAliases.every((alias) => !expectTools.includes(alias)), `sidecarRegistries=${JSON.stringify(registries)} withForbiddenName=${JSON.stringify(registriesWithAlias)} forbiddenClosures=[${aliasClosures.join(",")}]`, "tool-alias-registered")
-  const memoryAliasNames = ["memory_read", "memory_search", "memory_write"].filter((alias) => bundle.includes(`"${alias}"`))
+  const memoryAliasNames = ["memory_read", "memory_search", "memory_write"].filter((alias) => shippedSidecar.includes(`"${alias}"`))
   record("tools.no-memory-aliases-as-names", memoryAliasNames.length === 0, `quoted memory alias names in omo.js=[${memoryAliasNames.join(",")}]`, "memory-alias-name-present")
 
   const failures = checks.filter((check) => !check.ok)

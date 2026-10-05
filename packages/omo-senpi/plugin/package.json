@@ -9,6 +9,7 @@
     "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
     "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
     "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
+    "#omo-kibitzer-child-runtime": "./extensions/omo-kibitzer-child.js",
     "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js"
   },
   "keywords": [

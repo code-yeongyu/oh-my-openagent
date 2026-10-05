@@ -265,7 +265,21 @@ describe("checkExtensionCurrent", () => {
       "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
       "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
+      "#omo-kibitzer-child-runtime": "./extensions/omo-kibitzer-child.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })
   })
+})
+
+test("Kibitzer child factory is emitted only in its lazy entry", async () => {
+  const outputs = await sharedOutputs()
+  expect(outputs.mainInputs.some((path) => toPortableBuildPath(path).endsWith("memory/kibitzer/sidecar-model.ts"))).toBe(false)
+  expect(outputs.kibitzerChildInputs.some((path) => toPortableBuildPath(path).endsWith("memory/kibitzer/sidecar-model.ts"))).toBe(true)
+  const main = await readFile(outputs.outputPath, "utf8")
+  const child = await readFile(outputs.kibitzerChildOutputPath, "utf8")
+  expect(main).toContain('import("#omo-kibitzer-child-runtime")')
+  expect(main).not.toContain("Kibitzer sidecar model unavailable:")
+  expect(child).toContain("Kibitzer sidecar model unavailable:")
+  const pluginManifest = JSON.parse(await readFile(join(pluginRoot, "package.json"), "utf8"))
+  expect(pluginManifest.imports["#omo-kibitzer-child-runtime"]).toBe("./extensions/omo-kibitzer-child.js")
 })

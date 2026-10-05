@@ -18,6 +18,7 @@ const BUNDLE_FILES = [
   "omo-computer-use.js",
   "omo-memory-doctor.js",
   "omo-memory-memfs.js",
+  "omo-kibitzer-child.js",
 ] as const
 
 type LazyBarrel = {
