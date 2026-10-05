@@ -1,6 +1,6 @@
 import { createGatewayEngine, type GatewayEngineOptions, type GatewayResolve } from "./engine"
 import { checkExtensionSchema, extensionSchema, extensionSql } from "./extension-sql"
-import { singleExtensionStatement } from "./extension-statement"
+import { orderByColumns, singleExtensionStatement } from "./extension-statement"
 import { createGatewayRelay, type GatewayRelayOptions } from "./relay"
 import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
@@ -82,7 +82,7 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
   const tx: StoreExtensionTransaction = {
     all: (columns, statement, params, orderBy) => sql(statement, () => {
       for (const column of columns) singleExtensionStatement(column)
-      if (orderBy !== undefined) singleExtensionStatement(orderBy)
+      if (orderBy !== undefined) orderByColumns(orderBy)
       return ctx.sql.all(columns, statement, params, orderBy)
     }),
     one: (columns, statement, params) => sql(statement, () => {
