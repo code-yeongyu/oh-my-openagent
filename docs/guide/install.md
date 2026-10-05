@@ -147,4 +147,13 @@ npm i -g omo-ai
 
 A package-manager install updates with `omo update` and uninstalls with `bun remove -g omo-ai` (or `npm uninstall -g omo-ai`). The unrelated `omo` package on npm belongs to someone else.
 
+Run OmO as your own user, even when an administrator installed the npm package system-wide. On macOS and Linux, a securely root-owned installation uses a complete, private plugin copy under `~/.omo/agent/native-plugin/` so task and team hosts receive a launch spec owned by the running user. An explicit agent-directory override also moves this cache. The shared installation is not changed, and a changed plugin payload gets a new content-keyed copy.
+
+The launch-spec security checks remain enabled. Unsafe source permissions, symlinks or special files in the copied payload, and an incomplete or modified cache are refused rather than used as a fallback. Do not run the assistant as root or change the shared launch spec's ownership to one user. If the installation is not eligible for a private copy, use a user-owned npm prefix instead:
+
+```bash
+npm i -g --prefix "$HOME/.local" omo-ai
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 Looking for the OpenCode or Codex plugin editions instead? See [Installation](installation.md).
