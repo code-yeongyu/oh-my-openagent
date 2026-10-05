@@ -1,12 +1,12 @@
-import { join } from "node:path"
+import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { COVERAGE_RUNTIME } from "./category-coverage.js"
-import { packageRoot } from "./package-paths.js"
+import { nativePluginRoot } from "./package-paths.js"
 
 // The launcher is plain JS, so it reaches the TypeScript config loader through the same staged
 // runtime bundle the category-coverage and computer-use reports use (category-coverage-entry.ts).
 async function loadRuntime() {
-  return import(pathToFileURL(join(packageRoot, COVERAGE_RUNTIME)).href)
+  return import(pathToFileURL(join(nativePluginRoot(), relative("plugin", COVERAGE_RUNTIME))).href)
 }
 
 /**
