@@ -18,6 +18,7 @@ export async function checkExtensionCurrent(options = {}) {
     computerUseOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
+    lspFormatterOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
   } = resolveOutputs(options)
@@ -36,6 +37,8 @@ export async function checkExtensionCurrent(options = {}) {
   const currentAdvisorRuntime = await readBuiltEntry(advisorRuntimeOutput)
   if (currentAdvisorRuntime === undefined) return { ok: false, reason: "missing-output", output: advisorRuntimeOutput }
   const currentMemoryDoctor = await readBuiltEntry(memoryDoctorOutput)
+  const currentLspFormatter = await readBuiltEntry(lspFormatterOutput)
+  if (currentLspFormatter === undefined) return { ok: false, reason: "missing-output", output: lspFormatterOutput }
   const currentMemoryMemfs = await readBuiltEntry(memoryMemfsOutput)
   if (currentMemoryDoctor === undefined) return { ok: false, reason: "missing-output", output: memoryDoctorOutput }
   if (currentMemoryMemfs === undefined) return { ok: false, reason: "missing-output", output: memoryMemfsOutput }
@@ -56,6 +59,7 @@ export async function checkExtensionCurrent(options = {}) {
     toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
+    lspFormatterOutputPath: join(tempRoot, "omo-lsp-formatter.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
@@ -72,6 +76,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentSupervisor, expected.supervisorOutputPath, supervisorOutput],
       [currentAdvisorRuntime, expected.advisorRuntimeOutputPath, advisorRuntimeOutput],
       [currentMemoryDoctor, expected.memoryDoctorOutputPath, memoryDoctorOutput],
+      [currentLspFormatter, expected.lspFormatterOutputPath, lspFormatterOutput],
       [currentMemoryMemfs, expected.memoryMemfsOutputPath, memoryMemfsOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],

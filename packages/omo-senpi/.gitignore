@@ -7,6 +7,7 @@
 !/plugin/extensions/kibitzer-persona.md
 !/plugin/extensions/memory-run-supervisor.mjs
 !/plugin/extensions/omo-memory-doctor.js
+!/plugin/extensions/omo-lsp-formatter.js
 !/plugin/extensions/omo-memory-memfs.js
 !/plugin/extensions/omo-computer-use.js
 !/plugin/extensions/omo-init-deep-advisor.js

@@ -5,7 +5,8 @@ import { loadSenpiOmoConfig } from "../config-resolution";
 import { classifyPostEditFileLocation, type PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
 import { resolveAgentHome } from "../agent-home/resolve-agent-home";
 import { resolveSessionAgentDir } from "../memory/session-context-resolver";
-import { createFormatterStep } from "../formatter/formatter";
+import type { createFormatterStep } from "../formatter/formatter";
+import { MUTATION_TOOL_NAMES } from "../post-mutation/post-mutation";
 import { createLazyValue, deferUntilAfterFirstPaint } from "../../extension/startup-deferral";
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types";
 import {
@@ -68,7 +69,7 @@ export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiC
 			// The formatter reads omo config and the project's formatter markers off disk, and nothing
 			// before the first mutation tool result can observe it: built on first use, so a session
 			// that never edits a file never pays for it.
-			const formatMutation = createLazyValue(() => options.formatter ?? createFormatterStep({
+			const formatMutation = createLazyValue(async () => options.formatter ?? (await import("#omo-lsp-formatter-runtime")).createFormatterStep({
 				config: loadSenpiOmoConfig({ cwd }).config.formatOnMutation,
 				markers: markerCwd => listProjectMarkers(markerCwd),
 				readMarker: (markerCwd, marker) => readProjectMarker(markerCwd, marker),
@@ -92,8 +93,8 @@ export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiC
 
 			pi.on("tool_result", async (event, eventCtx) => {
 					const parsed = isToolResultLike(event) ? event : undefined;
-					if (!parsed) return undefined;
-					const formatted = await formatMutation.get()(parsed, pi.cwd ?? process.cwd(), sessionIdFromContext(eventCtx));
+					if (!parsed || parsed.isError || !MUTATION_TOOL_NAMES.has(parsed.toolName)) return undefined;
+					const formatted = await (await formatMutation.get())(parsed, pi.cwd ?? process.cwd(), sessionIdFromContext(eventCtx));
 					const afterFormat = formatted.content ? { ...parsed, content: [...parsed.content, ...formatted.content] } : parsed;
 					if (formatted.error) return { content: afterFormat.content, isError: true };
 					if (ctx.config.getFlag(LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG) === false) return formatted.content ? { content: afterFormat.content } : undefined;

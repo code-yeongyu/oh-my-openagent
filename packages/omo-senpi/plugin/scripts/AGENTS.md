@@ -45,3 +45,5 @@ bun test plugin/scripts/                          # colocated suite
 ```
 
 The `/memfs` registrar remains synchronous; its handlers are loaded on first invocation from `src/components/memory/commands/memfs-runtime.ts` via `#omo-memory-memfs-runtime`, mapped to `extensions/omo-memory-memfs.js` in the published plugin. Build freshness, required artifacts and bundle audits include this sidecar.
+
+LSP formatting is loaded on the first successful mutation tool result via `#omo-lsp-formatter-runtime` (`src/components/formatter/formatter.ts` in source, `extensions/omo-lsp-formatter.js` in the published plugin). Tool/flag/lifecycle registration stays synchronous. Read-only and failed tool results do not import the formatter; the shared build tracks its inputs, freshness, required artifact, and peer purity.

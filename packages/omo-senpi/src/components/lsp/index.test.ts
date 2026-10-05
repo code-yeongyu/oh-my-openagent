@@ -86,6 +86,33 @@ function toolNames(pi: FakeExtensionAPI): string[] {
 }
 
 describe("omo-senpi lsp component", () => {
+  it("#given lazy formatting #when startup, reads, failures and concurrent edits occur #then only successful edits construct one formatter", async () => {
+    const test = setup()
+    test.pi.setFlag("omo-senpi-lsp-post-edit-diagnostics-enabled", false)
+    let constructions = 0
+    let formatted = 0
+    createLspComponent({
+      get formatter() {
+        constructions += 1
+        return async () => {
+          formatted += 1
+          return { content: undefined, error: undefined }
+        }
+      },
+    }).register(test.pi, test.ctx)
+    expect(constructions).toBe(0)
+    const result = { toolCallId: "mutation", input: {}, content: [], isError: false }
+    await test.pi.dispatch("tool_result", { ...result, toolName: "read" })
+    await test.pi.dispatch("tool_result", { ...result, toolName: "edit", isError: true })
+    expect(constructions).toBe(0)
+    await Promise.all([
+      test.pi.dispatch("tool_result", { ...result, toolName: "write" }),
+      test.pi.dispatch("tool_result", { ...result, toolName: "apply_patch" }),
+    ])
+    expect(constructions).toBe(1)
+    expect(formatted).toBe(2)
+  })
+
   it("#given the legacy Senpi LSP descriptors #when the daemon-backed component registers #then all non-executor descriptor fields are preserved", () => {
     // given / when
     const { pi } = registerLsp()

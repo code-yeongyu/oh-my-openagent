@@ -14,6 +14,7 @@ export function outputPathsIn(root) {
     toolkitSdkOutputPath: join(root, "runtime", "agent-toolkit-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(root, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(root, "omo-memory-doctor.js"),
+    lspFormatterOutputPath: join(root, "omo-lsp-formatter.js"),
     memoryMemfsOutputPath: join(root, "omo-memory-memfs.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(root, "gateway-store-worker.mjs"),

@@ -75,6 +75,8 @@ const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefin
 const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
 const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
 const memoryDoctorEntryPath = join(packageRoot, "src", "components", "memory", "commands", "doctor-runtime.ts")
+const lspFormatterEntryPath = join(packageRoot, "src", "components", "formatter", "formatter.ts")
+const lspFormatterOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-lsp-formatter.js")
 const memoryMemfsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "memfs-runtime.ts")
 const memoryDoctorOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-doctor.js")
 const memoryMemfsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-memfs.js")
@@ -90,6 +92,7 @@ const externalSpecifiers = [
   "#omo-computer-use-runtime",
   "#omo-memory-doctor-runtime",
   "#omo-memory-memfs-runtime",
+  "#omo-lsp-formatter-runtime",
   "#omo-agent-toolkit-sdk",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
@@ -122,6 +125,7 @@ export const extensionBuildPaths = {
   computerUseOutputPath,
   memoryDoctorOutputPath,
   memoryMemfsOutputPath,
+  lspFormatterOutputPath,
   gatewayStoreWorkerOutputPath,
   gatewayRulesExtensionOutputPath,
 }
@@ -141,6 +145,7 @@ export function resolveOutputs(options) {
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
     memoryDoctorOutput: sibling(options.memoryDoctorOutputPath, memoryDoctorOutputPath, "omo-memory-doctor.js"),
+    lspFormatterOutput: sibling(options.lspFormatterOutputPath, lspFormatterOutputPath, "omo-lsp-formatter.js"),
     memoryMemfsOutput: sibling(options.memoryMemfsOutputPath, memoryMemfsOutputPath, "omo-memory-memfs.js"),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
@@ -169,6 +174,7 @@ export async function buildExtension(options = {}) {
     computerUseOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
+    lspFormatterOutput,
     gatewayStoreWorkerOutput,
     gatewayRulesExtensionOutput,
   } = resolveOutputs(options)
@@ -180,6 +186,7 @@ export async function buildExtension(options = {}) {
   const advisorRuntimeInputs = await buildEntry(advisorRuntimeEntryPath, advisorRuntimeOutput, buildDefines)
   const rollbackRuntimeInputs = await buildEntry(rollbackRuntimeEntryPath, rollbackRuntimeOutput, buildDefines, sdkExternalSpecifiers)
   const memoryDoctorInputs = await buildEntry(memoryDoctorEntryPath, memoryDoctorOutput, buildDefines)
+  const lspFormatterInputs = await buildEntry(lspFormatterEntryPath, lspFormatterOutput, buildDefines)
   const memoryMemfsInputs = await buildEntry(memoryMemfsEntryPath, memoryMemfsOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
@@ -202,6 +209,7 @@ export async function buildExtension(options = {}) {
     computerUseInputs,
     memoryDoctorInputs,
     memoryMemfsInputs,
+    lspFormatterInputs,
     gatewayStoreWorkerInputs,
     gatewayRulesExtensionInputs,
     threadSdkInputs,

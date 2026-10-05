@@ -36,3 +36,5 @@ Daemon-backed Senpi LSP adapter. This component retains only Senpi-facing descri
 - Do not read project-local `lsp-client.json` commands (`.omo/` or `.pi/`). They're intentionally ignored here; users who still need custom LSP commands must move those definitions to their user `~/.omo/lsp-client.json` (`~/.pi/lsp-client.json` is still read as a fallback). Project configs may keep safe fields such as extensions and priorities, but command/env entries only produce a migration warning.
 - Do not add LSP client, transport, or server-management logic in this component; that belongs to `lsp-core` and the daemon package.
 - Do not enable `installDecisionTool` in the request context; the Senpi adapter has no interactive install-decision surface.
+
+LSP formatting is loaded on the first successful mutation tool result via `#omo-lsp-formatter-runtime` (`src/components/formatter/formatter.ts` in source, `extensions/omo-lsp-formatter.js` in the published plugin). Tool/flag/lifecycle registration stays synchronous. Read-only and failed tool results do not import the formatter; the shared build tracks its inputs, freshness, required artifact, and peer purity.
