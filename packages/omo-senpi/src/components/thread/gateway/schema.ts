@@ -192,6 +192,50 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "CREATE TABLE extension_objects (type TEXT NOT NULL, name TEXT NOT NULL, owner TEXT, PRIMARY KEY (type, name))",
     "INSERT INTO extension_objects (type, name, owner) SELECT type, name, NULL FROM sqlite_schema",
   ],
+  // v7 (#9425): the model of each session the gateway created or re-modelled, and why it runs that
+  // model (`auto` from the connected providers, `set` by config/user/lead, `fallback` after a provider
+  // error). Keyed by durable id, so every resume path reads the same record. `chosen_*` is the model a
+  // fallback overrode, restored on the engine's fallback-revert.
+  [
+    `CREATE TABLE session_models (
+      durable_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      thinking_level TEXT,
+      provenance TEXT NOT NULL CHECK (provenance IN ('auto', 'set', 'fallback')),
+      set_by TEXT CHECK (set_by IS NULL OR set_by IN ('config', 'user', 'lead')),
+      reason TEXT,
+      chosen_provider TEXT,
+      chosen_model_id TEXT,
+      chosen_provenance TEXT CHECK (chosen_provenance IS NULL OR chosen_provenance IN ('auto', 'set')),
+      updated_at INTEGER NOT NULL
+    )`,
+    // Every core migration after v6 reserves the objects it creates, so no extension can register a
+    // name that prefixes them. An object an extension already owns keeps its one row: the registry
+    // records extension objects in lower case while sqlite_schema keeps the DDL's case, so the match
+    // ignores case.
+    `INSERT OR IGNORE INTO extension_objects (type, name, owner)
+     SELECT s.type, s.name, NULL FROM sqlite_schema s
+     WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
+  ],
+  // v8 (#9429): a revision every write to a session's model record bumps. The command paths swap on
+  // it, not on the row's values, so a writer holding an older read can never win after the record
+  // moved and came back to the same values (A->B->A).
+  ["ALTER TABLE session_models ADD COLUMN revision INTEGER NOT NULL DEFAULT 0"],
+  // v9 (#9429): the choice of a set-model the engine held (`pending_*`), so the switch keeps its
+  // setter when it lands; any switch that lands clears it, as it clears the engine's hold. The engine can
+  // also end a hold with no switch (it refuses it at apply time, or the session restarts and the in-memory
+  // hold is gone): `pending_noted_at` lets the session drop a choice noted before such an end, and only
+  // that one, never a choice a set-model noted again after it. Also drops
+  // the second, core-owned row a case-sensitive v7 reservation added for a mixed-case extension object.
+  [
+    "ALTER TABLE session_models ADD COLUMN pending_provider TEXT",
+    "ALTER TABLE session_models ADD COLUMN pending_model_id TEXT",
+    "ALTER TABLE session_models ADD COLUMN pending_set_by TEXT CHECK (pending_set_by IS NULL OR pending_set_by IN ('config', 'user', 'lead'))",
+    "ALTER TABLE session_models ADD COLUMN pending_noted_at INTEGER",
+    `DELETE FROM extension_objects WHERE owner IS NULL AND EXISTS (
+       SELECT 1 FROM extension_objects e WHERE e.owner IS NOT NULL AND e.type = extension_objects.type AND e.name = extension_objects.name COLLATE NOCASE)`,
+  ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects"] as const
+export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "session_models"] as const

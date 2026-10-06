@@ -13,6 +13,7 @@ import { gatewayDatabasePath, gatewayRootDirectory } from "./paths"
 import { processStartTime } from "./process-identity"
 import { isBusyError, Sql, type SqliteConnection } from "./sql"
 import * as ops from "./store-ops"
+import * as models from "./store-model-ops"
 import * as relay from "./store-relay-ops"
 import * as ownership from "./store-ownership"
 import { StoreExtensions } from "./store-extension-ops"
@@ -176,6 +177,15 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "release_answer": return await relay.releaseAnswer(ctx, args as Parameters<typeof relay.releaseAnswer>[1])
     case "confirm_answer": return await relay.confirmAnswer(ctx, args as Parameters<typeof relay.confirmAnswer>[1])
     case "mark_prior_delivered": return await relay.markPriorDelivered(ctx, args as Parameters<typeof relay.markPriorDelivered>[1])
+    case "record_session_model": return await models.recordSessionModel(ctx, args as Parameters<typeof models.recordSessionModel>[1])
+    case "record_session_model_if_current": return await models.recordSessionModelIfCurrent(ctx, args as Parameters<typeof models.recordSessionModelIfCurrent>[1])
+    case "update_session_thinking": return await models.updateSessionThinking(ctx, args as Parameters<typeof models.updateSessionThinking>[1])
+    case "record_pending_session_model": return await models.recordPendingSessionModel(ctx, args as Parameters<typeof models.recordPendingSessionModel>[1])
+    case "replace_pending_session_model": return await models.replacePendingSessionModel(ctx, args as Parameters<typeof models.replacePendingSessionModel>[1])
+    case "drop_held_choice": return await models.dropHeldChoice(ctx, args as Parameters<typeof models.dropHeldChoice>[1])
+    case "observe_model_select": return await models.observeModelSelect(ctx, args as Parameters<typeof models.observeModelSelect>[1])
+    case "session_models": return models.sessionModels(ctx, args as readonly string[])
+    case "session_model_record": return models.sessionModelRecord(ctx, args as string)
     case "close_question": return await relay.closeQuestion(ctx, args as Parameters<typeof relay.closeQuestion>[1])
     default: throw new Error(`unknown gateway store op: ${op}`)
   }

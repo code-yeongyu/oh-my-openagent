@@ -45,6 +45,22 @@ export const ThreadCreateParams = Type.Object({
       description: "Durable id of an existing thread to fork; the new thread starts with that transcript as prior context.",
     }),
   ),
+  provider: Type.Optional(
+    Type.String({ description: "Restricts the model choice to one provider; with a bare model id it names which provider serves it." }),
+  ),
+  model: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "Model the new thread runs, as provider/id, an exact model id, or a unique fragment of the id or display name; unset picks the best model the user's connected providers serve, in the active model profile's order.",
+    }),
+  ),
+  thinking: Type.Optional(
+    Type.Union(
+      [Type.Literal("off"), Type.Literal("minimal"), Type.Literal("low"), Type.Literal("medium"), Type.Literal("high"), Type.Literal("xhigh"), Type.Literal("max")],
+      { description: "Thinking level the new thread starts at; a level the chosen model cannot run returns thinking_level_unsupported with the supported list." },
+    ),
+  ),
   idempotency_key: IdempotencyKey,
 })
 

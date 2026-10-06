@@ -19,6 +19,80 @@ const extension = (name = "alpha"): StoreExtensionRegistration => ({
 const bind = { principal: "connector:test", binding: { platform: "custom", account_id: "bot", chat_id: "chat", session_durable_id: "target", ttl_seconds: null } }
 
 describe("store extension migrations", () => {
+  test("#given a mixed-case extension table registered on a v6 store #when the store upgrades to the current schema #then the extension registers again and owns its one table row", async () => {
+    const h = (harness = createGatewayHarness())
+    const mixed: StoreExtensionRegistration = { name: "alpha", moduleUrl, migrations: [["CREATE TABLE Alpha_Items (id INTEGER PRIMARY KEY, value TEXT)"]] }
+    const first = h.store()
+    expect(await first.registerStoreExtension(mixed)).toMatchObject({ kind: "ok" })
+    await first.dispose()
+    // Back to the v6 layout: the tables later migrations add are gone, and so are their reservations.
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    try {
+      db.exec("DROP TABLE session_models")
+      db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
+      db.exec("PRAGMA user_version = 6")
+      // Each core step after v6 on its own adds no core row beside an object the extension owns: v9's
+      // cleanup must not be what hides a step that shadows (the reservation is every later step's template).
+      db.exec("BEGIN")
+      for (const [index, step] of GATEWAY_MIGRATIONS.slice(6).entries()) {
+        for (const statement of step) db.exec(statement)
+        const shadows = db.query("SELECT core.type, core.name FROM extension_objects core JOIN extension_objects owned ON owned.owner IS NOT NULL AND owned.type = core.type AND owned.name = core.name COLLATE NOCASE WHERE core.owner IS NULL").all()
+        expect({ version: 7 + index, shadows }).toEqual({ version: 7 + index, shadows: [] })
+      }
+      db.exec("ROLLBACK")
+    } finally {
+      db.close()
+    }
+    const upgraded = h.store()
+    expect(await upgraded.registerStoreExtension(mixed)).toMatchObject({ kind: "ok" })
+    const check = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+    try {
+      expect(check.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length })
+      expect(check.query("SELECT name, owner FROM extension_objects WHERE type = 'table' AND lower(name) = 'alpha_items'").all()).toEqual([{ name: "alpha_items", owner: "alpha" }])
+    } finally {
+      check.close()
+    }
+  })
+
+  test("#given a v8 store where the case-sensitive v7 reserved a mixed-case extension table as core #when the store upgrades #then v9 drops that core row and the extension registers again", async () => {
+    const h = (harness = createGatewayHarness())
+    const mixed: StoreExtensionRegistration = { name: "alpha", moduleUrl, migrations: [["CREATE TABLE Alpha_Items (id INTEGER PRIMARY KEY, value TEXT)"]] }
+    const first = h.store()
+    expect(await first.registerStoreExtension(mixed)).toMatchObject({ kind: "ok" })
+    await first.dispose()
+    // Back to the v8 layout, holding the second row the case-sensitive v7 reservation added on upgrade.
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    try {
+      for (const column of ["pending_noted_at", "pending_set_by", "pending_model_id", "pending_provider"]) db.exec(`ALTER TABLE session_models DROP COLUMN ${column}`)
+      db.exec("INSERT INTO extension_objects (type, name, owner) VALUES ('table', 'Alpha_Items', NULL)")
+      db.exec("PRAGMA user_version = 8")
+    } finally {
+      db.close()
+    }
+    const upgraded = h.store()
+    expect(await upgraded.registerStoreExtension(mixed)).toMatchObject({ kind: "ok" })
+    const check = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+    try {
+      expect(check.query("SELECT name, owner FROM extension_objects WHERE type = 'table' AND lower(name) = 'alpha_items'").all()).toEqual([{ name: "alpha_items", owner: "alpha" }])
+    } finally {
+      check.close()
+    }
+  })
+
+  test("#given a core table added after the v6 snapshot #when an extension takes its name #then registration is refused and the table stays core", async () => {
+    const h = (harness = createGatewayHarness())
+    const store = h.store()
+    const result = await store.registerStoreExtension(extension("session_models"))
+    expect(result).toMatchObject({ kind: "refused", code: "extension_schema_violation" })
+    const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+    try {
+      expect(db.query("SELECT owner FROM extension_objects WHERE type = 'table' AND name = 'session_models'").get()).toEqual({ owner: null })
+      expect(db.query("SELECT name FROM extension_schema").all()).toEqual([])
+    } finally {
+      db.close()
+    }
+  })
+
   test("#given an extension #when registered and called repeatedly #then its migration applies once and core version stays five", async () => {
     const h = (harness = createGatewayHarness())
     const store = h.store()

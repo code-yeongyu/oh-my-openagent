@@ -9,10 +9,11 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../memory/worker/senpi-command"
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
+import { CATALOG_PROBE_CONTEXT, THREAD_CREATE_CONTEXT } from "./catalog-probe"
 import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegistryEndpoints, type EndpointKind, type RegistryEndpoint } from "./endpoint-registry"
 import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
-import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
+import type { ModelCatalogEntry, ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
 import { answerUiRequest } from "./ui-answer"
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorData?: unknown }
@@ -357,10 +358,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     interrupt: (sessionId, turnId) => send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }),
     setSessionName: async (sessionId, name) => { await send("set_session_name", { sessionId, name }) },
     setModel: (sessionId, provider, modelId) => send("set_model", { sessionId, provider, modelId }),
-    getAvailableModels: async (sessionId) => {
-      const { models } = await send<{ models: Awaited<ReturnType<ThreadHost["getAvailableModels"]>> }>("get_available_models", { sessionId })
-      return models.map(({ provider, id, name }) => ({ provider, id, ...(name === undefined ? {} : { name }) }))
-    },
+    getAvailableModels: async (sessionId) => catalogOf(await send<{ models: readonly WireModel[] }>("get_available_models", { sessionId })),
     setThinkingLevel: async (sessionId, level, scope) => { await send("set_thinking_level", { sessionId, level, ...(scope === "turn" ? { scope } : {}) }) },
     getAvailableThinkingLevels: async (sessionId) => (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
     wake: async (sessionId, deliveryIds) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] })),
@@ -437,7 +435,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
-      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...(params as Record<string, unknown>), retain_on_disconnect: true })
+      // `THREAD_CREATE_CONTEXT` keeps onboarding out of it: its first turn is the creator's message.
+      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...(params as Record<string, unknown>), retain_on_disconnect: true, context: { ...THREAD_CREATE_CONTEXT } })
       const routingId = result.sessionId
       const name = (params as { readonly name?: string }).name
       if (name !== undefined && name.trim() !== "") await call("set_session_name", { sessionId: routingId, name })
@@ -445,8 +444,33 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       const listed = sessions.find((session) => session.sessionId === routingId)
       return { ...result.state, ...(listed ?? {}), sessionId: routingId, socket: legacy, endpoint_kind: "rpc_host" }
     },
+    /**
+     * `get_available_models` answers per session, and a session that does not exist yet has none: the
+     * catalog comes from a session the legacy host already holds open, else from a hidden worker
+     * session opened for the question and closed after it. It carries `CATALOG_PROBE_CONTEXT`, so
+     * onboarding does not start a turn in it or spend the once-per-install marker on it; senpi still
+     * writes its session file with the startup entries. Every session of one host reads the same
+     * agent dir's credentials.
+     */
+    availableModels: async () => {
+      const { sessions } = await call<{ sessions: readonly ThreadHostSession[] }>("list_sessions", OBSERVE)
+      const open = sessions.find((session) => session.status === "open")
+      if (open !== undefined) return catalogOf(await call<{ models: readonly WireModel[] }>("get_available_models", { sessionId: open.sessionId }))
+      const probe = await call<{ sessionId: string }>("open_session", { kind: "worker", retain_on_disconnect: true, auto_title: false, context: { ...CATALOG_PROBE_CONTEXT } })
+      try {
+        return catalogOf(await call<{ models: readonly WireModel[] }>("get_available_models", { sessionId: probe.sessionId }))
+      } finally {
+        await call("close_session", { sessionId: probe.sessionId }).catch(() => undefined)
+      }
+    },
     ...sessionMethods(undefined, call),
   }
+}
+
+type WireModel = { readonly provider: string; readonly id: string; readonly name?: string; readonly supportedThinkingLevels?: readonly string[] }
+
+function catalogOf(reply: { readonly models: readonly WireModel[] }): readonly ModelCatalogEntry[] {
+  return reply.models.map(({ provider, id, name, supportedThinkingLevels }) => ({ provider, id, ...(name === undefined ? {} : { name }), ...(supportedThinkingLevels === undefined ? {} : { thinking_levels: [...supportedThinkingLevels] }) }))
 }
 
 export function defaultThreadStateDirectory(pi: SenpiExtensionAPI): string { return resolveProjectStateDirectory(pi.cwd ?? process.cwd(), "thread-tools") }

@@ -149,6 +149,35 @@ describe("schema migration v3 -> v4", () => {
   })
 })
 
+describe("schema migration v7 -> v8", () => {
+  test("#given a v7 store holding a session model #when the current store opens it #then the record reads revision 0, every write bumps it, and a swap on an older revision fails even when the values came back", async () => {
+    const h = (harness = createGatewayHarness())
+    mkdirSync(gatewayRootDirectory(h.agentDir), { recursive: true, mode: 0o700 })
+    const v7 = new Database(gatewayDatabasePath(h.agentDir))
+    for (const step of GATEWAY_MIGRATIONS.slice(0, 7)) for (const statement of step) v7.run(statement)
+    v7.run("PRAGMA user_version = 7")
+    v7.run("INSERT INTO session_models (durable_id, provider, model_id, thinking_level, provenance, set_by, reason, chosen_provider, chosen_model_id, chosen_provenance, updated_at) VALUES ('B', 'openai', 'gpt-y', 'high', 'set', 'user', NULL, 'openai', 'gpt-y', 'set', 1)")
+    v7.close()
+    const store = h.store()
+    const y = { provider: "openai", id: "gpt-y", thinking_level: "high", provenance: "set", set_by: "user", reason: null } as const
+    const x = { ...y, id: "gpt-x" }
+    expect(await store.sessionModelRecord("B")).toEqual({ model: y, revision: 0 })
+    expect(await store.recordSessionModelIfCurrent({ now: h.clock.now, durable_id: "B", expect_revision: 0, model: x })).toEqual({ applied: true, record: { model: x, revision: 1 } })
+    expect(await store.recordSessionModelIfCurrent({ now: h.clock.now, durable_id: "B", expect_revision: 1, model: y })).toEqual({ applied: true, record: { model: y, revision: 2 } })
+    // A->B->A: the record holds the values revision 0 held, and a writer that read revision 0 still loses.
+    expect(await store.recordSessionModelIfCurrent({ now: h.clock.now, durable_id: "B", expect_revision: 0, model: x })).toEqual({ applied: false, record: { model: y, revision: 2 } })
+    await store.observeModelSelect({ now: h.clock.now, durable_id: "B", to: { provider: "openai", id: "gpt-y" }, from: null, thinking_level: "low", source: "set", reason: null })
+    expect(await store.updateSessionThinking({ now: h.clock.now, durable_id: "B", thinking_level: "medium" })).toBe(true)
+    await store.recordSessionModel({ now: h.clock.now, durable_id: "B", model: y })
+    expect((await store.sessionModelRecord("B"))?.revision).toBe(5)
+    // A revert the record does not need still moved the engine, so it still moves the revision.
+    await store.observeModelSelect({ now: h.clock.now, durable_id: "B", to: { provider: "openai", id: "gpt-y" }, from: null, thinking_level: null, source: "fallback-revert", reason: null })
+    expect(await store.sessionModelRecord("B")).toEqual({ model: y, revision: 6 })
+    expect(await store.recordSessionModelIfCurrent({ now: h.clock.now, durable_id: "C", expect_revision: null, model: x })).toEqual({ applied: true, record: { model: x, revision: 1 } })
+    expect(await store.recordSessionModelIfCurrent({ now: h.clock.now, durable_id: "C", expect_revision: null, model: y })).toEqual({ applied: false, record: { model: x, revision: 1 } })
+  })
+})
+
 describe("legacy mailbox migration", () => {
   test("#given a legacy sender-local mailbox journal #when the store opens twice #then its pending items become queued rows once, in order, and the directory is left in place", async () => {
     const h = (harness = createGatewayHarness())

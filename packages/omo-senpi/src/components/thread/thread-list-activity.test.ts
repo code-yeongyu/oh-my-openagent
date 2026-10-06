@@ -4,13 +4,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { readDiskSession } from "./address-book"
-import { createGatewayStore } from "./gateway/store"
+import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { listThreads } from "./tools/read-ops"
 import type { ThreadHost, ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./tools/ports"
 
 const directories: string[] = []
+const stores: GatewayStore[] = []
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.all(stores.splice(0).map((store) => store.dispose()))
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
@@ -48,17 +50,13 @@ function options(directory: string): ThreadToolSurfaceOptions {
     setThinkingLevel: unused,
     getAvailableThinkingLevels: unused,
   }
-  return {
-    host,
-    callerSessionId: () => "caller",
-    callerWorkspaceRoot: () => directory,
-    stateDirectory: directory,
-    // The list never touches the store; a store opens no worker until its first call.
-    store: createGatewayStore({ agentDir: directory }),
-  }
+  // The list reads only the session model records from the store (#9425).
+  const store = createGatewayStore({ agentDir: directory })
+  stores.push(store)
+  return { host, callerSessionId: () => "caller", callerWorkspaceRoot: () => directory, stateDirectory: directory, store }
 }
 
-test("#given mixed live and degraded rows with known and unknown activity #when thread list returns them #then freshness agrees with the bounded reader and the public order is known-newest, null-last, id-ascending", () => {
+test("#given mixed live and degraded rows with known and unknown activity #when thread list returns them #then freshness agrees with the bounded reader and the public order is known-newest, null-last, id-ascending", async () => {
   const directory = scratch()
   const deadSocket = join(directory, "t-dead.sock")
   const partial = `{"type":"message","timestamp":"2026-09-30T02:00:00.000Z","message":"partial`
@@ -85,7 +83,7 @@ test("#given mixed live and degraded rows with known and unknown activity #when 
     disk: [dead],
   }
 
-  const result = listThreads(options(directory), current, true)
+  const result = await listThreads(options(directory), current, true)
   if (result.kind === "error" || !("threads" in result)) throw new Error("thread list did not return rows")
 
   expect(result.threads.map((row) => [row.thread_id, row.updated_at, row.status])).toEqual([

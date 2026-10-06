@@ -1,4 +1,5 @@
 import { workspaceEntries } from "../addressing"
+import { withModels } from "../model-control"
 import type { ThreadReadInput, ThreadToolResult } from "../contracts"
 import { readTranscript } from "../reader"
 import { addressBook, degradedSummary, failure, resolution, resolveEntries, routingId, sessionPort, summary, targetSession, transcriptRole } from "./internals"
@@ -10,7 +11,7 @@ import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from
  * knows. A session whose endpoint stopped answering is still a thread: it is listed from its JSONL
  * as resumable, with the endpoint's failure in error_note, instead of silently vanishing.
  */
-export function listThreads(options: ThreadToolSurfaceOptions, current: ThreadHostView, allScope: boolean | undefined): ThreadToolResult {
+export async function listThreads(options: ThreadToolSurfaceOptions, current: ThreadHostView, allScope: boolean | undefined): Promise<ThreadToolResult> {
   const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
   const inScope = (threadId: string) => allScope === true || scoped.some((entry) => entry.thread_id === threadId)
   const visible = current.sessions.filter((session) => inScope(session.durableSessionId ?? session.sessionId))
@@ -20,7 +21,7 @@ export function listThreads(options: ThreadToolSurfaceOptions, current: ThreadHo
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
   const threads = [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)]
     .sort((left, right) => (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER))
-  return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
+  return { kind: "ok", threads: await withModels(options, threads), scope: allScope === true ? "all" : "workspace" }
 }
 
 /** `thread_read` over one host view: the live transcript from the session's endpoint, else its JSONL when that endpoint is dead. */
@@ -36,13 +37,19 @@ export async function readThread(options: ThreadToolSurfaceOptions, current: Thr
   const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope)
   if (resolved.kind === "error") return { kind: "error", error: resolved }
   const session = targetSession(current, resolved.entry.thread_id)
-  if (session === undefined) return readDegraded(options, current, resolved.entry.thread_id, value)
+  const read = session === undefined ? readDegraded(options, current, resolved.entry.thread_id, value) : await readLive(options, session, resolved.entry.thread_id, value)
+  if (read.kind !== "ok") return read
+  const [withModel] = await withModels(options, [read as Extract<ThreadToolResult, { thread_id: string }>])
+  return withModel as ThreadToolResult
+}
+
+async function readLive(options: ThreadToolSurfaceOptions, session: ThreadHostSession, threadId: string, value: ThreadReadInput): Promise<ThreadToolResult> {
   const messages = await sessionPort(options, session).getMessages(routingId(session))
   const live = readTranscript({ kind: "live", entries: () => messages }, readWindow(value))
   if (live.kind === "error") return { kind: "error", error: live.error }
   return {
     kind: "ok",
-    thread_id: resolved.entry.thread_id,
+    thread_id: threadId,
     items: live.items.map((item, index) => ({ seq: index + 1, role: transcriptRole(item.role), content: JSON.stringify(item.content ?? item) })),
     truncated: live.truncated,
     ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }),

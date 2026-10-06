@@ -59,6 +59,7 @@ function hostWith(durableId: string, name: string, sessionPath: string): Answer 
       case "prompt": return { data: { turnId: `turn-${durableId}` } }
       case "get_messages": return { data: { messages: [{ role: "assistant", content: `from ${durableId}` }] } }
       case "open_session": return { data: { sessionId: "rpc-2", state: { cwd: process.cwd() } } }
+      case "get_available_models": return { data: { models: [{ provider: "anthropic", id: "claude-opus-5-5", supportedThinkingLevels: ["low", "medium", "high"] }] } }
       default: return { data: {} }
     }
   }

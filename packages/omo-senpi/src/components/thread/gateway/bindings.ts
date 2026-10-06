@@ -8,6 +8,7 @@
  */
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto"
 
+import type { ModelChange } from "./session-models"
 import type { ExternalAuthor, StoreRefusal } from "./types"
 
 export const BINDING_SCHEMA_VERSION = 1
@@ -114,6 +115,8 @@ export type OutboxRow = {
   readonly outcome: CompletionOutcome | null
   /** For an answered `question`: the human the connector named with the answer; null without one. */
   readonly answered_by: ExternalAuthor | null
+  /** Only on the `milestone` row a runtime fallback switch wrote (#9425): the switch and the provider error. */
+  readonly model_change?: ModelChange
   /**
    * For an answered `question`: `in_flight` while a `thread_answer` claim is still being handed to the session (it goes back to
    * `pending` if that fails), `delivered` once the session took it or closed the question itself. Only `delivered` is settled; a

@@ -117,10 +117,10 @@ async function holdWriteLock(databasePath: string) {
 }
 
 describe("thread component control endpoint registration", () => {
-  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm and shutdown hooks exist", () => {
+  test("#given an engine without pi.session #when the component registers #then none of the control endpoint's hooks (compaction and waiting-question tracking) is registered", () => {
     const f = eventApi()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state", agentDir: () => "/tmp/thread-test-agent" }).register(f.pi as never, context([]) as never)
-    expect([...f.handlers.keys()].sort()).toEqual(["agent_end", "agent_settled", "agent_start", "message_end", "message_start", "session_shutdown", "session_start"])
+    expect(["session_before_compact", "session_compact", "tool_execution_start", "tool_execution_end"].filter((event) => f.handlers.has(event))).toEqual([])
   })
 
   test("#given a completion armed through thread_report #when agent_end fires and then the session settles #then exactly one completion row appears, only after the settle", async () => {

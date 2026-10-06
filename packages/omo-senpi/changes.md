@@ -1,3 +1,19 @@
+## 2026-10-05 - A held set-model's setter no longer survives a hold the engine dropped (#9429 review)
+
+`set-model --set-by lead` (or `config`) notes its choice before asking the engine, so a switch the engine holds lands with that setter. The engine can also end a hold without a switch landing:
+- it refuses the held switch when it applies it, because the transcript still does not fit;
+- the session starts again, and the in-memory hold is gone.
+
+Nothing cleared the noted choice in those cases. A later `/model` pick of the same model by the user was then recorded as set by the lead.
+
+The noted choice now carries when it was noted (`pending_noted_at`). The session drops it when its next settle finds a `model_change_rejected` entry for that model, and when it starts again (not on an extension reload, where the hold lives on). A choice noted again after that end is kept.
+
+Tests (`model-control.test.ts`):
+- a refused hold, then a user pick, is the user's;
+- a restart, then a user pick, is the user's;
+- an extension reload keeps the hold's setter;
+- a choice noted again after an earlier hold's end is kept.
+
 ## 2026-10-05 - An idle gateway store no longer keeps its worker thread alive
 
 Every session that touches the gateway store (each terminal with a control endpoint, and every sender) started one store worker thread and kept it until the session ended. A measured idle worker retains 2.94 MB: an empty Bun worker plus the bundled store code and SQLite. That put the terminal control endpoint's idle cost at about 4.1 MB against the 3 MB budget.

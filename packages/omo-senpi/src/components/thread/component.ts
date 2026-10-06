@@ -3,10 +3,13 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { loadSenpiOmoConfig } from "../config-resolution"
+import { modelProfileChoice } from "./model-control"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
+import type { ModelRef, ModelSelectSource } from "./gateway/session-models"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
@@ -108,6 +111,80 @@ function waitingQuestionCallOf(event: unknown): string | undefined {
   if (typeof toolCallId !== "string" || typeof toolName !== "string") return undefined
   const flag = ASK_USER_WAIT_FLAGS[toolName]
   return flag !== undefined && (args as Record<string, unknown> | null | undefined)?.[flag] === true ? toolCallId : undefined
+}
+
+const MODEL_SELECT_SOURCES: readonly ModelSelectSource[] = ["set", "cycle", "restore", "fallback", "fallback-revert"]
+
+function modelRefOf(value: unknown): ModelRef | null {
+  const { provider, id } = (value ?? {}) as { readonly provider?: unknown; readonly id?: unknown }
+  return typeof provider === "string" && typeof id === "string" ? { provider, id } : null
+}
+
+/** senpi `model_select`: the new model, the one it replaced, and why the engine switched. */
+function modelSelectOf(event: unknown): { readonly to: ModelRef; readonly from: ModelRef | null; readonly source: ModelSelectSource } | undefined {
+  const { model, previousModel, source } = (event ?? {}) as { readonly model?: unknown; readonly previousModel?: unknown; readonly source?: unknown }
+  const to = modelRefOf(model)
+  const known = MODEL_SELECT_SOURCES.find((candidate) => candidate === source)
+  return to === null || known === undefined ? undefined : { to, from: modelRefOf(previousModel), source: known }
+}
+
+/** The provider error of a failed assistant message (`stopReason: "error"`): what a fallback switch that follows it reports. */
+function providerErrorOf(message: EngineMessage): string | undefined {
+  const { stopReason, errorMessage } = message as { readonly stopReason?: unknown; readonly errorMessage?: unknown }
+  return stopReason === "error" && typeof errorMessage === "string" && errorMessage.length > 0 ? errorMessage : undefined
+}
+
+type ModelSelect = NonNullable<ReturnType<typeof modelSelectOf>>
+
+/** The session-manager reads that show whether a switch landed (senpi `ReadonlySessionManager`). */
+type SessionEntryReader = { readonly getLeafId: () => string | null; readonly getEntry: (id: string) => { readonly type?: unknown; readonly parentId?: unknown; readonly provider?: unknown; readonly modelId?: unknown } | undefined }
+
+function entryReaderOf(eventCtx: unknown): SessionEntryReader | undefined {
+  const manager = (eventCtx as { readonly sessionManager?: Partial<SessionEntryReader> } | undefined)?.sessionManager
+  return typeof manager?.getLeafId === "function" && typeof manager.getEntry === "function" ? (manager as SessionEntryReader) : undefined
+}
+
+/**
+ * A switch the engine's `model_select` announced for a session, not yet known to have landed. `since` is
+ * the session leaf when the hook ran: the engine appends the switch's `model_change` entry after it only
+ * once every admission check accepted the candidate, and never for a switch it held or refused.
+ */
+type PendingSwitch = { readonly select: ModelSelect; readonly reason: string | null; readonly entries: SessionEntryReader; readonly since: string | null }
+
+/** How many entries a landed switch's `model_change` may sit above the hook's leaf; a switch appends a handful. */
+const SWITCH_ENTRY_WALK_LIMIT = 256
+
+function switchLanded(pending: PendingSwitch): boolean {
+  let id = pending.entries.getLeafId()
+  for (let step = 0; id !== null && id !== pending.since && step < SWITCH_ENTRY_WALK_LIMIT; step++) {
+    const entry = pending.entries.getEntry(id)
+    if (entry === undefined) return false
+    if (entry.type === "model_change" && entry.provider === pending.select.to.provider && entry.modelId === pending.select.to.id) return true
+    id = typeof entry.parentId === "string" ? entry.parentId : null
+  }
+  return false
+}
+
+/** How far back a scan for refused holds walks when the session has not been scanned yet. */
+const REFUSED_HOLD_WALK_LIMIT = 512
+
+/**
+ * senpi's `model_change_rejected` entries (`{ provider, modelId, timestamp }`) above `since`, newest first: a
+ * held switch the engine refused when it applied it. `since` undefined walks back at most the limit.
+ */
+function refusedHoldsSince(entries: SessionEntryReader, since: string | null | undefined): readonly { readonly at: number; readonly model: ModelRef }[] {
+  const found: { at: number; model: ModelRef }[] = []
+  let id = entries.getLeafId()
+  for (let step = 0; id !== null && id !== since && step < REFUSED_HOLD_WALK_LIMIT; step++) {
+    const entry = entries.getEntry(id) as { readonly type?: unknown; readonly parentId?: unknown; readonly provider?: unknown; readonly modelId?: unknown; readonly timestamp?: unknown } | undefined
+    if (entry === undefined) break
+    const at = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN
+    if (entry.type === "model_change_rejected" && typeof entry.provider === "string" && typeof entry.modelId === "string" && Number.isFinite(at)) {
+      found.push({ at: at + 1, model: { provider: entry.provider, id: entry.modelId } })
+    }
+    id = typeof entry.parentId === "string" ? entry.parentId : null
+  }
+  return found
 }
 
 /** senpi `ask-user/notify.js` ASK_USER_CLOSED_EVENT: every terminal outcome of an ask_user question, `{ requestId, status, resolvedBy? }`. */
@@ -223,6 +300,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
+        // #9425: thread_create with no model resolves from the same model_profile the session-start component applies.
+        modelProfile: options.modelProfile ?? (() => modelProfileChoice(loadSenpiOmoConfig({ cwd: pi.cwd ?? process.cwd() }).config)),
       })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
@@ -298,27 +377,117 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           ctx.logger.warn(`thread gateway: the legacy thread mailbox was not imported: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
-      pi.on("session_start", (_event, eventCtx) => {
+      pi.on("session_start", (event, eventCtx) => {
         void importLegacyMailbox()
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) void pickUpArms(durableId)
+        // The engine keeps a held switch in memory only: a session that starts (not an extension reload
+        // inside a live session) carries no hold, so a set-model choice noted before it is stale.
+        const reason = (event as { readonly reason?: unknown } | undefined)?.reason
+        if (durableId !== undefined && reason !== "reload" && existsSync(gatewayDatabasePath(agentDir()))) {
+          void store.dropHeldChoice({ durable_id: durableId, before: store.now() }).catch(warnUnrecorded("the end of a held model switch at session start"))
+        }
       })
-      pi.on("agent_start", () => {
+      pi.on("agent_start", async (_event, eventCtx) => {
         run.turn++
+        await settleQuiescent(eventCtx)
       })
       pi.on("message_start", (event) => {
         const message = messageOf(event)
         if (message !== undefined) noteInput(run, message)
       })
+      let lastProviderError: string | undefined
       pi.on("message_end", (event) => {
         const message = messageOf(event)
-        if (message?.role === "assistant") run.answered = !callsTools(message)
+        if (message?.role !== "assistant") return
+        run.answered = !callsTools(message)
+        lastProviderError = providerErrorOf(message)
+      })
+      // #9425: the record of a session the gateway created or re-modelled follows the engine's own
+      // switches, and a fallback switch is written as a milestone to the session's bindings. senpi's
+      // `model_select` is an admission hook, not a committed switch: after it the engine can still hold
+      // the switch (context budget) or refuse it and restore the previous model and level. So the hook
+      // only notes the candidate, and the record and the milestone are written once the session holds the
+      // switch's `model_change` entry - right after the switch when it lands, and at the latest at the
+      // session's next quiescent point (the next switch, a run start, a provider request, the settle,
+      // shutdown), where a candidate without one is dropped. A thinking level is recorded at a quiescent
+      // point, read from the engine then, because a switch changes it before its admission is decided.
+      // Only a store that already exists is touched, and a write is waited for at most the settle bound.
+      const pendingSwitches = new Map<string, PendingSwitch>()
+      const thinkingChanged = new Set<string>()
+      const currentThinking = (): string | null => {
+        const level = (pi as { readonly getThinkingLevel?: () => unknown }).getThinkingLevel?.()
+        return typeof level === "string" ? level : null
+      }
+      const warnUnrecorded = (what: string) => (error: unknown) => ctx.logger.warn(`thread gateway: ${what} was not recorded: ${error instanceof Error ? error.message : String(error)}`)
+      // A held switch the engine refuses when it applies it leaves a `model_change_rejected` entry and no
+      // model_select, so nothing else would clear the choice a set-model noted for it.
+      const scannedTo = new Map<string, string | null>()
+      const dropRefusedHolds = (durableId: string, eventCtx: unknown): Promise<void> | undefined => {
+        const entries = entryReaderOf(eventCtx)
+        if (entries === undefined) return undefined
+        const refused = refusedHoldsSince(entries, scannedTo.get(durableId))
+        scannedTo.set(durableId, entries.getLeafId())
+        if (refused.length === 0) return undefined
+        return Promise.all(refused.map((entry) => store.dropHeldChoice({ durable_id: durableId, before: entry.at, model: entry.model }))).then(() => undefined, warnUnrecorded("the end of a refused held model switch"))
+      }
+      /**
+       * `probe`: just after the switch, which may still be under admission - a landed switch is written, an
+       * undecided one waits. `superseded`: the next switch began, so this one is decided; the engine's level
+       * belongs to the new candidate by then and is recorded later. `quiescent`: no switch is in flight.
+       */
+      const settleSwitch = async (durableId: string, mode: "probe" | "superseded" | "quiescent"): Promise<void> => {
+        const writes: Promise<void>[] = []
+        const pending = pendingSwitches.get(durableId)
+        if (pending !== undefined) {
+          const landed = switchLanded(pending)
+          if (landed || mode !== "probe") pendingSwitches.delete(durableId)
+          if (landed) {
+            const thinking = mode === "superseded" ? null : currentThinking()
+            if (thinking !== null) thinkingChanged.delete(durableId)
+            const { select } = pending
+            writes.push(store.observeModelSelect({ now: store.now(), durable_id: durableId, ...select, thinking_level: thinking, reason: pending.reason }).then(() => undefined, warnUnrecorded(`the model switch to ${select.to.provider}/${select.to.id}`)))
+          }
+        }
+        if (mode === "quiescent" && !pendingSwitches.has(durableId) && thinkingChanged.delete(durableId)) {
+          const level = currentThinking()
+          if (level !== null) writes.push(store.updateSessionThinking({ now: store.now(), durable_id: durableId, thinking_level: level }).then(() => undefined, warnUnrecorded(`the thinking level ${level}`)))
+        }
+        if (writes.length > 0) await waitAtMost(Promise.all(writes).then(() => undefined), COMPLETION_SETTLE_WAIT_MS)
+      }
+      const settleQuiescent = async (eventCtx: unknown): Promise<void> => {
+        const durableId = durableIdOf(eventCtx)
+        if (durableId === undefined || !existsSync(gatewayDatabasePath(agentDir()))) return
+        const dropping = dropRefusedHolds(durableId, eventCtx)
+        if (pendingSwitches.has(durableId) || thinkingChanged.has(durableId)) await settleSwitch(durableId, "quiescent")
+        if (dropping !== undefined) await waitAtMost(dropping, COMPLETION_SETTLE_WAIT_MS)
+      }
+      pi.on("model_select", async (event, eventCtx) => {
+        const durableId = durableIdOf(eventCtx)
+        const select = modelSelectOf(event)
+        if (durableId === undefined || select === undefined || select.source === "restore" || !existsSync(gatewayDatabasePath(agentDir()))) return
+        await settleSwitch(durableId, "superseded")
+        const entries = entryReaderOf(eventCtx)
+        if (entries === undefined) return
+        thinkingChanged.add(durableId)
+        pendingSwitches.set(durableId, { select, reason: select.source === "fallback" ? (lastProviderError ?? null) : null, entries, since: entries.getLeafId() })
+        // The engine finishes admitting the switch synchronously once the model_select handlers return.
+        setImmediate(() => void settleSwitch(durableId, "probe"))
+      })
+      pi.on("thinking_level_select", (_event, eventCtx) => {
+        const durableId = durableIdOf(eventCtx)
+        if (durableId === undefined || !existsSync(gatewayDatabasePath(agentDir()))) return
+        thinkingChanged.add(durableId)
+      })
+      pi.on("before_provider_request", async (_event, eventCtx) => {
+        await settleQuiescent(eventCtx)
       })
       pi.on("agent_end", (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) completions.agentEnd(durableId, event as AgentEndFacts)
       })
       pi.on("agent_settled", async (_event, eventCtx) => {
+        await settleQuiescent(eventCtx)
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
         run.consumed = []
@@ -328,7 +497,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
         await waitAtMost(completions.settled(durableId).then(() => undefined, () => undefined), COMPLETION_SETTLE_WAIT_MS)
       })
-      pi.on("session_shutdown", async () => {
+      pi.on("session_shutdown", async (_event, eventCtx) => {
+        await settleQuiescent(eventCtx)
         completions.dispose()
         tools.dispose()
         await registrant?.stop().catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`))

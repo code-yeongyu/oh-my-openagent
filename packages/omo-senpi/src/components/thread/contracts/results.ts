@@ -1,5 +1,6 @@
 import type { ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
+import type { ThreadModel } from "../gateway/session-models"
 
 // Discriminated result unions. The error branch is shared data, never an exception: a caller
 // that sent a malformed payload receives { kind: "error", error: { code: "invalid_arguments" } }.
@@ -22,6 +23,8 @@ export type ThreadSummary = {
   readonly surface?: "tui" | "desktop" | "child" | "daemon" | null
   /** `false` when the endpoint is not answering; the fields then come from the session file. */
   readonly alive?: boolean
+  /** #9425: the model the gateway recorded for the thread; null when it neither created nor re-modelled it. */
+  readonly model?: ThreadModel | null
 }
 
 export type ThreadDelivery =
@@ -71,6 +74,7 @@ export type ThreadReadResult =
       /** Set on the JSONL fallback for a thread whose endpoint is dead: the file may lag the session. */
       readonly source_incomplete?: boolean
       readonly error_note?: string
+      readonly model?: ThreadModel | null
     }
   | ThreadDataError
 
@@ -108,7 +112,15 @@ export type ThreadRenameResult =
   | ThreadDataError
 
 export type ThreadSetModelResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string } }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly model: { readonly provider: string; readonly id: string }
+      /** The requested model when the engine held the switch (compaction): it applies from a later turn. */
+      readonly pending?: { readonly provider: string; readonly id: string }
+      /** The requested model when another switch replaced it: it will not apply. */
+      readonly superseded?: { readonly provider: string; readonly id: string }
+    }
   | ThreadDataError
 
 export type ThreadSetReasoningResult =

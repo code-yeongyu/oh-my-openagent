@@ -20,6 +20,7 @@ import type {
   ReportOpResult,
   ToolReceiptBegin,
 } from "./store-relay-ops"
+import type { ModelRef, ObserveModelRequest, ObserveModelResult, PendingChoice, SessionModelRecord, ThreadModel } from "./session-models"
 import type { DeliveryReceipt } from "./store-ops"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
@@ -132,6 +133,24 @@ export type GatewayStore = StoreExtensionApi & {
   readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
   readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
   readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>
+  /** #9425: the gateway's own model choice for a session it created or re-modelled. */
+  readonly recordSessionModel: (request: { readonly now: number; readonly durable_id: string; readonly model: ThreadModel }) => Promise<ThreadModel>
+  /** Compare-and-swap variant (#9429 B2): writes only while the record is still at `expect_revision` (null: no record); `record` is the record after the call. */
+  readonly recordSessionModelIfCurrent: (request: { readonly now: number; readonly durable_id: string; readonly expect_revision: number | null; readonly model: ThreadModel; readonly pending?: PendingChoice }) => Promise<{ readonly applied: boolean; readonly record: SessionModelRecord | null }>
+  /** A new thinking level for a session with a model record; false when there is none. */
+  readonly updateSessionThinking: (request: { readonly now: number; readonly durable_id: string; readonly thinking_level: string }) => Promise<boolean>
+  /** A set-model's choice, noted before it asks the engine and waiting on the record until the switch lands (#9429); `previous` is the choice it replaced. */
+  readonly recordPendingSessionModel: (request: PendingChoice & { readonly now: number; readonly durable_id: string }) => Promise<{ readonly recorded: boolean; readonly previous: PendingChoice | null }>
+  /** Replaces that choice with `next` (null clears it) only while the record still holds `expect`. */
+  readonly replacePendingSessionModel: (request: { readonly durable_id: string; readonly expect: PendingChoice; readonly next: PendingChoice | null }) => Promise<boolean>
+  /** The engine ended a hold with no switch landing (refused at apply time, or the session started again): drops a choice noted before `before`. */
+  readonly dropHeldChoice: (request: { readonly durable_id: string; readonly before: number; readonly model?: ModelRef }) => Promise<boolean>
+  /** The session's own `model_select`: keeps its record true and writes a fallback switch's milestone rows. */
+  readonly observeModelSelect: (request: ObserveModelRequest) => Promise<ObserveModelResult>
+  /** The model records of these sessions that exist, keyed by durable id; a plain read that takes no write lock. */
+  readonly sessionModels: (durableIds: readonly string[]) => Promise<Readonly<Record<string, ThreadModel>>>
+  /** One session's model record with its revision, null when it has none; a plain read that takes no write lock. */
+  readonly sessionModelRecord: (durableId: string) => Promise<SessionModelRecord | null>
   /** The session closed a relayed question itself (answered locally, timed out, cancelled); the questions closed. */
   readonly closeQuestion: (request: { readonly now: number; readonly session_durable_id: string; readonly ui_request_id: string }) => Promise<number>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
@@ -420,6 +439,15 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     releaseAnswer: (request) => call("release_answer", request),
     confirmAnswer: (request) => call("confirm_answer", request),
     markPriorDelivered: (request) => call("mark_prior_delivered", request),
+    recordSessionModel: (request) => call("record_session_model", request),
+    recordSessionModelIfCurrent: (request) => call("record_session_model_if_current", request),
+    updateSessionThinking: (request) => call("update_session_thinking", request),
+    recordPendingSessionModel: (request) => call("record_pending_session_model", request),
+    replacePendingSessionModel: (request) => call("replace_pending_session_model", request),
+    dropHeldChoice: (request) => call("drop_held_choice", request),
+    observeModelSelect: (request) => call("observe_model_select", request),
+    sessionModels: (durableIds) => call("session_models", durableIds),
+    sessionModelRecord: (durableId) => call("session_model_record", durableId),
     closeQuestion: (request) => call("close_question", request),
     onEvent: (listener) => {
       listeners.add(listener)
