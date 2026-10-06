@@ -32,6 +32,7 @@ interface Notice {
 interface Harness {
   pi: FakeExtensionAPI
   notices: Notice[]
+  errors: LoggedError[]
   setPercent(percent: number | null): void
   setCompacting(compacting: boolean): void
   advance(ms: number): void
@@ -56,9 +57,19 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
-function componentContext(): ComponentContext {
+interface LoggedError {
+  message: string
+  meta?: Record<string, unknown>
+}
+
+function componentContext(errors: LoggedError[] = []): ComponentContext {
   return {
-    logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
+    logger: {
+      info: () => {},
+      warn: () => {},
+      error: (message: string, meta?: Record<string, unknown>) => errors.push({ message, meta }),
+      debug: () => {},
+    },
     config: { getFlag: () => undefined },
   }
 }
@@ -78,6 +89,7 @@ async function createHarness(settings: ContextHandoffSettings, entries: readonly
   const pi = new FakeExtensionAPI()
   pi.cwd = cwd
   const notices: Notice[] = []
+  const errors: LoggedError[] = []
   let percent: number | null = 40
   let compacting = false
   let nowMs = 1_000_000
@@ -88,10 +100,11 @@ async function createHarness(settings: ContextHandoffSettings, entries: readonly
     isCompacting: () => compacting,
     ui: { notify: (message: string, level?: string) => notices.push({ message, level }) },
   }
-  await createContextHandoffComponent({ loadSettings: () => settings, now: () => nowMs }).register(pi, componentContext())
+  await createContextHandoffComponent({ loadSettings: () => settings, now: () => nowMs }).register(pi, componentContext(errors))
   return {
     pi,
     notices,
+    errors,
     setPercent: (next) => {
       percent = next
     },
@@ -460,22 +473,42 @@ describe("context-handoff switch", () => {
     }
   })
 
-  it("#given .omo or .omo/handoffs is a symlink #when the flow runs #then nothing is written outside the project and no switch happens", async () => {
+  it("#given .omo or .omo/handoffs becomes a symlink #when omo writes its fallback handoff #then the write is refused as a symlink and nothing lands outside the project", async () => {
     for (const linked of [".omo", join(".omo", "handoffs")]) {
-      rmSync(join(cwd, ".omo"), { recursive: true, force: true })
-      const outside = mkdtempSync(join(root, "outside-"))
-      mkdirSync(dirname(join(cwd, linked)), { recursive: true })
-      linkDir(outside, join(cwd, linked))
-      const harness = await createHarness(ENABLED)
+      for (const linkedWhen of ["before the request", "after the request"] as const) {
+        rmSync(join(cwd, ".omo"), { recursive: true, force: true })
+        const outside = mkdtempSync(join(root, "outside-"))
+        const linkPath = join(cwd, linked)
+        const link = (): void => {
+          rmSync(linkPath, { recursive: true, force: true })
+          mkdirSync(dirname(linkPath), { recursive: true })
+          linkDir(outside, linkPath)
+        }
+        if (linkedWhen === "before the request") link()
+        const harness = await createHarness(ENABLED)
 
-      await harness.compactionFailed()
-      for (let run = 0; run < 5; run += 1) await harness.settle()
+        // Same runs as the wait-runs-out test: the request, then enough settles for omo's own fallback write.
+        await harness.compactionFailed()
+        await harness.settle()
+        if (linkedWhen === "after the request") link()
+        for (let run = 0; run < 5; run += 1) await harness.settle()
 
-      expect({ linked, outside: readdirSync(outside), switched: harness.pi.userMessages.length }).toEqual({
-        linked,
-        outside: [],
-        switched: 0,
-      })
+        expect({
+          linked,
+          linkedWhen,
+          requests: handoffRequests(harness.pi).length,
+          outside: readdirSync(outside),
+          switched: harness.pi.userMessages.length,
+          refusals: harness.errors.map((logged) => logged.meta?.["error"]),
+        }).toEqual({
+          linked,
+          linkedWhen,
+          requests: linkedWhen === "after the request" ? 1 : 0,
+          outside: [],
+          switched: 0,
+          refusals: [`${linkPath} is a symlink`],
+        })
+      }
     }
   })
 
@@ -513,6 +546,8 @@ describe("context-handoff switch", () => {
   it("#given a path outside .omo/handoffs #when the command runs #then it is refused and no fresh session starts", async () => {
     writeFileSync(join(root, "outside.md"), "# outside\n")
     writeFileSync(join(cwd, "project-root.md"), "# project root\n")
+    // A real handoff directory, so only the path confinement can refuse these reads.
+    writeHandoff("# Handoff\n- item\n")
     const harness = await createHarness(ENABLED)
 
     for (const requested of ["../outside.md", join(root, "outside.md"), "project-root.md", ".omo/handoffs/../../project-root.md"]) {
