@@ -37,11 +37,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "max",
     },
     {
-      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-opus-5",
-      variant: "max",
-    },
-    {
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: "kimi-k3",
       variant: "max",
@@ -92,11 +87,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5-5",
-      variant: "max",
-    },
-    {
-      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-opus-5",
       variant: "max",
     },
     {
@@ -160,11 +150,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "claude-opus-5-5",
       variant: "medium",
     },
-    {
-      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-opus-5",
-      variant: "max",
-    },
     { providers: ["zai", "zai-coding-cn", "opencode-go"], model: "glm-5.3", variant: "max" },
     {
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
@@ -176,11 +161,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5-5",
-      variant: "low",
-    },
-    {
-      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-opus-5",
       variant: "low",
     },
     {

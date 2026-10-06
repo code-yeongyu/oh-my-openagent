@@ -9,11 +9,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "bailian-coding-plan", "moonshotai-cn", "firmware", "ollama-cloud", "aihubmix"],
         model: "kimi-k3",
       },
@@ -55,11 +50,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "max",
-      },
-      {
-        providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5",
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5.3" }
@@ -106,11 +96,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
         model: "kimi-k3",
         variant: "max",
@@ -130,11 +115,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
         model: "kimi-k3",
         variant: "max",
@@ -149,11 +129,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "max",
-      },
-      {
-        providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5",
         variant: "max",
       },
       {

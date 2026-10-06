@@ -33,8 +33,8 @@ describe("AGENT_FALLBACK_CHAINS", () => {
     expect(lengths).toEqual({
       explore: 6,
       librarian: 6,
-      "plan-consultant": 4,
-      "plan-reviewer": 7,
+      "plan-consultant": 3,
+      "plan-reviewer": 6,
     })
   })
 
@@ -59,7 +59,6 @@ describe("AGENT_FALLBACK_CHAINS", () => {
       "plan-consultant": [
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
-        { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
         { providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"], model: "kimi-k3", variant: "max" }
       ],
       "plan-reviewer": [
@@ -67,7 +66,6 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
         { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6-astra", variant: "high" },
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
-        { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
         { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
         { providers: ["opencode-go"], model: "glm-5.3" }
       ]

@@ -23,11 +23,6 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
@@ -180,11 +175,6 @@ describe("category routing policy", () => {
         variant: "medium",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["zai-coding-plan", "opencode-go"],
         model: "glm-5.3",
         variant: "max",
@@ -207,11 +197,6 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
@@ -221,11 +206,6 @@ describe("category routing policy", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "low",
-      },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
         variant: "low",
       },
       {

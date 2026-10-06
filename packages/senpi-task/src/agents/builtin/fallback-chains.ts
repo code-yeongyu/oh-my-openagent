@@ -42,11 +42,6 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       variant: "max",
     },
     {
-      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
-      model: "claude-opus-5",
-      variant: "max",
-    },
-    {
       providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
       model: "kimi-k3",
       variant: "max",
@@ -59,11 +54,6 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
       model: "claude-opus-5-5",
-      variant: "max",
-    },
-    {
-      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
-      model: "claude-opus-5",
       variant: "max",
     },
     {

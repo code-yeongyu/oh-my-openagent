@@ -9,24 +9,6 @@ import { resolveModelWithFallback } from "./model-resolver"
 // from `omo --offline --list-models` on 2026-09-23 (see the evidence report).
 // Resolution must choose those models rather than silently reaching system/default.
 describe("current catalog requirement chains", () => {
-  test("preserves an Opus 5 fallback when Copilot has no Opus 5.5", () => {
-    // given
-    const availableModels = new Set(["github-copilot/claude-opus-5"])
-
-    // when
-    const result = resolveModelWithFallback({
-      fallbackChain: CATEGORY_MODEL_REQUIREMENTS["unspecified-high"].fallbackChain,
-      availableModels,
-      systemDefaultModel: "system/default",
-    })
-
-    // then
-    expect(result).toMatchObject({
-      model: "github-copilot/claude-opus-5",
-      variant: "max",
-    })
-  })
-
   test("prefers Opus 5.5 when both generations are available", () => {
     // given
     const availableModels = new Set([

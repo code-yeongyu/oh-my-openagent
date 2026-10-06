@@ -81,7 +81,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("visual-engineering follows the approved 4-rung chain", () => {
+  test("visual-engineering follows the approved 3-rung chain", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -98,11 +98,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "max",
-      },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -213,7 +208,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("unspecified-high follows the approved Opus-first 4-rung chain", () => {
+  test("unspecified-high follows the approved Opus-first 3-rung chain", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
@@ -228,11 +223,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "medium",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["zai-coding-plan", "opencode-go"],
         model: "glm-5.3",
         variant: "max",
@@ -245,7 +235,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("artistry follows the approved 4-rung chain", () => {
+  test("artistry follows the approved 3-rung chain", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["artistry"]
 
@@ -265,11 +255,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
         providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
@@ -277,7 +262,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("writing leads with claude-opus-5-5 low on Anthropic and no longer carries claude-fable-5-1", () => {
+  test("writing leads with claude-opus-5-5 low and no longer carries claude-fable-5-1", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
@@ -290,11 +275,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "low",
-      },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
         variant: "low",
       },
       {
