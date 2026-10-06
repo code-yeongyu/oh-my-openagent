@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { FakeExtensionAPI, dispatchRunEnd } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
@@ -10,9 +10,10 @@ import {
   CONTEXT_HANDOFF_REQUEST_TYPE,
   createContextHandoffComponent,
   handoffPathFor,
+  MAX_CHAINED_HANDOFFS,
   type ContextHandoffSettings,
 } from "./index"
-import { SEED_OPEN_TAG } from "./prompts"
+import { SEED_GENERATION_PREFIX, SEED_OPEN_TAG } from "./prompts"
 
 const SESSION_ID = "01a10eeb-ca5e-7285-ace9-881289b59ce2"
 const FINISHED_RUN = { messages: [{ role: "assistant", stopReason: "stop", content: [{ type: "text", text: "done" }] }] }
@@ -132,10 +133,10 @@ interface FreshSessionCapture {
 
 const emptyCapture = (): FreshSessionCapture => ({ newSessionOptions: [], seeds: [], freshNotices: [] })
 
-function commandContext(capture: FreshSessionCapture): Record<string, unknown> {
+function commandContext(capture: FreshSessionCapture, entries: readonly unknown[] = []): Record<string, unknown> {
   return {
     cwd,
-    sessionManager: sessionManager(),
+    sessionManager: sessionManager(entries),
     ui: { notify: () => {} },
     waitForIdle: async () => {},
     newSession: async (options: Record<string, unknown>) => {
@@ -159,16 +160,33 @@ async function runCommand(pi: FakeExtensionAPI, args: string, commandCtx: unknow
   await handler(args, commandCtx)
 }
 
-describe("context-handoff trigger", () => {
-  it("#given the feature is disabled #when compaction fails #then nothing is sent or shown", async () => {
-    const harness = await createHarness({ ...ENABLED, enabled: false })
+// Symlinks to directories use junctions on Windows, which need no developer mode; POSIX ignores the type.
+function linkDir(target: string, path: string): void {
+  symlinkSync(target, path, "junction")
+}
 
-    await harness.compactionFailed()
-    await harness.settle()
+function seedEntries(generation: number): unknown[] {
+  return [
+    {
+      type: "message",
+      message: { role: "user", content: [{ type: "text", text: `${SEED_OPEN_TAG}\n${SEED_GENERATION_PREFIX}${generation}\nhandoff body` }] },
+    },
+  ]
+}
 
-    expect(harness.pi.messages).toHaveLength(0)
-    expect(harness.notices).toHaveLength(0)
+describe("context-handoff registration", () => {
+  it("#given context_handoff is off #when the component registers #then no hook and no command are registered", async () => {
+    const pi = new FakeExtensionAPI()
+    pi.cwd = cwd
+
+    await createContextHandoffComponent({ loadSettings: () => ({ ...ENABLED, enabled: false }) }).register(pi, componentContext())
+
+    expect(pi.handlers.map((handler) => handler.event)).toEqual([])
+    expect(pi.commands.map((command) => command.name)).toEqual([])
   })
+})
+
+describe("context-handoff trigger", () => {
 
   it("#given high usage but healthy compaction #when compaction brings usage down #then no handoff is requested", async () => {
     const harness = await createHarness(ENABLED)
@@ -269,6 +287,54 @@ describe("context-handoff trigger", () => {
     expect(handoffRequests(harness.pi)).toHaveLength(1)
   })
 
+  it("#given a context-overflow error that senpi will retry #when the run settles #then no handoff is requested", async () => {
+    const harness = await createHarness(ENABLED)
+
+    await harness.settle({ ...errorRun("prompt is too long: 1050000 tokens > 1000000 maximum"), willRetry: true })
+
+    expect(handoffRequests(harness.pi)).toHaveLength(0)
+  })
+
+  it("#given a compaction failure #when a later compaction brings usage under the limit #then no handoff is requested", async () => {
+    const harness = await createHarness(ENABLED)
+
+    await harness.compactionFailed()
+    await harness.compacted(20)
+    await harness.settle()
+    await harness.settle()
+
+    expect(handoffRequests(harness.pi)).toHaveLength(0)
+    expect(harness.notices).toHaveLength(0)
+  })
+
+  it("#given a requested handoff #when a later compaction brings usage under the limit #then the handoff is cancelled", async () => {
+    const harness = await createHarness(ENABLED)
+    await harness.compactionFailed()
+    await harness.settle()
+    expect(handoffRequests(harness.pi)).toHaveLength(1)
+
+    await harness.compacted(20)
+    for (let run = 0; run < 4; run += 1) await harness.settle()
+
+    expect(harness.pi.userMessages).toHaveLength(0)
+    expect(existsSync(handoffPathFor(cwd, SESSION_ID))).toBe(false)
+  })
+
+  it("#given a session at the chained handoff limit #when compaction fails #then it does not hand off again", async () => {
+    for (const [generation, expected] of [
+      [MAX_CHAINED_HANDOFFS - 1, 1],
+      [MAX_CHAINED_HANDOFFS, 0],
+    ] as const) {
+      const harness = await createHarness(ENABLED, seedEntries(generation))
+      await harness.settle()
+
+      await harness.compactionFailed()
+      await harness.settle()
+
+      expect({ generation, requests: handoffRequests(harness.pi).length }).toEqual({ generation, requests: expected })
+    }
+  })
+
   it("#given a run that ends in an unrelated provider error #when it settles #then no handoff is requested", async () => {
     const harness = await createHarness(ENABLED)
 
@@ -364,6 +430,98 @@ describe("context-handoff switch", () => {
     expect(handoffRequests(harness.pi)).toHaveLength(1)
   })
 
+  it("#given a handoff was requested #when the user aborts the next run #then the pending handoff is dropped", async () => {
+    const harness = await createHarness(ENABLED)
+    await harness.compactionFailed()
+    await harness.settle()
+
+    await harness.settle(ABORTED_RUN)
+    for (let run = 0; run < 4; run += 1) await harness.settle()
+
+    expect(harness.pi.userMessages).toHaveLength(0)
+    expect(existsSync(handoffPathFor(cwd, SESSION_ID))).toBe(false)
+  })
+
+  it("#given a handoff file older than the request #when runs settle #then it is not taken as the new handoff", async () => {
+    const harness = await createHarness(ENABLED)
+    const handoffPath = writeHandoff("# stale handoff from an earlier switch\n")
+    utimesSync(handoffPath, 0, 0)
+    await harness.compactionFailed()
+    await harness.settle()
+
+    await harness.settle()
+
+    expect(harness.pi.userMessages).toHaveLength(0)
+  })
+
+  it("#given a session id with path separators #when the handoff path is built #then it stays inside .omo/handoffs", () => {
+    for (const sessionId of ["../../outside", "..\\..\\outside", "/etc/passwd"]) {
+      expect(dirname(handoffPathFor(cwd, sessionId))).toBe(join(cwd, ".omo", "handoffs"))
+    }
+  })
+
+  it("#given .omo or .omo/handoffs is a symlink #when the flow runs #then nothing is written outside the project and no switch happens", async () => {
+    for (const linked of [".omo", join(".omo", "handoffs")]) {
+      rmSync(join(cwd, ".omo"), { recursive: true, force: true })
+      const outside = mkdtempSync(join(root, "outside-"))
+      mkdirSync(dirname(join(cwd, linked)), { recursive: true })
+      linkDir(outside, join(cwd, linked))
+      const harness = await createHarness(ENABLED)
+
+      await harness.compactionFailed()
+      for (let run = 0; run < 5; run += 1) await harness.settle()
+
+      expect({ linked, outside: readdirSync(outside), switched: harness.pi.userMessages.length }).toEqual({
+        linked,
+        outside: [],
+        switched: 0,
+      })
+    }
+  })
+
+  it("#given the handoff file is a symlink #when the wait runs out #then the link target is untouched and the handoff is a regular file", async () => {
+    const secret = join(root, "secret.md")
+    writeFileSync(secret, "SECRET-OUTSIDE")
+    mkdirSync(join(cwd, ".omo", "handoffs"), { recursive: true })
+    const handoffPath = handoffPathFor(cwd, SESSION_ID)
+    symlinkSync(secret, handoffPath, "file")
+    const harness = await createHarness(ENABLED)
+
+    await harness.compactionFailed()
+    for (let run = 0; run < 5; run += 1) await harness.settle()
+
+    expect(readFileSync(secret, "utf8")).toBe("SECRET-OUTSIDE")
+    expect(lstatSync(handoffPath).isSymbolicLink()).toBe(false)
+    expect(readFileSync(handoffPath, "utf8")).not.toContain("SECRET-OUTSIDE")
+  })
+
+  it("#given a symlinked handoff file #when the command runs on it #then the target is not read and no fresh session starts", async () => {
+    const secret = join(root, "secret.md")
+    writeFileSync(secret, "SECRET-OUTSIDE")
+    mkdirSync(join(cwd, ".omo", "handoffs"), { recursive: true })
+    const handoffPath = handoffPathFor(cwd, SESSION_ID)
+    symlinkSync(secret, handoffPath, "file")
+    const harness = await createHarness(ENABLED)
+    const capture = emptyCapture()
+
+    await runCommand(harness.pi, handoffPath, commandContext(capture))
+
+    expect(capture.newSessionOptions).toHaveLength(0)
+    expect(capture.seeds).toHaveLength(0)
+  })
+
+  it("#given a path outside .omo/handoffs #when the command runs #then it is refused and no fresh session starts", async () => {
+    writeFileSync(join(root, "outside.md"), "# outside\n")
+    writeFileSync(join(cwd, "project-root.md"), "# project root\n")
+    const harness = await createHarness(ENABLED)
+
+    for (const requested of ["../outside.md", join(root, "outside.md"), "project-root.md", ".omo/handoffs/../../project-root.md"]) {
+      const capture = emptyCapture()
+      await runCommand(harness.pi, requested, commandContext(capture))
+      expect({ requested, started: capture.newSessionOptions.length }).toEqual({ requested, started: 0 })
+    }
+  })
+
   it("#given the command names a missing file #when it runs #then no fresh session starts", async () => {
     const harness = await createHarness(ENABLED)
     const capture = emptyCapture()
@@ -414,12 +572,22 @@ describe("context-handoff carry-over", () => {
       join(sessionDir, "extensions", "goal", `${SESSION_ID}.json`),
       JSON.stringify({ version: 1, goal: { objective: "Old finished goal", status: "complete" } }),
     )
-    writeFileSync(join(cwd, "handoff.md"), "# Handoff\n- item\n")
+    writeHandoff("# Handoff\n- item\n")
     const capture = emptyCapture()
 
-    await runCommand(harness.pi, "handoff.md", commandContext(capture))
+    await runCommand(harness.pi, join(".omo", "handoffs", `${SESSION_ID}.md`), commandContext(capture))
 
     expect(capture.seeds[0]).toContain("- item")
     expect(capture.seeds[0]).not.toContain("Old finished goal")
+  })
+
+  it("#given a session seeded by a handoff #when it hands off again #then the fresh seed counts one more chained handoff", async () => {
+    const harness = await createHarness(ENABLED)
+    writeHandoff("# Handoff\n- item\n")
+    const capture = emptyCapture()
+
+    await runCommand(harness.pi, "", commandContext(capture, seedEntries(2)))
+
+    expect(capture.seeds[0]?.split("\n")[1]).toBe(`${SEED_GENERATION_PREFIX}3`)
   })
 })

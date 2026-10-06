@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { basename, dirname, join, resolve } from "node:path"
 
 import { resolveOmoContextHandoffSettings } from "@oh-my-opencode/omo-config-core"
 
@@ -11,6 +11,7 @@ import {
   buildFreshSessionSeed,
   buildHandoffRequest,
   CONTEXT_HANDOFF_REQUEST_OPEN_TAG,
+  SEED_GENERATION_PREFIX,
   SEED_OPEN_TAG,
   type CompactionFailure,
 } from "./prompts"
@@ -21,6 +22,12 @@ const HANDOFF_DIR = join(".omo", "handoffs")
 // Settled runs to wait for the handoff file after asking for it; a goal or ulw continuation may
 // take a run of its own before the agent gets to the request.
 const HANDOFF_WAIT_RUNS = 3
+// A session seeded by this many chained handoffs no longer hands off on its own, so a session that
+// fails again right after every switch cannot replace itself forever.
+export const MAX_CHAINED_HANDOFFS = 3
+// Opening with O_NOFOLLOW fails when the last path component is a symlink. Windows has no such flag;
+// the lstat check right before opening is the guard there.
+const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0
 
 // Provider wording for a request rejected because the prompt no longer fits the model's window.
 const CONTEXT_OVERFLOW_PATTERN =
@@ -47,7 +54,8 @@ type Phase = "watching" | "requested" | "switching" | "finished"
 interface SessionState {
   phase: Phase
   lastRun: unknown
-  seeded?: boolean
+  generation?: number
+  chainCapNotified?: boolean
   sawBelowThreshold: boolean
   pendingFailure?: CompactionFailure
   failure?: CompactionFailure
@@ -64,6 +72,7 @@ interface NotifyUi {
 
 interface SessionManagerLike {
   getSessionId(): string
+  getEntries?(): unknown
   getSessionFile?(): string | undefined
   getSessionDir?(): string
 }
@@ -108,6 +117,9 @@ export function createContextHandoffComponent(options: ContextHandoffComponentOp
         return settings
       }
 
+      // OFF means nothing is registered: no event hook and no command.
+      if (!settingsFor(pi.cwd ?? process.cwd()).enabled) return
+
       const stateFor = (sessionId: string): SessionState => {
         let state = sessions.get(sessionId)
         if (state === undefined) {
@@ -128,6 +140,17 @@ export function createContextHandoffComponent(options: ContextHandoffComponentOp
         if (state.phase !== "watching" || state.pendingFailure !== undefined) return
         state.pendingFailure = failure
         ctx.logger.info("omo-senpi context-handoff compaction failure observed", { sessionId, ...failure })
+      }
+
+      const cancelPending = (state: SessionState): void => {
+        state.phase = "watching"
+        state.pendingFailure = undefined
+        state.failure = undefined
+        state.handoffPath = undefined
+        state.requestedAtMs = undefined
+        state.requestRunError = undefined
+        state.waitedRuns = 0
+        state.compactionTimesMs = []
       }
 
       pi.on("session_compact_failed", (payload, eventCtx) => {
@@ -161,6 +184,18 @@ export function createContextHandoffComponent(options: ContextHandoffComponentOp
         if (percent === null) return
         if (percent < settings.thresholdPercent) {
           state.sawBelowThreshold = true
+          // senpi recovered on its own: a failure recorded earlier no longer warrants a fresh session.
+          if (state.pendingFailure !== undefined || state.phase === "requested") {
+            ctx.logger.info("omo-senpi context-handoff cleared: a later compaction brought usage under the limit", {
+              sessionId: sessionIdOf(eventCtx),
+              percent,
+              failure: state.pendingFailure ?? state.failure,
+            })
+            if (state.phase === "requested") {
+              uiOf(eventCtx)?.notify("Context compaction recovered; the pending handoff was cancelled and this session continues.", "info")
+            }
+            cancelPending(state)
+          }
           return
         }
         noteFailure(state, {
@@ -201,9 +236,28 @@ export function createContextHandoffComponent(options: ContextHandoffComponentOp
           if (readAgentEndOutcome(run).aborted) return
           if (isCompacting(eventCtx)) return
           state.pendingFailure = undefined
-          state.seeded ??= isSeededSession(eventCtx)
-          if (state.seeded && !state.sawBelowThreshold) {
+          state.generation ??= seedGenerationOf(eventCtx)
+          if (state.generation >= MAX_CHAINED_HANDOFFS) {
+            ctx.logger.warn("omo-senpi context-handoff skipped: chained handoff limit reached", { sessionId, generation: state.generation, ...failure })
+            if (state.chainCapNotified !== true) {
+              state.chainCapNotified = true
+              uiOf(eventCtx)?.notify(
+                `Context compaction failed (${failure.detail}), but this session already continues ${state.generation} chained handoffs; omo will not start another. Run /${CONTEXT_HANDOFF_COMMAND} yourself to switch anyway.`,
+                "warning",
+              )
+            }
+            return
+          }
+          if (state.generation > 0 && !state.sawBelowThreshold) {
             ctx.logger.info("omo-senpi context-handoff skipped: seeded session never dropped below threshold", { sessionId, ...failure })
+            return
+          }
+          try {
+            ensureHandoffDir(cwd, true)
+          } catch (error) {
+            state.phase = "finished"
+            ctx.logger.error("omo-senpi context-handoff refused: unsafe handoff directory", { sessionId, error: errorMessage(error) })
+            uiOf(eventCtx)?.notify(`Context compaction failed, but no handoff was requested: ${errorMessage(error)}`, "error")
             return
           }
           const handoffPath = handoffPathFor(cwd, sessionId)
@@ -230,10 +284,20 @@ export function createContextHandoffComponent(options: ContextHandoffComponentOp
         }
 
         if (state.phase !== "requested" || state.handoffPath === undefined) return
-        if (!handoffWritten(state.handoffPath, state.requestedAtMs ?? 0)) {
+        if (readAgentEndOutcome(run).aborted) {
+          ctx.logger.info("omo-senpi context-handoff cancelled: the user aborted the run", { sessionId, handoffPath: state.handoffPath })
+          cancelPending(state)
+          uiOf(eventCtx)?.notify("Context handoff cancelled because the run was aborted; staying in this session.", "info")
+          return
+        }
+        if (!handoffWritten(cwd, state.handoffPath, state.requestedAtMs ?? 0)) {
           state.waitedRuns += 1
           if (state.requestRunError === undefined && state.waitedRuns < HANDOFF_WAIT_RUNS) return
-          writeFallbackHandoff(state.handoffPath, eventCtx, state, ctx)
+          if (!writeFallbackHandoff(cwd, state.handoffPath, eventCtx, state, ctx)) {
+            state.phase = "finished"
+            uiOf(eventCtx)?.notify(`omo could not write a handoff to ${state.handoffPath}; staying in this session.`, "error")
+            return
+          }
           uiOf(eventCtx)?.notify(
             `The agent could not write a handoff${state.requestRunError === undefined ? "" : ` (${state.requestRunError})`}; omo wrote one from the session record to ${state.handoffPath}.`,
             "warning",
@@ -274,10 +338,14 @@ async function continueInFreshSession(
     commandCtx.ui?.notify(`Usage: /${CONTEXT_HANDOFF_COMMAND} <handoff-file>`, "error")
     return
   }
-  const handoffPath = requested === "" ? handoffPathFor(cwd, sessionId as string) : resolve(cwd, requested)
+  const handoffPath = requested === "" ? handoffPathFor(cwd, sessionId as string) : confinedHandoffPath(cwd, requested)
+  if (handoffPath === undefined) {
+    commandCtx.ui?.notify(`Handoff files must be directly inside ${resolve(cwd, HANDOFF_DIR)}; refused ${requested}.`, "error")
+    return
+  }
   let handoff: string
   try {
-    handoff = readFileSync(handoffPath, "utf8")
+    handoff = readHandoffFile(cwd, handoffPath)
   } catch (error) {
     commandCtx.ui?.notify(`Cannot read handoff ${handoffPath}: ${errorMessage(error)}`, "error")
     if (sessionId !== undefined) markFinished(sessions, sessionId)
@@ -296,6 +364,7 @@ async function continueInFreshSession(
     previousSessionFile,
     failure: sessionId === undefined ? undefined : sessions.get(sessionId)?.failure,
     goalObjective: sessionManager === undefined ? undefined : readOpenGoalObjective(sessionManager),
+    generation: seedGenerationOf({ sessionManager }) + 1,
   })
   await commandCtx.waitForIdle?.()
   ctx.logger.info("omo-senpi context-handoff starting fresh session", { sessionId, handoffPath })
@@ -312,7 +381,7 @@ async function continueInFreshSession(
   if (result.cancelled) commandCtx.ui?.notify("Fresh session was cancelled; staying in this session.", "warning")
 }
 
-function writeFallbackHandoff(path: string, eventCtx: unknown, state: SessionState, ctx: ComponentContext): void {
+function writeFallbackHandoff(cwd: string, path: string, eventCtx: unknown, state: SessionState, ctx: ComponentContext): boolean {
   const sessionManager = isRecord(eventCtx) && isRecord(eventCtx["sessionManager"]) ? eventCtx["sessionManager"] : undefined
   const getSessionFile = sessionManager?.["getSessionFile"]
   const sessionFile: unknown = typeof getSessionFile === "function" ? getSessionFile.call(sessionManager) : undefined
@@ -323,10 +392,64 @@ function writeFallbackHandoff(path: string, eventCtx: unknown, state: SessionSta
     recentUserMessages: recentUserMessages(eventCtx),
   })
   try {
-    mkdirSync(dirname(path), { recursive: true })
-    writeFileSync(path, content)
+    writeHandoffFile(cwd, path, content)
+    return true
   } catch (error) {
     ctx.logger.error("omo-senpi context-handoff fallback handoff write failed", { path, error: errorMessage(error) })
+    return false
+  }
+}
+
+// Walks <cwd>/.omo/handoffs one component at a time, creating missing directories when asked, and
+// refuses any component that is a symlink or not a directory, so a handoff is never read from or
+// written to a place outside the project.
+function ensureHandoffDir(cwd: string, create: boolean): string {
+  let current = resolve(cwd)
+  for (const part of [".omo", "handoffs"]) {
+    current = join(current, part)
+    let stats
+    try {
+      stats = lstatSync(current)
+    } catch (error) {
+      if (!create || errorCode(error) !== "ENOENT") throw error
+      mkdirSync(current)
+      continue
+    }
+    if (stats.isSymbolicLink()) throw new Error(`${current} is a symlink`)
+    if (!stats.isDirectory()) throw new Error(`${current} is not a directory`)
+  }
+  return current
+}
+
+// Only a file directly inside <cwd>/.omo/handoffs is accepted; `..` and absolute paths elsewhere are not.
+function confinedHandoffPath(cwd: string, requested: string): string | undefined {
+  const path = resolve(cwd, requested)
+  return dirname(path) === resolve(cwd, HANDOFF_DIR) ? path : undefined
+}
+
+function readHandoffFile(cwd: string, path: string): string {
+  ensureHandoffDir(cwd, false)
+  if (lstatSync(path).isSymbolicLink()) throw new Error(`${path} is a symlink`)
+  const fd = openSync(path, constants.O_RDONLY | O_NOFOLLOW)
+  try {
+    if (!fstatSync(fd).isFile()) throw new Error(`${path} is not a regular file`)
+    return readFileSync(fd, "utf8")
+  } finally {
+    closeSync(fd)
+  }
+}
+
+// Written to a fresh temp file (`wx` fails if anything already sits there) and renamed over the target;
+// rename replaces a symlink at the target instead of following it.
+function writeHandoffFile(cwd: string, path: string, content: string): void {
+  const dir = ensureHandoffDir(cwd, true)
+  const temp = join(dir, `.${basename(path)}.${process.pid}.${Date.now()}.tmp`)
+  writeFileSync(temp, content, { flag: "wx" })
+  try {
+    renameSync(temp, path)
+  } catch (error) {
+    rmSync(temp, { force: true })
+    throw error
   }
 }
 
@@ -395,29 +518,35 @@ export function handoffPathFor(cwd: string, sessionId: string): string {
   return join(cwd, HANDOFF_DIR, `${sessionId.replace(/[^A-Za-z0-9._-]+/g, "-")}.md`)
 }
 
-function handoffWritten(path: string, sinceMs: number): boolean {
+function handoffWritten(cwd: string, path: string, sinceMs: number): boolean {
   try {
-    const stats = statSync(path)
+    ensureHandoffDir(cwd, false)
+    const stats = lstatSync(path)
     return stats.isFile() && stats.size > 0 && stats.mtimeMs >= sinceMs - 1000
   } catch {
     return false
   }
 }
 
+// How many chained handoffs produced this session: 0 when its first user message is not a handoff seed.
 // A fresh session that starts at or above the threshold (an oversized handoff, a very low threshold)
 // would otherwise hand off again on its first run and loop.
-function isSeededSession(eventCtx: unknown): boolean {
-  if (!isRecord(eventCtx) || !isRecord(eventCtx["sessionManager"])) return false
+function seedGenerationOf(eventCtx: unknown): number {
+  if (!isRecord(eventCtx) || !isRecord(eventCtx["sessionManager"])) return 0
   const getEntries = eventCtx["sessionManager"]["getEntries"]
-  if (typeof getEntries !== "function") return false
+  if (typeof getEntries !== "function") return 0
   const entries: unknown = getEntries.call(eventCtx["sessionManager"])
-  if (!Array.isArray(entries)) return false
+  if (!Array.isArray(entries)) return 0
   for (const entry of entries) {
     if (!isRecord(entry) || entry["type"] !== "message" || !isRecord(entry["message"])) continue
     if (entry["message"]["role"] !== "user") continue
-    return messageText(entry["message"]["content"]).trimStart().startsWith(SEED_OPEN_TAG)
+    const text = messageText(entry["message"]["content"]).trimStart()
+    if (!text.startsWith(SEED_OPEN_TAG)) return 0
+    const line = text.split("\n").find((candidate) => candidate.startsWith(SEED_GENERATION_PREFIX))
+    const generation = line === undefined ? Number.NaN : Number(line.slice(SEED_GENERATION_PREFIX.length))
+    return Number.isInteger(generation) && generation > 0 ? generation : 1
   }
-  return false
+  return 0
 }
 
 function messageText(content: unknown): string {
@@ -452,6 +581,10 @@ function uiOf(eventCtx: unknown): NotifyUi | undefined {
   if (!isRecord(eventCtx) || !isRecord(eventCtx["ui"])) return undefined
   const ui = eventCtx["ui"]
   return typeof ui["notify"] === "function" ? (ui as unknown as NotifyUi) : undefined
+}
+
+function errorCode(error: unknown): unknown {
+  return isRecord(error) ? error["code"] : undefined
 }
 
 function errorMessage(error: unknown): string {
