@@ -160,11 +160,14 @@ and harness-block schemas so a config carrying it loads without an unknown-key d
 
 ## 2026-10-01 - `omo update` on npm 11+ explains the allowScripts notice and never passes `--allow-scripts` (#9281)
 
-npm 11+ ends a global install with a notice that esbuild, @google/genai and protobufjs have install scripts not covered by
-`allowScripts` (npm 12 blocks them, npm 11 runs them), and its suggested command fails because it has no package name. Those scripts are safe to skip, so the
-update argv stays `npm i -g <spec>` on every npm version and never passes `--allow-scripts`. `runChild` gained an optional
-`onOutput` observer (output still passes through unchanged); an npm update that showed the notice now prints that skipping
-the three scripts is safe and the working reinstall command with the package spec. The bun path is untouched.
+npm 11+ ends a global install with a notice that some packages have install scripts not covered by `allowScripts` (npm 12
+blocks them, npm 11 runs them), and its suggested command fails because it has no package name. The update argv stays
+`npm i -g <spec>` on every npm version and never passes `--allow-scripts`. npm keeps the inherited terminal (colour and
+progress); `omo update` points `npm_config_logs_dir` at a fresh temp directory, reads npm's own debug log there after a
+successful install (npm writes the same `install-scripts` warning lines to it), and removes the directory. The package
+names come from those lines: `esbuild`, `@google/genai` and `protobufjs` are described as not needed by omo ("blocked, omo
+works without them" on npm 12, "ran, informational" on npm 11), any other package gets a neutral line saying omo has not
+reviewed it, and the reinstall hint with the package spec is unchanged. No notice, no message. The bun path is untouched.
 
 ## 2026-09-30 - The compiled binary hands a downloaded Claude Code to the engine at startup (#9276)
 
