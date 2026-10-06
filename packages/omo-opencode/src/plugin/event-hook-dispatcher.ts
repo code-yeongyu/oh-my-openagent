@@ -1,6 +1,7 @@
 import type { CreatedHooks } from "../create-hooks";
 import { log } from "../shared/logger";
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id";
+import { openRuntimeFallbackRecoveryClaim } from "../shared/runtime-fallback-recovery";
 import { isRecord } from "./event-error-utils";
 import type { EventInput, EventHookRunner } from "./event-types";
 
@@ -36,6 +37,11 @@ export function createEventHookRunner(): EventHookRunner {
 
 export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafely: EventHookRunner) {
   return async (input: EventInput): Promise<void> => {
+    if (input.event.type === "session.error") {
+      // Runtime-fallback runs after the background manager, so the claim must exist before any hook sees the error.
+      const sessionID = getEventSessionID(input);
+      if (sessionID) openRuntimeFallbackRecoveryClaim(input.event, sessionID);
+    }
     await runEventHookSafely("autoUpdateChecker", hooks.autoUpdateChecker?.event, input);
     await runEventHookSafely("astGrepSgProvision", hooks.astGrepSgProvision?.event, input);
     await runEventHookSafely("legacyPluginToast", hooks.legacyPluginToast?.event, input);
