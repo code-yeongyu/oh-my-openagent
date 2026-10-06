@@ -1,6 +1,8 @@
 export const SEED_HANDOFF_CHAR_LIMIT = 60_000
 export const SEED_OPEN_TAG = "<omo-context-handoff-seed>"
 export const CONTEXT_HANDOFF_REQUEST_OPEN_TAG = "<omo-context-handoff>"
+// Second line of a seed; the number counts the chained handoffs that led to the seeded session.
+export const SEED_GENERATION_PREFIX = "handoff-generation: "
 const FALLBACK_MESSAGE_CHAR_LIMIT = 4_000
 
 export type CompactionFailureKind =
@@ -71,6 +73,7 @@ export interface FreshSessionSeedInput {
   readonly previousSessionFile: string | undefined
   readonly failure: CompactionFailure | undefined
   readonly goalObjective: string | undefined
+  readonly generation: number
 }
 
 export function buildFreshSessionSeed(input: FreshSessionSeedInput): string {
@@ -81,6 +84,7 @@ export function buildFreshSessionSeed(input: FreshSessionSeedInput): string {
     : `The previous session was replaced because its context compaction failed (${input.failure.kind}: ${input.failure.detail})`
   return [
     SEED_OPEN_TAG,
+    `${SEED_GENERATION_PREFIX}${input.generation}`,
     `This is a fresh session that continues a previous session in the same working directory. ${why}; it wrote the handoff below.`,
     `Handoff file: ${input.handoffPath}`,
     ...(input.previousSessionFile === undefined ? [] : [`Previous session file: ${input.previousSessionFile}`]),
