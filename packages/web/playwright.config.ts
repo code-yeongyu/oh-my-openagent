@@ -14,6 +14,17 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:3000",
     trace: "on-first-retry",
     headless: true,
+    // Never touch the real keychain/profile on a dev machine (raises "Chromium Safe Storage");
+    // keep the renderer heap capped so a runaway test cannot starve the host.
+    launchOptions: {
+      args: [
+        "--use-mock-keychain",
+        "--password-store=basic",
+        // Keep glyph screenshot references and actual text on grayscale AA in Linux CI.
+        "--disable-lcd-text",
+        "--js-flags=--max-old-space-size=2048",
+      ],
+    },
   },
 
   projects: [

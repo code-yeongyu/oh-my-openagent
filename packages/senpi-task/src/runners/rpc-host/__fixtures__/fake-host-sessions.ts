@@ -1,3 +1,4 @@
+import { spawn, type ChildProcess } from "node:child_process"
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs"
 import type { Socket } from "node:net"
 import { dirname } from "node:path"
@@ -18,6 +19,10 @@ export interface FakeHostSession {
   readonly autoTitle: unknown
   readonly attachments: number
   readonly parked: boolean
+  /** The session's own long-running process, while the session lives (`sessionProcesses`). */
+  readonly processPid?: number
+  /** Settles once that process has exited. */
+  readonly processExit?: Promise<void>
 }
 
 /** A session path a previous generation still owns while it drains. */
@@ -54,6 +59,8 @@ interface LiveSession {
   readonly attachments: Set<Socket>
   parked: boolean
   streaming: boolean
+  process: ChildProcess | undefined
+  processExit: Promise<void> | undefined
 }
 
 export class FakeSessionTable {
@@ -61,11 +68,13 @@ export class FakeSessionTable {
   readonly #holds = new Map<string, FakeSessionHold>()
   readonly #peaks = new Map<string, number>()
   readonly #transcripts: boolean
+  readonly #sessionProcesses: boolean
   #nextRoutingId = 0
 
   /** With `transcripts`, every session path becomes a real JSONL file, as a daemon's would. */
-  constructor(options: { readonly transcripts: boolean }) {
+  constructor(options: { readonly transcripts: boolean; readonly sessionProcesses?: boolean }) {
     this.#transcripts = options.transcripts
+    this.#sessionProcesses = options.sessionProcesses === true
   }
 
   open(socket: Socket, sessionPath: string, payload: Readonly<Record<string, unknown>>): FakeOpenOutcome {
@@ -77,6 +86,15 @@ export class FakeSessionTable {
     // still holds keeps its handle and counts one more attachment, exactly like the real host.
     if (existing !== undefined && existing.attachments.size === 0) session.routingId = this.#mintRouting()
     session.attachments.add(socket)
+    if (this.#sessionProcesses && session.process === undefined) {
+      const child = startSessionProcess()
+      session.process = child
+      // A spawn that fails emits `error` and never `exit`: either one ends the process's life.
+      session.processExit = new Promise<void>((resolve) => {
+        child.once("exit", () => resolve())
+        child.once("error", () => resolve())
+      })
+    }
     this.#peaks.set(sessionPath, Math.max(this.#peaks.get(sessionPath) ?? 0, session.attachments.size))
     session.parked = false
     this.#sessions.set(sessionPath, session)
@@ -101,6 +119,7 @@ export class FakeSessionTable {
       if (!session.attachments.delete(socket)) continue
       if (session.attachments.size > 0 || session.retainOnDisconnect === true) continue
       this.#sessions.delete(path)
+      endSessionProcess(session)
       closed.push(session)
     }
     return closed
@@ -110,6 +129,7 @@ export class FakeSessionTable {
     const session = this.#byRouting(routingId)
     if (session === undefined) return undefined
     this.#sessions.delete(session.sessionPath)
+    endSessionProcess(session)
     return drained(session)
   }
 
@@ -118,6 +138,7 @@ export class FakeSessionTable {
     const session = this.#sessions.get(sessionPath)
     if (session === undefined) return undefined
     const parked = drained(session)
+    endSessionProcess(session)
     session.parked = true
     session.attachments.clear()
     return parked
@@ -137,6 +158,7 @@ export class FakeSessionTable {
    */
   handoff(previousInstanceId: string, retryAfterMs: number): readonly FakeDrainedSession[] {
     const inherited = [...this.#sessions.values()].map(drained)
+    for (const session of this.#sessions.values()) endSessionProcess(session)
     for (const session of inherited) this.hold(session.sessionPath, previousInstanceId, retryAfterMs)
     this.#sessions.clear()
     return inherited
@@ -144,6 +166,7 @@ export class FakeSessionTable {
 
   /** The host process died: nothing survives in memory, only the transcripts on disk. */
   clear(): void {
+    for (const session of this.#sessions.values()) endSessionProcess(session)
     this.#sessions.clear()
   }
 
@@ -174,6 +197,8 @@ export class FakeSessionTable {
       autoTitle: session.autoTitle,
       attachments: session.attachments.size,
       parked: session.parked,
+      ...(session.process?.pid === undefined ? {} : { processPid: session.process.pid }),
+      ...(session.processExit === undefined ? {} : { processExit: session.processExit }),
     }))
   }
 
@@ -197,6 +222,8 @@ export class FakeSessionTable {
       attachments: new Set<Socket>(),
       parked: false,
       streaming: false,
+      process: undefined,
+      processExit: undefined,
     }
   }
 
@@ -213,6 +240,19 @@ export class FakeSessionTable {
     this.#nextRoutingId += 1
     return `routing-${this.#nextRoutingId}`
   }
+}
+
+// The host ends what a session started when the session itself ends; a polling loop never exits alone.
+function startSessionProcess(): ChildProcess {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" })
+  child.unref()
+  return child
+}
+
+function endSessionProcess(session: LiveSession): void {
+  session.process?.kill("SIGKILL")
+  session.process = undefined
+  session.processExit = undefined
 }
 
 function drained(session: LiveSession): FakeDrainedSession {

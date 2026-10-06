@@ -78,6 +78,10 @@ const LIMIT_ERRORS: Readonly<Record<string, string>> = {
   "limit-account": "You've hit your session limit · resets 3pm (Asia/Seoul)",
   "limit-model": "You've hit your Fable weekly limit · resets Oct 2, 9am",
 }
+// "limit-after-tool" (#9512): the child's primary first makes a tool call, then hits a usage limit on
+// the request that carries the tool result, so the fallback has to happen inside the running turn.
+const LIMIT_AFTER_TOOL = "limit-after-tool"
+const LIMIT_AFTER_TOOL_ERROR = "You've hit your session limit · resets 3pm (Asia/Seoul)"
 let parentCalls = 0
 
 export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
@@ -92,10 +96,11 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
       mockModel("healthy-fallback", "Healthy fallback"),
       mockModel("limit-fable", "Usage-limited primary"),
       mockModel("limit-opus", "Same-account sibling"),
+      mockModel("limit-after-tool", "Primary limited after a tool call"),
     ],
     streamSimple(model, context) {
       if (isChild(context)) {
-        return streamMessage(childReply(model.id))
+        return streamMessage(childReply(model.id, context))
       }
       parentCalls += 1
       return streamMessage(parentCalls === 1
@@ -104,7 +109,9 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
             id: "fallback-task-call",
             name: "task",
             arguments: {
-              category: SCENARIO === "user-fallback" ? "fallbackcat" : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick",
+              category: SCENARIO === "user-fallback"
+                ? "fallbackcat"
+                : SCENARIO === LIMIT_AFTER_TOOL ? "toolcat" : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick",
               prompt: "complete through the configured fallback chain",
               run_in_background: false,
               name: "fallback-child",
@@ -168,7 +175,17 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   }
 }
 
-function childReply(modelId: string): AssistantMessage {
+function childReply(modelId: string, context: Context): AssistantMessage {
+  if (SCENARIO === LIMIT_AFTER_TOOL && modelId === LIMIT_AFTER_TOOL) {
+    return hasToolResult(context)
+      ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
+      : assistant(modelId, "toolUse", [{
+          type: "toolCall",
+          id: "limit-after-tool-call",
+          name: "bash",
+          arguments: { command: "printf limit-after-tool-ran" },
+        }])
+  }
   const limitError = LIMIT_ERRORS[SCENARIO]
   if (limitError !== undefined) {
     const spent = modelId === "limit-fable" || (modelId === "limit-opus" && SCENARIO === "limit-account")
@@ -200,6 +217,10 @@ function mockModel(id: string, name: string) {
 // argv is the structural child signal there (the same selector task-e2e-mock-provider.ts uses).
 function isChild(context: Context): boolean {
   return messagesContainChild(context) || process.argv.includes("rpc")
+}
+
+function hasToolResult(context: Context): boolean {
+  return (context.messages ?? []).some((message) => (message as { readonly role?: string }).role === "toolResult")
 }
 
 function messagesContainChild(context: Context): boolean {

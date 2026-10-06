@@ -4,8 +4,11 @@ Every OmO session that runs task children as host sessions gets its own senpi RP
 A terminal session's `process` children run on a task host keyed by that session
 (`p-*`), and each Desktop interactive thread runs on its own thread host (`i-*`).
 A crash, an idle exit, or a handoff on one of those hosts does not touch the others.
-The machine-wide socket `rpc.sock` stays as the operator endpoint: `omo daemon run`
-and `attach` ensure it, and the thread tools create their sessions there.
+The socket `rpc.sock` stays as the operator endpoint: `omo daemon run` ensures it, and
+`thread_create` opens its sessions there. A terminal session runs its own session in its own
+process and never joins a host; other sessions reach it through its control endpoint (see
+[omo thread](./omo-thread.md)), and `omo daemon adopt` moves a session a host holds into a
+terminal.
 `omo daemon` is the operator's view of every one of these hosts in one agent directory.
 Everything that decides *who serves a socket* lives in the engine (`senpi host`);
 this command supplies omo's launch spec, reads the policy out of the omo config, and
@@ -14,8 +17,7 @@ turns the engine's answer into an exit code a script can branch on.
 ```bash
 omo daemon run                 # ensure the operator daemon on rpc.sock: start, reuse, or hand off
 omo daemon run --json          # the engine's JSON line verbatim
-omo daemon attach              # print the env a child needs to reach the operator daemon
-omo daemon attach --model x    # run omo with that env (a normal launch)
+omo daemon adopt <session> [--interrupt] [--force]   # take a host session into this terminal
 omo daemon status [--json] [--include-workers]   # every endpoint, then a machine aggregate
 omo daemon gc [--json] [--prune-store-index]     # remove dead endpoint state and its owner sidecars
 omo daemon stop [--drain]      # the operator endpoint only
@@ -25,12 +27,13 @@ omo daemon handoff             # upgrade-gated handoff across every live endpoin
 omo daemon rollback-prepare [--store <dir>]... [--allow-missing-index] [--dry-run] [--json]
 ```
 
-Bare `omo` never ensures the operator daemon on `rpc.sock`. Only `run`, `attach` and
-`handoff` can bring it into existence (per-session hosts are started by the task
+Bare `omo` never ensures the operator daemon on `rpc.sock`. Only `run` and `handoff` can
+bring it into existence (per-session hosts are started by the task
 engine ahead of a session's first child: on its first prompt by default, at session start or
 only at the first spawn per `task.host_shard_prewarm`, never by bare `omo` itself); `status`, `gc` and `stop` work on an install whose plugin payload was
 never built. `--persistent` is still accepted and does nothing; `--foreground` exits 2,
-because the engine host always detaches.
+because the engine host always detaches. There is no `attach` subcommand any more: a terminal
+no longer runs its session on a host, so to continue a host session in a terminal, adopt it.
 
 ## Per-session hosts
 
@@ -52,15 +55,15 @@ per-child-process child, a Desktop thread) is the root of its own tree: its chil
 go to `p-<its own key>`. Each child a host session opens carries its tree's key in its
 session context as `tree_key` and `shard_key`. When that child spawns children of its
 own, it reads `shard_key` and puts them on the host it already lives on. It may only
-attach to that host: it never ensures, starts, or hands it off, and a silent host is
+connect to that host: it never ensures, starts, or hands it off, and a silent host is
 `own_host_unreachable`. A child is never routed on a guess. With no session id at
 routing time the spawn fails with `shard_identity_missing`.
 
 **`OMO_RPC_SOCKET*` never route task children.** `OMO_RPC_SOCKET`, `SENPI_RPC_SOCKET`,
 `PI_RPC_SOCKET` and `OMO_RPC_SOCKET_PATH` name the operator endpoint only. `omo daemon`
-and the thread tools read them; the task host resolver does not. A process launched
-through `omo daemon attach` therefore still puts its own task children on its own
-`p-*` host, keyed by its own session id, not on the socket `attach` printed.
+and the thread tools read them; the task host resolver does not. A process whose
+environment names another operator socket therefore still puts its own task children on
+its own `p-*` host, keyed by its own session id, not on that socket.
 
 **Owner sidecar.** Starting a `p-*` or `i-*` host writes `<kind>-<key>.meta.json` beside
 the socket: `{ socket, kind, root, owner_session_id?, owner_session_file?, created_at,
@@ -82,8 +85,8 @@ idle retained session is 30 minutes, but OmO's launch path sets
 `SENPI_RPC_SESSION_IDLE_EVICTION_MS` to the idle-exit window, so both are 15 minutes by
 default. A longer inherited eviction window is kept. The trade-off, measured in the cost
 section below: a departed parent's own host idles out even when other clients stay
-connected elsewhere, while one shared host kept alive by any other client used to keep
-the departed parent's retained sessions for the whole eviction window.
+connected elsewhere, while the previous release's single host, kept alive by any other
+client, used to keep the departed parent's retained sessions for the whole eviction window.
 
 **Memory pressure is observability only.** Every host samples and reports its own
 memory. `status` shows `rss_mb` (the endpoint's whole process tree) and `host_rss_mb`
@@ -113,6 +116,7 @@ aggregate. `omo doctor` prints the same rows as `INFO` lines and a dead row as a
   ],
   "aggregate": {
     "live": 1,
+    "terminals": 0,
     "shards": 1,
     "threads": 0,
     "sessions": 2,
@@ -122,6 +126,10 @@ aggregate. `omo doctor` prints the same rows as `INFO` lines and a dead row as a
   }
 }
 ```
+
+`aggregate.live` counts reachable hosts only. `aggregate.terminals` counts reachable terminal
+(`endpoint_kind: "tui"`) endpoints; they are listed in `endpoints` but never counted in `live`,
+`shards`, `threads`, `sessions` or the RSS totals, because a terminal is not a host.
 
 `status` never prunes, signals, unlinks, or refreshes an idle host. A dead row is kept
 until `omo daemon gc` asks the engine (`senpi host gc`) to remove it. The engine removes
@@ -147,7 +155,7 @@ live generation, or holds a live claim.
 update meets its own `p-*` host running the older build and, under the default
 `upgrade` policy, hands that host off to the new build. With N live session hosts that
 is N successor spawns, one per host as each session next ensures it, instead of the
-single handoff one shared host used to need.
+single handoff the previous release's one host needed.
 
 **Older clients see only `rpc.sock`.** An `omo daemon status` from before per-session
 hosts asks for the single socket `rpc.sock`, and so does an older Desktop. Neither
@@ -161,15 +169,15 @@ scales with the number of busy sessions. Nothing caps it: there is no limit on h
 children, or memory.
 
 Measured on an Apple M-series 14-core machine with 64 GB, under load from other work,
-with engine senpi 2026.9.28-3, against the previous release's single shared host
-(20 samples per latency scenario):
+with engine senpi 2026.9.28-3, against the previous release, which ran every session's
+children on one host (20 samples per latency scenario):
 
 | Idle endpoint (0 sessions) | RSS MB | Physical footprint MB |
 | --- | --- | --- |
 | One task host (supervisor + host) | 245.4 | 126.2 |
-| Previous shared host (supervisor + host) | 248.6 | 137.3 |
+| Previous release's one host (supervisor + host) | 248.6 | 137.3 |
 
-| Parents, 4 children each | Per-session hosts RSS / footprint MB | One shared host RSS / footprint MB |
+| Parents, 4 children each | Per-session hosts RSS / footprint MB | One host for all RSS / footprint MB |
 | --- | --- | --- |
 | 1 | 620.7 / 203.8 | 666.6 / 228.6 |
 | 2 | 1353.7 / 432.5 | 753.7 / 255.3 |
@@ -194,8 +202,8 @@ at 4 children.
 
 Idle exit: with no client left, every endpoint was gone 16 minutes later in both
 configurations. With one parent still connected and two departed, both departed
-parents' hosts were gone by then while the live parent kept its own. The shared host
-stayed up for the live parent: it held 0 retained sessions under the default eviction
+parents' hosts were gone by then while the live parent kept its own. The previous
+release's one host stayed up for the live parent: it held 0 retained sessions under the default eviction
 window and 4 under a 1-hour window. The per-session configuration also used less
 memory in both cases (237.5 against 279.7 MB RSS by default, 235.7 against 263.9 MB
 with the 1-hour window).
@@ -222,7 +230,7 @@ node packages/omo-senpi/scripts/qa/task-host-e2e-shard-cost.mjs \
 | Endpoint log | `<host-state>/stderr.log` |
 | Crash records | `<host-state>/crashes.jsonl` (newest 50 counted by status) |
 | Launch spec | `<pluginRoot>/daemon-launch-spec.json`, shipped inside the omo plugin payload |
-| Operator env | `OMO_ENABLE_SHARED_HOST=1` and `OMO_RPC_SOCKET=<socket>` (what `attach` prints; task children ignore it) |
+| Operator endpoint override | `OMO_RPC_SOCKET=<socket>` (read by `omo daemon` and the thread tools; task children ignore it) |
 
 ## Launch spec
 
@@ -261,7 +269,7 @@ line per key with the move to make. A legacy `"never"` policy is told to use
 | `task.default_execution_mode` | `auto` · `in-process` · `process` | see *Execution mode* below |
 | `task.process_runner` | `host` · `child-process` | which runner a `process` child gets |
 
-`--no-upgrade` on the command line forces `never` (attach or start, never hand off)
+`--no-upgrade` on the command line forces `never` (reuse or start, never hand off)
 for that call; `never` is a command-line policy only, not an `omo.json` value. A flag
 beats config; config beats the default.
 
@@ -385,14 +393,14 @@ logged and changes nothing for the first child.
 Measured on the compiled binary (a fresh session, its first turn, a mock model answering
 after 1-3 s with a `task` call; time from the parent's `task` call to the child's first
 model request; 60 samples per configuration over two runs, interleaved with a control on
-an already-running shared host of the previous release):
+the previous release's one host, already running):
 
 | configuration | p50 | p95 |
 | --- | --- | --- |
 | `off` (host boots at the first child; 20 samples) | 1666 ms | 3280 ms |
 | `first-turn` (default) | 1116 ms | 1678 ms |
 | `session-start` | 1115 ms | 1648 ms |
-| previous release, shared host already running | 979 ms | 1593 ms |
+| previous release, its one host already running | 979 ms | 1593 ms |
 
 The pre-warm removes the host boot from the first child's wait; what remains, about
 0.1 s at p50, is the new host's first turn. `first-turn` is the default because it
@@ -447,15 +455,65 @@ A user-set `in-process` / `process`, and every per-agent `execution_mode`, still
 wins over the host check. Real fallbacks to a per-child process happen only for
 a capability or policy `engine_mismatch`, on win32, or on a Node without bun.
 
+## Adopting a session into this terminal
+
+`omo daemon adopt <session-id|name>` takes a session a host holds (a Desktop thread on its `i-*`
+host, a daemon or task session) into the terminal you run it in. It finds the session through the
+thread address book (`omo thread list --all-scope`), asks its host to hand it over (senpi
+`release_session`, reason `takeover`), and then resumes it with the normal interactive launch on
+`--session <session file>`, in the session's own directory. The host keeps nothing: it writes a
+`session_released` entry, closes the session and releases the file.
+
+- A quiet session is handed over as is. A session that is running a turn, or owes one to queued
+  input, is refused `turn_active` (exit 4); `--interrupt` stops the turn first. Input the
+  interrupt took out of the host's queue becomes this terminal's first prompts, in their queued
+  order, after `--`, so none is read as a launch option (a message starting with `@` is printed
+  instead, since the launch would read it as a file; an empty or whitespace-only one is dropped).
+  When the release is refused after the interrupt, that input is printed so it can be sent again.
+- A session another client is attached to (a Desktop thread window) is refused `attached` with
+  the client count (exit 4); `--force` takes it anyway, and those clients are told the session was
+  released.
+- A terminal session is refused as "already a terminal session" (exit 4), and a session no running
+  host holds exits 3 with the `omo --session` command that resumes it instead.
+- Gateway messages the host had admitted but not yet written are not lost: the adopting terminal's
+  inbox applies them again.
+- `--json` prints `{kind:"released", thread_id, session_path, attachments, dropped}` or
+  `{kind:"refused", error, thread_id?, dropped?}` on stdout before the terminal starts.
+
+Terminal endpoints are listed by `status` as `tui <name> pid <n> cwd <path>`
+(`endpoint_kind: "tui"` in `--json`), but they belong to their terminal: `handoff` prints them as
+skipped, `stop --all [--wait]` neither stops nor waits on them, and `gc` reaps only a terminal whose
+process is gone (the engine's evidence rules).
+
+### `omo host status --all`
+
+`omo host status --all [--json] [--include-workers]` is the engine's machine-wide inventory, one JSON
+line `{"endpoints": [...]}` with the engine's exit code (0 while anything answers, 3 when nothing
+does). OmO passes every row through unchanged and adds one field to each terminal
+(`endpoint_kind: "tui"`) row:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `last_activity_at` | ISO 8601 string or `null` | The top-level `timestamp` of the final complete, valid JSONL entry in the row's session file (`owner.session.path`). It is the value `omo thread list` shows as `updated_at` for that session when its endpoint reports none, including degraded/resumable rows. The reader takes the first and last 64 KiB plus at most 256 KiB while locating and validating the final record, so its cost never grows with the transcript. `null` means freshness is unknown: the row names no session, the file is missing/unreadable/headerless, the final line is partial or malformed, or that final entry exceeds 256 KiB. It never substitutes an older entry or the file mtime; copying, restoring or touching a file can change mtime independently of the entry clock. |
+
+```json
+{"socket": "/tmp/example/rpc-host-daemon/0123456789abcdef/t-0123456789abcdef.sock", "endpoint_kind": "tui", "alive": true, "reason": null,
+ "owner": {"pid": 4242, "cwd": "/work", "session": {"id": "session-id", "path": "/tmp/example/sessions/--work--/session.jsonl", "name": "my-tui"}},
+ "last_activity_at": "2026-09-30T01:07:30.000Z"}
+```
+
+Rows of any other kind carry no `last_activity_at`. When the engine prints no inventory line (a usage
+error), its output passes through untouched.
+
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | 0 | done — the engine's `action` says which of start / reuse / handoff |
 | 2 | usage: no subcommand, an unknown one, or `--foreground` (the engine is not called) |
-| 3 | `status`: no endpoint answers (`daemon: not running`); `stop --all`: an endpoint refused or, with `--wait`, is still live at the timeout; `handoff`: an endpoint refused; `rollback-prepare`: refused before writing |
-| 4 | unsupported platform: win32 has no unix socket to share (the engine is not called) |
-| 5 | the engine refused — read its line; the launch spec may be missing |
+| 3 | `adopt`: no running host holds the session; `status`: no endpoint answers (`daemon: not running`); `stop --all`: an endpoint refused or, with `--wait`, is still live at the timeout; `handoff`: an endpoint refused; `rollback-prepare`: refused before writing |
+| 4 | unsupported platform: win32 has no unix socket to share (the engine is not called); `adopt`: the host refused the hand-over (`turn_active`, `attached`, `session_busy`, ...) or the session is already a terminal session |
+| 5 | the engine refused — read its line; the launch spec may be missing; `adopt`: the host could not write the hand-over (`release_failed`) |
 
 ## Troubleshooting
 

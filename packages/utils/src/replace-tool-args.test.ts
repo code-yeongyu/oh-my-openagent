@@ -27,30 +27,31 @@ describe("replaceToolArgs", () => {
 			expect(output.args.format).toBe("markdown")
 		})
 
-		it("#when patching #then the args object the host holds is the one that changes", () => {
-			// given: opencode passes `{ args }` to the hook and then executes its own `args` reference
-			const hostArgs = { command: "echo hi" } as Record<string, unknown>
-			const output = { args: hostArgs }
+		it("#when patching #then the host-held args object receives the patch", () => {
+			// given
+			const originalArgs: Record<string, unknown> = { command: "echo hi" }
+			const output = { args: originalArgs }
 
 			// when
 			replaceToolArgs(output, { command: "echo bye" })
 
 			// then
-			expect(output.args).toBe(hostArgs)
-			expect(hostArgs.command).toBe("echo bye")
+			expect(originalArgs.command).toBe("echo bye")
+			expect(output.args).toBe(originalArgs)
 		})
 
-		it("#when a later hook edits output.args in place #then the host still sees that edit", () => {
+		it("#when a later hook edits patched args #then the host executes both rewrites", () => {
 			// given
-			const hostArgs = { command: "git status" } as Record<string, unknown>
-			const output = { args: hostArgs }
+			const originalArgs: Record<string, unknown> = { command: "echo hi", timeout: 30 }
+			const output = { args: originalArgs }
 
 			// when
-			replaceToolArgs(output, { command: "export CI=true; git status" })
-			output.args.command = `wrap '${output.args.command}'`
+			replaceToolArgs(output, { command: "echo bye" })
+			output.args.command += "; echo later"
 
 			// then
-			expect(hostArgs.command).toBe("wrap 'export CI=true; git status'")
+			expect(originalArgs.command).toBe("echo bye; echo later")
+			expect(originalArgs.timeout).toBe(30)
 		})
 	})
 

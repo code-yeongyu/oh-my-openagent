@@ -219,4 +219,22 @@ describe("createSisyphusAgent", () => {
       });
     });
   });
+
+  // #9538: the model copies a format example as the shape of its reply, so one written as a markdown
+  // quote line turned whole answers into blockquotes.
+  describe("#given every routed prompt family", () => {
+    test("#when creating the agent #then no format example is a markdown quote line", () => {
+      const models = [
+        "opencode-go/kimi-k3", "moonshotai/kimi-k2.6", "opencode-go/kimi-k2.7", "openai/gpt-5.5", "openai/gpt-5.4",
+        "anthropic/claude-opus-4-7", "anthropic/claude-opus-4-8", "anthropic/claude-opus-5", "anthropic/claude-fable-5",
+        "xai/grok-4.6", "zai/glm-5.2", "google/gemini-3.1-pro", "anthropic/claude-sonnet-4-6",
+      ];
+
+      for (const model of models) {
+        const quoted = (createSisyphusAgent(model).prompt ?? "").split("\n").filter((line) => /^\s*>.*\[[^\]]+\]/.test(line));
+        expect({ model, quoted }).toEqual({ model, quoted: [] });
+      }
+    });
+  });
 });
+

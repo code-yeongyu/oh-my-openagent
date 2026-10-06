@@ -7,7 +7,7 @@ import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { V1_PERSONA_SEED_SHA256, parseLockRecord, parseMemoryFile, readReflectionParkFile } from "@oh-my-opencode/memory-core"
+import { V1_PERSONA_SEED_SHA256, isMemoryContentPath, parseLockRecord, parseMemoryFile, readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
 import { readReflectionHealth, reflectionParkNextProbeAt, reflectionRemediation } from "../worker"
 import { runGit } from "./repo"
@@ -56,7 +56,9 @@ export function checkRepository(identity: MemoryCommandIdentity): DoctorCheck {
 }
 
 export async function checkFrontmatter(repoDir: string): Promise<DoctorCheck[]> {
-  const paths = await listMarkdown(repoDir, "")
+  // Only the frontmatter contract (the set the pre-commit hook validates); root files such as
+  // ARCHIVE.md and notes/ are outside it.
+  const paths = (await listMarkdown(repoDir, "")).filter(isMemoryContentPath)
   const failures: string[] = []
   for (const path of paths) {
     try {

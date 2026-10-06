@@ -1434,6 +1434,9 @@ jobs:
 
   post-publish-verify:
     runs-on: ubuntu-latest
+    # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
+    # probe can't hold a runner for GitHub's 6 h default (#9492).
+    timeout-minutes: 120
     needs: [release-metadata, prepare-release-state, publish-main, release]
     # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
     # already public by this point, so blocking the release job on them could only produce the worst
@@ -1471,22 +1474,31 @@ jobs:
           # therefore failed the run AFTER a successful publish. Size the wait to the registry's stated
           # contract and read with --prefer-online so a cached "not found" cannot mask a landed version.
           READINESS_INTERVAL_SECONDS=15
-          READINESS_ATTEMPTS=60   # 60 x 15 s = 15 minutes
+          READINESS_ATTEMPTS=240  # 240 x 15 s = 60 minutes; npm took ~55 minutes to serve omo-ai@5.1.13 (#9492)
           for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
             IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
+            TARBALL_URL=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball 2>/dev/null || true)
             TAG_READY=true
             if [ "$ALREADY_PUBLISHED" != "true" ]; then
               TAGGED_VERSION=$(npm view --prefer-online omo-ai "dist-tags.$OMO_AI_DIST_TAG" 2>/dev/null || true)
               [ "$TAGGED_VERSION" = "$OMO_AI_VERSION" ] || TAG_READY=false
             fi
 
-            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$TAG_READY" = "true" ]; then
-              echo "omo-ai@$OMO_AI_VERSION is ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
+            TARBALL_READY=false
+            if [ -n "$TARBALL_URL" ] &&
+               curl --fail --silent --location --connect-timeout 10 --max-time 15 --head --output /dev/null "$TARBALL_URL"; then
+              TARBALL_READY=true
+            fi
+
+            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] &&
+               [ "$TAG_READY" = "true" ] &&
+               [ "$TARBALL_READY" = "true" ]; then
+              echo "omo-ai@$OMO_AI_VERSION metadata and tarball are ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
               break
             fi
 
             if [ "$attempt" = "$READINESS_ATTEMPTS" ]; then
-              echo "::error::omo-ai@$OMO_AI_VERSION did not become visible within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION version' before re-running anything."
+              echo "::error::omo-ai@$OMO_AI_VERSION metadata and tarball did not become ready within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION version' and the dist.tarball URL's tarball availability before re-running anything."
               exit 1
             fi
             echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/${READINESS_ATTEMPTS}, ${READINESS_INTERVAL_SECONDS}s)"

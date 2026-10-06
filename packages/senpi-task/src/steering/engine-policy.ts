@@ -88,5 +88,16 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
     residency_state: "resident",
     updated_at: timestamp,
     notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
+    // A revive is a new user-visible run: handles minted before it no longer name the current run.
+    run_start_epoch: record.notification.run_epoch + 1,
+  }
+}
+
+export function evictionRefusal(taskId: string): SendOutcome {
+  return {
+    kind: "not_continuable",
+    task_id: taskId,
+    reason: `Task ${taskId} is being evicted; send was not started.`,
+    suggestion: "Use task_output to read the final result.",
   }
 }

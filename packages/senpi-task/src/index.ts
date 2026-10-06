@@ -1,4 +1,6 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
+export { CHILD_PERMISSION_EVENT, TASK_CHILD_EXTENSION_EVENT, parseChildExtensionEvent } from "./runners/child-extension-events"
+export type { ChildExtensionEvent, ChildExtensionListener } from "./runners/child-extension-events"
 export { createWorkpoolTool, createWorkpoolWorkerTool, buildWorkpoolExecute } from "./tools/workpool"
 export { WorkpoolParams, WorkpoolYieldParams } from "./tools/workpool-schema"
 export { WorkpoolCommandSchema, WorkpoolCreateSchema } from "./workpool/schema"
@@ -56,6 +58,7 @@ export type {
   ResolvedModelSource,
   SpawnSpecV1,
   TaskNotification,
+  CancelRequest,
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
@@ -641,3 +644,4 @@ export type {
 } from "./team"
 
 export * from "./tools/team"
+export { createEvalHandleHost, type EvalHandleHostDeps } from "./eval-handles"

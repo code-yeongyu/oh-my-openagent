@@ -75,6 +75,16 @@ Changes to these files only take effect after a git commit. Use the memory tools
 const V1_PERSONA_SEED = `---\ndescription: Persona - who I am\n---\n${V1_PERSONA_BODY}`
 
 describe("/doctor", () => {
+  test("#given registration #when doctor is not invoked #then no identity or settings are resolved", () => {
+    const pi = new MemoryFakeExtensionAPI()
+    registerDoctorCommand(pi, {
+      contextForSession: () => { throw new Error("registration resolved identity") },
+      bustPromptCache: () => { throw new Error("registration cleared prompt cache") },
+      loadSettings: () => { throw new Error("registration loaded settings") },
+    })
+    expect(pi.commands.find((command) => command.name === "doctor")?.options.description).toBe("Run deterministic memory health checks and repair skill frontmatter.")
+  })
+
   test("#given a healthy repository #when doctor runs #then every deterministic check passes", async () => {
     // given
     const { pi, ctx } = await harness()

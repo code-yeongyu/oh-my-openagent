@@ -28,6 +28,7 @@ import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 import type { TaskConcurrency } from "./concurrency"
 import type { InheritedExtensions } from "../runners/rpc/parent-extensions"
 import type { WorkpoolEngine } from "../workpool/engine"
+import type { ChildExtensionEvent } from "../runners/child-extension-events"
 
 export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
@@ -249,6 +250,7 @@ export type TrustedRespawnLaunch = {
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
 export type TaskManagerOptions = {
+  readonly onChildExtensionEvent?: (event: ChildExtensionEvent, owner: TaskRecord) => void
   readonly concurrency?: TaskConcurrency
   // Injected by row 17. Absent, `isolated` children are refused rather than silently run against the
   // parent checkout, so a wiring that forgot it can never break the isolation promise.

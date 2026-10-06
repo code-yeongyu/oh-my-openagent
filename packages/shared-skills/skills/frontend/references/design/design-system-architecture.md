@@ -246,7 +246,7 @@ After every component implementation, check:
 - [ ] Radii come from the Section 7 scale; nested corners are concentric.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 - [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
-- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 375px with no horizontal scroll of primary content.
+- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 390px with no horizontal scroll of primary content.
 
 ## Memory Management
 

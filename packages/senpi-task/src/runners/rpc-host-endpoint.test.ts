@@ -9,6 +9,7 @@ import type { HostSessionParked } from "./rpc-host/session-client"
 import { readTaskStoreIndex, taskStoreIndexPath } from "./rpc-host/store-index"
 import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import { cleanupTempDirs, ensureRecorder, posixShardTest, shardEndpoint, tempDir } from "./rpc-host-endpoint.test-support"
+import { TRANSPORT_LOST_REASON } from "./rpc-host/transport-recovery"
 
 const harness = hostRunnerHarness()
 const { fakeHost, runnerOver } = harness
@@ -256,7 +257,7 @@ describe("transport recovery reattaches ONLY on the recorded socket", () => {
     await handle.terminate()
   })
 
-  posixShardTest("#given a recorded host that fails every ensure for a non-incompatibility reason #when the retries are exhausted #then the child ends crashed with transport_gone", async () => {
+  posixShardTest("#given a recorded host that fails every ensure for a non-incompatibility reason #when the retries are exhausted #then the child ends crashed with transport lost", async () => {
     // given
     const host = await fakeHost()
     const recorded = shardEndpoint(host, "00000000000000c3")
@@ -272,7 +273,7 @@ describe("transport recovery reattaches ONLY on the recorded socket", () => {
     host.crash()
 
     // then
-    expect(await handle.waitForExit()).toMatchObject({ kind: "crashed", facts: { stderrTail: "transport_gone" } })
+    expect(await handle.waitForExit()).toMatchObject({ kind: "crashed", facts: { stderrTail: TRANSPORT_LOST_REASON } })
     expect(ensure.inputs.map((input) => input.socket)).toEqual(Array.from({ length: 6 }, () => recorded.socket))
   })
 

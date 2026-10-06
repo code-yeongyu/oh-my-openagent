@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { appendFile, mkdir, readFile, rename, rm, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
@@ -27,6 +27,8 @@ export type TranscriptJournalOptions = {
   readonly lock?: JournalLock
   /** Byte budget for one reflection payload; the remainder is carried into later captures. */
   readonly snapshotMaxBytes?: number
+  /** Replaces the state rename, so a test can simulate a rename the platform refuses. */
+  readonly renameFile?: (from: string, to: string) => Promise<void>
 }
 
 export type AppendResult = { readonly appended: number; readonly skipped: number }
@@ -320,6 +322,16 @@ export class TranscriptJournal {
     }, entries)
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
-    await rename(temporaryPath, this.statePath)
+    try {
+      await (this.options.renameFile ?? rename)(temporaryPath, this.statePath)
+    } catch (error) {
+      // A refused rename must not strand the temporary copy beside state.json.
+      try {
+        await rm(temporaryPath, { force: true })
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "state rename failed and its temporary file could not be removed")
+      }
+      throw error
+    }
   }
 }

@@ -208,7 +208,7 @@ Before classifying the task, identify what the user actually wants from you as a
 
 **Verbalize before proceeding:**
 
-> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
+"I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
 
 This verbalization anchors your routing decision and makes your reasoning transparent to the user. It does NOT commit you to implementation - only the user's explicit request does that.
 </intent_verbalization>

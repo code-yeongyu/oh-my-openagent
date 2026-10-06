@@ -96,6 +96,8 @@ describe("the failed rung's child as an obligation of the record", () => {
       hostSessionProbe: {
         daemonAlive: async () => true,
         sessionLive: async (session) => f.host.sessions().some((live) => live.sessionPath === session.session_path),
+        sessionLiveness: async (session) =>
+          f.host.sessions().some((live) => live.sessionPath === session.session_path) ? "live" : "gone",
         refresh: () => undefined,
       },
     })
@@ -125,7 +127,7 @@ describe("the failed rung's child as an obligation of the record", () => {
     const lifecycle = createTaskLifecycle({
       ...f.deps,
       config: { ...f.deps.config, ttl_ms: 1_000 },
-      hostSessionProbe: { daemonAlive: async () => true, sessionLive: async () => true, refresh: () => undefined },
+      hostSessionProbe: { daemonAlive: async () => true, sessionLive: async () => true, sessionLiveness: async () => "live", refresh: () => undefined },
       hostSessionClose: async () => {
         closing.resolve()
         await refuse.promise

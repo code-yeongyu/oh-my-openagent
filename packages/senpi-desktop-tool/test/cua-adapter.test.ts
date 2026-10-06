@@ -81,6 +81,7 @@ describe("computer_actions (gajae-code enforcement invariants)", HANG_GUARD, () 
 
 		// Then
 		expect(failureCode(result)).toBe("COMPUTER_PERMISSION_REQUIRED");
+		expect(result.details.isError).toBe(true);
 		expect(Reflect.get(result.details.value ?? {}, "failure")).toMatchObject({
 			permission: "accessibility",
 			settingsUrl: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
@@ -98,6 +99,7 @@ describe("computer_actions (gajae-code enforcement invariants)", HANG_GUARD, () 
 
 		// Then
 		expect(failureCode(result)).toBe("COMPUTER_DISPLAY_STALE");
+		expect(result.details.isError).toBe(true);
 		expect(textOf(result)).toContain("Capture a fresh screenshot");
 	});
 
@@ -191,6 +193,7 @@ describe("computer_actions arguments", HANG_GUARD, () => {
 			code: "COMPUTER_INVALID_ARGUMENTS",
 			spawned: 0,
 		});
+		expect(result.details.isError).toBe(true);
 		expect(textOf(result)).toContain(reason);
 	});
 });

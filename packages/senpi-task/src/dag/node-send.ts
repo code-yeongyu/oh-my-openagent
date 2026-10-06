@@ -142,6 +142,7 @@ function foldSendOutcome(
         nodeIds: [nodeId],
       })
     case "not_continuable":
+    case "stale":
       throw new DagNodeControlError({
         code: "node_not_continuable",
         message: `dag node "${nodeId}" cannot be continued: ${outcome.reason} Retry the node to run it again.`,

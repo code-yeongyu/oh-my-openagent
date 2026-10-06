@@ -31,7 +31,7 @@ Waiting is not free: a status poll replays the whole accumulated context through
 
 # Subagents
 
-Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent_v1.spawn_agent({"message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","agent_type":"<role>","fork_context":false})`. If your tool list instead has a flat `spawn_agent` with a required `task_name` (`multi_agent_v2`): `spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","fork_turns":"none"})` - finished agents end on their own; `wait_agent` takes only `timeout_ms`.
+Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent_v1.spawn_agent({"message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","agent_type":"<role>","fork_context":false})`. If your tool list instead has a flat `spawn_agent` with a required `task_name` (`multi_agent_v2`): `spawn_agent({"task_name":"<lowercase_digits_underscores>","agent_type":"<role>","message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","fork_turns":"none"})` - finished agents end on their own; `wait_agent` takes only `timeout_ms`.
 
 - `explorer` - codebase search
 - `librarian` - external docs, OSS code, API contracts
@@ -70,7 +70,7 @@ Write only what the current correct path needs: no handlers, fallbacks, retries,
 
 At a handoff - turn start (after the one-line read), a todo phase change, a blocker or plan change, the final message - first work out what the user asked for and what they need to know now, then open with one block:
 
-> [Outcome so far] toward [the user's original ask and the result they wanted]. You need: [ledger N/M done, findings, blockers]. Now: [todo task in progress]. Next: [next open task].
+[Outcome so far] toward [the user's original ask and the result they wanted]. You need: [ledger N/M done, findings, blockers]. Now: [todo task in progress]. Next: [next open task].
 
 Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration.
 

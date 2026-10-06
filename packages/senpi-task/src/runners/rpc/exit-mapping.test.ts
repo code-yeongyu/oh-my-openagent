@@ -2,6 +2,11 @@ import { describe, expect, test } from "bun:test"
 
 import { classifyChildExit, mapExitOutcomeToError, tailStderr } from "./exit-mapping"
 
+/** Lines a killed Windows child really wrote to stderr in #9471: the Bun reaper advisory, then memory teardown diagnostics. */
+const REAPER_ADVISORY = "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this host exits"
+const MEMORY_RENAME_EPERM = `${REAPER_ADVISORY}\nmemory shutdown drain step failed {\n  step: "shutdown-evaluator",\n  reason: "quit",\n  error: "Error: EPERM: operation not permitted, rename 'state.json.tmp-1' -> 'state.json'",\n}\n`
+const MEMORY_DRAIN_BUDGET = `${REAPER_ADVISORY}\nmemory shutdown drain hit its budget {\n  step: "facts-enqueue",\n  reason: "quit",\n  remainingMs: 0,\n  completedSteps: [ "journal-flush" ],\n}\n`
+
 describe("classifyChildExit", () => {
   test("#given a spawn error #when classifying #then it is a spawn_error outcome", () => {
     // when
@@ -29,65 +34,49 @@ describe("classifyChildExit", () => {
     expect(classifyChildExit({ code: 0, signal: null, pid: 1, stderr: "" }).kind).toBe("clean")
   })
 
-  test("#given a Windows external termination (code 1, no signal, no stderr) #when classifying #then it is killed", () => {
-    // given: Windows TerminateProcess yields exit code 1 with NO signal provenance
-    // and leaves the child's stderr buffer empty (nothing was written before death).
-
+  test("#given a child the runner terminated #when it exits with code 1 and memory teardown lines on stderr #then it is killed", () => {
     // when
-    const outcome = classifyChildExit({ code: 1, signal: null, pid: 6664, stderr: "", platform: "win32" })
+    const renameFailure = classifyChildExit({ code: 1, signal: null, pid: 8076, stderr: MEMORY_RENAME_EPERM, terminatedByRunner: true })
+    const drainBudget = classifyChildExit({ code: 1, signal: null, pid: 5532, stderr: MEMORY_DRAIN_BUDGET, terminatedByRunner: true })
 
     // then
-    expect(outcome.kind).toBe("killed")
-    expect(outcome.facts.code).toBe(1)
-    expect(outcome.facts.signal).toBeNull()
+    expect(renameFailure.kind).toBe("killed")
+    expect(drainBudget.kind).toBe("killed")
+    expect(drainBudget.facts.stderrTail).toContain("memory shutdown drain hit its budget")
   })
 
-  test("#given only the Bun Windows child-reaper startup advisory #when a child exits with code 1 #then it is killed", () => {
-    // The Windows driver captures this prefix; its error_excerpt truncates the rest.
-    const stderr = "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this "
-    const outcome = classifyChildExit({ code: 1, signal: null, pid: 2784, stderr, platform: "win32" })
-
-    expect(outcome.kind).toBe("killed")
-    expect(mapExitOutcomeToError(outcome, { alreadyTerminal: false })?.killed).toBe(true)
+  test("#given a child the runner terminated that exited cleanly on the signal #when classifying #then it is still killed", () => {
+    // when / then
+    expect(classifyChildExit({ code: 0, signal: null, pid: 2, stderr: "", terminatedByRunner: true }).kind).toBe("killed")
   })
 
-  test("#given N Bun Windows child-reaper advisory lines #when a child exits with code 1 #then every advisory-only count is killed", () => {
-    const advisory = "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this runtime exits"
-
-    for (const count of [1, 2, 4]) {
-      const outcome = classifyChildExit({ code: 1, signal: null, pid: 2784, stderr: `${Array.from({ length: count }, () => advisory).join("\n")}\n`, platform: "win32" })
-      expect(outcome.kind).toBe("killed")
-      expect(mapExitOutcomeToError(outcome, { alreadyTerminal: false })?.killed).toBe(true)
-    }
-  })
-
-  test("#given Bun advisory lines plus one real error line #when classifying #then it stays crashed", () => {
-    const advisory = "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this runtime exits"
-    const stderr = `${advisory}\n${advisory}\nTypeError: boom\n`
-
-    expect(classifyChildExit({ code: 1, signal: null, pid: 2784, stderr, platform: "win32" }).kind).toBe("crashed")
-    expect(classifyChildExit({ code: 1, signal: null, pid: 2784, stderr, platform: "linux" }).kind).toBe("crashed")
-  })
-
-  test("#given a Windows child that crashed on its own #when classifying #then it stays crashed, not killed", () => {
-    // given: a genuine crash writes diagnostics to stderr before exiting
+  test("#given a child that exits on its own and writes 'killed' #when classifying #then it is crashed, not killed", () => {
+    // given: stderr text never decides a kill
+    const stderr = "Error: the child was killed by its supervisor\n"
 
     // when
-    const outcome = classifyChildExit({ code: 1, signal: null, pid: 7000, stderr: "TypeError: boom", platform: "win32" })
+    const outcome = classifyChildExit({ code: 1, signal: null, pid: 7000, stderr })
 
     // then
     expect(outcome.kind).toBe("crashed")
   })
 
-  test("#given a POSIX child exiting with code 1 and no stderr #when classifying #then it stays crashed", () => {
-    // given: on POSIX a real kill always carries signal provenance, so a bare
-    // code-1 exit must NEVER be reinterpreted as a kill.
-
-    // when
-    const outcome = classifyChildExit({ code: 1, signal: null, pid: 8000, stderr: "", platform: "linux" })
+  test("#given an external termination the runner did not issue (Windows: code 1, no signal, no stderr) #when classifying #then it is crashed", () => {
+    // given: Windows reports TerminateProcess as a plain exit code, indistinguishable from a crash
+    const outcome = classifyChildExit({ code: 1, signal: null, pid: 6664, stderr: "" })
 
     // then
     expect(outcome.kind).toBe("crashed")
+  })
+
+  test("#given an external termination that only left the Bun reaper advisory #when classifying #then it is crashed", () => {
+    // when / then
+    expect(classifyChildExit({ code: 1, signal: null, pid: 2784, stderr: `${REAPER_ADVISORY}\n` }).kind).toBe("crashed")
+  })
+
+  test("#given a spawn error on a child the runner was terminating #when classifying #then the spawn error wins", () => {
+    // when / then
+    expect(classifyChildExit({ code: null, signal: null, error: new Error("EPERM"), stderr: "", terminatedByRunner: true }).kind).toBe("spawn_error")
   })
 
   test("#given a nonzero exit code #when classifying #then it is crashed and stderr tail is capped at 4KB", () => {
@@ -129,9 +118,9 @@ describe("mapExitOutcomeToError", () => {
     expect(mapped?.error_message).toContain("SIGKILL")
   })
 
-  test("#given a Windows externally terminated child #when mapping #then status error with killed:true", () => {
-    // given: the exact shape observed in issue #6976 (pid 6664, code 1, no signal, no stderr)
-    const outcome = classifyChildExit({ code: 1, signal: null, pid: 6664, stderr: "", platform: "win32" })
+  test("#given a child the runner terminated #when mapping #then killed:true and the message says the runner stopped it", () => {
+    // given
+    const outcome = classifyChildExit({ code: 1, signal: null, pid: 6664, stderr: MEMORY_DRAIN_BUDGET, terminatedByRunner: true })
 
     // when
     const mapped = mapExitOutcomeToError(outcome, { alreadyTerminal: false })
@@ -139,22 +128,24 @@ describe("mapExitOutcomeToError", () => {
     // then
     expect(mapped?.status).toBe("error")
     expect(mapped?.killed).toBe(true)
-    expect(mapped?.exit.pid).toBe(6664)
+    expect(mapped?.error_message).toBe("RPC child was terminated by its runner (exit code 1, pid=6664)")
   })
 
-  test("#given a Windows child that died on its own #when mapping #then killed stays false", () => {
+  test("#given an external Windows termination #when mapping #then killed:false and the message says the child exited unexpectedly", () => {
     // given
-    const outcome = classifyChildExit({ code: 1, signal: null, pid: 6665, stderr: "Error: self-inflicted", platform: "win32" })
+    const outcome = classifyChildExit({ code: 1, signal: null, pid: 6664, stderr: "" })
 
     // when
     const mapped = mapExitOutcomeToError(outcome, { alreadyTerminal: false })
 
     // then
+    expect(mapped?.status).toBe("error")
     expect(mapped?.killed).toBe(false)
-    expect(mapped?.error_message).toContain("self-inflicted")
+    expect(mapped?.error_message).toBe("RPC child exited unexpectedly (exit code 1)")
+    expect(mapped?.error_message).not.toContain("killed")
   })
 
-  test("#given a nonzero exit before terminal #when mapping #then status error carries the stderr tail, not killed", () => {
+  test("#given a nonzero exit before terminal #when mapping #then status error names the unexpected exit and keeps the stderr tail, not killed", () => {
     // given
     const outcome = classifyChildExit({ code: 2, signal: null, pid: 5, stderr: "boom failure" })
 
@@ -164,7 +155,20 @@ describe("mapExitOutcomeToError", () => {
     // then
     expect(mapped?.status).toBe("error")
     expect(mapped?.killed).toBe(false)
-    expect(mapped?.error_message).toContain("boom failure")
+    expect(mapped?.error_message).toBe("RPC child exited unexpectedly (exit code 2)\nboom failure")
+    expect(mapped?.exit.stderrTail).toBe("boom failure")
+  })
+
+  test("#given a daemon session that ended with a reason and no exit code #when mapping #then the host's reason is the whole message", () => {
+    // given: a session exit carries no pid, code or signal; the host's reason rides the stderr tail
+    const outcome = { kind: "crashed" as const, facts: { pid: undefined, code: null, signal: null, stderrTail: "transport lost: the connection to the task host dropped and the child did not resume" } }
+
+    // when
+    const mapped = mapExitOutcomeToError(outcome, { alreadyTerminal: false })
+
+    // then
+    expect(mapped?.killed).toBe(false)
+    expect(mapped?.error_message).toBe("transport lost: the connection to the task host dropped and the child did not resume")
   })
 
   test("#given an exit AFTER a terminal state #when mapping #then it is resident teardown with no status change", () => {
@@ -175,3 +179,4 @@ describe("mapExitOutcomeToError", () => {
     expect(mapExitOutcomeToError(outcome, { alreadyTerminal: true })).toBeNull()
   })
 })
+

@@ -5,22 +5,26 @@ import { pathToFileURL } from "node:url"
 import {
   buildExtension,
   extensionBuildPaths,
+  GATEWAY_STORE_WORKER_NAME,
   resolveBunExecutable,
   runBuildCommand,
   SENPI_LOADER_ALIASES,
+  THREAD_SDK_RELATIVE_PATH,
 } from "./build-extension-core.mjs"
 import { checkExtensionCurrent } from "./check-extension-current.mjs"
 
 export {
   buildExtension,
   checkExtensionCurrent,
+  GATEWAY_STORE_WORKER_NAME,
   resolveBunExecutable,
   SENPI_LOADER_ALIASES,
+  THREAD_SDK_RELATIVE_PATH,
 }
 export { toPortableBuildPath } from "./build-artifact.mjs"
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { scriptDir, outputPath, taskOutputPath, memberOutputPath, supervisorOutputPath, advisorRuntimeOutputPath, computerUseOutputPath } =
+  const { scriptDir, outputPath, taskOutputPath, memberOutputPath, supervisorOutputPath, advisorRuntimeOutputPath, computerUseOutputPath, gatewayStoreWorkerOutputPath, gatewayRulesExtensionOutputPath, threadSdkOutputPath } =
     extensionBuildPaths
   if (process.argv.includes("--check")) {
     runBuildCommand("node", [join(scriptDir, "build-daemon-launch-spec.mjs"), "--check"])
@@ -36,6 +40,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     console.log(`omo-senpi extension build is current: ${result.output}`)
   } else {
     await buildExtension()
-    console.log(`Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}, ${computerUseOutputPath}`)
+    console.log(`Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}, ${computerUseOutputPath}, ${gatewayStoreWorkerOutputPath}, ${gatewayRulesExtensionOutputPath}, ${threadSdkOutputPath}`)
   }
 }

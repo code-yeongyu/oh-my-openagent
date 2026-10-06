@@ -19,6 +19,8 @@ export type DiagnosticsRunner = (filePath: string) => Promise<PostEditDiagnostic
 export interface PostEditDiagnosticsBlock {
 	readonly filePath: string;
 	readonly diagnostics: string;
+	/** False for missing-server guidance: it is feedback for the model, not a defect in the edit. */
+	readonly blocking: boolean;
 }
 
 export interface PostEditDiagnosticsObservation {
@@ -91,7 +93,11 @@ export async function collectPostEditDiagnostics(
 				observations.push({ filePath: result.filePath, kind: "not_configured" });
 				break;
 			case "block":
-				blocks.push({ filePath: result.filePath, diagnostics: classification.diagnostics });
+				blocks.push({ filePath: result.filePath, diagnostics: classification.diagnostics, blocking: true });
+				observations.push({ filePath: result.filePath, kind: "block" });
+				break;
+			case "guidance":
+				blocks.push({ filePath: result.filePath, diagnostics: classification.text, blocking: false });
 				observations.push({ filePath: result.filePath, kind: "block" });
 				break;
 			default: {
@@ -166,8 +172,8 @@ function normalizeDiagnosticsOutcome(outcome: PostEditDiagnosticsOutcome): PostE
 
 function classifyNotInstalled(
 	guidance: string | undefined,
-): { readonly kind: "not_installed" } | { readonly kind: "block"; readonly diagnostics: string } {
-	return guidance === undefined ? { kind: "not_installed" } : { kind: "block", diagnostics: guidance };
+): { readonly kind: "not_installed" } | { readonly kind: "guidance"; readonly text: string } {
+	return guidance === undefined ? { kind: "not_installed" } : { kind: "guidance", text: guidance };
 }
 
 function normalizeDiagnosticsText(text: string): string {

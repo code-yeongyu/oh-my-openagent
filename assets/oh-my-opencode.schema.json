@@ -8898,10 +8898,6 @@
                   "maximum": 10
                 }
               },
-              "required": [
-                "enabled",
-                "turns"
-              ],
               "additionalProperties": false
             },
             "protected_tools": {
@@ -8930,9 +8926,6 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "enabled"
-                  ],
                   "additionalProperties": false
                 },
                 "supersede_writes": {
@@ -8947,10 +8940,6 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "enabled",
-                    "aggressive"
-                  ],
                   "additionalProperties": false
                 },
                 "purge_errors": {
@@ -8967,21 +8956,12 @@
                       "maximum": 20
                     }
                   },
-                  "required": [
-                    "enabled",
-                    "turns"
-                  ],
                   "additionalProperties": false
                 }
               },
               "additionalProperties": false
             }
           },
-          "required": [
-            "enabled",
-            "notification",
-            "protected_tools"
-          ],
           "additionalProperties": false
         },
         "task_system": {
@@ -9146,11 +9126,6 @@
           "maximum": 1000
         }
       },
-      "required": [
-        "enabled",
-        "auto_start",
-        "default_max_iterations"
-      ],
       "additionalProperties": false
     },
     "ralph_loop": {
@@ -9366,10 +9341,6 @@
                 "type": "number"
               }
             },
-            "required": [
-              "type",
-              "method"
-            ],
             "additionalProperties": false
           }
         },
@@ -9394,7 +9365,6 @@
               }
             },
             "required": [
-              "enabled",
               "gateway",
               "instruction"
             ],
@@ -9443,21 +9413,9 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "authorizedDiscordUserIds",
-            "pollIntervalMs",
-            "rateLimitPerMinute",
-            "maxMessageLength",
-            "includePrefix"
-          ],
           "additionalProperties": false
         }
       },
-      "required": [
-        "enabled",
-        "gateways",
-        "hooks"
-      ],
       "additionalProperties": false
     },
     "i18n": {
@@ -9535,18 +9493,6 @@
           "maximum": 9007199254740991
         }
       },
-      "required": [
-        "enabled",
-        "live_mode_enabled",
-        "max_monitors_per_session",
-        "max_runtime_ms",
-        "batch_max_lines",
-        "batch_max_bytes",
-        "flush_interval_ms",
-        "ring_max_lines",
-        "line_max_bytes",
-        "pattern_max_length"
-      ],
       "additionalProperties": false
     },
     "team_mode": {
@@ -9612,18 +9558,6 @@
           "maximum": 9007199254740991
         }
       },
-      "required": [
-        "enabled",
-        "tmux_visualization",
-        "max_parallel_members",
-        "max_members",
-        "max_messages_per_run",
-        "max_wall_clock_minutes",
-        "max_member_turns",
-        "message_payload_max_bytes",
-        "recipient_unread_max_bytes",
-        "mailbox_poll_interval_ms"
-      ],
       "additionalProperties": false
     },
     "keyword_detector": {
@@ -9664,9 +9598,6 @@
           "type": "number"
         }
       },
-      "required": [
-        "timeout_ms"
-      ],
       "additionalProperties": false
     },
     "git_master": {
@@ -9693,11 +9624,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "commit_footer",
-        "include_co_authored_by",
-        "git_env_prefix"
-      ],
       "additionalProperties": false
     },
     "browser_automation_engine": {
@@ -9719,9 +9645,6 @@
           }
         }
       },
-      "required": [
-        "provider"
-      ],
       "additionalProperties": false
     },
     "websearch": {
@@ -9781,14 +9704,6 @@
           ]
         }
       },
-      "required": [
-        "enabled",
-        "layout",
-        "main_pane_size",
-        "main_pane_min_width",
-        "agent_pane_min_width",
-        "isolation"
-      ],
       "additionalProperties": false
     },
     "tui": {
@@ -9810,15 +9725,9 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "enabled"
-          ],
           "additionalProperties": false
         }
       },
-      "required": [
-        "sidebar"
-      ],
       "additionalProperties": false
     },
     "sisyphus": {
@@ -9838,9 +9747,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "claude_code_compat"
-          ],
           "additionalProperties": false
         }
       },
@@ -9854,9 +9760,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "auto_commit"
-      ],
       "additionalProperties": false
     },
     "start_work": {
@@ -9867,9 +9770,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "auto_commit"
-      ],
       "additionalProperties": false
     },
     "default_mode": {
@@ -9884,10 +9784,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "ultrawork",
-        "goal"
-      ],
       "additionalProperties": false
     },
     "_migrations": {
@@ -9897,8 +9793,5 @@
       }
     }
   },
-  "required": [
-    "git_master"
-  ],
   "additionalProperties": false
 }

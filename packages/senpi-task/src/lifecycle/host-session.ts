@@ -23,9 +23,17 @@ export function hostSessionResumePath(record: TaskRecord | null | undefined): st
   return isHostSessionRecord(record) ? record.host_session.session_path : undefined
 }
 
+/**
+ * `unknown`: the daemon answers but could not list its sessions, so whether this one still runs is
+ * unknown. A caller that would otherwise END a child on a "gone" answer must wait instead (omo#9450).
+ */
+export type HostSessionLiveness = "live" | "gone" | "unknown"
+
 export type HostSessionProbe = {
   daemonAlive(hostSession: HostSessionIdentity): Promise<boolean>
+  /** True only for a session the daemon listed; a failed listing reads false. */
   sessionLive(hostSession: HostSessionIdentity): Promise<boolean>
+  sessionLiveness(hostSession: HostSessionIdentity): Promise<HostSessionLiveness>
   /** Refresh one recorded endpoint, or all snapshots when starting a reconcile/TTL pass. */
   refresh(socket?: string): void
 }
@@ -55,13 +63,14 @@ export type HostSessionProbePorts = {
   readonly liveSessionPaths: (socket: string) => Promise<readonly string[]>
 }
 
-type HostSnapshot = { readonly daemonAlive: boolean; readonly livePaths: ReadonlySet<string> }
+type HostSnapshot = { readonly daemonAlive: boolean; readonly listed: boolean; readonly livePaths: ReadonlySet<string> }
 
 /**
  * ONE `probeHost` + ONE `list_sessions` per socket per pass - never per record. Every record in a
  * reconcile/TTL pass shares the in-flight snapshot; `refresh()` is what starts the next pass. A
- * daemon that does not answer reads as "nothing is live", which is the safe answer everywhere: the
- * lifecycle then reopens from JSONL instead of attaching, and closes nothing.
+ * daemon that does not answer reads as "nothing is live": the lifecycle then reopens from JSONL instead
+ * of attaching, and closes nothing. A daemon that answers but cannot list is `unknown` to
+ * `sessionLiveness`, so a pending cancel waits instead of finishing over a running session.
  */
 export function createHostSessionProbe(ports: HostSessionProbePorts): HostSessionProbe {
   const passes = new Map<string, Promise<HostSnapshot>>()
@@ -70,8 +79,15 @@ export function createHostSessionProbe(ports: HostSessionProbePorts): HostSessio
     if (cached !== undefined) return cached
     const taken = Promise.all([
       ports.daemonReachable(socket).catch(() => false),
-      ports.liveSessionPaths(socket).catch((): readonly string[] => []),
-    ]).then(([daemonAlive, livePaths]) => ({ daemonAlive, livePaths: new Set(livePaths.map(canonicalSessionPath)) }))
+      ports.liveSessionPaths(socket).then(
+        (paths) => ({ listed: true, paths }),
+        () => ({ listed: false, paths: [] as readonly string[] }),
+      ),
+    ]).then(([daemonAlive, listing]) => ({
+      daemonAlive,
+      listed: listing.listed,
+      livePaths: new Set(listing.paths.map(canonicalSessionPath)),
+    }))
     passes.set(socket, taken)
     return taken
   }
@@ -79,6 +95,11 @@ export function createHostSessionProbe(ports: HostSessionProbePorts): HostSessio
     daemonAlive: async (hostSession) => (await snapshot(hostSession.socket)).daemonAlive,
     sessionLive: async (hostSession) =>
       (await snapshot(hostSession.socket)).livePaths.has(canonicalSessionPath(hostSession.session_path)),
+    sessionLiveness: async (hostSession) => {
+      const taken = await snapshot(hostSession.socket)
+      if (!taken.listed) return taken.daemonAlive ? "unknown" : "gone"
+      return taken.livePaths.has(canonicalSessionPath(hostSession.session_path)) ? "live" : "gone"
+    },
     refresh: (socket) => {
       if (socket === undefined) passes.clear()
       else passes.delete(socket)

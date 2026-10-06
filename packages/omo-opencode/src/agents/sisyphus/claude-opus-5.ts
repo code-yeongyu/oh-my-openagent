@@ -217,7 +217,7 @@ Map surface form → true intent → routing. Announce in one short line - this 
 
 **Verbalize routing every turn:**
 
-> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [plan]."
+"I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [plan]."
 
 Verbalization does NOT commit to implementation. ONLY explicit user request does.
 </intent_verbalization>

@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test"
 import type { RpcChildHandle } from "../types"
 import { createRpcChildHandle } from "./handle"
 import type { RpcProtocolClient } from "./protocol-client"
+import { createChildExtensionEvents } from "../child-extension-events"
 
 // The exact rejection senpi's AgentSession.prompt() raises when a message lands on a
 // streaming session without queueing semantics. Windows loses the startup race often
@@ -24,6 +25,7 @@ function createHarness(respond: (command: SentCommand) => RpcResponse): Harness 
   const child = Object.assign(new EventEmitter(), { pid: 4242 }) as unknown as ChildProcess
   const sent: SentCommand[] = []
   const client = {
+    extensionEvents: createChildExtensionEvents(),
     stderrTail: "",
     send: (command: RpcCommand) => {
       const seen = command as SentCommand

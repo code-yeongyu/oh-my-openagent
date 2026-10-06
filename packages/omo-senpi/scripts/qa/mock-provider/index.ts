@@ -204,7 +204,8 @@ export function streamMockStep(step: MockStep, callCount: number, options?: Simp
       stream.push({ type: "text_end", contentIndex: 0, content: step.text, partial: message })
     } else {
       const toolCall = message.content[0]
-      stream.push({ type: "toolcall_start", contentIndex: 0, partial: { ...message, content: [] } })
+      const partial = { ...message, content: [{ ...toolCall, arguments: {} }] }
+      stream.push({ type: "toolcall_start", contentIndex: 0, partial })
       stream.push({ type: "toolcall_delta", contentIndex: 0, delta: JSON.stringify(step.arguments), partial: message })
       stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message })
     }

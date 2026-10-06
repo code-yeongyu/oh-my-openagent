@@ -57,7 +57,8 @@ export function createWorkpoolStore(stateDir: string) {
       const existing = list().find(pool => pool.parent_session_id === caller.sessionId && pool.name === input.name)
       if (existing !== undefined) {
         const same = canonicalJson(z.json().parse(existing.agent)) === canonicalJson(z.json().parse(input.agent)) && existing.mode === input.mode &&
-          canonicalJson(z.json().parse(existing.worker_spec)) === canonicalJson(z.json().parse(workerSpec))
+          canonicalJson(z.json().parse(existing.worker_spec)) === canonicalJson(z.json().parse(workerSpec)) &&
+          sameGrant(existing.kernel_tool_names, input.tools)
         if (!same || existing.status !== "open") throw new WorkpoolError("pool_name_conflict", "Pool name is already in use; choose a new explicit name.")
         return existing
       }
@@ -75,3 +76,10 @@ export function createWorkpoolStore(stateDir: string) {
   return { load, list, owned, mutate, create }
 }
 export type WorkpoolStore = ReturnType<typeof createWorkpoolStore>
+
+// A reused pool keeps the tools it was created with, so a same-name create must ask for exactly that grant.
+function sameGrant(existing: readonly string[] | undefined, requested: readonly string[] | undefined): boolean {
+  const left = [...new Set(existing ?? [])].sort()
+  const right = [...new Set(requested ?? [])].sort()
+  return left.length === right.length && left.every((name, index) => name === right[index])
+}

@@ -234,3 +234,12 @@ describe("planner delegation contracts", () => {
 		);
 	});
 });
+
+// #9538: a format example written as a markdown quote line made replies render as blockquotes.
+describe("Hephaestus GPT-5.6 format examples", () => {
+	test("renders no format example as a markdown quote line", () => {
+		const prompt = buildGpt56HephaestusPrompt(AVAILABLE_AGENTS, [], AVAILABLE_SKILLS, AVAILABLE_CATEGORIES, false);
+
+		expect(prompt.split("\n").filter((line) => /^\s*>.*\[[^\]]+\]/.test(line))).toEqual([]);
+	});
+});

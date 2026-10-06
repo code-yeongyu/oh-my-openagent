@@ -19,6 +19,8 @@ import { HostSessionClient } from "../session-client"
 import { startFakeHost, type FakeHost, type FakeHostOptions } from "./fake-host"
 import { listFakeHostSessions, probeFakeHost } from "./fake-host-probe"
 import { fakeCloseChannel, fakeFallbackRunner } from "./host-world-ports"
+import type { ManualRecoveryClock } from "./manual-recovery-clock"
+import type { HostShardEvents } from "../handle-reattach"
 import { NO_HOST_ENDPOINT } from "../../../lifecycle/host-session"
 
 /**
@@ -44,6 +46,16 @@ export interface ParentOptions {
   readonly hostPid?: number
   /** Ask the daemon through the production liveness adapter instead of the fixture's own wire probe. */
   readonly productionProbe?: boolean
+  /** Task settings over the suite defaults, e.g. a one-slot lane. */
+  readonly settings?: Record<string, unknown>
+  /** The runner's backoff between reattach attempts after a lost transport. */
+  readonly reattachDelaysMs?: readonly number[]
+  /** The clock that decides when a lost transport's recovery bound runs out. */
+  readonly recoveryClock?: ManualRecoveryClock
+  /** How long a close the host does not answer may take before it counts as unconfirmed. */
+  readonly hostCloseTimeoutMs?: number
+  /** Observe every child's transport recoveries, as the parent's crash notice does. */
+  readonly shardEvents?: HostShardEvents
 }
 
 export interface ParentSession {
@@ -121,7 +133,7 @@ interface ConnectParentInput {
 function connectParent(input: ConnectParentInput): ParentSession {
   const { sessionId, projectDir, socketPath } = input
   const store = createTaskRecordStore({ project_dir: projectDir })
-  const config = hostSuiteSettings()
+  const config = hostSuiteSettings(input.options.settings)
   const warnings: string[] = []
   const waits: number[] = []
   const fallback = fakeFallbackRunner()
@@ -137,7 +149,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ownHostSocket: () => undefined,
     insideHost: () => false,
     onNotice: () => undefined,
-    shardEvents: {},
+    shardEvents: input.options.shardEvents ?? {},
     probeHost: () => probeFakeHost(socketPath),
     env: {},
     ensureDaemon: () =>
@@ -154,6 +166,8 @@ function connectParent(input: ConnectParentInput): ParentSession {
     modelAdmission: () => Promise.resolve(),
     heartbeatIntervalMs: 60_000,
     closeGraceMs: 50,
+    ...(input.options.reattachDelaysMs === undefined ? {} : { reattachDelaysMs: input.options.reattachDelaysMs }),
+    ...(input.options.recoveryClock === undefined ? {} : { transportRecovery: { clock: input.options.recoveryClock } }),
     onWarning: (message) => {
       warnings.push(message)
     },
@@ -176,6 +190,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
   })
   const lifecycle = createTaskLifecycle({
+    ...(input.options.hostCloseTimeoutMs === undefined ? {} : { hostCloseTimeoutMs: input.options.hostCloseTimeoutMs }),
     hostEndpoint: NO_HOST_ENDPOINT,
     store,
     config,

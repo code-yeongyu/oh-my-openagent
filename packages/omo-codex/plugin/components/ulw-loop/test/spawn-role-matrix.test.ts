@@ -11,6 +11,7 @@ beforeEach(async () => {
 	cwd = await mkdtemp(join(tmpdir(), "spawn-role-matrix-"));
 	vi.stubEnv("OMO_AGENT_TOOLKIT_SURFACE", "lazycodex");
 	vi.stubEnv("PLUGIN_DATA", join(cwd, "data"));
+	vi.stubEnv("CODEX_HOME", join(cwd, "codex-home"));
 });
 afterEach(async () => {
 	vi.unstubAllEnvs();

@@ -66,6 +66,7 @@ function endpointDeps(store: TaskRecordStore, world: EndpointWorld, ownHostSocke
     hostSessionProbe: {
       daemonAlive: (identity) => Promise.resolve(world.answering.has(identity.socket)),
       sessionLive: () => Promise.resolve(false),
+      sessionLiveness: () => Promise.resolve("gone" as const),
       refresh: () => undefined,
     },
     hostEndpoint: createHostEndpointPort({
@@ -174,7 +175,7 @@ describe("revival reaches the RECORDED endpoint and only it", () => {
     })
     const lifecycle = createTaskLifecycle({
       ...fixture.deps,
-      hostSessionProbe: { daemonAlive: () => Promise.resolve(true), sessionLive: () => Promise.resolve(false), refresh: () => undefined },
+      hostSessionProbe: { daemonAlive: () => Promise.resolve(true), sessionLive: () => Promise.resolve(false), sessionLiveness: () => Promise.resolve("gone"), refresh: () => undefined },
     })
     seedParked(store, "st_0c000005", hostSession("st_0c000005", { socket: OTHER_SHARD }))
 

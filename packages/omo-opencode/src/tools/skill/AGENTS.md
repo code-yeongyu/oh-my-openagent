@@ -35,7 +35,7 @@ skill(name="git-master")
 
 ## SCOPE PRIORITY
 
-Project configs override user configs, which override opencode builtins. `sortByScopePriority` applies to both skills and slash commands in the `<available_items>` listing.
+Project configs override user configs, which override opencode builtins. `sortByScopePriority` applies to both skills and slash commands in the `<available_items>` listing; ties within a scope break by name in code-unit order, so the listing (and the cached tool prefix) does not depend on discovery order (#9432).
 
 ## TEST MOCKS
 

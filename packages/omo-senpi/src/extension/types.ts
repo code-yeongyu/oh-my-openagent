@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@code-yeongyu/senpi"
+import type { EvalHandleHost, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import type { StartupWork } from "./startup-deferral"
@@ -68,6 +68,8 @@ export interface SenpiExtensionAPI {
   /** Feature-detected until the pinned Senpi runtime exports read classifiers. */
   registerReadClassifier?(classifier: ReadClassifier): () => void
   registerRemovedToolHint?(name: string, hint: string): void
+  /** Feature-detected: senpi runtimes before 2026.10.7 have no eval-handle capability slot. */
+  provideEvalHandleHost?(host: EvalHandleHost): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
   appendEntry?(customType: string, data?: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void

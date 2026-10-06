@@ -26,10 +26,15 @@ export function decorateEndpoints(endpoints, agentDir) {
   })
 }
 
+function isTerminal(endpoint) {
+  return endpoint.endpoint_kind === "tui"
+}
+
 export function aggregateEndpoints(endpoints) {
-  const live = endpoints.filter((endpoint) => endpoint.reachable)
+  const live = endpoints.filter((endpoint) => endpoint.reachable && !isTerminal(endpoint))
   return {
     live: live.length,
+    terminals: endpoints.filter((endpoint) => isTerminal(endpoint) && endpoint.reachable).length,
     shards: live.filter((endpoint) => endpoint.shard?.kind === "p").length,
     threads: live.filter((endpoint) => endpoint.shard?.kind === "i").length,
     sessions: live.reduce((total, endpoint) => total + (endpoint.sessions?.total ?? 0), 0),
@@ -40,6 +45,7 @@ export function aggregateEndpoints(endpoints) {
 }
 
 function endpointKind(endpoint) {
+  if (isTerminal(endpoint)) return "tui"
   if (endpoint.shard?.kind === "p") return "shard"
   if (endpoint.shard?.kind === "i") return "thread"
   if (typeof endpoint.socket === "string" && basename(endpoint.socket) === "rpc.sock") return "daemon"
@@ -89,9 +95,22 @@ function generationLine(generation, endpoint) {
   return `  gen ${generation.generation} (${state}) pid ${metric(generation.pid)} · engine ${generation.engineVersion ?? "?"} · ${sessions} session(s) · rss ${metric(generation.rss_mb)} MB (host ${metric(generation.host_rss_mb)} MB)`
 }
 
+/** A terminal row: `tui <name> pid <n> cwd <path>`, named by its session, else by its socket. */
+function terminalLine(endpoint) {
+  const owner = endpoint.owner ?? {}
+  const socketName = typeof endpoint.socket === "string" ? basename(endpoint.socket, ".sock") : basename(endpoint.dir ?? "unknown")
+  const line = `tui ${owner.session?.name ?? socketName} pid ${metric(owner.pid)} cwd ${owner.cwd ?? "?"}`
+  if (endpoint.alive !== false && endpoint.reachable) return line
+  return `${line}: not responding (${endpoint.reason ?? "unreachable"}; omo daemon gc reaps it once its process is gone)`
+}
+
 export function formatEndpointLines(endpoints) {
   const lines = []
   for (const endpoint of endpoints) {
+    if (isTerminal(endpoint)) {
+      lines.push(terminalLine(endpoint))
+      continue
+    }
     const name = endpointName(endpoint)
     if (!endpoint.reachable) {
       lines.push(`${name}: not running (retained state kept; run omo daemon gc)`)
@@ -104,7 +123,7 @@ export function formatEndpointLines(endpoints) {
   }
   const aggregate = aggregateEndpoints(endpoints)
   lines.push(
-    `hosts: ${aggregate.live} live (${aggregate.shards} shards, ${aggregate.threads} threads) · ${aggregate.sessions} session(s) · rss ${aggregate.rss_mb} MB (host ${aggregate.host_rss_mb} MB) · crashes ${aggregate.crashes} (recorded, newest 50 per endpoint)`,
+    `hosts: ${aggregate.live} live (${aggregate.shards} shards, ${aggregate.threads} threads)${aggregate.terminals > 0 ? ` · ${aggregate.terminals} terminal(s)` : ""} · ${aggregate.sessions} session(s) · rss ${aggregate.rss_mb} MB (host ${aggregate.host_rss_mb} MB) · crashes ${aggregate.crashes} (recorded, newest 50 per endpoint)`,
   )
   return lines
 }

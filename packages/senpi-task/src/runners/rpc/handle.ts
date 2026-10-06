@@ -27,6 +27,8 @@ export type CreateRpcChildHandleOptions = {
   readonly now: () => number
   /** The child's spawn env: where it keeps its agent dir, so its unexpected death is recorded there. */
   readonly childEnv?: NodeJS.ProcessEnv
+  /** Stops the child process; defaults to terminateRpcChild. A test passes a fake so it never signals a host process. */
+  readonly terminateChild?: (child: ChildProcess, options?: TerminateOptions) => Promise<void>
 }
 
 export type TrackedRpcChildHandle = RpcChildHandle & {
@@ -125,7 +127,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
 
   child.once("error", (error) => settleExit(classifyChildExit({ code: null, signal: null, error, pid: child.pid, stderr: client.stderrTail })))
   child.once("close", (code, signal) => {
-    const built = classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail })
+    const built = classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail, terminatedByRunner: terminationRequested })
     if (options.childEnv !== undefined) {
       recordTaskChildDeath({ env: options.childEnv, outcome: built, terminationRequested, startedAt, now: Date.now() })
     }
@@ -194,6 +196,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       return runCommand({ type: "abort" }, "abort")
     },
     subscribe: (listener: ChildEventListener) => client.onEvent(listener),
+    subscribeExtensionEvents: client.extensionEvents.subscribe,
     adoptFinishedTurn: async (finalResponse) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
       const response = await client.send({ type: "get_state" }).catch(() => undefined)
@@ -229,7 +232,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     },
     terminate: (terminateOptions?: TerminateOptions) => {
       terminationRequested = true
-      return terminateRpcChild(child, terminateOptions)
+      return (options.terminateChild ?? terminateRpcChild)(child, terminateOptions)
     },
     startInitialPrompt: (text) => runPrompt(text),
   }

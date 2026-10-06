@@ -56,7 +56,7 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 			} catch (error) {
 				if (!(error instanceof ComputerArgumentsError)) throw error;
 				const failure = computerFailure(error.code, error.reason, stopHotkey);
-				return { content: [{ type: "text", text: failure.message }], details: { value: failure }, isError: true };
+				return { content: [{ type: "text", text: failure.message }], details: { value: failure, isError: true }, isError: true };
 			}
 			const timeoutSeconds = Math.min(params.timeout ?? DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS);
 			const readOnly = isReadOnlyActions(params);
@@ -70,7 +70,7 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 					? error.data : undefined;
 				const reason = data?.code ?? Reflect.get(error, "reason") ?? Reflect.get(error, "code") ?? error.name;
 				const failure = computerFailure(String(reason), error.message, stopHotkey, data?.permission);
-				return { content: [{ type: "text", text: failure.message }], details: { value: failure }, isError: true };
+				return { content: [{ type: "text", text: failure.message }], details: { value: failure, isError: true }, isError: true };
 			}
 			const outcome = result.details.value;
 			if (!isActionsOutcome(outcome)) return result;
@@ -87,7 +87,7 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 			}`;
 			return {
 				content: [...images, { type: "text", text }],
-				details: { ...result.details, value: { ...outcome, failure } },
+				details: { ...result.details, value: { ...outcome, failure }, isError: true },
 				isError: true,
 			};
 		},

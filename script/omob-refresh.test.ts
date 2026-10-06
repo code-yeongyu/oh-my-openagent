@@ -66,9 +66,10 @@ function fixture() {
 	for (const [repo, branch] of [[omo, "dev"], [senpi, "main"]]) {
 		mkdirSync(join(repo, "scripts"), { recursive: true })
 		mkdirSync(join(repo, "packages", "coding-agent"), { recursive: true })
-		writeFileSync(join(repo, "packages", "coding-agent", "package.json"), '{}')
+		writeFileSync(join(repo, "packages", "coding-agent", "package.json"), '{"name":"@code-yeongyu/senpi"}')
 		writeFileSync(join(repo, "package-lock.json"), '{"packages":{}}')
 		writeFileSync(join(repo, "scripts", "prepare-senpi-bundled-workspaces.mjs"), "")
+		writeFileSync(join(repo, "scripts", "registry-packages.mjs"), 'export const registrySourcePackageNames = new Set(["@code-yeongyu/senpi"]);\n')
 		git(repo, ["init", "-q", "-b", branch])
 		git(repo, ["add", "."])
 		git(repo, ["commit", "-qm", "initial"])

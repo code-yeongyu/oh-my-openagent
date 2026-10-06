@@ -158,7 +158,7 @@ function refusal(outcome: Exclude<SendOutcome, { kind: "revived" }>): WorkpoolEr
       return new WorkpoolError(outcome.kind, outcome.reason)
     case "capacity_deferred": return new WorkpoolError("admission_refused", outcome.reason)
     case "one_shot_agent": return new WorkpoolError("worker_not_continuable", outcome.message)
-    case "not_continuable": case "not_found": return new WorkpoolError("worker_not_continuable", outcome.reason)
+    case "not_continuable": case "not_found": case "stale": return new WorkpoolError("worker_not_continuable", outcome.reason)
     case "queued": case "steered": return new WorkpoolError("delivery_uncertain", "Worker did not acknowledge the expected admitted epoch.")
     default: return assertNever(outcome)
   }

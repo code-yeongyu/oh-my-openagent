@@ -32,6 +32,15 @@ export interface HostRpcClient {
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
 }
 
+/** A session's own fallback policy, held in memory by the host (senpi `retry_fallback_profile`). */
+export interface HostRetryFallbackProfile {
+  readonly modelFallback: boolean
+  readonly fallbackChains: Readonly<Record<string, readonly string[]>>
+}
+
+/** The capability a host advertises when it honors `open_session.retryFallback`. */
+export const RETRY_FALLBACK_PROFILE_CAPABILITY = "retry_fallback_profile"
+
 /** The wire shape of `open_session`, in the engine's names. */
 export interface HostOpenSessionWire {
   readonly sessionPath: string
@@ -43,6 +52,7 @@ export interface HostOpenSessionWire {
   readonly context: Readonly<Record<string, string>>
   readonly retain_on_disconnect: boolean
   readonly auto_title: boolean
+  readonly retryFallback?: HostRetryFallbackProfile
 }
 
 /** The immutable launch profile of one child session, in omo's names. */
@@ -56,6 +66,8 @@ export interface HostSessionOpenInput {
   readonly context: Readonly<Record<string, string>>
   readonly retainOnDisconnect: boolean
   readonly autoTitle: boolean
+  /** Sent only to a host advertising `retry_fallback_profile`; an older host opens without it. */
+  readonly retryFallback?: HostRetryFallbackProfile
 }
 
 export interface HostRpcClientOptions {
@@ -89,6 +101,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
     context: input.context,
     retain_on_disconnect: input.retainOnDisconnect,
     auto_title: input.autoTitle,
+    ...(input.retryFallback === undefined ? {} : { retryFallback: input.retryFallback }),
   }
 }
 

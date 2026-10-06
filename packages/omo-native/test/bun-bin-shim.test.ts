@@ -96,10 +96,12 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   mkdirSync(join(senpiRoot, "dist", "core"), { recursive: true })
   writeFileSync(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   // A stand-in bun that proves it ran; the real bun end to end is QA's job against the real install.
+  // It answers `--version` like a real bun at the engine's floor, because the launcher probes the
+  // bun a bun-global install chose before trusting it (#9563).
   const markerFile = join(root, "fake-bun.marker")
   const bunBinary = join(bunInstall, "bin", "bun")
   mkdirSync(join(bunInstall, "bin"), { recursive: true })
-  writeFileSync(bunBinary, `#!/bin/sh\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
+  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
   symlinkSync(stockLinkTarget(), join(bunInstall, "bin", "omo"))
   mkdirSync(join(root, "home"), { recursive: true })
   return {

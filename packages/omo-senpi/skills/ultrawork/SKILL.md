@@ -275,13 +275,10 @@ Discovery order:
    `rewrite`, `scan`).
 3. Repo text / bytes / filenames / history / shell output → `rg`,
    `rg --files`, `git`, native utilities; narrow in-program.
-4. Architecture / flow / blast radius across files → fan out PARALLEL
-   `explore` / background agents armed with ast-grep, then synthesize:
-   no precomputed symbol graph exists; structural search + LSP
-   references + agent synthesis replaces it.
-Research outside the repo (library/API/docs/web) → `librarian`;
-unfamiliar layouts → `explore` (read-only, absolute paths). Run both
-in background; keep working.
+4. Architecture / flow / blast radius across more files than one wave
+   can read → parallel `explore` agents armed with ast-grep, then
+   synthesize; outside-repo research (library/API/docs/web) →
+   `librarian`. Run them in background; keep working.
 
 # Parallel execution (batch what is independent, observe what is not)
 **`eval` with `language: "js"` is the default surface for the independent

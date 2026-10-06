@@ -53,11 +53,12 @@ import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
 import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { withTaskRecordLockAsync } from "../store/record-lock"
 import { reattachManagedTask } from "./manager-reattach"
+import { PendingStops } from "./pending-stops"
 import { respawnWithWorkpool } from "./workpool-respawn"
 import { NameRegistry } from "./names"
 import { TaskSequence } from "./task-sequence"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
-import { subscribeTranscriptLog } from "./transcript-log"
+import { subscribeChildFacts } from "./child-facts"
 import type {
   ContinueResult,
   ListScope,
@@ -163,6 +164,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #background = new Set<string>()
   readonly #evicting = new Set<string>()
   readonly #sendCounts = new Map<string, number>()
+  readonly #stopsPending = new PendingStops()
   readonly #steering: SteeringEngine
   readonly #isolation: IsolationWiring
   readonly #outcome: OutcomeTracker
@@ -215,6 +217,13 @@ class TaskManagerImpl implements TaskManager {
       reserveForDetachedRevive: (record) => this.#reserveForDetachedRevive(record),
       destruction: options.destruction ?? NOOP_DESTRUCTION,
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
+      stopRequested: (taskId) => this.#stopsPending.request(taskId),
+      releaseTaskLeases: (taskId) => this.#concurrency.releaseTask(taskId),
+      stopSettled: (taskId) => {
+        this.#concurrency.releaseTask(taskId)
+        this.#settleWaiters(taskId)
+        this.#stopsPending.settle(taskId)
+      },
       now: this.#now,
     }
     this.#steering = createSteeringEngine(port)
@@ -236,6 +245,7 @@ class TaskManagerImpl implements TaskManager {
       forget: (taskId) => this.forget(taskId),
       settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
+      stopSettlement: (taskId) => this.#stopsPending.settlement(taskId),
     })
     this.workpools = createWorkpoolEngine(options.store.stateDir, createWorkpoolAdmission({
       options, concurrency: this.#concurrency, hostPid: this.#hostPid,
@@ -526,6 +536,10 @@ class TaskManagerImpl implements TaskManager {
     if (outcome.kind === "cancelled") {
       this.#removeCapacityWaiter(outcome.task_id)
       this.#releaseSlotForTask(outcome.task_id)
+      // A cancelled task never runs again, so no epoch of it may keep a lane slot - including a run
+      // whose live handle this manager already let go of, or never had (still launching). Only a live
+      // handle whose abort was skipped keeps its slot until its settled outcome releases it.
+      if (options?.abort !== "skip" || !this.#live.has(outcome.task_id)) this.#concurrency.releaseTask(outcome.task_id)
     }
     return outcome
   }
@@ -1024,22 +1038,15 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {
-    const transcript = subscribeTranscriptLog(handle, this.#options.store, taskId)
-    this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
-    const stats = handle.subscribe((event) => {
-      if (event.type === "retry_fallback_exhausted") this.#nativeFallbackExhaustions.add(handle)
-      this.#runStats.get(taskId)?.accept(event)
+    return subscribeChildFacts({
+      handle, taskId, store: this.#options.store, now: this.#now,
+      runStats: this.#runStats, fallbackExhaustions: this.#nativeFallbackExhaustions,
+      reopen: () => reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle),
+      onExtensionEvent: (event) => {
+        const record = this.#tryLoad(taskId)
+        if (record != null && record.host_pid === this.#hostPid) this.#options.onChildExtensionEvent?.(event, record)
+      },
     })
-    const resumed = handle.onSelfResumed?.(() => {
-      this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
-      void reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle).catch((error: unknown) =>
-        log("senpi-task self-resumed turn reopen failed", { taskId, error: String(error) }))
-    })
-    return () => {
-      transcript()
-      stats()
-      resumed?.()
-    }
   }
 
   async #tryRuntimeFallback(input: {
@@ -1458,7 +1465,7 @@ class TaskManagerImpl implements TaskManager {
     return { ok: true, release: () => this.#concurrency.releaseLease(record.task_id, epoch) }
   }
 
-  #releaseSlot(taskId: string, model: string, epoch: number): void {
+  #releaseSlot(taskId: string, _model: string, epoch: number): void {
     // Release once per (task, epoch). A stale re-release of an already-released epoch is a no-op;
     // a revived task's higher epoch supersedes the prior one so its later release still counts.
     // A lease an older run still holds is released even after a newer epoch was: runtime fallback can

@@ -24,6 +24,8 @@ export function toContinueResult(outcome: SendOutcome): ContinueResult {
       return { kind: "continued", task_id: outcome.task_id, status: "pending", delivered: "followUp" }
     case "not_continuable":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: outcome.suggestion }
+    case "stale":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: "Fetch the task's current run before sending." }
     case "one_shot_agent":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.message, suggestion: CONTINUE_SUGGESTION }
     case "scope_denied":

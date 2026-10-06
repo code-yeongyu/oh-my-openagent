@@ -52,7 +52,7 @@ export class TaskConcurrency {
   getLimit(model: string): number {
     const modelLimit = ownNumber(this.#config.model_concurrency, model)
     if (modelLimit !== undefined) return modelLimit === 0 ? Number.POSITIVE_INFINITY : modelLimit
-    const providerLimit = ownNumber(this.#config.provider_concurrency, providerOf(model))
+    const providerLimit = ownNumber(this.#config.provider_concurrency, providerOf(model)) ?? (providerOf(model) === "opengateway" ? 0 : undefined)
     if (providerLimit !== undefined) return providerLimit === 0 ? Number.POSITIVE_INFINITY : providerLimit
     const defaultLimit = this.#config.default_concurrency
     if (defaultLimit !== undefined) return defaultLimit === 0 ? Number.POSITIVE_INFINITY : defaultLimit
@@ -174,6 +174,17 @@ export class TaskConcurrency {
     for (const lane of this.#parked.values()) {
       const entry = lane.get(key)
       if (entry !== undefined) this.#dropParked(entry)
+    }
+    this.#dispatch()
+  }
+
+  // Every lease a task holds or has parked, at any epoch: a task that can never run again (cancelled)
+  // owns no lane slot, whichever run took it (omo#9403).
+  releaseTask(taskId: string): void {
+    const owned = [...this.#leases.values()].filter((lease) => lease.taskId === taskId)
+    for (const lease of owned) this.#dropLease(lease)
+    for (const lane of [...this.#parked.values()]) {
+      for (const entry of [...lane.values()]) if (entry.lease.taskId === taskId) this.#dropParked(entry)
     }
     this.#dispatch()
   }

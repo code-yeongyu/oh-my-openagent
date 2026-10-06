@@ -29,6 +29,7 @@ import {
 import { resolveOmoComputerSettings } from "./settings"
 import { skillStatusLine, toolActivatedNames } from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
+import { wireComputerPermissionEvents } from "./permission-events"
 
 type ComputerExecute = ComputerUseRuntime["computerTool"]["execute"]
 type ComputerActionsExecute = ComputerUseRuntime["computerActionsTool"]["execute"]
@@ -97,6 +98,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
   return {
     name: COMPUTER_USE_COMPONENT_NAME,
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      const reportPermission = wireComputerPermissionEvents(pi, options.env ?? process.env, ctx.logger)
       const api = hostApi(pi)
       const available = (() => {
         if (!isSupportedHost(platform)) return undefined
@@ -137,6 +139,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
               host: available.host,
               settings: available.settings,
               engineChild: options.engineChild,
+              onPermissionRequired: reportPermission,
               onEngineError: (code) => {
                 if (state.telemetryContext !== undefined) telemetry.engineError(state.telemetryContext, code, state.backend)
               },

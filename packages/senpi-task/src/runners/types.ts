@@ -1,5 +1,6 @@
 import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
 import type { RunnerOutcome } from "./in-process/child-handle"
+import type { ChildExtensionListener } from "./child-extension-events"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -34,6 +35,10 @@ export type RpcRunnerSpec = {
   readonly reasoning?: string
   // The resolved variant the child must apply as its thinking level (`--thinking`).
   readonly variant?: string
+  // The child's own fallback chain after `model`, as `provider/model[:thinking]` selectors in try order.
+  // A daemon-hosted child sends it as `open_session.retryFallback` when the host advertises
+  // `retry_fallback_profile` (#9512); the per-child process runner does not carry it.
+  readonly fallbackModels?: readonly string[]
   // Extension entry paths the child must load (`-e`). The child is spawned with `--no-extensions` and
   // then ONLY these are loaded, so a keyless local provider (or a production `-e` extension) the parent
   // registered is reproducible in the detached child without inheriting the parent's whole package set.
@@ -55,6 +60,7 @@ export type ChildHandle = {
   followUp(text: string): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
+  subscribeExtensionEvents?(listener: ChildExtensionListener): () => void
   waitForIdle(): Promise<void>
   waitForOutcome?(): Promise<RunnerOutcome>
   hasExited?(): boolean

@@ -83,6 +83,11 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         reason: outcome.reason,
         suggestion: outcome.suggestion,
       })
+    case "stale": {
+      // task_send never names a run, so only a handle-fenced caller reaches this; keep the tool's result shapes.
+      const suggestion = "Fetch the task's current run before sending."
+      return toolResult(`${outcome.reason} ${suggestion}`, { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion })
+    }
     case "one_shot_agent":
       return toolResult(outcome.message, {
         kind: "one_shot_agent",

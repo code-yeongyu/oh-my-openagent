@@ -1,4 +1,5 @@
 import { createAstGrepComponent } from "../components/ast-grep"
+import { createBrowserBridgeComponent } from "../components/browser-bridge"
 import { createBuiltinMcpsComponent } from "../components/builtin-mcps"
 import { createBundledSkillsComponent } from "../components/bundled-skills"
 import { createClaudeCodeComponent } from "../components/claude-code"
@@ -7,6 +8,7 @@ import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
+import { createGatewayComponent } from "../components/gateway"
 import { createGitMasterAttributionComponent } from "../components/git-master"
 import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
 import { createLspComponent } from "../components/lsp"
@@ -53,11 +55,14 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createLspComponent(),
     createXSearchComponent(),
     createComputerUseComponent(),
+    createBrowserBridgeComponent(),
     createClaudeCodeComponent(),
     createCommentCheckerComponent(),
     taskComponent,
     createThreadComponent(),
     createMemoryComponent(),
+    // After memory so the gateway block composes after the memory block in the system prompt.
+    createGatewayComponent(),
     createConfigWatchComponent(),
   ]
 }

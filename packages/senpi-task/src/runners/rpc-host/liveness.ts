@@ -8,8 +8,9 @@ import { probeWithEngine } from "./session-transport"
  * The two questions the lifecycle asks a daemon once per pass: "are you there?" (`get_protocol_info`
  * through the engine's own `probeHost`) and "which session paths do you still hold?"
  * (`list_sessions { include_workers: true }` - worker rows are hidden by default, and every task
- * child is a worker). Both answer conservatively on failure: an unreachable daemon holds nothing,
- * which makes the lifecycle reopen from JSONL rather than attach, and close nothing.
+ * child is a worker). An unreachable daemon holds nothing, which makes the lifecycle reopen from JSONL
+ * rather than attach. A listing the daemon refuses or does not answer is an ERROR, never an empty list:
+ * "could not ask" must stay distinguishable from "holds nothing" (omo#9450).
  */
 
 const LIST_REQUEST_ID = "omo-task-liveness"
@@ -41,10 +42,10 @@ export async function liveSessionPaths(socket: string): Promise<readonly string[
   const reply = await askDaemon(socket, { id: LIST_REQUEST_ID, type: "list_sessions", include_workers: true })
   if (reply === undefined) {
     log("senpi-task daemon session list failed", { socket })
-    return []
+    throw new Error(`list_sessions failed on ${socket}`)
   }
   const sessions = reply.sessions
-  if (!Array.isArray(sessions)) return []
+  if (!Array.isArray(sessions)) throw new Error(`list_sessions on ${socket} answered without a session list`)
   return sessions.flatMap((row: unknown) => (isRecord(row) && typeof row.sessionPath === "string" ? [row.sessionPath] : []))
 }
 

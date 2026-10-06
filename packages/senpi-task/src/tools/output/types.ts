@@ -41,6 +41,8 @@ export type TaskSnapshot = {
   readonly status: TaskStatus
   readonly residency_state: ResidencyState
   readonly suspended?: SuspendedDetails
+  // A cancel waits for this child's lost connection; it may still be running on its host.
+  readonly stop?: string
   // The child has not launched yet: its start-time fallback model is waiting for a lane slot.
   readonly start_queued?: StartQueued
   readonly execution_mode: string

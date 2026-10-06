@@ -77,6 +77,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const backgroundMode = readOptionalBackgroundMode(value)
   const reviveDeliveryUncertain = parseOptionalReviveDeliveryUncertainty(value)
   const resumedRunEpoch = readOptionalNumber(value, "resumed_run_epoch")
+  const runStartEpoch = readOptionalNumber(value, "run_start_epoch")
   const startQueued = parseOptionalStartQueued(value)
   const runnerKind = readOptionalRunnerKind(value)
   const suspensionReason = readOptionalSuspensionReason(value)
@@ -87,6 +88,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const fallbackHandoffEpoch = readOptionalNumber(value, "fallback_handoff_epoch")
   const closingChild = parseOptionalClosingChild(value)
   const residencyClaim = readOptionalString(value, "residency_claim")
+  const cancelRequested = parseOptionalCancelRequest(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -138,6 +140,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(backgroundMode === undefined ? {} : { background_mode: backgroundMode }),
     ...(reviveDeliveryUncertain === undefined ? {} : { revive_delivery_uncertain: reviveDeliveryUncertain }),
     ...(resumedRunEpoch === undefined ? {} : { resumed_run_epoch: resumedRunEpoch }),
+    ...(runStartEpoch === undefined ? {} : { run_start_epoch: runStartEpoch }),
     ...(startQueued === undefined ? {} : { start_queued: startQueued }),
     ...(suspensionReason === undefined ? {} : { suspension_reason: suspensionReason }),
     ...(runnerKind === undefined ? {} : { runner_kind: runnerKind }),
@@ -145,7 +148,16 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(fallbackHandoffEpoch === undefined ? {} : { fallback_handoff_epoch: fallbackHandoffEpoch }),
     ...(closingChild === undefined ? {} : { fallback_closing_child: closingChild }),
     ...(residencyClaim === undefined ? {} : { residency_claim: residencyClaim }),
+    ...(cancelRequested === undefined ? {} : { cancel_requested: cancelRequested }),
   }
+}
+
+function parseOptionalCancelRequest(record: Record<string, unknown>): TaskRecord["cancel_requested"] {
+  const value = record["cancel_requested"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("cancel_requested is not an object")
+  const reason = readOptionalString(value, "reason")
+  return { requested_at: readString(value, "requested_at"), ...(reason === undefined ? {} : { reason }) }
 }
 
 function parseOptionalClosingChild(record: Record<string, unknown>): TaskRecord["fallback_closing_child"] {

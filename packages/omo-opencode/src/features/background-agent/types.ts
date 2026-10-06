@@ -103,6 +103,8 @@ export interface BackgroundTask {
   stablePolls?: number
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
+  /** Number of consecutive idle polls where the session still ended on an errored assistant turn */
+  consecutiveErroredIdlePolls?: number
 }
 
 export interface BackgroundTaskSnapshot {

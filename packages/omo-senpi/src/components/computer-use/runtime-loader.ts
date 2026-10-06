@@ -6,6 +6,7 @@ import {
 } from "@oh-my-opencode/senpi-desktop-tool/registration"
 
 import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
+import type { TrackedDesktopServiceOptions } from "./engine-status"
 
 export type ComputerUseRuntimeModule = typeof import("#omo-computer-use-runtime")
 export type ComputerUseRuntime = import("#omo-computer-use-runtime").ComputerUseRuntime
@@ -34,6 +35,7 @@ export function createComputerRuntimeLoader(options: {
   readonly settings: ComputerSettings
   readonly engineChild: ((enginePath: string | undefined) => ChildFactory) | undefined
   readonly onEngineError: (code: ComputerUseEngineErrorCode) => void
+  readonly onPermissionRequired?: TrackedDesktopServiceOptions["onPermissionRequired"]
 }): ComputerRuntimeLoader {
   const { host, settings } = options
   // Providers without native deferred-tool search reach a tool only once it is active, so the
@@ -47,6 +49,7 @@ export function createComputerRuntimeLoader(options: {
       executeTool: host.executeTool,
       ...(options.engineChild === undefined ? {} : { engineChild: options.engineChild }),
       onEngineError: options.onEngineError,
+      onPermissionRequired: options.onPermissionRequired,
     })
     runtime.handle.onActivationChange((active) => {
       const current = host.getActiveTools()

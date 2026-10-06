@@ -81,7 +81,16 @@ export class MemoryUsageTracker {
   }
 
   private async flushBatch(batch: ReadonlyMap<string, number>, signal?: AbortSignal): Promise<void> {
-    const record = await createMemoryUsageLockRecord()
-    await incrementMemoryUsageBatch(this.paths, batch, this.now, record, signal)
+    const isAborted = (): boolean => signal?.aborted === true
+    if (isAborted()) return
+    try {
+      const record = await createMemoryUsageLockRecord()
+      if (isAborted()) return
+      await incrementMemoryUsageBatch(this.paths, batch, this.now, record, signal)
+    } catch (error) {
+      // The debounce is detached; a late filesystem failure must never become an
+      // unhandled rejection after the session or its runtime directories are gone.
+      this.logger?.warn("memory-usage ledger flush failed", { error: String(error) })
+    }
   }
 }

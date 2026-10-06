@@ -12,6 +12,7 @@ import type { LiveHostChildren } from "./live-children"
 import { openTaskHostSession } from "./open-session"
 import { createReattachPort } from "./reattach-port"
 import type { OpenedHostSession } from "./session-client"
+import type { TransportRecoveryOptions } from "./transport-recovery"
 import { discardUnstartedRpcHandle } from "../rpc/start-cleanup"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
@@ -25,6 +26,7 @@ export interface HostSessionOpenerInput {
   readonly closeGraceMs?: number
   readonly now: () => number
   readonly reattachDelaysMs: readonly number[]
+  readonly transportRecovery?: TransportRecoveryOptions
   readonly admissionWaitMs: number
   readonly sleep: (ms: number) => Promise<void>
   readonly onWarning: (message: string) => void | (() => void)
@@ -36,18 +38,30 @@ export interface HostSessionOpener {
 
 /** Open a daemon session, wire its recoverable handle, and deliver only a fresh child's first turn. */
 export function createHostSessionOpener(input: HostSessionOpenerInput): HostSessionOpener {
-  const openAdmitted = (
+  let fallbackProfileUnsupportedNoticed = false
+  const noticeFallbackProfileUnsupported = (opened: OpenedHostSession): void => {
+    if (opened.retryFallbackDropped !== true || fallbackProfileUnsupportedNoticed) return
+    fallbackProfileUnsupportedNoticed = true
+    input.onWarning(
+      `the task host (engine ${opened.engineVersion}) does not advertise retry_fallback_profile, so daemon-hosted ` +
+        "children switch to their fallback models only when a turn fails before any tool call until the host is upgraded",
+    )
+  }
+  const openAdmitted = async (
     client: ReturnType<CreateHostSessionChannel>,
     spec: RpcRunnerSpec,
     sessionPath: string,
-  ): Promise<OpenedHostSession> =>
-    openHostSessionWithAdmission({
+  ): Promise<OpenedHostSession> => {
+    const opened = await openHostSessionWithAdmission({
       open: () => openTaskHostSession({ client, spec, sessionPath }),
       now: input.now,
       sleep: input.sleep,
       admissionWaitMs: input.admissionWaitMs,
       onWarning: input.onWarning,
     })
+    noticeFallbackProfileUnsupported(opened)
+    return opened
+  }
 
   const startTurn = async (handle: ReturnType<typeof createHostSessionHandle>, spec: RpcRunnerSpec): Promise<void> => {
     try {
@@ -85,6 +99,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         closeGraceMs: input.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS,
         openDisposition: opened.attached ? "attached" : "reopened",
         shardEvents: input.liveChildren.events,
+        ...(input.transportRecovery === undefined ? {} : { transportRecovery: input.transportRecovery }),
         reattach: createReattachPort({
           endpoint: input.endpoint,
           spec,

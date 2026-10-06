@@ -131,11 +131,8 @@ export async function resolveKernelToolGrant(request: KernelToolGrantRequest): P
       const code = kernelToolErrorCode(entry.error, "kernel_tool_missing")
       return denied(
         code,
-        `Parent kernel tool "${entry.name}" is not defined: ${entry.error.message}. Define it first in the parent JavaScript cell with tool(function ${entry.name}(...) { ... }), then request it again.`,
+        `Parent kernel tool "${entry.name}" is not defined: ${entry.error.message}. Define it first in a parent cell: JavaScript tool(function ${entry.name}(...) { ... }) or Python @tool def ${entry.name}(...), then request it again.`,
       )
-    }
-    if (entry.descriptor.language !== "js") {
-      return denied("tools_unavailable", `Parent kernel tool "${entry.name}" is not a JavaScript kernel tool.`)
     }
     descriptors.push(entry.descriptor)
   }

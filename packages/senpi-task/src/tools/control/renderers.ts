@@ -219,6 +219,8 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
         color: statusThemeColor(details.status),
         text: `task_cancel cancelled ${details.task_id} (${details.previous_status} -> ${details.status})`,
       }
+    case "cancel_pending":
+      return { color: "warning", text: `task_cancel pending ${details.task_id}: ${details.reason}` }
     case "noop":
       return { color: statusThemeColor(details.status), text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}` }
     case "not_found":

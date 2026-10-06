@@ -16,6 +16,8 @@ const BUNDLE_FILES = [
   "memory-run-supervisor.mjs",
   "omo-init-deep-advisor.js",
   "omo-computer-use.js",
+  "omo-memory-doctor.js",
+  "omo-memory-memfs.js",
 ] as const
 
 type LazyBarrel = {

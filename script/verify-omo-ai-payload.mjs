@@ -16,6 +16,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
+  // The session gateway's SQLite store runs as a worker thread started from this sidecar beside omo.js.
+  "plugin/extensions/gateway-store-worker.mjs",
   // Credential-gated skill: not under plugin/skills (never eager-loaded) but the bundled x-search
   // component resolves ../skills-conditional/x-search/SKILL.md, so the payload must ship it.
   "plugin/skills-conditional/x-search/SKILL.md",
@@ -23,6 +25,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/dag/sdk.js",
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
+  // omo thread and omo daemon adopt import it (bin/lib/thread.js).
+  "plugin/runtime/thread-sdk/sdk.js",
   // omo doctor / omo setup classify task-category coverage through it (bin/lib/category-coverage.js).
   "plugin/runtime/category-coverage/index.js",
   // That bundle inlines the computer-use doctor, which reads the prelude assets from beside itself (#9193).

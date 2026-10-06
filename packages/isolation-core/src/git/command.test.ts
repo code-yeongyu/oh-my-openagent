@@ -105,36 +105,45 @@ test("input written to a child that dies while alias-shell survivors hold its pi
   else writeFileSync(release, "")
 })
 
+// A run that waited for its child instead of killing it would outlive these
+// tests' budget (the alias sleeps far past it, and `yes` never exits), so a
+// regression fails on the test timeout; no assertion reads the wall clock,
+// which a loaded runner can stretch past any fixed bound (#9477).
+const TREE_TEARDOWN_TEST_TIMEOUT_MS = 20_000
+
 test("a git process that never exits is terminated at its command deadline", async () => {
   // given
   const f = await fixture()
-  let failure: unknown
-  const started = Date.now()
+  let pgid: number | undefined
 
   // when
-  failure = await runGit(["-c", "alias.wait=!sleep 7", "wait"], { cwd: f.repoRoot, timeoutMs: 50 })
-    .then(() => undefined, (error: unknown) => error)
+  const failure = await runGit(["-c", "alias.wait=!sleep 60", "wait"], {
+    cwd: f.repoRoot, timeoutMs: 50, onSpawn: (child) => { pgid = child.pid },
+  }).then(() => undefined, (error: unknown) => error)
 
   // then
   expect(failure).toBeInstanceOf(GitCommandTimeoutError)
-  expect(Date.now() - started).toBeLessThan(5_000)
+  if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
   if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
-})
+}, TREE_TEARDOWN_TEST_TIMEOUT_MS)
 
 test("a budget breach on a still-streaming child preserves the typed limit error", async () => {
   const f = await fixture()
   class BudgetError extends Error {}
   let failure: unknown
-  const started = Date.now()
+  let pgid: number | undefined
   try {
-    await runGit(["-c", "alias.spam=!yes x", "spam"], { cwd: f.repoRoot, maxOutputBytes: 4096, outputLimitError: () => new BudgetError() })
+    await runGit(["-c", "alias.spam=!yes x", "spam"], {
+      cwd: f.repoRoot, maxOutputBytes: 4096, outputLimitError: () => new BudgetError(),
+      onSpawn: (child) => { pgid = child.pid },
+    })
   } catch (error) { failure = error }
   expect(failure).toBeInstanceOf(BudgetError)
   // `yes` is git's grandchild through the alias shell; it must go down with
   // the tree instead of holding the pipe open until the test times out.
-  expect(Date.now() - started).toBeLessThan(5_000)
+  if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
   if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
-})
+}, TREE_TEARDOWN_TEST_TIMEOUT_MS)
 
 const processGroupIsGone = async (pgid: number): Promise<boolean> => {
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -162,7 +171,6 @@ test("a budget breach tears down the writer even when the alias shell survives i
   class BudgetError extends Error {}
   let failure: unknown
   let pgid: number | undefined
-  const started = Date.now()
   try {
     await runGit(["-c", "alias.spam=!sh -c 'yes x'", "spam"], {
       cwd: f.repoRoot, maxOutputBytes: 4096, outputLimitError: () => new BudgetError(),
@@ -170,7 +178,6 @@ test("a budget breach tears down the writer even when the alias shell survives i
     })
   } catch (error) { failure = error }
   expect(failure).toBeInstanceOf(BudgetError)
-  expect(Date.now() - started).toBeLessThan(5_000)
   if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
   if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
-})
+}, TREE_TEARDOWN_TEST_TIMEOUT_MS)

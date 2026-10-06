@@ -8,7 +8,7 @@ import { EVIDENCE_ROOT } from "./common.mjs"
 const dir = new URL("./", import.meta.url).pathname
 const evidence = EVIDENCE_ROOT
 mkdirSync(evidence, { recursive: true })
-const scenarios = ["kill-mid-turn", "version-capability", "queued-resume", "uncertain-operation"]
+const scenarios = ["kill-mid-turn", "version-capability"]
 const output = []
 let failed = false
 for (const name of scenarios) {

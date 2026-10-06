@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { readMemoryUsageLedger, memoryUsagePaths } from "./memory-usage-ledger"
+import { MemoryUsageTracker } from "./memory-usage-tracker"
 import { registerMemoryUsage } from "./memory-usage-wiring"
 import { eventContext, fixture, toolCall } from "./memory-usage.test-support"
 
@@ -124,5 +126,25 @@ describe("registerMemoryUsage", () => {
     await tracker?.flush()
     const ledger = await readMemoryUsageLedger(memoryUsagePaths(context.identityPaths).ledgerPath)
     expect(Object.keys(ledger)).toEqual([])
+  })
+})
+
+describe("memory usage flush failures", () => {
+  test("#given an unavailable ledger lock directory #when the tracked batch flushes #then the failure is logged without rejecting", async () => {
+    const { paths, repoDir } = await fixture()
+    const blocker = join(repoDir, "lock-parent")
+    await writeFile(blocker, "not a directory")
+    const warnings: string[] = []
+    const tracker = new MemoryUsageTracker({
+      paths: { ...paths, lockPath: join(blocker, "memory-usage.lock") },
+      repoDir,
+      logger: {
+        debug: () => {}, info: () => {}, error: () => {},
+        warn: (message) => { warnings.push(message) },
+      },
+    })
+    tracker.recordRead(join(repoDir, "reference", "project", "foo.md"))
+    await expect(tracker.flush()).resolves.toBeUndefined()
+    expect(warnings).toEqual(["memory-usage ledger flush failed"])
   })
 })

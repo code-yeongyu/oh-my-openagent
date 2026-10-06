@@ -152,7 +152,7 @@ describe("collectPostEditDiagnostics not-installed guidance", () => {
 			locateFile: at("project"),
 		});
 
-		expect(result.blocks).toEqual([{ filePath: "src/a.ts", diagnostics: `${FULL_NUDGE} (typescript)` }]);
+		expect(result.blocks).toEqual([{ filePath: "src/a.ts", diagnostics: `${FULL_NUDGE} (typescript)`, blocking: false }]);
 	});
 
 	it("#given no decision tool #when repeated edits hit missing servers #then each server is nudged once per session", async () => {
@@ -219,6 +219,6 @@ describe("collectPostEditDiagnostics not-installed guidance", () => {
 			runDiagnostics: async () => notInstalled("typescript"),
 		});
 
-		expect(result.blocks).toEqual([{ filePath: "a.ts", diagnostics: `${FULL_NUDGE} (typescript)` }]);
+		expect(result.blocks).toEqual([{ filePath: "a.ts", diagnostics: `${FULL_NUDGE} (typescript)`, blocking: false }]);
 	});
 });

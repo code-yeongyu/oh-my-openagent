@@ -7,7 +7,7 @@ import {
   detectCompiledEngine,
   resolveSenpiLauncher as resolveTaskSenpiLauncher,
   type SenpiLauncher,
-} from "@oh-my-opencode/senpi-task"
+} from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 const SENPI_PACKAGE_DIR = join("@code-yeongyu", "senpi")
 const CLI_RELATIVE = join("dist", "cli.js")

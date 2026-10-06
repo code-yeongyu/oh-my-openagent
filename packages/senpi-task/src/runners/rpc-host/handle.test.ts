@@ -5,6 +5,7 @@ import { classifySessionExit, type SessionExitClassification, type SessionExitIn
 import { openHostSessionHandle } from "./handle.test-support"
 import type { HostSessionParked } from "./session-client"
 import { sessionClientHarness } from "./session-client.test-support"
+import { TRANSPORT_LOST_REASON } from "./transport-recovery"
 
 const harness = sessionClientHarness()
 const { fakeHost, hostClient } = harness
@@ -49,9 +50,9 @@ const MAPPING_ROWS: readonly MappingRow[] = [
   },
   {
     given: "the connection to the daemon is lost under a live session",
-    then: "the exit is crashed with a transport_gone tail",
+    then: "the exit is crashed with a transport lost tail",
     input: { cause: { kind: "transport_gone" }, intent: "running" },
-    expected: { disposition: "exit", outcome: { kind: "crashed", facts: facts("transport_gone") } },
+    expected: { disposition: "exit", outcome: { kind: "crashed", facts: facts(TRANSPORT_LOST_REASON) } },
   },
   {
     given: "the session never opened",
@@ -178,7 +179,7 @@ describe("createHostSessionHandle over a daemon session", () => {
 
     // then
     await expect(started).rejects.toMatchObject({ code: "rpc_transport_gone" })
-    expect(await handle.waitForExit()).toEqual({ kind: "crashed", facts: facts("transport_gone") })
+    expect(await handle.waitForExit()).toEqual({ kind: "crashed", facts: facts(TRANSPORT_LOST_REASON) })
     expect((await handle.waitForOutcome()).status).toBe("error")
     expect(handle.attached).toBe(false)
     await handle.dispose()

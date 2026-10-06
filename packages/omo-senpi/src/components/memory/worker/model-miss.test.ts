@@ -69,3 +69,67 @@ describe("classifyRetryableModelMiss", () => {
     expect(classifyRetryableModelMiss(success)).toBeUndefined()
   })
 })
+
+describe("runtime advisories before the child's real failure (#9553)", () => {
+  // Bun on win32 prints this once per terminated worker thread, before anything the child says.
+  const REAPER_ADVISORY =
+    "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this host exits"
+
+  test("#given the reaper advisory then a non-provider error #when classified #then it is the child's own failure, not a provider outage", () => {
+    // given
+    const child = result(`${REAPER_ADVISORY}\nError: reflection worker could not open its session file`)
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toBeUndefined()
+  })
+
+  test("#given the reaper advisory then a real rate limit #when classified #then it is a provider outage named by the provider's line", () => {
+    // given
+    const child = result(`${REAPER_ADVISORY}\n429: {"error":{"type":"rate_limit_error","message":"Too many requests"}}`)
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toEqual({
+      kind: "provider_unavailable",
+      detail: '429: {"error":{"type":"rate_limit_error","message":"Too many requests"}}',
+    })
+  })
+
+  test("#given only the reaper advisory #when classified #then nothing says a provider refused the model", () => {
+    // given
+    const child = result(REAPER_ADVISORY)
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toBeUndefined()
+  })
+
+  test("#given an advisory we have never seen then a real error #when classified #then the real error decides, not the advisory's wording", () => {
+    // given - an unknown notice whose wording alone would read as an outage
+    const child = result("note: response cache temporarily unavailable, continuing without it\nError: reflection worker could not open its session file")
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toBeUndefined()
+  })
+
+  test("#given a provider's own outage sentence then a stack error line #when classified #then the provider's sentence decides", () => {
+    // given - senpi prints the provider's answer first; a stack that follows must not replace it
+    const child = result("The model is temporarily unavailable\nError: request failed\n    at send (provider.js:10:3)")
+
+    // when
+    const miss = classifyRetryableModelMiss(child)
+
+    // then
+    expect(miss).toEqual({ kind: "provider_unavailable", detail: "The model is temporarily unavailable" })
+  })
+})

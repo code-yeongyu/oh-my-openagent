@@ -26,6 +26,60 @@ export const SCENARIO_IDS = [
   "incompatibility_and_entry_fault_isolation",
 ]
 
+// Keep each driver's expected rows explicit: a failed group may produce no records.
+export const SCENARIO_GROUPS = {
+  "crash": [
+    "topology_two_parent_shards",
+    "host_crash_isolated",
+    "crashed_shard_reattaches",
+    "all_six_children_complete",
+  ],
+  "nested": [
+    "grandchild_reuses_tree_shard",
+    "nested_spawn_attach_only",
+    "own_endpoint_unreachable_fails_closed",
+  ],
+  "handoff": [
+    "mixed_engine_host_spawns_shard",
+  ],
+  "handoff-successors": [
+    "handoff_nested_spawn_uses_successor",
+    "interactive_handoff_nested_spawn",
+    "alt_root_handoff_parent_and_thread",
+    "nested_resume_attach_only",
+  ],
+  "rollback": [
+    "rollback_live_endpoint_refused",
+    "rollback_drain_wait_gate",
+    "rollback_three_store_migration",
+    "rollback_r0_resume",
+    "rollback_without_prepare_parks",
+  ],
+  "index": [
+    "cross_endpoint_open_hazard",
+    "idle_gc_index_resume",
+    "store_index_registration_precondition",
+    "store_index_registration_precondition_auto",
+  ],
+  "retain": [
+    "retain_idle_resume",
+    "retain_midturn_continuation",
+    "migration_recorded_socket_wins",
+    "incompatibility_and_entry_fault_isolation",
+  ],
+  "contracts": [
+  ],
+}
+
+export function selectedScenarioIds(only = []) {
+  for (const group of only) {
+    if (!Object.hasOwn(SCENARIO_GROUPS, group)) throw new Error(`Unknown scenario group: ${group}`)
+  }
+  if (only.length === 0) return SCENARIO_IDS
+  const selected = new Set(only.flatMap((group) => SCENARIO_GROUPS[group]))
+  return SCENARIO_IDS.filter((id) => selected.has(id))
+}
+
 export const CONTROL_ID = "shared_host_cascade_reproduced"
 
 function verdictFor(id, row) {
@@ -41,7 +95,7 @@ function verdictFor(id, row) {
 
 export function evaluateShardFaultReport(report) {
   const control = report.mode === "control"
-  const expected = control ? [CONTROL_ID] : SCENARIO_IDS
+  const expected = control ? [CONTROL_ID] : selectedScenarioIds(report.only)
   const rows = expected.map((id) => verdictFor(id, report.scenarios?.[id]))
   const unexpected = Object.keys(report.scenarios ?? {}).filter((id) => !expected.includes(id))
   const failedGates = Object.entries(report.gates ?? {})

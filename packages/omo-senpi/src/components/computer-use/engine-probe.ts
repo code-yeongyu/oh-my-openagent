@@ -125,7 +125,8 @@ export function probeComputerUseEngine(
         try {
           process.kill(-child.pid, "SIGKILL")
         } catch (error) {
-          if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") throw error
+          // macOS reports EPERM, not ESRCH, for a group whose members exited but are not reaped yet.
+          if (!(error instanceof Error) || !("code" in error) || (error.code !== "ESRCH" && error.code !== "EPERM")) throw error
         }
       }
     }, timeoutMs)

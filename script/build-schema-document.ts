@@ -1,11 +1,13 @@
 import { z } from "zod"
 import { OhMyOpenCodeConfigSchema } from "../packages/omo-opencode/src/config/schema"
+import { optionalizeDefaultedProperties } from "./json-schema-defaulted-optional"
 
 export function createOhMyOpenCodeJsonSchema(): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
     target: "draft-7",
     unrepresentable: "any",
   }) as Record<string, unknown>
+  optionalizeDefaultedProperties(jsonSchema)
 
   return {
     $schema: "http://json-schema.org/draft-07/schema#",

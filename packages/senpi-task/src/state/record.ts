@@ -47,6 +47,7 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
       run_epoch: 0,
       notified_epoch: -1,
     },
+    run_start_epoch: 0,
     ...(name === undefined ? {} : { name }),
     ...(task_summary === undefined ? {} : { task_summary }),
     ...(team_run_id === undefined ? {} : { team_run_id }),

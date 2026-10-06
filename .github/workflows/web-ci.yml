@@ -105,6 +105,15 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
+      - name: Upload glyph failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: manifesto-glyph-failures
+          path: packages/web/test-results/*/glyph-*
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Write job summary
         if: always()
         shell: bash

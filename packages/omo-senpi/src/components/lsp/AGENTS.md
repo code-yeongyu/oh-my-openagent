@@ -10,11 +10,12 @@ Daemon-backed Senpi LSP adapter. This component retains only Senpi-facing descri
 |------|---------|
 | `index.ts` | Component factory (`createLspComponent`): flag registration, six-tool registration with the daemon runtime wrapped over each `execute`, post-edit `tool_result` hook, session lifecycle (`session_start`/`session_compact`/`session_shutdown` state reset plus daemon-client cache clear). |
 | `daemon-runtime.ts` | Resolves the packaged daemon CLI at `../runtime/lsp-daemon/dist/cli.js` (path must exist, version validated against a strict pattern); `OMO_LSP_DAEMON_CLI` + `OMO_LSP_DAEMON_VERSION` override both-or-neither, absolute path only. |
-| `daemon-tool-client.ts` | Loads the daemon's `client.js` beside the CLI (cached per path), maps Senpi tool names to daemon names (`lsp_diagnostics` -> `diagnostics`, ...), and builds the per-call request context: canonical cwd, project `.pi/lsp-client.json` path, user `~/.pi/lsp-client.json`, install-decisions path, `installDecisionTool: false`. |
+| `daemon-tool-client.ts` | Loads the daemon's `client.js` beside the CLI (cached per path), maps Senpi tool names to daemon names (`lsp_diagnostics` -> `diagnostics`, ...), and builds the per-call request context: canonical cwd, the project config paths `.omo/lsp-client.json` then `.pi/lsp-client.json`, the user config path, the install-decisions path, `installDecisionTool: false`. All paths come from `config-paths.ts`. |
+| `config-paths.ts` | Where LSP config lives: the branded `.omo/` directory is read first and `.pi/` stays a read-only fallback for trees the brand-dir migration (#8370) has not moved yet. A user file (`lsp-client.json`, `lsp-install-decisions.json`) resolves to the first existing of `~/.omo/` and `~/.pi/`, defaulting to `~/.omo/` when neither exists. |
 | `post-edit-diagnostics.ts` | Post-edit diagnostics over `@oh-my-opencode/lsp-core/post-edit`: mutation tools are `write`/`edit`/`apply_patch`, concurrency 4, per-session not-configured cache, widget lines under key `omo-senpi-lsp`. |
 | `adapter/descriptors.ts` | The six ToolDefinitions (`lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`) with typed details and TUI renderers. |
 | `adapter/renderers-*.ts` / `rendering.ts` | Call/result renderers per tool family (diagnostics, navigation, rename, symbols). |
-| `adapter/migration-notices.ts` | Scans project `.pi/lsp-client.json` for non-disabled entries carrying `command`/`env` and produces `untrusted_project_lsp_command` notices. |
+| `adapter/migration-notices.ts` | Scans the project's LSP config (the first existing of `.omo/lsp-client.json` and `.pi/lsp-client.json`) for non-disabled entries carrying `command`/`env` and produces `untrusted_project_lsp_command` notices. |
 | `adapter/schema.ts` / `language-mappings.ts` | TypeBox `defineTool` helper and extension-to-language tables. |
 
 ## Wiring
@@ -32,6 +33,6 @@ Daemon-backed Senpi LSP adapter. This component retains only Senpi-facing descri
 
 ## Anti-patterns
 
-- Do not read project-local `.pi/lsp-client.json` commands. They're intentionally ignored here; users who still need custom LSP commands must move those definitions to their user `.pi/lsp-client.json`. Project configs may keep safe fields such as extensions and priorities, but command/env entries only produce a migration warning.
+- Do not read project-local `lsp-client.json` commands (`.omo/` or `.pi/`). They're intentionally ignored here; users who still need custom LSP commands must move those definitions to their user `~/.omo/lsp-client.json` (`~/.pi/lsp-client.json` is still read as a fallback). Project configs may keep safe fields such as extensions and priorities, but command/env entries only produce a migration warning.
 - Do not add LSP client, transport, or server-management logic in this component; that belongs to `lsp-core` and the daemon package.
 - Do not enable `installDecisionTool` in the request context; the Senpi adapter has no interactive install-decision surface.

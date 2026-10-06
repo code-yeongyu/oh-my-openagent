@@ -40,10 +40,25 @@ export function classifyRetryableModelMiss(result: ModelMissResult): RetryableMo
     : undefined
 }
 
-/** First meaningful child error line: senpi prints the fatal provider error and exits. */
+/**
+ * A notice the process prints about itself rather than about the request: a runtime reporting on its
+ * own host (Bun on win32 prints `child reaper unavailable under Bun on win32: ...` once per terminated
+ * worker thread, before anything the child says), or any line that announces itself with a log-level
+ * prefix (`note:`, `info:`, `warning:`, ...). It is never the provider's answer, so it can never make a
+ * child look like a provider outage (#9553).
+ */
+const ADVISORY = /\bunder (?:Bun|Node(?:\.js)?|Deno)\b|^(?:\[[^\]]*\]\s*)?(?:note|notice|info|hint|debug|warn|warning)\s*:/i
+
+/**
+ * The child's failure line: the first line that is not an advisory. senpi prints the fatal provider
+ * error first and exits, so that line decides even when a stack (`Error: ...`) follows it.
+ */
 function providerFailureDetail(result: ModelMissResult): string | undefined {
   for (const stream of [result.stderr, result.stdout]) {
-    const line = stream.split("\n").map((entry) => entry.trim()).find((entry) => entry.length > 0)
+    const line = stream
+      .split("\n")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.length > 0 && !ADVISORY.test(entry))
     if (line !== undefined) return line.slice(0, PROVIDER_DETAIL_MAX_CHARS)
   }
   return undefined

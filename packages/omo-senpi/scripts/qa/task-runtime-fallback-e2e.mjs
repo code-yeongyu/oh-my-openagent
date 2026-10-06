@@ -11,6 +11,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs"
+import { createHash } from "node:crypto"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -144,6 +145,33 @@ const scenarios = [
       }
     },
   })),
+  // #9512: the child's primary makes a tool call, then hits a usage limit inside the same turn. A
+  // host-session child carries its own chain on open_session (retry_fallback_profile), so the hop
+  // happens inside the session; the user's settings file must not be touched by it.
+  {
+    name: "limit-after-tool",
+    omoConfig: {
+      categories: {
+        toolcat: {
+          model: "omo-fallback-mock/limit-after-tool",
+          fallback_models: ["omo-fallback-mock/healthy-fallback"],
+        },
+      },
+    },
+    checks: (artifacts, stdoutText, runner) => ({
+      final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
+      fallback_event: fallbackRecorded(artifacts.log),
+      // The task event log records each finished tool call as `tool_execution`; the in-session hop must come
+      // after it. Only a host-session child carries its own chain (retry_fallback_profile, #9512); a per-child
+      // process cannot receive one, so its manager-level fallback is a different path and is not judged here.
+      tool_ran_before_limit: runner.name !== "host-session"
+        ? "N/A"
+        : /"type":"tool_execution","payload":\{"tool":"bash"/.test(artifacts.log) ? "PASS" : "FAIL",
+      settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
+        ? "PASS"
+        : "FAIL",
+    }),
+  },
   {
     name: "chain-exhausted",
     omoConfig: {},
@@ -181,6 +209,13 @@ function seedDaemonPlugin(sandbox) {
   const settingsPath = join(sandbox.agentDir, "settings.json")
   const settings = JSON.parse(readFileSync(settingsPath, "utf8"))
   writeFileSync(settingsPath, `${JSON.stringify({ ...settings, packages: [sandboxPlugin] }, null, 2)}\n`)
+}
+
+// The user's settings file as the parent and every child see it; a per-session fallback chain must
+// never be written there.
+function settingsDigest(sandbox) {
+  const path = join(sandbox.agentDir, "settings.json")
+  return existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : undefined
 }
 
 function sandboxProcesses(sandbox) {
@@ -242,6 +277,8 @@ async function runScenario(scenario, runner, outDir) {
   let processes = { stopped: [], survivors: [] }
   let runResult
   let artifacts = { task: undefined, log: "" }
+  let settingsBefore
+  let settingsAfter
   try {
     seedSandbox(sandbox)
     if (runner.daemon === true) seedDaemonPlugin(sandbox)
@@ -255,6 +292,7 @@ async function runScenario(scenario, runner, outDir) {
     // category overrides into the fixture and hijack builtin category resolution.
     const homeDir = join(sandbox.root, "home")
     mkdirSync(homeDir, { recursive: true })
+    settingsBefore = settingsDigest(sandbox)
     runResult = spawnSync(
       process.env.SENPI_BIN?.trim() || "senpi",
       [
@@ -287,7 +325,8 @@ async function runScenario(scenario, runner, outDir) {
         maxBuffer: 64 * 1024 * 1024,
       },
     )
-    artifacts = readTaskArtifacts(sandboxStateDir(sandbox))
+    settingsAfter = settingsDigest(sandbox)
+    artifacts = { ...readTaskArtifacts(sandboxStateDir(sandbox)), settingsBefore, settingsAfter }
   } finally {
     writeFileSync(join(scenarioOutDir, "stdout.json.log"), runResult?.stdout ?? "")
     writeFileSync(join(scenarioOutDir, "stderr.log"), runResult?.stderr ?? "")
@@ -304,11 +343,11 @@ async function runScenario(scenario, runner, outDir) {
   const checks = {
     exit_zero: runResult?.status === 0 ? "PASS" : "FAIL",
     runner: runner.runner(artifacts.task),
-    ...scenario.checks(artifacts, stdoutText),
+    ...scenario.checks(artifacts, stdoutText, runner),
     real_credentials_untouched: afterCredentials === beforeCredentials ? "PASS" : "FAIL",
     cleanup,
   }
-  const result = Object.values(checks).every((value) => value === "PASS") ? "PASS" : "FAIL"
+  const result = Object.values(checks).every((value) => value === "PASS" || value === "N/A") ? "PASS" : "FAIL"
   const verdict = {
     result,
     runner: runner.name,

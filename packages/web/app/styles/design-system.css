@@ -209,8 +209,11 @@
     --lit-follow-fade: 22vh;
     --lit-follow-gap: 1.25em;
     --lit-follow-rise: var(--space-6);
-    --lit-line: 50vh;
-    --lit-band: 1vh;
+    /* The manifesto reveal fully lights a word once its bottom (plus its in-line stagger) is above
+       --lit-line - --lit-band (83vh). Measured at word tops, the fully lit depth is 0.81 of the
+       viewport at the median and 0.76 at worst across 390/1440/1920, en and ko (#9591: the top 75-80%). */
+    --lit-line: 91vh;
+    --lit-band: 8vh;
     --dur-swap-out: 80ms;
     --dur-swap-in: 220ms;
     --dur-spring: 900ms;
@@ -856,25 +859,21 @@
     white-space: pre-line;
     view-timeline: --lit-body block;
   }
-  /* Line mode (`lit-lines`): each authored line is a block with its own view timeline, and its
-     words light while the line crosses the reading line (--lit-line ± --lit-band). Lines do not
-     overlap vertically, so at most one line (plus a few words of its neighbour) is ever mid-sweep. */
-  .lit-line {
-    display: block;
-  }
   @supports (animation-timeline: view()) {
-    .lit-progress.lit-scroll:not(.lit-lines) {
+    .lit-progress.lit-scroll {
       animation: lit-progress linear both;
       animation-timeline: --lit-body;
+    }
+    /* Paragraph mode (landing secret): sweep the body across `cover 20vh → 100% - 50vh`. */
+    .lit-progress.lit-scroll:not(.lit-read) {
       animation-range-start: cover 20vh;
       animation-range-end: cover calc(100% - 50vh);
     }
-    .lit-lines.lit-scroll .lit-line {
-      animation: lit-progress linear both;
-      animation-timeline: view();
-      animation-range-start: cover calc(100vh - var(--lit-line) - var(--lit-band));
-      animation-range-end: cover calc(100% - var(--lit-line) + var(--lit-band));
-    }
+    /* Reveal mode (manifesto reading blocks): the reveal is driven by the JS per-word geometry in
+       lit-progress.ts (each word lights as its bottom crosses the full line), so the lit frontier
+       is monotonic and already-revealed text never lags the scroll. The JS observer fallback is the
+       single authoritative driver; the CSS scroll-timeline approximation (a block cascade) cannot
+       track tall blocks word-by-word, so the reveal does not opt into it. */
     .lit-scroll .lit-follow {
       animation: lit-follow linear both;
       animation-timeline: --lit-body;
@@ -928,22 +927,31 @@
   }
 
   /* Reading blocks (manifesto): the same sweep, tuned for long-form prose. Unread words stay
-     legible (--text-lo instead of --text-faint), the blur is halved, and every word is lit until
-     hydration picks a mode, so the page reads before JavaScript does. */
+     legible (--text-lo instead of --text-faint) and are never blurred — a readable floor, not a
+     smeared one — and every word is lit until hydration picks a mode, so the page reads before
+     JavaScript does. */
   .lit-read {
-    --lit-blur: 2px;
+    --lit-blur: 0px;
   }
   .lit-read[data-lit-mode="pending"] {
     --lit-p: 1;
   }
+  /* Before JavaScript (or if it fails): every word is fully lit, so the page reads in full. */
+  .lit-read[data-lit-mode="pending"] .lit-word {
+    --lit-local: 1;
+  }
   .lit-read .lit-word {
-    background-image: linear-gradient(
-      90deg,
-      var(--text-hi) 0%,
-      var(--text-hi) 45%,
-      var(--text-lo) 55%,
-      var(--text-lo) 100%
+    /* Per-word fade (not a line-wide background gradient): each word's brightness is ONE value, so
+       no word is ever split in half mid-transition. --lit-local (0..1) lerps the word between the
+       unread floor and full lit; the stagger steps BETWEEN words. Opacity stays 1 — the floor must
+       keep its full --text-lo contrast (5.95:1, WCAG AA); dimming is done by colour alone. */
+    background: none;
+    color: color-mix(
+      in oklab,
+      var(--text-hi) calc(var(--lit-local) * 100%),
+      var(--text-lo) calc((1 - var(--lit-local)) * 100%)
     );
+    filter: blur(calc((1 - var(--lit-local)) * var(--lit-blur)));
   }
   .lit-link {
     text-decoration: underline;
@@ -1446,8 +1454,7 @@
       display: none;
     }
     .lit-progress,
-    .lit-progress.lit-scroll,
-    .lit-lines.lit-scroll .lit-line {
+    .lit-progress.lit-scroll {
       --lit-p: 1;
       animation: none;
     }
@@ -1459,6 +1466,7 @@
     }
     .lit-word,
     .lit-read .lit-word {
+      --lit-local: 1;
       background-image: none;
       color: var(--text-hi);
       filter: none;
