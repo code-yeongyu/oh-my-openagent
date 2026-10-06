@@ -107,6 +107,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "memory": {},         // MemorySettings (Native harness)
   "git_master": { "commit_footer": false }, // opt-in commit footer (Native harness); no Co-authored-by trailer is ever emitted
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
+  "context_handoff": { "enabled": false }, // opt-in fresh-session restart when compaction fails (Native harness)
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
   "[native]": {},       // OmO Native-only overrides, typed base keys
@@ -121,7 +122,7 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `context_handoff`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`), so a harness-specific override stays schema-checked.
 
 `[senpi]` is the legacy spelling of `[native]`, kept working for one release line. It is canonicalized to `[native]` when the config is read, so a config that cannot be rewritten still applies every value it sets, and the startup migration rewrites the key in the file once, naming it in a notice. When a file carries both blocks, `[native]` wins and the ignored `[senpi]` block is reported as a deprecation diagnostic.
 
@@ -153,6 +154,31 @@ The optional `telemetry` block controls OmO Native product telemetry in Senpi. `
 ```
 
 The block may also appear at the shared top level or in profile layers and follows the normal resolution order. Because typed config objects are strict, an older `@oh-my-opencode/omo-config-core` version that predates this key rejects a file containing `telemetry` instead of ignoring it. See [Mixed-version compatibility](#mixed-version-compatibility) before sharing one config across versions.
+
+### `context_handoff` (Native harness)
+
+Off by default. Normally a long session keeps going through automatic context compaction, and context handoff leaves that alone. When enabled, it steps in only when compaction fails:
+
+- a compaction ends with an error (a compaction you cancel yourself does not count);
+- compaction is rejected because it cannot make the context smaller (the summary would still overflow, the compaction circuit breaker is open, or the session's compaction cap is reached);
+- context usage is still at or above `threshold_percent` (default `85`) right after a compaction;
+- `compaction_repeat_limit` compactions (default `3`) happen within `compaction_repeat_window_minutes` (default `10`);
+- a turn ends with a context-overflow error from the provider.
+
+It never acts while a compaction is still running, and a later compaction that brings usage back under `threshold_percent` clears a recorded failure. On a failure omo shows a warning and asks the agent once to write a handoff to `.omo/handoffs/<session-id>.md`, then continues in a fresh session (same working directory, the old session recorded as its parent) seeded with that handoff and any open goal objective. If the agent cannot write the handoff, omo writes one from the session record (the failure, the previous session file, and the last user messages) and switches anyway. Aborting the run (Esc) after the handoff was requested cancels the switch. Persistent monitors stop with the old session, so the handoff lists them and the fresh agent re-arms them. A session that is already the result of 3 chained handoffs does not hand off on its own again. Handoff files live only directly inside `.omo/handoffs/`: omo refuses a symlinked `.omo`, `.omo/handoffs`, or handoff file, and `/omo-context-handoff [path]` (the manual switch) accepts only a file in that directory. With `enabled` off, nothing of this feature is registered, including the command.
+
+```jsonc
+{
+  "[native]": {
+    "context_handoff": {
+      "enabled": true,
+      "threshold_percent": 85,
+      "compaction_repeat_limit": 3,
+      "compaction_repeat_window_minutes": 10
+    }
+  }
+}
+```
 
 ### `memory` (Native harness)
 

@@ -905,6 +905,34 @@
       },
       "additionalProperties": false
     },
+    "context_handoff": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "threshold_percent": {
+          "default": 85,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99
+        },
+        "compaction_repeat_limit": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 20
+        },
+        "compaction_repeat_window_minutes": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        }
+      },
+      "additionalProperties": false
+    },
     "task": {
       "type": "object",
       "properties": {
@@ -3182,6 +3210,30 @@
           },
           "additionalProperties": false
         },
+        "context_handoff": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "threshold_percent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "compaction_repeat_limit": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 20
+            },
+            "compaction_repeat_window_minutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -5289,6 +5341,30 @@
             },
             "include_co_authored_by": {
               "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "context_handoff": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "threshold_percent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "compaction_repeat_limit": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 20
+            },
+            "compaction_repeat_window_minutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120
             }
           },
           "additionalProperties": false
@@ -7404,6 +7480,30 @@
           },
           "additionalProperties": false
         },
+        "context_handoff": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "threshold_percent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "compaction_repeat_limit": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 20
+            },
+            "compaction_repeat_window_minutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120
+            }
+          },
+          "additionalProperties": false
+        },
         "task": {
           "type": "object",
           "properties": {
@@ -9509,6 +9609,30 @@
               },
               "include_co_authored_by": {
                 "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "context_handoff": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "threshold_percent": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 99
+              },
+              "compaction_repeat_limit": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 20
+              },
+              "compaction_repeat_window_minutes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 120
               }
             },
             "additionalProperties": false
@@ -11624,6 +11748,30 @@
                 },
                 "additionalProperties": false
               },
+              "context_handoff": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "threshold_percent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99
+                  },
+                  "compaction_repeat_limit": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 20
+                  },
+                  "compaction_repeat_window_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -13735,6 +13883,30 @@
                 },
                 "additionalProperties": false
               },
+              "context_handoff": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "threshold_percent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99
+                  },
+                  "compaction_repeat_limit": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 20
+                  },
+                  "compaction_repeat_window_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
+                  }
+                },
+                "additionalProperties": false
+              },
               "task": {
                 "type": "object",
                 "properties": {
@@ -15842,6 +16014,30 @@
                   },
                   "include_co_authored_by": {
                     "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_handoff": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "threshold_percent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99
+                  },
+                  "compaction_repeat_limit": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 20
+                  },
+                  "compaction_repeat_window_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
                   }
                 },
                 "additionalProperties": false

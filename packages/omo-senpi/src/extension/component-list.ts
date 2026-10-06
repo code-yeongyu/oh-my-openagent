@@ -7,6 +7,7 @@ import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
+import { createContextHandoffComponent } from "../components/context-handoff"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createGatewayComponent } from "../components/gateway"
 import { createGitMasterAttributionComponent } from "../components/git-master"
@@ -48,6 +49,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createUlwExecuteContinuationComponent(),
     createUlwLoopComponent(),
     createTodoFanoutReminderComponent(),
+    createContextHandoffComponent(),
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
     createAstGrepComponent(),

@@ -3,6 +3,7 @@ import * as z from "zod"
 import { OmoAgentsConfigSchema } from "./agent"
 import { OmoCategoriesConfigSchema } from "./category"
 import { OmoComputerSettingsLayerSchema, OmoComputerSettingsSchema } from "./computer"
+import { OmoContextHandoffSettingsLayerSchema, OmoContextHandoffSettingsSchema } from "./context-handoff"
 import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./git-master"
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
@@ -31,6 +32,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -47,6 +49,7 @@ export const OmoConfigProfileSchema = z.object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -69,6 +72,7 @@ export const OmoConfigSchema = z.object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsSchema.optional(),
   task: OmoTaskSettingsSchema.optional(),
   teams: OmoTeamsConfigSchema.optional(),
   models: OmoModelCatalogSchema.optional(),
@@ -94,6 +98,7 @@ export const OmoConfigLayerSchema = z.object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),

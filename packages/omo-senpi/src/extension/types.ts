@@ -57,7 +57,10 @@ export interface SenpiExtensionAPI {
   ): void
   getFlag(name: string): boolean | string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  sendUserMessage(
+    content: string | readonly Record<string, unknown>[],
+    options?: { deliverAs?: "steer" | "followUp"; expandPromptTemplates?: boolean },
+  ): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
   getCommands?(): readonly {
     readonly name: string

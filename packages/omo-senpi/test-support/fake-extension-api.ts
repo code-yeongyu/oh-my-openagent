@@ -28,7 +28,7 @@ export interface FakeSendMessageCall {
 
 export interface FakeSendUserMessageCall {
   content: string | readonly Record<string, unknown>[]
-  options?: { deliverAs?: "steer" | "followUp" }
+  options?: { deliverAs?: "steer" | "followUp"; expandPromptTemplates?: boolean }
 }
 
 export interface FakeRpcEvent {
@@ -150,7 +150,7 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     this.messages.push({ message, options })
   }
 
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void {
+  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: FakeSendUserMessageCall["options"]): void {
     this.userMessages.push({ content, options })
   }
 
