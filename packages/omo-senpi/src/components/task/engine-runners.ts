@@ -7,7 +7,6 @@ import {
   ULW_REVIEWER_AGENT_NAMES,
   RpcHostRunner,
   RpcProcessRunner,
-  ensureTaskDaemon,
   createInProcessManagedRunner,
   createParentRegistrySessionContext,
   createRpcManagedRunner,
@@ -25,14 +24,13 @@ import { log } from "@oh-my-opencode/utils"
 
 import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { MEMORY_TOOL_NAME } from "../memory/tools"
 import type { TaskRuntimeContext } from "./runtime-context"
+import type { TaskHostRouting } from "./shard-routing"
 
-// Memory tools are bound to the parent session's identity (repo commits + writer lock); question
-// tools need a parent user UI. A task child must never inherit either, so they ride the same
-// ui-only exclusion as render-only tools.
+// Question tools need a parent user UI. Memory stays available to match process children; its
+// invocation context supplies the child session identity while the shared definition preserves the
+// parent's live service/client instances.
 export const TASK_CHILD_UI_ONLY_TOOL_NAMES: readonly string[] = [
-  MEMORY_TOOL_NAME,
   "request_user_input",
   "ask_user_question",
 ]
@@ -54,7 +52,10 @@ export interface RunnerBuildContext {
   readonly resolveInheritedExtensions?: () => Promise<readonly string[]>
   // Where a daemon fallback reason goes. Defaults to the module logger; the engine passes the
   // session's deduped notice list so the same reason reaches `task_output` exactly once.
-  readonly onHostWarning?: (message: string) => void
+  readonly onHostWarning?: (message: string) => void | (() => void)
+  // WHERE this session's `process` children open (its own task host) and the task store the index
+  // records. The engine always passes it; the host runner cannot be built without it.
+  readonly hostRouting?: TaskHostRouting
 }
 
 export interface TaskRunnerFactories {
@@ -92,7 +93,10 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
     depthPolicy: { maxDepth: Math.max(build.settings.max_depth + 1, 1) },
     ...(build.kernelToolBindings === undefined ? {} : { kernelToolBindings: build.kernelToolBindings }),
   })
-  const context = createParentRegistrySessionContext(() => build.runtime.modelRegistry())
+  const context = createParentRegistrySessionContext(
+    () => build.runtime.modelRegistry(),
+    () => build.runtime.projectTrusted(),
+  )
   return createInProcessManagedRunner(inProcess, context)
 }
 
@@ -190,18 +194,22 @@ export function buildRespawnRunner(
 }
 
 /**
- * WHICH runner a `process` child gets. The default is a session of the machine-wide senpi daemon;
- * `task.process_runner: "child-process"` and win32 (no daemon runner path there) keep the per-child
- * process runner, which is also the daemon runner's loud fallback for the narrow set of reasons the
- * engine marks fallback-allowed.
+ * WHICH runner a `process` child gets. The default is a session of this session's OWN task host
+ * (its shard); `task.process_runner: "child-process"` and win32 (no host runner path there) keep the
+ * per-child process runner, which is also the host runner's loud fallback for the narrow set of
+ * reasons the engine marks fallback-allowed. There is no shared-host branch.
  */
 export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunner | RpcProcessRunner {
   const inheritedExtensions = parseExtensionEntries(process.argv)
-  const perChild = new RpcProcessRunner({ inheritedExtensions })
+  const perChild = new RpcProcessRunner({
+    inheritedExtensions,
+    ...(build.onHostWarning === undefined ? {} : { onWarning: build.onHostWarning }),
+  })
   const platform = build.platform ?? process.platform
   if (build.settings.process_runner !== "host" || platform === "win32") return perChild
+  const routing = build.hostRouting
+  if (routing === undefined) throw new Error("omo-senpi task host runner built without the session's shard routing")
   const env = build.env ?? process.env
-  const idleExitMs = build.settings.host_idle_exit_ms
   return new RpcHostRunner({
     policy: build.settings.host_engine_policy,
     agentDir: build.agentDir ?? resolveAgentHome({ env }),
@@ -209,8 +217,14 @@ export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunne
     inheritedExtensions,
     fallback: perChild,
     ...(build.onHostWarning === undefined ? {} : { onWarning: build.onHostWarning }),
-    // The only omo.json knob the launch spec yields to; every other daemon launch input is the
-    // spec's, so `omo daemon run` and a child-triggered ensure cannot drift.
-    ...(idleExitMs === undefined ? {} : { ensureDaemon: (input) => ensureTaskDaemon({ ...input, ports: { idleExitMs } }) }),
+    ensureDaemon: routing.ensureDaemon,
+    shardResolver: () => routing.shardResolver(),
+    storeDir: routing.storeDir,
+    ownHostSocket: routing.ownHostSocket,
+    insideHost: routing.insideHost,
+    onNotice: routing.onNotice,
+    shardEvents: routing.shardEvents,
+    liveChildren: routing.liveChildren,
+    probeHost: routing.probeHost,
   })
 }

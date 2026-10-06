@@ -110,6 +110,6 @@ describe("choosing an option closes the dialog and tells the user what happened"
 
     // then
     expect(h.writes).toHaveLength(0)
-    expect(h.toasts[0]).toContain("omo-ai@beta")
+    expect(h.toasts[0]).toContain("install --platform=native")
   })
 })

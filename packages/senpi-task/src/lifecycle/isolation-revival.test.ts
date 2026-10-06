@@ -11,6 +11,7 @@ import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import type { TaskIsolationSpec, TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { FakeRegistry, cleanupProjects, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -55,6 +56,7 @@ function harness(options: { readonly alive?: Set<number> } = {}) {
     signal: (pid) => { alive.delete(pid) },
   }
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry,
     config: settings(),
@@ -93,6 +95,7 @@ describe("isolated records are never revived", () => {
       task_id: "st_20000002", status: "running", residency_state: "resident", host_pid: hostPid,
     })
     const context = resolveContext({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store, registry, config: settings(), hostPid, now, signaller, orphanKillDelayMs: 0,
     })
 

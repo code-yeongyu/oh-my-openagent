@@ -18,7 +18,7 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic"],
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
         variant: "max",
       },
@@ -49,16 +49,14 @@ describe("category routing policy", () => {
       },
     ])
     expect(low.fallbackChain).toEqual([
-      {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-6-sol",
-        variant: "medium",
-      },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
         variant: "medium",
-      }
+      },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" }
     ])
   })
 
@@ -72,13 +70,13 @@ describe("category routing policy", () => {
     // then
     expect(leadingChain).toEqual([
       {
-        providers: ["chatgpt-subscription"],
+        providers: ["openai", "chatgpt-subscription"],
         model: "gpt-6-luna-fast",
         variant: "low",
       },
       {
         providers: ["deepseek"],
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         variant: "off",
       },
       {
@@ -104,11 +102,13 @@ describe("category routing policy", () => {
         providers: ["anthropic", "anthropic-api", "github-copilot"],
         model: "claude-haiku-4-5",
         variant: "off",
-      }
+      },
+      { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
+      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
     ])
   })
 
-  test("unspecified-low follows the approved 7-rung chain headed by mimo-v2.6-pro max", () => {
+  test("unspecified-low follows the approved 8-rung chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -118,6 +118,11 @@ describe("category routing policy", () => {
     // then
     expect(chain.map((entry) => entry.model)).not.toContain("gpt-5.6-luna")
     expect(chain).toEqual([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-sonnet-5-5",
+        variant: "medium",
+      },
       {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.6-pro",
@@ -170,9 +175,9 @@ describe("category routing policy", () => {
     // then
     expect(highChain).toEqual([
       {
-        providers: ["anthropic"],
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "max",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -197,7 +202,7 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic"],
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
         variant: "max",
       },
@@ -215,11 +220,6 @@ describe("category routing policy", () => {
     expect(writingChain).toEqual([
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-1",
-        variant: "low",
-      },
-      {
-        providers: ["anthropic"],
         model: "claude-opus-5-5",
         variant: "low",
       },

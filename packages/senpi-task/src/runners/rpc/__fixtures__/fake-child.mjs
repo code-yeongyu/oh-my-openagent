@@ -31,6 +31,7 @@ function assistantMessage(text, stopReason = "endTurn", errorMessage) {
 function completeTurn(text) {
   emit({ type: "message_end", message: assistantMessage(text) })
   emit({ type: "agent_end", willRetry: false, messages: [assistantMessage(text)] })
+  emit({ type: "agent_idle" })
 }
 
 function handlePrompt(cmd) {
@@ -41,6 +42,7 @@ function handlePrompt(cmd) {
     if (message === "empty-followup") {
       emit({ type: "agent_start" })
       emit({ type: "agent_end", willRetry: false, messages: [] })
+      emit({ type: "agent_idle" })
     }
     return
   }
@@ -67,6 +69,7 @@ function handlePrompt(cmd) {
     emit({ type: "agent_start" })
     emit({ type: "message_end", message: failed })
     emit({ type: "agent_end", willRetry: false, messages: [failed] })
+    emit({ type: "agent_idle" })
     return
   }
   if (message.startsWith("exit:")) {
@@ -114,7 +117,8 @@ function handleCommand(cmd) {
       return emit({ type: "queue_update", steering: [], followUp: [cmd.message] })
     case "abort":
       respond("abort", cmd.id)
-      return emit({ type: "agent_end", willRetry: false, messages: [] })
+      emit({ type: "agent_end", willRetry: false, messages: [] })
+      return emit({ type: "agent_idle" })
     case "get_state":
       return respond("get_state", cmd.id, {
         data: {

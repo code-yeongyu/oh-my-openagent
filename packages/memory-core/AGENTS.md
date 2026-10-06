@@ -15,7 +15,7 @@ The public API is the barrel at `src/index.ts`.
 | `src/identity/` | Memory identity resolution and the `OMO_MEMORY_HOME` directory layout. |
 | `src/locks/` | Cross-process locks for memory writes, reflection scheduling, and transcript state, plus the machine-wide `recall-wake` counting lease (`recall-wake.slot-<n>.lock` per slot, FIFO `recall-wake.tickets/`, default 2 slots, proof-based stale recovery for slots and tickets alike, bounded wait ending in `RecallWakeBusyError`). |
 | `src/memfs/` | Memory-path validation, markdown frontmatter parsing, and hook-script installation. |
-| `src/tools/` | `memory` and `memory_apply_patch` operations, patch parsing, typed tool errors, and auto-commit behavior. |
+| `src/tools/` | `memory` and `memory_apply_patch` operations, patch parsing, typed tool errors, and auto-commit behavior. `leaked-arguments.ts` splits an argument that leaked into its sibling (`summary</description>\n<parameter name="file_text">body`) back apart before `runMemoryTool` validates. |
 | `src/journal/` | Per-conversation transcript cursors, reflection snapshots, and durable journal state. |
 | `src/facts/` | Durable fact pipeline: queue + cursor watermarks, failure backoff/store, payload capping, person routing, recovery, mutation planning. |
 | `src/people/` | People-card grammar: parse/serialize, slug rules, reserved slugs, observations. |

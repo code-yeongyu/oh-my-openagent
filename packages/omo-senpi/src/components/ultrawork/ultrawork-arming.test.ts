@@ -3,7 +3,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 import { armingSnapshot, classifyUltraworkInput, createSessionArming, createUltraworkComponent } from "./index"
 import {
   createTestContext,
@@ -145,7 +145,7 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     const arming = createSessionArming()
     arming.markArmed("session-snapshot")
     arming.rearmOnCompact("session-snapshot")
-    const restoreSlot = seedSharedArmingSlot({ directive: SENPI_ULTRAWORK_DIRECTIVE, arming })
+    const restoreSlot = seedSharedArmingSlot({ directive: SENPI_ULTRAWORK_DIRECTIVE, astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE, arming })
 
     try {
       const before = {
@@ -358,15 +358,19 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     expect(content).not.toContain("<ultrawork-mode>")
   })
 
-  it("#given a slot left under different directive text #when the bundle re-evaluates #then the session is not armed and receives the full directive", async () => {
+  it.each(["baseline", "astra"] as const)("#given a slot left under different %s directive text #when the bundle re-evaluates #then the session is not armed and receives the full directive", async (variant) => {
     // given: an earlier bundle evaluation armed the session and left the REAL
-    // slot shape — { directive, arming } — on the process-global registry, tagged
+    // slot shape — { directive, astraDirective, arming } — on the process-global registry, tagged
     // with directive text the CURRENT directive no longer matches (omo.js or
     // SENPI_ULTRAWORK_DIRECTIVE changed mid-process). `arming` is present and IS
     // the stale ledger, so the directive-text mismatch alone must discard it.
     const staleLedger = createSessionArming()
     staleLedger.markArmed("session-upgraded")
-    const restoreSlot = seedSharedArmingSlot({ directive: "<ultrawork-mode>\nstale directive text\n</ultrawork-mode>", arming: staleLedger })
+    const restoreSlot = seedSharedArmingSlot({
+      directive: variant === "baseline" ? "stale baseline directive" : SENPI_ULTRAWORK_DIRECTIVE,
+      astraDirective: variant === "astra" ? "stale Astra directive" : SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
+      arming: staleLedger,
+    })
     try {
       // when: the reloaded bundle constructs its component against the shared slot
       const pi = new FakeExtensionAPI()

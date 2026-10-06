@@ -11,9 +11,9 @@ Audit each pass, fail, block, steering change, and checkpoint in `.omo/ulw-loop/
 ## Manual-QA channels
 Run each criterion's real-surface proof yourself through the channel that faithfully exercises it; capture the artifact before recording PASS.
 
-1. **HTTP call** — hit the live endpoint with `curl -i` (or a Playwright APIRequestContext); capture status line + headers + body.
+1. **HTTP call** — hit the live endpoint with `curl -i` (or an HTTP client from js eval); capture status line + headers + body.
 2. **Terminal / TUI** - prove it through the xterm.js web terminal; tmux `send-keys` is fine for a boot smoke, but NEVER `tmux capture-pane` for color/layout/CJK evidence (it degrades truecolor).
-3. **Browser use** — from js eval: (1) `new Bun.WebView()` on Bun >= 1.4 (macOS default; Linux/Windows need installed Chrome/Chromium/Edge). (2) Otherwise, or for Chrome semantics, stealth, trace, or auth, WRITE and run a `playwright-core` script against local Chrome (`channel: "chrome"`; persistent context on a CLONED profile, never the live one). Capture action log + screenshot path. Never downgrade a browser-facing criterion.
+3. **Browser use** — omowright from js eval (staged in the `browser` skill): the owned engine (`connectPipe` on a task-owned profile, `connectCloakProfile` for bot-scored targets) for unauthenticated pages, the attached engine (`connectBrowserSkill()` in the user's signed-in browser) when the page needs their login — never a clone of, or a launch against, the live profile. Capture action log + screenshot path. Never downgrade a browser-facing criterion, and never launch a headless browser because the attached one is missing.
 4. **Computer use** — for desktop/GUI apps, drive the running app via OS automation (computer-use, AppleScript, xdotool, etc.); capture action log + screenshot.
 
 For TUI visual QA (mandatory when a PR or review must inspect the terminal screen),
@@ -185,7 +185,7 @@ Use steering only for structured evidence-backed mutation. Reject natural-langua
 
 | Kind | When to use | Required fields |
 |------|-------------|-----------------|
-| add_subgoal | Any defect met mid-run, pre-existing included, or a real blocker; it becomes a story fixed to the ideal state, never a follow-up note. | `title`, `objective`, `evidence`, `rationale` |
+| add_subgoal | A defect inside the change's blast radius (the request not delivered, a regression this change introduces, an invalid proof, a failing test or stale doc of touched code) or a real blocker; it becomes a story fixed to the ideal state. A defect outside it gets a tracked issue, not a subgoal. | `title`, `objective`, `evidence`, `rationale` |
 | split_subgoal | Story too large; needs decomposition | `targetGoalId`, `childGoals` (array of `{ title, objective }`), `evidence`, `rationale` |
 | reorder_pending | Discovered dependency order | `pendingOrder` (array of ids), `evidence`, `rationale` |
 | revise_pending_wording | Title/objective ambiguous | `targetGoalId`, `revisedTitle?`, `revisedObjective?`, `evidence`, `rationale` |

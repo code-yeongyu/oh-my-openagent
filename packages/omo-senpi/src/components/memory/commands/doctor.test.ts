@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
@@ -16,13 +16,14 @@ import {
   type FakeDeps,
 } from "./commands.test-support"
 import { registerDoctorCommand } from "./doctor"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 const SEEDS = [
@@ -74,6 +75,78 @@ Changes to these files only take effect after a git commit. Use the memory tools
 const V1_PERSONA_SEED = `---\ndescription: Persona - who I am\n---\n${V1_PERSONA_BODY}`
 
 describe("/doctor", () => {
+  test("#given a dangling target #when doctor runs #then audit warns", async () => {
+    const { identity, pi, ctx } = await harness()
+    await mkdir(join(identity.identityPaths.repo, "reference"))
+    await writeFile(join(identity.identityPaths.repo, "reference/a.md"), "---\ndescription: Link\n---\n[[reference/missing.md]]\n")
+    const text = await invoke(pi, "doctor", "", ctx)
+    expect(text).toContain("[warn] audit:link_dangling: 1 issue: reference/a.md -> reference/missing.md")
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("warning")
+  })
+
+  test("#given a clean corpus #when doctor runs #then audit reports success once", async () => {
+    const { pi, ctx } = await harness()
+    const text = await invoke(pi, "doctor", "", ctx)
+    expect(text.match(/\[ok\] audit:/g)).toHaveLength(1)
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("info")
+  })
+
+  test("#given a clean corpus #when JSON is requested #then the audit notification is parseable and unchanged", async () => {
+    const { pi, ctx, identity } = await harness()
+    const text = await invoke(pi, "doctor", "--json", ctx)
+    const report = JSON.parse(text)
+    expect(report.audit.version).toBe(1)
+    expect(report.identity).toBe(identity.identity)
+    expect(report.checks.find((check: { name: string }) => check.name === "repository").level).toBe("ok")
+    expect(report.skills).toEqual({ scanned: 0, repaired: 0 })
+    expect(ctx.ui.notifications.at(-1)?.message).toBe(text)
+  })
+
+  test("#given legacy secrets #when JSON is requested #then audit redaction preserves counts", async () => {
+    const { identity, pi, ctx } = await harness()
+    await mkdir(join(identity.identityPaths.repo, "reference"))
+    await writeFile(join(identity.identityPaths.repo, "reference/a.md"), "---\ndescription: Legacy link\n---\n[[notes/token=abc123456.md]]\n")
+    await mkdir(identity.identityPaths.locks, { recursive: true })
+    await writeFile(join(identity.identityPaths.locks, "AKIAABCDEFGHIJKLMNOP.lock"), "invalid")
+    const text = await invoke(pi, "doctor", "--json", ctx)
+    const report = JSON.parse(text)
+    expect(report.audit.counts.link_dangling).toBe(1)
+    expect(Object.values(report.audit.counts).every((count) => typeof count === "number")).toBe(true)
+    expect(report.audit.issues[0].detail).toContain("***")
+    expect(report.checks.find((check: { name: string }) => check.name === "locks").detail).toContain("***")
+    expect(text).not.toContain("abc123456")
+    expect(text).not.toContain("AKIAABCDEFGHIJKLMNOP")
+  })
+
+  test("#given invalid frontmatter #when JSON is requested #then audit keeps the existing single failure check", async () => {
+    const { identity, pi, ctx } = await harness()
+    await writeFile(join(identity.identityPaths.repo, "system/bad.md"), "missing description")
+    const text = await invoke(pi, "doctor", "--json", ctx)
+    const report = JSON.parse(text)
+    expect(report.audit.counts.frontmatter_invalid).toBe(1)
+    expect(report.checks.filter((check: { name: string }) => check.name === "frontmatter")).toHaveLength(1)
+    expect(report.checks.find((check: { name: string }) => check.name === "frontmatter").level).toBe("fail")
+    expect(report.checks.some((check: { name: string }) => check.name === "audit:frontmatter_invalid")).toBe(false)
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
+  })
+
+  test("#given an unknown repair flag #when doctor runs #then audit refuses it", async () => {
+    const { pi, ctx } = await harness()
+    const text = await invoke(pi, "doctor", "--json --fix", ctx)
+    expect(text).toContain("unknown flag --fix")
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
+  })
+
+  test("#given registration #when doctor is not invoked #then no identity or settings are resolved", () => {
+    const pi = new MemoryFakeExtensionAPI()
+    registerDoctorCommand(pi, {
+      contextForSession: () => { throw new Error("registration resolved identity") },
+      bustPromptCache: () => { throw new Error("registration cleared prompt cache") },
+      loadSettings: () => { throw new Error("registration loaded settings") },
+    })
+    expect(pi.commands.find((command) => command.name === "doctor")?.options.description).toBe("Run deterministic memory health checks and repair skill frontmatter.")
+  })
+
   test("#given a healthy repository #when doctor runs #then every deterministic check passes", async () => {
     // given
     const { pi, ctx } = await harness()

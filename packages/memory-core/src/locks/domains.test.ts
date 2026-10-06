@@ -43,6 +43,7 @@ describe("lock domain paths", () => {
       "facts-queue",
       "facts-runs",
       "notice",
+      "memory-maintenance",
     ])
     expect(paths[0]).toBe(path.join(locksDirectory, "memory-write.lock"))
     expect(paths[1]).toBe(path.join(locksDirectory, "reflection-scheduler.lock"))

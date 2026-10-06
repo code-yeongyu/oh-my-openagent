@@ -50,6 +50,7 @@ export const OmoMemoryRecallSchema = z.object({
   sidecar_max_tokens: z.number().int().positive().default(48000),
   max_concurrent_wakes: z.number().int().positive().default(2),
   tool_budget: z.number().int().positive().default(8),
+  query_expansion: z.boolean().default(false),
 }).strict()
 
 // ---------------------------------------------------------------------------
@@ -151,6 +152,7 @@ export const OmoMemoryRecallLayerSchema = z.object({
   sidecar_max_tokens: z.number().int().positive().optional(),
   max_concurrent_wakes: z.number().int().positive().optional(),
   tool_budget: z.number().int().positive().optional(),
+  query_expansion: z.boolean().optional(),
 }).strict()
 
 export const OmoMemoryNudgeLayerSchema = z.object({
@@ -246,6 +248,7 @@ export const OmoMemorySettingsSchema = z.object({
     sidecar_max_tokens: 48000,
     max_concurrent_wakes: 2,
     tool_budget: 8,
+    query_expansion: false,
   }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),

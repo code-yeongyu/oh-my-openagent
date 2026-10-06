@@ -1,5 +1,0 @@
-category: unspecified-high
-provider: openai-codex
-modelId: gpt-6-astra
-variant: high
-fallbacks: ["anthropic/claude-opus-5","zai-coding-plan/glm-5.3"]

@@ -3,7 +3,7 @@ import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/sen
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { executeBatch } from "./execute-batch"
 import { runSpawn } from "./execute-single"
-import { buildStartSpec, ensureAutoExecutionMode, singleSpawnParams } from "./execute-spec"
+import { buildStartSpec, ensureAutoExecutionMode, singleSpawnParams, taskTargetOf } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
 import { resolveTaskKernelTools } from "./kernel-tools"
 import { evaluateSpawnPolicy } from "./spawn-policy"
@@ -83,7 +83,8 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
 
     // The parent session's one daemon check, settled BEFORE any spec is built so every child of
     // this call records the same execution mode (and a kernel-tool grant is decided against it).
-    await ensureAutoExecutionMode(deps)
+    // A call whose every target already runs in-process skips it and never ensures a host.
+    await ensureAutoExecutionMode(deps, resolved.items.map(taskTargetOf))
 
     // Parent kernel tools are resolved BEFORE any spawn: a refusal must leave zero child sessions.
     const kernelTools = await resolveTaskKernelTools(deps, ctx, resolved.items, params.tools)

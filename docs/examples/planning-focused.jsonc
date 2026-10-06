@@ -10,7 +10,7 @@
     "explore": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     // Research and documentation
-    "librarian": { "model": "deepseek/deepseek-v4-flash", "reasoning": "max" },
+    "librarian": { "model": "deepseek/deepseek-flash", "reasoning": "max" },
 
     // Pre-planning consultant: heavily used, maximum depth
     "plan-consultant": {
@@ -30,13 +30,13 @@
   "categories": {
     "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
-    "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
+    "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
     // High-effort planning tasks: maximum reasoning
-    "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
+    "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
     // Documentation from plans
-    "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "medium" },
+    "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
 
     // Visual architecture
     "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
@@ -45,7 +45,7 @@
     "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
     // Deep research and analysis: the default lane, then the escalation lane
-    "deep-low": { "model": "openai/gpt-6-sol", "reasoning": "medium" },
+    "deep-low": { "model": "openai/gpt-6.1-sol", "reasoning": "medium" },
     "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
     // Strategic reasoning

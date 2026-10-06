@@ -1,5 +1,5 @@
 import type { KernelToolInvokeScope } from "./contract"
-import { isTaskOrTeamFamilyTool } from "../runners/in-process/shared-tool-filter"
+import { isChildOrchestrationExcluded } from "../runners/in-process/shared-tool-filter"
 import { childStructuralToolNames, isWriteCapableHostTool } from "../runners/in-process/host-tools"
 
 export { isWriteCapableHostTool }
@@ -20,16 +20,15 @@ export { isWriteCapableHostTool }
  * THE RULE (also stated in the changelog fragment and the PR body):
  *
  * - The child's effective host tool set is the same list the runner installs: `childStructuralToolNames`
- *   (senpi session builtins ∪ merged custom tools) minus the task/team family, minus the denylist,
+ *   (senpi session builtins ∪ merged custom tools) minus lead-only workflow/team tools, minus the denylist,
  *   intersected with the allowlist whenever the resolved agent DEFINES one, even an empty one.
  * - The grant is REFUSED as `tools_unavailable` when that set is missing any write-capable name the
  *   parent closure can still reach on the same list.
  * - A name that is not in the host-tool table counts as WRITE-capable, so an unrecognised MCP or
  *   extension tool fails closed.
- * - Host-wide exclusions are NOT refusals. The UI/identity-bound tools (`memory`,
- *   `ask_user_question`, `request_user_input`) and the task/team family are withheld from EVERY
- *   child because they bind to the parent session's identity/UI or would let a child spawn its own
- *   graph - never as a reduction of what the child is permitted to cause.
+ * - Host-wide exclusions are NOT refusals. Parent-only question tools are withheld upstream from
+ *   every child, while workflow/team coordination stays excluded here. Task/workpool and memory
+ *   follow the process-child surface.
  */
 
 export type NestedHostScopeRequest = {
@@ -40,10 +39,11 @@ export type NestedHostScopeRequest = {
   readonly childToolNames?: readonly string[]
   readonly toolAllowlist?: readonly string[]
   readonly toolDenylist?: readonly string[]
+  readonly includeTaskTools?: boolean
 }
 
 function reachableHostTools(request: NestedHostScopeRequest): readonly string[] {
-  return childStructuralToolNames(request.childToolNames ?? []).filter((name) => !isTaskOrTeamFamilyTool(name))
+  return childStructuralToolNames(request.childToolNames ?? []).filter((name) => !isChildOrchestrationExcluded(name, request.includeTaskTools === true))
 }
 
 /**

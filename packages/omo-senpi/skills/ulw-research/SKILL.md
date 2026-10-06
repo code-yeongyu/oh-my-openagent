@@ -1,6 +1,7 @@
 ---
 name: ulw-research
 description: "Runs maximum-saturation research with a cooperating team, claim-graph gating, and a cited, QA'd deliverable. Use when the user explicitly asks for research or a deep investigation, including any 'ulw' research wording."
+argument-hint: "<research-topic>"
 metadata:
   short-description: Team-default saturation research with debate cross-critique and cited synthesis
 ---
@@ -48,10 +49,10 @@ The research is done when all of these hold:
 - Claims that were contested, undocumented, or performance-shaped were proven or refuted by executed code.
 - Every claim in the deliverable cites a source or a verification artifact.
 - Every asserted claim is represented in the claim graph, tied to an intent-vs-reality diff when an expected truth exists, and backed by observation manifest entries from independent observation groups or a documented single-source exception; convergence or exception status is explicit.
-- The format-proposal gate was asked and answered BEFORE the team was created, and the final materials match that answer.
-- The delivered artifact passed both delivery gates: visual QA on the rendered pages, then a `writing` proofread pass with a clean result.
+- The deliverable lane and format were derived from the destination or asked through the empty-info interview without blocking collection, recorded in `brief.md` with `answered_by`, and the final materials match that record.
+- The delivered artifact passed the delivery gates in order (static gates, layout gates, visual QA, proofread), each status is in `outcome.json`, and `outcome verify` passed.
 - Every excursion opened during the run was closed by an EXIT rule, folded back into the claim or axis that triggered it, and recorded in both `excursion-log.md` and the ulw-loop ledger.
-- The delivery message carries the closing briefing: how many sources the answer rests on (total + unique domains) and how many minutes the run took.
+- The delivery message carries the closing briefing printed by `outcome briefing`: sources (total + unique domains), elapsed minutes, every promised deliverable with its status, and any residual defects.
 - The session journal reconstructs what was searched, found, expanded, and debated, wave by wave, and it was written in real time rather than reconstructed at the end.
 - The team was disbanded (`team_delete`) and every lane reached terminal status before the final answer.
 
@@ -95,20 +96,20 @@ This is `$SESSION_DIR`. Write `brief.md` into it: the analysis block, the axis l
 
 ulw-loop is ON by default for this mode: register the research axes as loop goals from a JS eval cell (import the SDK once, const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`), then `agentToolkit.createGoals({ brief })`, then `create_goal` from the returned handoff) so the run has durable state and survives a compaction. The session directory's timestamp is the run's start clock — the closing briefing is computed from it, so create it once and never rename it. From that point every finding, source, quote, number, and lead is written into `$SESSION_DIR` **the instant it lands** — never held in the conversation for an end-of-run dump. After any context loss, re-read the brief, the journal, and `agentToolkit.status()` (re-import the SDK if the kernel restarted) before doing anything else, then resume from the open wave.
 
-### Format-proposal gate — ALWAYS ask, before the team exists
+### Deliverable lane, format, and the empty-info interview
 
-Never guess the shape of the deliverable. After the brief and before `team_create`, propose the final materials and WAIT for the user's answer:
+Never block collection on the shape of the deliverable, and never guess it either. Read [references/deliverable-phase.md](references/deliverable-phase.md) sections 1-6 before writing the brief, then:
 
-- **Default pair: PDF + DOCX.** Offer both as the baseline for any report/document request.
-- Name the alternatives that actually fit THIS domain — slides for a briefing, standalone HTML for a living page, Markdown for a working note, LaTeX for a typeset or citation-heavy document, several at once when the audience differs.
-- Propose the TEMPLATE too, chosen from the domain and the user's own context: section skeleton, citation style, length target, language, and any house style they have used before. A prior document the user points at is the strongest template signal — read it and mirror its structure and tagging.
-- Ask once, compactly: proposed format + proposed template + what each option costs. Then stop and wait. Guessing here wastes the entire assembly pass.
+1. **Derive first.** Name the lane (`template-strict`, `template-vibe`, `no-format`, `edit-existing`) and the promised formats from the request and its destination (the reference's section 3). When the request refers to an existing deliverable, decide its state with `node "$SKILL_DIR/scripts/report-tools.mjs" outcome state --deliverable <path> --session-dir "$SESSION_DIR"`: `partial` resumes the skeleton on disk, `complete` means edit-existing and never a regenerated report. `$SKILL_DIR` is this skill's own directory, the folder containing this SKILL.md.
+2. **Read the requester's format memory** when the memory tool exists: `read` the projected pointer `system/human/report-style.md`, then `reference/human-report-style.md`, and take the choice recorded for the most similar context (same destination kind and audience) as the first option.
+3. **Ask only what is still missing**: at most the reference's three questions (destination and format, audience and length, template lineage) in one `ask_user_question` call with `waitForAnswer: false`, each with its default first, a free-text "describe the format" path, and "don't care, you decide". Collection starts without waiting; a late answer is folded in until the assembly lane starts, and after that it becomes a re-render request.
+4. **Record it.** Write `## Deliverable` into `brief.md` (lane, state, formats, destination, audience, template, format description, each with `answered_by: user|default|request`) and open the manifest in the same step: `node "$SKILL_DIR/scripts/report-tools.mjs" outcome init --promised <formats> --lane <lane> --session-dir "$SESSION_DIR"`.
 
-Record the answer in `brief.md`; Phase 6 opens by turning it into `design-spec.md`.
+Phase 6 opens by turning the recorded fields into `design-spec.md`.
 
 ## Phase 1 — Stand up the team (DEFAULT composition)
 
-**When the user asked for MASS research, the team is not the collection surface.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that 8 member slots cannot produce. Read `mass-ulw`'s `references/planning.md` and run collection as chained dags at its mass scale: a 60+ node opening wave covering every angle the topic has, routed across `quick` / `unspecified-low` / `unspecified-high` / `deep-low` in one graph, each wave's EXPAND leads defining the next wave's nodes until convergence, and a synthesis that reduces through several parallel `architect` nodes into one `architect` reducer (`ultrabrain` substitutes when the config has no `architect` category). Everything else in this skill still binds: the format gate, the journal, the claim graph, the convergence rules, and both delivery gates. Keep a small team alongside the graph for the debate rounds of Phase 3 — attack is conversation, and dag nodes do not talk.
+**When the user asked for MASS research, the team is not the collection surface.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that 8 member slots cannot produce. Read `mass-ulw`'s `references/planning.md` and run collection as chained dags at its mass scale: a 60+ node opening wave covering every angle the topic has, routed across `quick` / `unspecified-low` / `unspecified-high` / `deep-low` in one graph, each wave's EXPAND leads defining the next wave's nodes until convergence, and a synthesis that reduces through several parallel `architect` nodes into one `architect` reducer (`ultrabrain` substitutes when the config has no `architect` category). Everything else in this skill still binds: the deliverable interview, the journal, the claim graph, the convergence rules, and the delivery gates. Keep a small team alongside the graph for the debate rounds of Phase 3 — attack is conversation, and dag nodes do not talk.
 
 Otherwise a team is the DEFAULT for ulw-research, not an option: a lead one member surfaces almost always reshapes what another should search next, and debate needs live cooperating members, not fire-and-forget workers. Create it immediately after the brief:
 
@@ -307,7 +308,7 @@ Members + lanes: <total> · Waves: <count> · Excursions: <count> · Sources: <c
 
 `SYNTHESIS.md` is the citation source of truth for final materials: every claim carries inline `[Source N]` citations, and every high-risk non-code claim you assert must be a verified-claims row from Phase 4b. Assert nothing the gate left in the unresolved/refuted annex and nothing the skeptic's attack left standing unanswered.
 
-**Write the skeleton early and fill it as claims lock.** The moment the format gate is answered, create the deliverable file with its approved section headings and a `STATUS: draft — <n> sections open` line at the top. An interrupted run must leave a partial report on disk, never an empty directory and a lost conversation.
+**Write the skeleton early and fill it as claims lock.** The moment the brief records the deliverable, create the deliverable file with its section headings and a `STATUS: draft — <n> sections open` line as line 2 (an HTML comment in HTML); that line is the partial-state marker `outcome state` reads, removed only when the deliverable is complete. An interrupted run must leave a partial report on disk, never an empty directory and a lost conversation.
 
 **Keep sourced numbers, assumptions, and derived results visibly apart.** Every quantitative claim carries its lineage: `MEASURED` (a number a source states, cited), `ASSUMED` (a coefficient, distribution, or scope you chose — say why), `DERIVED` (computed from those, showing the formula), plus a sensitivity line whenever the assumption moves the answer. Presenting a derived estimate with the confidence of a measured one is the most damaging thing this mode can ship.
 
@@ -315,7 +316,7 @@ Members + lanes: <total> · Waves: <count> · Excursions: <count> · Sources: <c
 
 ## Phase 6 — Final materials, then teardown
 
-The format answered at the Phase 0 gate is binding. Absent an explicit user override, render **both PDF and DOCX**:
+The promised formats recorded in `brief.md` and `outcome.json` are binding; `pdf` + `docx` is the default pair only when a document was asked for with no format word and no destination:
 
 | Target | How |
 |---|---|
@@ -325,7 +326,7 @@ The format answered at the Phase 0 gate is binding. Absent an explicit user over
 | Slides / deck | `uv run --with python-pptx python` — one claim per slide, a chart or diagram per claim. |
 | Standalone HTML / Markdown | The authored source itself. |
 
-**Write `design-spec.md` the moment the format gate is answered — before any asset lane spawns.** It is the one design contract every asset and assembly lane receives: template family (a document the user pointed at is the strongest signal — mirror its structure and register; absent one, default to the clean analyst-report register — restrained accent palette, generous margins, styled section headings, no emoji, no clipart), accent palette, body/heading fonts (a real CJK webfont — Pretendard, Noto Sans KR — when the report language needs one), and the figure standard below. One font family and one palette govern prose, charts, Mermaid, and generated images alike; a diagram rendering in a random default font inside a styled report is a defect, not a style choice.
+**Write `design-spec.md` the moment the deliverable is recorded — before any asset lane spawns.** When a document was pointed at, extract it instead of retyping its stylesheet: `node "$SKILL_DIR/scripts/report-tools.mjs" format-extract <reference> --out "$SESSION_DIR/design-spec.md"` (`--from-url` for a URL), then fill every `TODO: ask` from the interview answers, never by guessing. It is the one design contract every asset and assembly lane receives: template family (absent a reference, the clean analyst-report register — one accent over neutral tones, generous margins, styled section headings, no emoji, no clipart), palette tokens, body/heading fonts (a real gothic CJK webfont — Pretendard, Noto Sans KR — when the report language needs one, with `word-break: keep-all` for Korean), responsive breakpoints and HTML/CSS charts for web deliverables, the figure standard below, and the lineage mode on its own line: `Lineage: inline` (analyst default: every unit-bearing number tagged MEASURED / ASSUMED / DERIVED or cited in the same element) or `Lineage: section` (web and blog register: every section cited, lineage in the figure captions). The reference's section 6 lists the full defaults. One font family and one palette govern prose, charts, Mermaid, and generated images alike; a diagram rendering in a random default font inside a styled report is a defect, not a style choice.
 
 **The figure standard — binding for every image, chart, and diagram.** Each figure sits in a fixed-size container styled from the spec (border, background, caption); the image scales to fit entirely inside it with its original aspect ratio preserved — object-fit: contain semantics — never stretched, never cropped, never spilling out. Every chart carries a title, axis labels, units, and value labels in the report's language; a bare number the reader cannot name is a defect.
 
@@ -340,24 +341,29 @@ Asset lanes (background, parallel `task` spawns, each fed `design-spec.md`) — 
 
 Assembly lane — `task(category: "deep-low", load_skills: ["frontend", "visual-qa"], run_in_background: true, ...)`: the report is a designed artifact, not a text dump; its prompt carries `design-spec.md`. Use the template the user approved; absent a stronger house style the default skeleton is executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (members, lanes, waves, searches, verifications, debate rounds) → correction log naming what verification overturned. Write it long and specific: every claim cites `[Source N]`, and the sources section lists every source the run actually used rather than a curated few.
 
-### The two delivery gates — both must PASS, in order
+### The delivery gates — every gate for the QA tier must PASS, in order
 
-Nothing reaches the user until both gates pass:
+Nothing reaches the user until the gates pass. Record each result with `node "$SKILL_DIR/scripts/report-tools.mjs" outcome gate <static|layout|visual|proofread> <pass|fail|not_run> --session-dir "$SESSION_DIR"`. A chat or post answer (light tier) runs gate 1 and one render; every paginated or web deliverable runs all four (the reference's sections 3 and 7).
 
-1. **Visual QA (always).** Render the produced artifact back to images — PDF pages to PNG, the HTML in a real browser — and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.
-2. **Proofread gate — `task(category: "writing", ...)`.** Hand the final text to a dedicated `writing` lane whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language (for Korean, natural Korean written by a Korean, not translationese). It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass — this gate runs BEFORE the first delivery, not after the user finds the typo.
+1. **Static gates (always, before anyone looks at pixels).** `node "$SKILL_DIR/scripts/report-tools.mjs" check "$SESSION_DIR/report.html" --design-spec "$SESSION_DIR/design-spec.md" > "$SESSION_DIR/defects.json"`: keep-all, palette tokens, emoji, em dashes, heading length, unsourced numbers, figure containers, chart text, gothic-only fonts, citations, the closing and sources sections, broken assets. Codes and fixes: [references/report-gates.md](references/report-gates.md).
+2. **Layout gates.** Print the probe with `node "$SKILL_DIR/scripts/report-tools.mjs" layout-probe --json`, evaluate its `source` in the rendered page through the `browser` skill's owned headless engine, save the result as `$SESSION_DIR/boxes.json`, and re-run `check` with `--layout "$SESSION_DIR/boxes.json"` (overflow, clipped text, distorted images, overlapping siblings).
+3. **Visual QA.** Render the produced artifact back to images — PDF pages to PNG, the HTML through the browser skill at desktop and phone widths — and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Reading the source markup is not visual QA; inspect the pixels.
+4. **Proofread gate — `task(category: "writing", ...)`.** Hand the final text to a dedicated `writing` lane whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language (for Korean, natural Korean written by a Korean, not translationese). It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass — this gate runs BEFORE the first delivery, not after the user finds the typo.
 
-Then deliver: the artifact plus a compact chat-readable summary of what it says — the answer in a few sentences, the numbers that matter, and what to look at first. The document is the deliverable; the summary is what gets it read.
+**Repair is bounded.** After every gate run that found defects, ask `node "$SKILL_DIR/scripts/report-tools.mjs" repair decide --state "$SESSION_DIR/repair-state.json" --defects "$SESSION_DIR/defects.json" --artifact-bytes <bytes> --renders <pages> --session-dir "$SESSION_DIR"` and obey it: `repair` means fix and re-run; `deliver` means stop and ship with the residual defects the manifest now lists; `block` means a content-integrity defect remains (or there is no usable artifact), so do not deliver: tell the user what blocks it and record the row as `failed` with the reason. Never repair past a stop decision (3 attempts, a 2-attempt plateau, an oscillation, or 15 minutes; the reference's section 8).
+
+Then resolve every manifest row (`outcome set <format> delivered --path <file>` or `blocked_capability` / `skipped` / `failed` with `--reason`) and deliver: the artifact plus a compact chat-readable summary of what it says — the answer in a few sentences, the numbers that matter, and what to look at first. The document is the deliverable; the summary is what gets it read.
 
 ### The closing briefing — every run ends with it
 
 The last thing the user reads states, in one compact block, what the answer is made of:
 
-- **Sources.** How many sources the answer rests on and how many distinct domains they come from, counted from `sources-ledger.md`, not estimated: `grep -c '^\[S' sources-ledger.md` for the total and the unique-host count for domains. Name how many were primary sources and how many claims went to the unresolved/refuted annex.
-- **Effort.** Members, lanes, waves, excursions, verifications, and debate rounds — the same counters as the `SYNTHESIS.md` header.
-- **Elapsed time, always.** Minutes from the run's start to delivery, derived from the session directory's own timestamp so it cannot be guessed: `python3 -c "import datetime,os,sys; s=datetime.datetime.strptime(os.path.basename(sys.argv[1]),'%Y%m%d-%H%M%S'); print(round((datetime.datetime.now()-s).total_seconds()/60))" "$SESSION_DIR"`.
+- **The printed block.** `node "$SKILL_DIR/scripts/report-tools.mjs" outcome verify --session-dir "$SESSION_DIR" && node "$SKILL_DIR/scripts/report-tools.mjs" outcome finish --session-dir "$SESSION_DIR" && node "$SKILL_DIR/scripts/report-tools.mjs" outcome briefing --session-dir "$SESSION_DIR"`: sources and distinct domains counted from `sources-ledger.md`, elapsed minutes from the session directory's own timestamp, every promised deliverable with its status, the gate results, the residual defects, and the repair summary. A failing `verify` means the run is not done.
+- **Effort.** Members, lanes, waves, excursions, verifications, and debate rounds — the same counters as the `SYNTHESIS.md` header — plus how many sources were primary and how many claims went to the unresolved/refuted annex.
 
-Never ship the artifact without this block, and never fill it from memory — every number in it is read off the journal.
+Never ship the artifact without this block, and never fill it from memory — paste the printed block and read the rest off the journal.
+
+**Record the format choice.** After delivery, when the memory tool exists and the run qualifies (the user declared a preference, or made the same unsolicited choice on 2+ runs), append one episode line to `reference/human-report-style.md` in the grammar of the reference's section 5, and update the `system/human/report-style.md` pointer when a generalization changed.
 
 **Teardown is part of the deliverable.** Once the materials are delivered: `team_delete({ team_run_id, force: true })` for every team you stood up, confirm each lane is terminal (`/tasks`), and only then write the final answer. A live team left running past the final answer is a failed run, not a finished one.
 
@@ -399,7 +405,8 @@ High-yield combinations: official docs (`site:<docs domain>`), GitHub implementa
 | Contested claim settled by judgment | Phase 4 — run code, capture output, verdict |
 | Deliverable claims without citations | Every claim cites a source or a verification artifact |
 | Final answer while the team is still live | `team_delete` + terminal lanes first; teardown is part of done |
-| Guessing the deliverable format instead of asking | The format gate is unconditional: propose PDF+DOCX plus the domain-fitting alternatives and the template, then wait for the answer before `team_create` |
+| Guessing the deliverable format | Derive it from the request and destination; ask the empty-info interview only for what is still missing, and record `answered_by` for every field |
+| Blocking the collection wave on the format question | Ask with `waitForAnswer: false` and start collecting; unanswered fields run on the shown defaults |
 | A roster smaller than the runtime maximum | Fill every slot; split the broadest axis until the team is full |
 | One category across the whole roster | Mixed tiers by design — cheap breadth, premium attack, `writing` for language |
 | Silently re-routing a "quick"/"fast" roster to another tier | Routing words are literal; journal requested -> spawned -> fallback for every slot |
@@ -408,10 +415,14 @@ High-yield combinations: official docs (`site:<docs domain>`), GitHub implementa
 | Batching findings into an end-of-run journal dump | Journal each return as it lands; ulw-loop state is what survives a compaction |
 | Ending the run because every worker finished | Reserve the final fifth of the run for synthesis and materials |
 | A derived estimate presented as a measured number | MEASURED / ASSUMED / DERIVED lineage on every quantitative claim, plus a sensitivity line |
-| Delivering before visual QA or before the `writing` proofread gate | Both gates are mandatory and ordered; a typo the user finds means the gate did not run |
+| Delivering before visual QA or before the `writing` proofread gate | The gates are mandatory and ordered; a typo the user finds means the gate did not run |
+| Skipping the static gates | `report-tools check` runs before any pixel review; its defects are cheaper than a visual pass |
+| Delivering with a pending manifest row | `outcome verify` must pass; every promised format ends `delivered`, `blocked_capability`, `skipped`, or `failed` with a reason |
+| Repairing past the tracker's stop decision | `repair decide` owns the budget; `deliver` ships with the residual list, `block` stops delivery |
+| Guessing a design-spec value the extractor marked `TODO: ask` | Fill it from the interview answers or the reference's defaults, never by guessing |
 | Referencing an asset that is not on disk | Verify the asset manifest before rendering; re-render whatever is missing |
 | A figure stretched, cropped, or styled off the report's design language | `design-spec.md` binds every asset: fixed containers, contain-fit with aspect preserved, spec fonts and palette in charts and Mermaid |
 | Chasing an interesting find with no ENTER trigger | Excursions need a named trigger; everything else stays a queued lead |
 | An excursion that never came back, or drifted into a new mission | EXIT rules are unconditional; depth 3 means promote it to an axis or record it as a gap |
 | An excursion whose result was never folded back | Every EXIT writes what it changed in the top-level answer, `none` included, and mirrors into the loop ledger |
-| Delivering without the closing briefing | Source count, unique domains, and elapsed minutes are read off the journal and stated every time |
+| Delivering without the closing briefing | Paste the block `outcome briefing` prints; never compute or recall its numbers by hand |

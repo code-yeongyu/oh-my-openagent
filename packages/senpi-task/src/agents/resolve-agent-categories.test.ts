@@ -82,20 +82,20 @@ describe("resolveAgent category stage", () => {
 
     // then
     expect(result.model).toBe("anthropic/claude-opus-5-5")
-    expect(result.resolved_model?.reasoning).toBe("max")
+    expect(result.resolved_model?.reasoning).toBe("medium")
   })
 
   test("#given categories deep then unspecified-low #when only the low chain head is available #then it resolves at that chain head", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-low"])
-    const models = registry([model("xiaomi", "mimo-v2.6-pro")])
+    const models = registry([model("anthropic", "claude-sonnet-5-5")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.model).toBe("xiaomi/mimo-v2.6-pro")
-    expect(result.resolved_model?.reasoning).toBe("max")
+    expect(result.model).toBe("anthropic/claude-sonnet-5-5")
+    expect(result.resolved_model?.reasoning).toBe("medium")
   })
 
   test("#given a single unspecified-high category #when only its claude-opus-5-5 rung is available #then the agent runs on it", () => {
@@ -108,7 +108,7 @@ describe("resolveAgent category stage", () => {
 
     // then
     expect(result.model).toBe("anthropic/claude-opus-5-5")
-    expect(result.resolved_model?.reasoning).toBe("max")
+    expect(result.resolved_model?.reasoning).toBe("medium")
   })
 
   test("#given an omo.json deep category model override #when the agent resolves #then the user model reaches the agent", () => {
@@ -191,7 +191,7 @@ describe("resolveAgent category stage", () => {
   test("#given a category whose head model is unavailable #when a later rung wins #then requested_model is the selected model, not the head", () => {
     // given: unspecified-high's head is anthropic/claude-opus-5-5; only its glm-5.3 rung exists here.
     const definition: AgentDefinition = { name: "probe", categories: ["unspecified-high"] }
-    const glmOnlyRegistry = registry([model("zai-coding-plan", "glm-5.3")])
+    const glmOnlyRegistry = registry([model("zai", "glm-5.3")])
 
     // when
     const resolution = resolveAgent("probe", { probe: definition }, glmOnlyRegistry)
@@ -199,12 +199,12 @@ describe("resolveAgent category stage", () => {
     // then: the retry chain must lead with the model the child actually runs.
     expect(resolution.kind).toBe("resolved")
     if (resolution.kind !== "resolved") return
-    expect(resolution.model).toBe("zai-coding-plan/glm-5.3")
-    expect(resolution.requested_model?.display).toBe("zai-coding-plan/glm-5.3")
+    expect(resolution.model).toBe("zai/glm-5.3")
+    expect(resolution.requested_model?.display).toBe("zai/glm-5.3")
     // The unavailable head may still ride the retry tail (it can come back), but never ahead of
     // the model the child actually runs.
     const chain = [resolution.requested_model, ...(resolution.fallback_models ?? [])]
-    expect(chain[0]?.display).toBe("zai-coding-plan/glm-5.3")
+    expect(chain[0]?.display).toBe("zai/glm-5.3")
   })
 
   test("#given a malformed available-model container #when find still resolves the category model #then the agent keeps the find-only fallback", () => {

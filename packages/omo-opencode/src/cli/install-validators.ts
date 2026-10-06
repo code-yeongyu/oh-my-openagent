@@ -1,4 +1,5 @@
 import color from "picocolors"
+import { NATIVE_PACKAGE_SPEC } from "./install-native/plan"
 import type {
   BooleanArg,
   ClaudeSubscription,
@@ -37,7 +38,7 @@ export function formatConfigSummary(config: InstallConfig): string {
     lines.push(`  ${SYMBOLS.info} Codex autonomous mode: ${config.codexAutonomous ? "enabled" : "disabled"}`)
   }
   if (config.hasNative) {
-    lines.push(`  ${SYMBOLS.info} OmO Native: installing from omo-ai@beta`)
+    lines.push(`  ${SYMBOLS.info} OmO Native: installing from ${NATIVE_PACKAGE_SPEC}`)
   }
   if (config.hasNativeDev) {
     lines.push(`  ${SYMBOLS.info} OmO Native development adapter: enabled`)

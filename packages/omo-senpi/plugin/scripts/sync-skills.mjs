@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { existsSync } from "node:fs"
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, extname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -158,6 +159,32 @@ async function assertSourceExists(source) {
   }
 }
 
+// Shared assets are copied byte-for-byte (no text adaptation) after the native copy and its blank-line
+// normalization, so the shipped files equal their shared sources. A missing asset or one that the
+// native source already provides fails the sync instead of silently shadowing either side.
+async function overlaySharedAssets(name, nativeSource, destination, sharedAssets) {
+  const sharedSkillRoot = join(sharedSkillsRoot, name)
+  for (const asset of sharedAssets) {
+    const sharedPath = join(sharedSkillRoot, asset)
+    if (!existsSync(sharedPath)) {
+      throw new Error(`${name}: shared asset "${asset}" does not exist at ${sharedPath}`)
+    }
+
+    const nativePath = join(nativeSource, asset)
+    if (existsSync(nativePath)) {
+      const collisions = (await stat(nativePath)).isDirectory() ? await listFiles(nativePath) : [nativePath]
+      if (collisions.length > 0) {
+        throw new Error(`${name}: shared asset "${asset}" would overwrite native source file(s): ${collisions.join(", ")}`)
+      }
+    }
+
+    await cp(sharedPath, join(destination, asset), {
+      filter: createSkillSourceCopyFilter(sharedSkillRoot, senpiFilterOptions),
+      recursive: true,
+    })
+  }
+}
+
 // Read-only inventory shared by generation and shipped-payload validation.
 export async function getSkillOutputManifest() {
   const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true })
@@ -182,11 +209,12 @@ export async function syncSkills() {
     await adaptSkillTree(destination, normalizeBlankLines)
   }
 
-  for (const { name, source } of nativeSkillSources) {
+  for (const { name, source, sharedAssets = [] } of nativeSkillSources) {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
     await cp(source, destination, { filter: createSkillSourceCopyFilter(source, senpiFilterOptions), recursive: true })
     await adaptSkillTree(destination, normalizeBlankLines)
+    await overlaySharedAssets(name, source, destination, sharedAssets)
   }
 
   const { names } = await getSkillOutputManifest()

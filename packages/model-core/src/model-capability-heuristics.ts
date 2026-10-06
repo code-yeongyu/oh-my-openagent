@@ -51,6 +51,17 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     supportsTemperature: false,
   },
   {
+    // GPT-6.1 Sol's API ladder is low..max: like Astra it omits `none` (and `minimal`), so both
+    // downgrade to low instead of the plain GPT-6 family accepting `none`. The pattern matches the
+    // normalized id: detectHeuristicModelFamily rewrites `gpt-6.1-sol` to `gpt-6-1-sol` first.
+    family: "gpt-6.1-sol",
+    pattern: /gpt-6-1-sol/,
+    variants: ["low", "medium", "high", "xhigh", "max"],
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    reasoningEffortAliases: { none: "low", minimal: "low" },
+    supportsTemperature: false,
+  },
+  {
     family: "gpt-6",
     includes: ["gpt-6"],
     variants: ["low", "medium", "high", "xhigh", "max"],

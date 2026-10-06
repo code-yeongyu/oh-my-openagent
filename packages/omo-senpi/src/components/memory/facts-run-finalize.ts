@@ -9,6 +9,7 @@ import { join } from "node:path"
 import {
   findFactsBatchReceipt,
   parseFactsExtractionJsonl,
+  MemorySecretError,
   type FactsFailureReason,
   type FactsPayload,
   type GitMemoryRepo,
@@ -77,6 +78,10 @@ export async function finalizeClaimedFactsRun(input: FinalizeClaimedFactsRunInpu
   try {
     applied = await applyWithRetries(input, records)
   } catch (error) {
+    if (error instanceof MemorySecretError) {
+      await fail("secret_like_content", error.message)
+      return { status: "failed", runId }
+    }
     await fail("invalid_extraction", describe(error))
     return { status: "failed", runId }
   }

@@ -20,6 +20,7 @@ import {
 	assertIsolatedRejected,
 	assertNotApplied,
 } from "./isolation-e2e-scenarios.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -68,7 +69,7 @@ function runSenpi(senpiBin, sandbox, prompt) {
 	return spawnSync(senpiBin, ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", prompt], {
 		cwd: sandbox.cwd,
 		env: {
-			...process.env,
+			...isolatedChildEnv(process.env, sandbox.agentDir),
 			OMO_CODING_AGENT_DIR: sandbox.agentDir,
 			SENPI_CODING_AGENT_DIR: sandbox.agentDir,
 			PI_CODING_AGENT_DIR: sandbox.agentDir,
@@ -92,7 +93,7 @@ function scenario({ name, script, assert, senpiBin, pluginRoot, keepSandbox }) {
 	try {
 		seed(sandbox, pluginRoot, script)
 		const run = runSenpi(senpiBin, sandbox, "spawn the isolated child now")
-		const checks = assert(sandbox.cwd, run)
+		const checks = assert(sandbox, run)
 		return {
 			name,
 			plugin_root: pluginRoot,
@@ -110,11 +111,12 @@ function scenario({ name, script, assert, senpiBin, pluginRoot, keepSandbox }) {
 }
 
 function selfTest() {
-	const applied = assertApplied("/nonexistent-checkout")
+	const absent = { cwd: "/nonexistent-checkout", agentDir: "/nonexistent-agent" }
+	const applied = assertApplied(absent)
 	if (applied.some((check) => check.pass && check.name === "merge_result.kind")) {
 		throw new Error("assertApplied must fail without a record")
 	}
-	const control = assertIsolatedRejected("/nonexistent-checkout")
+	const control = assertIsolatedRejected(absent)
 	if (control[1].pass) throw new Error("the control must report that no task record exists")
 	if (!control[0].pass) throw new Error("an absent checkout records no isolation")
 	console.log("SELF-TEST OK")
@@ -140,7 +142,7 @@ function main() {
 		results.push(scenario({
 			name: "control-pre-change-plugin-rejects-isolated",
 			script: APPLIED_SCRIPT,
-			assert: (cwd) => assertIsolatedRejected(cwd),
+			assert: (sandbox) => assertIsolatedRejected(sandbox),
 			senpiBin,
 			pluginRoot: resolve(controlPluginRoot),
 			keepSandbox,

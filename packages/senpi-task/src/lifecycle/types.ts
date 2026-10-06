@@ -25,6 +25,13 @@ export type ReconcileDeferredReason =
   | "host_draining"
   // The daemon hosting this child did not answer; the record stays parked until it does.
   | "host_unreachable"
+  // The recorded host answers, but incompatibly; the session is never reopened on another endpoint.
+  | "host_incompatible"
+  // The recorded host is the one this session runs behind and it is silent; only the parent's next
+  // resume (outside the host) can ensure it.
+  | "own_host_unreachable"
+  // The agent-dir store index could not record this child's store; nothing was opened.
+  | "store_index_unavailable"
   // The child ran in a copy-on-write clone that is already settled and reclaimed; respawning it
   // would resume against a directory that no longer exists, so it is refused at every boundary.
   | "isolated_not_revivable"

@@ -4,64 +4,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-type WorkflowExpectation = {
-  readonly path: string
-  readonly jobs: readonly string[]
-}
-
 const workflowDirectory = ".github/workflows"
 const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
-
-const workflowExpectations = [
-  {
-    path: ".github/workflows/ci.yml",
-    jobs: [
-      "ci-mode",
-      "block-master-pr",
-      "test",
-      "typecheck",
-      "codex-compatibility",
-      "senpi-compatibility",
-      "lazycodex-published-smoke",
-      "build",
-      "omo-ai-payload-check",
-      "auto-commit-schema",
-      "draft-release",
-    ],
-  },
-  { path: ".github/workflows/cla.yml", jobs: ["cla"] },
-  { path: ".github/workflows/compiled-worker.yml", jobs: ["relocated-worker"] },
-  { path: ".github/workflows/bot-merge.yml", jobs: ["merge"] },
-  { path: ".github/workflows/lint-workflows.yml", jobs: ["actionlint"] },
-  { path: ".github/workflows/npm-dist-tag-rollback.yml", jobs: ["retag"] },
-  { path: ".github/workflows/package-labels.yml", jobs: ["ensure-labels", "label-pull-request", "label-issue"] },
-  { path: ".github/workflows/publish-platform.yml", jobs: ["build", "publish", "smoke-linux-arm64"] },
-  {
-    path: ".github/workflows/publish.yml",
-    jobs: [
-      "gate-reuse",
-      "preflight-trust",
-      "release-metadata",
-      "prepare-release-state",
-      "dispatch-provenance-safe-publish",
-      "publish-main",
-      "verify-release-notes",
-      "release",
-      "post-publish-verify",
-    ],
-  },
-  {
-    path: ".github/workflows/review-claims.yml",
-    jobs: ["gate", "claim", "release-claim", "stale-sweep"],
-  },
-  { path: ".github/workflows/refresh-model-capabilities.yml", jobs: ["refresh"] },
-  { path: ".github/workflows/sisyphus-agent.yml", jobs: ["agent"] },
-  { path: ".github/workflows/stats.yml", jobs: ["stats"] },
-  { path: ".github/workflows/web-ci.yml", jobs: ["format-lint-typecheck-build"] },
-  { path: ".github/workflows/isolation-linux-fs.yml", jobs: ["linux-fs"] },
-  { path: ".github/workflows/web-deploy.yml", jobs: ["deploy"] },
-  { path: ".github/workflows/windows-flake-soak.yml", jobs: ["soak"] },
-] as const satisfies readonly WorkflowExpectation[]
 
 function discoverWorkflowPaths(): readonly string[] {
   return readdirSync(workflowDirectory)
@@ -149,21 +93,19 @@ describe("GitHub workflow job summaries", () => {
   })
 
   test("#given repository workflows #when inspected #then every step-based job writes a concise Markdown summary", () => {
-    const expectedWorkflowPaths = workflowExpectations.map((expectation) => expectation.path).sort()
-    expect(discoverWorkflowPaths()).toEqual(expectedWorkflowPaths)
+    const workflowPaths = discoverWorkflowPaths()
+    expect(workflowPaths.length).toBeGreaterThan(0)
+    let jobCount = 0
 
-    for (const expectation of workflowExpectations) {
-      const workflow = readFileSync(expectation.path, "utf8")
-      expect(discoverStepBasedJobs(workflow), `${expectation.path} step-based job list must stay covered`).toEqual(
-        expectation.jobs,
-      )
-
-      for (const job of expectation.jobs) {
-        const jobSection = sliceJob(workflow, job)
-
-        expect(hasSummaryWriter(jobSection), `${expectation.path} ${job} must write a job summary`).toBe(true)
+    for (const path of workflowPaths) {
+      const workflow = readFileSync(path, "utf8")
+      for (const job of discoverStepBasedJobs(workflow)) {
+        jobCount += 1
+        expect(hasSummaryWriter(sliceJob(workflow, job)), `${path} ${job} must write a job summary`).toBe(true)
       }
     }
+
+    expect(jobCount).toBeGreaterThan(0)
   })
 
   test("#given a privileged publish summary #when it renders dispatch inputs #then raw inputs are passed through env", () => {

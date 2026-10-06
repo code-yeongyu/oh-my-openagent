@@ -1,6 +1,7 @@
 ---
 name: remove-ai-slops
 description: "Removes AI-generated code smells from branch changes or an explicit file list behind regression tests. Use when the user asks to clean up, deslop, or remove AI-slop patterns from recent changes."
+argument-hint: "[file ...]"
 ---
 
 # Remove AI Slops Skill

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
 import { parseJsonEvents } from "./task-e2e-analysis.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -122,7 +123,7 @@ function main() {
       {
         cwd: sandbox.cwd,
         env: {
-          ...process.env,
+          ...isolatedChildEnv(process.env, sandbox.agentDir),
           SENPI_CODING_AGENT_DIR: sandbox.agentDir,
           XDG_CONFIG_HOME: sandbox.xdgConfigHome,
           SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
@@ -142,12 +143,12 @@ function main() {
       return typeof id === "string" && id.startsWith("st_") ? [id] : []
     })[0]
     const taskPath = typeof taskId === "string"
-      ? join(sandbox.cwd, ".omo", "senpi-task", "tasks", `${taskId}.json`)
+      ? join(sandboxStateDir(sandbox), "tasks", `${taskId}.json`)
       : ""
     const taskRecord = taskPath && existsSync(taskPath) ? JSON.parse(readFileSync(taskPath, "utf8")) : undefined
     const spawnPrompt = taskRecord?.spawn_spec?.prompt ?? ""
     const childRoot = typeof taskId === "string"
-      ? join(sandbox.cwd, ".omo", "senpi-task", "children", taskId, "sessions")
+      ? join(sandboxStateDir(sandbox), "children", taskId, "sessions")
       : ""
     const transcript = childRoot
       ? collectJsonl(childRoot).map((path) => readFileSync(path, "utf8")).join("\n")

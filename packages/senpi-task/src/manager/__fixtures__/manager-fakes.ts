@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
+import type { SuspensionReason } from "../../state"
 import type { ManagedChildEvent, ManagedChildListener } from "../child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { TaskRecordStore } from "../../store"
@@ -37,8 +38,11 @@ export type FakeHandle = {
   readonly followUpCalls: string[]
   subscribeCount(): number
   unsubscribeCount(): number
+  parkWatchCount(): number
+  park(reason: SuspensionReason): void
   waitForSubscription(): Promise<void>
   waitForUnsubscription(): Promise<void>
+  selfResume(): void
 }
 
 export function makeHandle(taskId: string, pid?: number): FakeHandle {
@@ -51,10 +55,12 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   const steerCalls: string[] = []
   const followUpCalls: string[] = []
   const listeners = new Set<ManagedChildListener>()
+  const parkWatches = new Set<(event: { readonly reason: SuspensionReason }) => void>()
   let subscribeCalls = 0
   let unsubscribeCalls = 0
   const subscriptionWaiters: Array<() => void> = []
   const unsubscriptionWaiters: Array<() => void> = []
+  const resumedListeners = new Set<() => void>()
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -76,7 +82,15 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
         listeners.delete(listener)
       }
     },
+    onParked: (listener) => {
+      parkWatches.add(listener)
+      return () => parkWatches.delete(listener)
+    },
     waitForOutcome: () => outcome,
+    onSelfResumed: (listener) => {
+      resumedListeners.add(listener)
+      return () => resumedListeners.delete(listener)
+    },
     lastAssistantText: () => undefined,
     dispose: async () => {},
   }
@@ -97,12 +111,19 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     followUpCalls,
     subscribeCount: () => subscribeCalls,
     unsubscribeCount: () => unsubscribeCalls,
+    parkWatchCount: () => parkWatches.size,
+    park: (reason) => {
+      for (const listener of [...parkWatches]) listener({ reason })
+    },
     waitForSubscription: () => subscribeCalls > 0
       ? Promise.resolve()
       : new Promise((resolve) => subscriptionWaiters.push(resolve)),
     waitForUnsubscription: () => unsubscribeCalls > 0
       ? Promise.resolve()
       : new Promise((resolve) => unsubscriptionWaiters.push(resolve)),
+    selfResume: () => {
+      for (const listener of [...resumedListeners]) listener()
+    },
   }
 }
 

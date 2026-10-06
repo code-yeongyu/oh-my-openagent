@@ -16,7 +16,7 @@ import {
   optionalRendererText,
   rendererVisibleWidth,
 } from "../../renderer-text"
-import { runStatsResultTokens } from "../run-stats-format"
+import { runStatsCardSummary } from "../run-stats-format"
 
 const TASK_REASON_EXCERPT_WIDTH = 40
 
@@ -112,6 +112,7 @@ function fallbackCountToken(details: Pick<TaskToolDetails, "fallback_attempts">)
 function taskResultLine(details: TaskToolDetails, mode: string | undefined): string {
   const taskId = optionalRendererText(details.task_id)
   const reason = optionalRendererText(details.reason)
+  const summary = runStatsCardSummary(details.run_stats)
   return joinRendererTokens([
     "task",
     taskTargetToken(details),
@@ -119,10 +120,9 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
     mode,
     formatTaskStatus(details.status),
     taskId === undefined ? undefined : `id:${taskId}`,
-    ...runStatsResultTokens(details.run_stats),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
-  ])
+  ]) + summary
 }
 
 function taskItemResultLine(item: TaskToolItemDetail): string {
@@ -166,6 +166,10 @@ function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefin
     if (rendererVisibleWidth(candidate) > width) break
     line = candidate
   }
+  const summary = runStatsCardSummary(details.run_stats)
+  if (summary.length > 0 && rendererVisibleWidth(`${line}${summary}`) <= width) {
+    line = `${line}${summary}`
+  }
   return line
 }
 
@@ -180,7 +184,6 @@ function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
   const reason = optionalRendererText(details.reason)
   return [
     taskId === undefined ? undefined : `id:${taskId}`,
-    ...runStatsResultTokens(details.run_stats),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
   ].filter((token): token is string => token !== undefined)

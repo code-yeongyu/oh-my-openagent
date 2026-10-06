@@ -1,5 +1,6 @@
 import type { GitMemoryRepo } from "../git"
 import { parseMemoryFile } from "../memfs/frontmatter"
+import { redactSecretLikeMaterial } from "../sync/redact"
 import {
   renderExternalProjection,
   renderSystemTree,
@@ -62,8 +63,8 @@ async function readSystemFile(
     const parsed = parseMemoryFile(await repo.show(revision, relativePath))
     return {
       relativePath,
-      body: parsed.body,
-      description: parsed.frontmatter.description,
+      body: redactSecretLikeMaterial(parsed.body),
+      description: redactSecretLikeMaterial(parsed.frontmatter.description),
     }
   } catch {
     return undefined

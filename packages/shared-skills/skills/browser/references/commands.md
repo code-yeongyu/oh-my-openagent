@@ -1,90 +1,114 @@
-# Command semantics
+# Session methods
 
-Everything here cost a failed attempt to learn. Read it before improvising.
+`connectBrowserSkill()` returns a `BskSession`. Every method is one call on the BrowserSkill
+daemon's tool surface; options are the daemon's parameter names in camelCase.
 
 ## Sessions
 
-```bash
-bsk session start --json --no-focus --name "<task>"   # keep session_id
-bsk session list
-bsk session stop <id> --json                          # positional id, not --session
+```js
+const session = await omowright.connectBrowserSkill({ name: "<task>", focused: false, browser: "<instance id>", width: 1200, height: 800 })
+session.sessionId            // four letters, e.g. "ckhg"
+session.browserInstanceId    // which connected browser owns the Agent Window
+await session.stop()         // ALWAYS, on success and failure
 ```
 
-Every session-scoped command needs `--session <id>`. `--no-focus` keeps the Agent Window from
-stealing focus; drop it only when the user is watching on purpose.
+`browser` is needed only when more than one browser is connected (`bskDoctor()` lists them).
+`focused: false` keeps the Agent Window from stealing focus; drop it only when the user is watching
+on purpose. Throws `BskRpcError` `no_browser_connected` when no extension is attached — that is a
+stop, not a cue to launch something else.
+
+## Targets
+
+| Form | Meaning |
+|---|---|
+| `"@e3"` / `"e3"` | a ref from the last `observe()` / `snapshot()` |
+| `"#login > button"` | a CSS selector, resolved live |
+| `{ captureId, x, y }` | a point in a screenshot, from `screenshot()` |
+| `css.e3` from `bskSnapshot` | the light-DOM CSS path of an OmOWright ref (`null` inside shadow roots — use the daemon ref instead) |
 
 ## Reading
 
-| Command | Returns |
+| Call | Returns |
 |---|---|
-| `observe --session <id>` | semantic tree with `@eN` refs and perception probes — **the default read** |
-| `snapshot --session <id>` | static accessibility tree |
-| `get-html --session <id>` | exact markup, hidden metadata |
-| `screenshot --session <id> --out <path>` | PNG; add `--full-page` for a long capture |
-| `evaluate "<js>" --session <id> --json` | `{ok, value}` — **check `.ok`; exit code 0 does not mean the script succeeded** |
-| `console` / `network` | buffered log lines and responses |
+| `bskSnapshot(session, { interactive, maxDepth })` | `{ tree, refs, css }` — the OmOWright accessibility tree with refs, computed in the page **without** leaving a global or touching the DOM |
+| `session.observe({ maxTokens, cursor, probeHover })` | the daemon's semantic tree (`@vom`) with `@eN` refs, layers and hover probes — **the default read for shadow DOM and iframes** |
+| `session.snapshot({ maxDepth, maxTokens })` | the daemon's plain accessibility tree |
+| `session.getHtml({ ref, maxBytes })` | exact markup |
+| `session.screenshot({ ref })` / `screenshot({ fullPage: true })` | `{ buffer, width, height, captureId }`; full-page captures stream back in chunks |
+| `session.evaluate(expression, { awaitPromise, timeoutMs })` | `{ ok, value, error }` — **check `.ok`**; a resolved promise does not mean the script succeeded |
+| `session.console({ since })` / `session.network({ since })` | buffered console entries / request metadata (no bodies) |
 
-**Refs are reissued by every `observe` and `snapshot`.** Read a ref and act on it in the same
-cycle. A ref captured two calls ago silently addresses a different element — this is how a click
-lands on the neighbouring row.
-
-`observe --max-tokens <n>` bounds a large page. There is no default cap.
+**Refs are reissued by every read.** Read a ref and act on it in the same cycle. A ref captured
+two calls ago silently addresses a different element — this is how a click lands on the
+neighbouring row.
 
 ## Acting
 
-| Need | Command |
+| Need | Call |
 |---|---|
-| Click | `click @e3 --session <id>` |
-| Fill | `fill @e3 --value "text" --session <id>` |
-| Select | `select @e3 --value "<option value>" --session <id>` |
-| Key | `press Enter --ref @e3 --session <id>` |
-| Hover | `hover @e3 --session <id>` |
-| Scroll into view | `scroll-to @e3 --session <id>` |
-| Wheel | `wheel --delta-y 600 --session <id>` |
-| Focus / blur | `focus @e3` / `blur @e3` |
-| Upload / download | `upload --file <path>` / `download --out <path>` |
+| Click | `session.click(target, { button, clickCount, modifiers })` |
+| Fill | `session.fill(target, value, { clearBefore })` |
+| Select | `session.select(target, ["<option value>"])` |
+| Key | `session.press("Enter", { target, modifiers, holdMs })` |
+| Hover | `session.hover(target, { settleMs })` |
+| Scroll into view | `session.scrollTo(target)` |
+| Wheel | `session.wheel({ deltaY: 600, target })` |
+| Focus / blur | `session.focus(target)` / `session.blur(target)` |
+| Navigate | `session.navigate(url, { waitUntil: "load" \| "domcontentloaded" \| "networkidle" \| "commit", timeoutMs })`, `back()`, `forward()`, `reload({ hard })`, `waitForNavigation()` |
+| Window | `session.resize(width, height)`, `session.emulate({ overrides: { width, mobile } })` |
 
 Traps:
 
 - `select` takes the option's **value attribute**, not its visible label.
-- `fill` and `click` accept a CSS selector; **`press --ref` does not** — it answers
-  `ref_not_found` for a selector. `press` without `--ref` goes to the focused node.
-- A menu that a `click` opens can be toggled shut by that same click. `focus` then
-  `press Enter` opens it reliably.
-- Hover-only controls report `element not visible`: hover the trigger, observe, then act on the
-  revealed item's fresh ref. Markers like `[has-submenu]` and `[expanded]` identify triggers;
-  `observe --probe-hover` finds one when no marker does, at the cost of touching the live page.
-- The clipboard is unavailable in a window started `--no-focus` (no document focus), so read
-  values out of the DOM instead.
+- `press` without `target` goes to the focused node; `press` with a CSS selector is fine, but a
+  daemon ref must come from the current read.
+- A menu that a `click` opens can be toggled shut by that same click. `focus` then `press("Enter")`
+  opens it reliably.
+- Hover-only controls report `element not visible`: hover the trigger, read again, then act on the
+  revealed item's fresh ref. `observe({ probeHover: true })` finds one when no marker does, at the
+  cost of touching the live page.
+- The clipboard is unavailable in a window started `focused: false`, so read values out of the DOM.
 
-## Borrowing a user tab
+## Tabs
 
-```bash
-bsk tab list --scope user
-bsk tab borrow <tab-id>
-bsk tab return <tab-id>
+```js
+const { tabs } = await session.tabList({ scope: "user" })   // "user" | "agent" | "all"
+await session.tabBorrow(tabId)                                // the user confirms in the browser (60 s)
+await session.tabReturn(tabId)                                // stop() returns anything still borrowed
+await session.tabCreate({ url }); await session.tabSelect(id); await session.tabClose(id)
 ```
 
-Borrowing asks the user to confirm. Never invent a tab id, never repeat a denied borrow, and
-always return what you borrowed (`session stop` also returns them).
+Never invent tab ids and never repeat a denied borrow.
 
-## Failures
+## Humans
 
-| Symptom | Meaning | Response |
+```js
+const { outcome } = await session.requestHelp({ prompt, title, targets: ["@e4"], completionCriteria, timeoutMs })
+// outcome: "completed" | "continued" | "cancelled" | "timed_out" | "navigated" | "disabled"
+```
+
+## Errors
+
+Every refusal is a `BskRpcError` with the daemon's own `code`:
+
+| `code` | Meaning | Do |
 |---|---|---|
-| `browsers: []` | extension not connected | ask the user to open the browser / enable the extension |
-| daemon missing | idle exit or reboot | none; the next call restarts it |
-| `cdp_failed: Cannot access a chrome-extension:// URL of different extension` | another extension injected a frame, so the debugger cannot attach to that tab | transient and page-specific; collapse the work into one `evaluate` and retry, or navigate away and back |
-| `permission_denied: element not visible` | hover-gated or clipped control | drive its menu instead |
-| `ref_not_found` | stale ref, or a selector passed to `press` | observe again; use a real ref |
-| version skew warning | CLI and extension disagree | `bsk update` after finishing sessions; the extension updates through its store |
+| `no_browser_connected` | no extension attached | run the onboarding script, relay the human step, wait |
+| `not_found` | stale ref or unknown session | read again; if the session is gone, start a new one |
+| `invalid_params` | wrong option shape | fix the call, do not retry as-is |
+| `permission_denied` | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
+| `timeout` | the tool did not finish in its budget | read the page state before retrying once |
+| `user_aborted` | the user pressed Stop in the browser | stop the task and report; under `OMO_BROWSER_ENGINE` this surfaces as `BrowserUserStoppedError` and no session starts again this turn |
+| `cdp_failed` | the page cannot be attached (restricted URL, DevTools open) | say which page and why |
 
-**Two identical failures select a different approach. A third identical attempt is a defect.**
+Typed errors under `OMO_BROWSER_ENGINE` (see SKILL.md Step 0):
 
-## Sandboxed hosts
+| Error | `code` | Meaning |
+|---|---|---|
+| `BrowserNotConnectedError` | `browser_not_connected` | the user's browser is not connected; ask them to connect it |
+| `BrowserEngineRefusal` | `browser_engine_none` / `browser_engine_builtin` / `browser_engine_unsupported` / `browser_tool_blocked` | this engine setting does not allow that call |
+| `BrowserActionDeclinedError` | `user_declined` | the user said no, or no question could be asked; do not retry |
+| `BrowserUserStoppedError` | `user_stopped` | the user stopped browser use |
 
-If the host kills background children after each command, the daemon cannot survive between calls.
-Set `BSK_AUTO_START=0`, share one `BSK_HOME` across every call, and start
-`bsk daemon start --foreground` in the host's persistent background task. Check readiness with
-`bsk status --json` in a separate call before continuing. Do not loop on launches, delete runtime
-files, or restart a daemon another task is using.
+Long calls can be cancelled: `const h = session.client.callWithHandle("tool.navigate", {...})`
+then `await session.client.cancel(h.rpcId)`.

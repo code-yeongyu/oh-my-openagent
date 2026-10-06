@@ -1,4 +1,0 @@
-type-last key order, no parentID -> TOPLEVEL-BRANCH   (expected TOPLEVEL-BRANCH)
-type-last key order, parentID    -> CHILD-BRANCH   (expected CHILD-BRANCH)
-no session.created at all        -> FAIL-BRANCH   (expected FAIL-BRANCH)
-PASS: all three branches are reachable, so the assertions can fail

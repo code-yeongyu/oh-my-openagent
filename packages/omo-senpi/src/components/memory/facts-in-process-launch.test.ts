@@ -66,8 +66,8 @@ async function launchFactsChild(
           for (const listener of listeners) listener(event)
         }
       },
-      steer: async () => undefined,
-      followUp: async () => undefined,
+      steer: async () => "handled",
+      followUp: async () => "handled",
       abort: async () => undefined,
       subscribe: (listener) => {
         listeners.add(listener)

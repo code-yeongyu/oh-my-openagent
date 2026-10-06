@@ -6,18 +6,19 @@ nothing in this package needs to bridge it.
 Shape:
 
 - The **browser machine** needs only the extension.
-- The **agent machine** runs the `bsk` CLI and this skill.
+- The **agent machine** runs the `bsk` daemon, omowright and this skill.
 - They are joined by a daemon in server mode plus a pairing link.
 
 ```bash
-bsk daemon start --mode server      # on the machine the agent runs on
+bsk daemon start --mode server      # on the machine the agent runs on; WSS is required off loopback
 ```
 
 Then follow upstream's pairing guide, which owns the current flag surface and the TLS
 prerequisites: https://github.com/Tencent/BrowserSkill/blob/main/docs/remote-extension-connection.md
 
-Once paired, every command in `commands.md` behaves identically; `--out` paths still resolve on
-the machine that ran the command.
+Once paired, `connectBrowserSkill()` and every session method behave identically; screenshot
+buffers arrive on the machine that ran the call. Windows named pipes are not discovered
+automatically — pass `sockPath` to `connectBrowserSkill()`.
 
 If pairing is not configured, say so and ask. Do not substitute a browser on the agent machine:
 the point of the attached engine is the sessions that live in the user's browser, and a local

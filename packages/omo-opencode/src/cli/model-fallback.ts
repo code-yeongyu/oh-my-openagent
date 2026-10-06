@@ -177,7 +177,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
           .map(([role]) => [role, { model: ULTIMATE_FALLBACK }])
       ),
       categories: Object.fromEntries(
-        Object.keys(CLI_CATEGORY_MODEL_REQUIREMENTS).map((cat) => [cat, { model: ULTIMATE_FALLBACK }])
+        Object.entries(CLI_CATEGORY_MODEL_REQUIREMENTS)
+          .filter(([, req]) => !req.requiresAnyModel)
+          .map(([cat]) => [cat, { model: ULTIMATE_FALLBACK }])
       ),
     }
   }
@@ -258,6 +260,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         ? CLI_CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
         : req.fallbackChain
 
+    if (req.requiresAnyModel && !isAnyFallbackEntryAvailable(fallbackChain, avail)) {
+      continue
+    }
     if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {
       continue
     }

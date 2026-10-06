@@ -21,7 +21,7 @@ The former `omo` bin was removed from these packages in this major release. The 
 
 | Bin | Package | Channel | What it is |
 | --- | --- | --- | --- |
-| `omo` | `omo-ai` | bun (recommended): `bun add -g omo-ai@beta`; npm fallback: `npm i -g omo-ai@beta` | Launches the pinned senpi release with the full OMO extension loaded. A bare `bun add -g omo-ai` or `npm i -g omo-ai` fails by design; see the [omo-ai publishing runbook](./omo-ai-publishing.md). |
+| `omo` | `omo-ai` | bun (recommended): `bun add -g omo-ai`; npm fallback: `npm i -g omo-ai` | Launches the pinned senpi release with the full OMO extension loaded. Prerelease builds live on `omo-ai@beta`; see the [omo-ai publishing runbook](./omo-ai-publishing.md). |
 
 The `omo-agent-toolkit` npm bin stays with the wrapper packages above; `omo-ai` never declares it.
 
@@ -156,6 +156,13 @@ bunx oh-my-openagent doctor
 
 - The current minimum OpenCode version check is `>= 1.4.0`.
 - The doctor command warns when legacy plugin registration (`oh-my-opencode`) is still present in `opencode.json`.
+- OmO Native's `doctor` subcommand also reports computer use (experimental) without opening a desktop session or requesting OS permissions. It prints:
+  - whether the effective Native config enables computer use and whether the host is supported;
+  - the selected engine path and its version, protocol, and ABI, or the engine-location diagnostic and every path tried;
+  - the backend plus capture, input, and accessibility permission state;
+  - display count and screen-lock state;
+  - the stop path, reported as not armed until computer use starts input, because the engine arms the stop chord only then.
+  The probe sends only the read-only `engine.hello` and `capabilities` requests and is bounded by the doctor's timeout.
 
 ---
 
@@ -194,6 +201,10 @@ bunx oh-my-openagent run <message>
 1. `--agent`
 2. `OPENCODE_DEFAULT_AGENT`
 3. `default_run_agent` in plugin config
+
+`--agent` accepts config keys (`sisyphus`, `prometheus`) and remapped display names (`Sisyphus - ultraworker`). Builtin categories (`quick`, `deep`, `ultrabrain`, `unspecified-high`, and the others used by `task(category=...)`) are not CLI agents; `oh-my-openagent run --agent quick` errors with the runnable names.
+
+`opencode run --agent` does exact-key lookup in the host. Prefer `oh-my-openagent run --agent`, or pass the remapped display name. Unknown host `--agent` values should fail closed (see the OpenCode CLI).
 
 ---
 

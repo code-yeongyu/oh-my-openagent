@@ -1,6 +1,8 @@
+import { isGpt6AstraModel } from "@oh-my-opencode/model-core"
+import { transformContextText } from "../../extension/context-text-transform"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { stripQuotedRegions } from "../skill-pointers/strip-quoted-regions"
-import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 
 // Match complete words so prose such as "ulwfoo" and identifiers such as "ulw_helper" do not
 // arm ultrawork. Hyphens and spaces remain boundaries, so skill names like "ulw-loop" and phrases
@@ -58,6 +60,7 @@ type SenpiInputEventResult = { action: "continue" } | { action: "transform"; tex
 // event handler receives the live ExtensionContext, so the session id is available
 // on input events directly and on the session lifecycle events that feed the tracker.
 interface SessionEventContext {
+  readonly model?: { readonly id?: unknown }
   readonly sessionManager?: {
     getSessionId(): string
   }
@@ -89,6 +92,7 @@ const ARMING_LEDGER_KEY = Symbol.for("omo.ultrawork.arming")
 
 interface SharedArmingSlot {
   readonly directive: string
+  readonly astraDirective: string
   readonly arming: SessionArming
 }
 
@@ -103,7 +107,7 @@ function isCurrentArmingSlot(value: unknown): value is SharedArmingSlot {
   // a 32-bit FNV-1a revision demonstrably allowed) can never reuse stale arming.
   // A bare ledger from a pre-slot bundle has no directive to match, so it is
   // discarded here exactly like a mismatched one.
-  return slot.directive === SENPI_ULTRAWORK_DIRECTIVE && typeof slot.arming === "object" && slot.arming !== null
+  return slot.directive === SENPI_ULTRAWORK_DIRECTIVE && slot.astraDirective === SENPI_ASTRA_ULTRAWORK_DIRECTIVE && typeof slot.arming === "object" && slot.arming !== null
 }
 
 export function sharedSessionArming(): SessionArming {
@@ -113,7 +117,7 @@ export function sharedSessionArming(): SessionArming {
     return existing.arming
   }
   const created = createSessionArming()
-  const slot: SharedArmingSlot = { directive: SENPI_ULTRAWORK_DIRECTIVE, arming: created }
+  const slot: SharedArmingSlot = { directive: SENPI_ULTRAWORK_DIRECTIVE, astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE, arming: created }
   registry[ARMING_LEDGER_KEY] = slot
   return created
 }
@@ -123,8 +127,33 @@ export function createUltraworkComponent(arming: SessionArming = sharedSessionAr
     name: "ultrawork",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       pi.on("input", (payload: unknown, eventCtx: unknown): SenpiInputEventResult =>
-        handleInput(pi, payload, ctx, arming, sessionIdFromEventCtx(eventCtx)),
+        handleInput(pi, payload, ctx, arming, eventCtx),
       )
+      // Input is transformed before a queued message drains. Select again at the
+      // receiving boundary so a model switch or fallback cannot deliver its old policy.
+      pi.on("context", (payload: unknown, eventCtx: unknown) => {
+        if (ctx.config.getFlag(ULTRAWORK_DISABLED_FLAG) === true) return
+        if (typeof payload !== "object" || payload === null || !("messages" in payload) || !Array.isArray(payload.messages)) return
+        const directive = directiveForModel(modelIdFromContext(eventCtx))
+        let selected = false
+        const messages = payload.messages.map((message: unknown) => {
+          if (typeof message !== "object" || message === null || !("content" in message)) return message
+          const selectText = (text: string): string => {
+            const content = selectDirectiveText(text, directive)
+            if (content !== undefined) selected = true
+            return content ?? text
+          }
+          if (typeof message.content === "string") return transformContextText({ ...message }, selectText)
+          const content = Array.isArray(message.content) ? message.content.map((block: unknown) => {
+              if (typeof block !== "object" || block === null || !("type" in block) || block.type !== "text" || !("text" in block) || typeof block.text !== "string") return block
+              return { ...block, text: selectText(block.text) }
+            }) : message.content
+          return { ...message, content }
+        })
+        if (!selected) return
+        arming.markArmed(sessionIdFromEventCtx(eventCtx) ?? arming.currentSessionId())
+        return { messages }
+      })
       pi.on("session_start", (_payload: unknown, eventCtx: unknown) => {
         arming.trackSession(sessionIdFromEventCtx(eventCtx))
       })
@@ -285,7 +314,7 @@ function handleInput(
   payload: unknown,
   ctx: ComponentContext,
   arming: SessionArming,
-  eventSessionId: string | undefined,
+  eventCtx: unknown,
 ): SenpiInputEventResult {
   if (ctx.config.getFlag(ULTRAWORK_DISABLED_FLAG) === true) {
     return { action: "continue" }
@@ -305,7 +334,8 @@ function handleInput(
 
   // The input event's own ctx names the live session; the lifecycle tracker covers
   // hosts that only expose the id on session events.
-  const sessionId = eventSessionId ?? arming.currentSessionId()
+  const sessionId = sessionIdFromEventCtx(eventCtx) ?? arming.currentSessionId()
+  const directive = directiveForModel(modelIdFromContext(eventCtx))
   const classification = classifyUltraworkInput(payload, snapshotSessionArming(arming, sessionId))
 
   // A pasted transcript (or an earlier injection) already carries the directive
@@ -334,7 +364,7 @@ function handleInput(
   // Any defined streamingBehavior means senpi will QUEUE this prompt instead of
   // sending it now, which changes how the directive has to travel.
   const isQueued = payload.streamingBehavior !== undefined
-  return armUltrawork(pi, payload.text, isQueued, arming, sessionId)
+  return armUltrawork(pi, payload.text, isQueued, arming, sessionId, directive)
 }
 
 /**
@@ -364,10 +394,11 @@ function armUltrawork(
   isQueued: boolean,
   arming: SessionArming,
   sessionId: string | undefined,
+  directive: string,
 ): SenpiInputEventResult {
   // An armed session's transcript already holds the full directive; the short
   // reminder re-points the model at that block without re-paying ~17KB per trigger.
-  const content = arming.isArmed(sessionId) ? ULTRAWORK_REMINDER : SENPI_ULTRAWORK_DIRECTIVE
+  const content = arming.isArmed(sessionId) ? ULTRAWORK_REMINDER : directive
   arming.markArmed(sessionId)
 
   if (isQueued) {
@@ -385,6 +416,31 @@ function armUltrawork(
 
 function isSessionEventContext(value: unknown): value is SessionEventContext {
   return typeof value === "object" && value !== null
+}
+
+function modelIdFromContext(value: unknown): string | undefined {
+  if (!isSessionEventContext(value)) return undefined
+  return typeof value.model?.id === "string" ? value.model.id : undefined
+}
+
+function directiveForModel(modelId: string | undefined): string {
+  return isGpt6AstraModel(modelId) ? SENPI_ASTRA_ULTRAWORK_DIRECTIVE : SENPI_ULTRAWORK_DIRECTIVE
+}
+
+function selectDirectiveText(text: string, directive: string): string | undefined {
+  // Native skill expansion retains the variant markers; generated directives
+  // omit them. Match only the canonical full body, preserving arbitrary prose.
+  const unmarked = text.replace(/<!-- omo-ultrawork-astra:[a-z0-9-]+:(?:start|end) -->\r?\n/g, "")
+  const selected = directive.trimEnd()
+  let result = unmarked
+  let matched = false
+  for (const candidate of [SENPI_ULTRAWORK_DIRECTIVE, SENPI_ASTRA_ULTRAWORK_DIRECTIVE]) {
+    if (result.includes(candidate.trimEnd())) {
+      matched = true
+      result = result.replaceAll(candidate.trimEnd(), () => selected)
+    }
+  }
+  return matched ? result : undefined
 }
 
 function sessionIdFromEventCtx(value: unknown): string | undefined {

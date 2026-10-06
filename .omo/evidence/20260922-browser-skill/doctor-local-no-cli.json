@@ -1,5 +1,0 @@
-{
-  "state": "no-cli",
-  "platform": "darwin",
-  "remedy": "Install the CLI: node \"<skill-root>/scripts/browser-install.mjs\", then re-run this doctor."
-}

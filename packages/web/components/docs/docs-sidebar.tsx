@@ -3,21 +3,20 @@
 import type { JSX } from "react"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import type { DocSectionId } from "@/lib/docs-sections"
 import { cn } from "@/lib/utils"
 
 export type DocsShellSection = {
-  id: DocSectionId
+  id: string
   title: string
 }
 
 export interface DocsSidebarProps {
   readonly sections: readonly DocsShellSection[]
-  readonly activeSection: DocSectionId
+  readonly activeSection: string
   readonly searchQuery: string
   readonly searchPlaceholder: string
   readonly onSearchChange: (value: string) => void
-  readonly onSelect: (id: DocSectionId) => void
+  readonly onSelect: (id: string) => void
   readonly className?: string
 }
 

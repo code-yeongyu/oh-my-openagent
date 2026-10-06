@@ -6,10 +6,12 @@ import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-r
 const GPT_PROVIDERS = ["openai", "chatgpt-subscription", "github-copilot", "opencode"]
 
 describe("GPT-6 family routing", () => {
-  test("deep-low leads with gpt-6-sol medium and keeps gpt-5.6-sol medium as the fallback rung", () => {
+  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast medium on the OpenAI lanes, then gpt-5.6-sol medium on every lane, then gpt-5.6-sol-fast, and nothing after it", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain).toEqual([
-      { providers: GPT_PROVIDERS, model: "gpt-6-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
       { providers: GPT_PROVIDERS, model: "gpt-5.6-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" },
     ])
   })
 
@@ -20,7 +22,7 @@ describe("GPT-6 family routing", () => {
 
   test("quick leads with gpt-6-luna-fast low", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain[0]).toEqual({
-      providers: ["chatgpt-subscription"],
+      providers: ["openai", "chatgpt-subscription"],
       model: "gpt-6-luna-fast",
       variant: "low",
     })
@@ -47,7 +49,7 @@ describe("GPT-6 family routing", () => {
     const chain = table[name].fallbackChain
     expect(chain[0]?.model).toBe("claude-fable-5-1")
     expect(chain[1]).toMatchObject({ model: "claude-opus-5-5", variant: "max" })
-    expect(chain[1]?.providers).toEqual(["anthropic"])
+    expect(chain[1]?.providers).toEqual(chain[0]?.providers)
     expect(chain[2]).toEqual({
       providers: chain[0]?.providers,
       model: "claude-opus-5",

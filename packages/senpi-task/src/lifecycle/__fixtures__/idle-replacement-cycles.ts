@@ -6,6 +6,7 @@ import { createTaskManager } from "../../manager/manager"
 import { FakeRunner, tempProject, settings } from "../../manager/__fixtures__/manager-fakes"
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle } from "../create"
+import { NO_HOST_ENDPOINT } from "../host-session"
 
 /** Four active turns share one parent, lane cap and residency cap across four replacement cycles. */
 export async function idleReplacementCycles() {
@@ -25,7 +26,7 @@ export async function idleReplacementCycles() {
     destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
   })
   const registry = createManagerResidencyRegistry(() => manager)
-  const lifecycle = createTaskLifecycle({ store, config, registry, now: () => now, idleReclaimerScheduler: { setInterval: () => ({}), clearInterval: () => undefined } })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, registry, now: () => now, idleReclaimerScheduler: { setInterval: () => ({}), clearInterval: () => undefined } })
   const snapshots: unknown[] = []
   const observe = () => {
     const records = store.list().records

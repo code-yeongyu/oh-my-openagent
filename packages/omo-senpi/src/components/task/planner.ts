@@ -240,6 +240,7 @@ function toPlanResolution(
       category: categoryName,
       ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
       ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
+      ...(resolution.unlisted_provider_model !== undefined && { unlisted_provider_model: resolution.unlisted_provider_model }),
     },
   }
 }

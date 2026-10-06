@@ -51,7 +51,12 @@ function localLauncherPath(homeDir = homedir2()) {
 function localLauncherCmdPath(homeDir = homedir2()) {
   return join2(homeDir, ".local", "bin", "omo.cmd");
 }
+function releaseChannel(version) {
+  return version !== undefined && version.includes("-") ? "beta" : "latest";
+}
 function renderLocalLauncher(options) {
+  const channel = releaseChannel(options.version);
+  const updateCommand = channel === "beta" ? "bun add -g omo-ai@beta" : "bun add -g omo-ai";
   const brand = {
     name: "OmO",
     command: "omo",
@@ -66,8 +71,8 @@ function renderLocalLauncher(options) {
     },
     update: {
       packageName: "omo-ai",
-      distTag: "beta",
-      command: "npm i -g omo-ai@beta",
+      distTag: channel,
+      command: updateCommand,
       changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases"
     }
   };
@@ -97,7 +102,7 @@ const selfUpdate = process.argv[2] === "update"
   && process.argv.slice(3).every((arg) => arg.startsWith("-") || ["self", "senpi", "omo"].includes(arg))
   && !process.argv.slice(3).some((arg) => arg === "--extensions" || arg === "--models")
 if (selfUpdate) {
-  console.log("omo is updated via npm: npm i -g omo-ai@beta")
+  console.log(${JSON.stringify(`omo is updated via bun: ${updateCommand}`)})
   process.exit(0)
 }
 // windowsHide-exempt: this is the interactive foreground CLI, spawned with inherited stdio.
@@ -284,11 +289,18 @@ function isErrno(error, code) {
 var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "omo.js"),
   join4("extensions", "omo-task.js"),
+  join4("extensions", "omo-computer-use.js"),
+  join4("extensions", "omo-memory-doctor.js"),
+  join4("extensions", "omo-memory-memfs.js"),
+  join4("extensions", "assets.generated.json"),
   join4("extensions", "omo-member.js"),
   join4("extensions", "memory-run-supervisor.mjs"),
+  join4("extensions", "gateway-store-worker.mjs"),
   ...PERSONA_ASSET_FILES.map((filename) => join4("extensions", filename)),
   join4("skills", "ast-grep", "SKILL.md"),
   join4("skills", "browser", "SKILL.md"),
+  join4("skills", "browser", "runtime", "omowright", "index.js"),
+  join4("skills", "browser", "runtime", "omowright", "page-bundle.js"),
   join4("skills", "coding-agent-sessions", "SKILL.md"),
   join4("skills", "debugging", "SKILL.md"),
   join4("skills", "frontend", "SKILL.md"),
@@ -308,6 +320,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("skills", "visual-qa", "SKILL.md"),
   join4("skills-conditional", "x-search", "SKILL.md"),
   join4("runtime", "agent-toolkit-sdk", "sdk.js"),
+  join4("runtime", "thread-sdk", "sdk.js"),
   join4("runtime", "ast-grep-mcp", "cli.js"),
   join4("runtime", "lsp-daemon", "dist", "cli.js"),
   join4("runtime", "lsp-daemon", "dist", "index.js"),

@@ -20,13 +20,13 @@ Explore-before-asking. Dispatch parallel read-only research in one turn - intern
 <interview>
 TOPOLOGY LOCK first: from the request plus exploration, enumerate the 1-6 top-level components that can each succeed or fail independently, confirm them in ONE turn, and record them in the draft's Components ledger (id, one-line outcome, status, evidence path). Do NOT collapse to one component because the request looks small.
 
-Then the TWO FILTERS (full definition in SKILL.md): (1) evidence-answerable -> explore; (2) intent plus a defensible default -> adopt and record, EXCEPT owner-decisions (irreversible / destructive / safety-critical, or cross-cutting product choices), which always survive as questions.
+Then the TWO FILTERS (full definition in SKILL.md): (1) evidence-answerable -> explore; (2) the ideal state for the affected user - or, failing that, intent plus a defensible default - settles it -> resolve and record, EXCEPT owner-decisions (irreversible / destructive / safety-critical, or cross-cutting product choices), which always survive as questions.
 
 ASK WITH WHY: name what you explored, why it did not resolve, and which part of the plan forks on the answer. Deliver surviving forks through the active renderer (`references/stance-calibration.md` - read it first): batch puts every fork in one brief, one-by-one paces one fork per turn, examples-first replaces open questions with 2-3 contrasting concrete approaches to critique. In every renderer each fork carries 2-4 options with your recommended default FIRST, a skipped or opted-out fork resolves to that default, and every reply is classified per the same reference. Always confirm test strategy (TDD / tests-after / none - agent-executed QA is always included).
 
 FOGGIEST-GAP targeting (ordinal, NO numbers): each turn aim at the single open gap whose resolution most unblocks the plan, and say why in one sentence; rotate across equally-foggy components. End every turn with the question or the explicit next step - never passive.
 
-CLEARANCE CHECK after each turn: objective defined? scope IN/OUT explicit? approach decided? test strategy confirmed? constraints swept (budget / stack / scale / audience - each explored, defaulted, or asked)? no blocking ambiguity left? Any NO is your next question; all YES -> present the approval brief and stop.
+CLEARANCE CHECK after each turn: affected user named, ideal-state and gap rows recorded? objective defined? scope IN/OUT explicit? approach decided? test strategy confirmed? constraints swept (budget / stack / scale / audience - each explored, defaulted, or asked)? no blocking ambiguity left? Any NO is your next question; all YES -> present the approval brief and stop.
 </interview>
 
 <approval_and_deliver>
@@ -36,10 +36,9 @@ Run the durable approval gate (mechanics in `full-workflow.md`): present the bri
 <worked_example>
 Request: "add a 5/min-per-IP rate-limit to `/login`".
 1. Explore -> auth middleware at `src/auth/login.ts:40`, an existing limiter util at `src/util/rate-limit.ts`, Redis client at `src/redis.ts`.
-2. Topology lock (one turn): one active component - "login rate-limit".
-3. Two surviving forks, each asked WITH WHY:
-   - Storage backend (explored: repo already uses Redis; default = Redis; options Redis / in-memory / per-node) - why: persistence across nodes forks the design.
-   - Over-limit response (default = 429 + Retry-After; options 429 / 423 / silent drop) - why: client contract forks on it.
+2. Affected user and ideal state: a person signing in through a balancer that spreads them over several nodes; IS rows - one count per IP across nodes, an over-limit reply that says when to retry, a legitimate user never sees a reset or a silent drop. Topology lock (one turn): one active component - "login rate-limit".
+3. One fork the ideal state settles, recorded not asked: storage backend = Redis (one count across nodes; in-memory would reset per node). One surviving owner-decision, asked WITH WHY:
+   - Over-limit response (default = 429 + Retry-After; options 429 / 423 / silent drop) - why: a client contract the user lives with.
    - Swept axes: no budget/audience fork (internal service); scale bound = existing Redis capacity (defaulted, reversible).
 4. Approval brief -> explicit okay -> scaffold -> append todos -> run the plan-reviewer high-accuracy review (default-on unless the user explicitly opted out) and deliver the receipt.
 </worked_example>

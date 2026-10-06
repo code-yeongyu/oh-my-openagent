@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
+import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
 import { BUILTIN_AGENTS, DEFAULT_CATEGORIES } from "@oh-my-opencode/senpi-task"
 import { BUILTIN_SKILL_NAMES } from "./components/telemetry/product-identity"
+import { createNativeSkillSources } from "../plugin/scripts/native-skill-sources.mjs"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
 const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
@@ -193,6 +195,29 @@ describe("OMO Senpi scoped skill sync", () => {
       const shippedPath = join(skillsRoot, skillName, "SKILL.md")
       const shipped = readFileSync(shippedPath, "utf8")
       expect(shipped, `${relative(repoRoot, shippedPath)} must ship the native source verbatim`).toBe(source)
+    }
+  })
+
+  test("#given the shared ulw-research runtime #when synced #then scripts and every shared reference ship byte-equal to their shared sources", () => {
+    const sharedSkillRoot = join(repoRoot, "packages", "shared-skills", "skills", "ulw-research")
+    const shippedSkillRoot = join(skillsRoot, "ulw-research")
+    const keep = createSkillSourceCopyFilter(sharedSkillRoot)
+    const toRelative = (root: string) => (file: string) => relative(root, file).replaceAll("\\", "/")
+
+    const sharedScripts = listFiles(join(sharedSkillRoot, "scripts")).filter(keep).map(toRelative(sharedSkillRoot)).sort()
+    const shippedScripts = listFiles(join(shippedSkillRoot, "scripts")).map(toRelative(shippedSkillRoot)).sort()
+
+    expect(shippedScripts).toEqual(sharedScripts)
+    expect(shippedScripts).toContain("scripts/contracts.mjs")
+    expect(shippedScripts.filter((path) => path.endsWith(".test.ts") || path.startsWith("scripts/tests/"))).toEqual([])
+
+    const { sources } = createNativeSkillSources(join(repoRoot, "packages"))
+    const sharedAssetFiles = (sources.find((source) => source.name === "ulw-research")?.sharedAssets ?? []).filter((asset) => asset !== "scripts")
+    expect(sharedAssetFiles.length).toBeGreaterThan(0)
+    for (const relativePath of [...shippedScripts, ...sharedAssetFiles]) {
+      const shipped = readFileSync(join(shippedSkillRoot, relativePath))
+      const shared = readFileSync(join(sharedSkillRoot, relativePath))
+      expect(shipped.equals(shared), `ulw-research/${relativePath} must ship the shared bytes`).toBe(true)
     }
   })
 

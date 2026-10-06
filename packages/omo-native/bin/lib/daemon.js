@@ -1,45 +1,56 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { join } from "node:path"
+import {
+  parseEngineLine,
+  parseStoreArgs,
+  hostCommandEnvironment,
+  runGc,
+  runHandoff,
+  runStatus,
+  runStopAll,
+} from "./daemon-operations.js"
+import { runRollbackPrepare } from "./daemon-rollback.js"
+import { runAdoptCommand } from "./daemon-adopt.js"
+import { loadThreadSdk } from "./thread.js"
+import { blockingPause, DAEMON_EXIT, readTimeoutSeconds } from "./daemon-args.js"
+import { readDaemonConfig } from "./daemon-config.js"
+
+export { DAEMON_EXIT } from "./daemon-args.js"
+export { daemonReportLines } from "./daemon-doctor-report.js"
 
 /**
- * `omo daemon` - the operator's view of the one machine-wide engine host.
+ * `omo daemon` - the operator's view of every engine host in one agent dir: the operator daemon on
+ * `rpc.sock` (the only endpoint `run` ensures), each session's task host (`p-*`), each
+ * Desktop thread host (`i-*`), and any other endpoint the engine enumerates. `status`, `gc`,
+ * `handoff`, `stop --all` and `rollback-prepare` cover all of them.
  *
- * Everything that decides WHO serves the socket lives in the engine (`senpi host`): probing an
+ * Everything that decides WHO serves a socket lives in the engine (`senpi host`): probing an
  * existing host, comparing build ordinals, handing a generation over, refusing when the two sides
  * cannot agree. This wrapper owns three much smaller things, and deliberately nothing else:
- * omo's launch spec is the argv source, omo.json is where the policy comes from, and the caller
+ * omo's launch spec is the argv source, the omo config is where the policy comes from, and the caller
  * gets an exit code it can branch on without reading prose.
  */
 
-const SUBCOMMANDS = new Set(["run", "attach", "status", "stop", "handoff"])
-/** Flags this wrapper consumes itself; anything else after `attach` belongs to the launch. */
-const DAEMON_FLAGS = new Set(["--json", "--no-upgrade", "--persistent", "--foreground", "--include-workers", "--drain"])
+const SUBCOMMANDS = new Set(["run", "adopt", "status", "stop", "handoff", "gc", "rollback-prepare"])
 /** The subcommands that can bring a host into existence, and therefore need omo's argv source. */
-const NEEDS_SPEC = new Set(["run", "attach", "handoff"])
-
-/** A named code per outcome, so a script never has to parse the message to know what happened. */
-export const DAEMON_EXIT = {
-  ok: 0,
-  usage: 2,
-  notRunning: 3,
-  unsupported: 4,
-  engineRefused: 5,
-}
+const NEEDS_SPEC = new Set(["run", "handoff"])
 
 const USAGE = [
-  "usage: omo daemon <run|attach|status|stop|handoff> [options]",
+  "usage: omo daemon <run|adopt|status|stop|handoff|gc|rollback-prepare> [options]",
   "",
   "  run       ensure a daemon is serving this agent dir (start, reuse, or hand off)",
-  "  attach    print the environment a child needs to reach the daemon",
+  "  adopt     take a session a host holds into this terminal (--interrupt, --force)",
   "  status    report who is serving and which sessions exist",
   "  stop      end the daemon; --drain lets in-flight work finish first",
   "  handoff   hand the socket to this build, keeping live sessions",
+  "  gc        remove dead endpoint state; --prune-store-index drops missing store paths",
+  "  rollback-prepare migrate retained task records back to rpc.sock before downgrading",
   "",
   "  --json            print the engine's JSON line instead of a summary",
   "  --no-upgrade      never hand off, even from an older build",
-  "  --persistent      outlive the process that started it",
-  "  --foreground      run the host in this process instead of detaching",
   "  --include-workers include subagent sessions in status",
+  "  --all             apply stop to every discovered endpoint",
+  "  --wait            with stop --drain --all, wait for generations and claims to end",
 ].join("\n")
 
 /**
@@ -53,56 +64,20 @@ function resolvePolicy(args, config) {
   return "upgrade"
 }
 
-/** omo.json is optional and may be hand-edited, so unreadable config must not take the CLI down. */
-function readConfig(agentDir) {
-  const path = join(agentDir, "omo.json")
-  if (!existsSync(path)) return undefined
-  try {
-    return JSON.parse(readFileSync(path, "utf8"))
-  } catch {
-    return undefined
-  }
-}
-
 /**
- * The engine owns four subcommands - ensure, status, stop, handoff. `run` and `attach` are omo's
- * words for the same ensure: one asks for a daemon, the other asks for a daemon plus the
- * environment to reach it. Mapping them here is what keeps this file from inventing a fifth.
+ * The engine owns four subcommands - ensure, status, stop, handoff. `run` is omo's word for the
+ * ensure. Mapping them here is what keeps this file from inventing a fifth.
  */
-const ENGINE_SUBCOMMAND = { run: "ensure", attach: "ensure", status: "status", stop: "stop", handoff: "handoff" }
+const ENGINE_SUBCOMMAND = { run: "ensure", status: "status", stop: "stop", handoff: "handoff" }
 
-function buildArgs(subcommand, args, { specPath, policy, config }) {
+function buildArgs(subcommand, args, { specPath, policy }) {
   const engineArgs = ["host", ENGINE_SUBCOMMAND[subcommand], "--json"]
-  if (subcommand === "run" || subcommand === "attach" || subcommand === "handoff") {
+  if (subcommand === "run" || subcommand === "handoff") {
     engineArgs.push("--launch-spec", specPath, "--policy", policy)
-    const idleExitMs = config?.task?.host_idle_exit_ms
-    if (typeof idleExitMs === "number" && Number.isFinite(idleExitMs)) {
-      engineArgs.push("--idle-exit-ms", String(Math.trunc(idleExitMs)))
-    }
-    if (args.includes("--persistent")) engineArgs.push("--persistent")
-    if (args.includes("--foreground")) engineArgs.push("--foreground")
   }
   if (subcommand === "stop" && args.includes("--drain")) engineArgs.push("--drain")
   if (subcommand === "status" && args.includes("--include-workers")) engineArgs.push("--include-workers")
   return engineArgs
-}
-
-function parseLine(stdout) {
-  const line = stdout.trim().split("\n").filter(Boolean).pop()
-  if (line === undefined) return undefined
-  try {
-    return JSON.parse(line)
-  } catch {
-    return undefined
-  }
-}
-
-/** What a child process needs in its environment to reach this daemon rather than start its own. */
-function attachEnv(parsed, agentDir) {
-  return {
-    OMO_ENABLE_SHARED_HOST: "1",
-    OMO_RPC_SOCKET: parsed?.socket ?? join(agentDir, "rpc", "rpc.sock"),
-  }
 }
 
 function summarize(subcommand, parsed, exitCode) {
@@ -117,13 +92,28 @@ function summarize(subcommand, parsed, exitCode) {
   return `daemon: ${parsed.action ?? subcommand}${pid}`
 }
 
+/** `omo daemon adopt`: the thread SDK finds and releases the session; the result is an exit code or a launch. */
+async function adopt(args, options) {
+  const loaded = await (options.threadSdk ?? loadThreadSdk)({ ...options, cwd: options.cwd ?? process.cwd() })
+  if (loaded.error !== undefined) {
+    options.stderr.write(`omo daemon adopt: ${loaded.error}\n`)
+    return DAEMON_EXIT.unsupported
+  }
+  try {
+    return await runAdoptCommand(args, { sdk: loaded.sdk, stdout: options.stdout, stderr: options.stderr })
+  } finally {
+    // The release already happened; a store that fails to close is logged, never a new outcome.
+    await loaded.sdk.dispose().catch((error) => options.stderr.write(`omo daemon adopt: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`))
+  }
+}
+
 /**
  * @param args argv after `omo daemon`
  * @param options.engine  something that can run the engine CLI; injected so tests never spawn one
  * @returns the process exit code the launcher should use
  */
 export function runDaemonCommand(args, options) {
-  const { engine, pluginRoot, agentDir, env, stdout, stderr, platform } = options
+  const { engine, migration, pluginRoot, agentDir, env, stdout, stderr, platform } = options
   const subcommand = args[0]
 
   if (subcommand === "--help" || subcommand === "-h") {
@@ -135,71 +125,113 @@ export function runDaemonCommand(args, options) {
     return DAEMON_EXIT.usage
   }
   if (!SUBCOMMANDS.has(subcommand)) {
-    stderr.write(`omo daemon: unknown subcommand '${subcommand}'\n${USAGE}\n`)
+    // Scripts written for the removed shared-host join get a pointer to what replaced it.
+    const removed = subcommand === "attach" ? "omo daemon: 'attach' was removed; to continue a host session in this terminal, run omo daemon adopt <session>\n" : ""
+    stderr.write(`omo daemon: unknown subcommand '${subcommand}'\n${removed}${USAGE}\n`)
     return DAEMON_EXIT.usage
   }
   // A named pipe is per-process on win32: there is no socket for a second client to attach to,
   // so refusing here is honest, where pretending would strand the caller on a host it cannot reach.
   if (platform === "win32") {
-    stderr.write("omo daemon: a shared host needs a unix socket, which win32 does not provide\n")
+    stderr.write("omo daemon: a task host needs a unix socket, which win32 does not provide\n")
     return DAEMON_EXIT.unsupported
+  }
+  if (args.includes("--foreground")) {
+    stderr.write("omo daemon: --foreground is unsupported; the engine host always detaches\n")
+    return DAEMON_EXIT.usage
   }
 
   // Only the subcommands that may START something need the spec; asking who is serving, or
   // asking it to stop, must still work on an install whose plugin payload was never built.
+  if (subcommand === "adopt") return adopt(args.slice(1), options)
+
   const specPath = join(pluginRoot, "daemon-launch-spec.json")
   if (NEEDS_SPEC.has(subcommand) && !existsSync(specPath)) {
     stderr.write(`omo daemon: launch spec missing at ${specPath}\n`)
     return DAEMON_EXIT.engineRefused
   }
 
-  const config = readConfig(agentDir)
-  const engineArgs = buildArgs(subcommand, args, { specPath, policy: resolvePolicy(args, config), config })
-  const result = engine.run(engineArgs, { env: { ...env, OMO_AGENT_DIR: agentDir } })
-  const parsed = parseLine(result.stdout ?? "")
+  const { config } = readDaemonConfig({ pluginRoot, agentDir, env, cwd: options.cwd, loadRuntime: options.loadTaskConfig })
+  if (subcommand === "status") {
+    const status = runStatus({
+      engine,
+      agentDir,
+      env,
+      json: args.includes("--json"),
+      stdout,
+      stderr,
+    })
+    if (!status.legacy) return status.exitCode
+  }
+  if (subcommand === "gc") {
+    if (args.includes("--prune-store-index") && migration === undefined) {
+      stderr.write("omo daemon: rollback migration runtime is unavailable\n")
+      return DAEMON_EXIT.engineRefused
+    }
+    return runGc({
+      engine,
+      migration,
+      agentDir,
+      env,
+      json: args.includes("--json"),
+      pruneStoreIndex: args.includes("--prune-store-index"),
+      stdout,
+      stderr,
+    })
+  }
+  if (subcommand === "rollback-prepare") {
+    if (migration === undefined) {
+      stderr.write("omo daemon: rollback migration runtime is unavailable\n")
+      return DAEMON_EXIT.engineRefused
+    }
+    return runRollbackPrepare({
+      engine,
+      migration,
+      agentDir,
+      env,
+      explicitStores: parseStoreArgs(args),
+      allowMissingIndex: args.includes("--allow-missing-index"),
+      dryRun: args.includes("--dry-run"),
+      json: args.includes("--json"),
+      stdout,
+      stderr,
+    })
+  }
+  if (subcommand === "handoff") {
+    return runHandoff({
+      engine,
+      pluginRoot,
+      agentDir,
+      env,
+      policy: resolvePolicy(args, config),
+      config,
+      stdout,
+      stderr,
+    })
+  }
+  if (subcommand === "stop" && args.includes("--all")) {
+    const timeoutSeconds = readTimeoutSeconds(args)
+    const outcome = runStopAll({
+      engine,
+      agentDir,
+      env,
+      drain: args.includes("--drain"),
+      wait: args.includes("--wait"),
+      timeoutSeconds,
+      stdout,
+      stderr,
+      now: options.now ?? Date.now,
+      pause: options.pause ?? blockingPause,
+    })
+    if (outcome !== undefined) return outcome
+  }
+  const engineArgs = buildArgs(subcommand, args, { specPath, policy: resolvePolicy(args, config) })
+  const result = engine.run(engineArgs, { env: hostCommandEnvironment(env, agentDir, config) })
+  const parsed = parseEngineLine(result.stdout ?? "")
 
   if (result.stderr) stderr.write(result.stderr)
-
-  if (subcommand === "attach") {
-    if (result.exitCode !== DAEMON_EXIT.ok) return result.exitCode
-    const daemonEnv = attachEnv(parsed, agentDir)
-    // `omo daemon attach --model x`: the trailing args are a normal omo launch that should run
-    // against the daemon, so the caller gets the merged environment back and continues with them.
-    const launchArgs = args.slice(1).filter((arg) => !DAEMON_FLAGS.has(arg))
-    if (launchArgs.length > 0) return { passthrough: true, args: launchArgs, env: { ...env, ...daemonEnv } }
-    const payload = { ...(parsed ?? {}), env: daemonEnv }
-    if (args.includes("--json")) stdout.write(`${JSON.stringify(payload)}\n`)
-    else for (const [key, value] of Object.entries(daemonEnv)) stdout.write(`${key}=${value}\n`)
-    return DAEMON_EXIT.ok
-  }
 
   if (args.includes("--json") && result.stdout) stdout.write(result.stdout.trim() + "\n")
   else stdout.write(`${summarize(subcommand, parsed, result.exitCode)}\n`)
   return result.exitCode
-}
-
-/**
- * The `omo doctor` view: one INFO line, never a FAIL - a machine without a daemon is healthy,
- * it just has nothing shared to report. Returned as lines so doctor can place it with the rest.
- */
-export function daemonReportLines({ engine, pluginRoot, agentDir, env, platform }) {
-  if (platform === "win32") return ["INFO Daemon: unavailable on win32 (no unix socket to share)"]
-  const stdout = { write() {} }
-  const captured = []
-  const exitCode = runDaemonCommand(["status", "--json"], {
-    engine, pluginRoot, agentDir, env, platform,
-    stdout: { write: (text) => void captured.push(text) },
-    stderr: stdout,
-  })
-  const parsed = parseLine(captured.join(""))
-  if (exitCode !== DAEMON_EXIT.ok || parsed === undefined) return ["INFO Daemon: not running"]
-  const sessions = parsed.sessions?.total ?? parsed.sessions?.length ?? 0
-  const parts = [
-    `pid ${parsed.pid}`,
-    parsed.instanceId === undefined ? undefined : `instance ${parsed.instanceId}`,
-    parsed.engineVersion === undefined ? undefined : `engine ${parsed.engineVersion}`,
-    `${sessions} session(s)`,
-    `zombies ${parsed.zombies ?? 0}`,
-  ].filter(Boolean)
-  return [`INFO Daemon: running ${parts.join(" · ")}`]
 }

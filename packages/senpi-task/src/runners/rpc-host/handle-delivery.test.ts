@@ -95,6 +95,7 @@ describe("host session turn outcomes", () => {
     // when
     await handle.abort()
     port.emitEvent(event({ type: "agent_end", willRetry: false, messages: [] }))
+    port.emitEvent(event({ type: "agent_idle" }))
 
     // then
     expect((await handle.waitForOutcome()).status).toBe("cancelled")
@@ -122,6 +123,7 @@ describe("host session turn outcomes", () => {
       }),
     )
     port.emitEvent(event({ type: "agent_end", willRetry: false, messages: [] }))
+    port.emitEvent(event({ type: "agent_idle" }))
     await handle.waitForIdle()
 
     // then
@@ -147,6 +149,7 @@ describe("host session turn outcomes", () => {
       }),
     )
     port.emitEvent(event({ type: "agent_end", willRetry: false, messages: [] }))
+    port.emitEvent(event({ type: "agent_idle" }))
     expect(await handle.waitForOutcome()).toEqual({ status: "completed", finalResponse: "first" })
 
     // when
@@ -162,6 +165,7 @@ describe("host session turn outcomes", () => {
       }),
     )
     port.emitEvent(event({ type: "agent_end", willRetry: false, messages: [] }))
+    port.emitEvent(event({ type: "agent_idle" }))
     expect(await handle.waitForOutcome()).toEqual({ status: "completed", finalResponse: "second answer" })
     await handle.dispose()
   })

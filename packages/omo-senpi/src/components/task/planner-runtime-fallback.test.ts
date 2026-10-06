@@ -81,7 +81,7 @@ describe("createTaskChildPlanner runtime fallback", () => {
       {},
       {},
       () => registry([
-        model("deepseek", "deepseek-v4-flash"),
+        model("deepseek", "deepseek-flash"),
         model("opencode-go", "minimax-m3"),
       ]),
     )
@@ -97,7 +97,7 @@ describe("createTaskChildPlanner runtime fallback", () => {
     // then
     if (result.kind !== "resolved") throw new Error(`Expected resolved plan, got ${result.kind}`)
     expect(result.plan).toMatchObject({
-      model: "deepseek/deepseek-v4-flash",
+      model: "deepseek/deepseek-flash",
       requested_model: {
         source: "category",
         provider: "chatgpt-subscription",
@@ -106,7 +106,7 @@ describe("createTaskChildPlanner runtime fallback", () => {
       resolved_model: {
         source: "category",
         provider: "deepseek",
-        model_id: "deepseek-v4-flash",
+        model_id: "deepseek-flash",
         variant: "off",
       },
       fallback_models: [
@@ -114,7 +114,6 @@ describe("createTaskChildPlanner runtime fallback", () => {
           source: "category",
           provider: "opencode-go",
           model_id: "minimax-m3",
-          variant: "max",
         },
       ],
     })
@@ -159,7 +158,6 @@ describe("createTaskChildPlanner runtime fallback", () => {
         provider: "opencode-go",
         model_id: "minimax-m3",
         display: "opencode-go/minimax-m3",
-        variant: "max",
       },
     ])
   })

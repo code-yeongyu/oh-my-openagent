@@ -54,9 +54,19 @@ function collect(manager: CommandManager, scope: ListScope | undefined): readonl
 async function runTasksCommand(manager: CommandManager, args: string, ctx: CommandContext): Promise<void> {
   const allScope = args.trim().split(/\s+/).includes("--all")
   const records = collect(manager, scopeFor(ctx, allScope))
-  const scopeLabel = allScope ? "all sessions" : "this session"
-  const text = records.length === 0 ? `No tasks in ${scopeLabel}.` : records.map(formatTaskRow).join("\n")
+  let text: string
+  if (records.length > 0) text = records.map(formatTaskRow).join("\n")
+  else if (allScope) text = "No tasks in all sessions."
+  else text = emptySessionTasksText(collect(manager, scopeFor(ctx, true)).length)
   ctx.ui?.notify(text, "info")
+}
+
+// An empty session scope is not an empty store: a restart, a second pane, or a run started
+// elsewhere all land here, so name the --all escape hatch and how many tasks it would show.
+function emptySessionTasksText(otherSessionCount: number): string {
+  const hint = "/tasks --all lists every session's tasks"
+  if (otherSessionCount === 0) return `No tasks in this session. ${hint}.`
+  return `No tasks in this session. ${hint} (${otherSessionCount} in other sessions).`
 }
 
 async function runTaskKillCommand(manager: CommandManager, ctx: CommandContext): Promise<void> {

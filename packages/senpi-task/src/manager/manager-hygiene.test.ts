@@ -71,3 +71,26 @@ describe("TaskManager transcript subscription ownership", () => {
     expect(fake.unsubscribeCount()).toBe(fake.subscribeCount())
   })
 })
+
+// The outcome tracker watches every tracked handle for a park. forget() is where the manager gives the
+// handle up, so it must end that watch too, or each forgotten child keeps a manager closure alive.
+describe("TaskManager park watch ownership", () => {
+  test("#given a running task the manager watches for parks #when it is forgotten #then the watch is gone and a later park touches nothing", async () => {
+    // given
+    const inProcess = new FakeRunner()
+    const { manager, store } = makeManager({ inProcess, config: settings({ default_concurrency: 5, max_depth: 1 }) })
+    const started = await manager.start(baseSpec({ name: "a" }))
+    if (started.kind !== "started") throw new Error("expected started")
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("expected live handle")
+    expect(fake.parkWatchCount()).toBe(1)
+
+    // when
+    manager.forget(started.task_id)
+    fake.park("idle_evicted")
+
+    // then
+    expect(fake.parkWatchCount()).toBe(0)
+    expect(store.load(started.task_id)?.residency_state).toBe("resident")
+  })
+})

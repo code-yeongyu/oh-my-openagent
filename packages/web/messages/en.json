@@ -36,13 +36,24 @@
       "subcopy": "Turn your tokens into results that matter.\nResearch across ten thousand sources. A deck people actually get.\nCompany work, experiments, backends, frontends, code.\nWhatever you need done.",
       "getStarted": "Get started",
       "readManifesto": "Read the manifesto",
-      "installLabel": "One command, one tool",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installLabel": "One command, one tool"
     },
     "command": {
       "copy": "Copy",
       "copied": "Copied",
-      "copyAria": "Copy install command"
+      "copyAria": "Copy install command",
+      "copiedStatus": "Install command copied"
+    },
+    "install": {
+      "tabsLabel": "Install command for your system",
+      "windows": "Windows",
+      "tabs": {
+        "unix": "macOS, Linux, WSL",
+        "powershell": "PowerShell",
+        "cmd": "CMD"
+      },
+      "next": "Then open a new terminal and run omo.",
+      "onComputer": "Run this on your Mac, Linux or Windows computer."
     },
     "proof": {
       "label": "Live numbers",
@@ -118,7 +129,25 @@
       "item6Name": "Goals that survive",
       "item6Desc": "Long work is checkpointed with evidence, so a session restart resumes where it stopped.",
       "item7Name": "Hot-reloading everything",
-      "item7Desc": "Config, skills and prompts reload live. No restarts to try a change."
+      "item7Desc": "Config, skills and prompts reload live. No restarts to try a change.",
+      "item8Name": "Computer use",
+      "item8Desc": "The agent reads the screen and accessibility tree of native apps on macOS, Linux and Windows, then clicks and types in the background, so your focus and cursor stay put. A stop chord suspends it; only you resume.",
+      "stage": {
+        "roundTrip": "one round trip",
+        "oneStep": "1 step",
+        "repaired": "repaired before it ran",
+        "splits": "splits the job",
+        "parallel": "working in parallel",
+        "waiting": "waiting · 0 polls",
+        "woke": "woke up",
+        "goalProgress": "goal · 3 of 4 checked",
+        "resumes": "restart → resumes at step 4",
+        "saved": "saved",
+        "reloaded": "reloaded · no restart",
+        "background": "in the background",
+        "focusKept": "clicked · your focus never moved",
+        "stageLabel": "A single cell acting out the selected detail"
+      }
     },
     "platforms": {
       "titlePrefix": "And from your",
@@ -147,8 +176,7 @@
       "title": "One command. Then get back to work.",
       "subtitle": "Install OmO, open your project, describe the job. That's the whole setup.",
       "installNow": "Install now",
-      "readTheDocs": "Read the docs",
-      "installCommand": "bun install -g omo-ai@beta"
+      "readTheDocs": "Read the docs"
     },
     "dag": {
       "region": "OmO desktop with the workflow graph open",
@@ -175,7 +203,11 @@
   },
   "docs": {
     "mobileHeader": "OmO Docs",
-    "searchPlaceholder": "Search docs..."
+    "searchPlaceholder": "Search docs...",
+    "install": {
+      "title": "Install OmO",
+      "description": "Install OmO with one command on macOS, Linux, WSL and Windows."
+    }
   },
   "manifesto": {
     "badge": "Manifesto",

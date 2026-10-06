@@ -368,7 +368,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       BUILTIN_AGENTS,
-      () => registry([model("anthropic", "claude-fable-5-1")]),
+      () => registry([model("anthropic", "claude-opus-5-5")]),
     )
 
     // when
@@ -391,7 +391,7 @@ describe("createTaskChildPlanner", () => {
       "plan-consultant",
       "plan-reviewer",
     ])
-    // writing survives when its Fable 5.1 rung resolves; ultrabrain's
+    // writing survives when its Opus 5.5 rung resolves; ultrabrain's
     // Astra-only chain is dead, so the dead-chain gate excludes it.
     expect(result.error.availableCategories).toContain("writing")
     expect(result.error.availableCategories).not.toContain("ultrabrain")
@@ -645,7 +645,7 @@ describe("createTaskChildPlanner reviewer category routing", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.plan.model).toBe("anthropic/claude-opus-5-5")
-    expect(resolved.plan.variant).toBe("max")
+    expect(resolved.plan.variant).toBe("medium")
   })
 })
 

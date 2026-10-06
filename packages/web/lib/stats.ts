@@ -1,8 +1,10 @@
-const GITHUB_OWNER = "code-yeongyu"
-const GITHUB_REPO = "oh-my-openagent"
-// OmO shipped under three npm names in sequence; downloads are the sum of the lineage.
-const NPM_PACKAGES = ["oh-my-opencode", "oh-my-openagent", "omo-ai"] as const
-const NPM_FIRST_PUBLISH_YEAR = 2025
+import { GITHUB_REPOSITORY, githubHeaders } from "./github"
+import {
+  fetchInstallerDownloads,
+  resetInstallerDownloadsCacheForTests,
+} from "./installer-downloads"
+import { fetchNativeDownloads, resetNativeDownloadsCacheForTests } from "./native-downloads"
+import { fetchAllTimeDownloads, sumLineageDownloads } from "./npm-downloads"
 
 const CACHE_TTL_MS = 60 * 60 * 1000
 
@@ -13,6 +15,9 @@ export const FALLBACK_STATS_DATA: StatsData = {
   stars: 69_000,
   description: FALLBACK_DESCRIPTION,
   totalDownloads: 3_800_000,
+  npmTotalDownloads: 3_800_000,
+  nativeDownloads: 0,
+  installerDownloads: 0,
   monthlyDownloads: 200_000,
   weeklyDownloads: 36_000,
 }
@@ -25,7 +30,11 @@ interface StatsCache {
 export interface StatsData {
   stars: number
   description: string
+  /** npm lineage plus the compiled binaries downloaded from GitHub releases and the get.omo.dev mirror. */
   totalDownloads: number
+  npmTotalDownloads: number
+  nativeDownloads: number
+  installerDownloads: number
   monthlyDownloads: number
   weeklyDownloads: number
 }
@@ -42,11 +51,13 @@ let cache: StatsCache | null = null
 
 export function resetStatsCacheForTests(): void {
   cache = null
+  resetNativeDownloadsCacheForTests()
+  resetInstallerDownloadsCacheForTests()
 }
 
 function formatCount(num: number): string {
   if (num >= 1_000_000) {
-    const formatted = (num / 1_000_000).toFixed(1)
+    const formatted = (Math.floor(num / 100_000) / 10).toFixed(1)
     return `${formatted.replace(/\.0$/, "")}M+`
   }
   if (num >= 1_000) {
@@ -56,8 +67,10 @@ function formatCount(num: number): string {
   return String(num)
 }
 
+const REVALIDATE_HOURLY = { next: { revalidate: 3600 } } as RequestInit
+
 async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
-  const res = await fetch(url, { ...init, next: { revalidate: 3600 } } as RequestInit)
+  const res = await fetch(url, { ...init, ...REVALIDATE_HOURLY })
   if (!res.ok) {
     throw new Error(`Upstream ${res.status} for ${url}`)
   }
@@ -65,18 +78,8 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
 }
 
 async function fetchGitHubStats(): Promise<Pick<StatsData, "stars" | "description">> {
-  const headers: Record<string, string> = {
-    Accept: "application/vnd.github.v3+json",
-    "User-Agent": "omo-web",
-  }
-
-  const token = process.env.GITHUB_TOKEN
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
-  const data = await fetchJson(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`, {
-    headers,
+  const data = await fetchJson(`https://api.github.com/repos/${GITHUB_REPOSITORY}`, {
+    headers: githubHeaders(),
   })
   if (typeof data !== "object" || data === null) {
     throw new Error("GitHub repo payload is not an object")
@@ -93,50 +96,31 @@ async function fetchGitHubStats(): Promise<Pick<StatsData, "stars" | "descriptio
   }
 }
 
-function readDownloads(payload: unknown, context: string): number {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error(`npm payload for ${context} is not an object`)
-  }
-  const downloads = Reflect.get(payload, "downloads")
-  if (typeof downloads !== "number" || !Number.isFinite(downloads) || downloads < 0) {
-    throw new Error(`npm payload for ${context} has no downloads count`)
-  }
-  return downloads
-}
-
-async function fetchPackageDownloads(range: string, pkg: string): Promise<number> {
-  const payload = await fetchJson(`https://api.npmjs.org/downloads/point/${range}/${pkg}`)
-  return readDownloads(payload, `${pkg}@${range}`)
-}
-
-async function sumPackages(range: string): Promise<number> {
-  const counts = await Promise.all(NPM_PACKAGES.map((pkg) => fetchPackageDownloads(range, pkg)))
-  return counts.reduce((sum, n) => sum + n, 0)
-}
-
-function yearRanges(now: Date): readonly string[] {
-  const today = now.toISOString().slice(0, 10)
-  const ranges: string[] = []
-  for (let year = NPM_FIRST_PUBLISH_YEAR; year <= now.getFullYear(); year++) {
-    const end = year === now.getFullYear() ? today : `${year}-12-31`
-    ranges.push(`${year}-01-01:${end}`)
-  }
-  return ranges
-}
-
-async function fetchAllTimeDownloads(now: Date): Promise<number> {
-  const perYear = await Promise.all(yearRanges(now).map((range) => sumPackages(range)))
-  return perYear.reduce((sum, n) => sum + n, 0)
-}
-
 async function fetchFreshStats(now: Date): Promise<StatsData> {
-  const [github, monthlyDownloads, weeklyDownloads, totalDownloads] = await Promise.all([
+  const [
+    github,
+    monthlyDownloads,
+    weeklyDownloads,
+    npmTotalDownloads,
+    nativeDownloads,
+    installerDownloads,
+  ] = await Promise.all([
     fetchGitHubStats(),
-    sumPackages("last-month"),
-    sumPackages("last-week"),
-    fetchAllTimeDownloads(now),
+    sumLineageDownloads("last-month", REVALIDATE_HOURLY),
+    sumLineageDownloads("last-week", REVALIDATE_HOURLY),
+    fetchAllTimeDownloads(now, REVALIDATE_HOURLY),
+    fetchNativeDownloads(REVALIDATE_HOURLY),
+    fetchInstallerDownloads(REVALIDATE_HOURLY),
   ])
-  return { ...github, totalDownloads, monthlyDownloads, weeklyDownloads }
+  return {
+    ...github,
+    totalDownloads: npmTotalDownloads + nativeDownloads + installerDownloads,
+    npmTotalDownloads,
+    nativeDownloads,
+    installerDownloads,
+    monthlyDownloads,
+    weeklyDownloads,
+  }
 }
 
 /**

@@ -74,6 +74,18 @@ describe("category activation gating", () => {
       expect(result.availableCategories).toContain("architect")
     })
 
+    test("#when the registry offers gpt-6-sol alone #then deep-low is unavailable, because GPT-6 Sol is not a deep-low model", () => {
+      // given
+      const models = registry([model("openai", "gpt-6-sol")])
+
+      // when
+      const result = resolveCategory("deep-low", {}, models)
+
+      // then
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("deep-low")
+    })
+
     test("#when the gate model is absent but omo.json configures the category #then the explicit entry bypasses the gate", () => {
       // given
       const models = registry([model("kimi-coding", "k3")])
@@ -304,7 +316,7 @@ describe("category activation gating", () => {
       expect(result.availableCategories).not.toContain("ultrabrain")
     })
 
-    test("#when a real vercel gateway id is present #then the gate still opens", () => {
+    test("#when only an unlisted gateway re-publishes the gate model #then the gate stays closed", () => {
       // given
       const models = registry([model("vercel", "openai/gpt-5.6-sol")])
 
@@ -312,8 +324,8 @@ describe("category activation gating", () => {
       const result = resolveCategory("ultrabrain", {}, models)
 
       // then
-      expect(result.kind).toBe("resolved")
-      expect(result.availableCategories).toContain("ultrabrain")
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("ultrabrain")
     })
   })
 

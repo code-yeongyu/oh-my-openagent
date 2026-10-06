@@ -1,3 +1,5 @@
+import { isModelUnreachableDetail } from "./memory-model-attempts"
+
 /**
  * Marks a detail built by `formatMemoryModelExhaustion`, which always closes with the roster of
  * models it tried. Model admission is finalized under the same `spawn_failed` reason as a real
@@ -7,6 +9,9 @@
 const MODEL_EXHAUSTION_ROSTER = /\battempted:/
 
 export function reflectionRemediation(reason: string | undefined, detail: string | undefined): string {
+  if (isModelUnreachableDetail(detail)) {
+    return "no memory child can see the reflection model, not even with extensions loaded; set categories.<category>.model (or memory.reflection.category) in omo.json to a model from a core provider, or set memory.reflection.enabled to false"
+  }
   const combined = `${reason ?? ""} ${detail ?? ""}`.toLowerCase()
   if (combined.includes("budget_not_met")) {
     return "run /dream again and trim or demote the largest system/ files until the committed estimate is below $SYSTEM_TOKEN_TARGET"

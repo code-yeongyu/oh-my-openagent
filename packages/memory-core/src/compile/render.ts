@@ -1,3 +1,5 @@
+import { redactSecretLikeMaterial } from "../sync/redact"
+
 const MEMORY_DIR = "$MEMORY_DIR"
 
 export interface CompiledSystemFile {
@@ -9,11 +11,6 @@ export interface CompiledSystemFile {
 interface SystemTreeNode {
   children: Map<string, SystemTreeNode>
   file?: CompiledSystemFile
-}
-
-interface ProjectionTreeNode {
-  children: Map<string, ProjectionTreeNode>
-  leaf: boolean
 }
 
 export function renderSystemTree(files: readonly CompiledSystemFile[]): string {
@@ -47,9 +44,10 @@ function renderSystemNode(
   const entries = [...node.children.entries()].sort(([a], [b]) => a.localeCompare(b))
   for (const [label, child] of entries) {
     const childParts = [...pathParts, label]
-    lines.push(`${pad}<${label}>`)
+    const safeLabel = redactSecretLikeMaterial(label)
+    lines.push(`${pad}<${safeLabel}>`)
     if (child.file) {
-      lines.push(`${pad}  <projection>${MEMORY_DIR}/system/${childParts.join("/")}.md</projection>`)
+      lines.push(`${pad}  <projection>${MEMORY_DIR}/system/${childParts.map(redactSecretLikeMaterial).join("/")}.md</projection>`)
       if (child.file.description.trim()) {
         lines.push(`${pad}  <description>${child.file.description.trim()}</description>`)
       }
@@ -57,45 +55,37 @@ function renderSystemNode(
       if (body) lines.push(`${pad}  ${body}`)
     }
     renderSystemNode(child, lines, indent + 1, childParts)
-    lines.push(`${pad}</${label}>`)
+    lines.push(`${pad}</${safeLabel}>`)
   }
 }
 
 export function renderExternalProjection(paths: readonly string[]): string {
-  const root: ProjectionTreeNode = { children: new Map(), leaf: false }
+  const filesByDirectory = new Map<string, string[]>()
   for (const path of paths) {
     const parts = path.split("/").filter(Boolean)
-    let node = root
-    for (const [index, part] of parts.entries()) {
-      let child = node.children.get(part)
-      if (!child) {
-        child = { children: new Map(), leaf: false }
-        node.children.set(part, child)
-      }
-      if (index === parts.length - 1) child.leaf = true
-      node = child
-    }
+    const name = parts.pop()
+    if (name === undefined) continue
+    const directory = parts.length > 0 ? `${parts.join("/")}/` : ""
+    const names = filesByDirectory.get(directory)
+    if (names) names.push(name)
+    else filesByDirectory.set(directory, [name])
   }
 
-  const lines = ["<external_projection>", `${MEMORY_DIR}/`]
-  renderProjectionNode(root, lines)
+  const rootNames = filesByDirectory.get("")
+  const lines = [
+    "<external_projection>",
+    rootNames ? `${MEMORY_DIR}/: ${listNames(rootNames)}` : `${MEMORY_DIR}/`,
+  ]
+  for (const directory of [...filesByDirectory.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b))) {
+    const safeDirectory = `${directory.split("/").filter(Boolean).map(redactSecretLikeMaterial).join("/")}/`
+    lines.push(`${safeDirectory}: ${listNames(filesByDirectory.get(directory) ?? [])}`)
+  }
   lines.push("</external_projection>")
   return lines.join("\n")
 }
 
-function renderProjectionNode(node: ProjectionTreeNode, lines: string[], prefix = ""): void {
-  const entries = [...node.children.entries()].sort(([aName, a], [bName, b]) => {
-    const aDirectory = a.children.size > 0
-    const bDirectory = b.children.size > 0
-    if (aDirectory !== bDirectory) return aDirectory ? -1 : 1
-    return aName.localeCompare(bName)
-  })
-  for (const [index, [name, child]] of entries.entries()) {
-    const last = index === entries.length - 1
-    const directory = child.children.size > 0
-    lines.push(`${prefix}${last ? "└── " : "├── "}${name}${directory ? "/" : ""}`)
-    if (directory) renderProjectionNode(child, lines, `${prefix}${last ? "    " : "│   "}`)
-  }
+function listNames(names: string[]): string {
+  return names.sort((a, b) => a.localeCompare(b)).map(redactSecretLikeMaterial).join(", ")
 }
 
 export function markMemoryBlock(identity: string, block: string): string {

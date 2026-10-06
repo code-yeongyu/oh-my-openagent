@@ -7,33 +7,28 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 // senpi-only difference: every claude-* rung is headed by "anthropic-subscription", senpi's Claude subscription
 // lane, so a Claude Pro/Max login outranks the metered `opencode` lane (#8051; see the category chains
 // for the full rationale). model-core stays without it - no other edition has that provider.
-// senpi-only difference: no rung lists "openai", the metered API-key lane; "chatgpt-subscription" is the only
-// OpenAI lane (#8300; see the category chains). model-core keeps "openai" for OpenCode.
+// senpi-only difference: every GPT rung lists "chatgpt-subscription" first and "openai" directly after it,
+// so the subscription outranks the API-key lane (#8300) and an `openai`-only machine still reaches the
+// rung (#8734; see the category chains). model-core lists "openai" first, OpenCode's single OpenAI id.
 // The ulw reviewer agents are absent by design: they resolve their model through the `categories`
 // field on their definition (see resolve-agent-categories.ts), not through a hand-mirrored chain.
 // Parity with the mirror source is enforced by omo-senpi's builtin-agent-chain-parity test (#8259).
 export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   explore: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-    { providers: ["chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
-    { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
+    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
+    { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-    { providers: ["opencode-go"], model: "minimax-m3" },
-    { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go"], model: "minimax-m2.7" },
-    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-4-5" },
-    { providers: ["chatgpt-subscription"], model: "gpt-5.4-nano" }
+    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-4-5" }
   ],
   librarian: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-    { providers: ["chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
-    { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
+    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
+    { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-    { providers: ["opencode-go"], model: "minimax-m3" },
-    { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go"], model: "minimax-m2.7" },
-    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-4-5" },
-    { providers: ["chatgpt-subscription"], model: "gpt-5.4-nano" }
+    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-4-5" }
   ],
   "plan-consultant": [
     {
@@ -42,7 +37,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       variant: "max",
     },
     {
-      providers: ["anthropic-subscription", "anthropic"],
+      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
       model: "claude-opus-5-5",
       variant: "max",
     },
@@ -58,11 +53,11 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     }
   ],
   "plan-reviewer": [
-    { providers: ["chatgpt-subscription"], model: "gpt-6-astra", variant: "xhigh" },
+    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-astra", variant: "xhigh" },
     { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
-    { providers: ["chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "high" },
+    { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6-astra", variant: "high" },
     {
-      providers: ["anthropic-subscription", "anthropic"],
+      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
       model: "claude-opus-5-5",
       variant: "max",
     },

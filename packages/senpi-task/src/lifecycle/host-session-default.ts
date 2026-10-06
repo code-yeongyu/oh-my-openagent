@@ -13,7 +13,9 @@ export function defaultHostSessionProbe(): HostSessionProbe {
   })
 }
 
+/** Resolves only when the daemon confirmed the close; a refused attach or close_session rejects. */
 export const defaultHostSessionCloser: HostSessionCloser = async (request) => {
   const { closeHostSession } = await import("../runners/rpc-host/close")
-  await closeHostSession(request)
+  const outcome = await closeHostSession(request)
+  if (outcome !== "closed") throw new Error(`host session close was not confirmed (${outcome}): ${request.hostSession.session_path}`)
 }

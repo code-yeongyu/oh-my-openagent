@@ -1,4 +1,0 @@
-oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
-oh-my-openagent: OmO Native (beta) is the same omo as one 'omo' command, with no OpenCode host: bun add -g omo-ai@beta
-⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
-  The CLI may not work on this platform.

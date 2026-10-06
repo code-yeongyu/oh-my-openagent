@@ -15,6 +15,8 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+import { AGENT_DIR_ENV_NAMES } from "./task-host-e2e-sandbox.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 export const PACKAGE_ROOT = resolve(scriptDir, "..", "..")
@@ -29,6 +31,7 @@ export const NUDGE_TOOL = "nudge"
 export const NUDGED_ENTRY_TYPE = "omo-kibitzer:nudged"
 export const RECALL_ENTRY_TYPE = "omo-kibitzer:recall"
 export const GATE_ENTRY_TYPE = "omo-kibitzer:gate"
+export const UNAVAILABLE_ENTRY_TYPE = "omo-kibitzer:unavailable"
 
 export const TURN_TIMEOUT_MS = 60_000
 export const WAKE_TIMEOUT_MS = 60_000
@@ -129,10 +132,14 @@ export function prepareSandbox(pluginRoot, baseUrl) {
   return { ...sandbox, memoryHome: join(sandbox.root, "memory"), sessionsDir: join(sandbox.agentDir, "sessions") }
 }
 
-/** `recall` merges over the lane's defaults; `max_items: 1` makes the nudge closure end a wake on its first accept. */
-export function writeOmoConfig(sandbox, { recallEnabled, recall = {} }) {
+/**
+ * `recall` merges over the lane's defaults; `max_items: 1` makes the nudge closure end a wake on its
+ * first accept. `categories` replaces the lane's mock quick pin - `{}` leaves the recall category on
+ * its builtin chain, whose providers this sandbox never connects (only `omo-mock` is authenticated).
+ */
+export function writeOmoConfig(sandbox, { recallEnabled, recall = {}, categories = { quick: { description: "QA mock quick category", model: "omo-mock/mock-1" } } }) {
   writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify({
-    categories: { quick: { description: "QA mock quick category", model: "omo-mock/mock-1" } },
+    categories,
     memory: {
       enabled: true,
       recall: { enabled: recallEnabled, max_items: 1, ...recall },
@@ -153,7 +160,7 @@ export function sandboxEnv(sandbox) {
   const env = { ...process.env }
   for (const name of SCRUBBED_ENV) delete env[name]
   return {
-    ...env,
+    ...isolatedChildEnv(env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     OMO_MEMORY_HOME: sandbox.memoryHome,
     HOME: sandbox.homeDir,
@@ -166,12 +173,14 @@ export function sandboxEnv(sandbox) {
   }
 }
 
+// Every agent-dir lane points at the sandbox: `isolatedChildEnv` sets all three (#8967), and the omo
+// lane outranks the senpi one, so a lane that is merely absent-or-real would be a leak, not a scrub.
 export function assertSandboxEnv(sandbox, env) {
-  for (const [name, expected] of [["SENPI_CODING_AGENT_DIR", sandbox.agentDir], ["OMO_MEMORY_HOME", sandbox.memoryHome], ["HOME", sandbox.homeDir]]) {
+  for (const [name, expected] of [...AGENT_DIR_ENV_NAMES.map((lane) => [lane, sandbox.agentDir]), ["OMO_MEMORY_HOME", sandbox.memoryHome], ["HOME", sandbox.homeDir]]) {
     if (env[name] !== expected) throw new Error(`env ${name} is ${env[name]}, expected the sandbox path ${expected}`)
     if (!env[name].startsWith(sandbox.root)) throw new Error(`env ${name} escapes the sandbox root ${sandbox.root}`)
   }
-  for (const name of ["OMO_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR", "SENPI_BIN", "SENPI_PACKAGE_DIR", "OMO_PACKAGE_DIR", "PI_PACKAGE_DIR"]) {
+  for (const name of ["SENPI_BIN", "SENPI_PACKAGE_DIR", "OMO_PACKAGE_DIR", "PI_PACKAGE_DIR"]) {
     if (env[name] !== undefined) throw new Error(`env ${name} must be scrubbed before spawning`)
   }
   if (env.PI_OFFLINE !== "1") throw new Error("env PI_OFFLINE must be 1: the lane allows no network beyond the mock provider")
@@ -182,6 +191,13 @@ export function assertSandboxEnv(sandbox, env) {
 export function requestToolNames(body) {
   const tools = Array.isArray(body?.tools) ? body.tools : []
   return tools.map((tool) => tool?.function?.name ?? tool?.name).filter((name) => typeof name === "string")
+}
+
+/** The parameter names one tool declares in a request, so a scenario can prove which schema the model was sent. */
+export function requestToolParameters(body, name) {
+  const tools = Array.isArray(body?.tools) ? body.tools : []
+  const tool = tools.find((entry) => (entry?.function?.name ?? entry?.name) === name)
+  return Object.keys(tool?.function?.parameters?.properties ?? tool?.parameters?.properties ?? {})
 }
 
 export function requestSystemText(body) {
@@ -227,7 +243,7 @@ export function createRouter({ lanes = [] } = {}) {
       state[lane.name] = (state[lane.name] ?? 0) + 1
       step = lane.step(body)
     } else if (isSidecarRequest(body)) {
-      state.sidecarRequests.push({ index, toolNames: requestToolNames(body), messageCount: Array.isArray(body?.messages) ? body.messages.length : 0 })
+      state.sidecarRequests.push({ index, toolNames: requestToolNames(body), memoryParameters: requestToolParameters(body, "memory"), messageCount: Array.isArray(body?.messages) ? body.messages.length : 0 })
       step = sidecarSteps[sidecarCursor] ?? { type: "text", text: "sidecar script exhausted" }
       sidecarCursor += 1
       state.sidecar += 1
@@ -413,6 +429,7 @@ export function readEntries(file) {
 export const isNudged = (entry) => entry.type === "custom" && entry.customType === NUDGED_ENTRY_TYPE
 export const isRecall = (entry) => entry.type === "custom_message" && entry.customType === RECALL_ENTRY_TYPE
 export const isGate = (entry) => entry.type === "custom" && entry.customType === GATE_ENTRY_TYPE
+export const isUnavailable = (entry) => entry.type === "custom" && entry.customType === UNAVAILABLE_ENTRY_TYPE
 export const isUserMessage = (entry) => entry.type === "message" && entry.message?.role === "user"
 export const isAssistantMessage = (entry) => entry.type === "message" && entry.message?.role === "assistant"
 
@@ -450,6 +467,11 @@ export function sidecarDirs(identityDir) {
   const root = join(identityDir, "runtime", "recall", "sidecars")
   if (!existsSync(root)) return []
   return readdirSync(root).sort().map((name) => ({ name, dir: join(root, name), sessionId: decodeSidecarDirName(name) }))
+}
+
+/** `wakes.ndjson`: one bounded record per settled wake of that lineage. */
+export function wakeRecords(sidecarDir) {
+  return readEntries(join(sidecarDir, "wakes.ndjson"))
 }
 
 export function childTranscripts(sidecarDir) {

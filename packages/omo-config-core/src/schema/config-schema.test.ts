@@ -86,7 +86,7 @@ describe("omo config schema", () => {
     expect(result.data.task?.process_runner).toBe("host")
     expect(result.data.task?.host_engine_policy).toBe("upgrade")
     expect(result.data.task?.default_concurrency).toBe(5)
-    expect(result.data.task?.residency_max_children).toBe(8)
+    expect(result.data.task?.residency_max_children).toBe("unlimited")
     expect(result.data.categories?.deep?.max_tokens).toBe(12000)
     expect(result.data.categories?.deep?.reasoning).toBe("high")
     expect(result.data.categories?.deep?.provider_options).toEqual({
@@ -137,7 +137,12 @@ describe("omo config schema", () => {
     // given
     const block = {
       model_profiles: {
-        capable: { display_name: "Capable", models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }] },
+        capable: {
+          display_name: "Capable",
+          family: "daily",
+          tier: "normal",
+          models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],
+        },
       },
       model_profile: "capable",
     }
@@ -159,10 +164,12 @@ describe("omo config schema", () => {
     ])
     if (!results.config.success) throw new Error(results.config.error.message)
     expect(results.config.data.model_profile).toBe("capable")
-    expect(results.config.data.model_profiles?.capable?.models).toEqual([
-      "anthropic/claude-fable-5-1",
-      { model: "openai/gpt-6-astra", reasoning: "high" },
-    ])
+    expect(results.config.data.model_profiles?.capable).toEqual({
+      display_name: "Capable",
+      family: "daily",
+      tier: "normal",
+      models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],
+    })
   })
 
   test("#given a non-string model_profile #when parsed #then the issue path identifies the bad field", () => {

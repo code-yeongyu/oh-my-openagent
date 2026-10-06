@@ -1,0 +1,92 @@
+name: Installer mirror (R2)
+run-name: "${{ format('installer mirror {0}{1}', inputs.tag, inputs.dry_run && ' (dry run)' || '') }}"
+
+# Mirrors one published release into the private omo-releases R2 bucket behind get.omo.dev and moves the
+# installer channel. publish.yml calls it as the last release step; run it by hand to backfill or re-run a
+# failed mirror (idempotent), or with dry_run to prove the pipeline without touching any channel.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      channel:
+        type: string
+        required: true
+      dry_run:
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to mirror, e.g. v5.1.1"
+        required: true
+        type: string
+      channel:
+        description: "Installer channel to move after a verified mirror"
+        required: true
+        type: choice
+        default: none
+        options: [none, latest, beta]
+      dry_run:
+        description: "Upload and verify under a scratch prefix, move no channel, then delete the scratch prefix"
+        type: boolean
+        default: true
+
+concurrency:
+  group: installer-mirror-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Mirror and verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R2_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
+          TAG: ${{ inputs.tag }}
+          CHANNEL: ${{ inputs.channel }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          args=(--tag "$TAG" --channel "$CHANNEL")
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          bun script/installer/mirror-release-to-r2.ts "${args[@]}"
+
+      - name: Check the channel get.omo.dev serves
+        if: inputs.dry_run != true && inputs.channel != 'none'
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # The pointer is cached for 60 s at the edge; read it through a cache-busting query so a stale edge copy cannot pass or fail this.
+          served="$(curl -fsSL "https://get.omo.dev/channels/${CHANNEL}?check=${GITHUB_RUN_ID}" | tr -d '[:space:]')"
+          echo "get.omo.dev/channels/${CHANNEL} -> ${served}"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Installer mirror
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Verifies the release assets against SHA256SUMS and the GitHub digests.
+            - Uploads to R2 with signed payload hashes, reads every object back, then writes the completion marker.
+            - Moves the installer channel only after that; a failure leaves the previous version in place.
+          JOB_SUMMARY_NEXT: Re-run this workflow for the same tag; it keeps verified objects and refuses to overwrite different bytes.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

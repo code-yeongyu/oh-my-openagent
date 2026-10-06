@@ -5,10 +5,16 @@ import { join } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import { guardedSerialization, serialization } from "../bin/lib/rpc-stream-errors.js"
+
 const engineEntry = import.meta.resolve("@code-yeongyu/senpi")
-// The source map preserves upstream input even after postinstall prepared the installed JS.
-const rpcMap = JSON.parse(readFileSync(new URL("./modes/rpc/rpc-mode.js.map", engineEntry), "utf8"))
-const rpcSource = new Bun.Transpiler({ loader: "ts" }).transformSync(rpcMap.sourcesContent[0])
+// senpi ships no source maps (senpi#2362), and postinstall may already have prepared the installed JS.
+// The preparation is exactly one replacement, so reversing it recovers the upstream serializer.
+const installedRpc = readFileSync(new URL("./modes/rpc/rpc-mode.js", engineEntry), "utf8")
+const rpcSource = installedRpc.replace(guardedSerialization, serialization)
+if (!rpcSource.includes(serialization) || rpcSource.includes(guardedSerialization)) {
+  throw new Error("installed RPC mode does not carry the upstream stream serializer")
+}
 const { toJsonEvent } = await import(new URL("./modes/json-event.js", engineEntry).href)
 const patchScript = fileURLToPath(new URL("../bin/senpi-patch.mjs", import.meta.url))
 const roots = []

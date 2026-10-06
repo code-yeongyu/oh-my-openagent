@@ -1,14 +1,9 @@
-function values(items) {
-  return items.length > 0 ? items.join(", ") : "none"
-}
+export const MODEL_GUIDE_LINE = "Model-to-agent guidance: docs/guide/agent-model-matching.md"
 
-export function formatModelReport(inventory) {
-  const lines = ["", "MODEL AVAILABILITY"]
-  for (const harness of inventory.harnesses) {
-    lines.push(`${harness.id}: providers ${values(harness.providers)}; models ${harness.modelHint}`)
-  }
-  lines.push(
-    "Model-to-agent guidance: docs/guide/agent-model-matching.md",
+// Only printed when setup found nothing to carry over: with a real plan, the stages write the
+// providers and model choices themselves, so a placeholder would describe by hand what setup does.
+export function formatModelTemplate() {
+  return [
     "Ready-to-paste omo.json models catalog template:",
     JSON.stringify({
       models: {
@@ -17,10 +12,5 @@ export function formatModelReport(inventory) {
       },
     }, null, 2),
     "For custom endpoints, define the provider baseUrl in the engine's models.json, then use that provider id above.",
-  )
-  return `${lines.join("\n")}\n`
-}
-
-export function printModelReport(inventory) {
-  process.stdout.write(formatModelReport(inventory))
+  ]
 }

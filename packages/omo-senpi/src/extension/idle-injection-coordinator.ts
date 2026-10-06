@@ -11,6 +11,8 @@ export interface IdleInjection {
   /** Rides a flush that carries at least one non-passive entry; never causes a flush by itself. */
   readonly passive?: boolean
   readonly details?: unknown
+  /** Preserve this segment's boundary for model-specific context transforms. */
+  readonly contextScoped?: boolean
   readonly onFlushed?: () => void
   readonly onDeliveryFailed?: (error: unknown) => void
 }
@@ -19,7 +21,7 @@ export interface IdleInjectionMessage extends Record<string, unknown> {
   readonly customType: "omo-senpi:wake"
   readonly content: string
   readonly display: false
-  readonly details: ReadonlyArray<{ readonly customType: string; readonly details: unknown }>
+  readonly details: ReadonlyArray<{ readonly customType: string; readonly details: unknown; readonly contentRange?: readonly [number, number] }>
 }
 
 export type IdleInjectionDelivery = (
@@ -178,16 +180,23 @@ export class IdleInjectionCoordinator {
     this.#pending.clear()
     let delivery: unknown
     try {
+      const contents = ordered.map((injection) => injection.content)
+      let offset = 0
+      const details = ordered.flatMap((injection, index) => {
+        const start = offset
+        const end = start + (contents[index]?.length ?? 0)
+        offset = end + 2
+        return injection.customType === undefined ? [] : [{
+          customType: injection.customType, details: injection.details,
+          ...(injection.contextScoped === true ? { contentRange: [start, end] as const } : {}),
+        }]
+      })
       delivery = this.#deliver(
         {
           customType: "omo-senpi:wake",
-          content: ordered.map((injection) => injection.content).join("\n\n"),
+          content: contents.join("\n\n"),
           display: false,
-          details: ordered.flatMap((injection) =>
-            injection.customType === undefined
-              ? []
-              : [{ customType: injection.customType, details: injection.details }],
-          ),
+          details,
         },
         { deliverAs },
       )

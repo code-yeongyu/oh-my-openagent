@@ -14,17 +14,17 @@ export interface ReadingParagraphProps {
 }
 
 /**
- * One manifesto paragraph: its own `LitProgress` block in line mode, so every authored line
- * is a block that lights while it crosses the fixed reading line (`--lit-line`). Only one line
- * is ever mid-sweep, and the reveal unit is the same as the line-break unit.
+ * One manifesto paragraph: a `LitProgress` reading block in reveal mode. A scroll-driven window
+ * reveal keeps everything above the bright edge fully lit, so a whole screenful is readable and
+ * the reveal never gates reading on scroll; words near the edge carry the emphasis.
  */
 export function ReadingParagraph({ text, parts, className }: ReadingParagraphProps): JSX.Element {
   return (
-    <LitProgress className="lit-read" lines>
+    <LitProgress className="lit-read" reveal>
       {parts ? (
-        <LitWords lines parts={parts} className={cn(READING_CLASS, className)} />
+        <LitWords parts={parts} className={cn(READING_CLASS, className)} />
       ) : (
-        <LitWords lines text={text ?? ""} className={cn(READING_CLASS, className)} />
+        <LitWords text={text ?? ""} className={cn(READING_CLASS, className)} />
       )}
     </LitProgress>
   )

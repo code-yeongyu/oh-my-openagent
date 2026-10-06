@@ -12,7 +12,12 @@ const SUSPENDED_EXPLANATION = "suspended (resumes with session)"
 // the operator the difference between "waiting for its session" and "its engine daemon is gone".
 const SUSPENSION_REASON_EXPLANATIONS: Readonly<Record<NonNullable<TaskRecord["suspension_reason"]>, string>> = {
   daemon_unavailable: "suspended (daemon unavailable)",
+  handoff_parked: "suspended (its host handed off to a newer generation; reopens there)",
   host_draining: "suspended (host draining)",
+  host_incompatible: "suspended (its host is incompatible; never reopened elsewhere)",
+  idle_evicted: "suspended (its host parked the idle session; reopens on the next message)",
+  own_host_unreachable: "suspended (the host this session runs behind is unreachable)",
+  store_index_unavailable: "suspended (task store index unavailable)",
 }
 
 const SUSPENDED_RESIDENCIES: ReadonlySet<TaskRecord["residency_state"]> = new Set(["persisted_only", "rpc_detached"])
@@ -27,6 +32,7 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     status: record.status,
     residency_state: record.residency_state,
     ...(isSuspended(record) ? { suspended: { explanation: suspendedExplanation(record) } } : {}),
+    ...(record.status === "running" && record.start_queued !== undefined ? { start_queued: record.start_queued } : {}),
     execution_mode: record.execution_mode,
     model: record.model,
     ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),

@@ -14,9 +14,11 @@ import {
 	fetchRefArgs,
 	parseCommitLog,
 	hostTargetFor,
+	packSenpiSiblingTarballs,
 	packSoleSenpiTarball,
 	parseOmobArgs,
 	resolveCachedSenpiPackage,
+	SENPI_ARTIFACT_ASSEMBLY,
 } from "./build-omob"
 import { planRuntimePrune, selectPruneEntries } from "./omob-runtime-prune"
 
@@ -208,12 +210,67 @@ describe("resolveCachedSenpiPackage", () => {
 			mkdirSync(artifactRoot, { recursive: true })
 			writeFileSync(
 				join(cacheDir, "artifacts", "senpi", "aaa1111", "manifest.json"),
-				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz" }),
+				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz", assembly: SENPI_ARTIFACT_ASSEMBLY }),
 			)
 			expect(resolveCachedSenpiPackage(cacheDir, "bbb2222")).toBeUndefined()
 			expect(resolveCachedSenpiPackage(cacheDir, "aaa1111")).toBe(artifactRoot)
 		} finally {
 			rmSync(cacheDir, { recursive: true, force: true })
+		}
+	})
+
+	// Storage contract: an install assembled with registry siblings must never be reused.
+	test("#given a same-commit artifact from an older assembly scheme #when resolving #then it is rebuilt", () => {
+		const cacheDir = tempDir("omob-artifact-legacy-")
+		try {
+			const artifactRoot = join(cacheDir, "artifacts", "senpi", "aaa1111", "install", "package")
+			mkdirSync(artifactRoot, { recursive: true })
+			writeFileSync(
+				join(cacheDir, "artifacts", "senpi", "aaa1111", "manifest.json"),
+				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz" }),
+			)
+			expect(resolveCachedSenpiPackage(cacheDir, "aaa1111")).toBeUndefined()
+		} finally {
+			rmSync(cacheDir, { recursive: true, force: true })
+		}
+	})
+})
+
+describe("packSenpiSiblingTarballs", () => {
+	function writeSenpiFixture(root: string, workspaces: Readonly<Record<string, string>>): void {
+		mkdirSync(join(root, "scripts"), { recursive: true })
+		writeFileSync(
+			join(root, "scripts", "registry-packages.mjs"),
+			`export const registrySourcePackageNames = new Set(${JSON.stringify(["@fixture/main", "@fixture/tui", "@fixture/ai"])});\n`,
+		)
+		for (const [directory, name] of Object.entries(workspaces)) {
+			mkdirSync(join(root, "packages", directory), { recursive: true })
+			writeFileSync(join(root, "packages", directory, "package.json"), JSON.stringify({ name, version: "0.0.0-dev" }))
+		}
+	}
+
+	test("#given every lockstep workspace #when packing #then each sibling except the engine maps to its own tarball", async () => {
+		const root = tempDir("omob-siblings-")
+		try {
+			writeSenpiFixture(join(root, "senpi"), { "coding-agent": "@fixture/main", tui: "@fixture/tui", ai: "@fixture/ai", chord: "@fixture/chord" })
+			const tarballs = await packSenpiSiblingTarballs(join(root, "senpi"), join(root, "tarballs"), (workspaceDir, destination) => {
+				const { name } = JSON.parse(readFileSync(join(workspaceDir, "package.json"), "utf8")) as { name: string }
+				writeFileSync(join(destination, `${name.replace("@", "").replace("/", "-")}.tgz`), name)
+			})
+			expect(Object.keys(tarballs).sort()).toEqual(["@fixture/ai", "@fixture/tui"])
+			for (const [name, tarball] of Object.entries(tarballs)) expect(readFileSync(tarball, "utf8")).toBe(name)
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
+	})
+
+	test("#given a lockstep sibling missing from the checkout #when packing #then it fails instead of using a registry copy", async () => {
+		const root = tempDir("omob-siblings-missing-")
+		try {
+			writeSenpiFixture(join(root, "senpi"), { "coding-agent": "@fixture/main", ai: "@fixture/ai" })
+			await expect(packSenpiSiblingTarballs(join(root, "senpi"), join(root, "tarballs"), () => {})).rejects.toThrow(/@fixture\/tui/)
+		} finally {
+			rmSync(root, { recursive: true, force: true })
 		}
 	})
 })

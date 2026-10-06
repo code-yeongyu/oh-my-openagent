@@ -1,0 +1,25 @@
+// The harness-neutral core packages. Both the shared-core extraction guard and the package
+// registration audit import this one list, so a new core package is registered in one place.
+export const corePackagePaths = [
+  "packages/utils",
+  "packages/model-core",
+  "packages/omo-config-core",
+  "packages/delegate-core",
+  "packages/prompts-core",
+  "packages/rules-engine",
+  "packages/agents-md-core",
+  "packages/lsp-core",
+  "packages/mcp-stdio-core",
+  "packages/mcp-client-core",
+  "packages/comment-checker-core",
+  "packages/hashline-core",
+  "packages/tmux-core",
+  "packages/team-core",
+  "packages/openclaw-core",
+  "packages/boulder-state",
+  "packages/isolation-core",
+  "packages/memory-core",
+  "packages/telemetry-core",
+  "packages/claude-code-compat-core",
+  "packages/skills-loader-core",
+] as const

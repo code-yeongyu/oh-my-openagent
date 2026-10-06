@@ -1,7 +1,0 @@
-{
-  "agents": {
-    "oracle": {
-      "model": "openai/gpt-5"
-    }
-  }
-}

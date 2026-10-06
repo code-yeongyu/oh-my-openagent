@@ -198,6 +198,30 @@ describe("createRpcManagedRunner", () => {
     // then: a separate OS process cannot share the parent's registry, so the model rides the spec
     expect(captured?.model).toBe("anthropic/claude")
   })
+
+  test("#given a managed spec with fallback models #when started #then the rpc spec carries them as selectors in order, thinking included", async () => {
+    // given
+    let captured: RpcRunnerSpec | undefined
+    const runner: RpcRunnerLike = {
+      start: async (spec) => {
+        captured = spec
+        return fakeRpcHandle()
+      },
+    }
+    const managed = createRpcManagedRunner(runner)
+
+    // when
+    await managed.start({
+      ...managedSpec(),
+      fallbackModels: [
+        { source: "category", provider: "openai", model_id: "gpt-5.6-sol", display: "GPT", reasoning: "high" },
+        { source: "category", provider: "zai", model_id: "glm-5.3", display: "GLM" },
+      ],
+    })
+
+    // then
+    expect(captured?.fallbackModels).toEqual(["openai/gpt-5.6-sol:high", "zai/glm-5.3"])
+  })
 })
 
 describe("variant threading", () => {

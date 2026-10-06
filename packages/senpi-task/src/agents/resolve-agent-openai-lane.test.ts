@@ -3,8 +3,9 @@ import { describe, expect, test } from "bun:test"
 import { BUILTIN_AGENTS } from "./builtin"
 import { resolveAgent } from "./resolve-agent"
 
-// Curated agent chains list only senpi's chatgpt-subscription subscription lane (#8300): when a machine
-// also holds an OpenAI API key, the metered `openai` lane must never be picked over it.
+// Curated GPT rungs list chatgpt-subscription first and openai second: when a machine holds both, the
+// metered `openai` lane is never picked over the subscription (#8300); when it holds only `openai`, the
+// rung is still reachable at selection AND in the runtime fallback list (#8734).
 
 type FakeModel = {
   readonly provider: string
@@ -35,6 +36,25 @@ const CURATED_GPT_CASES = [
 ] as const
 
 describe("resolveAgent openai lane policy", () => {
+  test("#given the kimi head plus an openai-only luna lane #when explore resolves #then the runtime fallback list tries openai/gpt-6-luna-fast before claude-haiku-4-5", () => {
+    // given
+    const models = registry([
+      model("kimi-coding", "kimi-for-coding-highspeed"),
+      model("openai", "gpt-6-luna-fast"),
+      model("anthropic", "claude-haiku-4-5"),
+    ])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", BUILTIN_AGENTS, models))
+
+    // then
+    expect(result.model).toBe("kimi-coding/kimi-for-coding-highspeed")
+    expect(result.fallback_models?.map((entry) => entry.display)).toEqual([
+      "openai/gpt-6-luna-fast",
+      "anthropic/claude-haiku-4-5",
+    ])
+  })
+
   for (const { agent, modelId } of CURATED_GPT_CASES) {
     test(`#given openai and chatgpt-subscription both serve ${modelId} #when ${agent} resolves #then the chatgpt-subscription lane wins`, () => {
       // given

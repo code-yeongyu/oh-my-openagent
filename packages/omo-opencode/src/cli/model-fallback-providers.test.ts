@@ -303,9 +303,10 @@ describe("generateModelConfig provider routes", () => {
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then utility agents use the global MiniMax provider
-      expect(result.agents?.librarian?.model).toBe("minimax-coding-plan/MiniMax-M3")
-      expect(result.agents?.explore?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      // then the orchestration agents use the global MiniMax provider; explore and librarian
+      // carry no Coding Plan rung, so librarian is omitted and explore takes the ultimate fallback
+      expect(result.agents?.librarian).toBeUndefined()
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
       expect(result.agents?.atlas?.model).toBe("minimax-coding-plan/MiniMax-M3")
       expect(result.agents?.["sisyphus-junior"]?.model).toBe("minimax-coding-plan/MiniMax-M3")
     })
@@ -331,9 +332,10 @@ describe("generateModelConfig provider routes", () => {
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then utility agents use the regional MiniMax provider
-      expect(result.agents?.librarian?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
-      expect(result.agents?.explore?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
+      // then the orchestration agents use the regional MiniMax provider; explore and librarian
+      // carry no Coding Plan rung, so librarian is omitted and explore takes the ultimate fallback
+      expect(result.agents?.librarian).toBeUndefined()
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
       expect(result.agents?.atlas?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
       expect(result.agents?.["sisyphus-junior"]?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
     })

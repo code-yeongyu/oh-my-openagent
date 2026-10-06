@@ -1,5 +1,5 @@
 import { NATIVE_EDITION_GUIDE_URL } from "../../cli/native-edition-hint"
-import { formatNativeInstallCommand, NATIVE_SETUP_COMMAND, resolveNativeInstallPlan } from "../../cli/install-native"
+import { formatNativeInstallEntryCommand, NATIVE_SETUP_COMMAND, resolveNativeInstallPlan } from "../../cli/install-native"
 import {
   createNudgeStateStore,
   nativeEditionStateDir,
@@ -48,7 +48,7 @@ export function applyNativeEditionNudgeAction(
   const state = currentState(options.store, options.now)
 
   if (action === "install") {
-    const command = formatNativeInstallCommand(resolveNativeInstallPlan(options.bunAvailable))
+    const command = formatNativeInstallEntryCommand(resolveNativeInstallPlan(options.bunAvailable))
     // Handed over, not spawned: a global install has no rollback and this dialog has no progress
     // surface to report a partial failure. Nothing is recorded either, so the nudge keeps working
     // until the edition is actually detected on disk - an install that exits 0 without landing

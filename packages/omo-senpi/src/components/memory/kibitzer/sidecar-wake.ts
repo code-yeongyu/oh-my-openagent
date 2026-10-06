@@ -11,6 +11,7 @@ import type { SidecarAdmission } from "./sidecar-admission"
 import type { KibitzerOfferResult } from "./sidecar-contract"
 import { describe, type Child, type Envelope, type Payload, type SidecarCore, type Turn } from "./sidecar-core"
 import { envelopeInput, merge, payloadOf } from "./sidecar-envelope"
+import { kibitzerConfigurationFailure } from "./sidecar-model"
 import { classifyWakeEnd, startFailureEnd } from "./sidecar-outcome"
 import { renderKibitzerReseedPrompt, renderKibitzerSeedPrompt, renderKibitzerWakePrompt } from "./sidecar-prompt"
 import type { SidecarRecovery } from "./sidecar-recovery"
@@ -105,10 +106,13 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
     } catch (error) {
       if (turn.abort === "deadline") return abandoned(payload)
       // No child read the envelope and nothing was offered: its events and candidates ride the retry.
+      // A configuration refusal (the pinned category's chain is dead) is reported non-diagnostically;
+      // the backoff and the carried payload still apply, so a provider connecting mid-session
+      // re-resolves against the live registry on the next wake and recovers without a restart.
       turns.clearDeadline(turn)
       core.carry = [payload]
       await admission.releaseLease(turn)
-      turns.report(turn, startFailureEnd(error), [], undefined)
+      turns.report(turn, startFailureEnd(error, kibitzerConfigurationFailure(error)), [], undefined)
       recovery.enterBackoff()
       return { action: "buffered", reason: "backoff" }
     }

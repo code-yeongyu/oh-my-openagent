@@ -1,4 +1,0 @@
-packed paths: 1222
-shipped gate (shared-skills only) missing: []
-new gate required: ["packages/prompts-core/prompts/ultrawork/codex.md"]
-new gate missing: ["packages/prompts-core/prompts/ultrawork/codex.md"]

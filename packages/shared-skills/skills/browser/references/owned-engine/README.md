@@ -1,11 +1,33 @@
 # The owned engine
 
-A browser **your code launches and owns**, driven over CDP, with its own profile. The opposite of
-the attached engine: no user logins, full control.
+A browser **your code launches and owns**, driven over CDP by omowright with its own profile. The
+opposite of the attached engine: no user logins, full control.
 
-**This package ships no such engine.** These documents describe the contract and the technique, so
-that a locally installed CDP library — or a script you write against one — is driven correctly.
-If no owned engine is installed, say so and stay on the attached engine.
+```js
+const { omowright } = await loadOmowright()
+const profile = mkdtempSync(join(tmpdir(), "omowright-"))
+const browser = await omowright.connectPipe({
+  browserPath: "<CloakBrowser or chrome-headless-shell binary>",
+  browserArgs: ["--headless", "--no-first-run", `--user-data-dir=${profile}`],
+  storageRoot: profile,
+  dialogPolicy: { accept: true },
+})
+try {
+  const page = await browser.newTab("https://example.com/")
+  const tree = omowright.compactSnapshot(await page.snapshot())   // ALWAYS compact before a model reads it
+  await page.locator("e3").click()                                 // refs come straight from the snapshot
+  await Bun.write("shot.png", await page.screenshot())
+} finally {
+  await browser.close()
+  rmSync(profile, { recursive: true, force: true })                // paired: a leftover profile is a logged-in browser nobody watches
+}
+```
+
+`connectPipe` launches over `--remote-debugging-pipe`: no listening port, stdio drained, the
+process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to a browser something
+else launched. `connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
+fingerprint seed — the stealth path for WAF and bot-scored targets, where the attached engine's
+console capture would be a signal.
 
 ## When it is the right engine
 
@@ -16,27 +38,25 @@ If no owned engine is installed, say so and stay on the attached engine.
 | Solving a challenge widget programmatically | needs coordinate control and OCR |
 | Reading the network instead of the DOM | needs request interception on your own target |
 | A QA flight trace (steps, HAR, screenshots) | recording someone's real session is not acceptable |
+| Headless or unattended runs | the user's browser is on their desk |
 
 For anything that needs the user's login, the attached engine wins. For extracting text from a
 blocked URL, neither: use the `ultimate-browsing` skill.
 
-## What an owned engine must give you
+## The page
 
-1. A transport that opens no listening port (launch over a pipe), or an explicit local CDP endpoint.
-2. An accessibility snapshot with stable in-page refs, and a **compact** form that drops the ref
-   map before the tree reaches a model — on a real page that map is roughly half the bytes and the
-   client never reads it.
-3. Locators that resolve those refs in-page, including refs inside cross-origin frames.
-4. Coordinate input, for what locators cannot address.
-5. A dialog policy, so `alert` / `confirm` / `beforeunload` can never block a run.
+`OmOPage` is Playwright-shaped: `goto`, `snapshot`, `locator(ref | css)`, `click`, `fill`,
+`press`, `hover`, `check`, `selectOption`, `dragTo`, `setInputFiles`, `screenshot`, `pdf`,
+`evaluate`, `waitForURL`, `keyboard`, `mouse`, `frameLocator`. A snapshot is an accessibility tree
+with virtual refs (`[ref=e3]`, cross-origin frames as `f1e3`); `compactSnapshot()` drops the refs
+map, about half the bytes. Readiness is a content probe (body plus interactive elements, landmarks
+or text), not a timer; `goto(url, { waitUntil: "commit" })` is the escape hatch for empty pages.
 
 ## Reference
 
-- [ladder.md](ladder.md) — the escalation ladder, viewport pinning, coordinate control, challenge widgets
-- [network.md](network.md) — read the network instead of the DOM; traces and request interception
-- [frames-and-humans.md](frames-and-humans.md) — cross-origin frames, overlays, dialogs, human handoff
+- [ladder.md](ladder.md) — the escalation ladder, viewport pinning, `createCua`, `createCaptcha`
+- [network.md](network.md) — `createNetworkSnoop`, `collectWhileScrolling`, `createTrace`, `createRoutes`
+- [frames-and-humans.md](frames-and-humans.md) — `snapshotWithFrames`, `describeLayers`, dialog policy, `emulate`, `requestHuman`
 
-## Cleanup is paired
-
-Close the browser and remove the profile directory in the same `finally`. A profile left behind is
-a logged-in browser nobody is watching.
+The library's own skill (`skills/omowright/SKILL.md` and `presets/*` in the omowright repository)
+is the authoritative, longer treatment of each; these pages are the routing summary.

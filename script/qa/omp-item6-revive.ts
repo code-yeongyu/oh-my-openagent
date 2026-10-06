@@ -106,7 +106,7 @@ export async function runRevivedChildStaleKernel(): Promise<Record<string, unkno
     const restartedTools: ToolDefinition[] = []
     const restarted = new InProcessRunner({ kernelToolBindings: createKernelToolBindings(), createSession: async (options) => {
       restartedTools.push(...(options.customTools ?? []))
-      return { sessionId: "restarted", prompt: async () => undefined, steer: async () => undefined, followUp: async () => undefined, abort: async () => undefined, subscribe: () => () => undefined, getLastAssistantText: () => undefined, dispose: () => undefined }
+      return { sessionId: "restarted", prompt: async () => undefined, steer: async () => "handled", followUp: async () => "handled", abort: async () => undefined, subscribe: () => () => undefined, getLastAssistantText: () => undefined, dispose: () => undefined }
     } })
     const handle = await restarted.resume({
       taskId, cwd: env.root, sessionDir: `${env.store.stateDir}/children/${taskId}/sessions/${taskId}/`,

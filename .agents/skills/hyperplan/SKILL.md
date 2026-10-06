@@ -33,7 +33,7 @@ Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and
 | Category | Model | Native Mindset | Why This Adversarial Role Fits |
 |----------|-------|----------------|--------------------------------|
 | `unspecified-low` | gpt-5.6-luna xhigh | Mid-tier, simplicity-leaning, structure-demanding | Pragmatist Skeptic — model bias toward simplicity makes it the natural enemy of over-engineering |
-| `unspecified-high` | kimi-k3 max -> claude-opus-5-5 max -> gpt-5.6-sol high | High-effort, broad-impact, coordination-aware | Integration Tester — max-tier broad-scope thinking exposes cross-module fragility |
+| `unspecified-high` | claude-opus-5-5 medium -> glm-5.3 max -> kimi-k3 max | High-effort, broad-impact, coordination-aware | Integration Tester — broad-scope thinking exposes cross-module fragility |
 | `deep-low` | gpt-5.6-sol medium | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
 | `ultrabrain` | gpt-5.6-sol xhigh | Hard-logic, simplicity-biased, strategic advisor | Architect Strategist — xhigh reasoning sees structural flaws others miss |
 | `artistry` | claude-fable-5 xhigh | Unconventional, pattern-breaking, lateral | Creative Challenger — pattern-breaking bias attacks orthodox thinking |

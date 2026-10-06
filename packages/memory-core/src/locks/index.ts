@@ -11,6 +11,7 @@ export {
   LOCK_DOMAINS,
   factsQueueLockPath,
   factsRunsLockPath,
+  memoryMaintenanceLockPath,
   memoryWriterLockPath,
   memoryUsageLockPath,
   noticeLockPath,

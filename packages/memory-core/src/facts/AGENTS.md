@@ -14,7 +14,7 @@ that plus strict wire contracts. Parent: [`packages/memory-core/AGENTS.md`](../.
 | `queue.ts` | `FactsQueue` — atomic enqueue/publish with monotonic watermarks |
 | `schema.ts` | Versioned queue/cursor/consumed record shapes; fail-closed validation |
 | `extraction.ts` | `applyFactsBatch()`, `parseFactsExtractionJsonl()` validation |
-| `payload-cap.ts` | `selectCappedFactsBatch()` — 128 KiB envelope budget (`MAX_FACTS_PAYLOAD_BYTES`) |
+| `payload-cap.ts` | `selectCappedFactsBatch()` — 128 KiB envelope budget (`MAX_FACTS_PAYLOAD_BYTES`); a single entry above it is reported in `oversized`, which the omo-senpi adapter may run alone under its bounded oversized budget (#8984, ≤512 KiB) |
 | `failures-{schema,backoff,store,selection}.ts` | Failure records, backoff/clear-on-success, starvation-aware `selectLaunchable()` |
 | `person-routing.ts` | `planFactsRouting()` — alias resolution, observation normalization, render targets |
 | `mutation-plan.ts` | `planFactsMutation()` + `factsRecordsHash()` — dirty-parent guard, deterministic ops |

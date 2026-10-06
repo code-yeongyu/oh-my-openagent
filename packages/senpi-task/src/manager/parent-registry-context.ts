@@ -18,6 +18,9 @@ export type ChildModelRegistry = NonNullable<CreateAgentSessionOptions["modelReg
 // senpi's own default resolution rather than spawning against a half-built registry.
 export type ParentModelRegistryResolver = () => ChildModelRegistry | undefined
 
+// Returns the parent session's project-trust decision, or undefined before the first live context.
+export type ParentProjectTrustResolver = () => boolean | undefined
+
 // The minimal read surface `findModelReference` needs: a `find(provider, modelId)` lookup. The concrete
 // ModelRegistry satisfies it structurally, and a test fake satisfies it without constructing the class.
 type ModelFinder<TModel> = {
@@ -33,14 +36,20 @@ type ModelFinder<TModel> = {
  */
 export function createParentRegistrySessionContext(
   resolveRegistry: ParentModelRegistryResolver,
+  resolveProjectTrust: ParentProjectTrustResolver = () => undefined,
 ): InProcessSessionContextProvider {
+  const trust = (): Pick<InProcessSessionContext, "projectTrusted"> => {
+    const projectTrusted = resolveProjectTrust()
+    return projectTrusted === undefined ? {} : { projectTrusted }
+  }
   const provide = (spec: ManagedStartSpec): InProcessSessionContext => {
     const registry = resolveRegistry()
-    if (registry === undefined) return {}
+    if (registry === undefined) return trust()
     const model = spec.model === undefined ? undefined : findModelReference(registry, spec.model)
     const modelRuntime = registry.modelRuntime
     const thinkingLevel = asSenpiThinkingLevel(spec.variant)
     return {
+      ...trust(),
       modelRegistry: registry,
       authStorage: registry.authStorage,
       ...(modelRuntime !== undefined && { modelRuntime }),
@@ -49,7 +58,10 @@ export function createParentRegistrySessionContext(
     }
   }
   return Object.assign(provide, {
-    resolveResumeContext: (spec: ManagedStartSpec) => resolveResumeContext(resolveRegistry, spec),
+    resolveResumeContext: (spec: ManagedStartSpec): ResumeContextResult => {
+      const resolved = resolveResumeContext(resolveRegistry, spec)
+      return resolved.ok ? { ok: true, context: { ...trust(), ...resolved.context } } : resolved
+    },
   })
 }
 

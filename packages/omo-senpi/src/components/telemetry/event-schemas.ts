@@ -1,6 +1,8 @@
 import { CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task/agents-builtin"
 import { BUILTIN_CATEGORY_DEFAULTS } from "@oh-my-opencode/senpi-task/category-builtins"
+import { ERROR_CODES } from "@oh-my-opencode/senpi-desktop-protocol"
 import { CATEGORY_CONFIG_SCHEMA } from "./category-config-schema"
+import { PROCESS_CRASHED_SCHEMA } from "./crash-schema"
 import { buildDelegationCompletedSchema } from "./delegation-schema"
 import { KIBITZER_SUMMARY_SCHEMA } from "./kibitzer-schema"
 import { KNOWN_MODELS, KNOWN_PROVIDERS } from "./model-vocabulary"
@@ -33,6 +35,24 @@ export const BUILTIN_SKILL_NAMES = Object.freeze([
   "review-work", "ulw-execute", "ultimate-browsing", "ultrawork", "ulw-loop", "ulw-plan", "ulw-research",
   "visual-qa",
 ] as const)
+export const COMPUTER_USE_ACTIVATION_SOURCES = Object.freeze([
+  "tool_call", "command_on", "command_off", "other",
+] as const)
+export const COMPUTER_USE_BACKENDS = Object.freeze([
+  "quartz", "x11", "wayland", "win32", "fake", "unavailable", "other",
+] as const)
+export const COMPUTER_USE_ENGINE_ERROR_CODES = Object.freeze([
+  ...ERROR_CODES,
+  "native-unavailable",
+  "quarantined",
+  "abi-mismatch",
+  "other",
+] as const)
+export const COMPUTER_USE_PERMISSIONS = Object.freeze([
+  "capture", "input", "ax", "read", "exec",
+] as const)
+export const COMPUTER_USE_PERMISSION_SCOPES = Object.freeze(["os", "tier"] as const)
+export const COMPUTER_USE_PLATFORMS = Object.freeze(["darwin", "linux", "win32", "other"] as const)
 
 export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
   daily_active: Object.freeze({
@@ -104,6 +124,26 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     "$session_id": STRING_PROPERTY,
     feature: enumProperty(["goal_tool", "team_create", "memory_tool"] as const),
   }),
+  computer_use_activation: Object.freeze({
+    "$session_id": STRING_PROPERTY,
+    active: BOOLEAN_PROPERTY,
+    backend: enumProperty(COMPUTER_USE_BACKENDS),
+    host_platform: enumProperty(COMPUTER_USE_PLATFORMS),
+    source: enumProperty(COMPUTER_USE_ACTIVATION_SOURCES),
+  }),
+  computer_use_permission_denied: Object.freeze({
+    "$session_id": STRING_PROPERTY,
+    backend: enumProperty(COMPUTER_USE_BACKENDS),
+    host_platform: enumProperty(COMPUTER_USE_PLATFORMS),
+    permission: enumProperty(COMPUTER_USE_PERMISSIONS),
+    scope: enumProperty(COMPUTER_USE_PERMISSION_SCOPES),
+  }),
+  computer_use_engine_error: Object.freeze({
+    "$session_id": STRING_PROPERTY,
+    backend: enumProperty(COMPUTER_USE_BACKENDS),
+    code: enumProperty(COMPUTER_USE_ENGINE_ERROR_CODES),
+    host_platform: enumProperty(COMPUTER_USE_PLATFORMS),
+  }),
   kibitzer_summary: KIBITZER_SUMMARY_SCHEMA,
   parallelism_summary: PARALLELISM_SUMMARY_SCHEMA,
   delegation_completed: buildDelegationCompletedSchema({
@@ -111,6 +151,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     models: [...new Set(Object.values(KNOWN_MODELS).flat()), "custom"],
   }),
   category_config: CATEGORY_CONFIG_SCHEMA,
+  process_crashed: PROCESS_CRASHED_SCHEMA,
 } as const)
 
 export const OMO_NATIVE_PROPERTY_ALLOWLISTS = Object.freeze(Object.fromEntries(

@@ -46,6 +46,9 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
     final_response: finalResponse.text,
     ...(finalResponse.file === undefined ? {} : { final_response_file: finalResponse.file }),
     continuation_hint: continuationHint(record),
+    ...(record.resumed_run_epoch !== undefined && record.resumed_run_epoch === record.notification.run_epoch
+      ? { resumed_turn: true as const }
+      : {}),
     ...(record.owner?.kind === "dag"
       ? { dag: { run_id: record.owner.runId, node_id: record.owner.nodeId } }
       : {}),
@@ -54,12 +57,15 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
   return tokens === undefined ? base : { ...base, tokens }
 }
 
-export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
+export function buildCompletionMessage(
+  details: readonly CompletionDetails[],
+  verificationDirective = DAG_VERIFICATION_DIRECTIVE,
+): ParentNotifierMessage {
   const body = completionMessageLines(details).join("\n")
   const carriesDag = details.some((detail) => detail.dag !== undefined)
   return {
     customType: "senpi-task.completion",
-    content: carriesDag ? `${body}\n\n${DAG_VERIFICATION_DIRECTIVE}` : body,
+    content: carriesDag ? `${body}\n\n${verificationDirective}` : body,
     display: false,
     details,
   }
@@ -99,7 +105,7 @@ function continuationHint(record: TaskRecord): string {
 
 function completionDetailLines(detail: CompletionDetails, width: number | undefined): readonly string[] {
   const identity = joinRendererTokens([
-    "task completion",
+    detail.resumed_turn === true ? "task completion (resumed turn)" : "task completion",
     `name:${normalizeRendererText(detail.name)}`,
     `id:${normalizeRendererText(detail.task_id)}`,
     formatTargetWithModel({

@@ -13,6 +13,7 @@ import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec } fro
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { WorkpoolCreate, WorkpoolEvent } from "../types"
+import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup() })
@@ -75,7 +76,7 @@ export function fixture(options: {
     tryClaimEviction: taskId => manager.tryClaimEviction?.(taskId) ?? false,
     releaseEviction: taskId => manager.releaseEviction?.(taskId),
   }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
     ...(options.kernelToolBindings === undefined ? {} : { kernelToolBindings: options.kernelToolBindings }),
     planner: options.planner ?? (spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model", ...(spec.subagent_type === undefined ? {} : { agentType: spec.subagent_type }) } })),

@@ -9,7 +9,7 @@ import {
 } from "./model-capability-guardrails"
 
 describe("model-capability-guardrails", () => {
-  test.each(["gpt-5.6-luna-fast", "gpt-6-luna-fast"])("keeps %s aligned with its bundled canonical model", (modelID) => {
+  test.each(["gpt-5.6-luna-fast", "gpt-6-luna-fast", "gpt-6-sol-fast", "gpt-6.1-sol", "gpt-6.1-sol-fast"])("keeps %s aligned with its bundled canonical model", (modelID) => {
     const issues = collectModelCapabilityGuardrailIssues({
       snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
     })

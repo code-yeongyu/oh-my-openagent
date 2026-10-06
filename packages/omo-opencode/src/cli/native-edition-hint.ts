@@ -1,8 +1,11 @@
+import { formatNativeInstallEntryCommand, resolveNativeInstallPlan } from "./install-native/plan"
 import type { InstallConfig } from "./types"
 
-export const NATIVE_EDITION_INSTALL_COMMAND = "bun add -g omo-ai@beta"
+// The installer command, not the raw `bun add -g`: it is the only spelling that is also correct on a
+// machine whose global `omo` still belongs to a pre-rename oh-my-openagent release.
+export const NATIVE_EDITION_INSTALL_COMMAND = formatNativeInstallEntryCommand(resolveNativeInstallPlan(true))
 export const NATIVE_EDITION_GUIDE_URL =
-  "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/guide/installation.md#omo-native-beta-omo-via-omo-ai"
+  "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/guide/migrating-from-opencode.md"
 export const NATIVE_EDITION_HINT_TITLE = "OmO Native (beta)"
 
 export type NativeEditionHintPaint = {

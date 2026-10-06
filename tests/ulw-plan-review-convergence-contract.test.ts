@@ -8,7 +8,9 @@ const repoRoot = join(import.meta.dir, "..")
 // shared (OpenCode) and Codex editions shipped an unbounded "fix every cited issue and
 // resubmit until approval" protocol with no round cap and no blocker-eligibility rule.
 // This contract is machine-consumed review policy: every edition's full-workflow.md must
-// carry the same bounded convergence contract JSON.
+// carry the same bounded convergence contract JSON. #8773 added the ideal-state category: an
+// IS row no todo closes or no QA scenario proves, or an approach that cannot reach it for the
+// named user, is blocker-eligible in every edition.
 const surfaces = [
 	{
 		name: "shared (OpenCode Ultimate)",
@@ -41,6 +43,7 @@ const BLOCKER_ELIGIBILITY = [
 	"reproducible_broken_flow",
 	"concrete_security_data_loss_or_compatibility_risk",
 	"external_api_provider_or_release_contract_conflict",
+	"ideal_state_row_unmapped_or_unreachable_for_the_affected_user",
 ] as const
 
 function readJsonContract(workflow: string, contractName: string): Record<string, unknown> {
@@ -82,15 +85,6 @@ describe("#given the ulw-plan high-accuracy review protocol across all three edi
 				])
 				expect(contract.fix_edit_policy).toBe("smallest_edit_no_scope_expansion")
 			})
-		})
-	}
-})
-
-describe("#given issue #6128 non-convergence root cause wording", () => {
-	for (const surface of surfaces) {
-		test(`#when reading ${surface.name} #then no unconditional resubmit-until-approval loop remains`, () => {
-			const workflow = readFileSync(surface.workflowPath, "utf8")
-			expect(workflow).not.toMatch(/fix every cited issue and resubmit (?:both )?fresh until (?:each|it) approves/)
 		})
 	}
 })

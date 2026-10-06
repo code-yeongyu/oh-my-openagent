@@ -225,6 +225,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
       omo_ai_version: ${{ steps.omo-ai.outputs.omo_ai_version }}
+      omo_ai_dist_tag: ${{ steps.omo-ai.outputs.omo_ai_dist_tag }}
       already_published: ${{ steps.omo-ai.outputs.already_published }}
       previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
@@ -285,13 +286,19 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # The channel follows the version: a prerelease X.Y.Z-<suffix> ships as X.Y.Z-0.<suffix> on the
+          # beta dist-tag, a stable X.Y.Z ships as exactly X.Y.Z on latest, so a bare `bun add -g omo-ai`
+          # resolves the stable release.
           if [[ "$VERSION" == *"-"* ]]; then
             OMO_AI_VERSION="${VERSION/-/-0.}"
+            OMO_AI_DIST_TAG=beta
           else
-            OMO_AI_VERSION="${VERSION}-1"
+            OMO_AI_VERSION="${VERSION}"
+            OMO_AI_DIST_TAG=latest
           fi
 
           echo "omo_ai_version=$OMO_AI_VERSION" >> "$GITHUB_OUTPUT"
+          echo "omo_ai_dist_tag=$OMO_AI_DIST_TAG" >> "$GITHUB_OUTPUT"
 
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/omo-ai/${OMO_AI_VERSION}")
           if [ "$STATUS" = "200" ]; then
@@ -430,21 +437,19 @@ jobs:
             exit 1
           fi
 
-          # A release commit may only be REUSED when it is the current base head. A stamp that
-          # sits behind the head belongs to an earlier, abandoned attempt: its tree predates every
-          # merge since, so publishing it would ship a version whose contents nobody reviewed under
-          # that number (2026-09-04: a beta.41 retry re-selected the first attempt's stamp, whose
-          # tree lacked the senpi engine bump; only gate-reuse's CI check kept it off npm). Fail
-          # closed and ask for a fresh version number instead of restamping over a live one.
+          # A merged stamping commit remains reusable only while its tree equals the current
+          # base. The merge wrapper must not replace its maintainer attribution, and later
+          # content must never be silently omitted by reusing an abandoned stamp (#7779).
           reuse_or_refuse() {
             local candidate="$1" origin_desc="$2"
-            if [ "$candidate" = "$BASE_HEAD" ]; then
+            if git merge-base --is-ancestor "$candidate" "$BASE_HEAD" &&
+              [ "$(git rev-parse "${candidate}^{tree}")" = "$(git rev-parse "${BASE_HEAD}^{tree}")" ]; then
               echo "release_sha=${candidate}" >> "$GITHUB_OUTPUT"
               echo "needs_push=false" >> "$GITHUB_OUTPUT"
-              echo "${origin_desc} is the current origin/${BASE_REF} head: ${candidate}"
+              echo "${origin_desc} matches the current origin/${BASE_REF} tree: ${candidate}"
               exit 0
             fi
-            echo "::error::${origin_desc} (${candidate}) is stale: origin/${BASE_REF} has moved to ${BASE_HEAD}. Refusing to publish a tree that predates the base head. Bump to an unused version so a fresh release commit is stamped on the current head."
+            echo "::error::${origin_desc} (${candidate}) is stale or unrelated to origin/${BASE_REF} (${BASE_HEAD}). Bump to an unused version so a fresh release commit is stamped on the current head."
             exit 1
           }
 
@@ -452,7 +457,7 @@ jobs:
             reuse_or_refuse "$(git rev-list --max-count=1 "refs/tags/v${VERSION}")" "Release tag v${VERSION}"
           fi
 
-          RELEASE_SHA="$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
+          RELEASE_SHA="$(git rev-list --no-merges --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
           if [ -n "$RELEASE_SHA" ]; then
             reuse_or_refuse "$RELEASE_SHA" "Release commit for v${VERSION}"
           fi
@@ -497,13 +502,15 @@ jobs:
           # rejects the release commit as stale (v5.0.0-beta.83 release-state PR).
           bun run build:codex-install
 
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config --global user.email "code.yeon.gyu@gmail.com"
+          git config --global user.name "YeonGyu-Kim"
           git add CHANGELOG.md package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
-          # build-extension.mjs also stamps the version into the agent-toolkit SDK bundle under
-          # plugin/runtime; it must be committed with the extensions or the freshness check
-          # rejects the release commit as stale-output (#8329).
-          git add -f packages/omo-senpi/plugin/extensions packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js
+          # build-extension.mjs also rewrites the committed bundles under plugin/runtime (the
+          # agent-toolkit SDK, the rollback migrator); commit every tracked one it touched or the
+          # freshness check rejects the release commit as stale-output (#8329, v5.1.1). `-u` stages
+          # only tracked files, so gitignored staged runtimes (lsp-daemon, ast-grep-mcp) stay out.
+          git add -f packages/omo-senpi/plugin/extensions
+          git add -u packages/omo-senpi/plugin/runtime
           git add packages/omo-codex/scripts/install-dist/install-local.mjs
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
@@ -600,9 +607,16 @@ jobs:
           for attempt in $(seq 1 120); do
             PR_STATE="$(retry_gh "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
-              RELEASE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              MERGE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              RELEASE_SHA="$(retry_gh "Read release-state PR source SHA" gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
+              git fetch origin "$MERGE_SHA" "$RELEASE_SHA"
+              if ! git merge-base --is-ancestor "$RELEASE_SHA" "$MERGE_SHA" ||
+                [ "$(git rev-parse "${RELEASE_SHA}^{tree}")" != "$(git rev-parse "${MERGE_SHA}^{tree}")" ]; then
+                echo "::error::Merged release tree differs from its prepared source; refusing publication."
+                exit 1
+              fi
               echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-              echo "Release-state PR #${PR_NUMBER} merged at ${RELEASE_SHA}"
+              echo "Release-state PR #${PR_NUMBER} merged at ${MERGE_SHA}; publishing stamped source ${RELEASE_SHA}"
               exit 0
             fi
 
@@ -755,7 +769,11 @@ jobs:
           set -uo pipefail
 
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
-          ATTEMPTS="${PROPAGATION_ATTEMPTS:-20}"
+          # npm reads have lagged successful publishes by 10-25 minutes in this release lane
+          # (#8691: 12-16 min on beta.84; 5.1.1: linux-arm64-musl still 404 when the old
+          # 5-minute window closed). 120 x 15s = 30 minutes covers that with margin, so the
+          # wrapper publish does not strand an otherwise successful platform release.
+          ATTEMPTS="${PROPAGATION_ATTEMPTS:-120}"
           DELAY="${PROPAGATION_DELAY:-15}"
 
           PENDING=()
@@ -1018,10 +1036,12 @@ jobs:
             fi
           done
 
-      - name: Publish omo-ai (beta only)
+      - name: Publish omo-ai
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
         working-directory: packages/omo-native
-        run: npm publish --ignore-scripts --access public --provenance --tag beta
+        env:
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
+        run: npm publish --ignore-scripts --access public --provenance --tag "$OMO_AI_DIST_TAG"
 
       - name: Restore package.json after lazycodex-ai publish attempt
         if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
@@ -1174,8 +1194,8 @@ jobs:
           bun run --cwd packages/omo-codex/plugin build
           bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
           cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config --global user.email "code.yeon.gyu@gmail.com"
+          git config --global user.name "YeonGyu-Kim"
           git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo
           if git diff --cached --quiet; then
             echo "LazyCodex marketplace already up to date"
@@ -1285,6 +1305,14 @@ jobs:
           path: .omo/release-binaries
           merge-multiple: true
 
+      - name: Download desktop-engine artifacts
+        if: inputs.skip_platform != true && inputs.lazycodex_only != true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-engine-*
+          path: .omo/release-binaries
+          merge-multiple: true
+
       - name: Upload release assets
         # Runs for both stable and dist-tagged releases: the compiled binaries
         # and SHA256SUMS are part of the release contract on every channel.
@@ -1294,39 +1322,63 @@ jobs:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          # Partial reruns skip binaries already present on the release. Restore
+          # those original bytes before rebuilding the complete checksum set.
+          for TARGET in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
+            NAME="omo-${TARGET}"
+            if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
+            if [ ! -f ".omo/release-binaries/$NAME" ]; then
+              gh release download "v${VERSION}" --pattern "$NAME" --dir .omo/release-binaries
+            fi
+          done
           ls -la .omo/release-binaries/
-          # Generate the combined checksum file from the 12 downloaded binaries:
-          # each matrix leg uploads only its own omo-* binary (per-leg SHA256SUMS
-          # would collide under merge-multiple), so the release job owns the
-          # release-level SHA256SUMS covering every binary.
+          # The release owns two checksum assets: one for 12 omo launchers,
+          # and one for the four separately downloadable desktop engines.
           (cd .omo/release-binaries && shasum -a 256 omo-* > SHA256SUMS)
-          cat .omo/release-binaries/SHA256SUMS
-          gh release upload "v${VERSION}" .omo/release-binaries/omo-* .omo/release-binaries/SHA256SUMS --clobber
+          bun script/desktop-engine-release.ts checksums .omo/release-binaries
+          gh release upload "v${VERSION}" .omo/release-binaries/omo-* \
+            .omo/release-binaries/SHA256SUMS \
+            .omo/release-binaries/senpi-desktop-engine-darwin-* \
+            .omo/release-binaries/senpi-desktop-engine-linux-* \
+            .omo/release-binaries/senpi-desktop-engine-win32-* \
+            .omo/release-binaries/senpi-desktop-engine-checksums.txt --clobber
 
       - name: Verify uploaded assets
         # Intentionally ungated: release assets are part of the release
-        # contract, so reruns that skip the platform jobs must still prove the
-        # assets are downloadable and hash-verified. Reruns are safe because
-        # upload is --clobber-idempotent and the per-target build is
-        # unconditional, so this can only stay green when the release actually
-        # carries its 13 assets (12 per-target omo binaries + SHA256SUMS).
+        # contract, so skip_platform reruns must fail when an engine asset is
+        # absent rather than treating a skipped upload as success.
         if: inputs.lazycodex_only != true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           VERIFY_DIR="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_DIR"' EXIT
           gh release download "v${VERSION}" --dir "$VERIFY_DIR"
-          ASSET_COUNT="$(find "$VERIFY_DIR" -maxdepth 1 -type f | wc -l)"
-          if [ "$ASSET_COUNT" -ne 13 ]; then
-            echo "::error::Release v${VERSION} must expose 13 assets (12 per-target omo binaries + SHA256SUMS); found ${ASSET_COUNT}."
-            exit 1
-          fi
+          EXPECTED_DIR="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_DIR" "$EXPECTED_DIR"' EXIT
+          for TARGET in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
+            NAME="omo-${TARGET}"
+            if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
+            touch "$EXPECTED_DIR/$NAME"
+          done
+          for HOST in darwin-arm64 darwin-x64 linux-x64; do
+            touch "$EXPECTED_DIR/senpi-desktop-engine-${HOST}"
+          done
+          touch "$EXPECTED_DIR/senpi-desktop-engine-win32-x64.exe" \
+            "$EXPECTED_DIR/SHA256SUMS" "$EXPECTED_DIR/senpi-desktop-engine-checksums.txt"
+          diff -u <(cd "$EXPECTED_DIR" && printf '%s\n' * | sort) \
+            <(cd "$VERIFY_DIR" && printf '%s\n' * | sort)
           (
             cd "$VERIFY_DIR"
+            test "$(wc -l < SHA256SUMS)" -eq 12
+            test "$(wc -l < senpi-desktop-engine-checksums.txt)" -eq 4
             shasum -a 256 -c SHA256SUMS
+            shasum -a 256 -c senpi-desktop-engine-checksums.txt
           )
-          echo "Verified ${ASSET_COUNT}/13 release assets for v${VERSION}"
+          echo "Verified 18/18 release assets for v${VERSION}"
 
       - name: Delete draft release
         if: inputs.lazycodex_only != true
@@ -1365,8 +1417,31 @@ jobs:
           JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  installer-mirror:
+    needs: [release-metadata, release, post-publish-verify]
+    # Last release step: mirror the published assets into R2 behind get.omo.dev, then move the installer
+    # channel. It waits for post-publish-verify so the channel only follows an npm dist-tag that is already
+    # live. A failure leaves the GitHub release and npm untouched and keeps get.omo.dev on the previous
+    # version; re-run installer-mirror.yml for this tag to finish it.
+    if: >-
+      always() &&
+      inputs.prepared_release_sha != '' &&
+      inputs.lazycodex_only != true &&
+      inputs.skip_platform != true &&
+      needs.release.result == 'success' &&
+      needs.post-publish-verify.result == 'success'
+    uses: ./.github/workflows/installer-mirror.yml
+    with:
+      tag: v${{ needs.release-metadata.outputs.version }}
+      channel: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
+      dry_run: false
+    secrets: inherit
+
   post-publish-verify:
     runs-on: ubuntu-latest
+    # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
+    # probe can't hold a runner for GitHub's 6 h default (#9492).
+    timeout-minutes: 120
     needs: [release-metadata, prepare-release-state, publish-main, release]
     # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
     # already public by this point, so blocking the release job on them could only produce the worst
@@ -1393,6 +1468,7 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
           ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
         run: |
           set -euo pipefail
@@ -1403,22 +1479,31 @@ jobs:
           # therefore failed the run AFTER a successful publish. Size the wait to the registry's stated
           # contract and read with --prefer-online so a cached "not found" cannot mask a landed version.
           READINESS_INTERVAL_SECONDS=15
-          READINESS_ATTEMPTS=60   # 60 x 15 s = 15 minutes
+          READINESS_ATTEMPTS=240  # 240 x 15 s = 60 minutes; npm took ~55 minutes to serve omo-ai@5.1.13 (#9492)
           for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
             IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
-            BETA_READY=true
+            TARBALL_URL=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball 2>/dev/null || true)
+            TAG_READY=true
             if [ "$ALREADY_PUBLISHED" != "true" ]; then
-              BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
-              [ "$BETA_VERSION" = "$OMO_AI_VERSION" ] || BETA_READY=false
+              TAGGED_VERSION=$(npm view --prefer-online omo-ai "dist-tags.$OMO_AI_DIST_TAG" 2>/dev/null || true)
+              [ "$TAGGED_VERSION" = "$OMO_AI_VERSION" ] || TAG_READY=false
             fi
 
-            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$BETA_READY" = "true" ]; then
-              echo "omo-ai@$OMO_AI_VERSION is ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
+            TARBALL_READY=false
+            if [ -n "$TARBALL_URL" ] &&
+               curl --fail --silent --location --connect-timeout 10 --max-time 15 --head --output /dev/null "$TARBALL_URL"; then
+              TARBALL_READY=true
+            fi
+
+            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] &&
+               [ "$TAG_READY" = "true" ] &&
+               [ "$TARBALL_READY" = "true" ]; then
+              echo "omo-ai@$OMO_AI_VERSION metadata and tarball are ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
               break
             fi
 
             if [ "$attempt" = "$READINESS_ATTEMPTS" ]; then
-              echo "::error::omo-ai@$OMO_AI_VERSION did not become visible within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION version' before re-running anything."
+              echo "::error::omo-ai@$OMO_AI_VERSION metadata and tarball did not become ready within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION version' and the dist.tarball URL's tarball availability before re-running anything."
               exit 1
             fi
             echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/${READINESS_ATTEMPTS}, ${READINESS_INTERVAL_SECONDS}s)"
@@ -1429,20 +1514,22 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
           ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
         run: |
           set -euo pipefail
 
+          # A stable release owns latest. A prerelease owns beta and must never land on latest.
           LATEST_VERSION=$(npm view omo-ai dist-tags.latest 2>/dev/null || true)
-          if [ "$LATEST_VERSION" != "0.0.0-beta.0" ]; then
-            echo "::error::omo-ai latest must remain pinned to 0.0.0-beta.0, got ${LATEST_VERSION:-missing}. Remediate with: npm dist-tag add omo-ai@0.0.0-beta.0 latest"
+          if [ "$OMO_AI_DIST_TAG" != "latest" ] && [ "$LATEST_VERSION" = "$OMO_AI_VERSION" ]; then
+            echo "::error::omo-ai latest points at the prerelease $OMO_AI_VERSION; move it back to the last stable release"
             exit 1
           fi
 
           if [ "$ALREADY_PUBLISHED" != "true" ]; then
-            BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
-            if [ "$BETA_VERSION" != "$OMO_AI_VERSION" ]; then
-              echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, expected $OMO_AI_VERSION"
+            TAGGED_VERSION=$(npm view omo-ai "dist-tags.$OMO_AI_DIST_TAG" 2>/dev/null || true)
+            if [ "$TAGGED_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::omo-ai $OMO_AI_DIST_TAG points to ${TAGGED_VERSION:-missing}, expected $OMO_AI_VERSION"
               exit 1
             fi
           fi
@@ -1451,6 +1538,7 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
           ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
         run: |
           set -euo pipefail
@@ -1476,31 +1564,23 @@ jobs:
             exit 1
           fi
 
+          # The channel spelling users are told to run must install this release: bare `omo-ai` for a
+          # stable release (latest), `omo-ai@beta` for a prerelease.
           if [ "$ALREADY_PUBLISHED" != "true" ]; then
-            BETA_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-beta.XXXXXX")
-            npm i -g omo-ai@beta --prefix "$BETA_PREFIX"
-            BETA_INSTALLED_VERSION=$(jq -r '.version' "$BETA_PREFIX/lib/node_modules/omo-ai/package.json")
-            rm -rf "$BETA_PREFIX"
-            if [ "$BETA_INSTALLED_VERSION" != "$OMO_AI_VERSION" ]; then
-              echo "::error::omo-ai@beta installed $BETA_INSTALLED_VERSION, expected $OMO_AI_VERSION"
+            if [ "$OMO_AI_DIST_TAG" = "latest" ]; then
+              CHANNEL_SPEC=omo-ai
+            else
+              CHANNEL_SPEC="omo-ai@$OMO_AI_DIST_TAG"
+            fi
+            CHANNEL_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-channel.XXXXXX")
+            npm i -g "$CHANNEL_SPEC" --prefix "$CHANNEL_PREFIX"
+            CHANNEL_INSTALLED_VERSION=$(jq -r '.version' "$CHANNEL_PREFIX/lib/node_modules/omo-ai/package.json")
+            rm -rf "$CHANNEL_PREFIX"
+            if [ "$CHANNEL_INSTALLED_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::$CHANNEL_SPEC installed $CHANNEL_INSTALLED_VERSION, expected $OMO_AI_VERSION"
               exit 1
             fi
           fi
-
-          BARE_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-bare.XXXXXX")
-          BARE_ERROR="$RUNNER_TEMP/omoai-bare-error.txt"
-          if npm i -g omo-ai --prefix "$BARE_PREFIX" 2>"$BARE_ERROR"; then
-            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
-            echo "::error::Bare omo-ai install unexpectedly succeeded; the beta-only channel is broken"
-            exit 1
-          fi
-          if ! grep -q "ETARGET" "$BARE_ERROR"; then
-            cat "$BARE_ERROR" >&2
-            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
-            echo "::error::Bare omo-ai install failed without the required ETARGET beta gate"
-            exit 1
-          fi
-          rm -rf "$BARE_PREFIX" "$BARE_ERROR"
 
       - name: Smoke test published lazycodex-ai
         if: inputs.publish_lazycodex == true && needs.publish-main.outputs.lazycodex_publish_skipped != 'true'

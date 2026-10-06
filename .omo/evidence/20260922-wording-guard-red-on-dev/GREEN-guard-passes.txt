@@ -1,6 +1,0 @@
-(pass) the guard itself can fail > #given a bare edition mention dressed as prose #when checked #then the allowlist does not excuse it [0.07ms]
-
- 17 pass
- 0 fail
- 24 expect() calls
-Ran 17 tests across 1 file. [3.10s]

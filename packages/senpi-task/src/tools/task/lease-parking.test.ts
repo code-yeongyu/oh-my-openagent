@@ -92,7 +92,7 @@ function tree(levels: number, holdLeaf = false, batch = false, promote = false) 
           final = "complete"
         },
         abort: async () => { controller.abort(); finishLeaf.resolve(); finishParent.resolve() },
-        steer: async () => {}, followUp: async () => {}, subscribe: () => () => {},
+        steer: async () => "handled", followUp: async () => "handled", subscribe: () => () => {},
         getLastAssistantText: () => final, dispose: () => {},
       }
     },

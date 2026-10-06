@@ -16,25 +16,27 @@ not in a cookie. So:
 Therefore: borrow the existing tab, read, return it. Do not open, do not navigate away, do not
 "refresh to fix" anything.
 
-```bash
-bsk tab list --scope user           # find the already-signed-in tab
-bsk tab borrow <tab-id>
-# ... read ...
-bsk tab return <tab-id>
+```js
+const { tabs } = await session.tabList({ scope: "user" })          // find the already-signed-in tab by URL
+const vault = tabs.find((t) => /my\.1password\.com\/(?:vaults|app)/.test(t.url))
+await session.tabBorrow(vault.tab_id)                               // the user confirms
+// ... read ...
+await session.tabReturn(vault.tab_id)
 ```
 
 ## Check liveness by URL, never by title
 
 The app mutates its URL hash without updating the document title, so a signed-in vault can still
 report a sign-in title. A live session's `location.href` contains the app path and never the
-sign-in path. Read the URL.
+sign-in path. Read the URL from `tabList`, or `session.evaluate("location.href")`.
 
 ## The browser may be shared
 
 Other automation may be driving the same window.
 
-- **Clear the search box before typing.** It often holds someone else's query, and typing alone
-  appends to it, returning confident results for the wrong search.
+- **Clear the search box before typing** (`fill(target, value, { clearBefore: true })`). It often
+  holds someone else's query, and typing alone appends to it, returning confident results for the
+  wrong search.
 - **Read the autocomplete listbox, not the results grid.** The grid holds whatever query was last
   committed, possibly by another actor. Scraping every option on the page silently merges two
   different searches.
@@ -42,11 +44,11 @@ Other automation may be driving the same window.
 
 ## If it is locked
 
-```bash
-bsk request-help --session <id> --prompt "Please unlock 1Password in this tab, then continue."
+```js
+await session.requestHelp({ prompt: "Please unlock 1Password in this tab, then continue." })
 ```
 
-Then observe again.
+Then read the page again.
 
 ## Not in scope
 

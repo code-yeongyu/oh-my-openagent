@@ -1,9 +1,10 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
-import { messageability } from "../state"
+import { isTransportLostMessage, messageability } from "../state"
 import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
+import { runMoved, staleSend } from "./stale-run"
 import {
   DEFAULT_SEND_DELIVERY,
   type SendDelivery,
@@ -14,6 +15,7 @@ import {
   type SteeringPort,
 } from "./types"
 import {
+  evictionRefusal,
   uncertainDeliveryDenial,
   notContinuableReason,
   oneShotPolicyDenial,
@@ -59,6 +61,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     }
     const denied = scopeDenied(record, input)
     if (denied !== undefined) return denied
+    // A fenced send acts on exactly this record's run: every revive below re-checks that run_epoch
+    // inside its own record mutation, so a run that moves after this check is never revived twice.
+    if (runMoved(record, input.expectedRunEpoch)) return staleSend(record)
     // One-shot policy runs after ownership is established but BEFORE the pending enqueue and
     // messageability: a one-shot agent refuses task_send in every state (running, pending,
     // terminal, cross-session alike), and an unauthorized caller learns only the scope denial.
@@ -68,6 +73,15 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     const deliverAs = input.deliverAs ?? DEFAULT_SEND_DELIVERY
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
     if (port.isEvicting?.(record.task_id) === true) return evictionRefusal(record.task_id)
+    // An accepted cancel is final: nothing may revive or steer the child it is stopping (omo#9403).
+    if (record.status === "running" && record.cancel_requested !== undefined) {
+      return {
+        kind: "not_continuable",
+        task_id: record.task_id,
+        reason: `Task ${record.task_id} has a pending cancel and will not run again.`,
+        suggestion: TASK_OUTPUT_SUGGESTION,
+      }
+    }
 
     if (coldRevivals.has(record.task_id)) return { kind: "admission_refused", task_id: record.task_id, reason: "revival_in_progress" }
     const cold = isColdRevivalCandidate(record)
@@ -105,11 +119,16 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       }
     }
     if (handle.hasExited?.() === true) {
+      // A child whose connection never came back ended for that reason; say so instead of pointing at
+      // a message (omo#9403). Its transcript and worktree are left for the parent to recover from.
+      const lost = isTransportLostMessage(record.error_message)
       return {
         kind: "not_continuable",
         task_id: record.task_id,
-        reason: `Task ${record.task_id} exited before its last message was acknowledged.`,
-        suggestion: "Inspect task_output before resending.",
+        reason: lost
+          ? `Task ${record.task_id} ended: ${record.error_message}. Its transcript and worktree are kept.`
+          : `Task ${record.task_id} exited before its last message was acknowledged.`,
+        suggestion: lost ? "Read its work with task_output and start a new task to continue it." : "Inspect task_output before resending.",
       }
     }
 
@@ -171,15 +190,6 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
 
   function hasPendingSends(taskId: string): boolean {
     return (pendingSends.get(taskId) ?? 0) > 0 || (tryLoad(taskId)?.pending_steering?.length ?? 0) > 0
-  }
-
-  function evictionRefusal(taskId: string): SendOutcome {
-    return {
-      kind: "not_continuable",
-      task_id: taskId,
-      reason: `Task ${taskId} is being evicted; send was not started.`,
-      suggestion: TASK_OUTPUT_SUGGESTION,
-    }
   }
 
   function dropPending(taskId: string): void {

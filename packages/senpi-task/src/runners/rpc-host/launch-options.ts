@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path"
 
 import type { HostEnginePolicy } from "../../lazy/senpi-barrel"
 import { MEMBER_PROCESS_ENV_NAMES, WORKPOOL_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
-import { OMO_SENPI_TASK_RPC_CHILD } from "../rpc/spawn"
+import { OMO_SENPI_TASK_DEPTH, OMO_SENPI_TASK_ROOT_SESSION_ID, OMO_SENPI_TASK_RPC_CHILD } from "../rpc/spawn"
 import type { DaemonLaunchSpec } from "./launch-spec"
 
 export interface DaemonLaunchOptionsInput {
@@ -38,6 +38,8 @@ export function daemonLaunchOptions(input: DaemonLaunchOptionsInput): DaemonLaun
   // Child- and member-scoped identity never reaches a host shared by every child on the machine.
   for (const name of [
     OMO_SENPI_TASK_RPC_CHILD,
+    OMO_SENPI_TASK_DEPTH,
+    OMO_SENPI_TASK_ROOT_SESSION_ID,
     CHILD_SESSION_DIR_ENV,
     ...MEMBER_PROCESS_ENV_NAMES,
     ...WORKPOOL_PROCESS_ENV_NAMES,

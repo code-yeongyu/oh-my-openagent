@@ -3,6 +3,7 @@ import type { JSX, ReactNode } from "react"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import Script from "next/script"
+import { installDetectScript } from "@/lib/install-targets"
 import { getStats, FALLBACK_DESCRIPTION } from "@/lib/stats"
 import "./globals.css"
 
@@ -115,6 +116,7 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
       suppressHydrationWarning
     >
       <head>
+        <script dangerouslySetInnerHTML={{ __html: installDetectScript }} />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <link
           rel="stylesheet"

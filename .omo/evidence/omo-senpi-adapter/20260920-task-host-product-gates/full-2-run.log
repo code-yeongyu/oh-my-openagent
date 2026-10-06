@@ -1,2 +1,0 @@
-A: PASS one daemon, two parents x 16 process children
-A1: PASS single-parent control: 16 children, one daemon identity

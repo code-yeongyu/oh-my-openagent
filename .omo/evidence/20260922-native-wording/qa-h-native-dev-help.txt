@@ -1,8 +1,0 @@
-  --copilot <value>                 GitHub Copilot subscription: no, yes
-  --platform <platform>             Install target platform: opencode, codex,
-                                    both, native, native-dev (choices:
-                                    "opencode", "codex", "both", "native",
-                                    "native-dev")
-  --opencode-zen <value>            OpenCode Zen access: no, yes (default: no)
-  --platform <platform>             Install target platform: opencode, codex,
-                                    both, native, native-dev (choices:

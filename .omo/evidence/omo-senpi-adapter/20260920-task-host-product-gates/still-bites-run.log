@@ -1,2 +1,0 @@
-C2: FAIL child=completed parked=true reopenExit=0 lines 12->12
-{"result":"FAIL","counts":{"pass":0,"fail":1,"skipped":0},"out":"/Volumes/mengmotaStorage/local-workspaces/omo-wt/fix/task-host-product-gates/.omo/evidence/omo-senpi-adapter/20260920-task-host-product-gates/still-bites","realSenpiUntouched":true,"realAgentDirNeverAddressed":true}

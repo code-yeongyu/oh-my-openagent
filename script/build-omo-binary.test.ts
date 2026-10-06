@@ -27,6 +27,7 @@ import {
   PLUGIN_PAYLOAD_FILES,
   RELEASE_BINARY_TARGETS,
   buildRuntimeManifest,
+  runtimeManifestFileContent,
   collectStagedFiles,
   createStampedPackageJson,
   embeddedNameForRelPath,
@@ -354,6 +355,21 @@ describe("runtime manifest", () => {
   })
 })
 
+describe("embedded runtime manifest file", () => {
+  test("#given a musl target #when the manifest file is written #then it names that release asset flavor outside the digest", async () => {
+    const stageDir = makeTempDir("omo-manifest-target-")
+    writeFileSync(join(stageDir, "package.json"), createStampedPackageJson("1.2.3"), "utf8")
+    const manifest = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+
+    const written = JSON.parse(runtimeManifestFileContent(manifest, "linux-x64-musl"))
+
+    expect(written.releaseTarget).toBe("linux-x64-musl")
+    expect(written.marker).toBe("OMO_RUNTIME_MANIFEST_V1")
+    expect(written.manifestSha).toBe(manifest.manifestSha)
+    rmSync(stageDir, { recursive: true, force: true })
+  })
+})
+
 describe("size budget", () => {
   test("#given a synthetic oversize binary #when the budget is enforced #then it fails loud naming the target", () => {
     // given
@@ -491,10 +507,11 @@ describe("sidecar parity set", () => {
     })
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node")
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_grep.darwin-arm64.node")
-    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(2)
+    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(3)
+    expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi-desktop-engine")
   })
 
-  test("#given a native-absent target #when the expected sidecar set is resolved #then no native prebuild is required", () => {
+  test("#given a native-addon-absent target #when expected paths are resolved #then the desktop engine remains required", () => {
     // given
     const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "linux-x64")
     expect(target).toBeDefined()
@@ -503,7 +520,9 @@ describe("sidecar parity set", () => {
     const relPaths = resolveExpectedSidecarRelPaths(target!)
 
     // then
-    expect(relPaths.some((relPath) => relPath.startsWith("native/prebuilds/"))).toBe(false)
+    expect(relPaths.filter((relPath) => relPath.startsWith("native/prebuilds/"))).toEqual([
+      "native/prebuilds/linux-x64/senpi-desktop-engine",
+    ])
     expect(relPaths).toContain("package.json")
   })
 })

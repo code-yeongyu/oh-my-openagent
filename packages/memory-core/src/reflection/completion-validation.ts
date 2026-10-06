@@ -4,6 +4,7 @@ import { createNodeGitExec, type GitExec } from "../git"
 import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
+import { findSecretLikeFailure } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -59,6 +60,12 @@ export async function validateCompletion(
     }
     if (tipSha === recordedBase) return { status: "no_changes", tipSha, changedPaths: [] }
 
+    const secretFailure = await findSecretLikeFailure(
+      (argv, stdin) => run(exec, worktree.dir, argv, stdin),
+      recordedBase,
+      tipSha,
+    )
+    if (secretFailure !== null) return { status: "failed", detail: secretFailure }
     const changed = await git(exec, worktree.dir, ["diff", "--name-only", "-z", `${recordedBase}..${tipSha}`, "--"])
     const changedPaths = changed.stdout.split("\0").filter(Boolean)
     if (changedPaths.length === 0) {
@@ -135,8 +142,13 @@ async function git(exec: GitExec, cwd: string, argv: readonly string[]) {
   return result
 }
 
-function run(exec: GitExec, cwd: string, argv: readonly string[]) {
-  return exec.run(argv, { cwd, timeoutMs: GIT_TIMEOUT_MS, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } })
+function run(exec: GitExec, cwd: string, argv: readonly string[], stdin?: string) {
+  return exec.run(argv, {
+    cwd,
+    timeoutMs: GIT_TIMEOUT_MS,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    ...(stdin === undefined ? {} : { stdin }),
+  })
 }
 
 function errorMessage(error: unknown): string {

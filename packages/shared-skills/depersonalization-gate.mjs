@@ -44,6 +44,9 @@ const DENY_RULES = [
 
 const TEXT_EXTENSIONS = new Set([".md", ".py", ".yaml", ".yml", ".json", ".js", ".mjs", ".ts", ".txt", ".sh"]);
 const SKIP_DIR_NAMES = new Set(["__pycache__", "node_modules", ".git"]);
+// Third-party library bundles staged at build time (gitignored, never hand-edited): scanned like
+// node_modules, i.e. not at all. Their identifiers are upstream code, not vendored personal prose.
+const SKIP_STAGED_DIRS = new Set([join(here, "skills", "browser", "runtime")]);
 
 function fileExtension(name) {
 	const dot = name.lastIndexOf(".");
@@ -62,7 +65,7 @@ async function collectFiles(rootDir) {
 		for (const entry of entries) {
 			const full = join(dir, entry.name);
 			if (entry.isDirectory()) {
-				if (SKIP_DIR_NAMES.has(entry.name)) continue;
+				if (SKIP_DIR_NAMES.has(entry.name) || SKIP_STAGED_DIRS.has(full)) continue;
 				await walk(full);
 			} else if (entry.isFile() && TEXT_EXTENSIONS.has(fileExtension(entry.name))) {
 				out.push(full);

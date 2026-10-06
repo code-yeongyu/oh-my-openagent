@@ -9,6 +9,7 @@ import { configureSharedSubunitLogger } from "@oh-my-opencode/utils"
 import { createTaskManager } from "../manager/manager"
 import { FakeRunner } from "../manager/__fixtures__/manager-fakes"
 import { parkRealSession } from "./__fixtures__/idle-park-session"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 const NOW = 2_000_000
 const OLD = new Date(NOW - settings().resident_idle_timeout_ms).toISOString()
@@ -28,7 +29,7 @@ describe("idle suspension", () => {
     seedRecord(store, { task_id: id, host_pid: process.pid, updated_at: new Date(1000).toISOString() })
     registry.add(fakeHandle(id, "rpc", []))
     let now = 1036
-    const context = resolveContext({ store, registry, config, now: () => now })
+    const context = resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config, now: () => now })
     expect(await reclaimIdleResidents(context)).toEqual([])
     now = 1037
     expect(await reclaimIdleResidents(context)).toEqual([id])
@@ -40,7 +41,7 @@ describe("idle suspension", () => {
     let unrefs = 0
     let clears = 0
     const config = { ...settings(), resident_idle_timeout_ms: 37 }
-    const stop = startIdleResidentReclaimer(resolveContext({ store: tempStore(), registry: new FakeRegistry(), config,
+    const stop = startIdleResidentReclaimer(resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store: tempStore(), registry: new FakeRegistry(), config,
       idleReclaimerScheduler: { setInterval: (_tick, ms) => { intervals.push(ms); return { unref: () => { unrefs += 1 } } }, clearInterval: () => { clears += 1 } },
     }))
     stop()
@@ -79,7 +80,7 @@ describe("idle suspension", () => {
       store.mutate(item.id, (record) => ({ ...record, final_response: "IDLE_PARK_SENTINEL", spawn_spec: { version: 1, cwd: store.stateDir, prompt: "fixture" } }))
       registry.add(fakeHandle(item.id, item.kind, trace))
     }
-    const context = resolveContext({ store, registry, config: settings({ resume_children: false }), now: () => NOW })
+    const context = resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings({ resume_children: false }), now: () => NOW })
     // when
     const parked = await reclaimIdleResidents(context)
     // then
@@ -125,7 +126,7 @@ describe("idle suspension", () => {
     const release = Promise.withResolvers<void>()
     const handle = fakeHandle(id, "in-process", trace)
     registry.add({ ...handle, abort: async () => { await handle.abort(); events.emit("abort"); await release.promise } })
-    const context = resolveContext({ store, registry, config: settings(), now: () => NOW })
+    const context = resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), now: () => NOW })
     // when: subscribed before the sweep enters teardown; no scheduler timing dependency.
     const first = reclaimIdleResidents(context)
     try {
@@ -150,7 +151,7 @@ describe("idle suspension", () => {
     const trace: string[] = []
     const ids = ["st_00000301", "st_00000302"]
     for (const id of ids) { seedRecord(store, { task_id: id, host_pid: process.pid, updated_at: OLD }); registry.add(fakeHandle(id, "in-process", trace)) }
-    const context = resolveContext({ store: { ...store, list: () => {
+    const context = resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store: { ...store, list: () => {
       const snapshot = store.list()
       store.mutate(ids[0], (r) => ({ ...r, status: "running" }))
       registry.markPending(ids[1])
@@ -168,7 +169,7 @@ describe("idle suspension", () => {
     seedRecord(store, { task_id: "st_00000401", host_pid: 999999, updated_at: OLD })
     registry.add(fakeHandle("st_00000401", "in-process", []))
     // when / then
-    expect(await reclaimIdleResidents(resolveContext({ store, registry, config: settings(), now: () => NOW }))).toEqual(["st_00000401"])
+    expect(await reclaimIdleResidents(resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), now: () => NOW }))).toEqual(["st_00000401"])
     expect(store.load("st_00000401")?.residency_state).toBe("persisted_only")
   })
 
@@ -181,7 +182,7 @@ describe("idle suspension", () => {
     configureSharedSubunitLogger((_message, data) => failures.push(data))
     seedRecord(store, { task_id: "st_00000501", host_pid: process.pid, updated_at: OLD })
     registry.add(fakeHandle("st_00000501", "in-process", trace, { disposeRejects: true }))
-    const context = resolveContext({ store, registry, config: settings(), now: () => NOW })
+    const context = resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), now: () => NOW })
     // when / then
     expect(await reclaimIdleResidents(context)).toEqual([])
     expect(await reclaimIdleResidents(context)).toEqual([])
@@ -203,7 +204,7 @@ describe("idle suspension", () => {
       registry.add(fakeHandle(id, "in-process", []))
     }
     // when
-    await reclaimIdleResidents(resolveContext({ store, registry, config: settings(), now: () => NOW }))
+    await reclaimIdleResidents(resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), now: () => NOW }))
     // then
     for (const record of store.list().records) {
       expect(record.residency_state).toBe("disposed")

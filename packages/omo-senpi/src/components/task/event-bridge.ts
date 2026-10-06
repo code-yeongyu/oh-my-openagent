@@ -9,6 +9,7 @@ import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
+import { wireDagVerificationContext } from "./dag-verification-context"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -42,6 +43,7 @@ export function wireEventBridge(
   deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  wireDagVerificationContext(pi, engine.runtime)
   const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
@@ -151,7 +153,8 @@ export function wireEventBridge(
     )
   })
 
-  pi.on("before_agent_start", (_payload, eventCtx) => {
+  pi.on("before_agent_start", (payload, eventCtx) => {
+    if (isPreview(payload)) return undefined
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"
@@ -161,7 +164,7 @@ export function wireEventBridge(
       {},
     )
     return undefined
-  })
+  }, { previewSafe: true })
 }
 
 async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
@@ -190,4 +193,8 @@ function asLiveContext(value: unknown): LiveTaskContext {
 
 function isLiveContext(value: unknown): value is LiveTaskContext {
   return typeof value === "object" && value !== null
+}
+
+function isPreview(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }

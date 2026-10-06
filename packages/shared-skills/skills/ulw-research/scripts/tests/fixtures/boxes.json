@@ -1,0 +1,90 @@
+{
+	"probe_version": 1,
+	"viewport": { "w": 1280, "h": 900 },
+	"document": { "w": 1280, "h": 9240 },
+	"count": 7,
+	"truncated": false,
+	"boxes": [
+		{
+			"selector": "body > main > section:nth-of-type(1) > h2",
+			"tag": "h2",
+			"rect": { "x": 353, "y": 420, "w": 574, "h": 38.4 },
+			"parentSelector": "body > main > section:nth-of-type(1)",
+			"parentRect": { "x": 353, "y": 400, "w": 574, "h": 1400 },
+			"scroll": { "sw": 574, "cw": 574, "sh": 38, "ch": 38 },
+			"overflow": { "x": "visible", "y": "visible" },
+			"position": "static",
+			"textLen": 31
+		},
+		{
+			"selector": "body > main > section:nth-of-type(1) > p:nth-of-type(1)",
+			"tag": "p",
+			"rect": { "x": 353, "y": 474.4, "w": 574, "h": 115.6 },
+			"parentSelector": "body > main > section:nth-of-type(1)",
+			"parentRect": { "x": 353, "y": 400, "w": 574, "h": 1400 },
+			"scroll": { "sw": 574, "cw": 574, "sh": 116, "ch": 116 },
+			"overflow": { "x": "visible", "y": "visible" },
+			"position": "static",
+			"textLen": 212
+		},
+		{
+			"selector": "body > main > section:nth-of-type(1) > figure:nth-of-type(1)",
+			"tag": "figure",
+			"rect": { "x": 353, "y": 614, "w": 574, "h": 761 },
+			"parentSelector": "body > main > section:nth-of-type(1)",
+			"parentRect": { "x": 353, "y": 400, "w": 574, "h": 1400 },
+			"scroll": { "sw": 574, "cw": 574, "sh": 761, "ch": 761 },
+			"overflow": { "x": "visible", "y": "visible" },
+			"position": "static",
+			"textLen": 48
+		},
+		{
+			"selector": "body > main > section:nth-of-type(1) > figure:nth-of-type(1) > img",
+			"tag": "img",
+			"rect": { "x": 353, "y": 614, "w": 574, "h": 717 },
+			"parentSelector": "body > main > section:nth-of-type(1) > figure:nth-of-type(1)",
+			"parentRect": { "x": 353, "y": 614, "w": 574, "h": 761 },
+			"scroll": { "sw": 574, "cw": 574, "sh": 717, "ch": 717 },
+			"overflow": { "x": "visible", "y": "visible" },
+			"position": "static",
+			"textLen": 0,
+			"objectFit": "fill",
+			"natural": { "w": 1280, "h": 1600 }
+		},
+		{
+			"selector": "body > main > section:nth-of-type(1) > figure:nth-of-type(2)",
+			"tag": "figure",
+			"rect": { "x": 353, "y": 1399, "w": 574, "h": 368.4 },
+			"parentSelector": "body > main > section:nth-of-type(1)",
+			"parentRect": { "x": 353, "y": 400, "w": 574, "h": 1400 },
+			"scroll": { "sw": 574, "cw": 574, "sh": 368, "ch": 368 },
+			"overflow": { "x": "visible", "y": "visible" },
+			"position": "static",
+			"textLen": 52
+		},
+		{
+			"selector": "body > main > section:nth-of-type(1) > figure:nth-of-type(2) > img",
+			"tag": "img",
+			"rect": { "x": 353, "y": 1399, "w": 574, "h": 324.4 },
+			"parentSelector": "body > main > section:nth-of-type(1) > figure:nth-of-type(2)",
+			"parentRect": { "x": 353, "y": 1399, "w": 574, "h": 368.4 },
+			"scroll": { "sw": 574, "cw": 574, "sh": 324, "ch": 324 },
+			"overflow": { "x": "visible", "y": "visible" },
+			"position": "static",
+			"textLen": 0,
+			"objectFit": "fill",
+			"natural": { "w": 1100, "h": 620 }
+		},
+		{
+			"selector": "#method > pre",
+			"tag": "pre",
+			"rect": { "x": 353, "y": 8120, "w": 574, "h": 180 },
+			"parentSelector": "#method",
+			"parentRect": { "x": 353, "y": 8040, "w": 574, "h": 420 },
+			"scroll": { "sw": 812, "cw": 550, "sh": 156, "ch": 156 },
+			"overflow": { "x": "auto", "y": "auto" },
+			"position": "static",
+			"textLen": 640
+		}
+	]
+}

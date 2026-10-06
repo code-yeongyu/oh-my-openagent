@@ -74,6 +74,18 @@ describe("reflection health alert", () => {
     expect(entry.fingerprint).not.toMatch(/\d+\s\|\s/)
   })
 
+  test("#given a streak of model misses no child can see even with extensions #when alerting runs #then the park alert stays its only notice", async () => {
+    // given
+    const root = await failureStreak(3, "model_unreachable_with_extensions; model_not_visible:gw/model; attempted:gw/model")
+    const harness = liveHarness()
+
+    // when
+    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
+
+    // then
+    expect({ emitted, notifications: harness.notifications }).toEqual({ emitted: false, notifications: [] })
+  })
+
   test("#given only two consecutive failures #when alerting runs #then the streak threshold suppresses the alert", async () => {
     // given
     const root = await failureStreak(2, "stable")

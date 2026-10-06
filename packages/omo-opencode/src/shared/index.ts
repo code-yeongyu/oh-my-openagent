@@ -17,6 +17,7 @@ export * from "./claude-config-dir"
 export * from "./jsonc-parser"
 export * from "./migration"
 export * from "./opencode-config-dir"
+export * from "./opencode-plugin-sandbox"
 export * from "./resolve-agent-definition-paths"
 export type {
   OpenCodeBinaryType,
@@ -85,5 +86,4 @@ export * from "./legacy-workspace-migration"
 export * from "./task-system-enabled"
 export * from "./parse-tools-config"
 export { parseModelString } from "./model-string-parser"
-export { EXCLUDED_DIRS } from "./excluded-dirs"
 export * from "./replace-tool-args"

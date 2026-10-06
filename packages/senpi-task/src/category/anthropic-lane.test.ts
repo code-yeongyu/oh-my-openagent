@@ -69,7 +69,7 @@ describe("builtin Claude rungs under the senpi harness", () => {
     // then
     expect(resolved.spec.provider).toBe("anthropic-subscription")
     expect(resolved.spec.modelId).toBe("claude-opus-5-5")
-    expect(resolved.spec.variant).toBe("max")
+    expect(resolved.spec.variant).toBe("medium")
   })
 
   test("#given anthropic-subscription and opencode both serve Fable 5.1 #when plan-consultant resolves #then the subscription lane wins", () => {
@@ -114,7 +114,7 @@ describe("builtin Claude rungs under the senpi harness", () => {
       fallbackEntry: { model: "claude-fable-5-1", variant: "max" },
     })
     expect([meteredHigh.spec.provider, meteredHigh.spec.modelId, meteredHigh.spec.variant]).toEqual([
-      "opencode", "claude-opus-5-5", "max",
+      "opencode", "claude-opus-5-5", "medium",
     ])
     expect(meteredHigh.spec.requested_model?.display).toBe("anthropic/claude-opus-5-5")
     expect(planConsultant.model).toBe("anthropic/claude-fable-5-1")

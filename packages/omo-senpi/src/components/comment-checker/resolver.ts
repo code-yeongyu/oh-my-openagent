@@ -1,10 +1,13 @@
 import { accessSync, constants, existsSync } from "node:fs"
 import { createRequire } from "node:module"
+import { homedir } from "node:os"
 import { delimiter, isAbsolute, join } from "node:path"
 
-import { COMMENT_CHECKER_ENV_KEY, COMMENT_CHECKER_PACKAGE_NAME } from "./constants"
+import { commentCheckerBinaryName, commentCheckerCacheDir, isCachedCommentCheckerCurrent } from "@oh-my-opencode/comment-checker-core"
+
+import { COMMENT_CHECKER_CACHE_DIR_NAME, COMMENT_CHECKER_ENV_KEY, COMMENT_CHECKER_PACKAGE_NAME } from "./constants"
 import type { SenpiCommentCheckerBinaryResolverOptions } from "./types"
-import { isCommentCheckerPackage } from "./utils"
+import { isCommentCheckerPackage, isMissingModuleValue } from "./utils"
 
 export function resolveSenpiCommentCheckerBinary(options: SenpiCommentCheckerBinaryResolverOptions = {}): string | null {
   const checkExists = options.existsSync ?? existsSync
@@ -23,9 +26,23 @@ export function resolveSenpiCommentCheckerBinary(options: SenpiCommentCheckerBin
     return fromPackageApi
   }
 
-  const binaryName = (options.platform ?? process.platform) === "win32" ? "comment-checker.exe" : "comment-checker"
+  const platform = options.platform ?? process.platform
+  const binaryName = commentCheckerBinaryName(platform)
   const pathLookup = options.pathLookup ?? findExecutableOnPath
-  return pathLookup(binaryName) ?? null
+  const fromPath = pathLookup(binaryName)
+  if (fromPath) return fromPath
+
+  const cacheDir = options.cacheDir ?? defaultCommentCheckerCacheDir(platform, env)
+  const cached = join(cacheDir, binaryName)
+  // An unrecorded or older checker in the shared slot is left for the downloader to replace (#8850).
+  return checkExists(cached) && isCachedCommentCheckerCurrent(cacheDir) ? cached : null
+}
+
+export function defaultCommentCheckerCacheDir(
+  platform: NodeJS.Platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  return commentCheckerCacheDir({ platform, env, homedir: homedir(), cacheDirName: COMMENT_CHECKER_CACHE_DIR_NAME })
 }
 
 function findExecutableOnPath(binaryName: string): string | null {
@@ -65,7 +82,7 @@ function resolvePackageApiBinary(input: PackageApiBinaryResolverInput): string |
     const binaryPath = packageExports.getBinaryPath()
     return input.existsSync(binaryPath) ? binaryPath : null
   } catch (error) {
-    if (error instanceof Error) {
+    if (isMissingModuleValue(error)) {
       return null
     }
     throw error

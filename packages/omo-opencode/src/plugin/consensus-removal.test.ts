@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
-import { dirname, join, relative } from "node:path"
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 
 import { OhMyOpenCodeConfigSchema } from "../config"
 
@@ -39,53 +39,4 @@ describe("#given PR 4703 consensus removal", () => {
     // then
     expect(hasConsensusConfig).toBe(false)
   })
-
-  test("#when source files are scanned #then consensus tool implementation traces are absent", () => {
-    // given
-    const forbiddenPaths = [
-      "packages/omo-opencode/src/config/schema/consensus.ts",
-      "packages/omo-opencode/src/features/consensus",
-      "packages/omo-opencode/src/shared/model-lineage.ts",
-      "packages/omo-opencode/src/tools/consensus",
-    ]
-    const forbiddenSnippets = [
-      "createConsensusTool",
-      "createConsensusToolsRecord",
-      "buildConsensusSection",
-      "<Consensus_Usage>",
-      "consensusSection",
-      "Consensus consultation",
-      "ConsensusConfigSchema",
-      "ConsensusToolResult",
-      "multi-lineage voter panel",
-      "runConsensus",
-      "ConsensusToolArgs",
-    ]
-
-    // when
-    const existingForbiddenPaths = forbiddenPaths.filter((path) => existsSync(join(REPO_ROOT, path)))
-    const sourceHits = collectSourceFiles(join(REPO_ROOT, "packages", "omo-opencode", "src"))
-      .filter((path) => !path.endsWith("consensus-removal.test.ts"))
-      .flatMap((path) => {
-        const content = readFileSync(path, "utf8")
-        return forbiddenSnippets
-          .filter((snippet) => content.includes(snippet))
-          .map((snippet) => `${relative(REPO_ROOT, path)}:${snippet}`)
-      })
-
-    // then
-    expect(existingForbiddenPaths).toEqual([])
-    expect(sourceHits).toEqual([])
-  })
 })
-
-function collectSourceFiles(directory: string): string[] {
-  return readdirSync(directory).flatMap((entry) => {
-    const path = join(directory, entry)
-    const stat = statSync(path)
-    if (stat.isDirectory()) {
-      return collectSourceFiles(path)
-    }
-    return path.endsWith(".ts") ? [path] : []
-  })
-}

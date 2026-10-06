@@ -116,6 +116,17 @@ To use this category:
 Available categories: ${allCategoryNames}`)
     }
 
+    if (categoryExists && requirement?.requiresAnyModel && userCategories?.[categoryName] === undefined) {
+      const chainModels = [...new Set(requirement.fallbackChain.map((entry) => entry.model))].join(", ")
+      return categoryResolutionError(`Category "${categoryName}" has no available model: none of its fallback-chain models (${chainModels}) is available.
+
+To use this category:
+1. Connect a provider that serves one of: ${chainModels}
+2. Or configure a model for this category in your .omo/omo.jsonc
+
+Available categories: ${allCategoryNames}`)
+    }
+
     return categoryResolutionError(`Unknown category: "${categoryName}". Available: ${allCategoryNames}`)
   }
 

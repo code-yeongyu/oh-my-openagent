@@ -7,7 +7,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 | Skill | Role |
 |-------|------|
 | `mass-ulw/` | Chained-dag orchestration at repo scale (multi-run composition, size formula, node categories). `references/planning.md` is REQUIRED reading before building any dag: wave doctrine, node prompt contract, failure playbook. |
-| `ultrawork/` | Senpi-native ultrawork directive source; its body is embedded into `src/components/ultrawork/generated-directive.ts` by `plugin/scripts/embed-directive.mjs` (build fails on non-senpi harness tokens). |
+| `ultrawork/` | Senpi-native ultrawork directive source; its body is embedded into `src/components/ultrawork/generated-directive.ts` by `plugin/scripts/embed-directive.mjs` (build fails on non-senpi harness tokens). Blocks wrapped in `<!-- omo-ultrawork-astra:<name>:start/end -->` are swapped for the matching `## <name>` section of `references/astra-variant.md` in the GPT-6 Astra variant the ultrawork component selects by receiving model; the baseline strips only the marker lines, so every other model reads the skill body verbatim. |
 | `ulw-plan/` | Read-only planning lifecycle: draft -> plan with explicit approval; `scripts/scaffold-plan.mjs` scaffolds guarded `.omo` artifacts. |
 | `ulw-loop/` | Goal/QA lifecycle loop; component-owned native source, shipped verbatim. |
 | `ulw-research/` | Claim-graph research orchestration: claims enter `claim-graph.md` as `verified-claims`; unsupported claims stay unresolved/refuted. |
@@ -15,7 +15,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 | `init-deep/` | Hierarchical AGENTS.md generation via a size-formula dag map-reduce (quick scanners -> high writers, ALWAYS-REDUCE); senpi-local override shadowing the shared-pool copy. |
 | `dag-library/` | Store a dag definition once and re-run it by name; loads through `plugin/runtime/dag/library.js`. |
 | `onboarding/` | First-run onboarding; `qa-validator.sh` pins the skill contract (front matter `name: onboarding`), `qa-savings-fixture.sh` expects `qa-savings-fixture: OK`. |
-| `give-me-tips/` | Explains any senpi tip in depth (`Tip:` lines incl. the Fable-5-refusal fallback tip and the kibitzer `Aha moment!` recall notice); queries `senpi --list-tips` first, checks what THIS user can see, verifies feature code before explaining. |
+| `give-me-tips/` | Explains any senpi tip in depth (`Tip:` lines incl. the Fable-5-refusal fallback tip and the kibitzer `Aha moment!` recall notice); queries the product's tip list first (`omo --list-tips` on OmO Native, `senpi --list-tips` on a plain senpi install), checks what THIS user can see, verifies feature code before explaining. |
 
 ## CONVENTIONS
 

@@ -1,1 +1,0 @@
-error: option '--platform <platform>' argument 'native-dev' is invalid. Allowed choices are opencode, codex, both, native.

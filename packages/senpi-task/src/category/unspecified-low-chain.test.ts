@@ -19,6 +19,7 @@ function registry(models: readonly FakeModel[]) {
 // With the whole chain available the winner proves chain ORDER, not mere availability: a registry
 // serving only one rung can never distinguish a correctly ordered chain from a mis-ordered one.
 const FULL_CHAIN_MODELS: readonly FakeModel[] = [
+  { provider: "anthropic", id: "claude-sonnet-5-5" },
   { provider: "xiaomi", id: "mimo-v2.6-pro" },
   { provider: "xai", id: "grok-4.7" },
   { provider: "chatgpt-subscription", id: "gpt-5.6-terra" },
@@ -28,8 +29,8 @@ const FULL_CHAIN_MODELS: readonly FakeModel[] = [
   { provider: "xiaomi", id: "mimo-v2.5-pro" },
 ]
 
-describe("unspecified-low chain order (#8652)", () => {
-  test("#given every rung of the chain is served at once #when unspecified-low resolves #then the mimo-v2.6-pro head rung wins", () => {
+describe("unspecified-low chain order", () => {
+  test("#given every rung of the chain is served at once #when unspecified-low resolves #then the claude-sonnet-5-5 medium head rung wins", () => {
     // given / when
     const result = resolveCategory("unspecified-low", {}, registry(FULL_CHAIN_MODELS))
 
@@ -37,15 +38,32 @@ describe("unspecified-low chain order (#8652)", () => {
     expect(result.kind).toBe("resolved")
     if (result.kind !== "resolved") throw new Error("Expected unspecified-low to resolve")
     expect(result.spec).toMatchObject({
-      provider: "xiaomi",
-      modelId: "mimo-v2.6-pro",
-      variant: "max",
+      provider: "anthropic",
+      modelId: "claude-sonnet-5-5",
+      variant: "medium",
     })
   })
 
-  test("#given the mimo head is absent but every later rung is served #when unspecified-low resolves #then the grok-4.7 xhigh rung wins", () => {
+  test("#given the sonnet-5-5 head is absent but every later rung is served #when unspecified-low resolves #then the mimo-v2.6-pro high rung wins", () => {
     // given
-    const models = FULL_CHAIN_MODELS.filter((model) => model.id !== "mimo-v2.6-pro")
+    const models = FULL_CHAIN_MODELS.filter((model) => model.id !== "claude-sonnet-5-5")
+
+    // when
+    const result = resolveCategory("unspecified-low", {}, registry(models))
+
+    // then
+    expect(result.kind).toBe("resolved")
+    if (result.kind !== "resolved") throw new Error("Expected unspecified-low to resolve")
+    expect(result.spec).toMatchObject({
+      provider: "xiaomi",
+      modelId: "mimo-v2.6-pro",
+      variant: "high",
+    })
+  })
+
+  test("#given the sonnet-5-5 and mimo-v2.6-pro rungs are absent but every later rung is served #when unspecified-low resolves #then the grok-4.7 xhigh rung wins", () => {
+    // given
+    const models = FULL_CHAIN_MODELS.filter((model) => model.id !== "claude-sonnet-5-5" && model.id !== "mimo-v2.6-pro")
 
     // when
     const result = resolveCategory("unspecified-low", {}, registry(models))

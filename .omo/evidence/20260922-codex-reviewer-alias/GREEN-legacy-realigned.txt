@@ -1,9 +1,0 @@
-
- RUN  v5.0.1 <repo>/packages/omo-codex/plugin/components/ulw-loop
-
-
- Test Files  2 passed (2)
-      Tests  52 passed (52)
-   Start at  14:53:37
-   Duration  798ms (tests 62%, transform 33%, import 5%, worker 1%)
-

@@ -6,6 +6,7 @@ import {
   resolveOmoTaskSettings,
   type OmoTaskSettings,
 } from "./task"
+import { OmoConfigSchema } from "./config"
 
 // 0 is the unbounded sentinel for the concurrency/residency caps: the engine already maps it to
 // Infinity (TaskConcurrency.getLimit) and to "admit every child" (residency admission), so the
@@ -73,8 +74,9 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
     expect(parsed.residency_max_children).toBe(0)
   })
 
-  test("#given parallelism 14 #when settings resolve without a residency override #then the bounded default resolves to 16", () => {
-    expect(resolveOmoTaskSettings({}, () => 14).residency_max_children).toBe(16)
+  test("#given any parallelism #when settings resolve without a residency override #then residency is unlimited", () => {
+    expect(resolveOmoTaskSettings({}, () => 14).residency_max_children).toBe("unlimited")
+    expect(resolveOmoTaskSettings({}, () => 2).residency_max_children).toBe("unlimited")
   })
 
   test("#given an explicit zero residency cap #when settings resolve #then the parallelism default never overrides it", () => {
@@ -141,6 +143,35 @@ describe("OmoTaskSettingsSchema resident idle timeout", () => {
     for (const value of [0, -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, "37", "unlimited", null]) {
       expect(OmoTaskSettingsSchema.safeParse({ resident_idle_timeout_ms: value }).success).toBe(false)
       expect(OmoTaskSettingsLayerSchema.safeParse({ resident_idle_timeout_ms: value }).success).toBe(false)
+    }
+  })
+})
+
+describe("OmoTaskSettingsSchema host shard prewarm", () => {
+  test("#given no prewarm override #when task settings parse #then the session's host warms on its first turn", () => {
+    expect(OmoTaskSettingsSchema.parse({}).host_shard_prewarm).toBe("first-turn")
+    expect(OmoTaskSettingsSchema.parse({ host_shard_prewarm: "off" }).host_shard_prewarm).toBe("off")
+    expect(OmoTaskSettingsLayerSchema.parse({})).not.toHaveProperty("host_shard_prewarm")
+  })
+
+  test("#given first-turn prewarm #when task settings parse #then the value is preserved", () => {
+    expect(OmoTaskSettingsSchema.parse({ host_shard_prewarm: "first-turn" }).host_shard_prewarm).toBe("first-turn")
+    expect(OmoTaskSettingsLayerSchema.parse({ host_shard_prewarm: "session-start" })).toEqual({
+      host_shard_prewarm: "session-start",
+    })
+  })
+
+  test("#given invalid prewarm or sharding keys #when task settings parse #then the dotted paths are rejected", () => {
+    const invalidPrewarm = OmoConfigSchema.safeParse({ task: { host_shard_prewarm: "always" } })
+    const invalidSharding = OmoConfigSchema.safeParse({ task: { host_sharding: "off" } })
+
+    expect(invalidPrewarm.success).toBe(false)
+    expect(invalidSharding.success).toBe(false)
+    if (!invalidPrewarm.success && !invalidSharding.success) {
+      expect(invalidPrewarm.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("host_shard_prewarm")
+      expect(invalidSharding.error.issues.map((issue) => `${issue.path.join(".")}:${issue.message}`).join(",")).toContain(
+        "host_sharding",
+      )
     }
   })
 })

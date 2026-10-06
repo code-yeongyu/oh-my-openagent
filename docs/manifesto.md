@@ -64,7 +64,7 @@ That's a worthwhile investment when it means 10x, 20x, or 100x productivity gain
 **However:**
 
 Unnecessary token waste is not pursued. The system optimizes for:
-- Using cheaper, faster models for simple tasks (the `quick` category: GPT-5.6 Luna Fast, then DeepSeek V4 Flash and the other speed rungs)
+- Using cheaper, faster models for simple tasks (the `quick` category: GPT-6 Luna Fast, then DeepSeek V4.1 Flash and the other speed rungs)
 - Avoiding redundant exploration
 - Caching learnings across sessions
 - Stopping research when sufficient context is gathered
