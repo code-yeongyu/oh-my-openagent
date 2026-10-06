@@ -261,6 +261,21 @@
       ],
       "overlapsWith": [],
       "orderNote": "Independent of 01-16. The second marker lives in packages/utils/src, which apply.mjs and verify.mjs search since this fix (ported to v2-int 2026-10-02). Upstream: issue #9448 and PR #9449."
+    },
+    {
+      "id": "18-runtime-fallback-recovery-arbitration",
+      "title": "runtime-fallback owns session.error recovery before the background manager finalizes the task",
+      "commit": "01b3b411ea80234dd268bd472e9a5d11ff302701",
+      "patch": "patches/18-runtime-fallback-recovery-arbitration.patch",
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/9683",
+      "why": "A subagent session whose first generation failed (ProviderModelNotFoundError) was retried by runtime-fallback inside the same session and completed hours of work while the caller's background task handle reported error and was treated as dead; two such invisible workers raced one repo (2026-10-06). The event dispatcher runs backgroundNotificationHook (which does not await manager.handleEvent) before runtimeFallback, and runtime-fallback awaits agent resolution before it sets sessionRetryInFlight / sessionAwaitingFallbackResult, so BackgroundManager.handleSessionErrorEvent finalized the task (or started its own replacement session) before there was any retry state to read. Retry prompts can reuse the original user message id, so message ids and retry markers cannot attribute an error to its generation. Each session.error now carries a claim keyed by the event object: the dispatcher opens it before any hook runs, runtime-fallback settles it retry-owned or declined, and the manager awaits it before tryFallbackRetry and terminal finalization. A retry that fails raises a new session.error with its own claim, so it still ends the task. No runtime-fallback hook means no claim and no wait; an unsettled claim resolves declined after 20s.",
+      "markers": [
+        "awaitRuntimeFallbackRecoveryDecision",
+        "openRuntimeFallbackRecoveryClaim",
+        "session.error recovered by runtime-fallback retry; keeping task running"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-17; id 15 remains the v2 compaction-event alias. Ported unchanged from v1 fix 18, source commit fca36ac472e728f4f1af7ac4f22bb3f8d402eb3b and ledger commit 91cc39ed0fa7b144cdb00398be15c202bcca0c95, onto integration/opencode-v2 at OMO 5.1.19 (2026-10-06). Patch bytes are unchanged; path is relative to local-fixes/ per v2-int convention. Touches manager.ts handleSessionErrorEvent, runtime-fallback/hook.ts, plugin/event-hook-dispatcher.ts and adds shared/runtime-fallback-recovery.ts. Upstream: issue #9682, PR #9683. Not covered: delegate-task sync polling (sync-session-turns.ts / sync-result-fetcher.ts) and the manager's own session.status retry path."
     }
   ],
   "externalFixes": [

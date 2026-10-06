@@ -1,0 +1,991 @@
+From fca36ac472e728f4f1af7ac4f22bb3f8d402eb3b Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Tue, 6 Oct 2026 22:34:56 +0300
+Subject: [PATCH] fix(background-agent): let runtime-fallback own session.error
+ recovery before the task is finalized
+
+A subagent session whose first generation failed (for example
+ProviderModelNotFoundError) can be retried by runtime-fallback inside the same
+session. The background manager runs before runtime-fallback in the event
+dispatcher and finalizes the task as error on a terminal session.error, so the
+caller's task handle reports a dead task while the retry generation keeps
+working unobserved. If the manager also has a fallback chain, it starts a
+replacement session, leaving two writers on the same work.
+
+Each session.error now carries a claim keyed by the event object: the
+dispatcher opens it before any hook runs, runtime-fallback settles it as
+retry-owned or declined once it has decided, and the manager awaits it before
+its own fallback or terminal finalization. Keying by event, not by session or
+message id, attributes an error to its own generation even when retry prompts
+reuse the original message id. A retry that later fails raises a new
+session.error with its own claim, so it can still end the task. Without a
+runtime-fallback hook no claim is opened and nothing waits; an unsettled claim
+resolves as declined after 20s.
+---
+ .../manager.runtime-fallback-recovery.test.ts | 284 ++++++++++++++++++
+ .../src/features/background-agent/manager.ts  |  21 ++
+ .../src/hooks/runtime-fallback/hook.ts        |  28 +-
+ .../runtime-fallback/recovery-claim.test.ts   | 193 ++++++++++++
+ ...ent-hook-dispatcher.recovery-claim.test.ts |  95 ++++++
+ .../src/plugin/event-hook-dispatcher.ts       |   6 +
+ .../shared/runtime-fallback-recovery.test.ts  | 120 ++++++++
+ .../src/shared/runtime-fallback-recovery.ts   |  96 ++++++
+ 8 files changed, 842 insertions(+), 1 deletion(-)
+ create mode 100644 packages/omo-opencode/src/features/background-agent/manager.runtime-fallback-recovery.test.ts
+ create mode 100644 packages/omo-opencode/src/hooks/runtime-fallback/recovery-claim.test.ts
+ create mode 100644 packages/omo-opencode/src/plugin/event-hook-dispatcher.recovery-claim.test.ts
+ create mode 100644 packages/omo-opencode/src/shared/runtime-fallback-recovery.test.ts
+ create mode 100644 packages/omo-opencode/src/shared/runtime-fallback-recovery.ts
+
+diff --git a/packages/omo-opencode/src/features/background-agent/manager.runtime-fallback-recovery.test.ts b/packages/omo-opencode/src/features/background-agent/manager.runtime-fallback-recovery.test.ts
+new file mode 100644
+index 000000000..271133898
+--- /dev/null
++++ b/packages/omo-opencode/src/features/background-agent/manager.runtime-fallback-recovery.test.ts
+@@ -0,0 +1,284 @@
++/// <reference types="bun-types" />
++
++import { afterEach, beforeEach, describe, expect, test } from "bun:test"
++import { tmpdir } from "node:os"
++import type { PluginInput } from "@opencode-ai/plugin"
++import {
++  _resetRuntimeFallbackRecoveryForTesting,
++  openRuntimeFallbackRecoveryClaim,
++  registerRuntimeFallbackRecoveryOwner,
++  settleRuntimeFallbackRecoveryClaim,
++} from "../../shared/runtime-fallback-recovery"
++import { BackgroundManager } from "./manager"
++import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
++import type { BackgroundTask } from "./types"
++
++type SessionMessage = { info: { role: string; error?: unknown }; parts: Array<{ type: string; text?: string }> }
++type SessionErrorEvent = { type: string; properties: { sessionID: string; error: { name: string; message: string } } }
++
++const SESSION_ID = "ses_recovery"
++const CONCURRENCY_KEY = "explore/anthropic"
++const ORIGINAL_ERROR = { name: "ProviderUnavailableError", message: "no provider available" }
++const RETRY_ERROR = { name: "ProviderUnavailableError", message: "no provider available for the retry generation" }
++
++const ERRORED_TURN: SessionMessage[] = [
++  { info: { role: "user" }, parts: [{ type: "text", text: "do the work" }] },
++  { info: { role: "assistant", error: { name: "ProviderModelNotFoundError" } }, parts: [] },
++]
++
++function createPluginContext(client: object): PluginInput {
++  const directory = tmpdir()
++  return {
++    project: { id: "test-project", worktree: directory, time: { created: Date.now() } },
++    directory,
++    worktree: directory,
++    serverUrl: new URL("http://localhost:4096"),
++    $: {} as PluginInput["$"],
++    client: client as PluginInput["client"],
++  }
++}
++
++function createHarness() {
++  const state: { status: string; messages: SessionMessage[] } = { status: "busy", messages: ERRORED_TURN }
++  const replacementCalls: string[] = []
++  const client = {
++    session: {
++      status: async () => ({ data: { [SESSION_ID]: { type: state.status } } }),
++      get: async () => ({ data: { id: SESSION_ID } }),
++      create: async () => {
++        replacementCalls.push("create")
++        return { data: { id: "ses_replacement" } }
++      },
++      prompt: async () => ({}),
++      promptAsync: async () => {
++        replacementCalls.push("promptAsync")
++        return {}
++      },
++      abort: async () => ({}),
++      todo: async () => ({ data: [] }),
++      messages: async () => ({ data: state.messages }),
++    },
++  }
++  const manager = new BackgroundManager({
++    pluginContext: createPluginContext(client),
++    config: undefined,
++    enableParentSessionNotifications: false,
++  })
++  const task: BackgroundTask = {
++    id: `bg_${SESSION_ID}`,
++    sessionId: SESSION_ID,
++    parentSessionId: "parent-session",
++    parentMessageId: "parent-msg",
++    description: "task whose first generation failed",
++    prompt: "do the work",
++    agent: "explore",
++    status: "running",
++    startedAt: new Date(),
++    progress: { toolCalls: 0, lastUpdate: new Date() },
++    concurrencyKey: CONCURRENCY_KEY,
++    fallbackChain: [{ providers: ["anthropic"], model: "claude-opus-4-7" }, { providers: ["anthropic"], model: "gpt-5.5" }],
++    attemptCount: 0,
++  }
++  manager["tasks"].set(task.id, task)
++  return { manager, task, state, replacementCalls }
++}
++
++function sessionError(error: { name: string; message: string }): SessionErrorEvent {
++  return { type: "session.error", properties: { sessionID: SESSION_ID, error } }
++}
++
++async function flush(): Promise<void> {
++  for (let index = 0; index < 5; index++) {
++    await new Promise((resolve) => setTimeout(resolve, 0))
++  }
++}
++
++/** Delivers the event the way the dispatcher does: the claim is open before the manager sees it. */
++function deliver(manager: BackgroundManager, event: SessionErrorEvent): void {
++  openRuntimeFallbackRecoveryClaim(event, SESSION_ID)
++  manager.handleEvent(event)
++}
++
++describe("BackgroundManager session.error arbitration with runtime-fallback", () => {
++  beforeEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++    registerRuntimeFallbackRecoveryOwner()
++  })
++
++  afterEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++    clearBackgroundTaskRegistryForTesting()
++  })
++
++  test("#given a retry accepted by runtime-fallback #when the original error is handled #then the task keeps running and keeps its slot", async () => {
++    // given
++    const { manager, task, replacementCalls } = createHarness()
++    await manager["concurrencyManager"].acquire(CONCURRENCY_KEY)
++    task.consecutiveErroredIdlePolls = 7
++    const event = sessionError(ORIGINAL_ERROR)
++
++    // when
++    deliver(manager, event)
++    await flush()
++    const runningWhileDecisionPending = task.status
++    settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
++    await flush()
++    const slotsHeld = manager["concurrencyManager"].getCount(CONCURRENCY_KEY)
++    const keyHeld = task.concurrencyKey
++    await manager.shutdown()
++
++    // then
++    expect(runningWhileDecisionPending).toBe("running")
++    expect(task.status).toBe("running")
++    expect(task.error).toBeUndefined()
++    expect(task.completedAt).toBeUndefined()
++    expect(keyHeld).toBe(CONCURRENCY_KEY)
++    expect(slotsHeld).toBe(1)
++    expect(task.consecutiveErroredIdlePolls).toBe(0)
++    expect(manager["notifications"].get(task.parentSessionId)).toBeUndefined()
++    expect(replacementCalls).toEqual([])
++  })
++
++  test("#given runtime-fallback owns recovery #when the manager has its own fallback chain #then no replacement session is started", async () => {
++    // given
++    const { manager, task } = createHarness()
++    const retriedByManager: string[] = []
++    manager["tryFallbackRetry"] = async () => {
++      retriedByManager.push(task.id)
++      return true
++    }
++    const event = sessionError({ name: "APIError", message: "Rate limit reached for requests" })
++
++    // when
++    deliver(manager, event)
++    settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
++    await flush()
++    await manager.shutdown()
++
++    // then
++    expect(retriedByManager).toEqual([])
++    expect(task.status).toBe("running")
++  })
++
++  test("#given runtime-fallback declines #when the error is handled #then the task ends in error as before", async () => {
++    // given
++    const { manager, task } = createHarness()
++    await manager["concurrencyManager"].acquire(CONCURRENCY_KEY)
++    const event = sessionError(ORIGINAL_ERROR)
++
++    // when
++    deliver(manager, event)
++    await flush()
++    const statusWhileDecisionPending = task.status
++    settleRuntimeFallbackRecoveryClaim(event, "declined")
++    await flush()
++    const slotsHeld = manager["concurrencyManager"].getCount(CONCURRENCY_KEY)
++    await manager.shutdown()
++
++    // then
++    expect(statusWhileDecisionPending).toBe("running")
++    expect(task.status).toBe("error")
++    expect(task.error).toContain("no provider available")
++    expect(task.concurrencyKey).toBeUndefined()
++    expect(slotsHeld).toBe(0)
++  })
++
++  test("#given no claim was opened for the error #when it is handled #then the task ends in error without waiting", async () => {
++    // given
++    const { manager, task } = createHarness()
++    const event = sessionError(ORIGINAL_ERROR)
++
++    // when
++    manager.handleEvent(event)
++    await flush()
++    await manager.shutdown()
++
++    // then
++    expect(task.status).toBe("error")
++    expect(task.error).toContain("no provider available")
++  })
++
++  test("#given an accepted retry #when its generation completes #then the task completes with the retry's output", async () => {
++    // given
++    const { manager, task, state } = createHarness()
++    const event = sessionError(ORIGINAL_ERROR)
++    deliver(manager, event)
++    settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
++    await flush()
++    await manager["pollRunningTasks"]()
++    const statusWhileRetryRuns = task.status
++
++    // when
++    state.status = "idle"
++    state.messages = [
++      ...ERRORED_TURN,
++      { info: { role: "assistant" }, parts: [{ type: "text", text: "finished on the fallback model" }] },
++    ]
++    await manager["pollRunningTasks"]()
++    await manager.shutdown()
++
++    // then
++    expect(statusWhileRetryRuns).toBe("running")
++    expect(task.status).toBe("completed")
++    expect(task.error).toBeUndefined()
++  })
++
++  test("#given an accepted retry #when the retry generation fails and runtime-fallback declines #then the retry's error ends the task", async () => {
++    // given
++    const { manager, task } = createHarness()
++    const originalError = sessionError(ORIGINAL_ERROR)
++    deliver(manager, originalError)
++    settleRuntimeFallbackRecoveryClaim(originalError, "retry-owned")
++    await flush()
++    const statusAfterRetryAccepted = task.status
++    const retryError = sessionError(RETRY_ERROR)
++
++    // when
++    deliver(manager, retryError)
++    settleRuntimeFallbackRecoveryClaim(retryError, "declined")
++    await flush()
++    await manager.shutdown()
++
++    // then
++    expect(statusAfterRetryAccepted).toBe("running")
++    expect(task.status).toBe("error")
++    expect(task.error).toContain("for the retry generation")
++  })
++
++  test("#given a stale error from the superseded generation #when the retry is already live #then the stale error cannot end the task", async () => {
++    // given
++    const { manager, task } = createHarness()
++    const staleError = sessionError(ORIGINAL_ERROR)
++    const retryError = sessionError(RETRY_ERROR)
++    deliver(manager, staleError)
++    deliver(manager, retryError)
++
++    // when
++    settleRuntimeFallbackRecoveryClaim(retryError, "retry-owned")
++    settleRuntimeFallbackRecoveryClaim(staleError, "retry-owned")
++    await flush()
++    await manager.shutdown()
++
++    // then
++    expect(task.status).toBe("running")
++    expect(task.error).toBeUndefined()
++  })
++
++  test("#given the task is cancelled while the decision is pending #when runtime-fallback declines #then the cancelled task is not finalized as an error", async () => {
++    // given
++    const { manager, task } = createHarness()
++    const event = sessionError(ORIGINAL_ERROR)
++    deliver(manager, event)
++    await flush()
++
++    // when
++    task.status = "cancelled"
++    settleRuntimeFallbackRecoveryClaim(event, "declined")
++    await flush()
++    await manager.shutdown()
++
++    // then
++    expect(task.status).toBe("cancelled")
++    expect(task.error).toBeUndefined()
++  })
++})
+diff --git a/packages/omo-opencode/src/features/background-agent/manager.ts b/packages/omo-opencode/src/features/background-agent/manager.ts
+index c6d6c3fd4..99d5c750f 100644
+--- a/packages/omo-opencode/src/features/background-agent/manager.ts
++++ b/packages/omo-opencode/src/features/background-agent/manager.ts
+@@ -29,6 +29,7 @@ import {
+   hasMoreFallbacks,
+   shouldRetryError,
+ } from "../../shared/model-error-classifier"
++import { awaitRuntimeFallbackRecoveryDecision } from "../../shared/runtime-fallback-recovery"
+ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+ import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
+ import { setSessionTools } from "../../shared/session-tools-store"
+@@ -1906,6 +1907,7 @@ The fallback retry session is now created and can be inspected directly.
+ 
+       const errorInfo = { name: errorName, message: errorMessage }
+       void this.handleSessionErrorEvent({
++        event,
+         errorInfo,
+         errorMessage,
+         errorName,
+@@ -2090,6 +2092,7 @@ The fallback retry session is now created and can be inspected directly.
+   }
+ 
+   private async handleSessionErrorEvent(args: {
++    event: Event
+     task: BackgroundTask
+     errorInfo: { name?: string; message?: string; statusCode?: number }
+     errorName: string | undefined
+@@ -2117,6 +2120,24 @@ The fallback retry session is now created and can be inspected directly.
+       return
+     }
+ 
++    // runtime-fallback retries inside this session, so a replacement session or a terminal error here
++    // would leave its generation running unobserved. It decides first; only a declined recovery falls through.
++    const runtimeFallbackDecision = awaitRuntimeFallbackRecoveryDecision(args.event)
++    if (runtimeFallbackDecision) {
++      const decision = await runtimeFallbackDecision
++      if (task.status !== "running") return
++      if (decision === "retry-owned") {
++        task.consecutiveErroredIdlePolls = 0
++        log("[background-agent] session.error recovered by runtime-fallback retry; keeping task running:", {
++          taskId: task.id,
++          sessionID: task.sessionId,
++          errorName,
++          errorMessage: errorMessage?.slice(0, 200),
++        })
++        return
++      }
++    }
++
+     if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {
+       return
+     }
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts b/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+index ae0b99afb..8d923ef37 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+@@ -4,6 +4,11 @@ import { DEFAULT_CONFIG } from "./constants"
+ import { createEventHandler } from "./event-handler"
+ import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
+ import { createMessageUpdateHandler } from "./message-update-handler"
++import { resolveSessionEventID } from "../../shared/event-session-id"
++import {
++  registerRuntimeFallbackRecoveryOwner,
++  settleRuntimeFallbackRecoveryClaim,
++} from "../../shared/runtime-fallback-recovery"
+ import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
+ 
+ declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
+@@ -79,7 +84,16 @@ export function createRuntimeFallbackHook(
+     }
+   }
+ 
+-  const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
++  const releaseRecoveryOwner = registerRuntimeFallbackRecoveryOwner()
++
++  // A session.error is recovered here when a retry dispatch is pending or awaiting its result. That covers
++  // an accepted retry and an error from a superseded generation that arrives while one is live; an error
++  // from the retry itself clears both sets before it is declined.
++  const ownsRecovery = (sessionID: string | undefined): boolean =>
++    sessionID !== undefined
++    && (deps.sessionRetryInFlight.has(sessionID) || deps.sessionAwaitingFallbackResult.has(sessionID))
++
++  const handleEvent = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+     ensureInterval()
+ 
+     if (config.enabled) {
+@@ -95,7 +109,19 @@ export function createRuntimeFallbackHook(
+     await baseEventHandler({ event })
+   }
+ 
++  const eventHandler = async (input: { event: { type: string; properties?: unknown } }) => {
++    try {
++      await handleEvent(input)
++    } finally {
++      if (input.event.type === "session.error") {
++        const sessionID = resolveSessionEventID(input.event.properties as Record<string, unknown> | undefined)
++        settleRuntimeFallbackRecoveryClaim(input.event, ownsRecovery(sessionID) ? "retry-owned" : "declined")
++      }
++    }
++  }
++
+   const dispose = () => {
++    releaseRecoveryOwner()
+     if (cleanupInterval) {
+       clearInterval(cleanupInterval)
+     }
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/recovery-claim.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/recovery-claim.test.ts
+new file mode 100644
+index 000000000..46a962848
+--- /dev/null
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/recovery-claim.test.ts
+@@ -0,0 +1,193 @@
++import { afterEach, beforeEach, describe, expect, test } from "bun:test"
++import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
++import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
++import { _resetForTesting as resetClaudeCodeSessionState } from "../../features/claude-code-session-state"
++import {
++  _resetRuntimeFallbackRecoveryForTesting,
++  awaitRuntimeFallbackRecoveryDecision,
++  openRuntimeFallbackRecoveryClaim,
++} from "../../shared/runtime-fallback-recovery"
++import { SessionCategoryRegistry } from "../../shared/session-category-registry"
++import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
++import { createRuntimeFallbackHook } from "./hook"
++import type { RuntimeFallbackPluginInput } from "./types"
++
++function createConfig(overrides?: Partial<RuntimeFallbackConfig>): RuntimeFallbackConfig {
++  return {
++    enabled: true,
++    retry_on_errors: [429, 503, 529],
++    max_fallback_attempts: 3,
++    cooldown_seconds: 60,
++    notify_on_fallback: false,
++    restore_primary_after_cooldown: false,
++    ...overrides,
++  }
++}
++
++function createPluginConfig(fallbackModels: string[]): OhMyOpenCodeConfig {
++  return {
++    git_master: { commit_footer: true, include_co_authored_by: true, git_env_prefix: "GIT_MASTER=1" },
++    categories: { test: { fallback_models: fallbackModels } },
++  }
++}
++
++function createPluginInput(promptCalls: unknown[]): RuntimeFallbackPluginInput {
++  return unsafeTestValue<RuntimeFallbackPluginInput>({
++    client: {
++      tui: { showToast: async () => ({}) },
++      session: {
++        messages: async () => ({ data: [{ info: { role: "user", id: "msg_original" }, parts: [{ type: "text", text: "do the work" }] }] }),
++        promptAsync: async (args: unknown) => {
++          promptCalls.push(args)
++          return {}
++        },
++        abort: async () => ({}),
++      },
++    },
++    directory: "/test/dir",
++  })
++}
++
++type SessionErrorEvent = { type: string; properties: Record<string, unknown> }
++
++function sessionError(sessionID: string, model: string): SessionErrorEvent {
++  return {
++    type: "session.error",
++    properties: { sessionID, model, error: { statusCode: 429, message: "Rate limit" } },
++  }
++}
++
++describe("runtime-fallback recovery claim", () => {
++  beforeEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++    SessionCategoryRegistry.clear()
++    resetClaudeCodeSessionState()
++    releaseAllPromptAsyncReservationsForTesting()
++  })
++
++  afterEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++    SessionCategoryRegistry.clear()
++    resetClaudeCodeSessionState()
++    releaseAllPromptAsyncReservationsForTesting()
++  })
++
++  async function startSession(hook: ReturnType<typeof createRuntimeFallbackHook>, sessionID: string, model: string) {
++    SessionCategoryRegistry.register(sessionID, "test")
++    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model } } } })
++  }
++
++  async function deliver(
++    hook: ReturnType<typeof createRuntimeFallbackHook>,
++    event: SessionErrorEvent,
++  ) {
++    openRuntimeFallbackRecoveryClaim(event, String(event.properties.sessionID))
++    const decision = awaitRuntimeFallbackRecoveryDecision(event)
++    await hook.event({ event })
++    return decision
++  }
++
++  test("claims recovery when a fallback retry is accepted into the same session", async () => {
++    // given
++    const promptCalls: unknown[] = []
++    const hook = createRuntimeFallbackHook(createPluginInput(promptCalls), {
++      config: createConfig(),
++      pluginConfig: createPluginConfig(["openai/gpt-5.4"]),
++    })
++    await startSession(hook, "ses_claim_accepted", "google/gemini-2.5-pro")
++
++    // when
++    const decision = await deliver(hook, sessionError("ses_claim_accepted", "google/gemini-2.5-pro"))
++
++    // then
++    expect(promptCalls).toHaveLength(1)
++    expect(decision).toBe("retry-owned")
++    hook.dispose?.()
++  })
++
++  test("declines when no fallback model is configured", async () => {
++    // given
++    const promptCalls: unknown[] = []
++    const hook = createRuntimeFallbackHook(createPluginInput(promptCalls), {
++      config: createConfig(),
++      pluginConfig: createPluginConfig([]),
++    })
++    await startSession(hook, "ses_claim_no_models", "google/gemini-2.5-pro")
++
++    // when
++    const decision = await deliver(hook, sessionError("ses_claim_no_models", "google/gemini-2.5-pro"))
++
++    // then
++    expect(promptCalls).toHaveLength(0)
++    expect(decision).toBe("declined")
++    hook.dispose?.()
++  })
++
++  test("declines when the hook is disabled", async () => {
++    // given
++    const promptCalls: unknown[] = []
++    const hook = createRuntimeFallbackHook(createPluginInput(promptCalls), {
++      config: createConfig({ enabled: false }),
++      pluginConfig: createPluginConfig(["openai/gpt-5.4"]),
++    })
++
++    // when
++    const decision = await deliver(hook, sessionError("ses_claim_disabled", "google/gemini-2.5-pro"))
++
++    // then
++    expect(promptCalls).toHaveLength(0)
++    expect(decision).toBe("declined")
++    hook.dispose?.()
++  })
++
++  test("keeps a stale error from the superseded generation under the live retry", async () => {
++    // given
++    const promptCalls: unknown[] = []
++    const hook = createRuntimeFallbackHook(createPluginInput(promptCalls), {
++      config: createConfig(),
++      pluginConfig: createPluginConfig(["openai/gpt-5.4"]),
++    })
++    await startSession(hook, "ses_claim_stale", "google/gemini-2.5-pro")
++    await deliver(hook, sessionError("ses_claim_stale", "google/gemini-2.5-pro"))
++
++    // when
++    const staleDecision = await deliver(hook, sessionError("ses_claim_stale", "google/gemini-2.5-pro"))
++
++    // then
++    expect(promptCalls).toHaveLength(1)
++    expect(staleDecision).toBe("retry-owned")
++    hook.dispose?.()
++  })
++
++  test("declines when the retry generation itself fails and no fallback remains", async () => {
++    // given
++    const promptCalls: unknown[] = []
++    const hook = createRuntimeFallbackHook(createPluginInput(promptCalls), {
++      config: createConfig(),
++      pluginConfig: createPluginConfig(["openai/gpt-5.4"]),
++    })
++    await startSession(hook, "ses_claim_retry_failed", "google/gemini-2.5-pro")
++    const firstDecision = await deliver(hook, sessionError("ses_claim_retry_failed", "google/gemini-2.5-pro"))
++
++    // when
++    const retryFailureDecision = await deliver(hook, sessionError("ses_claim_retry_failed", "openai/gpt-5.4"))
++
++    // then
++    expect(firstDecision).toBe("retry-owned")
++    expect(retryFailureDecision).toBe("declined")
++    hook.dispose?.()
++  })
++
++  test("stops claiming recovery after the hook is disposed", async () => {
++    // given
++    const hook = createRuntimeFallbackHook(createPluginInput([]), { config: createConfig() })
++    hook.dispose?.()
++    const event = sessionError("ses_claim_disposed", "google/gemini-2.5-pro")
++
++    // when
++    openRuntimeFallbackRecoveryClaim(event, "ses_claim_disposed")
++
++    // then
++    expect(awaitRuntimeFallbackRecoveryDecision(event)).toBeUndefined()
++  })
++})
+diff --git a/packages/omo-opencode/src/plugin/event-hook-dispatcher.recovery-claim.test.ts b/packages/omo-opencode/src/plugin/event-hook-dispatcher.recovery-claim.test.ts
+new file mode 100644
+index 000000000..7ca798a68
+--- /dev/null
++++ b/packages/omo-opencode/src/plugin/event-hook-dispatcher.recovery-claim.test.ts
+@@ -0,0 +1,95 @@
++import { afterEach, beforeEach, describe, expect, test } from "bun:test"
++import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
++import {
++  _resetRuntimeFallbackRecoveryForTesting,
++  awaitRuntimeFallbackRecoveryDecision,
++  registerRuntimeFallbackRecoveryOwner,
++  settleRuntimeFallbackRecoveryClaim,
++} from "../shared/runtime-fallback-recovery"
++import { createEventHookDispatcher, createEventHookRunner } from "./event-hook-dispatcher"
++
++type Dispatcher = Parameters<typeof createEventHookDispatcher>[0]
++
++describe("event hook dispatcher recovery claim", () => {
++  beforeEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++  })
++
++  afterEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++  })
++
++  test("opens the claim before the background manager sees the error and before runtime-fallback runs", async () => {
++    // given
++    registerRuntimeFallbackRecoveryOwner()
++    const order: string[] = []
++    let managerDecision: ReturnType<typeof awaitRuntimeFallbackRecoveryDecision>
++    const dispatch = createEventHookDispatcher(
++      unsafeTestValue<Dispatcher>({
++        backgroundNotificationHook: {
++          event: ({ event }: { event: object }) => {
++            managerDecision = awaitRuntimeFallbackRecoveryDecision(event)
++            order.push(`background-notification:claim=${managerDecision ? "open" : "none"}`)
++          },
++        },
++        runtimeFallback: {
++          event: async ({ event }: { event: object }) => {
++            order.push("runtime-fallback")
++            settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
++          },
++        },
++      }),
++      createEventHookRunner(),
++    )
++
++    // when
++    await dispatch({ event: { type: "session.error", properties: { sessionID: "ses_dispatch_1" } } })
++
++    // then
++    expect(order).toEqual(["background-notification:claim=open", "runtime-fallback"])
++    expect(await managerDecision).toBe("retry-owned")
++  })
++
++  test("opens no claim for events other than session.error", async () => {
++    // given
++    registerRuntimeFallbackRecoveryOwner()
++    let managerDecision: ReturnType<typeof awaitRuntimeFallbackRecoveryDecision> = Promise.resolve("declined")
++    const dispatch = createEventHookDispatcher(
++      unsafeTestValue<Dispatcher>({
++        backgroundNotificationHook: {
++          event: ({ event }: { event: object }) => {
++            managerDecision = awaitRuntimeFallbackRecoveryDecision(event)
++          },
++        },
++      }),
++      createEventHookRunner(),
++    )
++
++    // when
++    await dispatch({ event: { type: "session.idle", properties: { sessionID: "ses_dispatch_2" } } })
++
++    // then
++    expect(managerDecision).toBeUndefined()
++  })
++
++  test("opens no claim when runtime-fallback is not running", async () => {
++    // given
++    let managerDecision: ReturnType<typeof awaitRuntimeFallbackRecoveryDecision> = Promise.resolve("declined")
++    const dispatch = createEventHookDispatcher(
++      unsafeTestValue<Dispatcher>({
++        backgroundNotificationHook: {
++          event: ({ event }: { event: object }) => {
++            managerDecision = awaitRuntimeFallbackRecoveryDecision(event)
++          },
++        },
++      }),
++      createEventHookRunner(),
++    )
++
++    // when
++    await dispatch({ event: { type: "session.error", properties: { sessionID: "ses_dispatch_3" } } })
++
++    // then
++    expect(managerDecision).toBeUndefined()
++  })
++})
+diff --git a/packages/omo-opencode/src/plugin/event-hook-dispatcher.ts b/packages/omo-opencode/src/plugin/event-hook-dispatcher.ts
+index 6f168887f..34ed7a4e6 100644
+--- a/packages/omo-opencode/src/plugin/event-hook-dispatcher.ts
++++ b/packages/omo-opencode/src/plugin/event-hook-dispatcher.ts
+@@ -1,6 +1,7 @@
+ import type { CreatedHooks } from "../create-hooks";
+ import { log } from "../shared/logger";
+ import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id";
++import { openRuntimeFallbackRecoveryClaim } from "../shared/runtime-fallback-recovery";
+ import { isRecord } from "./event-error-utils";
+ import type { EventInput, EventHookRunner } from "./event-types";
+ 
+@@ -36,6 +37,11 @@ export function createEventHookRunner(): EventHookRunner {
+ 
+ export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafely: EventHookRunner) {
+   return async (input: EventInput): Promise<void> => {
++    if (input.event.type === "session.error") {
++      // Runtime-fallback runs after the background manager, so the claim must exist before any hook sees the error.
++      const sessionID = getEventSessionID(input);
++      if (sessionID) openRuntimeFallbackRecoveryClaim(input.event, sessionID);
++    }
+     await runEventHookSafely("autoUpdateChecker", hooks.autoUpdateChecker?.event, input);
+     await runEventHookSafely("astGrepSgProvision", hooks.astGrepSgProvision?.event, input);
+     await runEventHookSafely("legacyPluginToast", hooks.legacyPluginToast?.event, input);
+diff --git a/packages/omo-opencode/src/shared/runtime-fallback-recovery.test.ts b/packages/omo-opencode/src/shared/runtime-fallback-recovery.test.ts
+new file mode 100644
+index 000000000..def6f8c4f
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/runtime-fallback-recovery.test.ts
+@@ -0,0 +1,120 @@
++import { afterEach, beforeEach, describe, expect, test } from "bun:test"
++import {
++  _resetRuntimeFallbackRecoveryForTesting,
++  awaitRuntimeFallbackRecoveryDecision,
++  openRuntimeFallbackRecoveryClaim,
++  registerRuntimeFallbackRecoveryOwner,
++  settleRuntimeFallbackRecoveryClaim,
++} from "./runtime-fallback-recovery"
++
++describe("runtime-fallback recovery claims", () => {
++  beforeEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++  })
++
++  afterEach(() => {
++    _resetRuntimeFallbackRecoveryForTesting()
++  })
++
++  test("opens no claim while no runtime-fallback owner is registered", () => {
++    // given
++    const event = { type: "session.error" }
++
++    // when
++    openRuntimeFallbackRecoveryClaim(event, "ses_1")
++
++    // then
++    expect(awaitRuntimeFallbackRecoveryDecision(event)).toBeUndefined()
++  })
++
++  test("holds the waiter until the owner settles, then resolves with its decision", async () => {
++    // given
++    registerRuntimeFallbackRecoveryOwner()
++    const event = { type: "session.error" }
++    openRuntimeFallbackRecoveryClaim(event, "ses_1")
++    let resolved: string | undefined
++
++    // when
++    const pending = awaitRuntimeFallbackRecoveryDecision(event)
++    pending?.then((decision) => { resolved = decision })
++    await Promise.resolve()
++    const resolvedBeforeSettle = resolved
++    settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
++
++    // then
++    expect(resolvedBeforeSettle).toBeUndefined()
++    expect(await pending).toBe("retry-owned")
++  })
++
++  test("returns the decision immediately when it was settled before the waiter arrived", async () => {
++    // given
++    registerRuntimeFallbackRecoveryOwner()
++    const event = { type: "session.error" }
++    openRuntimeFallbackRecoveryClaim(event, "ses_1")
++    settleRuntimeFallbackRecoveryClaim(event, "declined")
++
++    // when
++    const decision = await awaitRuntimeFallbackRecoveryDecision(event)
++
++    // then
++    expect(decision).toBe("declined")
++  })
++
++  test("keeps claims for two errors on the same session independent", async () => {
++    // given
++    registerRuntimeFallbackRecoveryOwner()
++    const staleError = { type: "session.error" }
++    const retryError = { type: "session.error" }
++    openRuntimeFallbackRecoveryClaim(staleError, "ses_1")
++    openRuntimeFallbackRecoveryClaim(retryError, "ses_1")
++
++    // when
++    settleRuntimeFallbackRecoveryClaim(staleError, "retry-owned")
++    settleRuntimeFallbackRecoveryClaim(retryError, "declined")
++
++    // then
++    expect(await awaitRuntimeFallbackRecoveryDecision(staleError)).toBe("retry-owned")
++    expect(await awaitRuntimeFallbackRecoveryDecision(retryError)).toBe("declined")
++  })
++
++  test("keeps the first decision when a claim is settled twice", async () => {
++    // given
++    registerRuntimeFallbackRecoveryOwner()
++    const event = { type: "session.error" }
++    openRuntimeFallbackRecoveryClaim(event, "ses_1")
++
++    // when
++    settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
++    settleRuntimeFallbackRecoveryClaim(event, "declined")
++
++    // then
++    expect(await awaitRuntimeFallbackRecoveryDecision(event)).toBe("retry-owned")
++  })
++
++  test("resolves as declined when the owner never settles", async () => {
++    // given
++    registerRuntimeFallbackRecoveryOwner()
++    const event = { type: "session.error" }
++    openRuntimeFallbackRecoveryClaim(event, "ses_1")
++
++    // when
++    const decision = await awaitRuntimeFallbackRecoveryDecision(event, 10)
++
++    // then
++    expect(decision).toBe("declined")
++  })
++
++  test("stops opening claims once the last owner is released", () => {
++    // given
++    const release = registerRuntimeFallbackRecoveryOwner()
++    release()
++    release()
++    const event = { type: "session.error" }
++
++    // when
++    openRuntimeFallbackRecoveryClaim(event, "ses_1")
++
++    // then
++    expect(awaitRuntimeFallbackRecoveryDecision(event)).toBeUndefined()
++  })
++})
+diff --git a/packages/omo-opencode/src/shared/runtime-fallback-recovery.ts b/packages/omo-opencode/src/shared/runtime-fallback-recovery.ts
+new file mode 100644
+index 000000000..c3b80e079
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/runtime-fallback-recovery.ts
+@@ -0,0 +1,96 @@
++import { log } from "./logger"
++
++/**
++ * Arbitration between the runtime-fallback hook (same-session retry) and the
++ * background manager (terminal error finalization) for one `session.error` event.
++ *
++ * The event dispatcher runs the background manager before runtime-fallback, and
++ * runtime-fallback resolves its agent asynchronously before it decides anything,
++ * so the manager cannot read runtime-fallback's state at the moment the error
++ * arrives. Each `session.error` event therefore carries a claim: the dispatcher
++ * opens it before any hook runs, runtime-fallback settles it once it has decided,
++ * and the manager awaits it before finalizing the task.
++ *
++ * Claims are keyed by the event object, not by session or message id. Retry
++ * prompts can reuse the original user message id, so neither a session id nor a
++ * marker on a message can tell a stale error from the failure of the retry; the
++ * event itself is the only identity that stays attached to one error.
++ */
++export type RuntimeFallbackRecoveryDecision = "retry-owned" | "declined"
++
++export const RUNTIME_FALLBACK_RECOVERY_DECISION_TIMEOUT_MS = 20_000
++
++type RecoveryClaim = {
++  readonly sessionID: string
++  decision: RuntimeFallbackRecoveryDecision | undefined
++  readonly waiters: Array<(decision: RuntimeFallbackRecoveryDecision) => void>
++}
++
++const recoveryClaims = new WeakMap<object, RecoveryClaim>()
++let registeredOwners = 0
++
++/** Called by the runtime-fallback hook for its lifetime. Without an owner no claim is ever opened. */
++export function registerRuntimeFallbackRecoveryOwner(): () => void {
++  registeredOwners += 1
++  let released = false
++  return () => {
++    if (released) return
++    released = true
++    registeredOwners = Math.max(0, registeredOwners - 1)
++  }
++}
++
++/** Called by the event dispatcher before any hook sees the event. */
++export function openRuntimeFallbackRecoveryClaim(event: object, sessionID: string): void {
++  if (registeredOwners === 0 || recoveryClaims.has(event)) return
++  recoveryClaims.set(event, { sessionID, decision: undefined, waiters: [] })
++}
++
++/** Called by the runtime-fallback hook once it has finished handling the event. */
++export function settleRuntimeFallbackRecoveryClaim(
++  event: object,
++  decision: RuntimeFallbackRecoveryDecision,
++): void {
++  const claim = recoveryClaims.get(event)
++  if (!claim || claim.decision !== undefined) return
++  claim.decision = decision
++  for (const resolve of claim.waiters.splice(0)) {
++    resolve(decision)
++  }
++}
++
++/**
++ * Called by consumers that would otherwise terminalize on the event. Returns
++ * undefined when no claim was opened for it, so callers pay no extra await in
++ * that case. A claim that is never settled resolves as `declined` after the
++ * timeout, which is the behavior from before arbitration existed.
++ */
++export function awaitRuntimeFallbackRecoveryDecision(
++  event: object,
++  timeoutMs: number = RUNTIME_FALLBACK_RECOVERY_DECISION_TIMEOUT_MS,
++): Promise<RuntimeFallbackRecoveryDecision> | undefined {
++  const claim = recoveryClaims.get(event)
++  if (!claim) return undefined
++  if (claim.decision !== undefined) return Promise.resolve(claim.decision)
++
++  return new Promise((resolve) => {
++    const onDecision = (decision: RuntimeFallbackRecoveryDecision) => {
++      clearTimeout(timer)
++      resolve(decision)
++    }
++    const timer = setTimeout(() => {
++      const index = claim.waiters.indexOf(onDecision)
++      if (index >= 0) claim.waiters.splice(index, 1)
++      log("[runtime-fallback-recovery] Recovery decision timed out; treating as declined", {
++        sessionID: claim.sessionID,
++        timeoutMs,
++      })
++      resolve("declined")
++    }, timeoutMs)
++    claim.waiters.push(onDecision)
++  })
++}
++
++export function _resetRuntimeFallbackRecoveryForTesting(): void {
++  registeredOwners = 0
++}
+-- 
+2.55.0.windows.3
+
