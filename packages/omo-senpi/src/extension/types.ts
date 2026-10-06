@@ -99,7 +99,10 @@ export interface SenpiExtensionAPI {
   /** Dialogs every client attached to the session may answer (senpi#6204); absent on older engines. */
   readonly sessionDialog?: DialogUi
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  sendUserMessage(
+    content: string | readonly Record<string, unknown>[],
+    options?: { deliverAs?: "steer" | "followUp"; expandPromptTemplates?: boolean },
+  ): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
   getCommands?(): readonly {
     readonly name: string
