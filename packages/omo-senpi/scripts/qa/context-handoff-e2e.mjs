@@ -11,7 +11,7 @@
 import assert from "node:assert/strict"
 import { spawn, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, watch, writeFileSync } from "node:fs"
+import { appendFileSync, constants, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, watch, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, relative, resolve } from "node:path"
 import { createInterface } from "node:readline"
@@ -40,6 +40,16 @@ const TIMEOUT = 60_000
 // The live Mac agent's installed runtimes contain 43k files / 1.13GB.
 // These finite budgets include them rather than silently omitting installations.
 const HOME_LIMITS = { maxFiles: 100000, maxEntries: 200000, maxBytes: 2 * 1024 ** 3 }
+
+function createSeededSandbox() {
+  const sandbox = createSandbox()
+  // The shared seeder invokes POSIX mkdir -p, which is unavailable on native Windows.
+  for (const path of [sandbox.cwd, sandbox.agentDir, sandbox.homeDir,
+    sandbox.xdgConfigHome, sandbox.xdgDataHome, sandbox.xdgCacheHome])
+    mkdirSync(path, { recursive: true })
+  seedSandbox(sandbox)
+  return sandbox
+}
 
 function parseArgs(argv) {
   const options = { selfTest: false, evidenceDir: undefined }
@@ -157,7 +167,7 @@ function launch(command, sandbox, env, evidence) {
     for (const waiter of waiters) waiter.finish(error)
   }
   child.once("error", fail)
-  const exited = new Promise((done) => child.once("exit", (code, signal) => {
+  const exited = new Promise((done) => child.once("close", (code, signal) => {
     fail(new Error(`Senpi exited: code=${code}, signal=${signal}`))
     done({ code, signal })
   }))
@@ -229,17 +239,29 @@ function installObserver(sandbox) {
   return trace
 }
 
-async function stop(session) {
+async function stop(session, ownedPids = new Set([session.child.pid])) {
   const { child } = session
   if (child.exitCode !== null || child.signalCode !== null) return await session.exited
   // Kill the owned tree, not only its leader. Await the exit event with a deadline.
-  const exit = deadline(session.exited, 10000, "process-tree exit")
+  const exit = deadline(session.exited, TIMEOUT, "process-tree exit")
   if (process.platform === "win32") {
-    const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" })
-    await deadline(new Promise((done, reject) => {
+    // Observe both promises immediately: waiting for taskkill first can leave an
+    // earlier exit timeout unhandled while native Windows is still terminating.
+    const [result, killCode] = await Promise.all([exit, deadline(new Promise((done, reject) => {
+      const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" })
       killer.once("error", reject)
-      killer.once("exit", (code) => code === 0 ? done() : reject(new Error(`taskkill exit ${code}`)))
-    }), 10000, "taskkill")
+      killer.once("exit", done)
+    }), TIMEOUT, "taskkill")])
+    // taskkill can report 128 when a descendant exits during its tree walk.
+    // Certify termination from actual PID liveness, not the utility's exit alone.
+    const inventory = spawnSync("powershell", ["-NoProfile", "-Command",
+      "Get-CimInstance Win32_Process | Select-Object -ExpandProperty ProcessId | ConvertTo-Json -Compress"],
+      { encoding: "utf8", timeout: TIMEOUT })
+    if (inventory.status !== 0) throw new Error(`termination inventory failed: ${inventory.error ?? inventory.stderr}`)
+    const live = new Set([JSON.parse(inventory.stdout)].flat())
+    const remainingPids = [...ownedPids].filter(pid => pid !== process.pid && live.has(pid))
+    if (remainingPids.length > 0) throw new Error(`taskkill exit ${killCode}; owned processes still alive: ${remainingPids.join(",")}`)
+    return { ...result, taskkillExitCode: killCode, remainingPids }
   } else {
     process.kill(-child.pid, "SIGKILL")
   }
@@ -294,9 +316,18 @@ function observeHome(path) {
   return process.platform === "win32" ? portableObservation(path) : snapshotDirectory(path, HOME_LIMITS)
 }
 
+function protectedHome(path) {
+  // Windows has no O_NOFOLLOW. The shared reader still rejects non-files and
+  // verifies lstat/opened-fstat/finished-fstat/lstat identity before accepting data.
+  return process.platform === "win32"
+    ? snapshotProtectedState(path, { noFollowReadFlags: constants.O_RDONLY })
+    : snapshotProtectedState(path)
+}
+
 function smallJson(file) {
   try {
-    if (statSync(file).size > 1024 * 1024) return undefined
+    const metadata = statSync(file)
+    if (!metadata.isFile() || metadata.size > 1024 * 1024) return undefined
     return JSON.parse(readFileSync(file, "utf8"))
   } catch (error) {
     if (error.code === "ENOENT" || error.code === "ENOTDIR" || error instanceof SyntaxError) return undefined
@@ -360,7 +391,7 @@ function homeBefore(sandbox, ownedPids) {
       path, versions: new Map(), references: new Set(), captureErrors: [],
       peers: peerMarkers(path), runtimeMarkers: new Map(),
       gatewayOwners: openFileOwners(join(path, "gateway/gateway.sqlite")),
-      protected: snapshotProtectedState(path), credentials: credentialDigest(path),
+      protected: protectedHome(path), credentials: credentialDigest(path),
     }
     const capture = (rel) => {
       const normalized = rel.replaceAll("\\", "/")
@@ -430,7 +461,7 @@ function attributeChange(path, record, sandbox, ownedPids, peers) {
 
 function homeAfter(before, sandbox, ownedPids) {
   return before.map((record) => {
-    const after = snapshotProtectedState(record.path)
+    const after = protectedHome(record.path)
     const observed = observeHome(record.path)
     record.capture("settings.json")
     record.watcher?.close()
@@ -454,7 +485,9 @@ function homeAfter(before, sandbox, ownedPids) {
       record.captureErrors.length === 0
     return {
       path: record.path,
+      protectedReadMethod: process.platform === "win32" ? "readonly-descriptor-stable-file-identity" : "nofollow-descriptor",
       protectedUntouched: protectedSnapshotsUntouched(record.protected, after),
+      protectedErrors: [...record.protected.errors, ...after.errors],
       changedPaths: changedSnapshotPaths(record.protected.snapshot, after.snapshot),
       credentialsUntouched: record.credentials === credentialDigest(record.path),
       nonvolatileUntouched: fileObservationComplete && observedChangedPaths.length === 0,
@@ -540,8 +573,7 @@ async function scenario(name, command, evidenceRoot) {
   const enabled = name !== "disabled-control"
   const evidence = join(evidenceRoot, name)
   mkdirSync(evidence, { recursive: true })
-  const sandbox = createSandbox()
-  seedSandbox(sandbox)
+  const sandbox = createSeededSandbox()
   sandbox.sessionsDir = join(sandbox.agentDir, "sessions")
   mkdirSync(sandbox.sessionsDir, { recursive: true })
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
@@ -665,7 +697,7 @@ async function scenario(name, command, evidenceRoot) {
         result.checks.push(check("owned_pid_scan", true))
       } catch (error) { result.checks.push(check("owned_pid_scan", false, String(error))) }
       try {
-        result.cleanup = await stop(session)
+        result.cleanup = await stop(session, ownedPids)
         result.checks.push(check("process_tree_cleanup", true))
       } catch (error) { result.checks.push(check("process_tree_cleanup", false, String(error))) }
       result.eventTypes = session.events.map((event) => event.type)
@@ -705,9 +737,39 @@ async function scenario(name, command, evidenceRoot) {
 
 async function selfTest(evidenceDir) {
   console.log("WORKING: self-test")
-  const sandbox = createSandbox()
-  seedSandbox(sandbox)
+  const sandbox = createSeededSandbox()
   try {
+    // The shared seeder needs every fixture directory before writing its settings.
+    for (const path of [sandbox.cwd, sandbox.agentDir, sandbox.homeDir,
+      sandbox.xdgConfigHome, sandbox.xdgDataHome, sandbox.xdgCacheHome])
+      assert.ok(statSync(path).isDirectory())
+    assert.deepEqual(JSON.parse(readFileSync(join(sandbox.agentDir, "settings.json"), "utf8")).packages,
+      [join(repoRoot, "packages/omo-senpi/plugin")])
+    assert.equal(JSON.parse(readFileSync(join(sandbox.agentDir, "trust.json"), "utf8"))[sandbox.canonicalCwd], true)
+    assert.equal(smallJson(sandbox.agentDir), undefined)
+    // Subscribe before terminating a real idle child; no timing-based readiness.
+    const child = spawn(process.execPath, ["-e", 'process.stdout.write("ready"); process.stdin.on("data", () => {})'], {
+      cwd: sandbox.cwd, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"],
+    })
+    const exited = new Promise((done) => child.once("close", (code, signal) => done({ code, signal })))
+    await deadline(new Promise((done, reject) => {
+      child.once("error", reject)
+      child.stdout.once("data", done)
+    }), TIMEOUT, "cleanup child ready")
+    const terminated = await stop({ child, exited })
+    assert.ok(terminated.code !== null || terminated.signal !== null)
+    const protectedBefore = protectedHome(sandbox.agentDir)
+    assert.ok(protectedBefore.complete)
+    const protectedFile = join(sandbox.agentDir, "auth.json")
+    writeFileSync(protectedFile, '{"qa":1}')
+    const protectedAfter = protectedHome(sandbox.agentDir)
+    assert.ok(protectedAfter.complete)
+    assert.equal(protectedSnapshotsUntouched(protectedBefore, protectedAfter), false)
+    assert.ok(changedSnapshotPaths(protectedBefore.snapshot, protectedAfter.snapshot).includes("auth.json"))
+    rmSync(protectedFile)
+    mkdirSync(protectedFile)
+    assert.ok(protectedHome(sandbox.agentDir).errors.some(error => error.path === "auth.json" && error.code === "UNSUPPORTED_ENTRY"))
+    rmSync(protectedFile, { recursive: true })
     // Given an isolated fixture, when env is constructed, then all routing lanes are isolated.
     const env = isolatedChildEnv({ OMO_RPC_SOCKET: "real", PI_SESSION_ID: "real" }, sandbox.agentDir)
     for (const lane of ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"]) assert.equal(env[lane], sandbox.agentDir)
@@ -817,7 +879,7 @@ async function selfTest(evidenceDir) {
     assert.equal(ownedReferences({ pid: 54321 }, sandbox, owned), false)
     assert.ok(isFailedCompaction({ type: "session_compact", payload: { accepted: false, rejectionCause: "would-overflow" } }))
     assert.equal(isFailedCompaction({ type: "session_compact", payload: { accepted: false, rejectionCause: "cancelled-by-extension" } }), false)
-    const verdict = { result: "PASS", selfTest: true, checks: ["isolated-env", "portable-state-digest", "path-parser", "bounded-deadline", "file-event", "wire-summary-overflow", "verdict-negative-controls", "writer-attribution"] }
+    const verdict = { result: "PASS", selfTest: true, checks: ["native-sandbox-directories", "native-process-tree-cleanup", "protected-file-identity", "isolated-env", "portable-state-digest", "path-parser", "bounded-deadline", "file-event", "wire-summary-overflow", "verdict-negative-controls", "writer-attribution"] }
     if (evidenceDir) {
       mkdirSync(evidenceDir, { recursive: true })
       writeFileSync(join(evidenceDir, "self-test.json"), JSON.stringify(verdict, null, 2))
