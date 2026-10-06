@@ -137,3 +137,71 @@ describe("a reopened session's finished transcript settles only an idle session 
     await handle.dispose()
   })
 })
+
+
+describe("admission compaction failures without agent_end (omo#9590)", () => {
+  const failure = {
+    role: "assistant", content: [], stopReason: "error",
+    errorMessage: "Context remains above the compaction threshold because compaction did not complete",
+  }
+
+  test("#given an admission error without agent_end #when the session reports idle #then the error turn settles", async () => {
+    const port = fakeSessionPort()
+    const handle = handleOverPort(port)
+    await handle.startInitialPrompt("work")
+    const outcome = handle.waitForOutcome()
+    port.emitEvent(event({ type: "message_end", message: failure }))
+    expect(await settledYet(outcome)).toBe(false)
+    port.emitEvent(event({ type: "agent_idle" }))
+    expect(await outcome).toEqual({ status: "error", failure: { kind: "child-turn-failed", message: failure.errorMessage } })
+    await handle.dispose()
+  })
+
+  test("#given an admission error without idle events #when heartbeat confirms idle #then the error is surfaced instead of remaining running", async () => {
+    const port = fakeSessionPort()
+    const handle = handleOverPort(port, 1)
+    await handle.startInitialPrompt("work")
+    const outcome = handle.waitForOutcome()
+    port.emitEvent(event({ type: "message_end", message: failure }))
+    await port.stateAsked()
+    await port.answerState({ sessionId: "s", isStreaming: false, isCompacting: false })
+    expect(await outcome).toEqual({ status: "error", failure: { kind: "child-turn-failed", message: failure.errorMessage } })
+    await handle.dispose()
+  })
+
+  test("#given an admission error #when the host still has a queued follow-up #then heartbeat cannot end the task before its continuation", async () => {
+    const port = fakeSessionPort()
+    const handle = handleOverPort(port, 1)
+    await handle.startInitialPrompt("work")
+    const outcome = handle.waitForOutcome()
+    port.emitEvent(event({ type: "message_end", message: failure }))
+    await port.stateAsked()
+    await port.answerState({ sessionId: "s", isStreaming: false, followUp: ["retry"], pendingMessageCount: 1 })
+    expect(await settledYet(outcome)).toBe(false)
+    port.emitEvent(event({ type: "agent_start" }))
+    port.emitEvent(event({ type: "message_end", message: CONTINUED }))
+    port.emitEvent(event({ type: "agent_end", willRetry: false, messages: [CONTINUED] }))
+    port.emitEvent(event({ type: "agent_idle" }))
+    expect(await outcome).toEqual({ status: "completed", finalResponse: "finished after the nudge" })
+    await handle.dispose()
+  })
+})
+
+
+test("#given an admission error held during retry backoff #when heartbeat sees a retry attempt #then it cannot fail the active retry", async () => {
+  const port = fakeSessionPort()
+  const handle = handleOverPort(port, 1)
+  await handle.startInitialPrompt("work")
+  const outcome = handle.waitForOutcome()
+  port.emitEvent(event({ type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "retry me" } }))
+  port.emitEvent(event({ type: "agent_end", willRetry: true, messages: [] }))
+  await port.stateAsked()
+  await port.answerState({ sessionId: "s", isStreaming: false, retryAttempt: 1 })
+  expect(await settledYet(outcome)).toBe(false)
+  port.emitEvent(event({ type: "agent_start" }))
+  port.emitEvent(event({ type: "message_end", message: CONTINUED }))
+  port.emitEvent(event({ type: "agent_end", willRetry: false, messages: [CONTINUED] }))
+  port.emitEvent(event({ type: "agent_idle" }))
+  expect(await outcome).toEqual({ status: "completed", finalResponse: "finished after the nudge" })
+  await handle.dispose()
+})

@@ -33,6 +33,8 @@ export type TurnSettlement = {
 export function sessionIsIdle(state: {
   readonly isStreaming?: boolean
   readonly isCompacting?: boolean
+  readonly retryAttempt?: number
+  readonly isBashRunning?: boolean
   readonly steering?: readonly unknown[]
   readonly followUp?: readonly unknown[]
   readonly pendingMessageCount?: number
@@ -40,6 +42,8 @@ export function sessionIsIdle(state: {
   return (
     state.isStreaming === false &&
     state.isCompacting !== true &&
+    (state.retryAttempt ?? 0) === 0 &&
+    state.isBashRunning !== true &&
     (state.steering?.length ?? 0) === 0 &&
     (state.followUp?.length ?? 0) === 0 &&
     (state.pendingMessageCount ?? 0) === 0
@@ -56,6 +60,23 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_start":
           held = undefined
           return
+        case "message_end": {
+          // Admission compaction can refuse before Agent core starts a run, emitting an
+          // assistant error without agent_end. Hold it until the SESSION is idle: retries
+          // and extension continuations must still have a chance to replace this failure.
+          const message = event.message
+          if (message.role !== "assistant" || message.stopReason !== "error") return
+          held = input.abortedByUser()
+            ? { status: "cancelled" }
+            : {
+                status: "error",
+                failure: {
+                  kind: "child-turn-failed",
+                  message: message.errorMessage ?? 'RPC child turn ended with stopReason "error"',
+                },
+              }
+          return
+        }
         case "agent_end": {
           if (event.willRetry !== false) return
           const outcome = endOutcome(event)

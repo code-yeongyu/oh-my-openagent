@@ -100,6 +100,11 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     onState: (state) => {
       lastSeenAt = now()
       sessionId = state.sessionId
+      // A refused admission may emit only message_end, with no agent_end/agent_idle.
+      // The host's idle state confirms the observed error has no continuation owning it.
+      if (settlement.pending()?.status === "error" && sessionIsIdle(state)) {
+        settlement.observe({ type: "agent_idle" })
+      }
     },
   })
 

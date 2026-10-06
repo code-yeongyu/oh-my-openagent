@@ -22,6 +22,8 @@ export interface HostSessionLiveness {
   readonly sessionId: string
   readonly isStreaming?: boolean
   readonly isCompacting?: boolean
+  readonly retryAttempt?: number
+  readonly isBashRunning?: boolean
   readonly steering?: readonly unknown[]
   readonly followUp?: readonly unknown[]
   readonly pendingMessageCount?: number
