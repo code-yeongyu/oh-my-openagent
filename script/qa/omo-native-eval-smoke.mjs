@@ -285,6 +285,11 @@ async function main() {
     if (!textOf(isolated).includes(JSON.stringify(["undefined", "undefined", sandbox.marker]))) {
       throw new Error(`sandbox probe: expected no ambient process/fetch and the marker, got ${textOf(isolated)}`)
     }
+    // The sandbox cell reports its own runtime, not the persistent kernel's (senpi #2811).
+    const sandboxRuntime = isolated.details?.runtime
+    if (sandboxRuntime?.name !== "quickjs" || sandboxRuntime?.isolation !== "sandbox" || typeof sandboxRuntime?.version !== "string") {
+      throw new Error(`sandbox cell runtime: expected quickjs/sandbox, got ${JSON.stringify(sandboxRuntime)}`)
+    }
     // An isolated cell's own error is a settled cell result (status "error"), not a failed tool call.
     if (stored.details?.cells?.[0]?.status !== "error" || !textOf(stored).includes("eval_isolate_no_state")) {
       throw new Error(`sandbox store() was not refused with eval_isolate_no_state: ${textOf(stored)}`)
@@ -317,7 +322,7 @@ async function main() {
     process.stdout.write(`PASS JS_OK 42 marker=${sandbox.marker} through one permission/hook read\n`)
     process.stdout.write("PASS PY_OK 42\n")
     process.stdout.write("PASS eval list contains JavaScript and Python cells\n")
-    process.stdout.write(`PASS sandbox cell: no process, no fetch, marker read through the host hook${processIsolation ? "; kernel cells ran process-isolated" : ""}\n`)
+    process.stdout.write(`PASS sandbox cell (quickjs ${isolated.details.runtime.version}): no process, no fetch, marker read through the host hook${processIsolation ? "; kernel cells ran process-isolated" : ""}\n`)
     process.stdout.write("PASS sandbox store() refused with eval_isolate_no_state\n")
     process.stdout.write(`PASS 4 MiB sandbox item visible through peek before settling; spill sha256=${expected}\n`)
     process.stdout.write("PASS renamed source tree; owned workers/interpreters=0 sockets=0\n")
