@@ -108,6 +108,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "git_master": { "include_co_authored_by": true, "commit_footer": false }, // sisyphus-dev-ai co-author trailer (on by default) and opt-in commit footer (Native harness)
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
   "device_service": { "enabled": true }, // the device service start-up bootstrap (Native harness), enabled by default
+  "context_handoff": { "enabled": false }, // opt-in fresh-session restart when compaction fails (Native harness)
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
@@ -123,7 +124,7 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`, `exclude_models`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `context_handoff`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`, `exclude_models`), so a harness-specific override stays schema-checked.
 
 `[senpi]` is the legacy spelling of `[native]`, kept working for one release line. It is canonicalized to `[native]` when the config is read, so a config that cannot be rewritten still applies every value it sets, and the startup migration rewrites the key in the file once, naming it in a notice. When a file carries both blocks, `[native]` wins and the ignored `[senpi]` block is reported as a deprecation diagnostic.
 
@@ -187,6 +188,31 @@ Whether your other devices may control this one is a separate, per-device settin
 {
   "device_service": {
     "enabled": false
+  }
+}
+```
+
+### `context_handoff` (Native harness)
+
+Off by default. Normally a long session keeps going through automatic context compaction, and context handoff leaves that alone. When enabled, it steps in only when compaction fails:
+
+- a compaction ends with an error (a compaction you cancel yourself does not count);
+- compaction is rejected because it cannot make the context smaller (the summary would still overflow, the compaction circuit breaker is open, or the session's compaction cap is reached);
+- context usage is still at or above `threshold_percent` (default `85`) right after a compaction;
+- `compaction_repeat_limit` compactions (default `3`) happen within `compaction_repeat_window_minutes` (default `10`);
+- a turn ends with a context-overflow error from the provider.
+
+It never acts while a compaction is still running. On a failure omo shows a warning and asks the agent once to write a handoff to `.omo/handoffs/<session-id>.md`, then continues in a fresh session (same working directory, the old session recorded as its parent) seeded with that handoff and any open goal objective. If the agent cannot write the handoff, omo writes one from the session record (the failure, the previous session file, and the last user messages) and switches anyway. Persistent monitors stop with the old session, so the handoff lists them and the fresh agent re-arms them. Run `/omo-context-handoff [path]` to switch manually.
+
+```jsonc
+{
+  "[native]": {
+    "context_handoff": {
+      "enabled": true,
+      "threshold_percent": 85,
+      "compaction_repeat_limit": 3,
+      "compaction_repeat_window_minutes": 10
+    }
   }
 }
 ```
