@@ -7,11 +7,13 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
 } from "node:fs"
-import { dirname, join, parse, resolve } from "node:path"
+import { basename, dirname, join, parse, resolve } from "node:path"
 import { LAUNCH_SPEC_FILENAME } from "./launch-spec-mode.js"
+import { prunePluginCaches } from "./plugin-root-cache.js"
 
 const OTHER_WRITE = 0o022
 const STICKY = 0o1000
@@ -49,7 +51,19 @@ function assertTrustedAncestors(path, security) {
 }
 
 function ensurePrivateDirectory(path, security) {
-  const absolute = resolve(path)
+  let existing = resolve(path)
+  const missing = []
+  let absolute
+  while (true) {
+    try {
+      absolute = join(realpathSync(existing), ...missing)
+      break
+    } catch (error) {
+      if (!errorCode(error, "ENOENT") || existing === dirname(existing)) throw error
+      missing.unshift(basename(existing))
+      existing = dirname(existing)
+    }
+  }
   const root = parse(absolute).root
   const parts = absolute.slice(root.length).split(/[\\/]+/).filter(Boolean)
   let current = root
@@ -183,10 +197,10 @@ function copySnapshot(paths, snapshot, security) {
 /** @param {string} installedPluginRoot @param {string} cacheRoot @param {{ platform?: string, getuid?: () => number | undefined, lstat?: (path: string) => ReturnType<typeof lstatSync>, rename?: (source: string, destination: string) => void }} [io] @returns {string} */
 export function resolvePluginRoot(installedPluginRoot, cacheRoot, io = {}) {
   if ((io.platform ?? process.platform) === "win32") return installedPluginRoot
-  const pluginRoot = resolve(installedPluginRoot)
+  const installedRoot = resolve(installedPluginRoot)
   let specStat
   try {
-    specStat = statPath(join(pluginRoot, LAUNCH_SPEC_FILENAME), io)
+    specStat = statPath(join(installedRoot, LAUNCH_SPEC_FILENAME), io)
   } catch (error) {
     if (errorCode(error, "ENOENT") || errorCode(error, "ENOTDIR")) return installedPluginRoot
     throw error
@@ -196,6 +210,7 @@ export function resolvePluginRoot(installedPluginRoot, cacheRoot, io = {}) {
   if (specStat.uid !== 0) throw new Error(`plugin launch spec is owned by unsupported uid ${specStat.uid}`)
   if (!specStat.isFile()) throw new Error("root-owned plugin launch spec is not a regular file")
 
+  const pluginRoot = realpathSync(installedRoot)
   const snapshot = sourceSnapshot(pluginRoot, security)
   const privateRoot = ensurePrivateDirectory(cacheRoot, security)
   const target = join(privateRoot, snapshot.fingerprint)
@@ -211,5 +226,11 @@ export function resolvePluginRoot(installedPluginRoot, cacheRoot, io = {}) {
     assertUnchangedSource(pluginRoot, snapshot, security)
     return target
   }
-  return copySnapshot({ pluginRoot, cacheRoot: privateRoot }, snapshot, security)
+  const selected = copySnapshot({ pluginRoot, cacheRoot: privateRoot }, snapshot, security)
+  try {
+    prunePluginCaches(privateRoot, selected, security)
+  } catch (error) {
+    console.error(`WARN plugin cache: could not prune old private copies: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  return selected
 }

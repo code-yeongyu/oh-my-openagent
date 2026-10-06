@@ -4,7 +4,7 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
-import { channelDistTagVersion, nativePluginRoot, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
+import { channelDistTagVersion, nativePluginDoctorLines, nativePluginRoot, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
 import { daemonReportLines } from "./daemon.js"
 import { migrationReport } from "./doctor-migration.js"
 import { launchSpecDoctorLines } from "./launch-spec-mode.js"
@@ -412,6 +412,7 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(...transientMemoryReport(options))
   const launchSpec = launchSpecDoctorLines(options.pluginRoot ?? nativePluginRoot(), options.launchSpecIo)
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
+  lines.push(...(options.pluginRelocationWarnings ?? (options.pluginRoot === undefined ? nativePluginDoctorLines() : [])))
   lines.push(...launchSpec)
   lines.push(...daemonReport(options), ...(options.computerUse ?? []), ...(options.categoryCoverage ?? []), ...(options.gateway ?? []))
   if ((options.computerUse ?? []).some((line) => line.startsWith("FAIL "))) failed = true

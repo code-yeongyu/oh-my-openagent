@@ -5,15 +5,20 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, sep } from "node:path"
+import { basename, join, sep } from "node:path"
 import { resolvePluginRoot } from "../bin/lib/plugin-root.js"
+import { createPluginRootSelection } from "../bin/lib/plugin-root-selection.js"
+import { runDoctor } from "../bin/lib/doctor.js"
 
 const SPEC = "daemon-launch-spec.json"
 const roots: string[] = []
@@ -24,7 +29,7 @@ afterEach(() => {
 })
 
 function pluginFixture(withSpec = true) {
-  const fixtureRoot = mkdtempSync(join(tmpdir(), "omo-plugin-root-"))
+  const fixtureRoot = mkdtempSync(join(realpathSync(tmpdir()), "omo-plugin-root-"))
   roots.push(fixtureRoot)
   const pluginRoot = join(fixtureRoot, "plugin")
   const cacheRoot = join(fixtureRoot, "cache")
@@ -53,8 +58,9 @@ function rootOwnedIo(pluginRoot: string, cacheRoot: string, ownerForPath: (path:
       getuid: () => uid,
       lstat(path: string) {
         const stat = lstatSync(path)
+        const physicalPath = realpathSync(path)
         const owner = ownerForPath(path)
-          ?? (within(pluginRoot, path) ? 0 : within(cacheRoot, path) ? uid : stat.uid)
+          ?? (within(pluginRoot, physicalPath) ? 0 : within(cacheRoot, physicalPath) ? uid : stat.uid)
         return new Proxy(stat, {
           get(target, property) {
             if (property === "uid") return owner
@@ -148,6 +154,67 @@ describe("Native plugin root selection", () => {
     expect(existsSync(cacheRoot)).toBe(false)
   })
 
+  posixOnly("#given a group-writable cache ancestor #when the launcher selects its plugin #then it keeps the shared install and doctor reports the refusal", () => {
+    const { fixtureRoot, pluginRoot } = pluginFixture()
+    const agentHome = join(fixtureRoot, ".omo")
+    const cacheRoot = join(agentHome, "agent", "native-plugin")
+    mkdirSync(join(agentHome, "agent"), { recursive: true })
+    chmodSync(agentHome, 0o775)
+    const warnings: string[] = []
+    const { io, uid } = rootOwnedIo(pluginRoot, cacheRoot)
+    const select = createPluginRootSelection(pluginRoot, cacheRoot, { ...io, warn: (line) => warnings.push(line) })
+
+    const selection = select()
+    const output: string[] = []
+    const originalLog = console.log
+    const originalExitCode = process.exitCode
+    try {
+      console.log = (value?: unknown) => { output.push(String(value)) }
+      runDoctor({ harnesses: [] }, [], {
+        pluginRoot: selection.root,
+        pluginRelocationWarnings: selection.warning === undefined ? [] : [selection.warning],
+        launchSpecIo: { getuid: () => uid, stat: () => io.lstat(join(pluginRoot, SPEC)) },
+        list: () => [],
+        fetchDistTags: () => null,
+        daemonReport: () => [],
+        env: { OMO_CODING_AGENT_DIR: join(agentHome, "agent") },
+        homeDir: fixtureRoot,
+      })
+    } finally {
+      console.log = originalLog
+      process.exitCode = originalExitCode ?? 0
+    }
+
+    expect(selection.root).toBe(pluginRoot)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain(`unsafe writable plugin path ancestor: ${agentHome}`)
+    expect(output.join("\n")).toContain(warnings[0] ?? "")
+    expect(output.join("\n")).toContain("launch_spec_insecure")
+    expect(modeOf(agentHome)).toBe(0o775)
+    expect(existsSync(cacheRoot)).toBe(false)
+    expect(select()).toBe(selection)
+    expect(warnings).toHaveLength(1)
+  })
+
+  posixOnly("#given a selected private plugin #when the source changes during this process #then repeated selection keeps the same root without another filesystem walk", () => {
+    const { pluginRoot, cacheRoot } = pluginFixture()
+    const { io } = rootOwnedIo(pluginRoot, cacheRoot)
+    let inspections = 0
+    const select = createPluginRootSelection(pluginRoot, cacheRoot, {
+      ...io,
+      lstat(path: string) { inspections++; return io.lstat(path) },
+    })
+    const initial = select()
+    const initialInspections = inspections
+    writeFileSync(join(pluginRoot, "extensions", "member.js"), "export const member = false\n")
+
+    const repeated = select()
+
+    expect(repeated.root).toBe(initial.root)
+    expect(inspections).toBe(initialInspections)
+    expect(readFileSync(join(repeated.root, "extensions", "member.js"), "utf8")).toBe("export const member = true\n")
+  })
+
   posixOnly("#given an existing relocated cache whose file was tampered #when selected again #then the cache is rejected", () => {
     const { pluginRoot, cacheRoot } = pluginFixture()
     const { io } = rootOwnedIo(pluginRoot, cacheRoot)
@@ -166,14 +233,54 @@ describe("Native plugin root selection", () => {
     expect(() => resolvePluginRoot(pluginRoot, cacheRoot, io)).toThrow()
   })
 
-  posixOnly("#given a cache root that is a symlink #when selected #then it is rejected", () => {
+  posixOnly("#given a cache root symlink to a writable directory #when selected #then its unsafe target is rejected", () => {
     const { fixtureRoot, pluginRoot, cacheRoot } = pluginFixture()
     const target = join(fixtureRoot, "cache-target")
     mkdirSync(target)
+    chmodSync(target, 0o770)
     symlinkSync(target, cacheRoot)
     const { io } = rootOwnedIo(pluginRoot, cacheRoot)
 
     expect(() => resolvePluginRoot(pluginRoot, cacheRoot, io)).toThrow()
+    expect(modeOf(target)).toBe(0o770)
+  })
+
+  posixOnly("#given trusted source and cache directory aliases #when selected #then it validates and uses their physical paths", () => {
+    const { fixtureRoot, pluginRoot, cacheRoot } = pluginFixture()
+    mkdirSync(cacheRoot, { mode: 0o700 })
+    const pluginAlias = join(fixtureRoot, "plugin-alias")
+    const cacheAlias = join(fixtureRoot, "cache-alias")
+    symlinkSync(pluginRoot, pluginAlias)
+    symlinkSync(cacheRoot, cacheAlias)
+    const { io } = rootOwnedIo(pluginRoot, cacheRoot)
+
+    const selected = resolvePluginRoot(pluginAlias, cacheAlias, io)
+
+    expect(selected.startsWith(`${cacheRoot}${sep}`)).toBe(true)
+    expect(readFileSync(join(selected, SPEC), "utf8")).toBe(readFileSync(join(pluginRoot, SPEC), "utf8"))
+  })
+
+  posixOnly("#given a missing cache below a symlinked agent directory #when selected #then it creates the cache under the trusted physical ancestor", () => {
+    const { fixtureRoot, pluginRoot, cacheRoot } = pluginFixture()
+    const agentAlias = join(fixtureRoot, "agent-alias")
+    symlinkSync(fixtureRoot, agentAlias)
+    const { io } = rootOwnedIo(pluginRoot, cacheRoot)
+
+    const selected = resolvePluginRoot(pluginRoot, join(agentAlias, "cache"), io)
+
+    expect(selected.startsWith(`${cacheRoot}${sep}`)).toBe(true)
+    expect(modeOf(cacheRoot)).toBe(0o700)
+  })
+
+  posixOnly("#given a source alias to a writable ancestor #when selected #then the physical source is rejected before caching", () => {
+    const { fixtureRoot, pluginRoot, cacheRoot } = pluginFixture()
+    const pluginAlias = join(fixtureRoot, "plugin-alias")
+    symlinkSync(pluginRoot, pluginAlias)
+    chmodSync(fixtureRoot, 0o770)
+    const { io } = rootOwnedIo(pluginRoot, cacheRoot)
+
+    expect(() => resolvePluginRoot(pluginAlias, cacheRoot, io)).toThrow(`unsafe writable plugin path ancestor: ${fixtureRoot}`)
+    expect(existsSync(cacheRoot)).toBe(false)
   })
 
   posixOnly("#given changed payload contents #when selected again #then it uses a new cache containing the new contents", () => {
@@ -187,6 +294,50 @@ describe("Native plugin root selection", () => {
 
     expect(updated).not.toBe(initial)
     expect(readFileSync(join(updated, "extensions", "member.js"), "utf8")).toBe("export const member = false\n")
+  })
+
+  posixOnly("#given two previous plugin versions #when a new copy is published #then it keeps the current and newest previous version", () => {
+    const { pluginRoot, cacheRoot } = pluginFixture()
+    const sourcePath = join(pluginRoot, "extensions", "member.js")
+    const { io } = rootOwnedIo(pluginRoot, cacheRoot)
+    const oldest = resolvePluginRoot(pluginRoot, cacheRoot, io)
+    utimesSync(oldest, 1, 1)
+    writeFileSync(sourcePath, "export const member = 2\n")
+    const previous = resolvePluginRoot(pluginRoot, cacheRoot, io)
+    utimesSync(previous, 2, 2)
+    const staging = join(cacheRoot, ".plugin-root-active")
+    const unrelated = join(cacheRoot, "operator-files")
+    mkdirSync(staging)
+    mkdirSync(unrelated)
+    const linked = join(cacheRoot, "a".repeat(64))
+    symlinkSync(unrelated, linked)
+    writeFileSync(sourcePath, "export const member = 3\n")
+
+    const current = resolvePluginRoot(pluginRoot, cacheRoot, io)
+
+    expect(existsSync(oldest)).toBe(false)
+    expect(readFileSync(join(previous, "extensions", "member.js"), "utf8")).toBe("export const member = 2\n")
+    expect(readFileSync(join(current, "extensions", "member.js"), "utf8")).toBe("export const member = 3\n")
+    expect(readdirSync(cacheRoot).sort()).toEqual([basename(previous), basename(current), ".plugin-root-active", "operator-files", "a".repeat(64)].sort())
+    expect(lstatSync(linked).isSymbolicLink()).toBe(true)
+  })
+
+  posixOnly("#given foreign-owned or non-private fingerprint directories #when a copy is published #then pruning leaves them untouched", () => {
+    const { pluginRoot, cacheRoot } = pluginFixture()
+    const { io, uid } = rootOwnedIo(pluginRoot, cacheRoot)
+    resolvePluginRoot(pluginRoot, cacheRoot, io)
+    const foreign = join(cacheRoot, "b".repeat(64))
+    const writable = join(cacheRoot, "c".repeat(64))
+    mkdirSync(foreign, { mode: 0o700 })
+    mkdirSync(writable, { mode: 0o700 })
+    chmodSync(writable, 0o770)
+    const protectedIo = rootOwnedIo(pluginRoot, cacheRoot, (path) => path === foreign ? uid + 1 : undefined).io
+    writeFileSync(join(pluginRoot, "extensions", "member.js"), "export const member = 2\n")
+
+    resolvePluginRoot(pluginRoot, cacheRoot, protectedIo)
+
+    expect(existsSync(foreign)).toBe(true)
+    expect(modeOf(writable)).toBe(0o770)
   })
 
   posixOnly("#given a changed source mode #when selected again #then it uses a different cache with private executable mode", () => {
