@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:61c15d83ff04bf639e1d60762380a5cc08af2760144f5ea767559d11672d9571:1374d59c66f04224775aaa25ff25460febb127d3627ac064466e2da18ac57bec
+// omo-codex-install:6f9f77e7afed7783f6cf75343a545436441cbf255909284fa9d11ae7a232ebd9:798a80648e69f5387f8f8edf86eff9bf1a0093bcbf347a61ee99639408819bf8
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -97,7 +97,7 @@ var init_destinations = __esm(() => {
   ];
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/util.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
   const numericValues = Object.values(entries).filter((v) => typeof v === "number");
   const values = Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -415,18 +415,6 @@ function prefixIssues(path, issues) {
 function unwrapMessage(message) {
   return typeof message === "string" ? message : message?.message;
 }
-function sizeCaps(defChecks) {
-  const caps = [];
-  for (const ch of defChecks ?? []) {
-    const d = ch._zod.def;
-    if (!/_(length|size)$|_equals$/.test(d.check))
-      break;
-    const max = d.maximum ?? d.length ?? d.size;
-    if (max >= 0)
-      caps.push([max, ch]);
-  }
-  return caps;
-}
 function attachSchema(issues, start, inst) {
   var _a;
   for (let i = start;i < issues.length; i++) {
@@ -653,7 +641,7 @@ var init_util = __esm(() => {
   };
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/core.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/core.js
 function newError(Definition) {
   const E = _E;
   if (E) {
@@ -774,7 +762,7 @@ var init_core = __esm(() => {
   globalConfig = globalThis.__zod_globalConfig;
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/errors.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -893,7 +881,7 @@ var init_errors = __esm(() => {
   });
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/parse.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -1032,7 +1020,7 @@ var init_parse = __esm(() => {
   COMPILE_FALLBACK = /* @__PURE__ */ Symbol.for("zod.compile.fallback");
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/regexes.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/regexes.js
 function nanoidOfLength(length) {
   return new RegExp(`^[a-zA-Z0-9_-]{${length}}$`);
 }
@@ -1090,7 +1078,7 @@ var init_regexes = __esm(() => {
   uppercase = /^[^a-z]*$/;
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/checks.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/checks.js
 var $ZodCheck, _whenHasLength = (payload) => {
   const val = payload.value;
   return !nullish(val) && val.length !== undefined;
@@ -1411,7 +1399,7 @@ var init_checks = __esm(() => {
   });
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/doc.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -1453,17 +1441,17 @@ ${content.join(`
   }
 }
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/versions.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/versions.js
 var version;
 var init_versions = __esm(() => {
   version = {
     major: 4,
     minor: 6,
-    patch: 7
+    patch: 5
   };
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/schemas.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/schemas.js
 async function validateAsync2(inst, value) {
   const ctx = { async: true };
   return toStandardResult(await inst._zod.run({ value, issues: [] }, ctx), ctx);
@@ -1584,28 +1572,6 @@ function isValidJWT(token, algorithm = null) {
   } catch {
     return false;
   }
-}
-function capSize(inst, size) {
-  const caps = sizeCaps(inst._zod.def.checks);
-  if (!caps.length)
-    return;
-  const cap = Math.min(...caps.map((c) => c[0]));
-  const parse = inst._zod.parse;
-  inst._zod.parse = (payload, ctx) => {
-    const n = size(payload.value);
-    if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
-      for (const [max, ch] of sizeCaps(inst._zod.def.checks)) {
-        if (n > max && ch._zod.def.when(payload)) {
-          const start = payload.issues.length;
-          ch._zod.check(payload);
-          payload.issues[start].continue = false;
-          attachSchema(payload.issues, start, inst);
-          return payload;
-        }
-      }
-    }
-    return parse(payload, ctx);
-  };
 }
 function handleArrayResult(result, final, index) {
   if (result.issues.length) {
@@ -1912,7 +1878,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-var $ZodType, toStandardResult = (r, ctx) => r.issues.length ? { issues: r.issues.map((iss) => finalizeIssue(iss, ctx, config())) } : { value: r.value }, $ZodString, $ZodStringFormat, $ZodGUID, $ZodUUID, $ZodEmail, URL_BAD_FORMAT = 1, URL_UNPARSEABLE = 2, asciiTabOrNewline, $ZodURL, $ZodEmoji, $ZodNanoID, $ZodCUID, $ZodCUID2, $ZodULID, $ZodXID, $ZodKSUID, $ZodISODateTime, $ZodISODate, $ZodISOTime, $ZodISODuration, $ZodIPv4, ipv6Alphabet, $ZodIPv6, $ZodCIDRv4, $ZodCIDRv6, base64Charset, $ZodBase64, base64urlCharset, $ZodBase64URL, $ZodE164, $ZodJWT, $ZodNumber, $ZodNumberFormat, $ZodBoolean, $ZodUnknown, $ZodNever, arraySize = (input) => Array.isArray(input) ? input.length : -1, $ZodArray, NO_SYMBOL_KEYS, $ZodObject, $ZodObjectJIT, $ZodUnion, $ZodDiscriminatedUnion, $ZodIntersection, $ZodRecord, $ZodEnum, $ZodLiteral, $ZodTransform, $ZodOptional, $ZodExactOptional, $ZodNullable, $ZodDefault, $ZodPrefault, $ZodNonOptional, $ZodCatch, $ZodPipe, $ZodPreprocess, $ZodReadonly, $ZodCustom;
+var $ZodType, toStandardResult = (r, ctx) => r.issues.length ? { issues: r.issues.map((iss) => finalizeIssue(iss, ctx, config())) } : { value: r.value }, $ZodString, $ZodStringFormat, $ZodGUID, $ZodUUID, $ZodEmail, URL_BAD_FORMAT = 1, URL_UNPARSEABLE = 2, asciiTabOrNewline, $ZodURL, $ZodEmoji, $ZodNanoID, $ZodCUID, $ZodCUID2, $ZodULID, $ZodXID, $ZodKSUID, $ZodISODateTime, $ZodISODate, $ZodISOTime, $ZodISODuration, $ZodIPv4, ipv6Alphabet, $ZodIPv6, $ZodCIDRv4, $ZodCIDRv6, base64Charset, $ZodBase64, base64urlCharset, $ZodBase64URL, $ZodE164, $ZodJWT, $ZodNumber, $ZodNumberFormat, $ZodBoolean, $ZodUnknown, $ZodNever, $ZodArray, NO_SYMBOL_KEYS, $ZodObject, $ZodObjectJIT, $ZodUnion, $ZodDiscriminatedUnion, $ZodIntersection, $ZodRecord, $ZodEnum, $ZodLiteral, $ZodTransform, $ZodOptional, $ZodExactOptional, $ZodNullable, $ZodDefault, $ZodPrefault, $ZodNonOptional, $ZodCatch, $ZodPipe, $ZodPreprocess, $ZodReadonly, $ZodCustom;
 var init_schemas = __esm(() => {
   init_checks();
   init_core();
@@ -2381,7 +2347,6 @@ var init_schemas = __esm(() => {
       }
       return payload;
     };
-    capSize(inst, arraySize);
   });
   NO_SYMBOL_KEYS = [];
   $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
@@ -3108,7 +3073,7 @@ var init_schemas = __esm(() => {
   });
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/memoizer.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/memoizer.js
 function isRef(value) {
   return value !== null && typeof value === "object";
 }
@@ -3377,7 +3342,7 @@ var init_memoizer = __esm(() => {
   };
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/locales/en.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/en.js
 function en_default() {
   return {
     localeError: error()
@@ -3503,10 +3468,10 @@ var init_en = __esm(() => {
   init_util();
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/locales/index.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/index.js
 var init_locales = () => {};
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/registries.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/registries.js
 class $ZodRegistry {
   constructor() {
     this._map = new WeakMap;
@@ -3556,7 +3521,7 @@ var init_registries = __esm(() => {
   globalRegistry = globalThis.__zod_globalRegistry;
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/compile.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/compile.js
 var INVALID, FALLBACK_FLAG, WHEN_DEFAULTED_CHECKS, PATTERN_IS_COMPLETE;
 var init_compile = __esm(() => {
   INVALID = Symbol.for("zod.compile.invalid");
@@ -3597,7 +3562,7 @@ var init_compile = __esm(() => {
   ]);
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/api.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -4050,7 +4015,7 @@ var init_api = __esm(() => {
   init_util();
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/to-json-schema.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -4577,7 +4542,7 @@ var init_to_json_schema = __esm(() => {
   UNION_KEYS = ["oneOf", "anyOf"];
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/json-schema-processors.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema-processors.js
 function aggregateChecks(schema) {
   const agg = {};
   const def = schema._zod.def;
@@ -5077,10 +5042,10 @@ var init_json_schema_processors = __esm(() => {
   UNREPRESENTABLE_DEFAULT = Symbol();
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/json-schema.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema.js
 var init_json_schema = () => {};
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/index.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/index.js
 var init_core2 = __esm(() => {
   init_util();
   init_regexes();
@@ -5099,12 +5064,12 @@ var init_core2 = __esm(() => {
   init_to_json_schema();
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/checks.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/checks.js
 var init_checks2 = __esm(() => {
   init_core2();
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/errors.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/errors.js
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
     configurable: true,
@@ -5154,7 +5119,7 @@ var init_errors2 = __esm(() => {
   });
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/parse.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/parse.js
 var parse2, parseAsync, safeParse, safeParseAsync, encode, decode, encodeAsync, decodeAsync, safeEncode, safeDecode, safeEncodeAsync, safeDecodeAsync;
 var init_parse2 = __esm(() => {
   init_core2();
@@ -5174,7 +5139,7 @@ var init_parse2 = __esm(() => {
   safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -6096,19 +6061,19 @@ var init_schemas2 = __esm(() => {
   });
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/compat.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/compat.js
 var ZodFirstPartyTypeKind;
 var init_compat = __esm(() => {
   (function(ZodFirstPartyTypeKind) {})(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/iso.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/iso.js
 var init_iso = () => {};
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/coerce.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/coerce.js
 var init_coerce = () => {};
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/external.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/external.js
 var init_external = __esm(() => {
   init_core2();
   init_locales();
@@ -6121,7 +6086,7 @@ var init_external = __esm(() => {
   init_compat();
 });
 
-// node_modules/.bun/zod@4.6.7/node_modules/zod/index.js
+// node_modules/.bun/zod@4.6.5/node_modules/zod/index.js
 var init_zod = __esm(() => {
   init_external();
 });
@@ -19956,6 +19921,11 @@ function isNodeErrorWithCode2(error) {
 // packages/omo-codex/src/install/codex-cache-runtime-wrapper.ts
 import { join as join3 } from "node:path";
 var RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER";
+function hasRuntimeWrapperHeader(content) {
+  const markerLine = content.split(`
+`, 2)[1]?.trimEnd();
+  return markerLine === `# ${RUNTIME_WRAPPER_MARKER}` || markerLine === `rem ${RUNTIME_WRAPPER_MARKER}`;
+}
 function posixRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath) {
   const ulwLoopBin = toPosixPath(join3(binDir, "omo-ulw-loop"));
   const nodeCli = escapePosixDoubleQuoted(toPosixPath(nodeCliPath));
@@ -20223,7 +20193,7 @@ async function removeGeneratedRuntimeWrapper(path) {
     if (!entry.isFile() && !entry.isSymbolicLink())
       return;
     const content = await readGeneratedWrapperContent(path);
-    if (content.includes(RUNTIME_WRAPPER_MARKER))
+    if (hasRuntimeWrapperHeader(content))
       await rm3(path, { force: true });
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
@@ -20248,7 +20218,7 @@ async function existingNonRuntimeWrapper(path) {
     if (!stat.isFile())
       return true;
     const content = await readFile3(path, "utf8");
-    return !content.includes(RUNTIME_WRAPPER_MARKER);
+    return !hasRuntimeWrapperHeader(content);
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT")
       return false;
