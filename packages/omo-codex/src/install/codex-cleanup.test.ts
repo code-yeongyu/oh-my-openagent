@@ -580,6 +580,31 @@ trusted_hash = "sha256:user"
     expect(await pathExists(userRootBin)).toBe(true)
   })
 
+  test("#given a standalone omo binary embedding the marker past the wrapper header #when cleanup runs #then it is kept", async () => {
+    // given: the standalone omo build bundles the installer, so the marker string sits in its payload
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-standalone-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-standalone-bin-"))
+    await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
+    const standaloneBin = join(binDir, "omo")
+    await writeFile(
+      standaloneBin,
+      Buffer.concat([Buffer.from([0xcf, 0xfa, 0xed, 0xfe]), Buffer.alloc(1024), Buffer.from(`var marker = "${RUNTIME_WRAPPER_MARKER}";\n`)]),
+    )
+
+    // when
+    const result = await cleanupCodexLight({
+      codexHome,
+      binDir,
+      platform: "linux",
+      projectDirectory: codexHome,
+      now: () => new Date("2026-06-01T00:00:00Z"),
+    })
+
+    // then
+    expect(result.removedBinLinks).toEqual([])
+    expect(await pathExists(standaloneBin)).toBe(true)
+  })
+
   test("#given a managed windows wrapper left on disk with different casing #when cleanup runs #then it is still removed", async () => {
     // given: Windows resolves names case-insensitively but preserves the casing an entry was
     // created with, so the installer's lowercase `omo.cmd` path can write through to a wrapper
