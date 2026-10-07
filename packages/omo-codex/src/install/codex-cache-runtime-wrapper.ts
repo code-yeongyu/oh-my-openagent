@@ -3,6 +3,14 @@ import { windowsNodeDiscoveryLines } from "./codex-cache-command-shim"
 
 export const RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER"
 
+// Generated wrappers carry the marker on their second line. Checking only that line keeps a file that
+// merely embeds the marker string, such as a standalone omo binary bundling this module, from being
+// mistaken for a generated wrapper.
+export function hasRuntimeWrapperHeader(content: string): boolean {
+  const markerLine = content.split("\n", 2)[1]?.trimEnd()
+  return markerLine === `# ${RUNTIME_WRAPPER_MARKER}` || markerLine === `rem ${RUNTIME_WRAPPER_MARKER}`
+}
+
 export function posixRuntimeWrapper(
   binName: string,
   cliPath: string,

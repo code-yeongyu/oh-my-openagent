@@ -7,6 +7,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { linkRootRuntimeBin } from "./codex-cache-bins"
 
+const STANDALONE_OMO_BINARY = Buffer.concat([
+  Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
+  Buffer.alloc(1024),
+  Buffer.from('var RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER";\n'),
+])
+
 async function createRepoFixture(): Promise<{ repoRoot: string; binDir: string; codexHome: string }> {
   const root = mkdtempSync(join(tmpdir(), "omo-codex-cache-bins-"))
   const repoRoot = join(root, "repo")
@@ -268,5 +274,35 @@ describe("legacy omo reclamation across link kinds", () => {
 
     // then
     expect(link?.name).toBe("omo-agent-toolkit")
+  })
+
+  it("#given bin/omo is a standalone omo binary embedding the marker past its header #when writing the canonical wrapper #then preserves it byte-identical", async () => {
+    // given: the standalone omo build bundles this installer, so the marker string sits in its payload
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    const legacyPath = join(fixture.binDir, "omo")
+    await writeFile(legacyPath, STANDALONE_OMO_BINARY)
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    expect(await readFile(legacyPath)).toEqual(STANDALONE_OMO_BINARY)
+  })
+
+  it("#given bin/omo is a symlink to a standalone omo binary embedding the marker #when writing the canonical wrapper #then preserves the symlink", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    const target = join(fixture.repoRoot, "omo-standalone")
+    await writeFile(target, STANDALONE_OMO_BINARY)
+    await symlink(target, join(fixture.binDir, "omo"))
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    const entry = await lstat(join(fixture.binDir, "omo"))
+    expect(entry.isSymbolicLink()).toBe(true)
   })
 })
