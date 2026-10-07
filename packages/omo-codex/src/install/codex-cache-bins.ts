@@ -4,7 +4,7 @@ import { COMMAND_SHIM_MARKER, windowsCommandShim } from "./codex-cache-command-s
 import { removeDanglingManagedComponentBins } from "./codex-cache-dangling-bins"
 import { isNodeErrorWithCode, isPlainRecord } from "./codex-cache-fs"
 import { removeLegacyCodexComponentBins } from "./codex-cache-legacy-bins"
-import { RUNTIME_WRAPPER_MARKER, posixRuntimeWrapper, windowsRuntimeWrapper } from "./codex-cache-runtime-wrapper"
+import { hasRuntimeWrapperHeader, posixRuntimeWrapper, windowsRuntimeWrapper } from "./codex-cache-runtime-wrapper"
 
 type LinkPlatform = NodeJS.Platform
 
@@ -209,7 +209,7 @@ async function removeGeneratedRuntimeWrapper(path: string): Promise<void> {
     const entry = await lstat(path)
     if (!entry.isFile() && !entry.isSymbolicLink()) return
     const content = await readGeneratedWrapperContent(path)
-    if (content.includes(RUNTIME_WRAPPER_MARKER)) await rm(path, { force: true })
+    if (hasRuntimeWrapperHeader(content)) await rm(path, { force: true })
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT") return
     throw error
@@ -231,7 +231,7 @@ async function existingNonRuntimeWrapper(path: string): Promise<boolean> {
     if (stat.isSymbolicLink()) return false
     if (!stat.isFile()) return true
     const content = await readFile(path, "utf8")
-    return !content.includes(RUNTIME_WRAPPER_MARKER)
+    return !hasRuntimeWrapperHeader(content)
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT") return false
     throw error
