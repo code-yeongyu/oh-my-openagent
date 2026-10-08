@@ -1,0 +1,2008 @@
+From 9a6a40824f893f286eaf3e680e15f5bd4d7f4b58 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Thu, 8 Oct 2026 18:55:18 +0300
+Subject: [PATCH] fix(runtime-fallback): protect compaction and exhausted retry
+ lanes
+
+---
+ .../auto-retry-timeout.test.ts                | 209 ++++++++++++-
+ .../runtime-fallback/auto-retry-timeout.ts    | 100 +++++-
+ .../chat-message-handler.test.ts              | 142 +++++++++
+ .../runtime-fallback/chat-message-handler.ts  |  36 +++
+ .../compaction-in-flight.test.ts              | 143 +++++++++
+ .../src/hooks/runtime-fallback/constants.ts   |   2 +
+ .../hooks/runtime-fallback/event-handler.ts   |  13 +-
+ .../hooks/runtime-fallback/fallback-state.ts  |  10 +
+ .../hooks/runtime-fallback/hook-rearm.test.ts | 286 ++++++++++++++++++
+ .../src/hooks/runtime-fallback/hook.ts        |  73 ++++-
+ .../message-update-handler.test.ts            |  39 +++
+ .../message-update-handler.ts                 |  37 ++-
+ .../session-status-handler.test.ts            |  20 ++
+ .../session-status-handler.ts                 |  53 +++-
+ .../src/hooks/runtime-fallback/types.ts       |   1 +
+ .../visible-assistant-response.ts             |   4 +
+ .../src/plugin/session-compacting.ts          |   2 +
+ .../src/shared/compaction-in-flight.ts        | 156 ++++++++++
+ .../omo-opencode/src/v2/event-shape.test.ts   |  35 +++
+ packages/omo-opencode/src/v2/event-shape.ts   |  16 +
+ packages/omo-opencode/src/v2/hook-bridge.ts   |  19 +-
+ packages/omo-opencode/src/v2/host.test.ts     |  53 ++++
+ 22 files changed, 1422 insertions(+), 27 deletions(-)
+ create mode 100644 packages/omo-opencode/src/hooks/runtime-fallback/compaction-in-flight.test.ts
+ create mode 100644 packages/omo-opencode/src/hooks/runtime-fallback/hook-rearm.test.ts
+ create mode 100644 packages/omo-opencode/src/shared/compaction-in-flight.ts
+ create mode 100644 packages/omo-opencode/src/v2/event-shape.test.ts
+
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts
+index c01a6b760..a9a706959 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts
+@@ -5,6 +5,7 @@ import { createFallbackState } from "./fallback-state"
+ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+ import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
++import { clearAllCompactions, isCompactionInFlight, recordCompactionEnd, recordCompactionStart } from "../../shared/compaction-in-flight"
+ 
+ function createContext(): RuntimeFallbackPluginInput {
+   return {
+@@ -57,6 +58,7 @@ function createDeps(): HookDeps {
+ describe("createFallbackTimeoutHelpers", () => {
+   afterEach(() => {
+     SessionCategoryRegistry.clear()
++    clearAllCompactions()
+     restoreRuntimeFallbackTestClock()
+   })
+ 
+@@ -102,7 +104,7 @@ describe("createFallbackTimeoutHelpers", () => {
+     expect(state.failedModels.size).toBe(0)
+   })
+ 
+-  test("#given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed", async () => {
++  test("#given an accepted fallback is awaiting its result #when timeout escalation is blocked #then residue is cleared after the abort", async () => {
+     // given
+     const sessionID = "session-timeout-awaiting-dispatch-blocked"
+     SessionCategoryRegistry.register(sessionID, "test")
+@@ -140,9 +142,8 @@ describe("createFallbackTimeoutHelpers", () => {
+     await new Promise((resolve) => setTimeout(resolve, 0))
+ 
+     // then
+-    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+-    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(true)
+-    helpers.clearSessionFallbackTimeout(sessionID)
++    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
++    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+   })
+ 
+   test("#given a timeout belongs to an older state generation #when that generation is replaced before its callback runs #then it never aborts the replacement request", async () => {
+@@ -222,4 +223,204 @@ describe("createFallbackTimeoutHelpers", () => {
+     expect(retryCalls).toBe(0)
+     expect(replacementState.currentModel).toBe("google/gemini-2.5-pro")
+   })
++
++  test("#given compaction remains active through the exact budget #when the watchdog reaches 600 seconds #then it aborts once without advancing fallback", async () => {
++    const sessionID = "session-timeout-compaction-budget"
++    SessionCategoryRegistry.register(sessionID, "test")
++    const deps = createDeps()
++    deps.options = { session_timeout_ms: 30_000 }
++    const state = createFallbackState("openai/gpt-5.4")
++    deps.sessionStates.set(sessionID, state)
++    deps.sessionAwaitingFallbackResult.add(sessionID)
++    deps.sessionAwaitingFallbackResult.add(sessionID)
++    deps.sessionRetryInFlight.add(sessionID)
++    let abortCalls = 0
++    let retryCalls = 0
++    let toastCalls = 0
++    deps.ctx.client.tui.showToast = async () => {
++      toastCalls += 1
++      return {}
++    }
++    const helpers = createFallbackTimeoutHelpers(
++      deps,
++      async () => { abortCalls += 1 },
++      async () => {
++        retryCalls += 1
++        return { accepted: true, status: "dispatched" }
++      },
++    )
++    const clock = installRuntimeFallbackTestClock(0)
++    recordCompactionStart(sessionID)
++    helpers.scheduleSessionFallbackTimeout(sessionID)
++
++    await clock.advanceBy(599_999)
++    expect(abortCalls).toBe(0)
++    expect(retryCalls).toBe(0)
++    expect(state.attemptCount).toBe(0)
++    expect(state.failedModels.size).toBe(0)
++    await clock.advanceBy(1)
++
++    expect(abortCalls).toBe(1)
++    expect(retryCalls).toBe(0)
++    expect(toastCalls).toBe(1)
++    expect(state.attemptCount).toBe(0)
++    expect(state.failedModels.size).toBe(0)
++    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
++    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
++    expect(isCompactionInFlight(sessionID)).toBe(false)
++  })
++
++  test("#given the watchdog is re-armed while the budget abort is pending #when the branch returns control #then no watchdog stays armed", async () => {
++    const sessionID = "session-timeout-compaction-budget-rearmed"
++    SessionCategoryRegistry.register(sessionID, "test")
++    const deps = createDeps()
++    deps.options = { session_timeout_ms: 30_000 }
++    const state = createFallbackState("openai/gpt-5.4")
++    deps.sessionStates.set(sessionID, state)
++    deps.sessionAwaitingFallbackResult.add(sessionID)
++    let abortCalls = 0
++    let retryCalls = 0
++    const helpers = createFallbackTimeoutHelpers(
++      deps,
++      async () => {
++        abortCalls += 1
++        if (abortCalls === 1) helpers.scheduleSessionFallbackTimeout(sessionID)
++      },
++      async () => {
++        retryCalls += 1
++        return { accepted: true, status: "dispatched" }
++      },
++    )
++    const clock = installRuntimeFallbackTestClock(0)
++    recordCompactionStart(sessionID)
++    helpers.scheduleSessionFallbackTimeout(sessionID)
++
++    await clock.advanceBy(600_000)
++
++    expect(abortCalls).toBe(1)
++    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
++
++    await clock.advanceBy(30_000)
++
++    expect(abortCalls).toBe(1)
++    expect(retryCalls).toBe(0)
++    expect(state.attemptCount).toBe(0)
++  })
++
++  test("#given compaction ends at 100 seconds #when the fresh watchdog window elapses #then it fires at 130 seconds", async () => {
++    const sessionID = "session-timeout-compaction-ended-window"
++    SessionCategoryRegistry.register(sessionID, "test")
++    const deps = createDeps()
++    deps.options = { session_timeout_ms: 30_000 }
++    const state = createFallbackState("openai/gpt-5.4")
++    deps.sessionStates.set(sessionID, state)
++    let abortCalls = 0
++    const helpers = createFallbackTimeoutHelpers(
++      deps,
++      async () => { abortCalls += 1 },
++      async () => ({ accepted: true, status: "dispatched" }),
++    )
++    const clock = installRuntimeFallbackTestClock(0)
++    recordCompactionStart(sessionID)
++    helpers.scheduleSessionFallbackTimeout(sessionID)
++
++    await clock.advanceBy(100_000)
++    expect(abortCalls).toBe(0)
++    recordCompactionEnd(sessionID)
++    helpers.scheduleSessionFallbackTimeout(sessionID)
++    await clock.advanceBy(29_999)
++    expect(abortCalls).toBe(0)
++    await clock.advanceBy(1)
++    expect(abortCalls).toBe(1)
++  })
++
++  test("#given no fallback can be prepared outside compaction #when the watchdog expires #then it aborts with an explicit wedge-return decision", async () => {
++    const sessionID = "session-timeout-no-fallback"
++    SessionCategoryRegistry.register(sessionID, "test")
++    const deps = createDeps()
++    deps.options = { session_timeout_ms: 1 }
++    deps.config.max_fallback_attempts = 0
++    const state = createFallbackState("openai/gpt-5.4")
++    deps.sessionStates.set(sessionID, state)
++    deps.sessionAwaitingFallbackResult.add(sessionID)
++    let abortCalls = 0
++    let retryCalls = 0
++    let toastCalls = 0
++    deps.ctx.client.tui.showToast = async () => {
++      toastCalls += 1
++      return {}
++    }
++    const helpers = createFallbackTimeoutHelpers(
++      deps,
++      async () => { abortCalls += 1 },
++      async () => {
++        retryCalls += 1
++        return { accepted: true, status: "dispatched" }
++      },
++    )
++    const clock = installRuntimeFallbackTestClock(0)
++    helpers.scheduleSessionFallbackTimeout(sessionID)
++    await clock.advanceBy(1)
++
++    expect(abortCalls).toBe(1)
++    expect(retryCalls).toBe(0)
++    expect(toastCalls).toBe(1)
++    expect(state.attemptCount).toBe(0)
++    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
++  })
++
++  test("#given a resolved agent on the original timer #when progress re-arms without an agent #then fallback dispatch keeps that agent", async () => {
++    const sessionID = "session-timeout-agent-rearm"
++    const deps = createDeps()
++    deps.options = { session_timeout_ms: 1 }
++    deps.pluginConfig = {
++      agents: {
++        worker: { fallback_models: ["litellm/openai.eu.gpt-5.5"] },
++      },
++    }
++    const state = createFallbackState("openai/gpt-5.4")
++    deps.sessionStates.set(sessionID, state)
++    let dispatchedAgent: string | undefined
++    const helpers = createFallbackTimeoutHelpers(
++      deps,
++      async () => {},
++      async (_sessionID, _model, resolvedAgent) => {
++        dispatchedAgent = resolvedAgent
++        return { accepted: true, status: "dispatched" }
++      },
++    )
++    const clock = installRuntimeFallbackTestClock(0)
++    helpers.scheduleSessionFallbackTimeout(sessionID, "worker")
++    helpers.scheduleSessionFallbackTimeout(sessionID)
++    await clock.advanceBy(1)
++
++    expect(dispatchedAgent).toBe("worker")
++  })
++
++  test("#given fallback dispatch is refused after the timeout abort #when the watchdog fires #then the user receives one toast", async () => {
++    const sessionID = "session-timeout-dispatch-refused-toast"
++    SessionCategoryRegistry.register(sessionID, "test")
++    const deps = createDeps()
++    deps.options = { session_timeout_ms: 1 }
++    const state = createFallbackState("openai/gpt-5.4")
++    deps.sessionStates.set(sessionID, state)
++    let abortCalls = 0
++    let toastCalls = 0
++    deps.ctx.client.tui.showToast = async () => {
++      toastCalls += 1
++      return {}
++    }
++    const helpers = createFallbackTimeoutHelpers(
++      deps,
++      async () => { abortCalls += 1 },
++      async () => ({ accepted: false, status: "blocked", reason: "refused" }),
++    )
++    const clock = installRuntimeFallbackTestClock(0)
++
++    helpers.scheduleSessionFallbackTimeout(sessionID)
++    await clock.advanceBy(1)
++
++    expect(abortCalls).toBe(1)
++    expect(toastCalls).toBe(1)
++  })
+ })
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts
+index 9c7e4eb27..4284753cb 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.ts
+@@ -1,10 +1,11 @@
+ import type { AutoRetryDispatchOutcome, HookDeps, RuntimeFallbackTimeout } from "./types"
+-import { HOOK_NAME } from "./constants"
++import { COMPACTION_WATCHDOG_BUDGET_MS, HOOK_NAME } from "./constants"
+ import { log } from "../../shared/logger"
+ import { getFallbackModelsForSession } from "./fallback-models"
+-import { prepareFallback } from "./fallback-state"
++import { canPrepareFallback, prepareFallback } from "./fallback-state"
+ import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-snapshot"
+ import { subagentSessions } from "../../features/claude-code-session-state"
++import { getCompaction, recordCompactionEnd } from "../../shared/compaction-in-flight"
+ 
+ declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
+ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+@@ -27,6 +28,20 @@ export function createFallbackTimeoutHelpers(
+     sessionFallbackTimeouts,
+     pluginConfig,
+   } = deps
++  const sessionResolvedAgents = new Map<string, string>()
++
++  const showWatchdogToast = async (sessionID: string, message: string) => {
++    try {
++      await deps.ctx.client.tui.showToast({ body: {
++        title: "Runtime fallback",
++        message,
++        variant: "warning",
++        duration: 3000,
++      } })
++    } catch (error) {
++      log(`[${HOOK_NAME}] Session fallback watchdog toast failed`, { sessionID, error: String(error) })
++    }
++  }
+ 
+   const clearSessionFallbackTimeout = (sessionID: string) => {
+     const timer = sessionFallbackTimeouts.get(sessionID)
+@@ -34,13 +49,19 @@ export function createFallbackTimeoutHelpers(
+       clearTimeout(timer)
+       sessionFallbackTimeouts.delete(sessionID)
+     }
++    sessionResolvedAgents.delete(sessionID)
+   }
+ 
+-  const scheduleSessionFallbackTimeout = (sessionID: string, resolvedAgent?: string) => {
++  const scheduleSessionFallbackTimeout = (sessionID: string, resolvedAgent?: string, delayOverride?: number) => {
++    const effectiveResolvedAgent = resolvedAgent ?? sessionResolvedAgents.get(sessionID)
+     clearSessionFallbackTimeout(sessionID)
++    if (effectiveResolvedAgent) {
++      sessionResolvedAgents.set(sessionID, effectiveResolvedAgent)
++    }
+ 
+     const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
+     if (timeoutMs <= 0) return
++    const delayMs = delayOverride ?? timeoutMs
+     const wasSubagentSession = subagentSessions.has(sessionID)
+     const fallbackState = sessionStates.get(sessionID)
+ 
+@@ -64,10 +85,65 @@ export function createFallbackTimeoutHelpers(
+       }
+       const state = fallbackState
+ 
++      const compaction = getCompaction(sessionID)
++      if (compaction && !compaction.endedAt) {
++        const elapsed = Date.now() - compaction.startedAt
++        if (elapsed < COMPACTION_WATCHDOG_BUDGET_MS) {
++          log(`[${HOOK_NAME}] compaction in flight; deferring session timeout (compaction-aware-timeout)`, { sessionID })
++          scheduleSessionFallbackTimeout(
++            sessionID,
++            effectiveResolvedAgent,
++            Math.min(timeoutMs, COMPACTION_WATCHDOG_BUDGET_MS - elapsed),
++          )
++          return
++        }
++        log(`[${HOOK_NAME}] compaction watchdog budget exhausted; returning control without fallback (compaction-aware-timeout)`, {
++          sessionID,
++          elapsed,
++          budgetMs: COMPACTION_WATCHDOG_BUDGET_MS,
++        })
++        await abortSessionRequest(sessionID, "session.timeout")
++        recordCompactionEnd(sessionID)
++        await showWatchdogToast(sessionID, "Compaction exceeded its watchdog budget")
++        deps.sessionAwaitingFallbackResult.delete(sessionID)
++        sessionRetryInFlight.delete(sessionID)
++        sessionResolvedAgents.delete(sessionID)
++        // Events caused by the abort can re-arm the watchdog while the awaits above are pending.
++        clearSessionFallbackTimeout(sessionID)
++        return
++      }
++
++      if (compaction?.endedAt) {
++        const elapsed = Date.now() - compaction.endedAt
++        if (elapsed < timeoutMs) {
++          scheduleSessionFallbackTimeout(sessionID, effectiveResolvedAgent, timeoutMs - elapsed)
++          return
++        }
++      }
++
+       if (sessionRetryInFlight.has(sessionID)) {
+         log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
+       }
+ 
++      const fallbackModels = getFallbackModelsForSession(sessionID, effectiveResolvedAgent, pluginConfig)
++      if (!canPrepareFallback(state, fallbackModels, config)) {
++        // A timeout outside compaction is a deliberate wedge return: the stream
++        // is considered stuck, so abort to return control to the user even when
++        // no replacement can be prepared. This branch never dispatches.
++        log(`[${HOOK_NAME}] fallback exhausted; aborting stuck session without replacement (fallback-exhausted-wedge-return)`, {
++          sessionID,
++          fallbackModels: fallbackModels.length,
++        })
++        await abortSessionRequest(sessionID, "session.timeout")
++        await showWatchdogToast(sessionID, "Runtime fallback could not prepare a replacement")
++        deps.sessionAwaitingFallbackResult.delete(sessionID)
++        sessionRetryInFlight.delete(sessionID)
++        sessionResolvedAgents.delete(sessionID)
++        // Same window as the budget branch: nothing may stay armed once control is returned.
++        clearSessionFallbackTimeout(sessionID)
++        return
++      }
++
+       await abortSessionRequest(sessionID, "session.timeout")
+       if (sessionStates.get(sessionID) !== state) {
+         log(`[${HOOK_NAME}] Session fallback timeout skipped for stale state generation`, {
+@@ -83,9 +159,6 @@ export function createFallbackTimeoutHelpers(
+       state.pendingFallbackPromptMayHaveBeenAccepted = false
+       const stateSnapshot = snapshotFallbackState(state)
+ 
+-      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+-      if (fallbackModels.length === 0) return
+-
+       log(`[${HOOK_NAME}] Session fallback timeout reached`, {
+         sessionID,
+         timeoutSeconds: config.timeout_seconds,
+@@ -94,20 +167,25 @@ export function createFallbackTimeoutHelpers(
+ 
+       const result = prepareFallback(sessionID, state, fallbackModels, config)
+       if (result.success && result.newModel) {
+-        const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
++        const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, effectiveResolvedAgent, "session.timeout")
+         if (!dispatchOutcome.accepted) {
+           restoreFallbackState(state, stateSnapshot)
+-          if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
+-            scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
+-          }
++          state.pendingFallbackModel = undefined
++          state.pendingFallbackPromptMayHaveBeenAccepted = false
++          deps.sessionAwaitingFallbackResult.delete(sessionID)
++          deps.sessionRetryInFlight.delete(sessionID)
++          sessionResolvedAgents.delete(sessionID)
++          clearSessionFallbackTimeout(sessionID)
++          await showWatchdogToast(sessionID, "Runtime fallback dispatch was not accepted")
+           log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
+             sessionID,
+             status: dispatchOutcome.status,
+             reason: dispatchOutcome.reason,
++            clearedPendingFallbackState: true,
+           })
+         }
+       }
+-    }, timeoutMs)
++    }, delayMs)
+ 
+     sessionFallbackTimeouts.set(sessionID, timer)
+   }
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+index 48ff3b1e6..ce579e8d2 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+@@ -3,6 +3,9 @@ import { describe, expect, test } from "bun:test"
+ import { createChatMessageHandler } from "./chat-message-handler"
+ import { createFallbackState } from "./fallback-state"
+ import type { HookDeps } from "./types"
++import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
++import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared/runtime-fallback-retry-marker"
++import { COMPACTION_CONTINUE_TEXT, reissueCompactionContinue } from "../../plugin/compaction-autocontinue-reroute"
+ 
+ function createDeps(): HookDeps {
+   return {
+@@ -254,4 +257,143 @@ describe("createChatMessageHandler runtime fallback model override", () => {
+       variant: "high",
+     })
+   })
++
++  test("#given a capped state #when a human prompt arrives #then only the cap counters reset", async () => {
++    const deps = createDeps()
++    const sessionID = "session-capped-human-prompt"
++    const state = createFallbackState("openai/gpt-5.4")
++    state.currentModel = "google/gemini-2.5-pro"
++    state.fallbackIndex = 1
++    state.attemptCount = deps.config.max_fallback_attempts
++    state.failedModels.set("openai/gpt-5.4", Date.now())
++    deps.sessionStates.set(sessionID, state)
++    const handler = createChatMessageHandler(deps)
++
++    await handler({ sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } }, {
++      message: {},
++      parts: [{ type: "text", text: "Please continue with the task" }],
++    })
++
++    expect(state.attemptCount).toBe(0)
++    expect(state.fallbackIndex).toBe(-1)
++    expect(state.failedModels.size).toBe(1)
++    expect(state.currentModel).toBe("google/gemini-2.5-pro")
++  })
++
++  test("#given a capped state #when an internal initiator prompt arrives #then the cap remains", async () => {
++    const deps = createDeps()
++    const sessionID = "session-capped-internal-prompt"
++    const state = createFallbackState("openai/gpt-5.4")
++    state.attemptCount = deps.config.max_fallback_attempts
++    state.fallbackIndex = 1
++    deps.sessionStates.set(sessionID, state)
++
++    await createChatMessageHandler(deps)({ sessionID }, {
++      message: {},
++      parts: [{ type: "text", text: `wake${OMO_INTERNAL_INITIATOR_MARKER}` }],
++    })
++
++    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
++    expect(state.fallbackIndex).toBe(1)
++  })
++
++  test("#given a capped state #when a runtime fallback retry prompt arrives #then the cap remains", async () => {
++    const deps = createDeps()
++    const sessionID = "session-capped-retry-prompt"
++    const state = createFallbackState("openai/gpt-5.4")
++    state.attemptCount = deps.config.max_fallback_attempts
++    state.fallbackIndex = 1
++    deps.sessionStates.set(sessionID, state)
++
++    await createChatMessageHandler(deps)({ sessionID }, {
++      message: {},
++      parts: [{ type: "text", text: `retry this${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
++    })
++
++    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
++    expect(state.fallbackIndex).toBe(1)
++  })
++
++  test("#given a capped state #when chat.message has no parts #then the cap remains", async () => {
++    const deps = createDeps()
++    const sessionID = "session-capped-no-parts"
++    const state = createFallbackState("openai/gpt-5.4")
++    state.attemptCount = deps.config.max_fallback_attempts
++    state.fallbackIndex = 1
++    deps.sessionStates.set(sessionID, state)
++
++    await createChatMessageHandler(deps)({ sessionID }, { message: {} })
++
++    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
++    expect(state.fallbackIndex).toBe(1)
++  })
++
++  test("#given a capped state #when the rerouted compaction auto-continue prompt arrives #then the cap remains", async () => {
++    const deps = createDeps()
++    const sessionID = "session-capped-compaction-continue"
++    const state = createFallbackState("openai/gpt-5.4")
++    state.currentModel = "google/gemini-2.5-pro"
++    state.attemptCount = deps.config.max_fallback_attempts
++    state.fallbackIndex = 1
++    deps.sessionStates.set(sessionID, state)
++    let reissuedParts: Array<{ type: string; text?: string }> | undefined
++    await reissueCompactionContinue({
++      client: {
++        session: {
++          messages: async () => ({ data: [] }),
++          promptAsync: async ({ body }) => {
++            reissuedParts = body.parts
++            return {}
++          },
++        },
++      },
++      sessionID,
++      agent: null,
++      workingModel: { providerID: "google", modelID: "gemini-2.5-pro" },
++    })
++
++    await createChatMessageHandler(deps)(
++      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
++      { message: {}, parts: reissuedParts ?? [] },
++    )
++
++    expect(reissuedParts).toEqual([
++      { type: "text", text: COMPACTION_CONTINUE_TEXT, metadata: { compaction_continue: true } },
++    ])
++    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
++    expect(state.fallbackIndex).toBe(1)
++  })
++
++  test("#given a capped state #when a marker-less synthetic prompt arrives #then the cap remains", async () => {
++    const deps = createDeps()
++    const sessionID = "session-capped-synthetic-prompt"
++    const state = createFallbackState("openai/gpt-5.4")
++    state.attemptCount = deps.config.max_fallback_attempts
++    state.fallbackIndex = 1
++    deps.sessionStates.set(sessionID, state)
++    const syntheticParts = [{ type: "text", text: "Continue if you have next steps", synthetic: true }]
++
++    await createChatMessageHandler(deps)({ sessionID }, { message: {}, parts: syntheticParts })
++
++    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
++    expect(state.fallbackIndex).toBe(1)
++  })
++
++  test("#given a capped state #when a human prompt carries a synthetic attachment part #then the cap counters reset", async () => {
++    const deps = createDeps()
++    const sessionID = "session-capped-human-prompt-with-synthetic-part"
++    const state = createFallbackState("openai/gpt-5.4")
++    state.attemptCount = deps.config.max_fallback_attempts
++    state.fallbackIndex = 1
++    deps.sessionStates.set(sessionID, state)
++    const humanPartsWithAttachment = [
++      { type: "text", text: "Please review this file" },
++      { type: "text", text: "Called the Read tool with the following input: {}", synthetic: true },
++    ]
++
++    await createChatMessageHandler(deps)({ sessionID }, { message: {}, parts: humanPartsWithAttachment })
++
++    expect(state.attemptCount).toBe(0)
++    expect(state.fallbackIndex).toBe(-1)
++  })
+ })
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts
+index a21b77027..da7816f5c 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts
+@@ -7,9 +7,38 @@ import { createFallbackState, isModelInCooldown, stringifyRuntimeModelWithVarian
+ import { buildRetryModelPayload } from "./retry-model-payload"
+ import { resolveRuntimeModelSettings } from "./runtime-model-settings"
+ import { getSessionAgent } from "../../features/claude-code-session-state"
++import { hasInternalInitiatorMarker } from "../../shared/internal-initiator-marker"
++import { hasRuntimeFallbackRetryMarker } from "../../shared/runtime-fallback-retry-marker"
++import { hasCompactionPart } from "../../shared/compaction-marker"
+ 
+ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+ 
++function isAutomatedPromptPart(part: object): boolean {
++  const { synthetic, metadata } = part as { synthetic?: unknown; metadata?: unknown }
++  if (synthetic === true) return true
++  return typeof metadata === "object"
++    && metadata !== null
++    && (metadata as { compaction_continue?: unknown }).compaction_continue === true
++}
++
++function isHumanPromptParts(parts: unknown): boolean {
++  if (!Array.isArray(parts) || parts.length === 0 || hasCompactionPart(parts)) return false
++
++  let hasSubstantiveText = false
++  for (const part of parts) {
++    if (typeof part !== "object" || part === null || (part as { type?: unknown }).type !== "text") continue
++    const text = (part as { text?: unknown }).text
++    if (typeof text !== "string" || text.trim().length === 0) continue
++    if (hasInternalInitiatorMarker(text) || hasRuntimeFallbackRetryMarker(text)) return false
++    // Automated prompts can be marker-less (reissueCompactionContinue sends only metadata.compaction_continue),
++    // while human prompts can carry synthetic attachment parts: skip the part, not the whole message.
++    if (isAutomatedPromptPart(part)) continue
++    hasSubstantiveText = true
++  }
++
++  return hasSubstantiveText
++}
++
+ export function createChatMessageHandler(deps: HookDeps) {
+   const {
+     config,
+@@ -87,6 +116,13 @@ export function createChatMessageHandler(deps: HookDeps) {
+       return
+     }
+ 
++    const cappedState = config.max_fallback_attempts > 0 && state.attemptCount >= config.max_fallback_attempts
++    if (cappedState && isHumanPromptParts(output.parts)) {
++      log(`[${HOOK_NAME}] capped-state-reset-on-human-prompt`, { sessionID })
++      state.attemptCount = 0
++      state.fallbackIndex = -1
++    }
++
+     if (requestedModel && requestedModel !== state.currentModel) {
+       log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
+         sessionID,
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/compaction-in-flight.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/compaction-in-flight.test.ts
+new file mode 100644
+index 000000000..601e22b18
+--- /dev/null
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/compaction-in-flight.test.ts
+@@ -0,0 +1,143 @@
++import { afterEach, describe, expect, test } from "bun:test"
++import {
++  getCompaction,
++  isCompactionInFlight,
++  observeCompactionEvent,
++  clearAllCompactions,
++  recordCompactionEnd,
++  recordCompactionStart,
++} from "../../shared/compaction-in-flight"
++import {
++  installRuntimeFallbackTestClock,
++  restoreRuntimeFallbackTestClock,
++} from "./test-timeout-clock.test-support"
++
++describe("compaction-in-flight registry", () => {
++  afterEach(() => {
++    clearAllCompactions()
++    restoreRuntimeFallbackTestClock()
++  })
++
++  test("tracks a compaction until its completion event", () => {
++    installRuntimeFallbackTestClock(1000)
++    recordCompactionStart("session")
++    expect(isCompactionInFlight("session")).toBe(true)
++    observeCompactionEvent({ type: "session.compacted", properties: { sessionID: "session" } })
++    expect(isCompactionInFlight("session")).toBe(false)
++    expect(getCompaction("session")?.endedAt).toBe(1000)
++  })
++
++  test("tracks the V2 compaction started event until it fails", () => {
++    installRuntimeFallbackTestClock(1000)
++    observeCompactionEvent({ type: "session.compaction.started", properties: { sessionID: "session" } })
++    expect(isCompactionInFlight("session")).toBe(true)
++    observeCompactionEvent({ type: "session.compaction.failed", properties: { sessionID: "session" } })
++    expect(isCompactionInFlight("session")).toBe(false)
++  })
++
++  test("does not clear a compaction on session.idle", () => {
++    installRuntimeFallbackTestClock(1000)
++    recordCompactionStart("session")
++    observeCompactionEvent({ type: "session.idle", properties: { sessionID: "session" } })
++    expect(isCompactionInFlight("session")).toBe(true)
++  })
++
++  test("recognizes an in-progress compaction assistant message", () => {
++    installRuntimeFallbackTestClock(1000)
++    observeCompactionEvent({
++      type: "message.updated",
++      properties: { info: { sessionID: "session", id: "message", role: "assistant", agent: "compaction" } },
++    })
++    expect(getCompaction("session")?.messageID).toBe("message")
++  })
++
++  test("expires an abandoned compaction after the registry TTL", () => {
++    installRuntimeFallbackTestClock(1000)
++    recordCompactionStart("session")
++    installRuntimeFallbackTestClock(901_001)
++    expect(getCompaction("session")).toBeUndefined()
++  })
++
++  test("keeps the plugin-start generation when a message start follows it", () => {
++    installRuntimeFallbackTestClock(1000)
++    recordCompactionStart("session")
++    const pluginGeneration = getCompaction("session")
++    installRuntimeFallbackTestClock(2000)
++
++    observeCompactionEvent({
++      type: "message.updated",
++      properties: { info: { sessionID: "session", id: "message", role: "assistant", agent: "compaction" } },
++    })
++
++    expect(getCompaction("session")).toMatchObject({
++      gen: pluginGeneration?.gen,
++      startedAt: 1000,
++      messageID: "message",
++    })
++  })
++
++  test("ignores a stale message end from an older generation", () => {
++    installRuntimeFallbackTestClock(1000)
++    observeCompactionEvent({
++      type: "message.updated",
++      properties: { info: { sessionID: "session", id: "first", role: "assistant", agent: "compaction" } },
++    })
++    installRuntimeFallbackTestClock(2000)
++    recordCompactionStart("session")
++    observeCompactionEvent({
++      type: "message.updated",
++      properties: { info: { sessionID: "session", id: "second", role: "assistant", agent: "compaction" } },
++    })
++    observeCompactionEvent({
++      type: "message.updated",
++      properties: { info: { sessionID: "session", id: "first", role: "assistant", time: { completed: 3000 } } },
++    })
++
++    expect(isCompactionInFlight("session")).toBe(true)
++    expect(getCompaction("session")?.messageID).toBe("second")
++  })
++
++  test("ignores a stale session end when it identifies an older generation", () => {
++    installRuntimeFallbackTestClock(1000)
++    recordCompactionStart("session")
++    const firstGeneration = getCompaction("session")?.gen
++    installRuntimeFallbackTestClock(2000)
++    recordCompactionStart("session")
++    const secondGeneration = getCompaction("session")?.gen
++
++    observeCompactionEvent({
++      type: "session.compaction.ended",
++      properties: { sessionID: "session", generation: firstGeneration },
++    })
++
++    expect(getCompaction("session")).toMatchObject({ gen: secondGeneration, startedAt: 2000 })
++    expect(isCompactionInFlight("session")).toBe(true)
++  })
++
++  test("ignores an end event received before the first start", () => {
++    installRuntimeFallbackTestClock(1000)
++    recordCompactionEnd("session")
++    expect(getCompaction("session")).toBeUndefined()
++
++    recordCompactionStart("session")
++    expect(isCompactionInFlight("session")).toBe(true)
++  })
++
++  test("ignores a late non-completed update for the ended compaction message", () => {
++    installRuntimeFallbackTestClock(1000)
++    observeCompactionEvent({
++      type: "message.updated",
++      properties: { info: { sessionID: "session", id: "message", role: "assistant", agent: "compaction" } },
++    })
++    recordCompactionEnd("session", undefined, "message")
++    installRuntimeFallbackTestClock(2000)
++
++    observeCompactionEvent({
++      type: "message.updated",
++      properties: { info: { sessionID: "session", id: "message", role: "assistant", agent: "compaction" } },
++    })
++
++    expect(getCompaction("session")).toMatchObject({ endedAt: 1000, messageID: "message" })
++    expect(isCompactionInFlight("session")).toBe(false)
++  })
++})
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/constants.ts b/packages/omo-opencode/src/hooks/runtime-fallback/constants.ts
+index 782564fa5..ef5fe6953 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/constants.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/constants.ts
+@@ -41,3 +41,5 @@ export const HOOK_NAME = "runtime-fallback"
+  * would otherwise be the only safety net.
+  */
+ export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = 180_000
++
++export const COMPACTION_WATCHDOG_BUDGET_MS = 600_000
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts b/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
+index 08eedbe9b..8e129597b 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
+@@ -18,6 +18,7 @@ import { buildRetryModelPayload } from "./retry-model-payload"
+ import { resolveRuntimeModelSettings } from "./runtime-model-settings"
+ import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+ import { normalizeModelToCanonicalString } from "./normalize-model"
++import { isCompactionInFlight } from "../../shared/compaction-in-flight"
+ 
+ function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
+   return typeof value === "object" && value !== null
+@@ -76,6 +77,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+     sessionAwaitingFallbackResult.delete(sessionID)
+     deps.internallyAbortedSessions.delete(sessionID)
+     sessionStatusRetryKeys.delete(sessionID)
++    deps.fallbackExhaustionToastStates?.delete(sessionID)
+     helpers.clearSessionFallbackTimeout(sessionID)
+   }
+ 
+@@ -130,6 +132,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+       deps.internallyAbortedSessions.delete(sessionID)
+       helpers.clearSessionFallbackTimeout(sessionID)
+       sessionStatusRetryKeys.delete(sessionID)
++      deps.fallbackExhaustionToastStates?.delete(sessionID)
+       SessionCategoryRegistry.remove(sessionID)
+     }
+   }
+@@ -154,6 +157,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+     const role = info?.role as string | undefined
+     if (!sessionID || role !== "user") return
+ 
++    // Capped-state reset lives in chat.message because message.updated payloads carry no parts.
++
+     cancelledSessions.delete(sessionID)
+   }
+ 
+@@ -198,6 +203,11 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+       return
+     }
+ 
++    if (!isAbortError(error) && isCompactionInFlight(sessionID)) {
++      log(`[${HOOK_NAME}] session.error belongs to compaction lane; preserving fallback state`, { sessionID })
++      return
++    }
++
+     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+ 
+     if (isAbortError(error)) {
+@@ -268,12 +278,13 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+     }
+ 
+     if (!state) {
+-      const initialModel = resolveFallbackBootstrapModel({
++      const initialModel = await resolveFallbackBootstrapModel({
+         sessionID,
+         source: "session.error",
+         eventModel: resolveEventModel(props),
+         resolvedAgent,
+         pluginConfig,
++        ctx: deps.ctx,
+       })
+       if (!initialModel) {
+         log(`[${HOOK_NAME}] No model info available, cannot fallback`, { sessionID })
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.ts b/packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.ts
+index 140f7b700..18a1b52ab 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/fallback-state.ts
+@@ -59,6 +59,16 @@ export function findNextAvailableFallback(
+   return undefined
+ }
+ 
++export function canPrepareFallback(
++  state: FallbackState | undefined,
++  fallbackModels: string[],
++  config: Required<Pick<RuntimeFallbackConfig, "max_fallback_attempts" | "cooldown_seconds">>,
++): boolean {
++  return state !== undefined
++    && state.attemptCount < config.max_fallback_attempts
++    && findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds) !== undefined
++}
++
+ export function prepareFallback(
+   sessionID: string,
+   state: FallbackState,
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/hook-rearm.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/hook-rearm.test.ts
+new file mode 100644
+index 000000000..5edd47f39
+--- /dev/null
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/hook-rearm.test.ts
+@@ -0,0 +1,286 @@
++import { afterEach, describe, expect, test } from "bun:test"
++import { createAutoRetryHelpers } from "./auto-retry"
++import { createRuntimeFallbackHook } from "./hook"
++import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackPluginInput } from "./types"
++import {
++  clearAllCompactions,
++  recordCompactionEnd,
++  recordCompactionStart,
++} from "../../shared/compaction-in-flight"
++import {
++  installRuntimeFallbackTestClock,
++  restoreRuntimeFallbackTestClock,
++} from "./test-timeout-clock.test-support"
++import { SessionCategoryRegistry } from "../../shared/session-category-registry"
++
++const hookConfig = {
++  enabled: true,
++  retry_on_errors: [429, 503, 529],
++  max_fallback_attempts: 3,
++  cooldown_seconds: 0,
++  timeout_seconds: 10,
++  notify_on_fallback: false,
++  restore_primary_after_cooldown: false,
++}
++
++function createContext(
++  abortCalls: string[],
++  toastCalls: string[],
++  observers: { onAbort?: () => Promise<void>; onPrompt?: () => void } = {},
++): RuntimeFallbackPluginInput {
++  return {
++    client: {
++      session: {
++        abort: async ({ path }) => {
++          abortCalls.push(path.id)
++          await observers.onAbort?.()
++          return {}
++        },
++        messages: async () => ({ data: [] }),
++        promptAsync: async () => {
++          observers.onPrompt?.()
++          return {}
++        },
++      },
++      tui: {
++        showToast: async ({ body }) => {
++          toastCalls.push(body.message)
++          return {}
++        },
++      },
++    },
++    directory: "/test/dir",
++  }
++}
++
++afterEach(() => {
++  SessionCategoryRegistry.clear()
++  clearAllCompactions()
++  restoreRuntimeFallbackTestClock()
++})
++
++describe("runtime fallback hook compaction re-arm guards", () => {
++  test("#given compaction progress arrives near the watchdog budget #when it re-arms a long timeout #then the budget abort still executes", async () => {
++    const abortCalls: string[] = []
++    const toastCalls: string[] = []
++    let deps: HookDeps | undefined
++    const clock = installRuntimeFallbackTestClock(0)
++    const hook = createRuntimeFallbackHook(createContext(abortCalls, toastCalls), {
++      config: {
++        enabled: true,
++        retry_on_errors: [429, 503, 529],
++        max_fallback_attempts: 3,
++        cooldown_seconds: 0,
++        timeout_seconds: 10,
++        notify_on_fallback: false,
++        restore_primary_after_cooldown: false,
++      },
++      session_timeout_ms: 10_000,
++    }, {
++      createAutoRetryHelpers: (nextDeps) => {
++        deps = nextDeps
++        return createAutoRetryHelpers(nextDeps)
++      },
++    })
++    const sessionID = "session-hook-progress-budget"
++    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
++    deps?.sessionAwaitingFallbackResult.add(sessionID)
++    recordCompactionStart(sessionID)
++
++    await clock.advanceBy(599_000)
++    await hook.event({ event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } })
++    await clock.advanceBy(1_000)
++
++    expect(abortCalls).toEqual([sessionID])
++    expect(toastCalls).toEqual(["Compaction exceeded its watchdog budget"])
++    expect(deps?.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
++    hook.dispose?.()
++  })
++
++  test("#given an ended compaction #when repeated message updates arrive #then post-compaction re-arm runs once per endedAt", async () => {
++    const scheduleCalls: Array<{ sessionID: string }> = []
++    let deps: HookDeps | undefined
++    const hook = createRuntimeFallbackHook(createContext([], []), {}, {
++      createAutoRetryHelpers: (nextDeps) => {
++        deps = nextDeps
++        return {
++          abortSessionRequest: async () => {},
++          clearSessionFallbackTimeout: () => {},
++          scheduleSessionFallbackTimeout: (sessionID: string) => {
++            scheduleCalls.push({ sessionID })
++          },
++          autoRetryWithFallback: async () => ({ accepted: true, status: "dispatched" as const }),
++          resolveAgentForSessionFromContext: async () => undefined,
++          cleanupStaleSessions: () => {},
++        }
++      },
++      createEventHandler: () => async () => {},
++      createMessageUpdateHandler: () => async () => {},
++      createChatMessageHandler: () => async () => {},
++      createFirstPromptWatchdog: () => ({
++        onUserMessage: () => {},
++        onAssistantProgress: () => {},
++        onSessionTerminal: () => {},
++        dispose: () => {},
++      }),
++    })
++    const sessionID = "session-hook-ended-rearm"
++    deps?.sessionAwaitingFallbackResult.add(sessionID)
++    recordCompactionStart(sessionID)
++    recordCompactionEnd(sessionID)
++
++    await hook.event({ event: { type: "message.updated", properties: { sessionID, info: { sessionID, role: "assistant", time: { completed: 1 } } } } })
++    await hook.event({ event: { type: "message.updated", properties: { sessionID, info: { sessionID, role: "assistant", time: { completed: 1 } } } } })
++
++    expect(scheduleCalls).toEqual([{ sessionID }])
++    hook.dispose?.()
++  })
++
++  test("#given the budget abort's own errored message.updated and session.idle land before cleanup #when the re-armed window elapses #then no second abort and no fallback dispatch follow", async () => {
++    const abortCalls: string[] = []
++    const toastCalls: string[] = []
++    let promptCalls = 0
++    let deps: HookDeps | undefined
++    const sessionID = "session-hook-budget-abort-window"
++    const compactionMessage = { sessionID, id: "compaction-message", role: "assistant", agent: "compaction" }
++    SessionCategoryRegistry.register(sessionID, "test")
++    const clock = installRuntimeFallbackTestClock(0)
++    const hook: RuntimeFallbackHook = createRuntimeFallbackHook(createContext(abortCalls, toastCalls, {
++      onAbort: async () => {
++        if (abortCalls.length !== 1) return
++        await hook.event({ event: { type: "message.updated", properties: { info: { ...compactionMessage, error: { name: "MessageAbortedError", message: "aborted" } } } } })
++        await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
++      },
++      onPrompt: () => {
++        promptCalls += 1
++      },
++    }), {
++      config: hookConfig,
++      pluginConfig: { categories: { test: { fallback_models: ["anthropic/claude-sonnet-4-5"] } } },
++      session_timeout_ms: 10_000,
++    }, {
++      createAutoRetryHelpers: (nextDeps) => {
++        deps = nextDeps
++        return createAutoRetryHelpers(nextDeps)
++      },
++    })
++    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
++    deps?.sessionAwaitingFallbackResult.add(sessionID)
++    await hook.event({ event: { type: "message.updated", properties: { info: compactionMessage } } })
++
++    await clock.advanceBy(599_000)
++    await hook.event({ event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } })
++    await clock.advanceBy(1_000)
++
++    expect(abortCalls).toEqual([sessionID])
++    expect(deps?.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
++    expect(deps?.sessionFallbackTimeouts.has(sessionID)).toBe(false)
++
++    await clock.advanceBy(10_000)
++
++    expect(abortCalls).toEqual([sessionID])
++    expect(toastCalls).toEqual(["Compaction exceeded its watchdog budget"])
++    expect(promptCalls).toBe(0)
++    expect(deps?.sessionStates.get(sessionID)?.attemptCount).toBe(0)
++    expect(deps?.sessionStates.get(sessionID)?.currentModel).toBe("openai/gpt-5.4")
++    hook.dispose?.()
++  })
++
++  test("#given stream progress lands while the wedge-return abort is pending #when the re-armed window elapses #then the session is not aborted a second time", async () => {
++    const abortCalls: string[] = []
++    const toastCalls: string[] = []
++    let deps: HookDeps | undefined
++    const sessionID = "session-hook-wedge-abort-window"
++    const progressEvent = { event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } }
++    const clock = installRuntimeFallbackTestClock(0)
++    const hook: RuntimeFallbackHook = createRuntimeFallbackHook(createContext(abortCalls, toastCalls, {
++      onAbort: async () => {
++        if (abortCalls.length === 1) await hook.event(progressEvent)
++      },
++    }), {
++      config: hookConfig,
++      session_timeout_ms: 10_000,
++    }, {
++      createAutoRetryHelpers: (nextDeps) => {
++        deps = nextDeps
++        return createAutoRetryHelpers(nextDeps)
++      },
++    })
++    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
++    deps?.sessionAwaitingFallbackResult.add(sessionID)
++    await hook.event(progressEvent)
++
++    await clock.advanceBy(10_000)
++
++    expect(abortCalls).toEqual([sessionID])
++    expect(deps?.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
++    expect(deps?.sessionFallbackTimeouts.has(sessionID)).toBe(false)
++
++    await clock.advanceBy(10_000)
++
++    expect(abortCalls).toEqual([sessionID])
++    expect(toastCalls).toEqual(["Runtime fallback could not prepare a replacement"])
++    hook.dispose?.()
++  })
++
++  test("#given stream progress lands while a refused fallback dispatch is pending #when the re-armed window elapses #then no second abort or fallback dispatch follows", async () => {
++    const abortCalls: string[] = []
++    const toastCalls: string[] = []
++    let promptCalls = 0
++    let deps: HookDeps | undefined
++    let hook: RuntimeFallbackHook
++    const sessionID = "session-hook-refused-dispatch-window"
++    SessionCategoryRegistry.register(sessionID, "test")
++    const progressEvent = { event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } }
++    const clock = installRuntimeFallbackTestClock(0)
++    hook = createRuntimeFallbackHook({
++      client: {
++        session: {
++          abort: async ({ path }) => {
++            abortCalls.push(path.id)
++            if (abortCalls.length === 1) await hook.event(progressEvent)
++            return {}
++          },
++          messages: async () => ({ data: [{ info: { id: "user-message", role: "user" }, parts: [{ type: "text", text: "real human prompt" }] }] }),
++          promptAsync: async () => {
++            promptCalls += 1
++            throw new Error("provider rejected prompt")
++          },
++        },
++        tui: {
++          showToast: async ({ body }) => {
++            toastCalls.push(body.message)
++            return {}
++          },
++        },
++      },
++      directory: "/test/dir",
++    }, {
++      config: hookConfig,
++      pluginConfig: { categories: { test: { fallback_models: ["anthropic/claude-sonnet-4-5", "google/gemini-2.5-pro"] } } },
++      session_timeout_ms: 10_000,
++    }, {
++      createAutoRetryHelpers: (nextDeps) => {
++        deps = nextDeps
++        return createAutoRetryHelpers(nextDeps)
++      },
++    })
++
++    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
++    deps?.sessionAwaitingFallbackResult.add(sessionID)
++    await hook.event(progressEvent)
++    await clock.advanceBy(10_000)
++
++    expect(abortCalls).toEqual([sessionID])
++    expect(promptCalls).toBe(1)
++    expect(deps?.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
++    expect(deps?.sessionFallbackTimeouts.has(sessionID)).toBe(false)
++
++    await clock.advanceBy(10_000)
++
++    expect(abortCalls).toEqual([sessionID])
++    expect(promptCalls).toBe(1)
++    expect(toastCalls).toEqual(["Runtime fallback dispatch was not accepted"])
++    hook.dispose?.()
++  })
++})
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts b/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+index 8d923ef37..c78712df1 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+@@ -1,10 +1,12 @@
+ import { createAutoRetryHelpers } from "./auto-retry"
+ import { createChatMessageHandler } from "./chat-message-handler"
+-import { DEFAULT_CONFIG } from "./constants"
++import { COMPACTION_WATCHDOG_BUDGET_MS, DEFAULT_CONFIG } from "./constants"
+ import { createEventHandler } from "./event-handler"
+ import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
+ import { createMessageUpdateHandler } from "./message-update-handler"
+ import { resolveSessionEventID } from "../../shared/event-session-id"
++import { clearAllCompactions, getCompaction, observeCompactionEvent } from "../../shared/compaction-in-flight"
++import { log } from "../../shared/logger"
+ import {
+   registerRuntimeFallbackRecoveryOwner,
+   settleRuntimeFallbackRecoveryClaim,
+@@ -62,6 +64,7 @@ export function createRuntimeFallbackHook(
+     sessionFallbackTimeouts: new Map(),
+     sessionStatusRetryKeys: new Map(),
+     internallyAbortedSessions: new Set(),
++    fallbackExhaustionToastStates: new Map(),
+   }
+ 
+   const helpers = factories.createAutoRetryHelpers(deps)
+@@ -72,6 +75,8 @@ export function createRuntimeFallbackHook(
+ 
+   let cleanupInterval: RuntimeFallbackInterval | null = null
+   let intervalStarted = false
++  const lastFallbackProgressRearm = new Map<string, number>()
++  const lastEndedRearm = new Map<string, number>()
+ 
+   const ensureInterval = (): void => {
+     if (intervalStarted) return
+@@ -95,11 +100,72 @@ export function createRuntimeFallbackHook(
+ 
+   const handleEvent = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+     ensureInterval()
++    observeCompactionEvent(event)
++
++    const messageUpdatedInfo = event.type === "message.updated"
++      && typeof event.properties === "object"
++      && event.properties !== null
++      && typeof (event.properties as Record<string, unknown>).info === "object"
++      && (event.properties as Record<string, unknown>).info !== null
++      ? (event.properties as Record<string, unknown>).info as Record<string, unknown>
++      : undefined
++    const messageUpdatedEnded = messageUpdatedInfo
++      && (messageUpdatedInfo.error !== undefined
++        || (typeof messageUpdatedInfo.time === "object"
++          && messageUpdatedInfo.time !== null
++          && (messageUpdatedInfo.time as Record<string, unknown>).completed !== undefined))
++    if (
++      event.type === "session.compacted"
++      || event.type === "session.compaction.ended"
++      || event.type === "session.compaction.failed"
++      || messageUpdatedEnded
++    ) {
++      const props = event.properties as Record<string, unknown> | undefined
++      const sessionID = resolveSessionEventID(props)
++      const compaction = sessionID ? getCompaction(sessionID) : undefined
++      const endedAt = compaction?.endedAt
++      if (sessionID && deps.sessionAwaitingFallbackResult.has(sessionID) && endedAt !== undefined
++        && lastEndedRearm.get(sessionID) !== endedAt) {
++        lastEndedRearm.set(sessionID, endedAt)
++        helpers.scheduleSessionFallbackTimeout(sessionID)
++      }
++    }
+ 
+     if (config.enabled) {
+       observeEventForWatchdog(event, firstPromptWatchdog)
+     }
+ 
++    if (event.type === "message.part.updated" || event.type === "message.part.delta") {
++      const props = event.properties as Record<string, unknown> | undefined
++      const sessionID = resolveSessionEventID(props) ?? resolveSessionEventID(
++        typeof props?.part === "object" && props.part !== null
++          ? props.part as Record<string, unknown>
++          : undefined,
++      )
++      if (sessionID && deps.sessionAwaitingFallbackResult.has(sessionID)) {
++        const lastRearm = lastFallbackProgressRearm.get(sessionID) ?? -Infinity
++        if (Date.now() - lastRearm >= 5_000) {
++          lastFallbackProgressRearm.set(sessionID, Date.now())
++          const compaction = getCompaction(sessionID)
++          const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
++          const delayOverride = compaction && !compaction.endedAt
++            ? Math.max(0, Math.min(timeoutMs, COMPACTION_WATCHDOG_BUDGET_MS - (Date.now() - compaction.startedAt)))
++            : undefined
++          helpers.scheduleSessionFallbackTimeout(sessionID, undefined, delayOverride)
++          log(`[runtime-fallback] watchdog-part-progress-rearm`, { sessionID })
++        }
++      }
++    }
++
++    if (event.type === "session.deleted") {
++      const props = event.properties as Record<string, unknown> | undefined
++      const sessionID = resolveSessionEventID(props)
++      if (sessionID) {
++        lastFallbackProgressRearm.delete(sessionID)
++        lastEndedRearm.delete(sessionID)
++      }
++    }
++
+     if (event.type === "message.updated") {
+       if (!config.enabled) return
+       const props = event.properties as Record<string, unknown> | undefined
+@@ -139,6 +205,11 @@ export function createRuntimeFallbackHook(
+     deps.sessionFallbackTimeouts.clear()
+     deps.sessionStatusRetryKeys.clear()
+     deps.internallyAbortedSessions.clear()
++    deps.fallbackExhaustionToastStates?.clear()
++    lastFallbackProgressRearm.clear()
++    lastEndedRearm.clear()
++    // clearAllCompactions is process-wide by design; retain this cleanup until registry ownership is per hook.
++    clearAllCompactions()
+   }
+ 
+   return {
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts
+index 05bb33893..23ad9cc5d 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts
+@@ -1,6 +1,7 @@
+ import { afterEach, describe, expect, it } from "bun:test"
+ import type { AutoRetryHelpers } from "./auto-retry"
+ import { createMessageUpdateHandler } from "./message-update-handler"
++import { createFallbackState } from "./fallback-state"
+ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
+ import { extractAutoRetrySignal } from "./error-classifier"
+@@ -186,6 +187,44 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
+     ])
+     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+   })
++
++  it("#given info.agent is absent #when a retry signal is handled #then the resolved agent supplies both checks and dispatch", async () => {
++    const sessionID = "session-message-resolved-agent"
++    const operations: string[] = []
++    const deps = createRuntimeFallbackDeps(operations)
++    deps.pluginConfig = { agents: { worker: { fallback_models: ["litellm/openai.eu.gpt-5.5"] } } }
++    const state = createFallbackState("openai/gpt-5.4")
++    deps.sessionStates.set(sessionID, state)
++    deps.sessionRetryInFlight.add(sessionID)
++    const helpers = createRuntimeFallbackHelpers(deps, operations)
++    let resolveCalls = 0
++    let dispatchedAgent: string | undefined
++    helpers.resolveAgentForSessionFromContext = async () => {
++      resolveCalls += 1
++      return "worker"
++    }
++    helpers.autoRetryWithFallback = async (_sessionID, model, resolvedAgent) => {
++      dispatchedAgent = resolvedAgent
++      operations.push(`retry:${model}`)
++      return { accepted: true, status: "dispatched" }
++    }
++    const handler = createMessageUpdateHandler(deps, helpers)
++
++    await handler({
++      sessionID,
++      info: {
++        role: "assistant",
++        model: "openai/gpt-5.4",
++        status: "retrying in 1s",
++        message: "retrying in 1s",
++        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
++      },
++    })
++
++    expect(resolveCalls).toBe(1)
++    expect(dispatchedAgent).toBe("worker")
++    expect(operations).toContain("retry:litellm/openai.eu.gpt-5.5")
++  })
+ })
+ 
+ 
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts b/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts
+index 1aacc488e..0b34dfab7 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts
+@@ -3,7 +3,7 @@ import type { AutoRetryHelpers } from "./auto-retry"
+ import { HOOK_NAME } from "./constants"
+ import { log } from "../../shared/logger"
+ import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+-import { createFallbackState } from "./fallback-state"
++import { canPrepareFallback, createFallbackState } from "./fallback-state"
+ import { getFallbackModelsForSession } from "./fallback-models"
+ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+@@ -11,11 +11,13 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
+ import { subagentSessions } from "../../features/claude-code-session-state"
+ import { resolveMessageEventSessionID } from "../../shared/event-session-id"
+ import { normalizeModelToCanonicalString } from "./normalize-model"
++import { isCompactionAgent, hasCompactionPart } from "../../shared/compaction-marker"
+ 
+ export { hasVisibleAssistantResponse } from "./visible-assistant-response"
+ 
+ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+   const { ctx, config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionStatusRetryKeys } = deps
++  const exhaustionToastStates = deps.fallbackExhaustionToastStates ?? new Map<string, ReturnType<typeof createFallbackState>>()
+   const checkVisibleResponse = hasVisibleAssistantResponse(extractAutoRetrySignal)
+ 
+   return async (props: Record<string, unknown> | undefined) => {
+@@ -41,6 +43,14 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
+       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
+     const role = info?.role as string | undefined
+     const model = normalizeModelToCanonicalString(info?.model)
++    const isCompactionMessage = role === "assistant" && (
++      isCompactionAgent(info?.agent)
++      || info?.mode === "compaction"
++      || info?.summary === true
++      || hasCompactionPart(parts)
++    )
++
++    if (isCompactionMessage) return
+ 
+     if (sessionID && role === "assistant" && !error) {
+       if (!sessionAwaitingFallbackResult.has(sessionID)) {
+@@ -102,11 +112,31 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
+         return
+       }
+ 
++      const agent = info?.agent as string | undefined
++      const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+       if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
+         log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
+           sessionID,
+           model,
+         })
++        const availableModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
++        if (state && !canPrepareFallback(state, availableModels, deps.config)) {
++          log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
++          if (exhaustionToastStates.get(sessionID) !== state) {
++            exhaustionToastStates.set(sessionID, state)
++            try {
++              await ctx.client.tui.showToast({ body: {
++                title: "Runtime fallback",
++                message: "Fallback attempts exhausted; native retry continues",
++                variant: "warning",
++                duration: 3000,
++              } })
++            } catch (toastError) {
++              log(`[${HOOK_NAME}] fallback exhaustion toast failed`, { sessionID, error: String(toastError) })
++            }
++          }
++          return
++        }
+         await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
+         sessionRetryInFlight.delete(sessionID)
+       }
+@@ -148,8 +178,6 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
+         })
+       }
+ 
+-      const agent = info?.agent as string | undefined
+-      const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+ 
+       if (fallbackModels.length === 0) {
+@@ -167,12 +195,13 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
+       }
+ 
+       if (!state) {
+-        const initialModel = resolveFallbackBootstrapModel({
++        const initialModel = await resolveFallbackBootstrapModel({
+           sessionID,
+           source: "message.updated",
+           eventModel: model,
+           resolvedAgent,
+           pluginConfig,
++          ctx,
+         })
+ 
+         if (!initialModel) {
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+index f56fb2e64..e34a61eeb 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts
+@@ -540,4 +540,24 @@ describe("createSessionStatusHandler", () => {
+     expect(state.pendingFallbackModel).toBe("google/gemini-2.5-pro")
+     SessionCategoryRegistry.clear()
+   })
++
++  it("#given an in-flight retry without bootstrap model data #when a retry signal arrives #then it does not abort before returning", async () => {
++    SessionCategoryRegistry.clear()
++    const sessionID = "session-status-no-bootstrap-model"
++    const deps = createDeps()
++    SessionCategoryRegistry.register(sessionID, "test")
++    deps.sessionRetryInFlight.add(sessionID)
++    const abortCalls: string[] = []
++    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
++    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
++
++    await handler({
++      sessionID,
++      status: { type: "retry", attempt: 1, message: "AI_APICallError: overloaded" },
++    })
++
++    expect(abortCalls).toEqual([])
++    expect(retryCalls).toEqual([])
++    expect(deps.sessionStates.has(sessionID)).toBe(false)
++  })
+ })
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts b/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+index 208361b69..a0a569c1a 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+@@ -1,15 +1,16 @@
+-import type { HookDeps } from "./types"
++import type { FallbackState, HookDeps } from "./types"
+ import type { AutoRetryHelpers } from "./auto-retry"
+ import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
+ import { log } from "../../shared/logger"
+ import { extractAutoRetrySignal } from "./error-classifier"
+-import { createFallbackState } from "./fallback-state"
++import { canPrepareFallback, createFallbackState } from "./fallback-state"
+ import { getFallbackModelsForSession } from "./fallback-models"
+ import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
+ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+ import { resolveSessionEventID } from "../../shared/event-session-id"
+ import { normalizeModelToCanonicalString } from "./normalize-model"
++import { isCompactionInFlight } from "../../shared/compaction-in-flight"
+ 
+ export function createSessionStatusHandler(
+   deps: HookDeps,
+@@ -22,6 +23,22 @@ export function createSessionStatusHandler(
+     sessionLastAccess,
+     sessionRetryInFlight,
+   } = deps
++  const exhaustionToastStates = deps.fallbackExhaustionToastStates ?? new Map<string, FallbackState>()
++
++  const showExhaustedToast = async (sessionID: string, state: FallbackState) => {
++    if (exhaustionToastStates.get(sessionID) === state) return
++    exhaustionToastStates.set(sessionID, state)
++    try {
++      await deps.ctx.client.tui.showToast({ body: {
++        title: "Runtime fallback",
++        message: "Fallback attempts exhausted; native retry continues",
++        variant: "warning",
++        duration: 3000,
++      } })
++    } catch (error) {
++      log(`[${HOOK_NAME}] fallback exhaustion toast failed`, { sessionID, error: String(error) })
++    }
++  }
+ 
+   return async (props: Record<string, unknown> | undefined) => {
+     const sessionID = resolveSessionEventID(props)
+@@ -63,14 +80,27 @@ export function createSessionStatusHandler(
+     seenRetryKeys.add(retryKey)
+     sessionStatusRetryKeys.set(sessionID, seenRetryKeys)
+ 
++    let shouldAbortInFlightRetry = false
++
+     if (sessionRetryInFlight.has(sessionID)) {
++      if (isCompactionInFlight(sessionID)) {
++        log(`[${HOOK_NAME}] retry signal belongs to compaction lane; primary chain untouched (compaction-lane-retry-ignored)`, { sessionID })
++        return
++      }
+       if (timeoutEnabled) {
+         log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
+           sessionID,
+           model,
+         })
+-        await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+-        sessionRetryInFlight.delete(sessionID)
++        const state = sessionStates.get(sessionID)
++        const resolvedAgentForAbort = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
++        const availableModels = getFallbackModelsForSession(sessionID, resolvedAgentForAbort, pluginConfig)
++        if (state && !canPrepareFallback(state, availableModels, deps.config)) {
++          log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
++          await showExhaustedToast(sessionID, state)
++          return
++        }
++        shouldAbortInFlightRetry = true
+       } else {
+         log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
+         seenRetryKeys?.delete(retryKey)
+@@ -92,12 +122,13 @@ export function createSessionStatusHandler(
+ 
+     let state = sessionStates.get(sessionID)
+     if (!state) {
+-      const initialModel = resolveFallbackBootstrapModel({
++      const initialModel = await resolveFallbackBootstrapModel({
+         sessionID,
+         source: "session.status",
+         eventModel: model,
+         resolvedAgent,
+         pluginConfig,
++        ctx: deps.ctx,
+       })
+       if (!initialModel) {
+         sessionStatusRetryKeys.delete(sessionID)
+@@ -141,7 +172,19 @@ export function createSessionStatusHandler(
+       retryAttempt: status.attempt,
+     })
+ 
++    if (isCompactionInFlight(sessionID)) {
++      log(`[${HOOK_NAME}] retry signal belongs to compaction lane; primary chain untouched (compaction-lane-retry-ignored)`, { sessionID })
++      return
++    }
++    if (!canPrepareFallback(state, fallbackModels, deps.config)) {
++      log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
++      await showExhaustedToast(sessionID, state)
++      return
++    }
+     await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
++    if (shouldAbortInFlightRetry) {
++      sessionRetryInFlight.delete(sessionID)
++    }
+ 
+     await dispatchFallbackRetry(deps, helpers, {
+       sessionID,
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/types.ts b/packages/omo-opencode/src/hooks/runtime-fallback/types.ts
+index 4db785a7c..c5452e298 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/types.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/types.ts
+@@ -96,4 +96,5 @@ export interface HookDeps {
+    * loop (every cycle started over at attempt:1). See issue #4006.
+    */
+   internallyAbortedSessions: Set<string>
++  fallbackExhaustionToastStates?: Map<string, FallbackState>
+ }
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/visible-assistant-response.ts b/packages/omo-opencode/src/hooks/runtime-fallback/visible-assistant-response.ts
+index c15a12f9f..0d6cfc166 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/visible-assistant-response.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/visible-assistant-response.ts
+@@ -2,6 +2,7 @@ import type { HookDeps } from "./types"
+ import type { SessionMessage, SessionMessagePart } from "./session-messages"
+ import { extractSessionMessages } from "./session-messages"
+ import { extractAutoRetrySignal } from "./error-classifier"
++import { isCompactionAgent } from "../../shared/compaction-marker"
+ 
+ function getLastUserMessageIndex(messages: SessionMessage[]): number {
+   for (let index = messages.length - 1; index >= 0; index--) {
+@@ -52,6 +53,9 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
+         if (message.info?.error) {
+           continue
+         }
++        if (message.info?.summary === true || isCompactionAgent(message.info?.agent)) {
++          continue
++        }
+ 
+         const infoParts = message.info?.parts
+         const infoMessageParts = Array.isArray(infoParts)
+diff --git a/packages/omo-opencode/src/plugin/session-compacting.ts b/packages/omo-opencode/src/plugin/session-compacting.ts
+index 92bbf38f7..85c92b43d 100644
+--- a/packages/omo-opencode/src/plugin/session-compacting.ts
++++ b/packages/omo-opencode/src/plugin/session-compacting.ts
+@@ -1,6 +1,7 @@
+ import type { Hooks } from "@opencode-ai/plugin"
+ 
+ import { isCompactionAgent } from "../shared/compaction-marker"
++import { recordCompactionStart } from "../shared/compaction-in-flight"
+ import { log } from "../shared/logger"
+ 
+ import {
+@@ -110,6 +111,7 @@ export function createSessionCompactingHandler(
+     input: SessionCompactingInput,
+     output: SessionCompactingOutput,
+   ): Promise<void> => {
++    recordCompactionStart(input.sessionID)
+     await runCompactionStep("compactionContextInjector.capture", input.sessionID, async () => {
+       const capture = hooks.compactionContextInjector?.capture
+       if (capture) {
+diff --git a/packages/omo-opencode/src/shared/compaction-in-flight.ts b/packages/omo-opencode/src/shared/compaction-in-flight.ts
+new file mode 100644
+index 000000000..56413a5f4
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/compaction-in-flight.ts
+@@ -0,0 +1,156 @@
++import { hasCompactionPart, isCompactionAgent } from "./compaction-marker"
++
++const COMPACTION_REGISTRY_TTL_MS = 900_000
++
++export type CompactionInFlight = {
++  gen: number
++  startedAt: number
++  messageID?: string
++  endedAt?: number
++}
++
++const compactions = new Map<string, CompactionInFlight>()
++const generations = new Map<string, number>()
++
++function isExpired(entry: CompactionInFlight, now: number): boolean {
++  return now - (entry.endedAt ?? entry.startedAt) >= COMPACTION_REGISTRY_TTL_MS
++}
++
++export function recordCompactionStart(sessionID: string, messageID?: string): void {
++  const gen = (generations.get(sessionID) ?? 0) + 1
++  generations.set(sessionID, gen)
++  compactions.set(sessionID, {
++    gen,
++    startedAt: Date.now(),
++    ...(messageID ? { messageID } : {}),
++  })
++}
++
++function recordCompactionMessageStart(sessionID: string, messageID?: string): void {
++  const entry = getCompaction(sessionID)
++  if (entry?.endedAt !== undefined) {
++    if (messageID !== undefined && entry.messageID === messageID) return
++    recordCompactionStart(sessionID, messageID)
++    return
++  }
++  if (!entry) {
++    recordCompactionStart(sessionID, messageID)
++    return
++  }
++
++  if (!entry.messageID && messageID) {
++    entry.messageID = messageID
++  }
++}
++
++export function recordCompactionEnd(
++  sessionID: string,
++  expectedGeneration?: number,
++  expectedMessageID?: string,
++): void {
++  const entry = compactions.get(sessionID)
++  if (!entry) return
++  if (expectedGeneration !== undefined && entry.gen !== expectedGeneration) return
++  if (expectedMessageID !== undefined && entry.messageID !== expectedMessageID) return
++  entry.endedAt = Date.now()
++}
++
++export function clearCompaction(sessionID: string): void {
++  compactions.delete(sessionID)
++  generations.delete(sessionID)
++}
++
++export function clearAllCompactions(): void {
++  compactions.clear()
++  generations.clear()
++}
++
++export function getCompaction(sessionID: string): CompactionInFlight | undefined {
++  const entry = compactions.get(sessionID)
++  if (!entry) return undefined
++  if (isExpired(entry, Date.now())) {
++    compactions.delete(sessionID)
++    generations.delete(sessionID)
++    return undefined
++  }
++  return entry
++}
++
++export function isCompactionInFlight(sessionID: string): boolean {
++  const entry = getCompaction(sessionID)
++  return entry !== undefined && entry.endedAt === undefined
++}
++
++export function observeCompactionEvent(
++  event: { type: string; properties?: unknown },
++): void {
++  const properties = typeof event.properties === "object" && event.properties !== null
++    ? event.properties as Record<string, unknown>
++    : undefined
++  const info = typeof properties?.info === "object" && properties.info !== null
++    ? properties.info as Record<string, unknown>
++    : undefined
++  const sessionID = typeof properties?.sessionID === "string"
++    ? properties.sessionID
++    : typeof info?.sessionID === "string"
++      ? info.sessionID
++      : typeof info?.id === "string"
++        ? info.id
++      : typeof properties?.id === "string"
++      ? properties.id
++      : undefined
++  if (!sessionID) return
++
++  if (event.type === "session.created") {
++    clearCompaction(sessionID)
++    return
++  }
++  if (event.type === "session.compaction.started") {
++    recordCompactionMessageStart(sessionID)
++    return
++  }
++  if (event.type === "session.compacted" || event.type === "session.compaction.ended" || event.type === "session.compaction.failed") {
++    // Accepted SDK limitation: real session-level end events carry only { sessionID }, so gen, generation and
++    // messageID are normally absent and an uncorrelated end closes whichever entry is current. Only
++    // message-correlated ends are generation-safe; the exposure is bounded by serial per-session compaction,
++    // the watchdog budget and the registry TTL.
++    const generation = typeof properties?.gen === "number"
++      ? properties.gen
++      : typeof properties?.generation === "number"
++        ? properties.generation
++        : undefined
++    const messageID = typeof properties?.messageID === "string" ? properties.messageID : undefined
++    recordCompactionEnd(sessionID, generation, messageID)
++    return
++  }
++  if (event.type === "session.deleted") {
++    clearCompaction(sessionID)
++    return
++  }
++  if (event.type !== "message.updated") return
++
++  const messageInfo = info ?? properties
++  const messageID = typeof messageInfo?.id === "string" ? messageInfo.id : undefined
++  const entry = getCompaction(sessionID)
++  const time = typeof messageInfo?.time === "object" && messageInfo.time !== null
++    ? messageInfo.time as Record<string, unknown>
++    : undefined
++  const hasCompletion = time?.completed !== undefined
++  const hasError = messageInfo?.error !== undefined
++  if (entry?.messageID && entry.messageID === messageID && (hasError || hasCompletion)) {
++    recordCompactionEnd(sessionID, entry.gen, messageID)
++    return
++  }
++
++  if (messageInfo?.role === "assistant" && !hasError && !hasCompletion
++    && (isCompactionAgent(messageInfo.agent)
++      || messageInfo.mode === "compaction"
++      || messageInfo.summary === true
++      || hasCompactionPart(
++        Array.isArray(properties?.parts) && properties.parts.length > 0
++          ? properties.parts
++          : messageInfo.parts,
++      ))) {
++    recordCompactionMessageStart(sessionID, messageID)
++  }
++}
+diff --git a/packages/omo-opencode/src/v2/event-shape.test.ts b/packages/omo-opencode/src/v2/event-shape.test.ts
+new file mode 100644
+index 000000000..c905f2aeb
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/event-shape.test.ts
+@@ -0,0 +1,35 @@
++import { describe, expect, test } from "bun:test"
++
++import { toV1Event } from "./event-shape"
++
++describe("OpenCode V2 event shape", () => {
++  test("maps session.retry.scheduled into the V1 retry-status shape", () => {
++    expect(toV1Event({
++      type: "session.retry.scheduled",
++      data: {
++        sessionID: "ses_retry",
++        assistantMessageID: "msg_assistant",
++        attempt: 2,
++        at: 123,
++        error: { type: "ProviderError", message: "overloaded", status: 503 },
++      },
++    })).toEqual({
++      type: "session.status",
++      properties: {
++        sessionID: "ses_retry",
++        status: { type: "retry", message: "overloaded", attempt: 2 },
++        error: { type: "ProviderError", message: "overloaded", status: 503 },
++      },
++    })
++  })
++
++  test("passes session.compaction.failed through as a terminal event", () => {
++    expect(toV1Event({
++      type: "session.compaction.failed",
++      data: { sessionID: "ses_compact", error: { message: "provider failed" } },
++    })).toEqual({
++      type: "session.compaction.failed",
++      properties: { sessionID: "ses_compact", error: { message: "provider failed" } },
++    })
++  })
++})
+diff --git a/packages/omo-opencode/src/v2/event-shape.ts b/packages/omo-opencode/src/v2/event-shape.ts
+index a357198bf..6ce1756cc 100644
+--- a/packages/omo-opencode/src/v2/event-shape.ts
++++ b/packages/omo-opencode/src/v2/event-shape.ts
+@@ -28,6 +28,22 @@ export function toV1Event(event: unknown): V1Event {
+     }
+   }
+ 
++  if (type === "session.retry.scheduled") {
++    const error = isRecord(data.error) ? data.error : {}
++    return {
++      type: "session.status",
++      properties: {
++        sessionID,
++        status: {
++          type: "retry",
++          message: typeof error.message === "string" ? error.message : "",
++          attempt: data.attempt,
++        },
++        error: data.error,
++      },
++    }
++  }
++
+   if (type === "session.execution.failed") {
+     return {
+       type: "session.error",
+diff --git a/packages/omo-opencode/src/v2/hook-bridge.ts b/packages/omo-opencode/src/v2/hook-bridge.ts
+index 2ef941f94..79807d4e8 100644
+--- a/packages/omo-opencode/src/v2/hook-bridge.ts
++++ b/packages/omo-opencode/src/v2/hook-bridge.ts
+@@ -100,8 +100,19 @@ function copyRecord(target: Record<string, unknown>, source: Record<string, unkn
+   Object.assign(target, source)
+ }
+ 
++function retryEventKey(event: ReturnType<typeof toV1Event>): string | undefined {
++  if (event.type !== "session.status" || !isRecord(event.properties.status)) return undefined
++  if (event.properties.status.type !== "retry") return undefined
++  const sessionID = typeof event.properties.sessionID === "string" ? event.properties.sessionID : undefined
++  if (!sessionID) return undefined
++  const attempt = typeof event.properties.status.attempt === "number" ? event.properties.status.attempt : "?"
++  const message = typeof event.properties.status.message === "string" ? event.properties.status.message : ""
++  return `${sessionID}:${attempt}:${message}`
++}
++
+ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: AdapterState): Promise<() => void> {
+   const controller = new AbortController()
++  const seenRetryEvents = new Map<string, string>()
+   const chatMessage = asHandler(hooks["chat.message"])
+   const chatParams = asHandler(hooks["chat.params"])
+   const chatHeaders = asHandler(hooks["chat.headers"])
+@@ -274,7 +285,12 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?:
+         for await (const raw of ctx.event.subscribe({ signal: controller.signal })) {
+           const event = toV1Event(raw)
+           noteRuntimeEvent(state, event)
+-          if (eventHandler) await safeCall("event", () => eventHandler({ event }))
++          const retryKey = retryEventKey(event)
++          const sessionID = typeof event.properties.sessionID === "string" ? event.properties.sessionID : undefined
++          const duplicateRetry = retryKey !== undefined && sessionID !== undefined && seenRetryEvents.get(sessionID) === retryKey
++          if (retryKey && sessionID) seenRetryEvents.set(sessionID, retryKey)
++          else if (sessionID) seenRetryEvents.delete(sessionID)
++          if (eventHandler && !duplicateRetry) await safeCall("event", () => eventHandler({ event }))
+           // fix 14 (opencode-v2): v2 emits "session.compaction.ended" where v1
+           // emitted "session.compacted". Alias it so v1-era handlers (the
+           // preemptive-compaction token-cache clear and post-compaction
+@@ -297,5 +313,6 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?:
+ 
+   return () => {
+     controller.abort()
++    seenRetryEvents.clear()
+   }
+ }
+diff --git a/packages/omo-opencode/src/v2/host.test.ts b/packages/omo-opencode/src/v2/host.test.ts
+index 5ff196a86..414cedb87 100644
+--- a/packages/omo-opencode/src/v2/host.test.ts
++++ b/packages/omo-opencode/src/v2/host.test.ts
+@@ -411,6 +411,59 @@ describe("OpenCode V2 adapter", () => {
+     await cleanup?.()
+   })
+ 
++  test("deduplicates V2 scheduled retries when a matching status event also arrives", async () => {
++    const fake = createFakeContext()
++    const seen: Array<{ type?: string; properties?: Record<string, unknown> }> = []
++    const cleanup = await setupOpenCodeV2(fake.ctx, {
++      server: async () => ({
++        event: async (input: { event: { type?: string; properties?: Record<string, unknown> } }) => {
++          seen.push(input.event)
++        },
++      }),
++    })
++
++    const retry = {
++      sessionID: "ses_retry",
++      attempt: 2,
++      error: { type: "ProviderError", message: "overloaded", status: 503 },
++    }
++    fake.pushEvent({ type: "session.retry.scheduled", data: retry })
++    fake.pushEvent({
++      type: "session.status",
++      data: { sessionID: "ses_retry", status: { type: "retry", message: "overloaded", attempt: 2 } },
++    })
++    await waitFor(() => seen.length >= 1)
++
++    await new Promise((resolve) => setTimeout(resolve, 20))
++    expect(seen.filter((event) => event.type === "session.status")).toHaveLength(1)
++    await cleanup?.()
++  })
++
++  test("forwards a matching retry again after a non-retry event", async () => {
++    const fake = createFakeContext()
++    const seen: Array<{ type?: string }> = []
++    const cleanup = await setupOpenCodeV2(fake.ctx, {
++      server: async () => ({
++        event: async (input: { event: { type?: string } }) => {
++          seen.push(input.event)
++        },
++      }),
++    })
++
++    const retry = {
++      sessionID: "ses_retry_again",
++      attempt: 2,
++      error: { type: "ProviderError", message: "overloaded", status: 503 },
++    }
++    fake.pushEvent({ type: "session.retry.scheduled", data: retry })
++    fake.pushEvent({ type: "session.execution.succeeded", data: { sessionID: "ses_retry_again" } })
++    fake.pushEvent({ type: "session.retry.scheduled", data: retry })
++    await waitFor(() => seen.filter((event) => event.type === "session.status").length >= 2)
++
++    expect(seen.filter((event) => event.type === "session.status")).toHaveLength(2)
++    await cleanup?.()
++  })
++
+   test("agents, providers, and models use the V1 data shape", async () => {
+     const fake = createFakeContext()
+     const catalog = fake.ctx as unknown as {
+-- 
+2.55.0.windows.3
+

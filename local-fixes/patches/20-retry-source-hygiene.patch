@@ -1,0 +1,469 @@
+From 97f96ddcb20a88214c25b15527a341387bd31ead Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Thu, 8 Oct 2026 18:56:53 +0300
+Subject: [PATCH] fix(runtime-fallback): preserve real retry prompt sources
+
+---
+ .../auto-retry-dispatch.test.ts               |  79 +++++++++++++
+ .../runtime-fallback/auto-retry-dispatch.ts   |   3 +-
+ .../runtime-fallback/auto-retry-metadata.ts   |  38 +++++--
+ .../fallback-bootstrap-model.ts               |  36 +++++-
+ .../runtime-fallback/first-prompt-watchdog.ts |   3 +-
+ .../runtime-fallback/last-user-retry-parts.ts |  17 ++-
+ .../retry-source-hygiene.test.ts              | 104 ++++++++++++++++++
+ .../shared/runtime-fallback-retry-marker.ts   |  29 +++++
+ 8 files changed, 294 insertions(+), 15 deletions(-)
+ create mode 100644 packages/omo-opencode/src/hooks/runtime-fallback/retry-source-hygiene.test.ts
+
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+index ffbddc3a4..7ebcd82e6 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts
+@@ -7,6 +7,11 @@ import { createFallbackState } from "./fallback-state"
+ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+ import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
+ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
++import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
++import {
++  createRuntimeFallbackRetryTextPart,
++  OMO_RUNTIME_FALLBACK_RETRY_MARKER,
++} from "../../shared/runtime-fallback-retry-marker"
+ 
+ function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
+   const session = {
+@@ -640,4 +645,78 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
+     await currentRetry
+     expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+   })
++
++  test("#given an internal prompt is retried twice #when the second hop selects its source #then it reuses the same prompt and message ID", async () => {
++    const promptCalls = { count: 0 }
++    const deps = createDeps(promptCalls)
++    const sessionID = "session-internal-prompt-two-hops"
++    const internalPrompt = `real delegated prompt\n${OMO_INTERNAL_INITIATOR_MARKER}`
++    let lookupCount = 0
++    const promptBodies: Array<Record<string, unknown>> = []
++    deps.ctx.client.session.messages = async () => {
++      lookupCount += 1
++      return {
++        data: [{
++          info: { id: "internal-message", role: "user" },
++          parts: [{
++            type: "text",
++            text: lookupCount === 1 ? internalPrompt : `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
++          }],
++        }],
++      }
++    }
++    deps.ctx.client.session.promptAsync = async (input) => {
++      promptCalls.count += 1
++      promptBodies.push((input as { body: Record<string, unknown> }).body)
++      return {}
++    }
++    const state = createFallbackState("anthropic/claude-opus-4-7")
++    deps.sessionStates.set(sessionID, state)
++    const helpers = createAutoRetryHelpers(deps)
++
++    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.status")
++    await helpers.autoRetryWithFallback(sessionID, "google/gemini-2.5-pro", undefined, "session.status")
++
++    expect(promptCalls.count).toBe(2)
++    expect(promptBodies).toHaveLength(2)
++    expect(promptBodies[0]?.messageID).toBe("internal-message")
++    expect(promptBodies[1]?.messageID).toBe("internal-message")
++    expect(promptBodies[0]?.parts).toEqual([{
++      type: "text",
++      text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
++    }])
++    expect(promptBodies[1]?.parts).toEqual([{
++      type: "text",
++      text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
++    }])
++  })
++
++  test("#given the first hop had to send the synthetic continuation #when the second hop finds the real prompt beside it #then it retries the real prompt under its message ID", async () => {
++    const promptCalls = { count: 0 }
++    const deps = createDeps(promptCalls)
++    const sessionID = "session-synthetic-continuation-not-replayed"
++    const promptBodies: Array<Record<string, unknown>> = []
++    let persistedRows: unknown[] = []
++    deps.ctx.client.session.messages = async () => ({ data: persistedRows })
++    deps.ctx.client.session.promptAsync = async (input) => {
++      promptCalls.count += 1
++      promptBodies.push((input as { body: Record<string, unknown> }).body)
++      return {}
++    }
++    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
++    const helpers = createAutoRetryHelpers(deps)
++
++    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.status")
++    persistedRows = [
++      { info: { id: "real-message", role: "user" }, parts: [{ type: "text", text: "real human prompt" }] },
++      { info: { id: "synthetic-message", role: "user" }, parts: promptBodies[0]?.parts },
++    ]
++    await helpers.autoRetryWithFallback(sessionID, "google/gemini-2.5-pro", undefined, "session.status")
++
++    expect(promptBodies).toHaveLength(2)
++    expect(promptBodies[0]?.messageID).toBeUndefined()
++    expect(promptBodies[0]?.parts).toEqual([createRuntimeFallbackRetryTextPart("continue")])
++    expect(promptBodies[1]?.messageID).toBe("real-message")
++    expect(promptBodies[1]?.parts).toEqual([{ type: "text", text: "real human prompt" }])
++  })
+ })
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+index 97eb7dcfc..9b1d77d27 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+@@ -8,6 +8,7 @@ import {
+   createRuntimeFallbackRetryTextPart,
+   hasRuntimeFallbackRetryMarker,
+   OMO_RUNTIME_FALLBACK_RETRY_MARKER,
++  RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT,
+ } from "../../shared/runtime-fallback-retry-marker"
+ import { hasInternalInitiatorMarker } from "../../shared/internal-initiator-marker"
+ import {
+@@ -115,7 +116,7 @@ export function createAutoRetryDispatcher(
+               )
+               // Mark this specifically as a fallback retry so the chat adapter
+               // can acknowledge it without treating other synthetic prompts as fallback generations.
+-              return [createRuntimeFallbackRetryTextPart("continue")]
++              return [createRuntimeFallbackRetryTextPart(RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT)]
+             })()
+       const retryMessageID = usingFetchedUserParts ? originalRetryMetadata.messageID : undefined
+       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-metadata.ts b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-metadata.ts
+index ede886b4a..0d5c272c9 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-metadata.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-metadata.ts
+@@ -1,5 +1,8 @@
+ import { isRecord } from "@oh-my-opencode/utils"
+ import { extractSessionMessages } from "./session-messages"
++import { hasCompactionPart } from "../../shared/compaction-marker"
++import { hasRuntimeFallbackRetryMarker, hasSubstantivePromptText } from "../../shared/runtime-fallback-retry-marker"
++import { log } from "../../shared/logger"
+ 
+ export type RetryPromptPart = { type: "text"; text: string; id?: string }
+ 
+@@ -12,14 +15,35 @@ export function resolveOriginalUserRetryMetadata(messagesResponse: unknown): {
+   parts: RetryPromptPart[]
+ } {
+   const messages = extractSessionMessages(messagesResponse)
+-  const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
++  const lastUserMessage = messages?.filter((message) => {
++    if (message.info?.role !== "user") return false
++    const propParts = Array.isArray(message.parts) ? message.parts : undefined
++    const infoParts = isRecord(message.info) && Array.isArray(message.info["parts"])
++      ? message.info["parts"]
++      : undefined
++    const parts = propParts && propParts.length > 0 ? propParts : infoParts
++    if (hasCompactionPart(parts)) {
++      log("[runtime-fallback] retry-payload-skips-compaction-marker")
++      return false
++    }
++    if (!hasSubstantivePromptText(parts)) {
++      if (Array.isArray(parts) && parts.some((part) => isRecord(part)
++        && typeof part["text"] === "string"
++        && hasRuntimeFallbackRetryMarker(part["text"]))) {
++        log("[runtime-fallback] retry-payload-skips-retry-marker")
++      }
++      return false
++    }
++    return true
++  }).pop()
+   const messageID = typeof lastUserMessage?.info?.id === "string" ? lastUserMessage.info.id : undefined
+-  const infoParts = isRecord(lastUserMessage?.info) ? lastUserMessage.info["parts"] : undefined
+-  const rawParts = Array.isArray(lastUserMessage?.parts)
+-    ? lastUserMessage.parts
+-    : Array.isArray(infoParts)
+-      ? infoParts
+-      : []
++  const propParts = Array.isArray(lastUserMessage?.parts) ? lastUserMessage.parts : undefined
++  const infoParts = isRecord(lastUserMessage?.info) && Array.isArray(lastUserMessage.info["parts"])
++    ? lastUserMessage.info["parts"]
++    : undefined
++  const rawParts = propParts && propParts.length > 0
++    ? propParts
++    : infoParts ?? []
+   const parts = rawParts
+     .filter(
+       (part): part is UserRetryPartRecord =>
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/fallback-bootstrap-model.ts b/packages/omo-opencode/src/hooks/runtime-fallback/fallback-bootstrap-model.ts
+index 41e0d0eb0..bd243f76d 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/fallback-bootstrap-model.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/fallback-bootstrap-model.ts
+@@ -3,6 +3,9 @@ import { HOOK_NAME } from "./constants"
+ import { log } from "../../shared/logger"
+ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+ import { stringifyRuntimeModel } from "./fallback-state"
++import { extractSessionMessages } from "./session-messages"
++import { hasCompactionPart } from "../../shared/compaction-marker"
++import { hasSubstantivePromptText } from "../../shared/runtime-fallback-retry-marker"
+ 
+ type ResolveFallbackBootstrapModelOptions = {
+   sessionID: string
+@@ -10,16 +13,45 @@ type ResolveFallbackBootstrapModelOptions = {
+   eventModel?: unknown
+   resolvedAgent?: string
+   pluginConfig?: OhMyOpenCodeConfig
++  ctx?: {
++    client: { session: { messages: (input: { path: { id: string }; query: { directory: string } }) => Promise<unknown> } }
++    directory: string
++  }
+ }
+ 
+-export function resolveFallbackBootstrapModel(
++export async function resolveFallbackBootstrapModel(
+   options: ResolveFallbackBootstrapModelOptions,
+-): string | undefined {
++): Promise<string | undefined> {
+   const eventModel = stringifyRuntimeModel(options.eventModel)
+   if (eventModel) {
+     return eventModel
+   }
+ 
++  if (options.ctx) {
++    try {
++      const response = await options.ctx.client.session.messages({
++        path: { id: options.sessionID },
++        query: { directory: options.ctx.directory },
++      })
++      const messages = extractSessionMessages(response)
++      const lastUser = messages?.filter((message) => {
++        if (message.info?.role !== "user") return false
++        const propParts = Array.isArray(message.parts) ? message.parts : undefined
++        const infoParts = Array.isArray(message.info?.parts) ? message.info.parts : undefined
++        const parts = propParts && propParts.length > 0 ? propParts : infoParts
++        if (hasCompactionPart(parts)) return false
++        return hasSubstantivePromptText(parts)
++      }).pop()
++      const userModel = stringifyRuntimeModel(lastUser?.info?.model)
++      if (userModel) {
++        log(`[${HOOK_NAME}] fallback-bootstrap-from-last-user-model`, { sessionID: options.sessionID, model: userModel })
++        return userModel
++      }
++    } catch (error) {
++      log(`[${HOOK_NAME}] Failed to resolve bootstrap model from session messages`, { sessionID: options.sessionID, error: String(error) })
++    }
++  }
++
+   const agentConfigs = options.pluginConfig?.agents
+   const agentConfig = options.resolvedAgent && agentConfigs
+     ? agentConfigs[options.resolvedAgent as keyof typeof agentConfigs]
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts b/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+index 794ee121c..8e07c5641 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+@@ -156,12 +156,13 @@ export function createFirstPromptWatchdog(
+ 
+     let state = deps.sessionStates.get(sessionID)
+     if (!state) {
+-      const initialModel = resolveFallbackBootstrapModel({
++      const initialModel = await resolveFallbackBootstrapModel({
+         sessionID,
+         source: SOURCE,
+         eventModel: model,
+         resolvedAgent,
+         pluginConfig: deps.pluginConfig,
++        ctx: deps.ctx,
+       })
+       if (!initialModel) {
+         log(`[${HOOK_NAME}] ${SOURCE}: no model info available, cannot dispatch fallback`, { sessionID })
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts b/packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts
+index c0cbf5657..5b9d0a9ff 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts
+@@ -3,6 +3,8 @@ import {
+   clearDelegatedChildSessionBootstrap,
+   getDelegatedChildSessionBootstrap,
+ } from "../../shared/delegated-child-session-bootstrap"
++import { hasCompactionPart } from "../../shared/compaction-marker"
++import { hasSubstantivePromptText } from "../../shared/runtime-fallback-retry-marker"
+ 
+ type RetryPart = { type: "text"; text: string }
+ 
+@@ -25,10 +27,17 @@ export function getLastUserRetryPayload(
+ ): LastUserRetryPayload {
+   const bootstrap = sessionID ? getDelegatedChildSessionBootstrap(sessionID) : undefined
+   const messages = extractSessionMessages(messagesResponse)
+-  const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
+-  const lastUserParts =
+-    lastUserMessage?.parts
+-    ?? (lastUserMessage?.info?.parts as Array<{ type?: string; text?: string }> | undefined)
++  const lastUserMessage = messages?.filter((message) => {
++    if (message.info?.role !== "user") return false
++    const propParts = Array.isArray(message.parts) ? message.parts : undefined
++    const infoParts = Array.isArray(message.info?.parts) ? message.info.parts : undefined
++    const parts = propParts && propParts.length > 0 ? propParts : infoParts
++    if (hasCompactionPart(parts)) return false
++    return hasSubstantivePromptText(parts)
++  }).pop()
++  const propParts = Array.isArray(lastUserMessage?.parts) ? lastUserMessage.parts : undefined
++  const infoParts = Array.isArray(lastUserMessage?.info?.parts) ? lastUserMessage.info.parts : undefined
++  const lastUserParts = propParts && propParts.length > 0 ? propParts : infoParts
+ 
+   const retryParts = (lastUserParts ?? [])
+     .filter(
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/retry-source-hygiene.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/retry-source-hygiene.test.ts
+new file mode 100644
+index 000000000..d113888f8
+--- /dev/null
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/retry-source-hygiene.test.ts
+@@ -0,0 +1,104 @@
++import { describe, expect, test } from "bun:test"
++import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
++import { getLastUserRetryParts } from "./last-user-retry-parts"
++import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
++import {
++  createRuntimeFallbackRetryTextPart,
++  hasSubstantivePromptText,
++  OMO_RUNTIME_FALLBACK_RETRY_MARKER,
++} from "../../shared/runtime-fallback-retry-marker"
++
++// The row the dispatcher persists when it finds no user parts: the only retry-marked row without a real prompt.
++const syntheticContinuation = createRuntimeFallbackRetryTextPart("continue")
++
++const messages = {
++  data: [
++    { info: { id: "real", role: "user", model: "openai/real" }, parts: [{ type: "text", text: "real prompt" }] },
++    { info: { id: "synthetic", role: "user" }, parts: [syntheticContinuation] },
++  ],
++}
++
++describe("runtime fallback retry source hygiene", () => {
++  test("metadata and retry parts skip the synthetic continuation row", () => {
++    expect(resolveOriginalUserRetryMetadata(messages)).toEqual({
++      messageID: "real",
++      parts: [{ type: "text", text: "real prompt" }],
++    })
++    expect(getLastUserRetryParts(messages)).toEqual([{ type: "text", text: "real prompt" }])
++  })
++
++  test("retry parts skip a compaction row", () => {
++    expect(getLastUserRetryParts({ data: [
++      { info: { role: "user" }, parts: [{ type: "text", text: "real prompt" }] },
++      { info: { role: "user" }, parts: [{ type: "compaction" }] },
++    ] })).toEqual([{ type: "text", text: "real prompt" }])
++  })
++
++  test("bootstrap prefers the last real user model", async () => {
++    const model = await resolveFallbackBootstrapModel({
++      sessionID: "session",
++      source: "test",
++      resolvedAgent: "agent",
++      pluginConfig: { agents: { agent: { model: "anthropic/config" } } } as never,
++      ctx: {
++        directory: "/test",
++        client: { session: { messages: async () => messages } },
++      },
++    })
++    expect(model).toBe("openai/real")
++  })
++
++  test("prefers non-empty info parts when top-level parts are empty", () => {
++    const splitStorage = {
++      data: [
++        {
++          info: { id: "real", role: "user", parts: [{ type: "text", text: "real prompt" }] },
++          parts: [],
++        },
++        {
++          info: { id: "synthetic", role: "user", parts: [syntheticContinuation] },
++          parts: [],
++        },
++      ],
++    }
++
++    expect(resolveOriginalUserRetryMetadata(splitStorage)).toEqual({
++      messageID: "real",
++      parts: [{ type: "text", text: "real prompt" }],
++    })
++    expect(getLastUserRetryParts(splitStorage)).toEqual([{ type: "text", text: "real prompt" }])
++  })
++
++  test("uses an explicit synthetic continuation when every user row is a synthetic continuation", () => {
++    const onlySyntheticContinuations = { data: [
++      { info: { id: "synthetic", role: "user" }, parts: [syntheticContinuation] },
++    ] }
++
++    expect(resolveOriginalUserRetryMetadata(onlySyntheticContinuations)).toEqual({ parts: [] })
++    expect(getLastUserRetryParts(onlySyntheticContinuations)).toEqual([])
++  })
++
++  test("keeps a retry-marked row when its text still contains the real prompt", () => {
++    const markedPrompt = {
++      data: [{
++        info: { id: "marked-real", role: "user", model: "openai/real" },
++        parts: [{ type: "text", text: `real prompt\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
++      }],
++    }
++
++    expect(resolveOriginalUserRetryMetadata(markedPrompt)).toEqual({
++      messageID: "marked-real",
++      parts: [{ type: "text", text: `real prompt\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
++    })
++    expect(getLastUserRetryParts(markedPrompt)).toEqual([
++      { type: "text", text: `real prompt\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` },
++    ])
++  })
++
++  test("treats only the retry-marked continuation literal as non-substantive", () => {
++    expect(hasSubstantivePromptText([syntheticContinuation])).toBe(false)
++    expect(hasSubstantivePromptText([{ type: "text", text: OMO_RUNTIME_FALLBACK_RETRY_MARKER }])).toBe(false)
++    expect(hasSubstantivePromptText([{ type: "text", text: "continue" }])).toBe(true)
++    expect(hasSubstantivePromptText([createRuntimeFallbackRetryTextPart("continue with the refactor")])).toBe(true)
++  })
++})
+diff --git a/packages/omo-opencode/src/shared/runtime-fallback-retry-marker.ts b/packages/omo-opencode/src/shared/runtime-fallback-retry-marker.ts
+index c43e4a212..487f40b57 100644
+--- a/packages/omo-opencode/src/shared/runtime-fallback-retry-marker.ts
++++ b/packages/omo-opencode/src/shared/runtime-fallback-retry-marker.ts
+@@ -2,6 +2,9 @@ import { createInternalAgentContinuationTextPart } from "./internal-initiator-ma
+ 
+ export const OMO_RUNTIME_FALLBACK_RETRY_MARKER = "<!-- OMO_RUNTIME_FALLBACK_RETRY -->"
+ 
++// Text of the synthetic continuation the dispatcher sends when it finds no user prompt to retry.
++export const RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT = "continue"
++
+ const RUNTIME_FALLBACK_RETRY_MARKER_PATTERN = /<!--\s*OMO_RUNTIME_FALLBACK_RETRY\s*-->/
+ 
+ type RuntimeFallbackRetryTextPartLike = {
+@@ -9,6 +12,9 @@ type RuntimeFallbackRetryTextPartLike = {
+   text?: string
+ }
+ 
++const MARKER_ONLY_LINE_PATTERN = /^\s*(?:<!--\s*OMO_RUNTIME_FALLBACK_RETRY\s*-->|<!--\s*OMO_INTERNAL_INITIATOR\s*-->|<!--|-->)\s*$/
++const INTERNAL_MARKERS_PATTERN = /<!--\s*(?:OMO_RUNTIME_FALLBACK_RETRY|OMO_INTERNAL_INITIATOR)\s*-->/g
++
+ export function hasRuntimeFallbackRetryMarker(text: string): boolean {
+   return RUNTIME_FALLBACK_RETRY_MARKER_PATTERN.test(text)
+ }
+@@ -30,3 +36,26 @@ export function isRuntimeFallbackRetryTextParts(
+     && hasRuntimeFallbackRetryMarker(part.text)
+   ))
+ }
++
++function isRuntimeFallbackContinuationText(text: string): boolean {
++  return hasRuntimeFallbackRetryMarker(text)
++    && text.replace(INTERNAL_MARKERS_PATTERN, "").trim() === RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT
++}
++
++export function hasSubstantivePromptText(parts: unknown): boolean {
++  if (!Array.isArray(parts)) return false
++
++  return parts.some((part) => {
++    if (typeof part !== "object" || part === null || (part as RuntimeFallbackRetryTextPartLike).type !== "text") {
++      return false
++    }
++    const text = (part as RuntimeFallbackRetryTextPartLike).text
++    if (typeof text !== "string") return false
++    // The fallback's own synthetic continuation is never the prompt to retry.
++    if (isRuntimeFallbackContinuationText(text)) return false
++    return text.split(/\r?\n/).some((line) => {
++      const trimmed = line.trim()
++      return trimmed.length > 0 && !MARKER_ONLY_LINE_PATTERN.test(trimmed)
++    })
++  })
++}
+-- 
+2.55.0.windows.3
+

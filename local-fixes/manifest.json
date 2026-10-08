@@ -276,6 +276,41 @@
       ],
       "overlapsWith": [],
       "orderNote": "Independent of 01-17; id 15 remains the v2 compaction-event alias. Ported unchanged from v1 fix 18, source commit fca36ac472e728f4f1af7ac4f22bb3f8d402eb3b and ledger commit 91cc39ed0fa7b144cdb00398be15c202bcca0c95, onto integration/opencode-v2 at OMO 5.1.19 (2026-10-06). Patch bytes are unchanged; path is relative to local-fixes/ per v2-int convention. Touches manager.ts handleSessionErrorEvent, runtime-fallback/hook.ts, plugin/event-hook-dispatcher.ts and adds shared/runtime-fallback-recovery.ts. Upstream: issue #9682, PR #9683. Not covered: delegate-task sync polling (sync-session-turns.ts / sync-result-fetcher.ts) and the manager's own session.status retry path."
+    },
+    {
+      "id": "19-compaction-aware-timeout-lane-guards",
+      "title": "Protect compaction lanes and exhausted fallback retries",
+      "commit": "9a6a40824f893f286eaf3e680e15f5bd4d7f4b58",
+      "patch": "patches/19-compaction-aware-runtime-fallback.patch",
+      "pr": null,
+      "why": "The 2026-10-08 incident let the 30s watchdog and retry-signal handlers abort healthy compaction work or native retries without a replacement, leaving sessions dead and advancing the wrong lane.",
+      "markers": [
+        "compaction-aware-timeout",
+        "compaction-lane-retry-ignored",
+        "fallback-exhausted-no-abort"
+      ],
+      "overlapsWith": [
+        "18-runtime-fallback-recovery-arbitration"
+      ],
+      "orderNote": "Adds the shared compaction-in-flight registry and guards timeout, retry-signal, message-update, visible-response, and session.error paths. Apply after 18. The v2 bridge maps session.retry.scheduled to the V1 retry-status shape and deduplicates adjacent dual retry signals; compaction start comes from the bridged compaction hook and raw failure events remain terminal signals."
+    },
+    {
+      "id": "20-retry-source-hygiene",
+      "title": "Reuse the last real user prompt for runtime fallback retries",
+      "commit": "97f96ddcb20a88214c25b15527a341387bd31ead",
+      "patch": "patches/20-retry-source-hygiene.patch",
+      "pr": null,
+      "why": "The same incident replayed compaction marker rows and synthetic continue prompts, and bootstrapped the fallback chain from agent config instead of the model on the last real user turn.",
+      "markers": [
+        "retry-payload-skips-compaction-marker",
+        "fallback-bootstrap-from-last-user-model",
+        "watchdog-part-progress-rearm"
+      ],
+      "overlapsWith": [
+        "19-compaction-aware-timeout-lane-guards",
+        "18-runtime-fallback-recovery-arbitration"
+      ],
+      "orderNote": "Refines retry payload selection and bootstrap model resolution after 19; keep after both 18 and 19."
     }
   ],
   "externalFixes": [
