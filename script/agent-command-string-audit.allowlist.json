@@ -75,6 +75,7 @@
     "packages/omo-native/test/bun-runtime-decision.test.ts: /bin/omo",
     "packages/omo-native/test/bun-runtime.test.ts: /bin/omo",
     "packages/omo-native/test/compiled-setup-doctor.test.ts: omo doctor x2",
+    "packages/omo-native/test/compiled-update-package-owner.test.ts: /bin/omo x5",
     "packages/omo-native/test/config-doctor.test.ts: omo doctor",
     "packages/omo-native/test/doctor-edition.test.ts: omo doctor",
     "packages/omo-native/test/doctor-migration.test.ts: omo doctor",

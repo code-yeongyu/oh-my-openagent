@@ -13,7 +13,7 @@ import {
 } from "./compile-runtime"
 import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
 import { buildLabel, parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
-import { compiledUpdate, fetchGitHubReleases, releaseAssetName, RELEASES_URL } from "./compiled-update"
+import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { nearestNodeBin, readJson, releaseBanner } from "./bin/lib/package-paths.js"
@@ -344,6 +344,7 @@ async function main(): Promise<void> {
       arch: process.arch,
       fetchReleases: fetchGitHubReleases,
       args: process.argv.slice(2),
+      probeOwner: probePackageOwner,
     })
     ;(result.stream === "stderr" ? console.error : console.log)(result.output)
     process.exitCode = result.exitCode
