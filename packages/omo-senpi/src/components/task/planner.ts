@@ -42,7 +42,7 @@ export type { ResolveDefaultRoute } from "./planner-explicit-pin"
 // Whatever path resolved, the plan then inherits the parent's effective execution tier
 // (fast-mode-inheritance.ts) so a fast parent never delegates to a standard-tier child.
 export function createTaskChildPlanner(
-  omoConfig: OmoConfig,
+  omoConfig: OmoConfig | (() => OmoConfig),
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
@@ -51,9 +51,12 @@ export function createTaskChildPlanner(
   const distributeModels = createModelDistributor()
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
+    // Mid-session omo.json(c) edits must reach new plans: resolve the config per plan instead of
+    // closing over the composition-time snapshot (a stale object silently pins old category models).
+    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, distributeModels, resolveDefaultRoute)
-      return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, liveConfig, distributeModels, resolveDefaultRoute)
+      return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, liveConfig)
     }
 
     if (spec.model !== undefined && spec.model.length > 0) {
@@ -82,14 +85,14 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = resolveCategory(categoryName, omoConfig, registry, { distributeModels })
+    const resolution = resolveCategory(categoryName, liveConfig, registry, { distributeModels })
     const plan = toPlanResolution(categoryName, resolution, availableAgents)
     // Q's standing model rule: a chain ends in a typed failure that names each model, so the parent
     // reads the whole chain and the fix instead of retrying a dead binding. No substitution happens.
     if (plan.kind === "error" && plan.error.code === "model_unavailable") {
       const message = categoryModelFailureText(
         plan.error,
-        omoConfig,
+        liveConfig,
         resolution.kind === "model_unavailable" ? resolution.category : undefined,
       )
       if (message !== undefined) return { kind: "error", error: { ...plan.error, message } }
