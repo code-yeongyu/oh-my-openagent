@@ -2,8 +2,31 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
+import { canonicalAgentDir } from "./agent-dir.js"
+import { createPluginRootSelection } from "./plugin-root-selection.js"
 
 export const packageRoot = fileURLToPath(new URL("../..", import.meta.url))
+
+const pluginSelections = new Map()
+
+function nativePluginSelection(env) {
+  const cacheRoot = join(canonicalAgentDir(env), "native-plugin")
+  let select = pluginSelections.get(cacheRoot)
+  if (select === undefined) {
+    select = createPluginRootSelection(join(packageRoot, "plugin"), cacheRoot)
+    pluginSelections.set(cacheRoot, select)
+  }
+  return select()
+}
+
+export function nativePluginRoot(env = process.env) {
+  return nativePluginSelection(env).root
+}
+
+export function nativePluginDoctorLines(env = process.env) {
+  const { warning } = nativePluginSelection(env)
+  return warning === undefined ? [] : [warning]
+}
 
 export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"))

@@ -4,7 +4,7 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
-import { channelDistTagVersion, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
+import { channelDistTagVersion, nativePluginDoctorLines, nativePluginRoot, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
 import { daemonReportLines } from "./daemon.js"
 import { migrationReport } from "./doctor-migration.js"
 import { launchSpecDoctorLines } from "./launch-spec-mode.js"
@@ -350,7 +350,7 @@ function daemonReport(options) {
   const engine = options.daemonEngine
   if (engine === undefined) return []
   return daemonReportLines({
-    engine, pluginRoot: join(packageRoot, "plugin"), agentDir: canonicalAgentDir(), env: process.env, platform: process.platform,
+    engine, pluginRoot: options.pluginRoot ?? nativePluginRoot(), agentDir: canonicalAgentDir(), env: process.env, platform: process.platform,
   })
 }
 
@@ -410,8 +410,9 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(...staleEngineReport(options))
   lines.push(...retiredPayloadReport(options))
   lines.push(...transientMemoryReport(options))
-  const launchSpec = launchSpecDoctorLines(options.pluginRoot ?? join(packageRoot, "plugin"), options.launchSpecIo)
+  const launchSpec = launchSpecDoctorLines(options.pluginRoot ?? nativePluginRoot(), options.launchSpecIo)
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
+  lines.push(...(options.pluginRelocationWarnings ?? (options.pluginRoot === undefined ? nativePluginDoctorLines() : [])))
   lines.push(...launchSpec)
   lines.push(...daemonReport(options), ...(options.computerUse ?? []), ...(options.categoryCoverage ?? []), ...(options.gateway ?? []))
   if ((options.computerUse ?? []).some((line) => line.startsWith("FAIL "))) failed = true

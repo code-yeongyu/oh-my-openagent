@@ -129,6 +129,8 @@ Then remove `%USERPROFILE%\.local\bin` from your User `PATH` if nothing else liv
 
 `~/.omo` also holds your settings, sessions and memory. Delete the whole folder only if you want those gone too.
 
+After stopping all OmO sessions and hosts, you can also remove the private plugin copies used by system-wide npm installations with `rm -rf ~/.omo/agent/native-plugin`. If you set an agent-directory override, remove its `native-plugin` subdirectory instead.
+
 ## Behind a proxy or offline
 
 The installer needs HTTPS access to `get.omo.dev`. If that fails, it falls back to `registry.npmjs.org` (to resolve the channel) and `github.com` (for the files). On macOS, Linux and WSL it downloads with `curl` (or `wget`), which honor the `https_proxy` / `HTTPS_PROXY` environment variables. Windows PowerShell uses the system proxy settings.
@@ -146,5 +148,14 @@ npm i -g omo-ai
 ```
 
 A package-manager install updates with `omo update` and uninstalls with `bun remove -g omo-ai` (or `npm uninstall -g omo-ai`). The unrelated `omo` package on npm belongs to someone else.
+
+Run OmO as your own user, even when an administrator installed the npm package system-wide. On macOS and Linux, a securely root-owned installation uses a complete, private plugin copy under `~/.omo/agent/native-plugin/` so task and team hosts receive a launch spec owned by the running user. An explicit agent-directory override also moves this cache. The shared installation is not changed, and a changed plugin payload gets a new content-keyed copy. After publishing a new copy, OmO keeps it and the most recent previous copy, so a process still using the previous version can finish loading its files.
+
+The launch-spec security checks remain enabled. Unsafe source permissions, symlinks or special files inside the copied payload, and an incomplete or modified cache cause the private copy to be refused. OmO keeps running from the shared installation and prints a warning; `omo doctor` explains the refusal and why task or team hosts may still reject the shared launch spec. For group-writable agent directories, use `chmod 700 ~/.omo ~/.omo/agent` (adjust these paths if you set an override). Do not run the assistant as root or change the shared launch spec's ownership to one user. If the installation is not eligible for a private copy, use a user-owned npm prefix instead:
+
+```bash
+npm i -g --prefix "$HOME/.local" omo-ai
+export PATH="$HOME/.local/bin:$PATH"
+```
 
 Looking for the OpenCode or Codex plugin editions instead? See [Installation](installation.md).
