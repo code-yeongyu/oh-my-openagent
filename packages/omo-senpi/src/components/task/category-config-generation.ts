@@ -72,7 +72,7 @@ export function createCategoryConfigGenerations(mask: MaskCategoryModel = identi
  */
 export function createGenerationObservingPlanner(input: {
   readonly planner: ChildPlanner
-  readonly omoConfig: OmoConfig
+  readonly omoConfig: OmoConfig | (() => OmoConfig)
   readonly resolveRegistry: ResolveModelRegistry
   readonly generations: CategoryConfigGenerations
 }): ChildPlanner {
@@ -81,7 +81,10 @@ export function createGenerationObservingPlanner(input: {
     const resolution = planner(spec)
     if (resolution.kind !== "resolved") return resolution
     const registry = resolveRegistry()
-    if (registry !== undefined) generations.observe({ omoConfig, registry })
+    // Same live-config rule as the planner: observe against the current file state so a generation
+    // bumps when a mid-session edit changes the effective map.
+    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
+    if (registry !== undefined) generations.observe({ omoConfig: liveConfig, registry })
     return resolution
   }
 }

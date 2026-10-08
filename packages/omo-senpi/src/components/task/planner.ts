@@ -34,16 +34,19 @@ const NO_REGISTRY_MESSAGE = "No senpi model registry is available yet to resolve
 // Whatever path resolved, the plan then inherits the parent's effective execution tier
 // (fast-mode-inheritance.ts) so a fast parent never delegates to a standard-tier child.
 export function createTaskChildPlanner(
-  omoConfig: OmoConfig,
+  omoConfig: OmoConfig | (() => OmoConfig),
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
 ): ChildPlanner {
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
+    // Mid-session omo.json(c) edits must reach new plans: resolve the config per plan instead of
+    // closing over the composition-time snapshot (a stale object silently pins old category models).
+    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig)
-      return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, liveConfig)
+      return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, liveConfig)
     }
 
     if (spec.model !== undefined && spec.model.length > 0) {
@@ -70,7 +73,7 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = resolveCategory(categoryName, omoConfig, registry)
+    const resolution = resolveCategory(categoryName, liveConfig, registry)
     return toPlanResolution(categoryName, resolution, availableAgents)
   }
   return (spec): PlanResolution => {

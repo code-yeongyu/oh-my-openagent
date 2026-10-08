@@ -103,6 +103,9 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       const engine = composeTaskEngine({
         pi,
         omoConfig: loaded.config,
+        // Re-read the user/project chain per plan so mid-session omo.json(c) category edits
+        // reach the planner seam instead of pinning the register-time snapshot forever.
+        getOmoConfig: () => loadConfig({ cwd }).config,
         cwd,
         loadSkills,
         sharedParentTools: () => ctx.getCapturedTools?.() ?? [],

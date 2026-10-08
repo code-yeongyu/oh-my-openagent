@@ -94,6 +94,9 @@ export interface TaskEngine {
 export interface ComposeTaskEngineDeps {
   readonly pi: SenpiExtensionAPI
   readonly omoConfig: OmoConfig
+  // Live user-config source for the planner seam. Defaults to the composition-time snapshot;
+  // the task component passes a re-loader so mid-session omo.json(c) edits apply to new plans.
+  readonly getOmoConfig?: () => OmoConfig
   readonly cwd: string
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly coordinator?: IdleInjectionCoordinator
@@ -214,9 +217,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const resolveRegistry: ResolveModelRegistry = () => runtime.modelRegistry()
+  const getOmoConfig = deps.getOmoConfig ?? (() => deps.omoConfig)
   const basePlanner = createGenerationObservingPlanner({
-    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier()),
-    omoConfig: deps.omoConfig,
+    planner: createTaskChildPlanner(getOmoConfig, agents, resolveRegistry, () => runtime.parentServiceTier()),
+    omoConfig: getOmoConfig,
     resolveRegistry,
     generations: categoryConfigGenerations,
   })
