@@ -101,6 +101,8 @@ export interface BackgroundTask {
   stablePolls?: number
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
+  /** Number of consecutive polls that errored while the task was idle (reset when runtime fallback claims recovery) */
+  consecutiveErroredIdlePolls?: number
 }
 
 export interface BackgroundTaskSnapshot {
