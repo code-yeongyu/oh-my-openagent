@@ -29,6 +29,7 @@ import {
   hasMoreFallbacks,
   shouldRetryError,
 } from "../../shared/model-error-classifier"
+import { awaitRuntimeFallbackRecoveryDecision } from "../../shared/runtime-fallback-recovery"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -1865,6 +1866,7 @@ The fallback retry session is now created and can be inspected directly.
 
       const errorInfo = { name: errorName, message: errorMessage }
       void this.handleSessionErrorEvent({
+        event,
         errorInfo,
         errorMessage,
         errorName,
@@ -2049,6 +2051,7 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private async handleSessionErrorEvent(args: {
+    event: Event
     task: BackgroundTask
     errorInfo: { name?: string; message?: string; statusCode?: number }
     errorName: string | undefined
@@ -2074,6 +2077,24 @@ The fallback retry session is now created and can be inspected directly.
         "agent-not-found session.error",
       )
       return
+    }
+
+    // runtime-fallback retries inside this session, so a replacement session or a terminal error here
+    // would leave its generation running unobserved. It decides first; only a declined recovery falls through.
+    const runtimeFallbackDecision = awaitRuntimeFallbackRecoveryDecision(args.event)
+    if (runtimeFallbackDecision) {
+      const decision = await runtimeFallbackDecision
+      if (task.status !== "running") return
+      if (decision === "retry-owned") {
+        task.consecutiveErroredIdlePolls = 0
+        log("[background-agent] session.error recovered by runtime-fallback retry; keeping task running:", {
+          taskId: task.id,
+          sessionID: task.sessionId,
+          errorName,
+          errorMessage: errorMessage?.slice(0, 200),
+        })
+        return
+      }
     }
 
     if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {

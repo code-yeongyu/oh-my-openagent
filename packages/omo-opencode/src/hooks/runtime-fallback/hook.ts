@@ -4,6 +4,11 @@ import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { resolveSessionEventID } from "../../shared/event-session-id"
+import {
+  registerRuntimeFallbackRecoveryOwner,
+  settleRuntimeFallbackRecoveryClaim,
+} from "../../shared/runtime-fallback-recovery"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -79,7 +84,16 @@ export function createRuntimeFallbackHook(
     }
   }
 
-  const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+  const releaseRecoveryOwner = registerRuntimeFallbackRecoveryOwner()
+
+  // A session.error is recovered here when a retry dispatch is pending or awaiting its result. That covers
+  // an accepted retry and an error from a superseded generation that arrives while one is live; an error
+  // from the retry itself clears both sets before it is declined.
+  const ownsRecovery = (sessionID: string | undefined): boolean =>
+    sessionID !== undefined
+    && (deps.sessionRetryInFlight.has(sessionID) || deps.sessionAwaitingFallbackResult.has(sessionID))
+
+  const handleEvent = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     ensureInterval()
 
     if (config.enabled) {
@@ -95,7 +109,19 @@ export function createRuntimeFallbackHook(
     await baseEventHandler({ event })
   }
 
+  const eventHandler = async (input: { event: { type: string; properties?: unknown } }) => {
+    try {
+      await handleEvent(input)
+    } finally {
+      if (input.event.type === "session.error") {
+        const sessionID = resolveSessionEventID(input.event.properties as Record<string, unknown> | undefined)
+        settleRuntimeFallbackRecoveryClaim(input.event, ownsRecovery(sessionID) ? "retry-owned" : "declined")
+      }
+    }
+  }
+
   const dispose = () => {
+    releaseRecoveryOwner()
     if (cleanupInterval) {
       clearInterval(cleanupInterval)
     }
