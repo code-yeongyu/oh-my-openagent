@@ -3,6 +3,9 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { stringifyRuntimeModel } from "./fallback-state"
+import { extractSessionMessages } from "./session-messages"
+import { hasCompactionPart } from "../../shared/compaction-marker"
+import { hasSubstantivePromptText } from "../../shared/runtime-fallback-retry-marker"
 
 type ResolveFallbackBootstrapModelOptions = {
   sessionID: string
@@ -10,14 +13,43 @@ type ResolveFallbackBootstrapModelOptions = {
   eventModel?: unknown
   resolvedAgent?: string
   pluginConfig?: OhMyOpenCodeConfig
+  ctx?: {
+    client: { session: { messages: (input: { path: { id: string }; query: { directory: string } }) => Promise<unknown> } }
+    directory: string
+  }
 }
 
-export function resolveFallbackBootstrapModel(
+export async function resolveFallbackBootstrapModel(
   options: ResolveFallbackBootstrapModelOptions,
-): string | undefined {
+): Promise<string | undefined> {
   const eventModel = stringifyRuntimeModel(options.eventModel)
   if (eventModel) {
     return eventModel
+  }
+
+  if (options.ctx) {
+    try {
+      const response = await options.ctx.client.session.messages({
+        path: { id: options.sessionID },
+        query: { directory: options.ctx.directory },
+      })
+      const messages = extractSessionMessages(response)
+      const lastUser = messages?.filter((message) => {
+        if (message.info?.role !== "user") return false
+        const propParts = Array.isArray(message.parts) ? message.parts : undefined
+        const infoParts = Array.isArray(message.info?.parts) ? message.info.parts : undefined
+        const parts = propParts && propParts.length > 0 ? propParts : infoParts
+        if (hasCompactionPart(parts)) return false
+        return hasSubstantivePromptText(parts)
+      }).pop()
+      const userModel = stringifyRuntimeModel(lastUser?.info?.model)
+      if (userModel) {
+        log(`[${HOOK_NAME}] fallback-bootstrap-from-last-user-model`, { sessionID: options.sessionID, model: userModel })
+        return userModel
+      }
+    } catch (error) {
+      log(`[${HOOK_NAME}] Failed to resolve bootstrap model from session messages`, { sessionID: options.sessionID, error: String(error) })
+    }
   }
 
   const agentConfigs = options.pluginConfig?.agents
