@@ -18,6 +18,7 @@ import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { isCompactionInFlight } from "../../shared/compaction-in-flight"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -76,6 +77,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     sessionAwaitingFallbackResult.delete(sessionID)
     deps.internallyAbortedSessions.delete(sessionID)
     sessionStatusRetryKeys.delete(sessionID)
+    deps.fallbackExhaustionToastStates?.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
   }
 
@@ -130,6 +132,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       deps.internallyAbortedSessions.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
+      deps.fallbackExhaustionToastStates?.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
   }
@@ -153,6 +156,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const sessionID = resolveMessageEventSessionID(props)
     const role = info?.role as string | undefined
     if (!sessionID || role !== "user") return
+
+    // Capped-state reset lives in chat.message because message.updated payloads carry no parts.
 
     cancelledSessions.delete(sessionID)
   }
@@ -195,6 +200,11 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     if (!sessionID) {
       log(`[${HOOK_NAME}] session.error without sessionID, skipping`)
+      return
+    }
+
+    if (!isAbortError(error) && isCompactionInFlight(sessionID)) {
+      log(`[${HOOK_NAME}] session.error belongs to compaction lane; preserving fallback state`, { sessionID })
       return
     }
 
@@ -268,12 +278,13 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     if (!state) {
-      const initialModel = resolveFallbackBootstrapModel({
+      const initialModel = await resolveFallbackBootstrapModel({
         sessionID,
         source: "session.error",
         eventModel: resolveEventModel(props),
         resolvedAgent,
         pluginConfig,
+        ctx: deps.ctx,
       })
       if (!initialModel) {
         log(`[${HOOK_NAME}] No model info available, cannot fallback`, { sessionID })

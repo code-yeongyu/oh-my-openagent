@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
@@ -81,6 +82,26 @@ describe("hasVisibleAssistantResponse", () => {
 
     // then
     expect(result).toBe(false)
+  })
+
+  it("#given a compaction part with text but no summary metadata #when visibility is checked #then it is not visible", async () => {
+    const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
+    const ctx = createContext({
+      data: [
+        { info: { role: "user" }, parts: [{ type: "text", text: "latest question" }] },
+        { info: { role: "assistant" }, parts: [{ type: "compaction" }, { type: "text", text: "summary text" }] },
+      ],
+    })
+
+    expect(await checkVisibleResponse(ctx, "session-compaction-part", undefined)).toBe(false)
+  })
+
+  it("#given a non-Error session message failure #when visibility is checked #then it returns false safely", async () => {
+    const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
+    const ctx = createContext({ data: [] })
+    ctx.client.session.messages = async () => { throw "non-error rejection" }
+
+    expect(await checkVisibleResponse(ctx, "session-non-error-rejection", undefined)).toBe(false)
   })
 })
 
@@ -185,6 +206,87 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
       "toast",
     ])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  it("#given an exhausted quota fallback #when message update is handled #then it does not abort without a replacement", async () => {
+    const sessionID = "session-quota-fallback-exhausted"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: { name: "ProviderRateLimitError", statusCode: 402, message: "quota exhausted" },
+      },
+    })
+
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
+  })
+
+  it("#given info.agent is absent #when a retry signal is handled #then the resolved agent supplies both checks and dispatch", async () => {
+    const sessionID = "session-message-resolved-agent"
+    const operations: string[] = []
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.pluginConfig = { agents: { worker: { fallback_models: ["litellm/openai.eu.gpt-5.5"] } } }
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    const helpers = createRuntimeFallbackHelpers(deps, operations)
+    let resolveCalls = 0
+    let dispatchedAgent: string | undefined
+    helpers.resolveAgentForSessionFromContext = async () => {
+      resolveCalls += 1
+      return "worker"
+    }
+    helpers.autoRetryWithFallback = async (_sessionID, model, resolvedAgent) => {
+      dispatchedAgent = resolvedAgent
+      operations.push(`retry:${model}`)
+      return { accepted: true, status: "dispatched" }
+    }
+    const handler = createMessageUpdateHandler(deps, helpers)
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
+      },
+    })
+
+    expect(resolveCalls).toBe(1)
+    expect(dispatchedAgent).toBe("worker")
+    expect(operations).toContain("retry:litellm/openai.eu.gpt-5.5")
+  })
+
+  it("#given a retry error with registry-tracked compaction and no compaction metadata #when handled #then it leaves the native retry untouched", async () => {
+    const sessionID = "session-message-compaction-registry"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.sessionRetryInFlight.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    const { recordCompactionStart } = await import("../../shared/compaction-in-flight")
+    recordCompactionStart(sessionID)
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: { name: "ProviderRateLimitError", message: "retrying in 1s" },
+      },
+    })
+
+    expect(operations).toEqual([])
   })
 })
 

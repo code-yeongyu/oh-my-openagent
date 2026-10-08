@@ -1,15 +1,16 @@
-import type { HookDeps } from "./types"
+import type { FallbackState, HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
 import { log } from "../../shared/logger"
 import { extractAutoRetrySignal } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
+import { canPrepareFallback, createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { isCompactionInFlight } from "../../shared/compaction-in-flight"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -22,6 +23,22 @@ export function createSessionStatusHandler(
     sessionLastAccess,
     sessionRetryInFlight,
   } = deps
+  const exhaustionToastStates = deps.fallbackExhaustionToastStates ?? new Map<string, FallbackState>()
+
+  const showExhaustedToast = async (sessionID: string, state?: FallbackState) => {
+    if (state ? exhaustionToastStates.get(sessionID) === state : exhaustionToastStates.has(sessionID)) return
+    exhaustionToastStates.set(sessionID, state ?? createFallbackState("unknown"))
+    try {
+      await deps.ctx.client.tui.showToast({ body: {
+        title: "Runtime fallback",
+        message: "Fallback attempts exhausted; native retry continues",
+        variant: "warning",
+        duration: 3000,
+      } })
+    } catch (error) {
+      log(`[${HOOK_NAME}] fallback exhaustion toast failed`, { sessionID, error: String(error) })
+    }
+  }
 
   return async (props: Record<string, unknown> | undefined) => {
     const sessionID = resolveSessionEventID(props)
@@ -54,6 +71,11 @@ export function createSessionStatusHandler(
       }
     }
 
+    if (isCompactionInFlight(sessionID)) {
+      log(`[${HOOK_NAME}] retry signal belongs to compaction lane; primary chain untouched (compaction-lane-retry-ignored)`, { sessionID })
+      return
+    }
+
     const retryModel = model ?? "unknown"
     const retryKey = `${retryModel}:${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`
     const seenRetryKeys = sessionStatusRetryKeys.get(sessionID) ?? new Set<string>()
@@ -63,14 +85,23 @@ export function createSessionStatusHandler(
     seenRetryKeys.add(retryKey)
     sessionStatusRetryKeys.set(sessionID, seenRetryKeys)
 
+    let shouldAbortInFlightRetry = false
+
     if (sessionRetryInFlight.has(sessionID)) {
       if (timeoutEnabled) {
         log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
           sessionID,
           model,
         })
-        await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
-        sessionRetryInFlight.delete(sessionID)
+        const state = sessionStates.get(sessionID)
+        const resolvedAgentForAbort = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+        const availableModels = getFallbackModelsForSession(sessionID, resolvedAgentForAbort, pluginConfig)
+        if (!canPrepareFallback(state, availableModels, deps.config, model)) {
+          log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
+          await showExhaustedToast(sessionID, state)
+          return
+        }
+        shouldAbortInFlightRetry = true
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
         seenRetryKeys?.delete(retryKey)
@@ -90,14 +121,22 @@ export function createSessionStatusHandler(
       return
     }
 
+    const stateBeforeMutation = sessionStates.get(sessionID)
+    if (!canPrepareFallback(stateBeforeMutation, fallbackModels, deps.config, model)) {
+      log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
+      await showExhaustedToast(sessionID, stateBeforeMutation)
+      return
+    }
+
     let state = sessionStates.get(sessionID)
     if (!state) {
-      const initialModel = resolveFallbackBootstrapModel({
+      const initialModel = await resolveFallbackBootstrapModel({
         sessionID,
         source: "session.status",
         eventModel: model,
         resolvedAgent,
         pluginConfig,
+        ctx: deps.ctx,
       })
       if (!initialModel) {
         sessionStatusRetryKeys.delete(sessionID)
@@ -124,8 +163,6 @@ export function createSessionStatusHandler(
           sessionID,
           pendingFallbackModel: state.pendingFallbackModel,
         })
-        state.pendingFallbackModel = undefined
-        state.pendingFallbackPromptMayHaveBeenAccepted = false
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped (pending fallback in progress)`, {
           sessionID,
@@ -141,7 +178,20 @@ export function createSessionStatusHandler(
       retryAttempt: status.attempt,
     })
 
+    if (!canPrepareFallback(state, fallbackModels, deps.config)) {
+      log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
+      await showExhaustedToast(sessionID, state)
+      return
+    }
     await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+    if (shouldAbortInFlightRetry) {
+      sessionRetryInFlight.delete(sessionID)
+    }
+
+    if (state.pendingFallbackModel) {
+      state.pendingFallbackModel = undefined
+      state.pendingFallbackPromptMayHaveBeenAccepted = false
+    }
 
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,

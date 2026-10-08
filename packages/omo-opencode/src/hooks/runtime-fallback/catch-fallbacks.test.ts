@@ -58,25 +58,24 @@ describe("runtime fallback catch fallbacks", () => {
     expect(result).toBe(false)
   })
 
-  test("hasVisibleAssistantResponse rethrows non-Error message loading failures", async () => {
+  test("hasVisibleAssistantResponse returns false for non-Error message loading failures", async () => {
     // given
     const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
-    const thrown = "non-error message loading failure"
     const ctx = unsafeTestValue<RuntimeFallbackPluginInput>({
       directory: "/tmp/project",
       client: {
         session: {
           messages: async () => {
-            throw thrown
+            throw "non-error message loading failure"
           },
         },
       },
     })
 
     // when
-    const result = checkVisibleResponse(ctx, "ses_non_error", undefined)
+    const result = await checkVisibleResponse(ctx, "ses_non_error", undefined)
 
     // then
-    await expect(result).rejects.toBe(thrown)
+    expect(result).toBe(false)
   })
 })

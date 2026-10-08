@@ -464,4 +464,5 @@ describe("createEventHandler", () => {
     expect(created?.currentModel).toBe("test-provider/test-model")
     expect(created?.fallbackIndex).toBe(0)
   })
+
 })
