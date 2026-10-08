@@ -540,4 +540,24 @@ describe("createSessionStatusHandler", () => {
     expect(state.pendingFallbackModel).toBe("google/gemini-2.5-pro")
     SessionCategoryRegistry.clear()
   })
+
+  it("#given an in-flight retry without bootstrap model data #when a retry signal arrives #then it does not abort before returning", async () => {
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-no-bootstrap-model"
+    const deps = createDeps()
+    SessionCategoryRegistry.register(sessionID, "test")
+    deps.sessionRetryInFlight.add(sessionID)
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    await handler({
+      sessionID,
+      status: { type: "retry", attempt: 1, message: "AI_APICallError: overloaded" },
+    })
+
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([])
+    expect(deps.sessionStates.has(sessionID)).toBe(false)
+  })
 })

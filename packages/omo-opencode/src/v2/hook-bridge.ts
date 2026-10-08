@@ -100,8 +100,19 @@ function copyRecord(target: Record<string, unknown>, source: Record<string, unkn
   Object.assign(target, source)
 }
 
+function retryEventKey(event: ReturnType<typeof toV1Event>): string | undefined {
+  if (event.type !== "session.status" || !isRecord(event.properties.status)) return undefined
+  if (event.properties.status.type !== "retry") return undefined
+  const sessionID = typeof event.properties.sessionID === "string" ? event.properties.sessionID : undefined
+  if (!sessionID) return undefined
+  const attempt = typeof event.properties.status.attempt === "number" ? event.properties.status.attempt : "?"
+  const message = typeof event.properties.status.message === "string" ? event.properties.status.message : ""
+  return `${sessionID}:${attempt}:${message}`
+}
+
 export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: AdapterState): Promise<() => void> {
   const controller = new AbortController()
+  const seenRetryEvents = new Map<string, string>()
   const chatMessage = asHandler(hooks["chat.message"])
   const chatParams = asHandler(hooks["chat.params"])
   const chatHeaders = asHandler(hooks["chat.headers"])
@@ -274,7 +285,12 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: 
         for await (const raw of ctx.event.subscribe({ signal: controller.signal })) {
           const event = toV1Event(raw)
           noteRuntimeEvent(state, event)
-          if (eventHandler) await safeCall("event", () => eventHandler({ event }))
+          const retryKey = retryEventKey(event)
+          const sessionID = typeof event.properties.sessionID === "string" ? event.properties.sessionID : undefined
+          const duplicateRetry = retryKey !== undefined && sessionID !== undefined && seenRetryEvents.get(sessionID) === retryKey
+          if (retryKey && sessionID) seenRetryEvents.set(sessionID, retryKey)
+          else if (sessionID) seenRetryEvents.delete(sessionID)
+          if (eventHandler && !duplicateRetry) await safeCall("event", () => eventHandler({ event }))
           // fix 14 (opencode-v2): v2 emits "session.compaction.ended" where v1
           // emitted "session.compacted". Alias it so v1-era handlers (the
           // preemptive-compaction token-cache clear and post-compaction
@@ -297,5 +313,6 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: 
 
   return () => {
     controller.abort()
+    seenRetryEvents.clear()
   }
 }

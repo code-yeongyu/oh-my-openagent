@@ -411,6 +411,59 @@ describe("OpenCode V2 adapter", () => {
     await cleanup?.()
   })
 
+  test("deduplicates V2 scheduled retries when a matching status event also arrives", async () => {
+    const fake = createFakeContext()
+    const seen: Array<{ type?: string; properties?: Record<string, unknown> }> = []
+    const cleanup = await setupOpenCodeV2(fake.ctx, {
+      server: async () => ({
+        event: async (input: { event: { type?: string; properties?: Record<string, unknown> } }) => {
+          seen.push(input.event)
+        },
+      }),
+    })
+
+    const retry = {
+      sessionID: "ses_retry",
+      attempt: 2,
+      error: { type: "ProviderError", message: "overloaded", status: 503 },
+    }
+    fake.pushEvent({ type: "session.retry.scheduled", data: retry })
+    fake.pushEvent({
+      type: "session.status",
+      data: { sessionID: "ses_retry", status: { type: "retry", message: "overloaded", attempt: 2 } },
+    })
+    await waitFor(() => seen.length >= 1)
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(seen.filter((event) => event.type === "session.status")).toHaveLength(1)
+    await cleanup?.()
+  })
+
+  test("forwards a matching retry again after a non-retry event", async () => {
+    const fake = createFakeContext()
+    const seen: Array<{ type?: string }> = []
+    const cleanup = await setupOpenCodeV2(fake.ctx, {
+      server: async () => ({
+        event: async (input: { event: { type?: string } }) => {
+          seen.push(input.event)
+        },
+      }),
+    })
+
+    const retry = {
+      sessionID: "ses_retry_again",
+      attempt: 2,
+      error: { type: "ProviderError", message: "overloaded", status: 503 },
+    }
+    fake.pushEvent({ type: "session.retry.scheduled", data: retry })
+    fake.pushEvent({ type: "session.execution.succeeded", data: { sessionID: "ses_retry_again" } })
+    fake.pushEvent({ type: "session.retry.scheduled", data: retry })
+    await waitFor(() => seen.filter((event) => event.type === "session.status").length >= 2)
+
+    expect(seen.filter((event) => event.type === "session.status")).toHaveLength(2)
+    await cleanup?.()
+  })
+
   test("agents, providers, and models use the V1 data shape", async () => {
     const fake = createFakeContext()
     const catalog = fake.ctx as unknown as {

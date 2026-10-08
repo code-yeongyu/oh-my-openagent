@@ -2,6 +2,7 @@ import type { HookDeps } from "./types"
 import type { SessionMessage, SessionMessagePart } from "./session-messages"
 import { extractSessionMessages } from "./session-messages"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { isCompactionAgent } from "../../shared/compaction-marker"
 
 function getLastUserMessageIndex(messages: SessionMessage[]): number {
   for (let index = messages.length - 1; index >= 0; index--) {
@@ -50,6 +51,9 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
         }
 
         if (message.info?.error) {
+          continue
+        }
+        if (message.info?.summary === true || isCompactionAgent(message.info?.agent)) {
           continue
         }
 

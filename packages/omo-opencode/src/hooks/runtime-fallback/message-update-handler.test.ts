@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
@@ -185,6 +186,44 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
       "toast",
     ])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  it("#given info.agent is absent #when a retry signal is handled #then the resolved agent supplies both checks and dispatch", async () => {
+    const sessionID = "session-message-resolved-agent"
+    const operations: string[] = []
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.pluginConfig = { agents: { worker: { fallback_models: ["litellm/openai.eu.gpt-5.5"] } } }
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    const helpers = createRuntimeFallbackHelpers(deps, operations)
+    let resolveCalls = 0
+    let dispatchedAgent: string | undefined
+    helpers.resolveAgentForSessionFromContext = async () => {
+      resolveCalls += 1
+      return "worker"
+    }
+    helpers.autoRetryWithFallback = async (_sessionID, model, resolvedAgent) => {
+      dispatchedAgent = resolvedAgent
+      operations.push(`retry:${model}`)
+      return { accepted: true, status: "dispatched" }
+    }
+    const handler = createMessageUpdateHandler(deps, helpers)
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
+      },
+    })
+
+    expect(resolveCalls).toBe(1)
+    expect(dispatchedAgent).toBe("worker")
+    expect(operations).toContain("retry:litellm/openai.eu.gpt-5.5")
   })
 })
 

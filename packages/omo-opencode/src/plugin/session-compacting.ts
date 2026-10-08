@@ -1,6 +1,7 @@
 import type { Hooks } from "@opencode-ai/plugin"
 
 import { isCompactionAgent } from "../shared/compaction-marker"
+import { recordCompactionStart } from "../shared/compaction-in-flight"
 import { log } from "../shared/logger"
 
 import {
@@ -110,6 +111,7 @@ export function createSessionCompactingHandler(
     input: SessionCompactingInput,
     output: SessionCompactingOutput,
   ): Promise<void> => {
+    recordCompactionStart(input.sessionID)
     await runCompactionStep("compactionContextInjector.capture", input.sessionID, async () => {
       const capture = hooks.compactionContextInjector?.capture
       if (capture) {

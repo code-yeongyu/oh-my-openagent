@@ -28,6 +28,22 @@ export function toV1Event(event: unknown): V1Event {
     }
   }
 
+  if (type === "session.retry.scheduled") {
+    const error = isRecord(data.error) ? data.error : {}
+    return {
+      type: "session.status",
+      properties: {
+        sessionID,
+        status: {
+          type: "retry",
+          message: typeof error.message === "string" ? error.message : "",
+          attempt: data.attempt,
+        },
+        error: data.error,
+      },
+    }
+  }
+
   if (type === "session.execution.failed") {
     return {
       type: "session.error",
