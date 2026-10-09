@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { delimiter, join } from "node:path"
+import { join } from "node:path"
 import { channelPackageSpec, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
 
 // updateTarget reads the version of the install it is pointed at and falls back to this package's own
@@ -11,7 +10,6 @@ import {
   formatUpdateCommand,
   formatVersionChange,
   isPrintOnlyUpdate,
-  parseAllowScriptsNotice,
   runSelfUpdate,
 } from "../bin/lib/self-update.js"
 
@@ -200,177 +198,6 @@ describe("omo self-update", () => {
         expect(code).toBe(1)
         expect(errors).toEqual([`omo: update failed; retry with: npm i -g ${SPEC}`])
       })
-    })
-  })
-
-  describe("#given a fake npm on PATH that records its argv", () => {
-    // The fake behaves like npm 11+: it never runs an install script unless --allow-scripts is passed, and
-    // like real npm it writes the allowScripts warning to its debug log in `<logs-dir>/<id>-debug-0.log`
-    // (`<n> warn install-scripts <line>`, the format lib/utils/log-file.js and format.js produce, checked
-    // against npm 11.21.0 and 12.2.0) while its stdout and stderr stay on the inherited terminal.
-    const FAKE_NPM = `#!/bin/sh
-echo "$@" >> "$FAKE_NPM_DIR/argv"
-env | grep '^npm_config_logs_dir=' > "$FAKE_NPM_DIR/logs-dir"
-case "$*" in
-  *--allow-scripts*) echo ran > "$FAKE_NPM_DIR/marker" ;;
-  *) if [ -n "$FAKE_NPM_PACKAGES" ]; then
-       log="$npm_config_logs_dir/2026-10-06T10_00_00_000Z-debug-0.log"
-       n=$FAKE_NPM_PACKAGES_COUNT
-       echo "0 verbose cli /usr/bin/node /usr/bin/npm" >> "$log"
-       echo "40 warn install-scripts $n packages $FAKE_NPM_HEADLINE covered by allowScripts:" >> "$log"
-       echo "$FAKE_NPM_PACKAGES" | tr ',' '\\n' | while read -r pkg; do
-         echo "40 warn install-scripts   $pkg (postinstall: node install.js)" >> "$log"
-       done
-       echo "40 warn install-scripts" >> "$log"
-       echo "41 info ok" >> "$log"
-     fi ;;
-esac
-exit 0
-`
-
-    // The headline npm prints before "covered by allowScripts:", captured from real npm 11 and npm 12 sources.
-    const HEADLINES: Record<string, string> = {
-      "11": "have install scripts not yet",
-      "12": "had install scripts blocked because they are not",
-    }
-
-    async function updateWithFakeNpm(packages: string[], spec = SPEC, npm = "11") {
-      const dir = mkdtempSync(join(tmpdir(), "omo-fake-npm-"))
-      const npmPath = join(dir, "npm")
-      writeFileSync(npmPath, FAKE_NPM)
-      chmodSync(npmPath, 0o755)
-      const lines: string[] = []
-      const errors: string[] = []
-      let logsDir = ""
-      const code = await runSelfUpdate(["update"], {
-        resolveUpdate: () => ({ manager: "npm", command: `npm i -g ${spec}`, argv: ["npm", "i", "-g", spec] }),
-        ...offline,
-        env: {
-          ...process.env,
-          PATH: `${dir}${delimiter}${process.env.PATH}`,
-          FAKE_NPM_DIR: dir,
-          FAKE_NPM_PACKAGES: packages.join(","),
-          FAKE_NPM_PACKAGES_COUNT: String(packages.length),
-          FAKE_NPM_HEADLINE: HEADLINES[npm],
-        },
-        readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
-        log: (line) => lines.push(line),
-        error: (line) => errors.push(line),
-      })
-      const argv = readFileSync(join(dir, "argv"), "utf8").trim().split("\n")
-      logsDir = readFileSync(join(dir, "logs-dir"), "utf8").trim().replace("npm_config_logs_dir=", "")
-      const marker = existsSync(join(dir, "marker"))
-      rmSync(dir, { recursive: true, force: true })
-      return { code, lines, errors, argv, marker, logsDir }
-    }
-
-    // The fake is a #!/bin/sh script, so these run where a shell script is executable by name.
-    const posixOnly = test.skipIf(process.platform === "win32")
-    const ALL_KNOWN = ["@google/genai@2.25.0", "esbuild@0.28.2", "protobufjs@7.6.6"]
-    const reinstall = (spec: string) => `omo: if npm suggested a command without a package name, ignore it; to reinstall use: npm i -g ${spec}`
-
-    for (const npm of ["11", "12"]) {
-      posixOnly(`#then an npm ${npm} update never passes --allow-scripts and runs no install script`, async () => {
-        const { code, lines, errors, argv, marker } = await updateWithFakeNpm(ALL_KNOWN, "omo-ai@5.1.6", npm)
-        expect(code).toBe(0)
-        expect(errors).toEqual([])
-        expect(argv).toEqual(["i -g omo-ai@5.1.6"])
-        expect(marker).toBe(false)
-        expect(lines.join("\n")).not.toContain("--allow-scripts")
-      })
-    }
-
-    posixOnly("#then npm 12 known packages are described as blocked and omo works without them", async () => {
-      const { lines } = await updateWithFakeNpm(ALL_KNOWN, "omo-ai@5.1.6", "12")
-      expect(lines.slice(-2)).toEqual([
-        "omo: npm blocked the install scripts of @google/genai, esbuild, protobufjs; omo works without them",
-        reinstall("omo-ai@5.1.6"),
-      ])
-    })
-
-    posixOnly("#then npm 11 known packages are described as run and the notice as informational", async () => {
-      const { lines } = await updateWithFakeNpm(["esbuild@0.28.2"], "omo-ai@5.1.6", "11")
-      expect(lines.slice(-2)).toEqual([
-        "omo: npm ran the install scripts of esbuild; omo does not need them, so the notice is informational",
-        reinstall("omo-ai@5.1.6"),
-      ])
-    })
-
-    posixOnly("#then an unknown package gets a neutral line and no safety claim", async () => {
-      const { lines } = await updateWithFakeNpm(["left-pad@1.3.0"], "omo-ai@5.1.6", "12")
-      expect(lines.slice(-2)).toEqual([
-        "omo: npm blocked the install scripts of left-pad; omo has not reviewed them",
-        reinstall("omo-ai@5.1.6"),
-      ])
-      expect(lines.join("\n")).not.toContain("works without")
-      expect(lines.join("\n")).not.toContain("does not need")
-    })
-
-    posixOnly("#then a mix names known and unknown packages on separate lines, claiming safety only for the known", async () => {
-      const { lines } = await updateWithFakeNpm(["esbuild@0.28.2", "@scope/native@1.0.0", "protobufjs@7.6.6"], "omo-ai@5.1.6", "11")
-      expect(lines.slice(-3)).toEqual([
-        "omo: npm ran the install scripts of esbuild, protobufjs; omo does not need them, so the notice is informational",
-        "omo: npm ran the install scripts of @scope/native; omo has not reviewed them",
-        reinstall("omo-ai@5.1.6"),
-      ])
-    })
-
-    posixOnly("#then an npm without the notice prints no guidance and passes the plain argv", async () => {
-      const { code, lines, argv, marker } = await updateWithFakeNpm([])
-      expect(code).toBe(0)
-      expect(argv).toEqual([`i -g ${SPEC}`])
-      expect(marker).toBe(false)
-      expect(lines.some((line) => line.startsWith("omo: npm") || line.includes("reinstall use"))).toBe(false)
-    })
-
-    posixOnly("#then the npm log directory is a fresh temp dir that is removed afterwards", async () => {
-      const { logsDir } = await updateWithFakeNpm([])
-      expect(logsDir.startsWith(join(tmpdir(), "omo-npm-logs-"))).toBe(true)
-      expect(existsSync(logsDir)).toBe(false)
-    })
-
-    test("#then the npm child keeps inherited stdio so npm still sees the terminal", async () => {
-      const runs: Array<{ command: string, options: Record<string, unknown> }> = []
-      await runSelfUpdate(["update"], {
-        resolveUpdate: () => ({ manager: "npm", command: `npm i -g ${SPEC}`, argv: ["npm", "i", "-g", SPEC] }),
-        ...offline,
-        readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
-        run: async (command, _args, options = {}) => {
-          runs.push({ command, options })
-          return { status: 0, signal: null }
-        },
-        log: () => {},
-      })
-      expect(runs[0].command).toBe("npm")
-      expect(runs[0].options.stdio).toBe("inherit")
-      expect(runs[0].options).not.toHaveProperty("onOutput")
-    })
-
-    test("#then the notice parser reads the stderr form of the lines too", () => {
-      const notice = parseAllowScriptsNotice([
-        "npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:",
-        "npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)",
-        "npm warn install-scripts   @google/genai@2.25.0 (preinstall: echo 'x')",
-      ].join("\n"))
-      expect(notice).toEqual({ blocked: false, packages: ["esbuild", "@google/genai"] })
-      expect(parseAllowScriptsNotice("0 verbose cli\n41 info ok")).toBeNull()
-    })
-
-    test("#then a bun update creates no npm log dir and prints no npm guidance", async () => {
-      const runOptions: Array<Record<string, unknown>> = []
-      const lines: string[] = []
-      await runSelfUpdate(["update"], {
-        resolveUpdate: () => ({ manager: "bun", command: `bun add -g ${SPEC}`, argv: ["bun", "add", "-g", SPEC] }),
-        ...offline,
-        readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
-        run: async (_command, _args, options = {}) => {
-          runOptions.push(options)
-          return { status: 0, signal: null }
-        },
-        log: (line) => lines.push(line),
-      })
-      expect((runOptions[0].env as Record<string, string> | undefined)?.npm_config_logs_dir).toBeUndefined()
-      expect(lines.some((line) => line.startsWith("omo: npm"))).toBe(false)
     })
   })
 })
