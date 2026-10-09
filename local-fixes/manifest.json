@@ -311,6 +311,20 @@
         "18-runtime-fallback-recovery-arbitration"
       ],
       "orderNote": "Refines retry payload selection and bootstrap model resolution after 19; keep after both 18 and 19."
+    },
+    {
+      "id": "21-agent-registration-flat",
+      "title": "Register OMO agents under their bare ids instead of a namespaced subdirectory",
+      "commit": "4f18e252b6268078cfc0ad16641c7f73ec7465ba",
+      "patch": "patches/21-agent-registration-flat.patch",
+      "pr": null,
+      "why": "The v2 port materialised every agent as agents/oh-my-openagent/<name>.md, so opencode derived ids like 'oh-my-openagent/Sisyphus - ultraworker'. default_agent ('Sisyphus - ultraworker'), every v1 session pin, and the agent picker all reference the bare name, so on the v2 lane nothing resolved: 'Session.AgentNotFoundError: Agent not found: \"Sisyphus - ultraworker\"' looped in 'Failed to drain Session' (observed 2026-10-09T20:16Z, run=228135fd) and the picker showed two entries per agent. The port now writes agents flat into agents/ and stamps a generated-by marker, so a hand-authored agent (explore.md pinned to MiniMax M3 for quota, general.md) is never overwritten - the v1 'user config wins' outcome. One-time cleanup after the first flat write: delete the stale agents/oh-my-openagent/ directory; the v2 host never recreates it.",
+      "markers": [
+        "generated-by: oh-my-openagent",
+        "agent file is user-authored; not overwriting"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-20; touches only packages/omo-opencode/src/v2/agent-markdown.ts. Complemented outside this repo by carrying v1's opencode.json agent block and default_agent into the v2 profile config (the cutover dropped both)."
     }
   ],
   "externalFixes": [

@@ -1,0 +1,91 @@
+From 4f18e252b6268078cfc0ad16641c7f73ec7465ba Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Fri, 9 Oct 2026 23:49:14 +0300
+Subject: [PATCH] fix(v2): register OMO agents under their bare ids
+
+The v2 port wrote every agent into agents/oh-my-openagent/, so opencode
+registered them as "oh-my-openagent/<name>". That broke default_agent,
+every existing session pinned to a bare name, and the agent picker
+(two entries per agent once the flat overrides existed).
+
+Write agents flat into agents/ instead, and stamp generated files with a
+generated-by marker so a hand-authored agent (e.g. a user-pinned
+explore.md) is never overwritten - the v1 "user config wins" outcome.
+---
+ .../omo-opencode/src/v2/agent-markdown.ts     | 32 +++++++++++++++----
+ 1 file changed, 26 insertions(+), 6 deletions(-)
+
+diff --git a/packages/omo-opencode/src/v2/agent-markdown.ts b/packages/omo-opencode/src/v2/agent-markdown.ts
+index 754cc7d13..a0c97a495 100644
+--- a/packages/omo-opencode/src/v2/agent-markdown.ts
++++ b/packages/omo-opencode/src/v2/agent-markdown.ts
+@@ -2,9 +2,18 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+ import { join } from "node:path"
+ 
+ import { getOpenCodeConfigDir } from "../shared/opencode-config-dir"
++import { log } from "../shared/logger"
+ 
+ const AGENT_DIRECTORY = "oh-my-openagent"
+ 
++/**
++ * Stamp written into every agent file this module owns. `writeAgentMarkdown` only ever
++ * overwrites files carrying it, so a hand-authored agent (or a config override such as a
++ * user-pinned explore.md) is never clobbered — the same "user config wins" outcome the v1
++ * plugin surface had.
++ */
++const GENERATED_MARKER = "generated-by: oh-my-openagent"
++
+ export type AgentPermissionEffect = "allow" | "deny" | "ask"
+ 
+ export type AgentPermissionRule = {
+@@ -19,7 +28,11 @@ const ACTION_ALIASES: Record<string, string> = {
+ 
+ export function agentMarkdownDirectory(override?: string): string {
+   if (override) return override
+-  return join(getOpenCodeConfigDir({ binary: "opencode" }), "agents", AGENT_DIRECTORY)
++  // Written FLAT into agents/ so opencode registers each agent under its bare id
++  // ("Sisyphus - ultraworker"), exactly like the v1 plugin surface did. The previous
++  // layout (agents/oh-my-openagent/<name>.md) made every id "oh-my-openagent/<name>",
++  // which broke default_agent, every existing session, and the agent picker.
++  return join(getOpenCodeConfigDir({ binary: "opencode" }), "agents")
+ }
+ 
+ export function agentFileName(name: string): string {
+@@ -77,7 +90,7 @@ export function renderAgentMarkdown(name: string, config: Record<string, unknown
+       : undefined
+   if (prompt === undefined && typeof config.description !== "string") return undefined
+ 
+-  const lines = ["---"]
++  const lines = ["---", `# ${GENERATED_MARKER}`]
+   if (typeof config.description === "string") lines.push(`description: ${yamlString(config.description)}`)
+   const mode = agentMode(config.mode)
+   if (mode) lines.push(`mode: ${mode}`)
+@@ -119,14 +132,21 @@ export function writeAgentMarkdown(input: {
+     const markdown = renderAgentMarkdown(name, value)
+     if (!markdown) continue
+     const path = join(input.directory, agentFileName(name))
+-    let changed = true
++    let existing: string | undefined
+     try {
+-      changed = readFileSync(path, "utf8") !== markdown
++      existing = readFileSync(path, "utf8")
+     } catch {
+-      changed = true
++      existing = undefined
++    }
++    if (existing !== undefined && !existing.includes(GENERATED_MARKER)) {
++      // A hand-authored agent owns this file; never overwrite it. The v1 surface let the
++      // user's config win the same way, and their model pins must survive regressions.
++      log("agent file is user-authored; not overwriting", { name, path })
++      continue
+     }
++    const changed = existing === undefined || existing !== markdown
+     if (changed) writeFileSync(path, markdown)
+-    written.push({ name, id: nestedAgentID(name), path, changed })
++    written.push({ name, id: name, path, changed })
+   }
+   return written
+ }
+-- 
+2.55.0.windows.3
+
