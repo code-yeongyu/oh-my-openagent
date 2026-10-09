@@ -93,6 +93,18 @@ describe("initI18n()", () => {
     })
   })
 
+  describe("#given LANG=fr_FR.UTF-8", () => {
+    it("#then auto-detects locale as fr", () => {
+      // given
+      process.env.LANG = "fr_FR.UTF-8"
+      // when
+      initI18n()
+      // then
+      expect(getLocale()).toBe("fr")
+      expect(t("toast.task_completed")).toBe("Tâche terminée")
+    })
+  })
+
   describe("#given LANG=en_US.UTF-8", () => {
     it("#then auto-detects locale as en", () => {
       // given
@@ -165,6 +177,20 @@ describe("setLocale() / getLocale()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given setLocale('fr')", () => {
+    it("#then translations switch to French with params interpolated", () => {
+      // given - en
+      // when
+      setLocale("fr")
+      // then
+      expect(getLocale()).toBe("fr")
+      expect(t("toast.task_completion_message", { description: "build", duration: "3m" })).toBe(
+        "«\u00A0build\u00A0» terminée en 3m",
+      )
+      expect(t("toast.concurrency_info", { total: 3, limit: 5 })).toBe(" [3/5]")
     })
   })
 

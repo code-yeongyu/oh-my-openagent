@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const I18nConfigSchema = z.object({
-  /** Override auto-detected locale (e.g. "en", "zh"). Falls back to LANG env var if not set. */
+  /** Override auto-detected locale (e.g. "en", "fr", "zh"). Falls back to LANG env var if not set. */
   locale: z.string().optional(),
 })
 
