@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -209,4 +209,24 @@ describe("sidecar parity set", () => {
     }
   })
 
+
+  test("#given the installed engine #when the sidecars are resolved #then the sandbox runtime quickjs-wasi and its wasm are staged as required entries", () => {
+    // Given / When
+    const sources = engineSidecarSources()
+    // Then
+    const target = "node_modules/@code-yeongyu/senpi-codemode/node_modules/quickjs-wasi"
+    expect(sources).toContainEqual(expect.objectContaining({ to: target, required: true }))
+    expect(sources).toContainEqual(expect.objectContaining({ to: `${target}/quickjs.wasm`, required: true }))
+  })
+
+  test("#given the installed engine #when the sidecars are resolved #then the staged codemode package carries the vendored sandbox host and worker", () => {
+    // Given / When
+    const codemode = engineSidecarSources().find((source) => source.to === "node_modules/@code-yeongyu/senpi-codemode")
+    // Then
+    expect(codemode?.required).toBe(true)
+    const vendored = join(codemode?.from ?? "", "src", "kernels", "sandbox", "vendor", "pi-codemode")
+    for (const file of ["runtime/host.ts", "runtime/worker.ts", "runtime/prelude-source.ts", "wasm.ts", "LICENSE"]) {
+      expect(existsSync(join(vendored, file))).toBe(true)
+    }
+  })
 })

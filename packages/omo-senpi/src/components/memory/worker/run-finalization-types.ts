@@ -6,6 +6,7 @@ import type {
   ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
+import type { MemoryReceiptsPort, ReceiptWarn } from "../receipts-port"
 import type { ReflectionReservationPort } from "./runner"
 import type { ReflectionCompletionRecord } from "./completion"
 import type { RunLivenessSeams } from "./run-liveness"
@@ -23,6 +24,8 @@ export interface RunFinalizationContext extends RunLivenessSeams {
   readonly launch?: (run: ReservedRun) => void
   readonly now: () => number
   readonly withWriterLock?: <T>(operation: () => Promise<T>) => Promise<T>
+  readonly receipts?: MemoryReceiptsPort
+  readonly warn?: ReceiptWarn
 }
 
 export interface ReservationRunResult {
@@ -40,4 +43,6 @@ export interface DurableFinalizationDecision {
   readonly reason?: string
   readonly detail?: string
   readonly integrationSha?: string
+  /** The supervisor died before publishing; its child's committed tip was validated and recovered. */
+  readonly recoveredFromWorktree?: true
 }

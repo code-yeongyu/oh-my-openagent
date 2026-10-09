@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { binaryOnlyFailures, compareRuns, normalizeText, PARITY_STEPS } from "./qa/omo-native-parity-compare.mjs"
+import { AST_GREP_MCP_TOOLS, AST_GREP_REGISTERED, astGrepProbeCode, binaryOnlyFailures, compareRuns, normalizeText, PARITY_STEPS } from "./qa/omo-native-parity-compare.mjs"
+
+const REGISTERED = `${AST_GREP_REGISTERED}${AST_GREP_MCP_TOOLS.join(", ")}`
 
 function run(overrides: Partial<Parameters<typeof compareRuns>[0]> = {}) {
-  const results = Object.fromEntries(PARITY_STEPS.map((step) => [step.id, { isError: false, text: `${step.id} ok` }]))
+  const results = Object.fromEntries(PARITY_STEPS.map((step) => [step.id, { isError: false, text: step.id === "ast-grep" ? REGISTERED : `${step.id} ok` }]))
   return {
     tools: ["eval", "read", "webfetch"],
     results,
@@ -51,6 +53,30 @@ describe("binary/npm parity comparison", () => {
       "first run: session exited 1",
       'first run: pty-bash failed "@earendil-works/pi-pty package.json is missing a string version"',
     ])
+  })
+
+  test("#given a side whose ast-grep MCP tools never registered #when compared #then it is reported even when both sides agree", () => {
+    const never = "ast-grep MCP tools never registered within 45s; listed: none"
+    const late = run()
+    late.results["ast-grep"] = { isError: false, text: never }
+    expect(compareRuns(run(), late)).toEqual([`ast-grep: npm "${never}"`, `ast-grep: binary ok "${REGISTERED}" vs npm ok "${never}"`])
+    expect(compareRuns(late, late)).toEqual([`ast-grep: binary "${never}"`, `ast-grep: npm "${never}"`])
+  })
+
+  test("#given the ast-grep probe cell #when its MCP tools register late or never #then it waits for all three or reports the timeout", async () => {
+    const bullet = (name: string) => `- ${name} — desc`
+    const probe = async (listed: (call: number) => readonly string[], options: { budgetMs: number; pollMs: number }) => {
+      let calls = 0
+      const printed: string[] = []
+      const tool = { tool_search: async () => ({ text: ["Found tools:", "", ...listed(++calls).map(bullet)].join("\n") }) }
+      const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor
+      await new AsyncFunction("tool", "print", astGrepProbeCode(options))(tool, (line: string) => printed.push(line))
+      return { calls, printed }
+    }
+    const late = await probe((call) => (call < 3 ? [...AST_GREP_MCP_TOOLS.filter((name) => !name.endsWith("_search")), "mcp__ast_grep_search_hint"] : ["lsp_find", ...AST_GREP_MCP_TOOLS]), { budgetMs: 60_000, pollMs: 0 })
+    expect(late).toEqual({ calls: 3, printed: [REGISTERED] })
+    const never = await probe(() => [AST_GREP_MCP_TOOLS[0] ?? ""], { budgetMs: 0, pollMs: 0 })
+    expect(never).toEqual({ calls: 1, printed: [`ast-grep MCP tools never registered within 0s; listed: ${AST_GREP_MCP_TOOLS[0]}`] })
   })
 
   test("#given sandbox paths and timings #when normalized #then they collapse to stable tokens", () => {

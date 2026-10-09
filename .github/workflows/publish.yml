@@ -437,21 +437,19 @@ jobs:
             exit 1
           fi
 
-          # A release commit may only be REUSED when it is the current base head. A stamp that
-          # sits behind the head belongs to an earlier, abandoned attempt: its tree predates every
-          # merge since, so publishing it would ship a version whose contents nobody reviewed under
-          # that number (2026-09-04: a beta.41 retry re-selected the first attempt's stamp, whose
-          # tree lacked the senpi engine bump; only gate-reuse's CI check kept it off npm). Fail
-          # closed and ask for a fresh version number instead of restamping over a live one.
+          # A merged stamping commit remains reusable only while its tree equals the current
+          # base. The merge wrapper must not replace its maintainer attribution, and later
+          # content must never be silently omitted by reusing an abandoned stamp (#7779).
           reuse_or_refuse() {
             local candidate="$1" origin_desc="$2"
-            if [ "$candidate" = "$BASE_HEAD" ]; then
+            if git merge-base --is-ancestor "$candidate" "$BASE_HEAD" &&
+              [ "$(git rev-parse "${candidate}^{tree}")" = "$(git rev-parse "${BASE_HEAD}^{tree}")" ]; then
               echo "release_sha=${candidate}" >> "$GITHUB_OUTPUT"
               echo "needs_push=false" >> "$GITHUB_OUTPUT"
-              echo "${origin_desc} is the current origin/${BASE_REF} head: ${candidate}"
+              echo "${origin_desc} matches the current origin/${BASE_REF} tree: ${candidate}"
               exit 0
             fi
-            echo "::error::${origin_desc} (${candidate}) is stale: origin/${BASE_REF} has moved to ${BASE_HEAD}. Refusing to publish a tree that predates the base head. Bump to an unused version so a fresh release commit is stamped on the current head."
+            echo "::error::${origin_desc} (${candidate}) is stale or unrelated to origin/${BASE_REF} (${BASE_HEAD}). Bump to an unused version so a fresh release commit is stamped on the current head."
             exit 1
           }
 
@@ -459,7 +457,7 @@ jobs:
             reuse_or_refuse "$(git rev-list --max-count=1 "refs/tags/v${VERSION}")" "Release tag v${VERSION}"
           fi
 
-          RELEASE_SHA="$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
+          RELEASE_SHA="$(git rev-list --no-merges --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
           if [ -n "$RELEASE_SHA" ]; then
             reuse_or_refuse "$RELEASE_SHA" "Release commit for v${VERSION}"
           fi
@@ -504,8 +502,8 @@ jobs:
           # rejects the release commit as stale (v5.0.0-beta.83 release-state PR).
           bun run build:codex-install
 
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config --global user.email "code.yeon.gyu@gmail.com"
+          git config --global user.name "YeonGyu-Kim"
           git add CHANGELOG.md package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           # build-extension.mjs also rewrites the committed bundles under plugin/runtime (the
           # agent-toolkit SDK, the rollback migrator); commit every tracked one it touched or the
@@ -609,9 +607,16 @@ jobs:
           for attempt in $(seq 1 120); do
             PR_STATE="$(retry_gh "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
-              RELEASE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              MERGE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              RELEASE_SHA="$(retry_gh "Read release-state PR source SHA" gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
+              git fetch origin "$MERGE_SHA" "$RELEASE_SHA"
+              if ! git merge-base --is-ancestor "$RELEASE_SHA" "$MERGE_SHA" ||
+                [ "$(git rev-parse "${RELEASE_SHA}^{tree}")" != "$(git rev-parse "${MERGE_SHA}^{tree}")" ]; then
+                echo "::error::Merged release tree differs from its prepared source; refusing publication."
+                exit 1
+              fi
               echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-              echo "Release-state PR #${PR_NUMBER} merged at ${RELEASE_SHA}"
+              echo "Release-state PR #${PR_NUMBER} merged at ${MERGE_SHA}; publishing stamped source ${RELEASE_SHA}"
               exit 0
             fi
 
@@ -1189,8 +1194,8 @@ jobs:
           bun run --cwd packages/omo-codex/plugin build
           bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
           cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config --global user.email "code.yeon.gyu@gmail.com"
+          git config --global user.name "YeonGyu-Kim"
           git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo
           if git diff --cached --quiet; then
             echo "LazyCodex marketplace already up to date"

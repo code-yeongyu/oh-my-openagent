@@ -1,7 +1,7 @@
 import type { DrainWakeEvent, GatewayAdmissionKind, SessionRuntimePort, WakeReason } from "./adapter"
 import { decideDelivery } from "./decision"
 import { isLockWaitExceeded } from "./lock-wait"
-import { renderDeliveryText } from "./provenance"
+import { deliverySender, renderDeliveryText } from "./provenance"
 import type { GatewayStore } from "./store"
 import type { DeliveryRow, ProcessIdentity } from "./types"
 
@@ -107,6 +107,8 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         result = runtime.admitExternalMessage({
           delivery_id: row.delivery_id,
           text: renderDeliveryText(claimed.row),
+          sender: deliverySender(claimed.row),
+          display_text: claimed.row.body,
           deliverAs: decision.deliverAs,
           ...(decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
         })

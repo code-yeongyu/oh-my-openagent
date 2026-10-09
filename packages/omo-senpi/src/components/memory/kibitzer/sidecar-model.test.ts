@@ -83,7 +83,7 @@ describe("resolveKibitzerSidecarModel", () => {
 
 // A catalog that knows every model below, and an availability list naming only the connected ones:
 // `find` answers for an unconnected provider's model exactly like the live catalog does (#9216).
-const CATALOG = ["openai/gpt-5.6-luna-fast", "apitopia/gpt-5.6-luna-fast", "anthropic/claude-haiku-4-5", "deepseek/deepseek-flash", "omo-mock/unrelated-1"]
+const CATALOG = ["openai/gpt-5.6-luna-fast", "apitopia/gpt-5.6-luna-fast", "anthropic/claude-haiku-5-5", "anthropic/claude-haiku-4-5", "deepseek/deepseek-flash", "omo-mock/unrelated-1"]
 
 function port(selector: string): SenpiModelPort {
   const slash = selector.indexOf("/")
@@ -101,15 +101,16 @@ const unconnectedPin: OmoConfig = { categories: { quick: { models: ["openai/gpt-
 
 describe("resolveKibitzerSidecarModel connected-first ordering (#9216)", () => {
   test("#given an anthropic-only registry and a quick pin naming only unconnected providers #when resolved #then the connected builtin rung leads and the pins trail", () => {
-    const resolution = resolveKibitzerSidecarModel({ config: unconnectedPin, registry: connectedRegistry(["anthropic/claude-haiku-4-5"]) })
+    const resolution = resolveKibitzerSidecarModel({ config: unconnectedPin, registry: connectedRegistry(["anthropic/claude-haiku-5-5"]) })
 
-    expect(resolution).toMatchObject({ kind: "resolved", category: "quick", model: "anthropic/claude-haiku-4-5", thinking: "off" })
+    expect(resolution).toMatchObject({ kind: "resolved", category: "quick", model: "anthropic/claude-haiku-5-5", thinking: "medium" })
     if (resolution.kind !== "resolved") throw new Error("unreachable")
-    expect(resolution.chain.selectedModel).toBe("anthropic/claude-haiku-4-5")
+    expect(resolution.chain.selectedModel).toBe("anthropic/claude-haiku-5-5")
     expect(resolution.fallbacks.map((candidate) => candidate.model)).toEqual(["openai/gpt-5.6-luna-fast", "apitopia/gpt-5.6-luna-fast"])
   })
 
   test("#given a pin whose later entry is connected and an earlier builtin rung also connected #when resolved #then the connected pin wins over the builtin chain", () => {
+    // The pinned claude-haiku-4-5 is not a builtin quick rung, so only pin priority can select it over DeepSeek.
     const config: OmoConfig = { categories: { quick: { models: ["openai/gpt-5.6-luna-fast", "anthropic/claude-haiku-4-5"] } } }
 
     const resolution = resolveKibitzerSidecarModel({ config, registry: connectedRegistry(["deepseek/deepseek-flash", "anthropic/claude-haiku-4-5"]) })
@@ -138,14 +139,14 @@ describe("resolveKibitzerSidecarModel connected-first ordering (#9216)", () => {
       sessionDir: "/state/recall/sidecars/cGFyZW50LTE",
       agentDir: "/home/agent",
       loadConfig: () => unconnectedPin,
-      modelRegistry: () => connectedRegistry(["anthropic/claude-haiku-4-5"]) as unknown as ChildModelRegistry,
+      modelRegistry: () => connectedRegistry(["anthropic/claude-haiku-5-5"]) as unknown as ChildModelRegistry,
       loadPersona: () => "persona text",
       createRunner: () => ({ start: async (spec) => (specs.push(spec), {} as ChildHandle) }),
     })
 
     await start({ sessionId: "parent-1", generation: 1, prompt: "<kibitzer-seed/>", tools: [nudgeTool()], maxItems: 2 })
 
-    expect(specs[0]?.selectedModel).toBe("anthropic/claude-haiku-4-5")
+    expect(specs[0]?.selectedModel).toBe("anthropic/claude-haiku-5-5")
   })
 })
 

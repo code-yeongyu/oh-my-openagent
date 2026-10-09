@@ -239,6 +239,11 @@ async function cancelMemberTasks(teamRunId: string, runtimeDir: string, deps: De
       cancelled.push(taskId)
       continue
     }
+    // Cancel parked a finished resident member (omo#9785); team deletion still ends it for good.
+    if (outcome.kind === "released") {
+      await deps.destruction.destroyResidentTask(taskId, "cancel")
+      continue
+    }
     // Terminal cancellation is an intentional noop (completed residents stay revivable), but team
     // deletion owns member teardown: route the resident through the lifecycle single-writer port.
     // A `cancelled` noop means an in-flight cancellation already owns destruction, and a

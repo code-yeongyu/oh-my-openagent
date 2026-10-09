@@ -1,6 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
-import type { TaskRecord } from "../state"
+import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { buildRevived } from "../steering/engine-policy"
 import type { ManagedChildHandle } from "./child-handle"
@@ -41,11 +41,11 @@ export async function reopenSelfResumedTurn(ports: SelfResumedTurnPorts, taskId:
   const settled = ports.tryLoad(taskId)
   const model = ports.liveModel(taskId)
   if (!reopenable(settled, handle, ports) || model === undefined) return
-  const epoch = settled.notification.run_epoch + 1
+  const epoch = nextRunEpoch(settled)
   const reservation = ports.reserveForRevive(taskId)
   let reopened = false
   ports.store.mutate(taskId, (fresh) => {
-    if (!reopenable(fresh, handle, ports) || fresh.notification.run_epoch + 1 !== epoch) return fresh
+    if (!reopenable(fresh, handle, ports) || nextRunEpoch(fresh) !== epoch) return fresh
     reopened = true
     return { ...buildRevived(fresh, nowIso(ports.now)), resumed_run_epoch: epoch }
   })

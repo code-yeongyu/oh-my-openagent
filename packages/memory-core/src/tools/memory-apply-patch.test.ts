@@ -101,3 +101,35 @@ describe("memoryApplyPatch success operations", () => {
     expect(await repo.show("HEAD", "system/tail.md")).toBe("---\ndescription: Tail\n---\nchanged")
   })
 })
+
+describe("memoryApplyPatch secret screening", () => {
+  it("#given an added file carrying a credential assignment #when applied #then it is refused with the masked path and class, and index and worktree are restored", async () => {
+    // #given
+    const { dir, repo, locksDirectory } = await fixture()
+    const headBefore = await repo.head()
+    const input = [
+      "*** Begin Patch",
+      "*** Add File: notes/a.md",
+      "+---",
+      "+description: Note",
+      "+---",
+      "+the token is token=abc123456",
+      "*** End Patch",
+    ].join("\n")
+
+    // #when
+    const error = await memoryApplyPatch(repo, params(locksDirectory, "add secret note", input)).then(
+      () => { throw new Error("expected the patch to be refused") },
+      (caught: unknown) => caught,
+    )
+
+    // #then
+    expect(error).toBeInstanceOf(Error)
+    const message = (error as Error).message
+    expect(message).toContain("refused: notes/a.md contains secret-like content (credential_assignment); remove it and retry")
+    expect(message).not.toContain("abc123456")
+    expect(await repo.head()).toBe(headBefore)
+    expect((await repo.status()).trim()).toBe("")
+    await git(dir, ["diff", "--cached", "--quiet"])
+  })
+})

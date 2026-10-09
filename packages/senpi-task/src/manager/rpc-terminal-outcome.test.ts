@@ -64,7 +64,7 @@ describe("RPC terminal outcomes", () => {
     expect(result.kind).toBe("start_failed")
     if (result.kind !== "start_failed") throw new Error("expected start_failed")
     expect(store.load(result.task_id)?.status).toBe("error")
-    expect(result.error_message).toBe("Child prompt failed to start.")
+    expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
     expect(rejections).toEqual([])
   })
 

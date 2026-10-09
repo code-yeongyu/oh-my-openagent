@@ -15,13 +15,14 @@ on:
       - ".github/workflows/web-deploy.yml"
 
 concurrency:
-  group: web-deploy-${{ github.ref }}
+  group: omo-web-worker-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: web-production
       url: https://omo.dev
@@ -47,6 +48,9 @@ jobs:
           bunx opennextjs-cloudflare build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Retain predecessor static assets
+        run: bun scripts/retain-static-assets.mjs .open-next/assets https://omo.dev 1800 --bootstrap-current
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v4

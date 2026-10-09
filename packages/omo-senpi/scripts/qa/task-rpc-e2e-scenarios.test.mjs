@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { killSenpiHost, waitForRunningRpcChild } from "./task-rpc-e2e-scenarios.mjs"
+import { readRecords } from "./task-rpc-e2e-helpers.mjs"
+import { killSenpiHost, waitForProcessCompletion, waitForRunningRpcChild } from "./task-rpc-e2e-scenarios.mjs"
 
 function makeStateDir() {
   const stateDir = mkdtempSync(join(tmpdir(), "omo-rpc-wait-"))
@@ -100,4 +101,41 @@ test("#given an exited Senpi QA host #when cleanup repeats #then no recycled pid
 
   expect(killed).toBe(true)
   expect(calls).toEqual([])
+})
+
+const runningProcessTask = { task_id: "t-done", name: "done", execution_mode: "process", status: "running", pid: 4343 }
+
+test("#given the parent session returned before its child's completion write #when the completion check runs #then it sees the completion that a single read misses", async () => {
+  // given: the record still says running when the check starts (#9481)
+  const stateDir = makeStateDir()
+  try {
+    writeRecord(stateDir, runningProcessTask)
+    const singleRead = readRecords(stateDir).some((r) => r.status === "completed" && r.execution_mode === "process")
+
+    // when: the check starts waiting, and only then does the child's completion land
+    const waiting = waitForProcessCompletion(stateDir, 10_000)
+    writeRecord(stateDir, { ...runningProcessTask, status: "completed" })
+
+    // then: the old single read reported no completion; the wait reports it
+    expect(singleRead).toBe(false)
+    expect(await waiting).toEqual({ completed: true })
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("#given a child that never completes #when the completion check waits #then it fails at its deadline and reports the last status", async () => {
+  // given
+  const stateDir = makeStateDir()
+  try {
+    writeRecord(stateDir, runningProcessTask)
+
+    // when
+    const result = await waitForProcessCompletion(stateDir, 300)
+
+    // then
+    expect(result).toEqual({ completed: false, lastStatuses: ["running"] })
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
 })

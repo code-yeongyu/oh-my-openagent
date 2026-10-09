@@ -73,6 +73,8 @@ export type TaskLifecycle = {
   destroyResidentTask(taskId: string, cause: DestroyCause): Promise<void>
   rollbackDetachedRevival(prior: TaskRecord): DetachedRevivalRollbackResult
   reclaimIdleResidents?(): Promise<readonly string[]>
+  // Release a finished child still resident here (task_cancel on a terminal task, omo#9785); false when there is none.
+  parkTerminalResident(taskId: string): Promise<boolean>
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.
   dispose?(): void
   admitResident(parentSessionId: string): Promise<AdmissionResult>

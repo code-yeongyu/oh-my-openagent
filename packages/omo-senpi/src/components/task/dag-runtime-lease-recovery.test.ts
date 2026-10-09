@@ -23,6 +23,7 @@ import {
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { composeTaskEngine } from "./engine"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 
 const cleanupRoots: string[] = []
 const STEP_BUDGET_MS = 3_000
@@ -141,7 +142,7 @@ async function pausedHandoffFixture(name: string, predecessor: Predecessor = "fo
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => new ScriptedRunner(), process: () => new ScriptedRunner() },
   })
-  firstEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+  firstEngine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
   const firstRuntime = createDagRuntime({ pi: firstPi, engine: firstEngine, logger: { info: () => undefined, warn: () => undefined, error: () => undefined } })
   // #8020: retirement now drains the scheduler before releasing the lease, so the
   // pause is awaited; the fixture must not observe the checkpoint mid-drain.
@@ -165,7 +166,7 @@ async function pausedHandoffFixture(name: string, predecessor: Predecessor = "fo
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
   })
-  engine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+  engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
   // The same-host probe says EVERY pid is alive: the reopen must be decided by identity, not liveness.
   const isProcessAlive = predecessor === "foreign-host"
     ? (pid: number) => pid === FOREIGN_HOST_PID && holder.alive
@@ -202,7 +203,7 @@ async function ownRuntimePauseFixture(name: string) {
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
   })
-  engine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+  engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
   const runtime: DagRuntime = createDagRuntime({
     pi,
     engine,

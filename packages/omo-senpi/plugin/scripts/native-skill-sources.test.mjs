@@ -24,6 +24,7 @@ describe("createNativeSkillSources", () => {
     "ultrawork",
     "ulw-plan",
     "ulw-research",
+    "visualize",
   ]
 
   test("#given the registry #when ordered names are extracted #then they match the expected alphabetical sequence including onboarding", () => {

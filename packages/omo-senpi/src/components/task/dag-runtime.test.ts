@@ -26,6 +26,7 @@ import { createDagRuntime } from "./dag-runtime"
 import { runDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskRunnerFactories } from "./engine"
 import type { CapturedUi } from "./runtime-context"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 
 const cleanupRoots: string[] = []
 
@@ -227,6 +228,7 @@ describe("assembled DAG runtime", () => {
     })
     const widgetRows: string[][] = []
     engine.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
       mode: "tui",
       ui: fakeUi(widgetRows),
       sessionManager: { getSessionId: () => "session-activity" },
@@ -295,7 +297,7 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "session-missing-skill" } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "session-missing-skill" } })
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
     await runtime.attach()
 
@@ -347,6 +349,7 @@ describe("assembled DAG runtime", () => {
       coordinator,
     })
     engine.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
       isIdle: () => false,
       sessionManager: { getSessionId: () => "session-wake-redelivery" },
     })
@@ -370,7 +373,7 @@ describe("assembled DAG runtime", () => {
 
     // when
     engine.runtime.setTransition(undefined)
-    engine.runtime.captureFrom({ isIdle: () => true })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), isIdle: () => true })
     await runtime.attach()
     await Promise.resolve()
     await runtime.attach()
@@ -412,7 +415,7 @@ describe("assembled DAG runtime", () => {
       coordinator,
     })
     const widgetRows: string[][] = []
-    engine.runtime.captureFrom({
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(),
       mode: "tui",
       ui: fakeUi(widgetRows),
       sessionManager: { getSessionId: () => "session-dag" },
@@ -573,7 +576,7 @@ describe("assembled DAG runtime", () => {
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
     const sessionId = "session-abort-boundary"
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
     await runtime.attach()
     const started = await runtime.manager.start({
@@ -643,7 +646,7 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "session-old" } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "session-old" } })
     const errors: string[] = []
     const runtime = createDagRuntime({
       pi,
@@ -666,7 +669,7 @@ describe("assembled DAG runtime", () => {
 
     // when
     runtime.detach()
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "session-new" } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "session-new" } })
     await runtime.attach()
     runner.handles[0]?.settle("late output")
     const result = await within(waiting)
@@ -697,7 +700,7 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "session-subscriber" } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "session-subscriber" } })
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
     await runtime.attach()
 
@@ -738,7 +741,7 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => new ScriptedRunner(), process: () => new ScriptedRunner() },
     })
-    firstEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    firstEngine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const firstRuntime = createDagRuntime({ pi: firstPi, engine: firstEngine, logger: logger() })
 
     // when
@@ -766,7 +769,7 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => resumedRunner, process: () => resumedRunner },
     })
-    resumedEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    resumedEngine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const resumedRuntime = createDagRuntime({ pi: resumedPi, engine: resumedEngine, logger: logger() })
 
     // when
@@ -824,7 +827,7 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
 
     // when
@@ -860,7 +863,7 @@ describe("assembled DAG runtime", () => {
       cwd,
       sharedParentTools: () => [],
     })
-    firstEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    firstEngine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const firstRuntime = createDagRuntime({ pi: firstPi, engine: firstEngine, logger: logger() })
     await pauseForShutdown(firstRuntime)
 
@@ -877,7 +880,7 @@ describe("assembled DAG runtime", () => {
       cwd,
       sharedParentTools: () => [],
     })
-    secondEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    secondEngine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const secondRuntime = createDagRuntime({
       pi: secondPi,
       engine: secondEngine,
@@ -913,7 +916,7 @@ describe("dag runtime node spawn policy", () => {
       sharedParentTools: () => [],
       runnerFactories,
     })
-    engine.runtime.captureFrom({
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(),
       mode: "tui",
       ui: fakeUi([]),
       sessionManager: { getSessionId: () => "session-dag" },
@@ -1001,7 +1004,7 @@ describe("assembled DAG runtime control verbs", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
     await runtime.attach()
     const tool = {

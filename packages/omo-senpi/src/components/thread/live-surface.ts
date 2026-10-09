@@ -13,6 +13,7 @@ import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegist
 import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
+import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { answerUiRequest } from "./ui-answer"
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorData?: unknown }
@@ -48,22 +49,8 @@ export const HOST_STATUS_ALL_ARGS = ["host", "status", "--all", "--include-worke
  */
 const OBSERVE = { observe: true } as const
 
-/**
- * The whole command surface of a terminal control endpoint (senpi `session-control-commands.ts`).
- * Nothing that starts, steers or queues a turn is sent to a terminal: messages reach it only through
- * the gateway, whose inbox the terminal's own extension drains. Any other command is refused here as
- * `unsupported` before a connection is opened.
- */
-export const TUI_ENDPOINT_COMMANDS: ReadonlySet<string> = new Set([
-  "get_protocol_info",
-  "list_sessions",
-  "get_state",
-  "get_messages",
-  "set_session_name",
-  "wake",
-  "subscribe",
-  "extension_ui_response",
-])
+/** The commands any terminal control endpoint answers, an older one included (senpi before its session controls). */
+export const TUI_ENDPOINT_COMMANDS: ReadonlySet<string> = LEGACY_TUI_COMMANDS
 
 type RequestOptions = { readonly timeoutMs?: number; readonly secret?: Uint8Array }
 
@@ -262,11 +249,22 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   // What serves each socket, as the last enumeration said; a socket's name decides before that.
   const kinds = new Map<string, EndpointKind>()
 
+  // What each terminal answered get_protocol_info with: the commands it accepts beyond the read-mostly set.
+  const tuiCommands = new Map<string, ReadonlySet<string>>()
+  const learnTuiCommands = async (socket: string): Promise<ReadonlySet<string>> => {
+    const known = tuiCommands.get(resolve(socket))
+    if (known !== undefined) return known
+    const info = await callFrame(socket, "get_protocol_info", {}, TUI_REQUEST_TIMEOUT_MS)
+    const commands = tuiCommandsFrom(info.success === true ? info.data : undefined)
+    tuiCommands.set(resolve(socket), commands)
+    return commands
+  }
+
   const kindOf = (socket: string): EndpointKind => kinds.get(resolve(socket)) ?? (isTuiControlSocket(socket) ? "tui" : "rpc_host")
 
   const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number): Promise<RpcFrame> => {
     const tui = kindOf(socket) === "tui"
-    if (tui && !TUI_ENDPOINT_COMMANDS.has(type)) throw new Error(`unsupported:${type}`)
+    if (tui && !LEGACY_TUI_COMMANDS.has(type) && !(await learnTuiCommands(socket)).has(type)) throw new Error(`unsupported:${type}`)
     if (!exists(socket)) throw new Error(`host_unavailable:${socket}`)
     let secret: Uint8Array | undefined
     if (tui) {
@@ -323,11 +321,16 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     // suspended or remote terminal is reported, never dialed again, reaped or reopened elsewhere.
     if (tui && endpoint.verdict.alive === false) return degraded(endpoint, new Error(endpoint.verdict.reason ?? "live_unresponsive"), endpoint.verdict.reason ?? "live_unresponsive")
     try {
-      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", tui ? {} : OBSERVE, tui ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS)
+      const [{ sessions }, commands] = await Promise.all([
+        callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", tui ? {} : OBSERVE, tui ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS),
+        tui ? learnTuiCommands(endpoint.socket).catch(() => LEGACY_TUI_COMMANDS) : Promise.resolve(undefined),
+      ])
+      const controls = acceptedControls(endpoint.kind, commands)
       const tagged = sessions.map((session) => ({
         ...session,
         socket: endpoint.socket,
         endpoint_kind: endpoint.kind,
+        controls,
         ...(tui && session.durableSessionId === undefined ? { durableSessionId: session.sessionId } : {}),
       }))
       lastListed.set(endpoint.socket, tagged.flatMap((session) => (typeof session.sessionPath === "string" ? [session.sessionPath] : [])))

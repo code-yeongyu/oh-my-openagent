@@ -76,6 +76,9 @@ export const SUSPENSION_REASONS = [
   "host_incompatible",
   "idle_evicted",
   "own_host_unreachable",
+  // The session that owns the child was resumed, but its reconcile could not revive the child yet;
+  // `revival_deferred_reason` names the reconcile's deferral (omo#9498).
+  "revival_deferred",
   "store_index_unavailable",
 ] as const
 

@@ -22,6 +22,8 @@ export type ThreadSummary = {
   readonly surface?: "tui" | "desktop" | "child" | "daemon" | null
   /** `false` when the endpoint is not answering; the fields then come from the session file. */
   readonly alive?: boolean
+  /** What a caller can do to this thread through its endpoint; an older terminal accepts only send, read and rename. */
+  readonly controls?: readonly ("send" | "read" | "rename" | "set_model" | "set_reasoning" | "interrupt")[]
 }
 
 export type ThreadDelivery =

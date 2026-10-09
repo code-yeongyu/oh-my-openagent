@@ -12,6 +12,7 @@ references/design/*.md
 !references/design/ambience-skill.md
 !references/design/aside.md
 !references/design/clone-from-url.md
+!references/design/component-catalogs.md
 !references/design/design-system-architecture.md
 !references/design/interaction-skill.md
 !references/design/layout-skill.md

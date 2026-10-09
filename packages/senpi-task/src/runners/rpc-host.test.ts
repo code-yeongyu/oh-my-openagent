@@ -83,6 +83,8 @@ describe("RpcHostRunner start", () => {
       sessionPath: session?.sessionPath ?? "",
       instanceId: "fake-instance",
     })
+    // The model the host reports for the fresh session reaches the handle (#9722).
+    expect(handle.reportedModel).toEqual({ provider: "anthropic", id: "claude-sonnet-4-5" })
   })
 
   test("#given a session the daemon still retains #when the child resumes #then it attaches without a second prompt or a switch", async () => {

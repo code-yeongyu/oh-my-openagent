@@ -46,6 +46,30 @@ describe("renderNudgeBlock", () => {
     expect(rendered.match(/<\/recalled-memory>/g)).toHaveLength(1)
     expect(rendered).toContain("&lt;/recalled-memory&gt;&lt;recalled-memory source=x&gt;")
   })
+
+  it("#given a hint carrying a credential assignment #when rendered #then the hint is masked", () => {
+    // given
+    const nudge = { path: "reference/a.md", hint: "see token=abc123456" }
+
+    // when
+    const block = renderNudgeBlock(nudge)
+
+    // then
+    expect(block).toContain("see ***")
+    expect(block).not.toContain("abc123456")
+  })
+
+  it("#given a path carrying a credential assignment #when rendered #then the source path is masked and no digits remain", () => {
+    // given
+    const nudge = { path: "reference/token=abc123456.md", hint: "clean" }
+
+    // when
+    const block = renderNudgeBlock(nudge)
+
+    // then: the whole assignment is masked (the value tail consumes `.md`), no digits survive
+    expect(block).toContain('source="[[reference/***]]"')
+    expect(block).not.toContain("abc123456")
+  })
 })
 
 describe("kibitzer persona sample block", () => {

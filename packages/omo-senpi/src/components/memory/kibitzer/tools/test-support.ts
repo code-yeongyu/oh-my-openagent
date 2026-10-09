@@ -44,6 +44,15 @@ export async function commitMemory(repo: GitMemoryRepo, path: string, body: stri
   await repo.commitWrite([path], `seed ${path}`, AUTHOR)
 }
 
+/** Commits through raw git with no hook, the way content written before secret screening existed sits in a repo. */
+export async function commitLegacyMemory(repo: GitMemoryRepo, path: string, body: string): Promise<void> {
+  await writeMemory(repo, path, body)
+  for (const argv of [["add", "--", path], ["commit", "--no-verify", "-m", `legacy ${path}`]]) {
+    const result = Bun.spawnSync(["git", ...argv], { cwd: repo.dir })
+    if (result.exitCode !== 0) throw new Error(`git ${argv[0]} failed: ${result.stderr.toString()}`)
+  }
+}
+
 export interface Harness {
   readonly tools: readonly AnyKibitzerSidecarTool[]
   readonly searchedPaths: ReadonlySet<string>

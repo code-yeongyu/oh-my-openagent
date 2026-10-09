@@ -12,8 +12,8 @@ import type {
   DagRunSnapshot,
   DagRunStatus,
 } from "./types"
+import { TERMINAL_DAG_RUN_STATUSES } from "./types"
 
-const TERMINAL_RUN_STATUSES = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
 const CANCEL_REASON_PAGE_LIMIT = 64
 const DEFAULT_CANCEL_REASON = "cancelled"
 
@@ -130,7 +130,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     waiters.set(runId, entry)
     const onJournalEvent = (): void => {
       const current = store.readCheckpoint<DagRunRecordV1>(runId)
-      if (current === null || !TERMINAL_RUN_STATUSES.has(current.status)) return
+      if (current === null || !TERMINAL_DAG_RUN_STATUSES.has(current.status)) return
       settleWaiters(runId, projectResult(current, store, readOutput))
     }
     // The durable journal channel covers scheduler instances that are distinct from the adapter's
@@ -139,7 +139,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     addSubscription(runId, entry, options.subscribe(runId, onJournalEvent))
     // The run may have gone terminal between the ownership read and the subscription.
     const now = store.readCheckpoint<DagRunRecordV1>(runId)
-    if (now !== null && TERMINAL_RUN_STATUSES.has(now.status)) {
+    if (now !== null && TERMINAL_DAG_RUN_STATUSES.has(now.status)) {
       settleWaiters(runId, projectResult(now, store, readOutput))
     }
   }
@@ -148,7 +148,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     // async so every pre-dispatch rejection reaches the caller as a rejected promise.
     wait: async (runId, parentSessionId) => {
       const record = ownedRecord(runId, parentSessionId)
-      if (TERMINAL_RUN_STATUSES.has(record.status)) return projectResult(record, store, readOutput)
+      if (TERMINAL_DAG_RUN_STATUSES.has(record.status)) return projectResult(record, store, readOutput)
       return new Promise<DagRunResult>((resolve) => {
         register(runId, resolve)
       })

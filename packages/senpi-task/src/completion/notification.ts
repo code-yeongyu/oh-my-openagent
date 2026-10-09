@@ -57,12 +57,15 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
   return tokens === undefined ? base : { ...base, tokens }
 }
 
-export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
+export function buildCompletionMessage(
+  details: readonly CompletionDetails[],
+  verificationDirective = DAG_VERIFICATION_DIRECTIVE,
+): ParentNotifierMessage {
   const body = completionMessageLines(details).join("\n")
   const carriesDag = details.some((detail) => detail.dag !== undefined)
   return {
     customType: "senpi-task.completion",
-    content: carriesDag ? `${body}\n\n${DAG_VERIFICATION_DIRECTIVE}` : body,
+    content: carriesDag ? `${body}\n\n${verificationDirective}` : body,
     display: false,
     details,
   }

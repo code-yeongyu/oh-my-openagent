@@ -145,26 +145,28 @@ describe("generateModelConfig", () => {
       expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
     })
 
-    test("explore uses Claude haiku when Claude available", () => {
+    test("explore uses Claude Haiku 5.5 medium when Claude available", () => {
       // #given Claude is available
       const config = createConfig({ hasClaude: true, isMax20: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use claude-haiku-4-5
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      // #then explore should use claude-haiku-5-5 at medium effort
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-5-5")
+      expect(result.agents?.explore?.variant).toBe("medium")
     })
 
-    test("explore uses Claude haiku regardless of isMax20 flag", () => {
+    test("explore uses Claude Haiku 5.5 medium regardless of isMax20 flag", () => {
       // #given Claude is available without Max 20 plan
       const config = createConfig({ hasClaude: true, isMax20: false })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use claude-haiku-4-5 (isMax20 doesn't affect explore)
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      // #then explore should use claude-haiku-5-5 (isMax20 doesn't affect explore)
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-5-5")
+      expect(result.agents?.explore?.variant).toBe("medium")
     })
 
     test("explore uses OpenAI model when only OpenAI available", () => {

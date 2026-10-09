@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, rm, writeFile } from "../fs/resilient"
+import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
@@ -116,23 +116,23 @@ export class TranscriptJournal {
   }
 
   async reconcile(messages: readonly TranscriptProjection[]): Promise<AppendResult> {
-    return this.locked(async () => {
-      const capturedAt = this.now().toISOString()
-      return this.appendUnlocked(
-        messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)),
-      )
-    })
+    const capturedAt = this.now().toISOString()
+    return this.append(messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)))
   }
 
+  /** A journal is created by its first entry: appending nothing to a journal that does not exist writes nothing (#9737). */
   async append(entries: readonly TranscriptEntry[]): Promise<AppendResult> {
+    if (entries.length === 0 && !(await this.exists())) return { appended: 0, skipped: 0 }
     return this.locked(() => this.appendUnlocked(entries))
   }
 
   async readEntries(): Promise<TranscriptEntry[]> {
+    if (!(await this.exists())) return []
     return this.locked(() => this.readEntriesUnlocked())
   }
 
   async getState(): Promise<ReflectionTranscriptState> {
+    if (!(await this.exists())) return deriveState(initialReflectionState(), [])
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
@@ -153,6 +153,8 @@ export class TranscriptJournal {
     signal?: AbortSignal,
     options: { readonly maxBytes?: number } = {},
   ): Promise<ReflectionSnapshot | null> {
+    signal?.throwIfAborted()
+    if (!(await this.exists())) return null
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
@@ -251,6 +253,15 @@ export class TranscriptJournal {
     })
   }
 
+  private async exists(): Promise<boolean> {
+    try {
+      return (await stat(this.options.journalDir)).isDirectory()
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") return false
+      throw error
+    }
+  }
+
   private async locked<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     signal?.throwIfAborted()
     await mkdir(this.options.journalDir, { recursive: true, mode: 0o700 })
@@ -288,7 +299,6 @@ export class TranscriptJournal {
       raw = await readFile(this.transcriptPath, "utf8")
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error
-      await writeFile(this.transcriptPath, "", { encoding: "utf8", flag: "a" })
       return []
     }
     return raw

@@ -189,6 +189,20 @@ export const OmoMemoryWriteNoticeLayerSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
+// External projection limits (the <external_projection> name list); 0 disables a limit
+// ---------------------------------------------------------------------------
+
+export const OmoMemoryProjectionSchema = z.object({
+  max_entries_per_directory: z.number().int().min(0).default(40),
+  max_bytes: z.number().int().min(0).default(24576),
+}).strict()
+
+export const OmoMemoryProjectionLayerSchema = z.object({
+  max_entries_per_directory: z.number().int().min(0).optional(),
+  max_bytes: z.number().int().min(0).optional(),
+}).strict()
+
+// ---------------------------------------------------------------------------
 // Per-agent overrides (layer-shaped)
 // ---------------------------------------------------------------------------
 
@@ -205,6 +219,7 @@ export const OmoMemoryAgentOverridesSchema = z.object({
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
+  projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
 }).strict()
 
@@ -250,6 +265,7 @@ export const OmoMemorySettingsSchema = z.object({
     tool_budget: 8,
     query_expansion: false,
   }),
+  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()
@@ -267,6 +283,7 @@ export const OmoMemorySettingsLayerSchema = z.object({
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
+  projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
 }).strict()

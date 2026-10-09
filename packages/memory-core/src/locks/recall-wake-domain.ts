@@ -17,7 +17,8 @@ import { randomUUID } from "node:crypto"
 import path from "node:path"
 
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "../fs/resilient"
-import { LockContentionError, acquireLock, delay, isLockOwnerProvenDead, releaseLock } from "./acquire"
+import { LockContentionError, acquireLock, isLockOwnerProvenDead, releaseLock } from "./acquire"
+import { delay, lockRetryDelayMs } from "./retry-delay"
 import { createLockRecord, parseLockRecord, type LockRecord } from "./lock-record"
 
 /** Concurrent wakes one machine admits when the caller names no count (`memory.recall.max_concurrent_wakes`). */
@@ -32,7 +33,7 @@ export type RecallWakeLeaseOptions = {
   readonly maxConcurrent?: number
   /** Total time to wait for a slot before {@link RecallWakeBusyError}; 0 means one pass. */
   readonly waitTimeoutMs?: number
-  /** Pause between queue polls while waiting. */
+  /** First pause between queue polls while waiting; later pauses back off from it. */
   readonly retryDelayMs?: number
   readonly signal?: AbortSignal
 }
@@ -180,7 +181,7 @@ export async function acquireRecallWakeLease(
   try {
     await published
     const record = await createLockRecord(SLOT_PURPOSE)
-    for (;;) {
+    for (let attempt = 0; ; attempt += 1) {
       signal?.throwIfAborted()
       const queue = await listTickets(ticketDirectory)
       const head = queue[0]
@@ -206,7 +207,7 @@ export async function acquireRecallWakeLease(
       }
       const now = Date.now()
       if (now >= deadline) throw new RecallWakeBusyError(now - started, maxConcurrent)
-      await delay(Math.min(retryDelayMs, Math.max(1, deadline - now)), signal)
+      await delay(Math.min(lockRetryDelayMs(attempt, retryDelayMs), Math.max(1, deadline - now)), signal)
     }
   } finally {
     await unlinkIfPresent(path.join(ticketDirectory, name)).catch(() => undefined)

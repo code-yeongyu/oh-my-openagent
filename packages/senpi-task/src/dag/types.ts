@@ -16,6 +16,15 @@ export const DAG_RUN_STATUSES = [
 
 export type DagRunStatus = (typeof DAG_RUN_STATUSES)[number]
 
+// A run in one of these statuses holds no scheduler or lease and does not count against the session's
+// active-run cap; it waits for retention. `send` may still revive a child of a failed run.
+export const TERMINAL_DAG_RUN_STATUSES: ReadonlySet<string> = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
+
+/** True for a persisted status string naming a terminal run; unknown or missing statuses are not terminal. */
+export function isTerminalDagRunStatus(status: string | undefined): boolean {
+  return status !== undefined && TERMINAL_DAG_RUN_STATUSES.has(status)
+}
+
 export const DAG_NODE_STATES = [
   "pending",
   "blocked",

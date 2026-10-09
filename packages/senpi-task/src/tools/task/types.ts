@@ -158,6 +158,8 @@ export type TaskToolDetails = {
   readonly execution_mode?: string
   readonly model?: string
   readonly resolved_model?: ResolvedModelRecord
+  // The model the child actually started on, read from the child itself (#9722).
+  readonly effective_model?: ResolvedModelRecord
   readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly run_in_background?: boolean
   readonly queue_position?: number

@@ -8,7 +8,7 @@ type ResidencyManager = Pick<TaskManager, "forget" | "get" | "getResidentHandle"
 // forget() delegates to manager.forget() so the registry and the manager's #live map share one
 // prune path (no stale handle after eviction, no unbounded growth). The manager is passed by accessor
 // because lifecycle (which owns the registry) is constructed before the manager in the composition.
-export function createManagerResidencyRegistry(getManager: () => ResidencyManager): ResidencyRegistry {
+export function createManagerResidencyRegistry(getManager: () => ResidencyManager, ownerSessionId?: () => string | undefined): ResidencyRegistry {
   return {
     get: (taskId) => toResidentHandle(getManager().getResidentHandle(taskId)),
     entries: () =>
@@ -25,6 +25,8 @@ export function createManagerResidencyRegistry(getManager: () => ResidencyManage
     isEvicting: (taskId) => getManager().isEvicting?.(taskId) ?? false,
     tryBeginSend: (taskId) => getManager().tryBeginSend?.(taskId) ?? true,
     endSend: (taskId) => getManager().endSend?.(taskId),
+    // One daemon process hosts an engine per session: only this session's own records are ours (#9785).
+    ownsRecord: (record) => ownerSessionId !== undefined && record.parent_session_id === ownerSessionId(),
   }
 }
 

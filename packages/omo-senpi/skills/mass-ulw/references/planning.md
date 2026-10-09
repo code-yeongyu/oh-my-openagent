@@ -93,7 +93,7 @@ if (findings.includes("critical")) {
 }
 ```
 
-**Concurrent runs.** Distinct keys run concurrently (default cap: `task.dag.max_runs_per_session` = 16). When two graphs are independent, start both and `Promise.all([sdk.wait(a), sdk.wait(b)])`.
+**Concurrent runs.** Distinct keys run concurrently (default cap: `task.dag.max_runs_per_session` = 16 active runs; finished, failed and cancelled runs do not count). When two graphs are independent, start both and `Promise.all([sdk.wait(a), sdk.wait(b)])`.
 
 **Trigger-launched runs.** A run does not have to start from a user turn: a monitor hit, a goal-loop wake, or a task-completion notification can be the trigger, and the cell that fires on the wake builds and starts the next graph. Conditional pipelines live in your code, never in the definition - the graph itself has no branch construct.
 

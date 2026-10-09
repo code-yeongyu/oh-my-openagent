@@ -110,7 +110,7 @@ At a handoff - turn start (after the routing line), a todo phase change, a block
 
 [Outcome so far] toward [the user's original ask and the result they wanted]. You need: [ledger N/M done, findings, blockers]. Now: [todo task in progress]. Next: [next open task].
 
-Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration.
+Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration. The block is for multi-step work tracked in todos. A request finished in a single turn with no todo list gets a plain answer with no block, and a final message never opens or closes with ledger lines such as `Next: none`.
 
 The final message stands alone: outcome first, then the evidence needed to trust it - what was verified and how, what could not be verified and why, and pre-existing problems left in place. Order it so the conclusion is easiest to check, not in the order you worked. Deliver the full requested artifact; trim repetition and background before required content.
 

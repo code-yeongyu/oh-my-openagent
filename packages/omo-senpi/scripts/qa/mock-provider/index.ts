@@ -65,7 +65,7 @@ interface AssistantMessage {
   content: AssistantContent[]
   api: Api
   provider: "omo-mock"
-  model: "mock-1"
+  model: string
   usage: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: number }
   stopReason: StopReason
   timestamp: number
@@ -101,6 +101,10 @@ interface LocalAssistantMessageEventStream extends AsyncIterable<LocalStreamEven
   result(): Promise<AssistantMessage>
 }
 
+// A second id that the Astra detectors recognize (`omo-mock/gpt-6-astra`), so a live driver can
+// prove which ultrawork directive a GPT-6 Astra receiver gets without a real OpenAI route.
+const ASTRA_MOCK_MODEL_ID = "gpt-6-astra"
+
 const model = {
   id: "mock-1",
   name: "Mock 1",
@@ -120,7 +124,7 @@ export default function registerMockProvider(pi: ExtensionAPI): void {
     baseUrl: "file://mock-provider",
     apiKey: "mock",
     api: "openai-completions",
-    models: [model],
+    models: [model, { ...model, id: ASTRA_MOCK_MODEL_ID, name: "Mock GPT-6 Astra" }],
     streamSimple(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
       return streamMockResponse(streamModel, context, options)
     },
@@ -140,7 +144,7 @@ export function loadMockScript(cwd: string): MockScript {
   return parsed
 }
 
-export function stepToAssistantMessage(step: MockStep, callCount: number): AssistantMessage {
+export function stepToAssistantMessage(step: MockStep, callCount: number, modelId = "mock-1"): AssistantMessage {
   const content =
     step.type === "text"
       ? [{ type: "text" as const, text: step.text }]
@@ -158,7 +162,7 @@ export function stepToAssistantMessage(step: MockStep, callCount: number): Assis
     content,
     api: "openai-completions",
     provider: "omo-mock",
-    model: "mock-1",
+    model: modelId,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
     stopReason: step.type === "tool_call" ? "toolUse" : "stop",
     timestamp: Date.now(),
@@ -174,19 +178,19 @@ function recordDeclaredTools(cwd: string, context: Context): void {
   appendFileSync(join(cwd, "mock-tools.jsonl"), `${JSON.stringify(names)}\n`)
 }
 
-function streamMockResponse(_model: Model<Api>, context: Context, options?: SimpleStreamOptions) {
+function streamMockResponse(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const cwd = context.cwd ?? process.cwd()
   recordDeclaredTools(cwd, context)
   const script = loadMockScript(cwd)
   const step = script.steps[Math.min(callCount, script.steps.length - 1)]
   callCount += 1
-  return streamMockStep(step, callCount, options)
+  return streamMockStep(step, callCount, streamModel.id, options)
 }
 
 /** Streams one scripted step; for drivers that choose the step themselves instead of by call order. */
-export function streamMockStep(step: MockStep, callCount: number, options?: SimpleStreamOptions) {
+export function streamMockStep(step: MockStep, callCount: number, modelId: string, options?: SimpleStreamOptions) {
   const stream = createLocalAssistantMessageEventStream()
-  const message = stepToAssistantMessage(step, callCount)
+  const message = stepToAssistantMessage(step, callCount, modelId)
 
   queueMicrotask(() => {
     if (options?.signal?.aborted) {

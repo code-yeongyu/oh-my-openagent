@@ -202,7 +202,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       if (avail.native.openai) {
         agentConfig = { model: "openai/gpt-6-luna-fast", variant: "low" }
       } else if (avail.native.claude) {
-        agentConfig = { model: "anthropic/claude-haiku-4-5" }
+        agentConfig = { model: "anthropic/claude-haiku-5-5", variant: "medium" }
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/gpt-5-nano" }
       } else if (avail.opencodeGo) {

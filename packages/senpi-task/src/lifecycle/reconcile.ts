@@ -26,6 +26,7 @@ export async function reconcileOnSessionStart(
 ): Promise<ReconcileResult> {
   const outcomes: ReconcileOutcome[] = []
   const candidates: TaskRecord[] = []
+  const excludedFromRevival = new Set(context.reconcileAdmission.excludeTaskIds)
   // ONE daemon snapshot per pass: every host-session record below is matched against it by session
   // path, so a hundred children still cost one probeHost and one list_sessions.
   context.hostSessionProbe.refresh()
@@ -34,6 +35,9 @@ export async function reconcileOnSessionStart(
   // every status and this process must not mutate it.
   for (const record of context.store.list().records) {
     if (await hasForeignLiveOwner(context, record, parentSessionId)) {
+      // Scoped admission re-reads the store rather than this candidate array. Carry the
+      // ownership exclusion into that selector too, or a suspended live-owner child is claimed.
+      excludedFromRevival.add(record.task_id)
       outcomes.push(parentSessionId === undefined
         ? {
             task_id: record.task_id,
@@ -77,7 +81,7 @@ export async function reconcileOnSessionStart(
   }
 
   outcomes.push(...await reconcileScopedRevival(
-    context,
+    { ...context, reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival } },
     parentSessionId,
     candidates.filter((record) => record.parent_session_id === parentSessionId),
     (taskId) => newestSessionPath(context, taskId),

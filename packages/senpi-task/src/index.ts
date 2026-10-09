@@ -99,6 +99,14 @@ export {
 } from "./progress"
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
+export { readSettingsDefaultRoute, resolveExplicitTaskPin, splitModelDecorators } from "./senpi/explicit-pin"
+export type {
+  ExplicitPinFailure,
+  ExplicitPinResolution,
+  ExplicitPinRuntime,
+  ResolvedExplicitPin,
+  SettingsDefaultRoute,
+} from "./senpi/explicit-pin"
 export {
   MEMBER_IDENTITY_ENV,
   SenpiTeamSpecError,
@@ -367,6 +375,8 @@ export {
   buildCompletionMessage,
   completionMessageLines,
   createCompletionNotifier,
+  ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE,
+  ASTRA_DAG_VERIFICATION_DIRECTIVE,
   DAG_VERIFICATION_DIRECTIVE,
   routeCompletion,
   shouldNotifyStatus,
@@ -424,6 +434,8 @@ export type {
   SuspendSummary,
   TaskLifecycle,
 } from "./lifecycle"
+export { deferralOutlookFor } from "./lifecycle/deferred-revival-reasons"
+export type { DeferralOutlook } from "./lifecycle/deferred-revival-reasons"
 export { DEFAULT_SEND_DELIVERY, createSteeringEngine } from "./steering"
 export type {
   CancelOutcome,

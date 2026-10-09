@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:c74ea2b7fbcdb5dac9e731cf2271d1a1510cbf83cba61136c3693fdcbaed3667:649167bb96dc93437998cf74759bc8f043182c2f2c532ae37cd91e30ab204141
+// omo-codex-install:de226fc361640de0ae4c8b648fc7a0973ca35aecd9e7b22552d8a65b8fd6bdb9:2dbb6a4f066ea238ae0ba31e7854babb2ab6d5e0b1dd0f10d0cec33e03a43f2b
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -9984,7 +9984,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.19",
+    version: "5.1.28",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -11449,6 +11449,14 @@ async function installCachedPlugin(input) {
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
     await assertHookCommandTargets(tempPath);
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename);
+    const versions = await readdir4(dirname4(targetPath), { withFileTypes: true });
+    for (const entry of versions) {
+      if (!entry.isDirectory() || entry.name === input.version || entry.name.startsWith("."))
+        continue;
+      if (!/^[a-zA-Z0-9_+-][a-zA-Z0-9._+-]*$/.test(entry.name))
+        continue;
+      await rm4(join10(dirname4(targetPath), entry.name), { recursive: true, force: true });
+    }
   } catch (error) {
     await rm4(tempPath, { recursive: true, force: true });
     throw error;
@@ -19541,6 +19549,14 @@ var OmoMemorySoulLayerSchema = object({
 var OmoMemoryWriteNoticeLayerSchema = object({
   enabled: boolean2().optional()
 }).strict();
+var OmoMemoryProjectionSchema = object({
+  max_entries_per_directory: number2().int().min(0).default(40),
+  max_bytes: number2().int().min(0).default(24576)
+}).strict();
+var OmoMemoryProjectionLayerSchema = object({
+  max_entries_per_directory: number2().int().min(0).optional(),
+  max_bytes: number2().int().min(0).optional()
+}).strict();
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
@@ -19554,6 +19570,7 @@ var OmoMemoryAgentOverridesSchema = object({
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
+  projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
 var OmoMemorySettingsSchema = object({
@@ -19592,6 +19609,7 @@ var OmoMemorySettingsSchema = object({
     tool_budget: 8,
     query_expansion: false
   }),
+  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -19608,6 +19626,7 @@ var OmoMemorySettingsLayerSchema = object({
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
+  projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();
@@ -19643,6 +19662,56 @@ var OmoModelProfilesSchema = record(string2(), OmoModelProfileSchema);
 var OmoModelProfileLayerInputSchema = OmoModelProfileInputSchema.partial();
 var OmoModelProfileLayerSchema = preprocess((value) => isRecord6(value) ? normalizeLegacyModelFields(value) : value, OmoModelProfileLayerInputSchema);
 var OmoModelProfilesLayerSchema = record(string2(), OmoModelProfileLayerSchema);
+
+// packages/omo-config-core/src/schema/side-panel.ts
+var OmoSidePanelWidthSchema = union([number2().int().min(24).max(160), string2().regex(/^(?:1\d|[2-4]\d|50)%$/)]);
+var OmoSidePanelSectionsShape = {
+  session: boolean2(),
+  goal: boolean2(),
+  context: boolean2(),
+  usage: boolean2(),
+  agents: boolean2(),
+  tools: boolean2(),
+  files: boolean2(),
+  memory: boolean2()
+};
+var OmoSidePanelSectionsLayerSchema = object(OmoSidePanelSectionsShape).partial().strict();
+var OmoSidePanelSectionsSchema = OmoSidePanelSectionsLayerSchema.extend({
+  session: boolean2().default(true),
+  goal: boolean2().default(true),
+  context: boolean2().default(true),
+  usage: boolean2().default(false),
+  agents: boolean2().default(true),
+  tools: boolean2().default(true),
+  files: boolean2().default(true),
+  memory: boolean2().default(true)
+}).strict();
+var OmoSidePanelSettingsShape = {
+  enabled: boolean2(),
+  width: OmoSidePanelWidthSchema,
+  min_columns: number2().int().min(60).max(400),
+  clickable: boolean2(),
+  usage_poll_seconds: number2().int().min(60).max(3600),
+  sections: OmoSidePanelSectionsLayerSchema
+};
+var OmoSidePanelSettingsLayerSchema = object(OmoSidePanelSettingsShape).partial().strict();
+var OmoSidePanelSettingsSchema = OmoSidePanelSettingsLayerSchema.extend({
+  enabled: boolean2().default(false),
+  width: OmoSidePanelWidthSchema.default("26%"),
+  min_columns: number2().int().min(60).max(400).default(120),
+  clickable: boolean2().default(true),
+  usage_poll_seconds: number2().int().min(60).max(3600).default(150),
+  sections: OmoSidePanelSectionsSchema.default({
+    session: true,
+    goal: true,
+    context: true,
+    usage: false,
+    agents: true,
+    tools: true,
+    files: true,
+    memory: true
+  })
+}).strict();
 
 // packages/omo-config-core/src/schema/task.ts
 import { availableParallelism } from "node:os";
@@ -19868,6 +19937,7 @@ var OmoTypedHarnessConfigSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional()
 }).strict();
@@ -19883,6 +19953,7 @@ var OmoConfigProfileSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
@@ -19904,6 +19975,7 @@ var OmoConfigSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
@@ -19928,6 +20000,7 @@ var OmoConfigLayerSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),

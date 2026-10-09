@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { ReattachResult } from "../lifecycle/port"
-import type { TaskRecord } from "../state"
+import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { discardManagedHandle, releaseSupersededHandle, type ManagedChildHandle } from "./child-handle"
 import { childIdentityOf, hasChildIdentity, isTerminalRecord, nowIso, recordSpawnedRunner } from "./manager-helpers"
@@ -81,7 +81,7 @@ export async function reattachManagedTask(input: {
       fallback_handoff_epoch: _handoff,
       ...rest
     } = fresh
-    const epoch = fresh.notification.run_epoch + 1
+    const epoch = nextRunEpoch(fresh)
     const timestamp = nowIso(input.now)
     const sessionId = input.handle.sessionId
     // A revived daemon child is identified by its session, exactly as a fresh spawn stamps it.

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto"
 import { dirname, join, posix } from "node:path"
 import { parseJsoncSafe } from "../internal/jsonc-parse"
-import { applyEdits, modify } from "jsonc-parser/lib/esm/main.js"
 import { resolveUserOmoConfigPath } from "../loader"
+import { applyOmoConfigEdit } from "./surgical-edit"
 import {
   DEFAULT_WRITE_FILE_SYSTEM,
   OmoConfigWriteError,
@@ -14,12 +14,6 @@ const EMPTY_OMO_CONFIG = `// OMO configuration
 {
 }
 `
-
-const FORMATTING_OPTIONS = {
-  eol: "\n",
-  insertSpaces: true,
-  tabSize: 2,
-}
 
 function backupSuffix(): string {
   return new Date().toISOString().replace(/[:.]/g, "-")
@@ -153,10 +147,7 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
 
   let nextContent = content
   for (const edit of options.edits) {
-    nextContent = applyEdits(
-      nextContent,
-      modify(nextContent, [...edit.path], edit.value, { formattingOptions: FORMATTING_OPTIONS }),
-    )
+    nextContent = applyOmoConfigEdit(nextContent, edit)
   }
 
   writeAtomically(path, nextContent, fileSystem)

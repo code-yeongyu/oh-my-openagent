@@ -3,6 +3,7 @@ import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import type { ChildExtensionEvent } from "../runners/child-extension-events"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
+import { subscribeEffectiveModel } from "./observed-model"
 import { subscribeTranscriptLog } from "./transcript-log"
 
 /** All observations are attached while the manager owns the handle, including its startup relay. */
@@ -19,6 +20,7 @@ export function subscribeChildFacts(input: {
   const { handle, taskId, now, runStats } = input
   const transcript = subscribeTranscriptLog(handle, input.store, taskId)
   runStats.set(taskId, createRunStatsTracker(now(), now))
+  const effectiveModel = subscribeEffectiveModel(handle, { store: input.store, taskId, now })
   const stats = handle.subscribe((event) => {
     if (event.type === "retry_fallback_exhausted") input.fallbackExhaustions.add(handle)
     runStats.get(taskId)?.accept(event)
@@ -31,6 +33,7 @@ export function subscribeChildFacts(input: {
   })
   return () => {
     transcript()
+    effectiveModel()
     stats()
     extension?.()
     resumed?.()

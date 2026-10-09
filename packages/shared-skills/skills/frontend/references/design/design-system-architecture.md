@@ -128,7 +128,7 @@ Document reusable patterns before implementation for greenfield work, and as the
 - **Spacing**: which tokens
 - **States**: default, hover, active, focus, disabled, loading, empty, error
 - **Accessibility**: keyboard, ARIA, contrast
-- **Motion**: entry/exit animations
+- **Motion**: entry/exit animations; a borrowed mechanism names its source (catalog, component, URL, reduced-motion path)
 - **Layout**: spatial primitive (stack / cluster / sidebar / grid / shell…) and, if the component scrolls or pins anything, its scroll owner
 
 Greenfield starts with the primitives you are about to build, assembled from

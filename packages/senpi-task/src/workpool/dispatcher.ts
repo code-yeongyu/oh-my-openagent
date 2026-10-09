@@ -42,8 +42,11 @@ export function createWorkpoolDispatcher(ports: {
       if (item === undefined || pending.has(item.item_id)) continue
       const recovery = item.status === "assigned" && item.delivery?.phase === "queued" ? item.binding : undefined
       if (item.status !== "queued" && recovery === undefined) continue
+      // A recovered turn's worker is the task as it is now: its predecessor epoch is the task's own run_epoch, not
+      // binding - 1, because a rollback may have burnt the epochs in between (#9562).
+      const recoveredTask = recovery !== undefined && recovery.run_epoch > 0 ? stores.tasks.load(recovery.task_id) : null
       const idle = recovery !== undefined && recovery.run_epoch > 0
-        ? { ...recovery, run_epoch: recovery.run_epoch - 1, status: "idle" as const, completed_turns: 0, idle_since: 0 }
+        ? { ...recovery, run_epoch: recoveredTask?.notification.run_epoch ?? recovery.run_epoch - 1, status: "idle" as const, completed_turns: 0, idle_since: 0 }
         : pool.mode === "keep_alive" ? orderIdleWorkers(fresh.workers).find(worker => !reservedWorkers.has(worker.task_id)) : undefined
       if (pool.mode === "keep_alive" && idle === undefined && recovery === undefined &&
         (fresh.workers.length > 0 || [...pending.values()].some(value => value.poolId === poolId)) &&

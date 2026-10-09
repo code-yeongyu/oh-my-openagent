@@ -44,6 +44,9 @@ export type ManagedChildHandle = {
     readonly instanceId: string
   }
   readonly spawnSpec?: RpcSpawnSpec
+  /** The model the child actually runs on: in-process reads the live session; a host child carries
+   *  its open-session state read. Absent where the runner cannot observe one (#9722). */
+  effectiveModel?(): { readonly provider: string; readonly id: string } | undefined
   // A daemon-session child whose session parked - itself (its recorded endpoint refused a reattach) or
   // by its host (idle sweep, generation handoff): the record parks with that reason either way.
   onParked?(listener: (event: { readonly reason: SuspensionReason }) => void): () => void
@@ -79,6 +82,7 @@ export function adaptInProcessHandle(handle: InProcessChildHandle): ManagedChild
     kind: "in-process",
     sessionId: handle.sessionId,
     pid: undefined,
+    effectiveModel: () => handle.effectiveModel(),
     steer: (text) => handle.steer(text),
     followUp: (text) => handle.followUp(text),
     abort: () => handle.abort(),
@@ -105,6 +109,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     get pid() {
       return handle.pid
     },
+    ...(handle.reportedModel === undefined ? {} : { effectiveModel: () => handle.reportedModel }),
     ...(handle.spawnSpec === undefined ? {} : { spawnSpec: handle.spawnSpec }),
     ...(isHostSessionHandle(handle)
       ? {

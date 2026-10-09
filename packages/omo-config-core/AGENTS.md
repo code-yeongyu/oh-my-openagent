@@ -11,11 +11,12 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | Path | Purpose |
 |------|---------|
 | `src/index.ts` | Barrel re-exporting `./schema`, `./loader`, `./models`, `./writer`, `./migration`. |
-| `src/schema/config.ts` | Root `OmoConfigSchema` + `OmoConfigLayerSchema` (`.strict()`; `$schema`, `categories`, `agents`, `git_master`, `task`, `teams`, `models`, `[opencode]`/`[senpi]`/`[codex]` blocks, `profiles`, `_migrations`, `legacy_migrations`). `OmoConfig` type. |
+| `src/schema/config.ts` | Root `OmoConfigSchema` + `OmoConfigLayerSchema` (`.strict()`; `$schema`, `categories`, `agents`, `git_master`, `task`, `teams`, `models`, `side_panel`, `[opencode]`/`[senpi]`/`[codex]` blocks, `profiles`, `_migrations`, `legacy_migrations`). `OmoConfig` type. |
 | `src/schema/harness.ts` | `HARNESS_IDS` (`codex`/`opencode`/`omo`), `OMO_CONFIG_HARNESS_IDS` (`opencode`/`senpi`/`codex`), `OmoHarnessIdSchema`. |
 | `src/schema/model-catalog.ts` | `OmoModelCatalogSchema` / `*Layer` variants: record of short name to `{ model, variant?, reasoningEffort? }`. |
 | `src/schema/category.ts` | `OmoCategoryConfigSchema` / `OmoCategoriesConfigSchema`. Keeps the OpenCode camelCase keys (`maxTokens`, `reasoningEffort`, `textVerbosity`) verbatim for parity. |
 | `src/schema/git-master.ts` | `OmoGitMasterSettingsSchema` (`commit_footer` bool\|string default `false`, `include_co_authored_by` deprecated no-op default `false`) + `resolveOmoGitMasterSettings` for commit attribution in the Senpi harness. |
+| `src/schema/side-panel.ts` | `OmoSidePanelSettingsSchema` (`enabled` bool default `false`, `width` columns-or-percent default `"26%"`, `min_columns` default `120`, `usage_poll_seconds` default `150`, per-section `sections` switches) + `resolveOmoSidePanelSettings` for the Senpi side panel. |
 | `src/schema/agent.ts` | `OmoAgentDefSchema` / `OmoAgentsConfigSchema` (`execution_mode`, `max_depth`, `allowed_subagents`, ...). |
 | `src/schema/task.ts` | `OmoTaskSettingsSchema` + nested `OmoTaskNotificationSchema`, `OmoTaskWaitSchema`, `OmoTaskTeamSettingsSchema`, all with defaults. |
 | `src/schema/team.ts` | `OmoTeamSpecSchema` (discriminated `category` / `subagent_type` members) + `OmoTeamsConfigSchema`; `*Layer` partial variants for per-file overrides. |
@@ -27,7 +28,8 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | `src/loader/types.ts` | `LoadOmoConfigOptions/Result`, `OmoConfigDiagnostic`, `OmoConfigSource`, the injectable `OmoConfigReadFileSystem` port, and `DEFAULT_READ_FILE_SYSTEM`. |
 | `src/models/model-reference-resolution.ts` (+ `model-catalog-cycles.ts`) | `resolveModelReferences` - expands `models` catalog keys referenced by agent/category `model` strings, fills unset tuning (site tuning wins), and reports `model_catalog_cycle` diagnostics (`findModelCatalogCycles`). |
 | `src/migration/` | Lock+journal transaction engine (`batch.ts`, `engine.ts`): owner-aware lease lock (`lock.ts`), journal recovery before predicates (`recovery.ts`, `predicate.ts`), per-(target, migration-id) `_migrations` markers, no-clobber merge with `skipped:` diagnostics (`merge.ts`), comment-preserving atomic target writes (`commit.ts`), and journaled resumable backups. |
-| `src/writer/writer.ts` | `updateOmoConfig(options)` - jsonc-parser `modify`/`applyEdits`, timestamped backup, atomic temp-then-rename write. |
+| `src/writer/writer.ts` | `updateOmoConfig(options)` - edits applied through `surgical-edit.ts` `applyOmoConfigEdit`, timestamped backup, atomic temp-then-rename write. |
+| `src/writer/surgical-edit.ts` | `applyOmoConfigEdit(content, edit)`: inserts and removes members by hand in the file's own indentation and trailing-comma style; replacing a value uses jsonc-parser `modify`, which rewrites only that value; a member that shares its line falls back to `modify` (#9777). |
 | `src/writer/types.ts` | `OmoConfigEdit`, `UpdateOmoConfigOptions/Result`, the injectable `OmoConfigWriteFileSystem` port, and the typed `OmoConfigWriteError`. |
 
 ## PUBLIC API (`src/index.ts` barrel)

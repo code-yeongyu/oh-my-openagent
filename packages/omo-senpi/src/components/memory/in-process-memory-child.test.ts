@@ -7,6 +7,7 @@ function handle(overrides: Partial<ChildHandle> = {}): ChildHandle {
   return {
     task_id: "memory-child",
     sessionId: "memory-child",
+    effectiveModel: () => undefined,
     steer: async () => undefined,
     followUp: async () => undefined,
     abort: async () => undefined,

@@ -1,4 +1,4 @@
-import type { ResolvedModelRecord, TaskRecord } from "../state"
+import { nextRunEpoch, type ResolvedModelRecord, type TaskRecord } from "../state"
 import { isHostSessionRecord } from "./host-session"
 
 /**
@@ -34,7 +34,7 @@ export type FallbackRung = {
  */
 export function handOffToNextRung(record: TaskRecord, rung: FallbackRung): TaskRecord {
   const { pid: closingPid, runner_kind: _closedRunner, host_session: closingSession, ...rest } = record
-  const runEpoch = record.notification.run_epoch + 1
+  const runEpoch = nextRunEpoch(record)
   const closing = {
     ...(closingPid === undefined ? {} : { pid: closingPid }),
     ...(closingSession === undefined ? {} : { host_session: closingSession }),

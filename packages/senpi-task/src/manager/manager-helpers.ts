@@ -1,9 +1,32 @@
 import { join } from "node:path"
 
 import { isSpawnSpecV1, type BackgroundMode, type SpawnSpecV1, type TaskRecord, type TaskRecordInput } from "../state"
+import type { ResolvedModelRecord } from "../state"
+import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
 import type { ExecutionMode } from "./execution-mode"
+
+// The spec for one attempt of a fallback chain: the rung's OWN model in every field the runner
+// and the post-start pin check read (#9722 H1) - a stale resolvedModel from the failed rung would
+// make the child reject the fallback it was asked to start.
+export function nextRungManagedSpec(
+  spec: ManagedStartSpec,
+  rung: ResolvedModelRecord,
+  options: {
+    readonly fallbackModels: readonly ResolvedModelRecord[]
+    readonly requestedModel?: ResolvedModelRecord
+  },
+): ManagedStartSpec {
+  return {
+    ...spec,
+    model: rung.display,
+    ...(options.requestedModel === undefined ? {} : { requestedModel: options.requestedModel }),
+    resolvedModel: rung,
+    fallbackModels: options.fallbackModels,
+    ...resolvedReasoningFields(rung),
+  }
+}
 
 export function nowIso(now: () => number): string {
   return new Date(now()).toISOString()

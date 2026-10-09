@@ -5,7 +5,7 @@ import { basename, dirname, join } from "node:path"
 
 import { defaultSignaller } from "../lifecycle/context"
 import { resolveStateDir } from "../store/state-dir"
-import { DAG_SETTINGS_DEFAULTS, type DagEventLane, type DagRunEvent, type DagRunId, type DagRunStatus, type DagSettings } from "./types"
+import { DAG_SETTINGS_DEFAULTS, type DagEventLane, type DagRunEvent, type DagRunId, type DagRunStatus, type DagSettings, isTerminalDagRunStatus } from "./types"
 import type { DagRunEventType } from "./events"
 
 const SCHEMA_VERSION = 1
@@ -14,7 +14,6 @@ const LOCK_WAIT_TIMEOUT_MS = 1_000
 const WINDOWS_CLEANUP_RETRIES = 8
 const WINDOWS_CLEANUP_RETRY_MS = 5
 const READ_BUFFER_BYTES = 64 * 1024
-const TERMINAL_STATUSES = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
 const sleeper = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
 
 export type DagStoreConfig = {
@@ -94,6 +93,8 @@ export type DagFileStore = {
   readonly withRunLock: <T>(runId: DagRunId, operation: () => T) => T
   readonly withKeyLock: <T>(parentSessionId: string, runKey: string, operation: () => T) => T
   readonly withTaskOwnerLock: <T>(taskOwner: string, runId: DagRunId, operation: () => T) => T
+  /** Runs `operation` under the session capacity lock once `runId` fits under the active-run cap (it is not counted). */
+  readonly withSessionRunCapacity: <T>(parentSessionId: string, runId: DagRunId, operation: () => T) => T
   readonly pruneExpired: (now?: number) => readonly DagRunId[]
 }
 
@@ -271,6 +272,10 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
     withTaskOwnerLock: (taskOwner, runId, operation) => withLock(
       paths.taskOwnerLock(taskOwner), runId, operation, isProcessAlive, now, fsyncWrites,
     ),
+    withSessionRunCapacity: (parentSessionId, runId, operation) => withLock(sessionCapacityLock(paths, parentSessionId), undefined, () => {
+      assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
+      return operation()
+    }, isProcessAlive, now, fsyncWrites),
     pruneExpired(pruneNow = now()) {
       const cutoff = pruneNow - retentionDays * 24 * 60 * 60 * 1000
       const pruned: DagRunId[] = []
@@ -285,7 +290,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
         const checkpoint = value as RetentionCheckpoint
         const runId = checkpoint.runId ?? entry.name.slice(0, -5) as DagRunId
         assertSupportedSchema(checkpoint, path, runId, now)
-        if (checkpoint.status === undefined || !TERMINAL_STATUSES.has(checkpoint.status)) continue
+        if (!isTerminalDagRunStatus(checkpoint.status)) continue
         const terminalAt = checkpoint.completedAt ?? checkpoint.updatedAt
         if (terminalAt === undefined || Date.parse(terminalAt) > cutoff) continue
         pruneRunArtifacts(paths, checkpoint, runId, artifacts)
@@ -337,28 +342,52 @@ function writeCheckpointWithinSessionLimit(
     writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
     return
   }
-  const capacityLock = join(paths.locks, `session-runs-${sha256(parentSessionId)}.lock`)
-  withLock(capacityLock, undefined, () => {
+  withLock(sessionCapacityLock(paths, parentSessionId), undefined, () => {
     if (fs.existsSync(path)) {
       writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
       return
     }
-    let runCount = 0
-    for (const entry of readDagDirectory(paths.runs)) {
-      if (!entry.isFile() || !entry.name.endsWith(".json")) continue
-      const existingRunId = entry.name.slice(0, -5) as DagRunId
-      const existingPath = join(paths.runs, entry.name)
-      const existing = readJsonFile(existingPath, existingRunId, now)
-      if (existing === null) continue
-      assertSupportedSchema(existing, existingPath, existingRunId, now)
-      if (readOptionalString(existing, "parentSessionId") === parentSessionId) runCount += 1
-    }
-    if (runCount >= maxRunsPerSession) {
+    try {
+      assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
+    } catch (error) {
       fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
-      throw new Error(`DAG session run limit reached: ${maxRunsPerSession}`)
+      throw error
     }
     writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
   }, isProcessAlive, now, fsyncWrites)
+}
+
+function sessionCapacityLock(paths: DagStorePaths, parentSessionId: string): string {
+  return join(paths.locks, `session-runs-${sha256(parentSessionId)}.lock`)
+}
+
+// Only runs that can still hold a scheduler count: a finished run waits for retention, not a slot.
+// Call with the session capacity lock held; `runId` itself is never counted.
+function assertSessionRunCapacity(
+  paths: DagStorePaths,
+  parentSessionId: string,
+  runId: DagRunId,
+  maxRunsPerSession: number,
+  now: () => number,
+): void {
+  let active = 0
+  for (const entry of readDagDirectory(paths.runs)) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue
+    const existingRunId = entry.name.slice(0, -5) as DagRunId
+    if (existingRunId === runId) continue
+    const existingPath = join(paths.runs, entry.name)
+    const existing = readJsonFile(existingPath, existingRunId, now)
+    if (existing === null) continue
+    assertSupportedSchema(existing, existingPath, existingRunId, now)
+    if (readOptionalString(existing, "parentSessionId") !== parentSessionId) continue
+    if (isTerminalDagRunStatus(readOptionalString(existing, "status"))) continue
+    active += 1
+  }
+  if (active < maxRunsPerSession) return
+  const runs = active === 1 ? "1 run is" : `${active} runs are`
+  throw new Error(
+    `DAG session run limit reached: ${runs} active in this session (limit ${maxRunsPerSession}); wait for one to finish, cancel one, or raise task.dag.max_runs_per_session`,
+  )
 }
 
 function writeJsonAtomic(path: string, value: object, platform: NodeJS.Platform, fsyncWrites: boolean): void {

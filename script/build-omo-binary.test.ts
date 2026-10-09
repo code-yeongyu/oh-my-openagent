@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url"
 import {
   assertBinarySizeBudget,
   assertEngineGraphBundled,
+  BINARY_HEADROOM_WARN_BYTES,
   EMBEDDED_PAYLOAD_ROOT,
   ENGINE_MINIMUM_MODULES,
   MAX_BINARY_BYTES,
@@ -32,6 +33,7 @@ import {
   createStampedPackageJson,
   embeddedNameForRelPath,
   relPathForEmbeddedName,
+  reportBinaryHeadroom,
   reportEmbeddedPayload,
   resolveExpectedSidecarRelPaths,
   RUNTIME_MANIFEST_REL_PATH,
@@ -388,8 +390,24 @@ describe("size budget", () => {
     // then
     expect(oversize).toThrow(/darwin-arm64/)
     expect(withinBudget).not.toThrow()
-    expect(MAX_BINARY_BYTES).toBe(150 * 1024 * 1024)
+    expect(MAX_BINARY_BYTES).toBe(160 * 1024 * 1024)
     rmSync(stageDir, { recursive: true, force: true })
+  })
+
+  test("#given a binary within 5 MiB of the budget #when headroom is reported #then the line is a warning annotation naming the target", () => {
+    // given
+    const near = MAX_BINARY_BYTES - BINARY_HEADROOM_WARN_BYTES + 1
+    const roomy = MAX_BINARY_BYTES - BINARY_HEADROOM_WARN_BYTES
+
+    // when
+    const nearLine = reportBinaryHeadroom("linux-x64", near)
+    const roomyLine = reportBinaryHeadroom("linux-x64", roomy)
+
+    // then
+    expect(nearLine.startsWith("::warning::")).toBe(true)
+    expect(nearLine).toContain("linux-x64")
+    expect(roomyLine.startsWith("::warning::")).toBe(false)
+    expect(roomyLine).toContain("5.00 MiB headroom")
   })
 })
 

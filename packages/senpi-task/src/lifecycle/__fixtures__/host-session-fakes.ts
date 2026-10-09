@@ -96,6 +96,8 @@ export type HostLifecycleInput = {
   readonly deferredRetryBackoffMs?: readonly number[]
   /** Runs inside every recorded wait, so a test can move the daemon between retries. */
   readonly onWait?: (ms: number) => void
+  /** Holds each retry wait until the returned promise settles; tests use it to act between attempts. */
+  readonly gateWait?: (ms: number) => Promise<void>
 }
 
 /** Lifecycle deps wired to a fake daemon, a recorded signaller, and a recorded (never real) wait. */
@@ -144,7 +146,7 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
       wait: (ms) => {
         waits.push(ms)
         input.onWait?.(ms)
-        return Promise.resolve()
+        return input.gateWait?.(ms) ?? Promise.resolve()
       },
     },
   }

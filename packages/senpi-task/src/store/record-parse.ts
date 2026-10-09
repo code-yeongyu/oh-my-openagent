@@ -68,6 +68,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const fallbackModels = parseOptionalResolvedModelArray(value, "fallback_models")
   const fallbackAttempts = parseOptionalResolvedModelArray(value, "fallback_attempts")
   const resolvedModel = parseOptionalResolvedModel(value, "resolved_model")
+  const effectiveModel = parseOptionalResolvedModel(value, "effective_model")
   const spawnSpec = parseOptionalSpawnSpec(value)
   const owner = parseOptionalOwner(value)
   const pendingSteering = parseOptionalPendingSteering(value, path, warnings)
@@ -78,9 +79,11 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const reviveDeliveryUncertain = parseOptionalReviveDeliveryUncertainty(value)
   const resumedRunEpoch = readOptionalNumber(value, "resumed_run_epoch")
   const runStartEpoch = readOptionalNumber(value, "run_start_epoch")
+  const burntEpoch = readOptionalNumber(value, "burnt_epoch")
   const startQueued = parseOptionalStartQueued(value)
   const runnerKind = readOptionalRunnerKind(value)
   const suspensionReason = readOptionalSuspensionReason(value)
+  const revivalDeferredReason = readOptionalString(value, "revival_deferred_reason")
   const failureKind = readOptionalTaskStartFailureKind(value)
   const failureReason = readOptionalTaskStartFailureReason(value)
   const hostSession = parseOptionalHostSession(value)
@@ -122,6 +125,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
     ...(fallbackAttempts === undefined ? {} : { fallback_attempts: fallbackAttempts }),
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
+    ...(effectiveModel === undefined ? {} : { effective_model: effectiveModel }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(owner === undefined ? {} : { owner }),
     ...(pendingSteering !== undefined && pendingSteering.length > 0 ? { pending_steering: pendingSteering } : {}),
@@ -141,8 +145,10 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(reviveDeliveryUncertain === undefined ? {} : { revive_delivery_uncertain: reviveDeliveryUncertain }),
     ...(resumedRunEpoch === undefined ? {} : { resumed_run_epoch: resumedRunEpoch }),
     ...(runStartEpoch === undefined ? {} : { run_start_epoch: runStartEpoch }),
+    ...(burntEpoch === undefined ? {} : { burnt_epoch: burntEpoch }),
     ...(startQueued === undefined ? {} : { start_queued: startQueued }),
     ...(suspensionReason === undefined ? {} : { suspension_reason: suspensionReason }),
+    ...(revivalDeferredReason === undefined ? {} : { revival_deferred_reason: revivalDeferredReason }),
     ...(runnerKind === undefined ? {} : { runner_kind: runnerKind }),
     ...(hostSession === undefined ? {} : { host_session: hostSession }),
     ...(fallbackHandoffEpoch === undefined ? {} : { fallback_handoff_epoch: fallbackHandoffEpoch }),

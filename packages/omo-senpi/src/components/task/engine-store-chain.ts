@@ -38,6 +38,7 @@ export function createTaskStoreChain(deps: TaskStoreChainDeps): TaskStoreChain {
     parentState: () => deps.runtime.parentState(),
     wasBackground: deps.terminal.wasBackground,
     onTerminal: deps.terminal.notifyOwnedMemberLiveness,
+    currentSessionId: () => deps.runtime.sessionId(),
   })
   const stamping = createConfigGenerationStampingStore(observing, () => deps.generations.current()?.generation)
   const listeners = new Set<() => void>()

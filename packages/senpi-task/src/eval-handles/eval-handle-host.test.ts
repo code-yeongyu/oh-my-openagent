@@ -5,7 +5,8 @@ import type { ManagedChildHandle } from "../manager/child-handle"
 import type { SendOutcome } from "../steering/types"
 import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager } from "../manager/__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "../manager/types"
-import { SEND_HOST_STATUS } from "./control"
+import { SEND_HOST_STATUS } from "./run-after-engine"
+import { WATCH_HOST_STATUS } from "./watch"
 import { createEvalHandleHost } from "./host"
 import { fixture as poolFixture, poolInput } from "../workpool/__fixtures__/admission"
 
@@ -402,7 +403,7 @@ describe("EvalHandleHost over real task children", () => {
     await flush()
     watch.close()
 
-    expect((await updates).map((s) => s.phase)).toEqual(["lost"])
+    expect((await updates).map((s) => [s.phase, s.host_status])).toEqual([["lost", WATCH_HOST_STATUS.runGone]])
     await expect(host.result(successor, OWNER)).rejects.toMatchObject({ code: "eval_handle_not_found" })
   })
 
@@ -549,7 +550,7 @@ describe("every send and cancel reply is checked against the run after the engin
   test.each([
     { outcome: "cancelled" as const, expect: { cancelled: true, phase: "cancelled" } },
     { outcome: "noop" as const, expect: "eval_handle_stale" },
-    { outcome: "cancel_pending" as const, expect: "eval_handle_stale" },
+  // No cancel_pending row: a pending cancel blocks revive and steer, so a newer run cannot start under one.
   ])("a cancel the engine answers $outcome, with a newer run started before the re-read, never reports that run", async (row) => {
     const { manager, store, ref } = await harness()
     const host = createEvalHandleHost({
@@ -561,8 +562,7 @@ describe("every send and cancel reply is checked against the run after the engin
           startFollowUpRun({ store, taskId: id, epoch: 1 })
           const status = store.load(id)?.status ?? "running"
           if (row.outcome === "cancelled") return { kind: "cancelled", task_id: id, previous_status: "running" }
-          if (row.outcome === "noop") return { kind: "noop", task_id: id, status, reason: "already ended" }
-          return { kind: "cancel_pending", task_id: id, previous_status: "running", reason: "unreachable" }
+          return { kind: "noop", task_id: id, status, reason: "already ended" }
         },
       },
       workpools: NO_POOLS,

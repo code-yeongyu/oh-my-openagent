@@ -1,6 +1,9 @@
+import { log } from "@oh-my-opencode/utils"
+
 import type { TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { hostSessionResumePath } from "./host-session"
+import { markRevivalDeferred } from "./host-session-record"
 import {
   deferred,
   isClaimHeld,
@@ -70,7 +73,7 @@ export async function reconcileScopedRevival(
     .filter(({ record }) => !excludedFromAdmission.has(record.task_id))
   if (context.config.reattach_on_reconcile === false) {
     outcomes.push(...candidates.map(({ record }) => deferred(record.task_id, "reattach_disabled")))
-    return outcomes
+    return recordDeferrals(context, outcomes)
   }
 
   const priorResidencies = new Map(candidates.map((candidate) => [candidate.record.task_id, candidate.priorResidency]))
@@ -102,6 +105,22 @@ export async function reconcileScopedRevival(
   for (const candidate of candidates) {
     if (!reported.has(candidate.record.task_id)) {
       outcomes.push(deferred(candidate.record.task_id, "foreign_live_owner"))
+    }
+  }
+  return recordDeferrals(context, outcomes)
+}
+
+// The session is resumed now, so a child this pass deferred no longer "resumes with its session":
+// its record carries the deferral, which task_send and task_output then state (omo#9498).
+function recordDeferrals(context: LifecycleContext, outcomes: ReconcileOutcome[]): ReconcileOutcome[] {
+  for (const outcome of outcomes) {
+    if (outcome.kind !== "deferred" || outcome.reason === undefined) continue
+    // Annotating one record must not fail the pass: a contended record lock leaves that record's
+    // generic suspension text, and every other outcome still stands.
+    try {
+      markRevivalDeferred(context, outcome.task_id, outcome.reason)
+    } catch (error) {
+      log("senpi-task revival deferral not recorded", { taskId: outcome.task_id, reason: outcome.reason, error: String(error) })
     }
   }
   return outcomes

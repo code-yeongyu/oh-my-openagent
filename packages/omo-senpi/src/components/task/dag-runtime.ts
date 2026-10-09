@@ -384,7 +384,11 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const wakeSource = createDagWakeSource({ pi: deps.pi, manager: queryManager, sessionId: () => deps.engine.runtime.sessionId() })
   const wake = deps.coordinator === undefined
     ? undefined
-    : createDagWake({ coordinator: deps.coordinator, parentState: () => deps.engine.runtime.parentState() })
+    : createDagWake({
+      coordinator: deps.coordinator,
+      parentState: () => deps.engine.runtime.parentState(),
+      getReceiverModel: () => deps.engine.runtime.parentModel(),
+    })
   const terminalWakeSeq = new Map<DagRunId, number>()
   const pausedWakeSeq = new Map<DagRunId, number>()
 

@@ -1,5 +1,5 @@
 import { accessSync, constants, statSync } from "node:fs"
-import { isSpawnSpecV1, type TaskRecord } from "../state"
+import { isSpawnSpecV1, nextRunEpoch, type TaskRecord } from "../state"
 import { acquireSessionAdmissionLease } from "./admission-lease"
 import { checkReviveGeneration, isColdRevivalCandidate } from "./revive-policy"
 import { nowIso, type LifecycleContext } from "./context"
@@ -16,7 +16,7 @@ export function rollbackDetachedRevival(
   let rolledBack = false
   context.store.mutate(prior.task_id, (fresh) => {
     const claimed = fresh.status === prior.status && fresh.notification.run_epoch === prior.notification.run_epoch
-    const running = fresh.status === "running" && fresh.notification.run_epoch === prior.notification.run_epoch + 1
+    const running = fresh.status === "running" && fresh.notification.run_epoch === nextRunEpoch(prior)
     if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident" || fresh.killed === true || (!claimed && !running)) return fresh
     rolledBack = true
     const {
@@ -46,6 +46,8 @@ export function rollbackDetachedRevival(
       ...(prior.run_start_epoch === undefined ? {} : { run_start_epoch: prior.run_start_epoch }),
       residency_state: prior.residency_state,
       notification: { ...fresh.notification, run_epoch: prior.notification.run_epoch },
+      // The undone run's epoch was handed out (a handle may name it): it is never issued again.
+      ...(running ? { burnt_epoch: Math.max(fresh.burnt_epoch ?? 0, fresh.notification.run_epoch) } : {}),
       updated_at: nowIso(context),
     }
   })

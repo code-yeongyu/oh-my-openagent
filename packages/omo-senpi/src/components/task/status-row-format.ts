@@ -1,5 +1,7 @@
 import {
   buildLiveStatsTokens,
+  deferralOutlookFor,
+  type DeferralOutlook,
   excerptRendererText,
   formatStatusTarget,
   formatTargetWithModel,
@@ -8,7 +10,6 @@ import {
   rendererVisibleWidth,
   selectLiveActivityVerb,
   taskIdentityLabel,
-  type ResidencyState,
   type TaskRecord,
   type TaskRunStats,
   type TaskStatus,
@@ -25,17 +26,91 @@ const LIVE_ACTIVITY_MIN = 8
 const LIVE_SEPARATOR_WIDTH = 3
 export const LIVE_STATUS_REFRESH_MS = 250
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
+// A parked child is not working, so its row gets a still mark instead of a spinner frame.
+const SUSPENDED_MARK = "‖"
 
 const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
-
-const SUSPENDED_RESIDENCIES: ReadonlySet<ResidencyState> = new Set(["persisted_only", "rpc_detached"])
 
 export function isTerminal(status: TaskStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
-function isSuspended(record: TaskRecord): boolean {
-  return SUSPENDED_RESIDENCIES.has(record.residency_state)
+/**
+ * Whether a live child is parked rather than running here. The side panel's rule: a host that gave
+ * up records `suspension_reason`, while an ordinary suspension (the parent session ended or
+ * restarted) shows up only as a residency other than `resident`. Only a child that has not
+ * finished can be parked; a finished child is `evicted` or `disposed` and keeps its own status.
+ */
+export function isSuspended(record: TaskRecord): boolean {
+  if (isTerminal(record.status)) return false
+  return record.suspension_reason !== undefined || record.residency_state !== "resident"
+}
+
+type SuspensionReason = NonNullable<TaskRecord["suspension_reason"]>
+
+// Each cause in words. What brings the child back is decided per record below, from the same
+// facts the engine uses: nothing watches for the cause to clear.
+const SUSPENSION_CAUSES: Readonly<Record<SuspensionReason, string>> = {
+  daemon_unavailable: "task daemon unavailable",
+  handoff_parked: "handed off",
+  host_draining: "host draining",
+  host_incompatible: "host version mismatch",
+  idle_evicted: "evicted while idle",
+  own_host_unreachable: "host lost",
+  revival_deferred: "revival deferred",
+  store_index_unavailable: "task store unavailable",
+}
+
+const PARENT_RESTARTED_CAUSE = "parent session restarted"
+
+// What a deferred revival does next (the engine's own outlook, see deferralOutlookFor).
+const DEFERRAL_OUTLOOKS: Readonly<Record<DeferralOutlook, string>> = {
+  waits_for_capacity: "retried when a running child ends, else on session restart",
+  may_stay_with_live_owner: "held by another live session",
+  retried_then_lost: "retried a few times, then marked lost",
+  retried_not_lost: "retried a few times, else waits for its host",
+  not_retried: "resumes on session restart",
+}
+
+/**
+ * Whether a message can bring a parked child back. task_send revives only a running daemon-hosted
+ * child parked at `rpc_detached` (messageability: `revive`); every other parked child resumes only
+ * with its session.
+ */
+function revivableByMessage(record: TaskRecord): boolean {
+  return record.status === "running"
+    && record.residency_state === "rpc_detached"
+    && record.runner_kind === "host-session"
+    && record.host_session !== undefined
+}
+
+function suspensionResumes(record: TaskRecord): string {
+  const byMessage = revivableByMessage(record)
+  switch (record.suspension_reason) {
+    case "host_incompatible":
+      return "will not resume"
+    case "idle_evicted":
+      return byMessage ? "resumes on a message" : "resumes on session restart"
+    case "revival_deferred":
+      return DEFERRAL_OUTLOOKS[deferralOutlookFor(record.revival_deferred_reason ?? "", byMessage || record.runner_kind === "host-session")]
+    default:
+      return byMessage ? "resumes on session restart or a message" : "resumes on session restart"
+  }
+}
+
+// Why the child is parked, in words: the host's recorded reason, or the parent restarting away.
+function suspensionCause(record: TaskRecord): string {
+  const cause = record.suspension_reason === undefined ? PARENT_RESTARTED_CAUSE : SUSPENSION_CAUSES[record.suspension_reason]
+  const deferred = optionalRendererText(record.revival_deferred_reason)
+  return record.suspension_reason === "revival_deferred" && deferred !== undefined ? `${cause}: ${deferred}` : cause
+}
+
+const CANCEL_HINT = "/task-kill to cancel"
+
+// How a parked child goes on: when it resumes by itself, and the user's one action. A narrow line
+// keeps only the action.
+function suspensionHints(record: TaskRecord): readonly string[] {
+  return [`${suspensionResumes(record)}; ${CANCEL_HINT}`, CANCEL_HINT]
 }
 
 // Maps a record's residency to its user-facing status label: suspended children show `suspended`
@@ -126,17 +201,22 @@ function formatLiveBackgroundRow(
   maxWidth: number,
   stats?: TaskRunStats,
 ): string {
-  const elapsed = formatElapsed(record.created_at, now)
-  const frame = SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]
+  const suspended = isSuspended(record)
+  // A parked child shows no running time: the record has no park timestamp (`updated_at` moves with
+  // every revival attempt), and a climbing timer is what made the row look alive.
+  const elapsed = suspended ? undefined : formatElapsed(record.created_at, now)
+  const frame = suspended
+    ? SUSPENDED_MARK
+    : SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]
   const fullIdentity = liveTaskIdentity(record)
   const fullTarget = recordStatusTarget(record)
-  const fullActivity = isSuspended(record)
-    ? "suspended"
+  const fullActivity = suspended
+    ? `suspended (${suspensionCause(record)})`
     : activity === undefined
       ? defaultLiveActivity(stats)
       : normalizeRendererText(activity)
   const minimumPartsWidth = rendererVisibleWidth(
-    `${frame} ${excerptRendererText(fullIdentity, LIVE_IDENTITY_MIN)} · ${excerptRendererText(fullTarget, LIVE_TARGET_MIN)} · ${excerptRendererText(fullActivity, LIVE_ACTIVITY_MIN)} · ${elapsed}`,
+    `${frame} ${excerptRendererText(fullIdentity, LIVE_IDENTITY_MIN)} · ${excerptRendererText(fullTarget, LIVE_TARGET_MIN)} · ${excerptRendererText(fullActivity, LIVE_ACTIVITY_MIN)}${elapsed === undefined ? "" : ` · ${elapsed}`}`,
   )
   let remainingWidth = Math.max(0, maxWidth - minimumPartsWidth)
   const statsTokens = liveStatsTokens(stats).filter((token) => {
@@ -147,14 +227,30 @@ function formatLiveBackgroundRow(
   })
   const activityWidth = Math.min(rendererVisibleWidth(fullActivity), LIVE_ACTIVITY_MIN + remainingWidth)
   remainingWidth -= Math.max(0, activityWidth - LIVE_ACTIVITY_MIN)
-  const targetWidth = Math.min(rendererVisibleWidth(fullTarget), LIVE_TARGET_MIN + remainingWidth)
-  remainingWidth -= Math.max(0, targetWidth - LIVE_TARGET_MIN)
-  const identityWidth = Math.min(LIVE_IDENTITY_MAX, LIVE_IDENTITY_MIN + remainingWidth)
+  // After the cause, a parked row says how to act on it, when the line has room.
+  const fittingHint = suspended
+    ? suspensionHints(record).find((candidate) => rendererVisibleWidth(candidate) + LIVE_SEPARATOR_WIDTH <= remainingWidth)
+    : undefined
+  const hint = fittingHint === undefined ? [] : [fittingHint]
+  remainingWidth -= fittingHint === undefined ? 0 : rendererVisibleWidth(fittingHint) + LIVE_SEPARATOR_WIDTH
+  // A parked row has no live activity to watch, so which child it is matters more than its route.
+  let targetWidth: number
+  let identityWidth: number
+  if (suspended) {
+    identityWidth = Math.min(LIVE_IDENTITY_MAX, rendererVisibleWidth(fullIdentity), LIVE_IDENTITY_MIN + remainingWidth)
+    remainingWidth -= Math.max(0, identityWidth - LIVE_IDENTITY_MIN)
+    targetWidth = Math.min(rendererVisibleWidth(fullTarget), LIVE_TARGET_MIN + remainingWidth)
+  } else {
+    targetWidth = Math.min(rendererVisibleWidth(fullTarget), LIVE_TARGET_MIN + remainingWidth)
+    remainingWidth -= Math.max(0, targetWidth - LIVE_TARGET_MIN)
+    identityWidth = Math.min(LIVE_IDENTITY_MAX, LIVE_IDENTITY_MIN + remainingWidth)
+  }
   const context = [
     excerptRendererText(fullTarget, targetWidth),
     ...statsTokens,
     excerptRendererText(fullActivity, activityWidth),
-    elapsed,
+    ...(elapsed === undefined ? [] : [elapsed]),
+    ...hint,
   ]
   const contextText = context.join(" · ")
   const identity = excerptRendererText(fullIdentity, identityWidth)

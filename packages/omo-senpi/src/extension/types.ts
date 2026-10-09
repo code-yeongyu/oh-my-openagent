@@ -56,6 +56,8 @@ export interface SenpiExtensionAPI {
     },
   ): void
   getFlag(name: string): boolean | string | undefined
+  /** The session's current name (`/name`, `set_session_name`); undefined when it has none. */
+  getSessionName?(): string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
@@ -73,6 +75,12 @@ export interface SenpiExtensionAPI {
   registerMessageRenderer?(customType: string, renderer: unknown): void
   appendEntry?(customType: string, data?: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
+  exec?(
+    command: string,
+    args: string[],
+    options?: { cwd?: string; timeout?: number },
+  ): Promise<{ stdout: string; stderr: string; code: number }>
 }
 
 export interface ComponentLogger {

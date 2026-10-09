@@ -10,6 +10,7 @@ import {
 import type { OmoSenpiComponent } from "../../extension/types"
 import { composeTaskEngine, type TaskEngine } from "../task/engine"
 import { capture, permissionSession } from "./permission-event.test-support"
+import { createTeamServiceTestModelRegistry } from "../task/team-service-test-model-registry"
 
 export async function permissionOwner(sessionContext?: Readonly<Record<string, string>>) {
   let engine: TaskEngine | undefined
@@ -83,7 +84,7 @@ export async function permissionOwner(sessionContext?: Readonly<Record<string, s
   const fixture = await permissionSession({ sessionContext, components: [owner] })
   const taskEngine = engine
   if (taskEngine === undefined) throw new Error("Task engine did not register")
-  taskEngine.runtime.captureFrom({ cwd: fixture.home, sessionManager: fixture.session.sessionManager })
+  taskEngine.runtime.captureFrom({ cwd: fixture.home, modelRegistry: createTeamServiceTestModelRegistry(["test/model"]), sessionManager: fixture.session.sessionManager })
   return {
     ...fixture,
     engine: taskEngine,

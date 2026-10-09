@@ -52,6 +52,13 @@ export async function installCachedPlugin(input: {
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
     await assertHookCommandTargets(tempPath)
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
+    // Codex prefers a leftover "local" cache over every versioned install.
+    const versions = await readdir(dirname(targetPath), { withFileTypes: true })
+    for (const entry of versions) {
+      if (!entry.isDirectory() || entry.name === input.version || entry.name.startsWith(".")) continue
+      if (!/^[a-zA-Z0-9_+-][a-zA-Z0-9._+-]*$/.test(entry.name)) continue
+      await rm(join(dirname(targetPath), entry.name), { recursive: true, force: true })
+    }
   } catch (error) {
     await rm(tempPath, { recursive: true, force: true })
     throw error

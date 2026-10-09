@@ -55,7 +55,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
   })
 
   for (const agent of ["librarian", "explore"] as const) {
-    test(`${agent} runs no-thinking Kimi HighSpeed, Luna Fast, DeepSeek V4.1 Flash, Qwen 3.7 Plus, M2.7, then Haiku`, () => {
+    test(`${agent} runs no-thinking Kimi HighSpeed, Luna Fast, Haiku 5.5 medium, DeepSeek V4.1 Flash, Qwen 3.7 Plus, then M2.7`, () => {
       // given
       const requirement = AGENT_MODEL_REQUIREMENTS[agent]
 
@@ -63,10 +63,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       expect(requirement.fallbackChain).toEqual([
         { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
         { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
+        { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
         { providers: ["opencode-go"], model: "minimax-m2.7" },
-        { providers: ["anthropic", "github-copilot"], model: "claude-haiku-4-5" },
       ])
     })
   }

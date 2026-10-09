@@ -7,6 +7,8 @@ import { parkedReason, reachRecordedHost, type HostParkedReason, type RecordedHo
 import { markSuspensionReason, parkHostSessionRecord } from "./host-session-record"
 import { deferred, reviveClaimed } from "./reconcile-reclamation"
 import { claimResidencySlot } from "./residency"
+import { retryDeferredScopedChild } from "./deferred-revival"
+import { SCOPED_RETRY_REASONS } from "./deferred-revival-reasons"
 import type { ReconcileOutcome } from "./types"
 
 /**
@@ -108,14 +110,24 @@ const retrying = new WeakMap<LifecycleContext, Set<string>>()
  * single-flight revival a reconcile uses, against its RECORDED session; it stops as soon as the
  * record is revived, terminal, killed, or claimed elsewhere.
  */
-export function retryDeferredHostSessions(context: LifecycleContext, outcomes: readonly ReconcileOutcome[]): void {
+export function retryDeferredHostSessions(
+  context: LifecycleContext,
+  outcomes: readonly ReconcileOutcome[],
+  parentSessionId?: string,
+): void {
   const active = retrying.get(context) ?? new Set<string>()
   retrying.set(context, active)
   for (const outcome of outcomes) {
-    if (outcome.kind !== "deferred" || !DEFERRED_REASONS.has(outcome.reason ?? "")) continue
-    if (active.has(outcome.task_id) || !isHostSessionRecord(context.store.load(outcome.task_id))) continue
+    if (outcome.kind !== "deferred") continue
+    const record = context.store.load(outcome.task_id)
+    const scoped = parentSessionId !== undefined && record?.parent_session_id === parentSessionId
+      && SCOPED_RETRY_REASONS.has(outcome.reason ?? "")
+    const host = DEFERRED_REASONS.has(outcome.reason ?? "") && isHostSessionRecord(record)
+    if ((!scoped && !host) || active.has(outcome.task_id)) continue
     active.add(outcome.task_id)
-    void retryDeferredHostSession(context, outcome.task_id)
+    void (scoped && parentSessionId !== undefined && outcome.reason !== undefined
+      ? retryDeferredScopedChild(context, outcome.task_id, parentSessionId, outcome.reason)
+      : retryDeferredHostSession(context, outcome.task_id))
       .catch((error: unknown) => log("senpi-task deferred host session retry failed", { taskId: outcome.task_id, error: String(error) }))
       .finally(() => active.delete(outcome.task_id))
   }

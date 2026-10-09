@@ -1,5 +1,6 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ColdRevivalFailureCode, DetachedRevivalResult, DetachedRevivalRollbackResult } from "../lifecycle/port"
+import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { HostSessionIdentity, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 
@@ -11,6 +12,8 @@ export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_han
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
 export type DestructionPort = {
   destroyResidentTask(taskId: string, cause: DestructionCause): Promise<void>
+  // Releases a finished child still resident here; false when there is none (omo#9785).
+  parkTerminalResident?(taskId: string): Promise<boolean>
 }
 
 // The seam steering consumes from the manager. The manager owns concurrency + live handles + the
@@ -44,6 +47,8 @@ export type SteeringPort = {
   stopSettled?(taskId: string): void
   // A reopened child handed back parked runs nowhere: no epoch of it keeps a lane slot.
   releaseTaskLeases?(taskId: string): void
+  // How long a running child's abort may hold a cancel or interrupt before it moves on (omo#9791).
+  readonly abortDeadline?: TeardownStepDeadline
   now(): number
 }
 
@@ -104,6 +109,8 @@ export type CancelOutcome =
   // reachable (or the child ends when its connection does not come back), and only then is it cancelled.
   | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
+  // The task had already finished; cancel released the child it still kept resident (omo#9785).
+  | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was cancelled. */
   | { readonly kind: "stale"; readonly task_id: string; readonly status: TaskStatus; readonly run_epoch: number; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }

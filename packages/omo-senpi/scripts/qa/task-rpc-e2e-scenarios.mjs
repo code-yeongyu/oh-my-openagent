@@ -194,6 +194,25 @@ function waitForRecord(stateDir, predicate, timeoutMs) {
   })
 }
 
+// The parent's session can return before its process child's completion is written to the task record:
+// on a slow Windows runner that write lands moments later (#9481). Wait for it instead of reading once.
+const PROCESS_COMPLETION_MS = 60_000
+
+const isCompletedProcessTask = (r) => r.status === "completed" && r.execution_mode === "process"
+
+/**
+ * Waits for a process-mode task record to reach `completed`. Returns `{ completed: true }`, or, when the
+ * deadline passes first, `{ completed: false, lastStatuses }` with the process tasks' last seen statuses.
+ */
+export async function waitForProcessCompletion(stateDir, timeoutMs = PROCESS_COMPLETION_MS) {
+  const done = await waitForRecord(stateDir, isCompletedProcessTask, timeoutMs)
+  if (done !== undefined) return { completed: true }
+  const lastStatuses = readRecordsLenient(stateDir)
+    .filter((r) => r.execution_mode === "process")
+    .map((r) => r.status)
+  return { completed: false, lastStatuses }
+}
+
 // The parent Senpi host starts cold on every scenario: on a loaded Windows runner its startup alone
 // can take most of a minute before it even creates the task. Give that phase its own budget, then
 // time the child spawn separately, so a slow parent start is not misread as a missing child.

@@ -21,10 +21,14 @@ export type ChildExtensionRunner = {
   emit(event: { readonly type: "session_shutdown"; readonly reason: "quit" }): Promise<unknown>
 }
 
-// Structural subset of senpi's AgentSession that the handle drives. The default seam returns a
-// live AgentSession; fakes implement only these members.
+/**
+ * Structural subset of senpi's AgentSession that the handle drives. The default seam returns a
+ * live AgentSession; fakes implement only these members. `model` is what the session actually
+ * started on, read by the runner's post-start pin check (#9722); fakes may omit it.
+ */
 export type ChildSession = {
   readonly sessionId: string
+  readonly model?: { readonly provider: string; readonly id: string }
   prompt(text: string): Promise<void>
   steer(text: string): Promise<QueuedInputDisposition>
   followUp(text: string): Promise<QueuedInputDisposition>
@@ -87,6 +91,8 @@ export type ChildCompletionPolicy = "final-text" | "turn"
 export type ChildHandle = {
   readonly task_id: string
   readonly sessionId: string
+  /** The model the child session is ACTUALLY on, read live - the post-start record's source (#9722). */
+  effectiveModel(): { readonly provider: string; readonly id: string } | undefined
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
   abort(): Promise<void>
@@ -272,6 +278,7 @@ function createTrackedChildHandle(
   const handle: ChildHandle = {
     task_id: taskId,
     sessionId: session.sessionId,
+    effectiveModel: () => session.model,
     steer: (text) => session.steer(text).then(ignoreQueuedInputDisposition),
     followUp: async (text) => {
       // While a turn is running, a follow-up is queued and delivered when the agent settles. Once

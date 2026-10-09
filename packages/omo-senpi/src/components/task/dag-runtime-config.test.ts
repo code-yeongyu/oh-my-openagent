@@ -14,6 +14,7 @@ import * as dagEngine from "@oh-my-opencode/senpi-task/dag"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine } from "./engine"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 
 const cleanupRoots: string[] = []
 
@@ -97,7 +98,7 @@ describe("assembled DAG runtime configuration", () => {
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
     const sessionId = "session-configured-ring"
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
     const runtime = createDagRuntime({
       pi,
       engine,

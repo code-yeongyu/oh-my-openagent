@@ -204,7 +204,7 @@ Override specific categories or curated agents in `omo.json`:
 
 **Claude-like models** (instruction-following, structured output):
 
-- Claude Fable 5, Claude Opus 5.5, Claude Sonnet 5.5, Claude Sonnet 5, Claude Haiku 4.5
+- Claude Fable 5, Claude Opus 5.5, Claude Sonnet 5.5, Claude Sonnet 5, Claude Haiku 5.5
 - Kimi K3: behaves very similarly to Claude
 - GLM 5.2 / 5.3: Claude-like behavior, good for broad tasks
 

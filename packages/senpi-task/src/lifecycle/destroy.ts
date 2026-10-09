@@ -6,6 +6,7 @@ import { endClosingFallbackChild } from "./fallback-closing-child"
 import { closeHostSessionConfirmed } from "./host-session-close"
 import { isHostSessionRecord } from "./host-session"
 import type { DestroyCause, ResidentHandle } from "./port"
+import { withinTeardownBudget } from "./teardown-budget"
 
 /**
  * THE single-writer destruction port. This is the ONLY function in the package that invokes a
@@ -43,7 +44,11 @@ export async function destroyResidentTask(
     const handle = context.registry.get(taskId)
     if (handle !== undefined) {
       try {
-        await teardownHandle(handle, cause === "cancel_without_abort")
+        await teardownHandle(context, handle, cause === "cancel_without_abort")
+        context.failedTeardowns.delete(taskId)
+      } catch (error) {
+        context.failedTeardowns.add(taskId)
+        throw error
       } finally {
         if (cause !== "fallback_handoff") context.registry.forget(taskId)
         if (cause === "revive_failure") recordRevivalFailure(context, taskId)
@@ -74,17 +79,20 @@ async function confirmClosingChildGone(context: LifecycleContext, taskId: string
 
 // A host-session handle's terminate() IS `abort` then `close_session` (runners/rpc-host/handle.ts),
 // so the rpc branch below is exactly right for it: no pid is involved on either side.
-async function teardownHandle(handle: ResidentHandle, skipInProcessAbort: boolean): Promise<void> {
+async function teardownHandle(context: LifecycleContext, handle: ResidentHandle, skipInProcessAbort: boolean): Promise<void> {
   // The pre-dispose step (in-process abort / rpc terminate) is best-effort: an already-exited child
   // rejects it. DAG cancellation skips in-process abort only after the child's outcome has settled,
   // because Senpi can float retry rejections from both abort() and active-session dispose(). Dispose
   // must always run at that safe boundary so teardown cannot leave a resident zombie occupying a slot.
+  const target = { taskId: handle.task_id, pid: handle.pid }
+  const bounded = (step: "abort" | "terminate" | "dispose", run: () => Promise<void>) =>
+    withinTeardownBudget(context.teardownStepDeadline, target, step, run)
   if (handle.kind === "in-process") {
-    if (!skipInProcessAbort) await bestEffort(handle.task_id, "abort", () => handle.abort())
+    if (!skipInProcessAbort) await bestEffort(handle.task_id, "abort", () => bounded("abort", () => handle.abort()))
   } else {
-    await bestEffort(handle.task_id, "terminate", () => handle.terminate())
+    await bestEffort(handle.task_id, "terminate", () => bounded("terminate", () => handle.terminate()))
   }
-  await handle.dispose()
+  await bounded("dispose", () => handle.dispose())
 }
 
 async function bestEffort(taskId: string, step: "abort" | "terminate", run: () => Promise<void>): Promise<void> {

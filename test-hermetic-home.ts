@@ -62,7 +62,14 @@ function failOnShardsInRealAgentDir(): void {
   )
 }
 
-function shardsCreatedBy(shardsDir: string, pid: number): string[] {
+// A pid is reused, so a shard left by an earlier process that held this pid names it as creator too.
+// Only a shard created at or after this process started can be this process's leak; a shard whose
+// created_at cannot be parsed is still reported, so a malformed meta never hides a leak.
+export function shardsCreatedBy(
+  shardsDir: string,
+  pid: number,
+  startedAt: number = Date.now() - process.uptime() * 1000,
+): string[] {
   let names: string[]
   try {
     names = readdirSync(shardsDir)
@@ -72,13 +79,18 @@ function shardsCreatedBy(shardsDir: string, pid: number): string[] {
   return names
     .filter((name) => name.endsWith(".meta.json"))
     .map((name) => join(shardsDir, name))
-    .filter((metaPath) => readCreatorPid(metaPath) === pid)
+    .filter((metaPath) => {
+      const meta = readShardMeta(metaPath)
+      if (meta.created_by_pid !== pid) return false
+      const createdAt = typeof meta.created_at === "string" ? Date.parse(meta.created_at) : Number.NaN
+      return Number.isNaN(createdAt) || createdAt >= startedAt
+    })
 }
 
-function readCreatorPid(metaPath: string): unknown {
+function readShardMeta(metaPath: string): { created_by_pid?: unknown; created_at?: unknown } {
   try {
-    return (JSON.parse(readFileSync(metaPath, "utf8")) as { created_by_pid?: unknown }).created_by_pid
+    return JSON.parse(readFileSync(metaPath, "utf8")) as { created_by_pid?: unknown; created_at?: unknown }
   } catch {
-    return undefined
+    return {}
   }
 }

@@ -1,6 +1,8 @@
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
 import { asSenpiThinkingLevel } from "../senpi/thinking-level"
+import { splitModelDecorators } from "../senpi/explicit-pin"
+import { RunnerError } from "../runners/in-process/runner-error"
 import type {
   InProcessSessionContext,
   InProcessSessionContextProvider,
@@ -14,8 +16,8 @@ import type { ManagedStartSpec } from "./types"
 export type ChildModelRegistry = NonNullable<CreateAgentSessionOptions["modelRegistry"]>
 
 // Returns the parent session's live model registry, captured from the senpi ExtensionContext. Returns
-// undefined before the first live context (headless / early unit runs) so the child falls back to
-// senpi's own default resolution rather than spawning against a half-built registry.
+// undefined before the first live context (headless / early unit runs); a spec carrying an explicit
+// model then fails closed in provide() instead of falling back to senpi's default resolution.
 export type ParentModelRegistryResolver = () => ChildModelRegistry | undefined
 
 // Returns the parent session's project-trust decision, or undefined before the first live context.
@@ -33,6 +35,11 @@ type ModelFinder<TModel> = {
  * `provider/modelId` model reference to a concrete Model against that same registry. This closes the
  * W2-V gap where a child created with the parent's default agent-dir resolution never saw a provider
  * registered on the live parent session and failed with "No API key found".
+ *
+ * `provide()` ASSERTS rather than filters (#9722): a spec whose `model` cannot resolve - or any
+ * spec carrying one before a live registry exists - fails closed with a typed `model_unavailable`
+ * RunnerError, exactly as `resolveResumeContext` does. Start and resume share one rule now: never
+ * silently hand senpi a model-less context so it substitutes the settings default.
  */
 export function createParentRegistrySessionContext(
   resolveRegistry: ParentModelRegistryResolver,
@@ -44,8 +51,36 @@ export function createParentRegistrySessionContext(
   }
   const provide = (spec: ManagedStartSpec): InProcessSessionContext => {
     const registry = resolveRegistry()
-    if (registry === undefined) return trust()
-    const model = spec.model === undefined ? undefined : findModelReference(registry, spec.model)
+    if (registry === undefined) {
+      if (spec.model !== undefined) {
+        throw new RunnerError({
+          kind: "model_unavailable",
+          message: `no live parent model registry available to resolve ${spec.model}; refusing the settings default`,
+        })
+      }
+      return trust()
+    }
+    if (spec.model !== undefined) {
+      // A record written before #9722 may still carry a `:level` in its model id; resolve it by its
+      // canonical base and let the suffix ride the thinking level instead of failing the respawn.
+      const model = findModelReference(registry, spec.model) ?? findModelReference(registry, splitModelDecorators(spec.model).base)
+      if (model === undefined) {
+        throw new RunnerError({
+          kind: "model_unavailable",
+          message: `model "${spec.model}" not found in the live parent registry; refusing the settings default`,
+        })
+      }
+      const modelRuntime = registry.modelRuntime
+      const thinkingLevel = asSenpiThinkingLevel(spec.variant) ?? asSenpiThinkingLevel(splitModelDecorators(spec.model).thinkingLevel)
+      return {
+        ...trust(),
+        modelRegistry: registry,
+        authStorage: registry.authStorage,
+        ...(modelRuntime !== undefined && { modelRuntime }),
+        model,
+        ...(thinkingLevel !== undefined && { thinkingLevel }),
+      }
+    }
     const modelRuntime = registry.modelRuntime
     const thinkingLevel = asSenpiThinkingLevel(spec.variant)
     return {
@@ -53,7 +88,6 @@ export function createParentRegistrySessionContext(
       modelRegistry: registry,
       authStorage: registry.authStorage,
       ...(modelRuntime !== undefined && { modelRuntime }),
-      ...(model !== undefined && { model }),
       ...(thinkingLevel !== undefined && { thinkingLevel }),
     }
   }

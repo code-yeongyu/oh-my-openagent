@@ -25,6 +25,9 @@ export interface HostSessionLiveness {
   readonly steering?: readonly unknown[]
   readonly followUp?: readonly unknown[]
   readonly pendingMessageCount?: number
+  // The host's effective model for this session (senpi's get_state carries it); the post-open pin
+  // check compares it with the requested provider/modelId (#9722).
+  readonly model?: { readonly provider: string; readonly id: string }
 }
 
 /** `HostSessionClient` satisfies this structurally. The transport error itself is never read. */

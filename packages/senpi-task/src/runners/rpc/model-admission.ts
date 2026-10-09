@@ -1,5 +1,6 @@
 import { RunnerError } from "../in-process/runner-error"
 import type { RunnerFailureReason } from "../in-process/child-handle"
+import { splitModelDecorators } from "../../senpi/explicit-pin"
 import type { RpcRunnerSpec } from "../types"
 import { type ModelCatalogProbeResult, parseModelCatalog, probeModelCatalog } from "./model-catalog-probe"
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "./spawn"
@@ -135,10 +136,17 @@ export function createRpcModelAdmission(options: RpcModelAdmissionOptions = {}):
       throw error
     }
     if (observed.models.has(model)) return
+    // A `provider/model:level` pin is valid: senpi's `--model` parses the suffix as a thinking
+    // level, so admission checks the catalog against the base id, never the decorated one (#9722).
+    const { base } = splitModelDecorators(model)
+    if (base !== model && observed.models.has(base)) return
     evict(key, catalog)
     const confirming = probeCatalog(descriptor, model)
     const confirmed = await confirming
-    if (!confirmed.models.has(model)) throw absenceFailure(model, confirmed)
-    catalogs.set(key, { catalog: confirming, cachedAt: now() })
+    if (confirmed.models.has(model) || (base !== model && confirmed.models.has(base))) {
+      catalogs.set(key, { catalog: confirming, cachedAt: now() })
+      return
+    }
+    throw absenceFailure(model, confirmed)
   }
 }

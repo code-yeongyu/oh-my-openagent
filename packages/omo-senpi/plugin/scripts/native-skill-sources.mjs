@@ -69,6 +69,10 @@ export function createNativeSkillSources(repoRoot) {
       source: join(nativeSkillsRoot, "ulw-research"),
       sharedAssets: ["scripts", "references/report-gates.md", "references/deliverable-phase.md"],
     },
+    {
+      name: "visualize",
+      source: join(nativeSkillsRoot, "visualize"),
+    },
   ]
 
   const names = new Set(sources.map(({ name }) => name))

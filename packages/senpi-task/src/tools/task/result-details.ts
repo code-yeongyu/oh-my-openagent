@@ -17,6 +17,7 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
     execution_mode: record.execution_mode,
     model: record.model,
     run_stats: record.run_stats,
+    ...(record.effective_model === undefined ? {} : { effective_model: record.effective_model }),
     failure_kind: record.failure_kind,
     failure_reason: record.failure_reason,
     ...(includeLifecycle && {
@@ -65,6 +66,7 @@ export function startedDetails(
     execution_mode: executionMode,
     model: params.model,
     resolved_model: started.resolved_model,
+    effective_model: started.effective_model,
     run_in_background: params.run_in_background === true,
     queue_position: started.queue_position,
     ...(started.isolation === undefined ? {} : { isolation: started.isolation }),

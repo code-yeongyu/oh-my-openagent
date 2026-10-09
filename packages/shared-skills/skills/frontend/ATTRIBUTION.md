@@ -227,6 +227,18 @@ therefore instructs reading component source for mechanism extraction only and n
 it into references, design documents, or this repository. React Bits names remain the property
 of their owner.
 
+`frontend/references/design/component-catalogs.md` is a project-original, curl-only operating
+guide that routes by tone and situation to public component catalogs (smoothui, cult-ui,
+kokonutui, magicui, bklit, vengenceui, neobrutalism, daisyUI, shadcn/ui, animate-ui, Aceternity
+UI, unlumen UI) and to the MUI X Charts styling docs, written from live endpoint, licence,
+terms-of-service, and robots.txt verification on 2026-10-06; no catalog source code,
+documentation text, or component implementations are vendored. It records each catalog's
+licence class: animate-ui is MIT plus the Commons Clause, and Aceternity UI and unlumen UI
+permit use in applications but forbid redistributing the components themselves, so the guide
+instructs reading source for mechanism extraction only. It excludes styles.refero.design (its
+robots.txt disallows AI agents), skiper-ui.com (its terms forbid copying site material), and
+originkit.dev (partnership licence). All catalog names remain the property of their owners.
+
 `frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
 workflow guide. Its browser + `getComputedStyle` clone approach follows the same
 MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that `aside.md`

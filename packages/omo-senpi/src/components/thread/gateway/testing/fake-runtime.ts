@@ -25,6 +25,7 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   private readonly steering: string[] = []
   private readonly followUps: string[] = []
   private readonly texts = new Map<string, string>()
+  private readonly inputs = new Map<string, AdmitExternalMessageInput>()
   private readonly emittedListeners = new Set<(deliveryId: string) => void>()
   private readonly idleListeners = new Set<() => void>()
   readonly sessionPath: string
@@ -52,6 +53,7 @@ export class FakeSessionRuntime implements SessionRuntimePort {
     if (this.editorHold !== undefined) return { kind: "held_draft", turn_epoch: turnEpoch }
     if (input.expected_turn_id !== undefined && input.expected_turn_id !== turnEpoch) return { kind: "turn_conflict", turn_epoch: turnEpoch }
     this.texts.set(id, input.text)
+    this.inputs.set(id, input)
     if (!this.isBusy()) {
       this.pending.set(id, "start")
       this.enqueueCalls.push({ lane: "start", delivery_id: id })
@@ -138,6 +140,12 @@ export class FakeSessionRuntime implements SessionRuntimePort {
 
   textOf(deliveryId: string): string | undefined {
     return this.texts.get(deliveryId)
+  }
+
+  /** Who the drain said sent a delivery, and the message as written, as the session was handed them. */
+  senderOf(deliveryId: string): Pick<AdmitExternalMessageInput, "sender" | "display_text"> | undefined {
+    const input = this.inputs.get(deliveryId)
+    return input === undefined ? undefined : { sender: input.sender, display_text: input.display_text }
   }
 
   /** senpi `release_session`: admission closes and the file records `session_released` before teardown. */

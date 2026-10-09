@@ -269,7 +269,7 @@ Team mode is for overlapping lanes that need to exchange discoveries mid-flight.
   },
   "categories": {
     "quick": {
-      "models": ["anthropic/claude-haiku-4-5"]
+      "models": ["anthropic/claude-haiku-5-5"]
     },
     "writing": {
       "models": ["anthropic/claude-opus-5-5"]

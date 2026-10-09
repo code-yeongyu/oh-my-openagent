@@ -59,6 +59,7 @@ function orderingProbe(runsDir: string) {
         sentinelExisted: names.some((name) =>
           existsSync(join(runsDir, name, "final.json")) || existsSync(join(runsDir, name, "abandoned.json"))),
       })
+      return { version: 1, updatedAt: new Date(0).toISOString(), entries: [] }
     },
     clearOnSuccess: async () => undefined,
   }

@@ -4,6 +4,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import {
   loadDreamPersona,
   loadReflectionPersona,
+  auditMemoryRepo,
+  redactSecretLikeMaterial,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
@@ -32,6 +34,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     dreamState: join(sessionDir, "dream-state.json"),
     dreamPolicy: join(sessionDir, "dream-policy.json"),
     systemTokens: join(sessionDir, "system-tokens.json"),
+    audit: join(sessionDir, "audit.json"),
   } : undefined
   const payloadPaths = [
     transcript,
@@ -59,6 +62,12 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
       copyJsonOrEmpty(input.dreamStateSource, dreamPaths.dreamState),
       writeFile(dreamPaths.dreamPolicy, `${JSON.stringify({ version: 1, people: input.peoplePolicy }, null, 2)}\n`, "utf8"),
       writeSystemTokenEstimate(input.worktree.dir, dreamPaths.systemTokens),
+      (async () => {
+        const systemTokens = await estimateSystemTokens(input.worktree.dir)
+        const audit = await auditMemoryRepo(input.worktree.dir, { systemTokens, budgetTokens: input.systemTokenBudget })
+        await writeFile(dreamPaths.audit, `${JSON.stringify(audit, (_key, value) =>
+          typeof value === "string" ? redactSecretLikeMaterial(value) : value, 2)}\n`, "utf8")
+      })(),
     ]),
   ])
   await Promise.all(payloadPaths.map((path) => chmod(path, 0o400)))
@@ -87,6 +96,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
       DREAM_STATE_PATH: dreamPaths.dreamState,
       DREAM_POLICY_PATH: dreamPaths.dreamPolicy,
       SYSTEM_TOKENS_PATH: dreamPaths.systemTokens,
+      AUDIT_PATH: dreamPaths.audit,
       SYSTEM_TOKEN_BUDGET: String(input.systemTokenBudget),
       SYSTEM_TOKEN_TARGET: String(input.systemTokenTarget),
       ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),

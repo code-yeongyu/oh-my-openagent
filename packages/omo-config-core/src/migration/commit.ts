@@ -5,6 +5,7 @@ import { toPosixPath } from "../internal/posix-path"
 import { resolveHomeDir } from "../loader"
 import { OMO_CONFIG_HARNESS_IDS, OMO_CONFIG_LEGACY_HARNESS_IDS, OmoConfigSchema, harnessBlockKey } from "../schema"
 import { updateOmoConfig } from "../writer"
+import { diffEdits, withoutMarker } from "./diff-edits"
 import { collectMigrationEdits, mergeWithoutClobber } from "./merge"
 import { hasMigrationMarker } from "./predicate"
 import { MigrationTransactionError, MigrationValidationError, type MigrationEnvironment, type MigrationFileSystem, type MigrationTargetWriter } from "./types"
@@ -162,16 +163,11 @@ export function prepareTargetReplacement(input: {
   const marker = markerValue(input.target, input.migrationId, input.targetPath)
   const document = { ...documentCleanup.document, _migrations: marker }
   validateTarget(input.targetPath, document)
-  const edits: { path: readonly string[]; value: unknown }[] = [...targetCleanup.edits]
-  for (const key of Object.keys(targetCleanup.document)) {
-    if (key !== "_migrations" && !Object.prototype.hasOwnProperty.call(documentCleanup.document, key)) {
-      edits.push({ path: [key], value: undefined })
-    }
-  }
-  for (const [key, value] of Object.entries(documentCleanup.document)) {
-    if (key !== "_migrations") edits.push({ path: [key], value })
-  }
-  edits.push({ path: ["_migrations"], value: marker })
+  const edits: { path: readonly string[]; value: unknown }[] = [
+    ...targetCleanup.edits,
+    ...diffEdits(withoutMarker(targetCleanup.document), withoutMarker(documentCleanup.document)),
+    { path: ["_migrations"], value: marker },
+  ]
   return {
     diagnostics: uniqueDiagnostics([...targetCleanup.diagnostics, ...documentCleanup.diagnostics]),
     document,

@@ -79,6 +79,26 @@ describe("createTaskStatusUi.background progress", () => {
     expect(rows.join("\n")).not.toContain("ordinary task")
   })
 
+  it("#given only suspended background children #when syncing #then no repaint timer runs", () => {
+    // given one background child that is parked, not running
+    const active = new Map<number, () => void>()
+    const timers: StatusUiTimers = {
+      set: (callback) => { active.set(1, callback); return 1 },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const parked = record({ task_id: "st_parked", task_summary: "parked child", status: "running", residency_state: "persisted_only" })
+    const manager = { list: () => listed([parked]), wasBackground: () => true }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager, runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" }, timers })
+
+    // when the widget syncs
+    statusUi.syncNow()
+
+    // then the row is painted once and nothing schedules a 250 ms repaint
+    expect(ui.widgetCalls.at(-1)?.content?.[0]).toContain("parked child")
+    expect(active.size).toBe(0)
+  })
+
   it("#given an idle parent with a running background task #when time advances quietly #then live status refreshes", () => {
     // given
     let currentTime = Date.parse("2026-07-07T00:00:00.000Z")

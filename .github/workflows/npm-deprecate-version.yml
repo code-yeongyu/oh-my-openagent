@@ -1,0 +1,137 @@
+name: npm-deprecate-version
+run-name: "deprecate platform packages @ ${{ inputs.version }}${{ inputs.dry_run && ' (dry run)' || '' }}"
+
+# Deprecates one exact version of the omo PLATFORM packages (oh-my-opencode-<target>,
+# oh-my-openagent-<target>), for a release that published some platform packages but
+# never its main packages (5.1.25: the linux-x64 size budget stopped publish-platform).
+# Guards:
+# - workflow_dispatch only; the npm credential is used only inside the deprecate step.
+# - Only the 24 platform package names; the main packages (omo-ai, lazycodex-ai,
+#   oh-my-opencode, oh-my-openagent) are never touched.
+# - The version must be exact semver, and must not be the current `latest` of any main
+#   package, so a live release can never be deprecated.
+# - dry_run lists exactly what would change and changes nothing.
+# - Every deprecated package is read back; a missing deprecation fails the job.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact version to deprecate on the platform packages (e.g., 5.1.25)"
+        required: true
+        type: string
+      message:
+        description: "Deprecation message"
+        required: true
+        type: string
+        default: "unreleased: superseded by a later release"
+      dry_run:
+        description: "List what would be deprecated without changing anything"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-deprecate-version
+  cancel-in-progress: false
+
+jobs:
+  deprecate:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Validate inputs and plan
+        id: plan
+        env:
+          VERSION: ${{ inputs.version }}
+          MESSAGE: ${{ inputs.message }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version must be exact X.Y.Z: $VERSION"; exit 1; }
+          [ -n "$MESSAGE" ] || { echo "::error::message is required"; exit 1; }
+          for main in omo-ai lazycodex-ai oh-my-opencode oh-my-openagent; do
+            latest="$(npm view "$main" dist-tags.latest --prefer-online)"
+            if [ "$latest" = "$VERSION" ]; then
+              echo "::error::$VERSION is the current latest of $main; refusing to deprecate a live release"
+              exit 1
+            fi
+            echo "$main latest is $latest"
+          done
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
+          : > targets.txt
+          for prefix in oh-my-opencode oh-my-openagent; do
+            for plat in "${PLATFORMS[@]}"; do
+              pkg="$prefix-$plat"
+              if [ "$(npm view "$pkg@$VERSION" version --prefer-online 2>/dev/null || true)" = "$VERSION" ]; then
+                echo "$pkg" >> targets.txt
+                echo "would deprecate $pkg@$VERSION"
+              else
+                echo "skip $pkg: $VERSION is not published"
+              fi
+            done
+          done
+          echo "count=$(wc -l < targets.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Deprecate
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          MESSAGE: ${{ inputs.message }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          while read -r pkg; do
+            npm deprecate "$pkg@$VERSION" "$MESSAGE"
+          done < targets.txt
+
+      - name: Read back
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          # The registry can lag the deprecate call by tens of seconds (run 37810763019 read 4 of 20
+          # before they propagated), so recheck the pending packages with backoff for about 2 minutes.
+          cp targets.txt pending.txt
+          for delay in 0 10 20 30 60; do
+            sleep "$delay"
+            : > still.txt
+            while read -r pkg; do
+              got="$(npm view "$pkg@$VERSION" deprecated --prefer-online 2>/dev/null || true)"
+              if [ -n "$got" ]; then
+                echo "$pkg@$VERSION deprecated: $got"
+              else
+                echo "$pkg" >> still.txt
+              fi
+            done < pending.txt
+            mv still.txt pending.txt
+            [ -s pending.txt ] || exit 0
+            echo "$(wc -l < pending.txt | tr -d ' ') package(s) not yet showing the deprecation; rechecking"
+          done
+          while read -r pkg; do
+            echo "::error::$pkg@$VERSION is not deprecated after about 2 minutes of rechecks"
+          done < pending.txt
+          exit 1
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## npm deprecate platform packages"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Version | \`${{ inputs.version }}\` |"
+            echo "| Dry run | \`${{ inputs.dry_run }}\` |"
+            echo "| Packages | ${{ steps.plan.outputs.count }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

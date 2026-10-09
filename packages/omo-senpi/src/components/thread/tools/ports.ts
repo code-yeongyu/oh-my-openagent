@@ -1,4 +1,5 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
 import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
 import type { GatewayStore } from "../gateway/store"
@@ -20,6 +21,8 @@ export type ThreadHostSession = {
   readonly updated_at?: string | null
   /** What serves the endpoint that listed the session. */
   readonly endpoint_kind?: EndpointKind
+  /** The controls that endpoint accepts (`endpoint-controls.ts`). */
+  readonly controls?: readonly ThreadControl[]
   /**
    * The endpoint that listed this session. Routing ids are per-host counters (`rpc-1` on every
    * host), so a session is only addressable as the pair (socket, sessionId); absent for a host
@@ -103,6 +106,8 @@ export type ThreadToolSurfaceOptions = {
   readonly store: GatewayStore
   /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
   readonly callerTurnId?: () => string | undefined
+  /** The caller session's current name, shown to a receiver as "Sent by another agent · <name>"; absent when it has none. */
+  readonly callerName?: () => string | undefined
   /**
    * The newest delivery whose message the caller's current run has consumed (`component.ts`
    * `RunContext.cause`), when one has: a send continues that causal root (hop, cycle and budget

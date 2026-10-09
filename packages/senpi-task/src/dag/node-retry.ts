@@ -11,10 +11,9 @@ import {
   readRecord,
 } from "./node-control-context"
 import { createDagScheduler, type DagScheduler, type DagSchedulerOptions } from "./scheduler"
-import type { DagNode, DagNodeId, DagNodeState, DagRunId } from "./types"
+import { TERMINAL_DAG_RUN_STATUSES, type DagNode, type DagNodeId, type DagNodeState, type DagRunId } from "./types"
 
 const RETRYABLE_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["failed", "cancelled", "skipped"])
-const SETTLED_RUN_STATUSES: ReadonlySet<string> = new Set(["completed", "failed", "cancelled"])
 
 export type DagRunReentry = {
   /** The record as it stands after the control verb journaled its mutations, before waves re-run. */
@@ -37,15 +36,32 @@ export type DagRetryOptions = {
  * `preAttachedTasks` is deliberately dropped: it describes children that were live when the PREVIOUS
  * instance was built, and re-attaching an already-settled task would fold its outcome onto the node
  * a second time.
+ *
+ * Reviving a settled run makes it active again, so it must fit under the session's active-run cap
+ * (`task.dag.max_runs_per_session`); a refusal throws before anything is journaled.
  */
 export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
   const current = readRecord(options.store, options.initialRecord.runId) ?? options.initialRecord
-  let record = current
-  if (SETTLED_RUN_STATUSES.has(current.status)) {
-    const journal = controlJournal(options, current)
-    journal.append(dagRunResumedEvent({ generation: current.generation + 1 }))
-    record = journal.snapshot()
-  }
+  const record = withRevivalCapacity(options, current, () => resumeIfSettled(options, current))
+  return startReentry(options, record)
+}
+
+// A settled run counts against the cap again the moment it resumes, so the journal writes that revive
+// it run under the session capacity lock: a concurrent start or revival cannot take the same slot, and
+// a refusal throws before anything is journaled. The scheduler starts after the lock is released.
+function withRevivalCapacity<T>(options: DagSchedulerOptions, record: DagRunRecordV1, operation: () => T): T {
+  if (!TERMINAL_DAG_RUN_STATUSES.has(record.status)) return operation()
+  return options.store.withSessionRunCapacity(record.parentSessionId, record.runId, operation)
+}
+
+function resumeIfSettled(options: DagSchedulerOptions, current: DagRunRecordV1): DagRunRecordV1 {
+  if (!TERMINAL_DAG_RUN_STATUSES.has(current.status)) return current
+  const journal = controlJournal(options, current)
+  journal.append(dagRunResumedEvent({ generation: current.generation + 1 }))
+  return journal.snapshot()
+}
+
+function startReentry(options: DagSchedulerOptions, record: DagRunRecordV1): DagRunReentry {
   const { preAttachedTasks: _preAttachedTasks, ...reentryOptions } = options
   const scheduler = createDagScheduler({ ...reentryOptions, initialRecord: record })
   return { record, scheduler, run: scheduler.run() }
@@ -87,30 +103,35 @@ export function retryDagNodes(
   }
   assertRetryable(record, runId, targets)
 
+  // A prompt override is a definition amendment: it is recorded even when the cap then refuses the retry.
   const current = retryOptions?.prompt === undefined
     ? record
     : amendRetryPrompt(options, record, targets[0] as DagNodeId, retryOptions.prompt)
-  const journal = controlJournal(options, current)
-  for (const nodeId of targets) {
-    const node = nodeById(journal.snapshot(), nodeId)
-    // The DISPLAY attempt belongs to task attachment; execAttempt is the execution-intent counter
-    // the owner fingerprint is keyed on, so a retried node claims a new owner identity.
-    journal.append(dagNodeRetriedEvent({
-      nodeId,
-      ...(node.taskId === undefined ? {} : { priorTaskId: node.taskId }),
-      execAttempt: (node.execAttempt ?? 0) + 1,
-      promptChanged: retryOptions?.prompt !== undefined,
-    }))
-  }
-  for (const node of skippedDependentsOf(journal.snapshot(), targets)) {
-    journal.append(dagNodeTransitionedEvent({
-      nodeId: node.id,
-      from: "skipped",
-      to: "blocked",
-      reason: { kind: "retried" },
-    }))
-  }
-  return reenterDagRun({ ...options, initialRecord: journal.snapshot() })
+  // The node mutations and the resume share one cap check, so a refused retry leaves every node as it was.
+  const resumed = withRevivalCapacity(options, current, () => {
+    const journal = controlJournal(options, current)
+    for (const nodeId of targets) {
+      const node = nodeById(journal.snapshot(), nodeId)
+      // The DISPLAY attempt belongs to task attachment; execAttempt is the execution-intent counter
+      // the owner fingerprint is keyed on, so a retried node claims a new owner identity.
+      journal.append(dagNodeRetriedEvent({
+        nodeId,
+        ...(node.taskId === undefined ? {} : { priorTaskId: node.taskId }),
+        execAttempt: (node.execAttempt ?? 0) + 1,
+        promptChanged: retryOptions?.prompt !== undefined,
+      }))
+    }
+    for (const node of skippedDependentsOf(journal.snapshot(), targets)) {
+      journal.append(dagNodeTransitionedEvent({
+        nodeId: node.id,
+        from: "skipped",
+        to: "blocked",
+        reason: { kind: "retried" },
+      }))
+    }
+    return resumeIfSettled(options, journal.snapshot())
+  })
+  return startReentry(options, resumed)
 }
 
 function defaultRetryTargets(record: DagRunRecordV1): DagNodeId[] {

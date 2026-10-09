@@ -8,7 +8,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { digestDirectory } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
 const { CREDENTIAL_FILES, digestCredentialFiles, parseEvents, readRecords, analyzeSpawn, analyzeRpcRouting, eventsMentionSteerAck, statusSnapshots, liveRecordRpcChildPids, recordRpcChildPids } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
-const { SCENARIO_A_STEPS, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck } =
+const { SCENARIO_A_STEPS, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck, waitForProcessCompletion } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-scenarios.mjs")).href)
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 
@@ -78,13 +78,16 @@ async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
     reason: spawn.pass ? (steerFact ? undefined : "no steer ack observed") : "blocked: no rpc child spawned (see spawn_process)",
   })
 
-  const completed = readRecords(stateDir).some((r) => r.status === "completed" && r.execution_mode === "process")
+  // Waits for the completion write rather than reading once: it can land just after the session returns (#9481).
+  const completion = spawn.pass ? await waitForProcessCompletion(stateDir) : { completed: false, lastStatuses: [] }
   const snaps = statusSnapshots(aEvents)
   checks.push({
     check: "completion_push_arrives",
-    verdict: spawn.pass && completed ? "PASS" : "FAIL",
-    reason: spawn.pass ? (completed ? undefined : "no completion recorded") : "blocked: no rpc child spawned (see spawn_process)",
-    facts: { statusSnapshotCount: snaps.length },
+    verdict: spawn.pass && completion.completed ? "PASS" : "FAIL",
+    reason: spawn.pass
+      ? (completion.completed ? undefined : `no completion recorded before the deadline; last status: ${completion.lastStatuses.join(",") || "none"}`)
+      : "blocked: no rpc child spawned (see spawn_process)",
+    facts: { statusSnapshotCount: snaps.length, ...(completion.completed ? {} : { lastStatuses: completion.lastStatuses }) },
   })
 
   checks.push(await runKillCheck(senpiBin))

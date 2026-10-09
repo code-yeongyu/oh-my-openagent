@@ -45,6 +45,8 @@ export interface OpenedHostSession {
   readonly engineVersion: string
   /** The open asked for a session fallback chain the host cannot hold (no `retry_fallback_profile`). */
   readonly retryFallbackDropped?: boolean
+  /** The model the host reported for a FRESH open (the post-start check's read; #9722). */
+  readonly reportedModel?: { readonly provider: string; readonly id: string }
 }
 
 /** The turn-delivery seam: the commands a child handle issues on its session. */
