@@ -48,7 +48,14 @@ const POINTER_METHODS = new Set(["click", "moveMouse", "drag", "scroll"]);
 const NULL_METHODS = new Set(["typeText", "keyChord", "raiseWindow", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
 
 // rpc code = -32000 - the ErrorCode ordinal (senpi-desktop-core error.rs).
-const INPUT_ERROR_RPC = { PermissionDenied: -32000, StopPathUnavailable: -32014, Suspended: -32015, ScreenLocked: -32016 };
+const INPUT_ERROR_RPC = {
+	PermissionDenied: -32000,
+	StopPathUnavailable: -32014,
+	Suspended: -32015,
+	ScreenLocked: -32016,
+	InputBusy: -32021,
+	ControlRequired: -32022,
+};
 
 const error = (rpcCode, code, message, hint = null) => ({ error: { code: rpcCode, message, data: { code, hint } } });
 

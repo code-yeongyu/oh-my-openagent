@@ -105,4 +105,18 @@ describe("Python computer facade", () => {
 			calls: [],
 		});
 	});
+
+	it("sends control helpers as one-step call chains (#9651 B5b)", () => {
+		// When
+		const run = runPythonFacade(
+			"computer.control.acquire(reason='click Run')\nout = computer.control.state()\ncomputer.control.release()",
+		);
+
+		// Then
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] },
+			{ action: "call", chain: [{ method: "control.state", args: [] }] },
+			{ action: "call", chain: [{ method: "control.release", args: [] }] },
+		]);
+	});
 });

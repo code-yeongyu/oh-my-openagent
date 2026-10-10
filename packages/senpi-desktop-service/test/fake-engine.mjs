@@ -46,6 +46,9 @@ const capabilities = {
 	screenLocked: false,
 };
 let suspended = false;
+// The foreground control grant this fake holds (B5); FAKE_ENGINE_CONTROL_BUSY=1 refuses grants InputBusy.
+let control = { active: false };
+const CONTROL_GRANTED_AT = "2026-10-11T00:00:00.000Z";
 const status = () => ({
 	suspended,
 	globalLive: true,
@@ -57,7 +60,8 @@ const status = () => ({
 
 const send = (message) => process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
 const reply = (id, result) => send({ id, result });
-const fail = (id, code, message) => send({ id, error: { code: -32000, message, data: { code, hint: null } } });
+const fail = (id, code, message, rpcCode = -32000) =>
+	send({ id, error: { code: rpcCode, message, data: { code, hint: null } } });
 const held = [];
 const cancellable = new Set();
 
@@ -85,6 +89,20 @@ function handle(request) {
 			suspended = false;
 			send({ method: "stopPath.changed", params: status() });
 			return reply(id, status());
+		case "control.state":
+			return reply(id, control);
+		case "control.grant":
+			if (process.env.FAKE_ENGINE_CONTROL_BUSY === "1") {
+				return fail(id, "InputBusy", "another session holds the foreground control grant", -32021);
+			}
+			if (process.env.FAKE_ENGINE_GRANT_ERROR !== undefined) {
+				return fail(id, process.env.FAKE_ENGINE_GRANT_ERROR, `grant refused: ${process.env.FAKE_ENGINE_GRANT_ERROR}`);
+			}
+			control = { active: true, reason: params?.reason ?? null, grantedAt: CONTROL_GRANTED_AT };
+			return reply(id, control);
+		case "control.revoke":
+			control = { active: false };
+			return reply(id, null);
 		case "$/cancel":
 			if (cancellable.delete(params.id)) fail(params.id, "Cancelled", "request was cancelled by $/cancel");
 			return;

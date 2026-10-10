@@ -9,7 +9,14 @@ import type {
 } from "@oh-my-opencode/senpi-desktop-protocol";
 import { isRecord } from "../service/parse";
 import type { DesktopService } from "../service/service";
-import { ComputerRunError, type EngineCall, type Resume, type RunContext, RunOutput } from "./context";
+import {
+	ComputerRunError,
+	type ConfirmControl,
+	type EngineCall,
+	type Resume,
+	type RunContext,
+	RunOutput,
+} from "./context";
 import { createDesktopFacade } from "./facade";
 import { createWait, type WaitOptions } from "./wait";
 
@@ -28,9 +35,12 @@ export interface ComputerRunRequest {
 	readonly signal?: AbortSignal;
 }
 
+/** `DesktopService` surface used by the run facade; `control.grant`/`revoke` stay host-only. */
 export interface ComputerRunHost {
-	readonly service: Pick<DesktopService, "call" | "onAudit">;
+	readonly service: Pick<DesktopService, "call" | "onAudit" | "revokeControl">;
 	readonly executeTool: ExecuteTool;
+	/** Human confirmation behind `desktop.control.acquire`; absent: headless, never grants (#9651 B5b). */
+	readonly confirmControl?: ConfirmControl;
 }
 
 const FILENAME = "computer-run.js";
@@ -103,6 +113,7 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 	if (request.signal?.aborted) onCallerAbort();
 	const audit: AuditRecord[] = [];
 	const unsubscribe = host.service.onAudit((event) => audit.push(auditRecord(event, snapshot.sessionId, runId)));
+	const settled = Promise.withResolvers<never>();
 
 	const context: RunContext = {
 		signal,
@@ -130,7 +141,12 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 	const print = (...values: readonly unknown[]) => context.output.text(format(...values));
 	const sandbox = vm.createContext(
 		{
-			desktop: createDesktopFacade({ context, call, resume }),
+			desktop: createDesktopFacade({
+				context,
+				call,
+				resume,
+				...(host.confirmControl === undefined ? {} : { confirmControl: host.confirmControl }),
+			}),
 			wait: (msOrPredicate: unknown, options?: WaitOptions) => resume(wait(msOrPredicate, options)),
 			assert: (condition: unknown, message?: string): void => {
 				if (!condition) throw new ComputerRunError("assertion", message ?? "Assertion failed");
@@ -168,7 +184,16 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 			audit: [...audit],
 		};
 	} catch (error) {
-		throw isVmTimeout(error) ? timeout() : error;
+		const failure = isVmTimeout(error) ? timeout() : error;
+		// A failed run revokes the control grant (lead add (a) of #9651): the next foreground action
+		// asks the human again. The interrupt's aborted run lands here too; best effort, never thrown.
+		// Isolated from the throw: the run settles now, the revoke still completes before it finishes.
+		const revoked = host.service.revokeControl();
+		void revoked.catch(() => undefined);
+		void revoked.finally(() => {
+			settled.reject(failure);
+		});
+		return await settled.promise;
 	} finally {
 		clearTimeout(timer);
 		request.signal?.removeEventListener("abort", onCallerAbort);
