@@ -12,6 +12,7 @@ import {
   buildGrokSisyphusAgentConfig,
 } from "./sisyphus-agent-config";
 import { buildFallbackSisyphusPrompt } from "./sisyphus-dynamic-prompt";
+import { buildClaudeFable51SisyphusPrompt } from "./sisyphus/fable-5-1";
 import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildClaudeOpus48SisyphusPrompt } from "./sisyphus/claude-opus-4-8";
@@ -25,6 +26,7 @@ import { buildKimiK27SisyphusPrompt } from "./sisyphus/kimi-k2-7";
 import { buildKimiK3SisyphusPrompt } from "./sisyphus/kimi-k3";
 import type { AgentMode } from "./types";
 import {
+  isClaudeFable51Model,
   isClaudeFable5Model,
   isClaudeOpus47Model,
   isClaudeOpus48Model,
@@ -58,10 +60,12 @@ export type SisyphusPromptFamily =
   | "kimi-k2-6"
   | "gpt-5-5"
   | "gpt-5-4"
-  | "claude-fable-5"
-  | "claude-opus-5"
-  | "claude-opus-4-8"
-  | "claude-opus-4-7"
+  | "fable-5-1"
+  | "fable-5"
+  | "opus-5-5"
+  | "opus-5"
+  | "opus-4-8"
+  | "opus-4-7"
   | "glm-5-2"
   | "grok-4"
   | "fallback";
@@ -72,11 +76,12 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isKimiK2Model(model)) return "kimi-k2-6";
   if (isGpt5_5Model(model) || isGpt5_6Model(model) || isGpt6Model(model)) return "gpt-5-5";
   if (isGptNativeSisyphusModel(model)) return "gpt-5-4";
-  if (isClaudeFable5Model(model)) return "claude-fable-5";
-  if (isClaudeOpus55Model(model)) return "claude-opus-5";
-  if (isClaudeOpus5Model(model)) return "claude-opus-5";
-  if (isClaudeOpus48Model(model)) return "claude-opus-4-8";
-  if (isClaudeOpus47Model(model)) return "claude-opus-4-7";
+  if (isClaudeFable51Model(model)) return "fable-5-1";
+  if (isClaudeFable5Model(model)) return "fable-5";
+  if (isClaudeOpus55Model(model)) return "opus-5-5";
+  if (isClaudeOpus5Model(model)) return "opus-5";
+  if (isClaudeOpus48Model(model)) return "opus-4-8";
+  if (isClaudeOpus47Model(model)) return "opus-4-7";
   if (isGlmModel(model)) return "glm-5-2";
   if (isGrok45Model(model) || isGrok46Model(model)) return "grok-4";
   return "fallback";
@@ -126,25 +131,37 @@ export function createSisyphusAgent(
         model,
         buildGpt54SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
-    case "claude-fable-5":
+    case "fable-5-1":
+      return buildClaudeSisyphusAgentConfig(
+        MODE,
+        model,
+        buildClaudeFable51SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "fable-5":
       return buildClaudeSisyphusAgentConfig(
         MODE,
         model,
         buildClaudeFable5SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
-    case "claude-opus-5":
+    case "opus-5-5":
       return buildClaudeSisyphusAgentConfig(
         MODE,
         model,
         buildClaudeOpus5SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
-    case "claude-opus-4-8":
+    case "opus-5":
+      return buildClaudeSisyphusAgentConfig(
+        MODE,
+        model,
+        buildClaudeOpus5SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "opus-4-8":
       return buildClaudeSisyphusAgentConfig(
         MODE,
         model,
         buildClaudeOpus48SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
-    case "claude-opus-4-7":
+    case "opus-4-7":
       return buildClaudeSisyphusAgentConfig(
         MODE,
         model,

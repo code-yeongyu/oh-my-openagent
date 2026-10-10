@@ -1,12 +1,14 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
 import {
+  isClaudeFable51Model,
   isClaudeFable5Model,
   isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
+  isClaudeOpus5LegacyModel,
   isClaudeOpus5Model,
   isClaudeOpus55Model,
   isGeminiModel,
@@ -23,12 +25,14 @@ import {
 } from "@oh-my-opencode/model-core";
 
 export {
+  isClaudeFable51Model,
   isClaudeFable5Model,
   isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
   isClaudeOpus48Model,
+  isClaudeOpus5LegacyModel,
   isClaudeOpus5Model,
   isClaudeOpus55Model,
   isGeminiModel,
