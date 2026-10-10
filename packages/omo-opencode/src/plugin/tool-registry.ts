@@ -59,6 +59,9 @@ export function createToolRegistry(args: {
       factories,
     }),
     ...(interactiveBashEnabled ? { interactive_bash: factories.interactive_bash } : {}),
+    ...(pluginConfig.dsh?.enabled
+      ? { call_dsh_agent: factories.createDshAgentTool({ ctx, config: pluginConfig.dsh }) }
+      : {}),
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),
     ...createMonitorToolsRecord({ pluginConfig, ctx, managers, factories }),
     ...createTaskToolsRecord({ taskSystemEnabled, pluginConfig, ctx, factories }),
