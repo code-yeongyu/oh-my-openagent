@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 
@@ -10,6 +10,7 @@ const FIXTURES = join(import.meta.dir, "tests", "fixtures")
 
 function sessionDir() {
 	const root = mkdtempSync(join(tmpdir(), "report-tools-cli-"))
+	onTestFinished(() => rmSync(root, { recursive: true, force: true }))
 	const dir = join(root, "20260101-120000")
 	mkdirSync(dir)
 	return dir
