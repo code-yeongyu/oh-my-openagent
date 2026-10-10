@@ -1,3 +1,4 @@
+export * from "./child-log"
 export * from "./completion"
 export * from "./failure-detail"
 export * from "./health"
