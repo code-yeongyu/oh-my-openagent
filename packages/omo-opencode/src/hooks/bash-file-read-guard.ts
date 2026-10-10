@@ -1,8 +1,7 @@
-import type { Hooks } from "@opencode-ai/plugin"
-
 import { log } from "../shared"
 
-const WARNING_MESSAGE = "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
+export const WARNING_MESSAGE =
+  "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
 
 const FILE_READ_PATTERNS = [
   /^\s*cat\s+(?!-)[^\s|&;]+\s*$/,
@@ -14,31 +13,29 @@ function isSimpleFileReadCommand(command: string): boolean {
   return FILE_READ_PATTERNS.some((pattern) => pattern.test(command))
 }
 
-export function createBashFileReadGuardHook(): Hooks {
+export function createBashFileReadGuardHook() {
   return {
-    "tool.execute.before": async (
-      input: { tool: string; sessionID: string; callID: string },
-      output: { args: Record<string, unknown>; message?: string },
+    "tool.execute.after": async (
+      input: { tool: string; sessionID: string; callID: string; args?: Record<string, unknown> },
+      output: { title: string; output: string; metadata: Record<string, unknown> },
     ): Promise<void> => {
       if (input.tool.toLowerCase() !== "bash") {
         return
       }
 
-      const command = output.args.command
-      if (typeof command !== "string") {
+      const command = input.args?.command
+      if (typeof command !== "string" || !isSimpleFileReadCommand(command)) {
         return
       }
-
-      if (!isSimpleFileReadCommand(command)) {
-        return
-      }
-
-      output.message = WARNING_MESSAGE
 
       log("[bash-file-read-guard] warned on bash file read command", {
         sessionID: input.sessionID,
         command,
       })
+
+      if (typeof output.output === "string" && !output.output.includes(WARNING_MESSAGE)) {
+        output.output = `[WARNING: ${WARNING_MESSAGE}]\n\n${output.output}`
+      }
     },
   }
 }
