@@ -6,7 +6,7 @@ import type {
 } from "../dynamic-agent-prompt-builder";
 import { buildClaude5SisyphusPrompt } from "./claude-5-core";
 
-export function buildClaudeOpus5SisyphusPrompt(
+export function buildClaudeHaiku55SisyphusPrompt(
   model: string,
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
@@ -14,6 +14,5 @@ export function buildClaudeOpus5SisyphusPrompt(
   availableCategories: AvailableCategory[] = [],
   useTaskSystem = false,
 ): string {
-  const variant = /opus-5[-.]5/i.test(model) ? "opus-5-5" : "opus-5";
-  return buildClaude5SisyphusPrompt(model, availableAgents, availableTools, availableSkills, availableCategories, useTaskSystem, variant);
+  return buildClaude5SisyphusPrompt(model, availableAgents, availableTools, availableSkills, availableCategories, useTaskSystem, "haiku-5-5");
 }

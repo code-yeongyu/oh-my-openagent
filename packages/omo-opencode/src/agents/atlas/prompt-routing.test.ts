@@ -2,10 +2,10 @@ import { describe, test, expect } from "bun:test"
 import { getAtlasPromptSource } from "./agent"
 
 describe("getAtlasPromptSource routes each model family to its dedicated variant", () => {
-  test("GPT models route to gpt", () => {
-    expect(getAtlasPromptSource("openai/gpt-5.5")).toBe("gpt")
-    expect(getAtlasPromptSource("openai/gpt-5.4")).toBe("gpt")
-    expect(getAtlasPromptSource("github-copilot/gpt-5.5")).toBe("gpt")
+  test("GPT versions route to their dedicated variants", () => {
+    expect(getAtlasPromptSource("openai/gpt-5.5")).toBe("gpt-5.5")
+    expect(getAtlasPromptSource("openai/gpt-5.4")).toBe("gpt-5.4")
+    expect(getAtlasPromptSource("github-copilot/gpt-5.5")).toBe("gpt-5.5")
   })
 
   test("Gemini models route to gemini", () => {
@@ -15,8 +15,8 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
   })
 
   test("Kimi K2.x models route to kimi", () => {
-    expect(getAtlasPromptSource("moonshotai/kimi-k2.6")).toBe("kimi")
-    expect(getAtlasPromptSource("kimi-for-coding/k2p6")).toBe("kimi")
+    expect(getAtlasPromptSource("moonshotai/kimi-k2.6")).toBe("kimi-k2-6")
+    expect(getAtlasPromptSource("kimi-for-coding/k2p6")).toBe("kimi-k2-6")
     expect(getAtlasPromptSource("opencode-go/kimi-k2.5")).toBe("kimi")
   })
 
@@ -30,10 +30,10 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
     expect(getAtlasPromptSource("kimi-for-coding/k2p7")).toBe("kimi-k2-7")
   })
 
-  test("Kimi K2.8 and the Kimi Code rolling ids share the K2.7 variant", () => {
-    expect(getAtlasPromptSource("moonshotai/kimi-k2.8")).toBe("kimi-k2-7")
-    expect(getAtlasPromptSource("kimi-for-coding/k2p8")).toBe("kimi-k2-7")
-    expect(getAtlasPromptSource("kimi-for-coding/kimi-for-coding")).toBe("kimi-k2-7")
+  test("Kimi K2.8 and the Kimi Code rolling ids route to their own variants", () => {
+    expect(getAtlasPromptSource("moonshotai/kimi-k2.8")).toBe("kimi-k2-8")
+    expect(getAtlasPromptSource("kimi-for-coding/k2p8")).toBe("kimi-k2-8")
+    expect(getAtlasPromptSource("kimi-for-coding/kimi-for-coding")).toBe("kimi-k2-8")
     expect(getAtlasPromptSource("kimi-for-coding/kimi-for-coding-highspeed")).toBe("kimi-k2-7")
   })
 
@@ -43,14 +43,14 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
   })
 
   test("Claude 4.6 family (opus-4-6, sonnet-4-6, haiku-4-5) routes to default", () => {
-    expect(getAtlasPromptSource("anthropic/claude-opus-4-6")).toBe("default")
+    expect(getAtlasPromptSource("anthropic/claude-opus-4-6")).toBe("opus-4-6")
     expect(getAtlasPromptSource("anthropic/claude-sonnet-4-6")).toBe("default")
     expect(getAtlasPromptSource("anthropic/claude-haiku-4-5")).toBe("default")
   })
 
   test("GLM models route to glm", () => {
     expect(getAtlasPromptSource("zai-coding-plan/glm-5.1")).toBe("glm")
-    expect(getAtlasPromptSource("zai/glm-5.2")).toBe("glm")
+    expect(getAtlasPromptSource("zai/glm-5.2")).toBe("glm-5.2")
   })
 
   test("undefined model falls through to default", () => {

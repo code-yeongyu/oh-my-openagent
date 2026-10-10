@@ -8,7 +8,7 @@ import {
   isClaudeOpus47OrLaterModel,
   isClaudeFableOrMythosModel,
   isClaudeOpus48Model,
-  isClaudeOpus5Model,
+  isClaudeOpus5LegacyModel,
   isGeminiModel,
   isGlmModel,
   isGptModel,
@@ -188,14 +188,15 @@ describe("model family detectors", () => {
   })
 
   test("#given Claude Opus 5 model ids #then detects Opus 5 only", () => {
-    expect(isClaudeOpus5Model("anthropic/claude-opus-5")).toBe(true)
-    expect(isClaudeOpus5Model("anthropic/claude-opus-5-0")).toBe(true)
-    expect(isClaudeOpus5Model("anthropic/claude-opus-5.0")).toBe(true)
-    expect(isClaudeOpus5Model("anthropic/claude-opus-5[1m]")).toBe(true)
-    expect(isClaudeOpus5Model("claude-opus-5")).toBe(true)
-    expect(isClaudeOpus5Model("anthropic/claude-opus-4-8")).toBe(false)
-    expect(isClaudeOpus5Model("anthropic/claude-fable-5")).toBe(false)
-    expect(isClaudeOpus5Model("anthropic/claude-sonnet-4-6")).toBe(false)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-opus-5")).toBe(true)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-opus-5-20251101")).toBe(true)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-opus-5[1m]")).toBe(true)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-opus-4-8")).toBe(false)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-opus-4-7")).toBe(false)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-fable-5")).toBe(false)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-opus-5-50")).toBe(false)
+    expect(isClaudeOpus5LegacyModel("anthropic/claude-opus-5.5")).toBe(false)
+    expect(isClaudeOpus5LegacyModel("claude-opus-5")).toBe(true)
   })
 
   test("#given Claude Fable 5 model ids #then detects Fable 5 only", () => {

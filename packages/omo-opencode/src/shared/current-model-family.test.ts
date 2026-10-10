@@ -4,7 +4,11 @@
 import { describe, expect, test } from "bun:test"
 
 const ACTIVE_SURFACE_EXTENSIONS = /\.(?:ts|mts|cts|mjs|js|json|jsonc|md|yaml|yml|toml)$/
-const LEGACY_GPT_MODEL_RE = /gpt-5(?:\.|-)(?:2|3)(?![-\s]codex(?:\b|-|\.|_))(?:\b|-|\.|_)/i
+// Matches a legacy GPT-5.2/5.3 id only where it is selected as a model: a `model:`/`model=` config
+// value or a `provider/model` path. Bare preset-name identifiers (the prompt-preset matrix names
+// dotted releases, e.g. variant keys like "gpt-5.2") are not model selections and must not trip the
+// guard; preset names will converge to the shared catalog ids under #9851.
+const LEGACY_GPT_MODEL_RE = /(?:\bmodel\b["']?\s*[:=]\s*["'`]?gpt-5(?:\.|-)(?:2|3)(?![-\s]codex(?:\b|-|\.|_))(?:\b|-|\.|_)|\/gpt-5(?:\.|-)(?:2|3)(?![-\s]codex(?:\b|-|\.|_))(?:\b|-|\.|_))/i
 
 const ALLOWED_LEGACY_REFERENCES = new Set([
   "packages/omo-opencode/src/generated/model-capabilities.generated.json",

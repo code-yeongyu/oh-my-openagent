@@ -90,7 +90,7 @@ describe("getHephaestusPromptSource", () => {
     const sources = bedrockModels.map((model) => getHephaestusPromptSource(model));
 
     // then
-    expect(sources).toEqual(["gpt-5-4", "gpt-5-4", "gpt-5-6", "gpt"]);
+    expect(sources).toEqual(["gpt-5-4", "gpt-5-4", "gpt-5-6", "gpt-5-3-codex"]);
   });
 
   test("returns 'gpt-5-4' for gpt-5.4 models", () => {
@@ -163,7 +163,7 @@ describe("getHephaestusPromptSource", () => {
     expect(source3).toBe("gpt-5-6");
   });
 
-  test("returns 'gpt' for GPT 5.3 Codex models", () => {
+  test("returns 'gpt-5-3-codex' for GPT 5.3 Codex models", () => {
     // given
     const model1 = "openai/gpt-5.3-codex";
     const model2 = "github-copilot/gpt-5-3-codex";
@@ -175,9 +175,9 @@ describe("getHephaestusPromptSource", () => {
     const source3 = getHephaestusPromptSource(model3);
 
     // then
-    expect(source1).toBe("gpt");
-    expect(source2).toBe("gpt");
-    expect(source3).toBe("gpt");
+    expect(source1).toBe("gpt-5-3-codex");
+    expect(source2).toBe("gpt-5-3-codex");
+    expect(source3).toBe("gpt-5-3-codex");
   });
 
   test("throws for generic GPT, unsupported GPT 5.x, non-GPT, and undefined models", () => {

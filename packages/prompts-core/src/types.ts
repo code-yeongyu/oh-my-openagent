@@ -58,3 +58,7 @@ export type LoadedPrompt<TFrontmatter = Record<string, unknown>> = {
 }
 
 export type VariantTable = Readonly<Record<string, PromptSource>>
+
+// Tables built from generated content are always bundled; declaring them with this narrower type
+// keeps indexed access assignable to loadPromptSync's BundledPromptSource without a cast.
+export type BundledVariantTable = Readonly<Record<string, BundledPromptSource>>
