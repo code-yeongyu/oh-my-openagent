@@ -2336,6 +2336,10 @@
           "type": "string",
           "minLength": 1
         },
+        "showCursor": {
+          "type": "boolean",
+          "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
+        },
         "max_width": {
           "type": "integer",
           "exclusiveMinimum": 0,
@@ -4543,6 +4547,10 @@
             "display": {
               "type": "string",
               "minLength": 1
+            },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
             },
             "max_width": {
               "type": "integer",
@@ -6752,6 +6760,10 @@
               "type": "string",
               "minLength": 1
             },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
+            },
             "max_width": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -8960,6 +8972,10 @@
               "type": "string",
               "minLength": 1
             },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
+            },
             "max_width": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -11165,6 +11181,10 @@
               "display": {
                 "type": "string",
                 "minLength": 1
+              },
+              "showCursor": {
+                "type": "boolean",
+                "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
               },
               "max_width": {
                 "type": "integer",
@@ -13374,6 +13394,10 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
+                  },
                   "max_width": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -15582,6 +15606,10 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
+                  },
                   "max_width": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -17789,6 +17817,10 @@
                   "display": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
                   },
                   "max_width": {
                     "type": "integer",

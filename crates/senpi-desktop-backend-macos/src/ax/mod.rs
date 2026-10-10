@@ -21,15 +21,55 @@ pub(crate) use self::point_owner::ensure_points_owned;
 use self::element::{element, handle};
 
 #[derive(Debug, Default)]
-pub struct MacAx;
+pub struct MacAx {
+    overlay: crate::overlay::Overlay,
+}
 
 impl MacAx {
-    pub const fn new() -> Self {
-        Self
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn with_overlay(overlay: crate::overlay::Overlay) -> Self {
+        Self { overlay }
+    }
+
+    fn show_target(&self, h: &AxHandle) {
+        if !self.overlay.available() {
+            return;
+        }
+        if let Ok(element) = element(h) {
+            if let Some(bounds) = element::bounds(element) {
+                self.overlay.target(bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0);
+            }
+        }
+    }
+
+    pub(crate) fn show_typing_target(&self, window: &DesktopWindow) {
+        let focused = window.pid
+            .and_then(|pid| i32::try_from(pid).ok())
+            .and_then(|pid| element::create_application(pid).ok())
+            .and_then(|app| element::copy_element(&app, "AXFocusedUIElement"));
+        if let Some(focused) = focused {
+            if element::owner_window_id(&focused).map(|id| id.to_string()).as_deref() == Some(window.id.as_str()) {
+                if let Some(bounds) = element::bounds(&focused) {
+                    self.overlay.target(bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0);
+                    return;
+                }
+            }
+        }
+        self.overlay.target(
+            f64::from(window.x) + f64::from(window.width) / 2.0,
+            f64::from(window.y) + f64::from(window.height) / 2.0,
+        );
     }
 
     /// `AXRaise` on the window's AX root; the `raise_window` primitive.
     pub fn raise(&mut self, window: &DesktopWindow) -> CoreResult<()> {
+        self.overlay.target(
+            f64::from(window.x) + f64::from(window.width) / 2.0,
+            f64::from(window.y) + f64::from(window.height) / 2.0,
+        );
         actions::perform(&*tree::window_root(window)?, "AXRaise")
     }
 }
@@ -96,14 +136,17 @@ impl AxBackend for MacAx {
     }
 
     fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()> {
+        self.show_target(h);
         actions::perform(element(h)?, action)
     }
 
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()> {
+        self.show_target(h);
         actions::set_value(element(h)?, value)
     }
 
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()> {
+        self.show_target(h);
         actions::focus(element(h)?)
     }
 

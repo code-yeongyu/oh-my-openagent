@@ -15,6 +15,24 @@ use super::MacCapture;
 const DEADLINE: Duration = Duration::from_secs(60);
 
 #[test]
+fn window_list_excludes_all_overlay_owner_windows_without_hiding_other_apps() {
+    // Given: two overlay windows and two real application windows.
+    let window = |id: &str, pid| senpi_desktop_core::types::DesktopWindow {
+        id: id.to_owned(), title: id.to_owned(), app: "fixture".to_owned(), pid,
+        x: 0, y: 0, width: 100, height: 100, focused: false, elevated: None,
+    };
+    let mut windows = vec![
+        window("overlay-arrow", Some(77)), window("app", Some(78)),
+        window("overlay-label", Some(77)), window("unknown-owner", None),
+    ];
+    // When: the same PID filter used by MacCapture::windows runs.
+    super::exclude_overlay_windows(&mut windows, Some(77));
+    // Then: sibling-window/focus consumers cannot see either overlay window.
+    let ids: Vec<_> = windows.iter().map(|window| window.id.as_str()).collect();
+    assert_eq!(ids, ["app", "unknown-owner"]);
+}
+
+#[test]
 fn permission_error_names_host_app_pane_and_relaunch() {
     let error = super::permission_denied();
     println!("{}", error.message);

@@ -2457,6 +2457,8 @@ dependencies = [
  "parking_lot",
  "senpi-desktop-core",
  "senpi-desktop-safety",
+ "serde",
+ "serde_json",
  "tempfile",
  "xcap",
 ]
@@ -2529,6 +2531,8 @@ name = "senpi-desktop-engine"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "core-graphics",
+ "objc2-app-kit",
  "parking_lot",
  "schemars",
  "senpi-desktop-backend-fake",
