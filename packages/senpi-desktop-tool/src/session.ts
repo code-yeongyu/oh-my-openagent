@@ -21,6 +21,7 @@ export interface ComputerHostContext {
 	readonly hasUI?: boolean;
 	/** Structural slice of the host's tool-call UI; only `confirm` is used, for `control.acquire`. */
 	readonly ui?: {
+		notify?(message: string, level: "info" | "warning" | "error"): void;
 		confirm?(title: string, body: string, options?: { signal?: AbortSignal; timeout?: number }): Promise<boolean>;
 	};
 }
