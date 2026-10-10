@@ -51,8 +51,20 @@ export async function applyMcpConfig(params: {
     ...createBuiltinMcps(disabledMcps, params.pluginConfig, { cwd: params.ctx.directory }),
     ...mcpResult.servers,
     ...(userMcp ?? {}),
-    ...params.pluginComponents.mcpServers,
   } as Record<string, McpEntry>;
+
+  // OpenCode keys MCP OAuth state by server name. A Claude Code plugin MCP is
+  // namespaced as "<plugin>:<server>", so when its bare server name matches an
+  // already-merged native server (builtin, .mcp.json, or user config) the namespaced
+  // duplicate can never satisfy the stored tokens and re-triggers auth on every start.
+  for (const [name, entry] of Object.entries(params.pluginComponents.mcpServers)) {
+    const bareName = name.includes(":") ? name.slice(name.indexOf(":") + 1) : name;
+    if (bareName !== name && bareName in merged) {
+      log(`warning: skipping plugin MCP server "${name}"; native MCP server "${bareName}" already exists`);
+      continue;
+    }
+    merged[name] = entry as McpEntry;
+  }
 
   for (const name of userDisabledMcps) {
     if (merged[name]) {
