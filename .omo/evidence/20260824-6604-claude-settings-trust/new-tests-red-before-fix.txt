@@ -1,0 +1,59 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/claude-code-hooks/config.test.ts:
+391 | 
+392 |     //#when
+393 |     const result = await loadTrustConfig()
+394 | 
+395 |     //#then
+396 |     expect(getStopCommands(result)).not.toContain("project-stop-command")
+                                              ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "project-stop-command"
+Received: [ "project-stop-command" ]
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6604/packages/omo-opencode/src/hooks/claude-code-hooks/config.test.ts:396:41)
+(fail) loadClaudeHooksConfig project trust gating > #given an untrusted project #when hooks config loads #then project-level hooks are not loaded [43.86ms]
+418 | 
+419 |     //#when
+420 |     const result = await loadTrustConfig()
+421 | 
+422 |     //#then
+423 |     expect(getStopCommands(result)).not.toContain("project-stop-command")
+                                              ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "project-stop-command"
+Received: [ "project-stop-command" ]
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6604/packages/omo-opencode/src/hooks/claude-code-hooks/config.test.ts:423:41)
+(fail) loadClaudeHooksConfig project trust gating > #given an explicitly denied project with env opt-in #when hooks config loads #then project-level hooks stay excluded [4.77ms]
+449 |     //#when
+450 |     const result = await loadTrustConfig()
+451 | 
+452 |     //#then
+453 |     expect(getStopCommands(result)).toContain("user-stop-command")
+454 |     expect(getStopCommands(result)).not.toContain("project-stop-command")
+                                              ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "project-stop-command"
+Received: [ "user-stop-command", "project-stop-command" ]
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6604/packages/omo-opencode/src/hooks/claude-code-hooks/config.test.ts:454:41)
+(fail) loadClaudeHooksConfig project trust gating > #given an untrusted project with user-level settings #when hooks config loads #then user-level hooks still load [4.48ms]
+
+packages/omo-opencode/src/hooks/claude-code-hooks/project-trust.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './project-trust' from '/home/viprix/projects/oom-wt-6604/packages/omo-opencode/src/hooks/claude-code-hooks/project-trust.test.ts'
+-------------------------------
+
+
+ 13 pass
+ 4 fail
+ 1 error
+ 32 expect() calls
+Ran 17 tests across 2 files. [1.85s]
