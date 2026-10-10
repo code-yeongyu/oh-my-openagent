@@ -12,6 +12,8 @@ import {
 } from "../computer-use-doctor-runtime"
 import type { EngineLauncher } from "../computer-use-engine-probe"
 import * as releaseSignature from "../../senpi-desktop-engine/src/release-signature"
+
+const PROBE_HANG_CEILING_MS = process.platform === "win32" ? 60_000 : 20_000
 import { describeEngineSource } from "../../omo-senpi/src/components/computer-use/engine-source"
 
 const roots: string[] = []
@@ -271,10 +273,12 @@ describe("computer use doctor probe", () => {
       platform: "darwin",
       arch: "arm64",
       launchEngine: runEngineScript,
+      // The probe settles on the engine's own replies and EOF; this is only a hang ceiling (#9720).
+      timeoutMs: PROBE_HANG_CEILING_MS,
     })
 
     // then
-    expect(report.kind).toBe("ready")
+    expect(report.kind === "failed" ? `${report.code}: ${report.message}` : report.kind).toBe("ready")
     if (report.kind !== "ready") throw new Error(`expected ready report, got ${report.kind}`)
     expect(report.enginePath).toBe(engine.path)
     const methods = readFileSync(engine.log, "utf8")
@@ -283,5 +287,5 @@ describe("computer use doctor probe", () => {
       .map((line) => JSON.parse(line).method)
     expect(methods).toEqual(["engine.hello", "capabilities"])
     expect(methods).not.toContain("session.open")
-  })
+  }, PROBE_HANG_CEILING_MS + 5_000)
 })
