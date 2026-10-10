@@ -63,6 +63,11 @@ export function createPreemptiveCompactionHook(
     if (event.type === "session.compacted") {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
+        // The cached measurement is the pre-compaction prompt, which is above the
+        // threshold by definition. Reusing it after the prompt has been replaced would
+        // immediately justify another compaction (observed firing at 7% real usage).
+        // Drop it; the next finished non-compaction assistant message re-populates it.
+        tokenCache.delete(sessionID)
         postCompactionMonitor.onSessionCompacted(sessionID)
       }
       return
