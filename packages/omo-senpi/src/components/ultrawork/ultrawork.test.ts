@@ -20,9 +20,9 @@ import {
 const generatedDirectivePath = resolve("packages/omo-senpi/src/components/ultrawork/generated-directive.ts")
 
 describe("omo-senpi ultrawork component", () => {
-  it("#given a task child role #when a ledger-path keyword is classified #then reports a suppressed child session", () => {
+  it("#given a task child role #when a brief carrying the keyword is classified #then reports a suppressed child session", () => {
     expect(classifyUltraworkInput(
-      { text: ".omo/ulw-execute/ledger.jsonl", source: "rpc", sessionRole: "child" },
+      { text: "ulw: implement the unit; evidence goes in .omo/ulw-execute/ledger.jsonl", source: "rpc", sessionRole: "child" },
       { wasArmed: true, compactRearmPending: true },
     )).toMatchObject({ matchedUlw: true, effective: false, stage: "none", route: "none", suppressionReason: "child_session" })
   })

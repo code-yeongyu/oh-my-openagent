@@ -1,6 +1,7 @@
 import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
 import type { RunnerOutcome } from "./in-process/child-handle"
 import type { ChildExtensionListener } from "./child-extension-events"
+import type { EffectiveModel } from "./pinned-model-equivalence"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -56,6 +57,8 @@ export type ChildHandle = {
   readonly task_id: string
   readonly sessionId: string | undefined
   readonly pid: number | undefined
+  /** The model the child actually opened on, when its open path observed one (host get_state; #9722). */
+  readonly reportedModel?: EffectiveModel
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
   abort(): Promise<void>

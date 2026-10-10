@@ -30,6 +30,24 @@ function parked(reason?: TaskRecord["suspension_reason"]): TaskRecord {
   }
 }
 
+describe("task_output effective model (#9722)", () => {
+  test("#given a record whose child reported the model it actually runs #when the snapshot is built #then it carries that model, separate from the resolved plan", () => {
+    // given
+    const record: TaskRecord = {
+      ...parked(),
+      resolved_model: { provider: "anthropic", model_id: "claude", display: "anthropic/claude", source: "explicit" },
+      effective_model: { provider: "anthropic", model_id: "claude-other", display: "anthropic/claude-other", source: "explicit" },
+    }
+
+    // when
+    const snapshot = buildTaskSnapshot(record, "/tmp/state", NOW)
+
+    // then
+    expect(snapshot.effective_model).toEqual(record.effective_model)
+    expect(snapshot.resolved_model).toEqual(record.resolved_model)
+  })
+})
+
 describe("task_output suspension explanation", () => {
   test("#given a host-session child parked because its daemon is gone #when the snapshot is built #then it says the daemon is unavailable", () => {
     // given / when

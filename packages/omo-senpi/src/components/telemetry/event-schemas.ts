@@ -93,7 +93,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     queue_mode: enumProperty(["immediate", "follow_up", "steer", "other"] as const),
     real_prompt_ordinal_bucket: enumProperty(["1", "2_3", "4_10", "11_25", "26_plus"] as const),
     suppression_reason: enumProperty([
-      "none", "no_keyword", "extension_source", "child_session", "embedded_directive", "skill_expansion", "skill_name_only",
+      "none", "no_keyword", "identifier_reference", "negated_mention", "extension_source", "child_session", "embedded_directive", "skill_expansion", "skill_name_only",
     ] as const),
   }),
   turn_completed: Object.freeze({

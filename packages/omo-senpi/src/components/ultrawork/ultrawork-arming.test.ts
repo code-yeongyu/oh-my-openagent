@@ -39,19 +39,19 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     }
     // The same shared host can next serve a root session. Its explicit request still arms.
     Object.defineProperty(pi, "sessionContext", { value: {}, configurable: true })
-    const result = await dispatchInput(pi, "Implement the assigned unit; evidence goes in .omo/ulw-execute/ledger.jsonl", "rpc", undefined, sessionEventCtx("root-session"))
+    const result = await dispatchInput(pi, "ulw: implement the assigned unit", "rpc", undefined, sessionEventCtx("root-session"))
     expectHiddenInjection(pi, result)
     expect(arming.isArmed("root-session")).toBe(true)
   })
 
-  it("#given the legacy RPC child marker #when the prompt contains ulw-execute #then arming remains suppressed", async () => {
+  it("#given the legacy RPC child marker #when the prompt carries the keyword #then arming remains suppressed", async () => {
     const previous = process.env.OMO_SENPI_TASK_RPC_CHILD
     process.env.OMO_SENPI_TASK_RPC_CHILD = "1"
     try {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()
       await createUltraworkComponent(arming).register(pi, createTestContext(pi))
-      const result = await dispatchInput(pi, ".omo/ulw-execute/ledger.jsonl", "rpc", undefined, sessionEventCtx("legacy-child"))
+      const result = await dispatchInput(pi, "ulw: implement the unit; evidence goes in .omo/ulw-execute/ledger.jsonl", "rpc", undefined, sessionEventCtx("legacy-child"))
       expect(result).toEqual({ action: "continue" })
       expect(pi.messages).toHaveLength(0)
       expect(arming.isArmed("legacy-child")).toBe(false)

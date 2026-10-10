@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "5.1.24",
+  "version": "5.1.29",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
-    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.10-6",
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.10-12",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -57,7 +57,7 @@
     "typebox": "1.3.34"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.10.10-6"
+    "@code-yeongyu/senpi": "2026.10.10-12"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -65,8 +65,8 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.10.10-6",
-    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.10-6",
+    "@code-yeongyu/senpi": "2026.10.10-12",
+    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.10-12",
     "terser": "5.51.2"
   }
 }

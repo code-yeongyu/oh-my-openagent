@@ -6,7 +6,6 @@ import { failedStartDetail, itemError, startedDetail, type StartedResult } from 
 import { trackBatchProgress } from "./batch-progress"
 import type { ForegroundWaitOptions, ForegroundWaitResult } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
-import { MAX_TASK_BATCH_ITEMS } from "./params"
 import { appendMissingSkills } from "./skill-result"
 import { backgroundConversionText } from "./start-presentation"
 import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDetails, TaskToolItemDetail } from "./types"
@@ -59,11 +58,6 @@ async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]
     }
   }
   return starts
-}
-
-function oversizedBatchResult(): AgentToolResult<TaskToolDetails> {
-  const reason = `tasks supports at most ${MAX_TASK_BATCH_ITEMS} items.`
-  return result(reason, { task_id: "", status: "invalid_arguments", mode: "spawn", reason })
 }
 
 function backgroundText(starts: readonly BatchStart[], status: "running" | "error"): string {
@@ -235,7 +229,6 @@ export async function executeBatch(input: ExecuteBatchInput): Promise<AgentToolR
     const reason = "Parent aborted before spawn"
     return result(reason, { task_id: "", status: "cancelled", mode: "spawn", reason })
   }
-  if (input.items.length > MAX_TASK_BATCH_ITEMS) return oversizedBatchResult()
   const starts = await startAll(input)
   if (input.runInBackground) return backgroundResult(starts)
   const parent = input.manager.findTaskByChildSession?.(input.ctx.sessionManager.getSessionId())

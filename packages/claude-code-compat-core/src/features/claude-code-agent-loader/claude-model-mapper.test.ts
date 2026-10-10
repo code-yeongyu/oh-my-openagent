@@ -27,8 +27,8 @@ describe("mapClaudeModelToOpenCode", () => {
       expect(mapClaudeModelToOpenCode("opus")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
     })
 
-    it("#when called with haiku #then maps to anthropic claude-haiku-4-5 object", () => {
-      expect(mapClaudeModelToOpenCode("haiku")).toEqual({ providerID: "anthropic", modelID: "claude-haiku-4-5" })
+    it("#when called with haiku #then maps to anthropic claude-haiku-5-5 object", () => {
+      expect(mapClaudeModelToOpenCode("haiku")).toEqual({ providerID: "anthropic", modelID: "claude-haiku-5-5" })
     })
 
     it("#when called with Sonnet (capitalized) #then maps case-insensitively to object", () => {
@@ -119,8 +119,8 @@ describe("mapClaudeModelToOpenCode", () => {
       expect(mapClaudeModelToOpenCode("sonnet", "kiro")).toEqual({ providerID: "kiro", modelID: "claude-sonnet-4-6" })
     })
 
-    it("#when called with haiku and custom provider #then maps to custom provider", () => {
-      expect(mapClaudeModelToOpenCode("haiku", "my-gateway")).toEqual({ providerID: "my-gateway", modelID: "claude-haiku-4-5" })
+    it("#when called with haiku and custom provider #then maps Haiku 5.5 to custom provider", () => {
+      expect(mapClaudeModelToOpenCode("haiku", "my-gateway")).toEqual({ providerID: "my-gateway", modelID: "claude-haiku-5-5" })
     })
 
     it("#when called with bare claude model and custom provider #then uses custom provider", () => {

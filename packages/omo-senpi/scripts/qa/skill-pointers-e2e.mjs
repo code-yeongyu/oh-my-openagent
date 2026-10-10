@@ -82,6 +82,35 @@ const SCENARIOS = [
     forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
     expectTranscriptMarkers: [],
   },
+  // #9738 / #9740: a skill name inside an identifier or path, or named only to forbid it, is a reference.
+  {
+    name: "identifier-reference",
+    prompt: "what happened in the mass-ulw-refactor session? see the senpi-ulw-loop lane and .omo/ulw-plan/draft.md",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  {
+    name: "negated-mention",
+    prompt: "Do not load mass-ulw or ulw-research or launch your own workflow. Summarize the release notes.",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  {
+    name: "lead-relay-naming-five-skills",
+    prompt: "Lead (w46:p1), bugwatch: build both rules; this report fired the mass-ulw, ulw-plan, ulw-loop, ulw-research and ultimate-browsing pointers",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  {
+    name: "request-after-prohibition",
+    prompt: "Don't use tmux. ulw this",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    expectTranscriptMarkers: ["<ultrawork-mode>"],
+  },
   {
     name: "korean-sentence-ending-keyword",
     prompt: "\uC774 \uBC84\uADF8 \uACE0\uCCD0\uC918 ulw",

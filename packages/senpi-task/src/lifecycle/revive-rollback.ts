@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import { markRecordLostForReconciliation, transitionTaskRecord, type TaskRecord, type TaskTransitionAudit } from "../state"
-import { delay, nowIso, type LifecycleContext } from "./context"
+import { nowIso, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
 
@@ -24,7 +24,7 @@ export async function terminateOldRpc(context: LifecycleContext, record: TaskRec
   if (pid === undefined || !context.signaller.isAlive(pid)) return true
   context.signaller.signal(pid, "SIGTERM")
   context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
-  await delay(context.orphanKillDelayMs)
+  await context.hostRetry.wait(context.orphanKillDelayMs)
   if (context.signaller.isAlive(pid)) {
     context.signaller.signal(pid, "SIGKILL")
     context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })

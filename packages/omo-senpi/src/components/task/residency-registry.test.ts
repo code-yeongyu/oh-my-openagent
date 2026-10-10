@@ -165,3 +165,27 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
     expect(calls).toEqual({ abort: 0, terminate: 0 })
   })
 })
+
+describe("createManagerResidencyRegistry ownership (#9785)", () => {
+  const manager = { forget: () => undefined, get: () => undefined, getResidentHandle: () => undefined, hasPendingSends: () => false, residentTaskIds: () => [] }
+
+  it("#given an engine serving one session #when asked about records #then only that session's own records are owned", () => {
+    // given
+    let current = "session-a"
+    const registry = createManagerResidencyRegistry(() => manager, () => current)
+
+    // when / then
+    expect(registry.ownsRecord?.({ parent_session_id: "session-a" })).toBe(true)
+    expect(registry.ownsRecord?.({ parent_session_id: "session-b" })).toBe(false)
+    current = "session-b"
+    expect(registry.ownsRecord?.({ parent_session_id: "session-b" })).toBe(true)
+  })
+
+  it("#given no session accessor #when asked #then nothing is owned", () => {
+    // given
+    const registry = createManagerResidencyRegistry(() => manager)
+
+    // when / then
+    expect(registry.ownsRecord?.({ parent_session_id: "session-a" })).toBe(false)
+  })
+})

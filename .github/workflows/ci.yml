@@ -7,8 +7,11 @@ on:
     branches: [master, dev]
     # `labeled` lets the ci:full-matrix label retrigger CI; concurrency cancel-in-progress absorbs bot-label churn.
     types: [opened, synchronize, reopened, labeled]
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
+  # Queue refs are unique per group, so unrelated groups never cancel each other.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -33,7 +36,7 @@ jobs:
         id: classify
         shell: bash
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before) }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
@@ -67,6 +70,14 @@ jobs:
           jq -r '"full_matrix=\(.fullMatrix)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq -r '"runtime_touching=\(.runtimeTouching)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq . <<< "$MODE_JSON"
+
+      # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
+      - name: Report-only temp-leak list only shrinks
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node script/check-temp-leak-report-only.mjs "$(git merge-base "$BASE_SHA" "$GITHUB_SHA")"
 
       - name: Write job summary
         if: always()
@@ -151,6 +162,9 @@ jobs:
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
+      # merge_group uses these same six required contexts, without PR labels.
+      # Queue commits always run heavy validation on every OS leg, including
+      # docs/web-only groups; the fast path remains a pull-request optimization.
       matrix:
         include:
           - os: ubuntu-latest
@@ -349,6 +363,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains all three required compatibility contexts.
       matrix:
         include:
           - os: ubuntu-latest
@@ -465,6 +480,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains this matrix, including the required ubuntu context.
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:

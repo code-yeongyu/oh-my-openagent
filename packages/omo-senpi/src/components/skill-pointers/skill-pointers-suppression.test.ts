@@ -13,6 +13,50 @@ import {
 import { dispatchInput, expectNoInjection, expectPointerInjections, registerSkillPointers } from "./test-support"
 
 describe("omo-senpi skill-pointers suppression", () => {
+  describe("#given a skill name inside a longer identifier or path (#9738)", () => {
+    it("#when the name is a segment of an identifier or path #then no pointer is injected", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      for (const text of [
+        "what happened in the mass-ulw-refactor session?",
+        "the senpi-ulw-loop lane finished",
+        "notes are in .omo/ulw-plan/draft.md",
+        "the mass-ulw-loop-runner session finished",
+        "see mass-ulw-research-notes.md",
+        "Do not load mass-ulw or ulw-research or launch your own workflow.",
+      ]) {
+        expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched: [] })
+        expectNoInjection(pi, await dispatchInput(pi, text))
+      }
+    })
+
+    it("#when a delegated session's brief names a skill #then no pointer is injected, and a root session still gets it", async () => {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+      for (const role of ["child", "dag_child", "member"]) {
+        Object.defineProperty(pi, "sessionContext", { value: { role }, configurable: true })
+        expectNoInjection(pi, await dispatchInput(pi, "mass ulw research the market"))
+      }
+      Object.defineProperty(pi, "sessionContext", { value: {}, configurable: true })
+      expect(matchedSkillPointerNames("mass ulw research the market")).toEqual(["mass-ulw", "ulw-research"])
+      expect(pi.messages.length).toBe(0)
+      await dispatchInput(pi, "mass ulw research the market")
+      expect(pi.messages.length).toBeGreaterThan(0)
+    })
+
+    it("#when the name stands as its own word or a skill chain #then it still matches", () => {
+      const cases: ReadonlyArray<readonly [string, string[]]> = [
+        ["mass-ulw the migration", ["mass-ulw"]],
+        ["mass ulw-loop ship the refactor", ["mass-ulw", "ulw-loop"]],
+        ["ulw-plan.", ["ulw-plan"]],
+      ]
+      for (const [text, matched] of cases) {
+        expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched })
+      }
+    })
+  })
+
   describe("#given quoted and relayed mentions", () => {
     it("#when a mention is inside inline code #then no pointer is injected", async () => {
       const pi = new FakeExtensionAPI()

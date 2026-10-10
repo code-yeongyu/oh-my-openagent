@@ -460,11 +460,19 @@ jobs:
             else
               ( cd .omo/release-binaries && sha256sum -c SHA256SUMS )
             fi
-            local size
+            # Same 160 MiB budget as MAX_BINARY_BYTES in script/build-omo-binary.ts: it bounds the
+            # download every install and update makes. Print the headroom; warn under 5 MiB.
+            local size budget=167772160 warn=5242880
             size="$(wc -c < "$BIN")"
-            if [ "$size" -gt 157286400 ]; then
-              echo "release binary ${TARGET} exceeds the 150MB size budget (${size} bytes)"
+            if [ "$size" -gt "$budget" ]; then
+              echo "release binary ${TARGET} exceeds the 160 MiB size budget (${size} bytes)"
               return 1
+            fi
+            local headroom=$(( budget - size ))
+            if [ "$headroom" -lt "$warn" ]; then
+              echo "::warning::release binary ${TARGET} is within 5 MiB of its size budget (${size} bytes, ${headroom} bytes headroom)"
+            else
+              echo "release binary ${TARGET}: ${size} bytes, ${headroom} bytes headroom under the 160 MiB budget"
             fi
           }
 

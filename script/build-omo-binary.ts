@@ -52,8 +52,17 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
-/** Hard per-binary size budget (150MB). */
-export const MAX_BINARY_BYTES = 150 * 1024 * 1024
+/**
+ * Hard per-binary size budget (160 MiB). It exists to keep the download and install of one
+ * platform binary small: every install, `omo update` and CI smoke fetches the full binary, so
+ * growth is a user-facing cost, not just a storage one. A release that crosses it fails loud
+ * rather than shipping a quietly larger download. Raised from 150 MiB for 5.1.26, when linux-x64
+ * reached 157.6 MB; `reportBinaryHeadroom` warns well before the next crossing.
+ */
+export const MAX_BINARY_BYTES = 160 * 1024 * 1024
+
+/** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
+export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024
 
 export interface NativePrebuild {
   readonly fileStem: "senpi_pty" | "senpi_grep"
@@ -287,6 +296,25 @@ export function assertBinarySizeBudget(
   }
 }
 
+/**
+ * One line per target with its headroom under the budget. Under BINARY_HEADROOM_WARN_BYTES the line is a
+ * GitHub Actions warning annotation, so a target drifting toward the budget shows up on the run summary.
+ */
+export function reportBinaryHeadroom(
+  target: string,
+  size: number,
+  options: { readonly maxBytes?: number; readonly warnBytes?: number } = {},
+): string {
+  const maxBytes = options.maxBytes ?? MAX_BINARY_BYTES
+  const warnBytes = options.warnBytes ?? BINARY_HEADROOM_WARN_BYTES
+  const headroom = maxBytes - size
+  const mib = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(2)
+  const detail = `${target}: ${size} bytes, ${mib(headroom)} MiB headroom under the ${mib(maxBytes)} MiB budget`
+  return headroom < warnBytes
+    ? `::warning::release binary near its size budget, ${detail}`
+    : `release binary size ${detail}`
+}
+
 // Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts (locked by build-omo-binary.test.ts).
 export const PLUGIN_PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
 export const PLUGIN_PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json"] as const
@@ -506,6 +534,10 @@ export function stageSidecarPayload(
 ): string[] {
   mkdirSync(stageDir, { recursive: true })
   const staged = new Set<string>()
+  // The compiled desktop engine is a required input that only needs a stat and a copy: check it before the plugin
+  // build (a full build-omo-native run with submodule fetches) so a missing payload fails closed at once (#9857).
+  const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
+  if (desktopEngine !== null) staged.add(desktopEngine)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
   writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")
@@ -521,8 +553,6 @@ export function stageSidecarPayload(
   }
   stagePluginPayload(stageDir, staged)
   for (const entry of target.nativePrebuilds) stageNativePrebuild(entry, stageDir, staged)
-  const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
-  if (desktopEngine !== null) staged.add(desktopEngine)
   return [...staged].sort()
 }
 
@@ -619,6 +649,7 @@ export async function buildReleaseBinary(
     }
 
     const size = statSync(binaryPath).size
+    console.log(reportBinaryHeadroom(target.target, size))
     const sha256 = sha256OfFile(binaryPath)
     appendFileSync(join(outDir, "SHA256SUMS"), `${sha256}  ${target.binaryName}\n`, "utf8")
     return { target: target.target, binaryPath, sha256, size, manifest }

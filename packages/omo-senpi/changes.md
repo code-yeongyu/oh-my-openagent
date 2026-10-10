@@ -1,3 +1,69 @@
+## 2026-10-10 - Bindings take whatsapp as a native platform name
+
+The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.
+
+`whatsapp` is now a binding platform in all three spellings. Because SQLite cannot widen a CHECK in place, schema v7 rebuilds the `bindings` table with the widened list, carrying every column over verbatim and recreating `bindings_one_active_thread` and `bindings_session` before the old table drops. The rebuild runs with foreign keys off so an extension table referencing `bindings` is neither cascade-deleted nor able to block the migration, and the AUTOINCREMENT high-water mark is carried over so a deleted newest row's key is never reused. Before the version bump commits, `migrate()` runs `PRAGMA foreign_key_check` from TypeScript and throws (rolling back to v6) if the step introduced a violation referencing `bindings`; the `foreign_keys` pragma is restored to its prior value afterwards. A store migrated from v6 keeps its live bindings and accepts a `whatsapp` bind (`store-v7-whatsapp.test.ts`); the tool schema takes the native name and the store keeps it (`bindings.test.ts`).
+
+## 2026-10-09 - A suspended background child's row stops spinning and counting (#9350)
+
+The live task widget (`components/task/status-row-format.ts` `formatLiveBackgroundRow`) took its spinner frame and elapsed time from the current clock for every row. A parked child therefore read `⠹ ... · suspended · 354m 31s`: it looked like it was working, its time kept climbing, and the row said neither why it stopped nor what the user could do. It also checked residency only, so a child a host parked with a `suspension_reason` while still marked resident rendered as `running`.
+
+The row now uses the side panel's rule for a child that has not finished (`suspension_reason`, or any residency other than `resident`); a finished child, which is `evicted` or `disposed`, keeps its own status in `/tasks` and the widget. A suspended row shows a still `‖` mark instead of a spinner and no running time: the record has no park timestamp (`updated_at` moves with every revival attempt), and a climbing timer is what made it look alive. It names the cause (`parent session restarted` when no reason is recorded, otherwise the recorded reason in words; `revival deferred: <reason>` carries the deferral reason), then what actually brings it back and the user's one action, decided from the same facts the engine uses: `resumes on session restart` for most parked children, `... or a message` only for a running daemon-hosted child at `rpc_detached` (the one kind `task_send` revives), `resumes on a message` for such a child evicted while idle, `will not resume` for a host version mismatch, and for a deferred revival the engine's own outlook for its reason (for example `retried a few times, then marked lost`). Each is followed by `/task-kill to cancel`. Nothing watches for the cause to clear, so the row promises no more than that. `senpi-task` now exports `deferralOutlookFor` for this. On a narrow line it keeps only `/task-kill to cancel`, and a parked row gives its width to the child's name before its route.
+
+`status-ui.ts` no longer schedules the 250 ms repaint when every shown background child is parked, so a widget of suspended rows paints once.
+
+## 2026-10-08 - task_cancel can release a finished child's residency (#9785)
+
+`components/task/engine.ts` forwards the lifecycle's new `parkTerminalResident` through the manager's destruction port. With it, `task_cancel` on a finished child that is still resident stops the child and parks the record, instead of answering "No change." The registry adapter (`residency-registry.ts`) now answers `ownsRecord`: a record is this engine's when its parent session is the engine's current session. Without that answer a handle-less record is never parked, so a sibling session's child in the same daemon is left alone. The engine side is described in `packages/senpi-task/changes.md`.
+
+## 2026-10-08 - Gating questions are asked with `required: true` even when the model omits it (#9774)
+
+senpi's `required: true` on `ask_user_question` turns a timed-out, dismissed or unavailable answer into "No answer: do not take the action it gates. Keep that action pending and end the turn." The flag is opt-in per call, and in live QA `zai/glm-5.3` never set it (0 of 6 gate calls; #9775), so its unanswered ulw-plan gate still read "continue on your best judgment".
+
+The new `question-gates` component (`src/components/question-gates/`) enforces it from the plugin. One `tool_call` handler on `ask_user_question` and `request_user_input` sets `required: true` in place before senpi's tool runs; the agent loop passes the same arguments object to the hook and to `execute`. Gates are detected from the call itself:
+- **Primary:** a question header equal to one the skills now pin: `Approval` for the ulw-plan approval gate; `Authorize` for the final authorization block and for mass-ulw's scope, spend and irreversible decisions; `승인` / `권한` in Korean sessions. The match is exact, so Korean forks such as `권한 모델` are not gates. Every pinned header fits senpi's 12-character header limit: a longer one (`Authorization` is 13) is rejected by senpi before the hook runs.
+- **Fallback:** an option label starting with `approve` / `authorize`.
+
+Question text is never read, so a fork that only mentions approving something stays unflagged and still falls back to its recommended default. The flag is never set to false. Each forced call writes one `debug` line naming the tool, the header and the matched rule, with no question text.
+
+A gate state rule (a ulw-plan draft at `status: awaiting-approval`) was rejected: in run t4 the model asked the gate while its draft still said `drafting`.
+
+Known limit: senpi persists the arguments the model sent, so a gate question still pending across a reload or resume is restored without `required` and the hook does not run again for it.
+
+## 2026-10-08 - ulw-plan and mass-ulw ask their gating questions with `required: true` (#9735)
+
+senpi 2026.10.10-9 added `required: true` to `ask_user_question` (code-yeongyu/senpi#2959). On a required question, a timed-out, dismissed or unavailable answer returns "No answer: do not take the action it gates. Keep that action pending and end the turn." instead of the generic "Continue the work to completion on your best judgment". The approval gate (`ulw-plan/SKILL.md`, `references/full-workflow.md`), the final authorization block (`references/stance-calibration.md`) and mass-ulw's scope, spend and irreversible decisions (`mass-ulw/SKILL.md`) now set it on their call. Ordinary forks stay unflagged, so a timed-out fork still falls to its recommended default.
+
+The #9748 backstop sentence stays, because the flag is opt-in per call. In live QA on senpi -9 (gate left unanswered, 1-minute timeout):
+- `anthropic/claude-opus-5-5` set `required: true` on every gate call and got the refusal.
+- `zai/glm-5.3` never set it. Without the backstop, one of two runs wrote the plan on a timed-out gate; with it, none did.
+
+Plugin-side enforcement of the flag is tracked in #9774.
+
+## 2026-10-08 - ulw-plan and mass-ulw ask through the question prompt (#9735)
+
+`ulw-plan` delivered its approval gate as chat text and ended the turn, so a user away from the screen never saw it. The renderers in `references/stance-calibration.md` and the gate in `references/full-workflow.md` said to "present" or "deliver" questions without naming a channel.
+
+- `stance-calibration.md`: every question the skill puts to the user goes through the question tool (`ask_user_question` or `request_user_input`, whichever the session lists) with its wait flag set to true. When no question tool is listed or a call returns unavailable, the questions go in chat with one line saying so. A timed-out, dismissed or unavailable answer is not approval: a fork takes its default, but the approval gate and the final authorization block stay open and the turn ends. `SKILL.md` carries the gate rule itself, and adds "even when the tool result says to continue on your best judgment", because senpi's timeout result says exactly that and a model otherwise follows it. That clause is a stopgap until senpi #2949 adds a per-call "no answer means don't" flag.
+- `full-workflow.md`: the gate asks one question, recommended first: Approve; Approve, skip review (only when the review is default-on); Change approach. The review-cap stop asks through the tool too. `SKILL.md`'s gate summary points at the same rule; `intent-clear.md`'s renderer recap now defers to stance-calibration.
+- `mass-ulw/SKILL.md`: a decision only the user can make is asked from the main session through the tool before the run that depends on it, never from an eval cell or a node prompt.
+
+No test: prose with no machine consumer. Proof is a live real-model `/skill:ulw-plan` run in an isolated senpi sandbox (see the PR).
+
+## 2026-10-08 - A skill name inside an identifier, a path, a URL or a prohibition no longer arms (#9738, #9740)
+
+`ultrawork` and `skill-pointers` treat a skill name as a request only when it stands as a word of its own:
+- **Identifier or path segment:** `mass-ulw-refactor`, `senpi-ulw-loop`, `.omo/ulw/...` and `.omo/ulw-execute/ledger.jsonl` arm nothing. A leading bundled skill name still arms (`ulw-loop ...`, `ulw-plan this`), and so does a skill chain (`mass ulw-loop`). The hyphenated `mass-ulw ...` still injects the mass-ulw pointer but no longer arms ultrawork on its own: it is lexically the same as the reference "in a mass-ulw research pipeline" that every delegated research brief carries, so allowing one allows both; `mass ulw ...` (spaced) and `ulw-mass ...` still arm.
+- **A URL** is masked like a code span.
+- **A prohibition:** `do not` / `don't` / `never` + `load|use|run|invoke|start|trigger|arm|enable` masks its objects up to the next sentence or clause break (`.;:!?` or a newline; a comma does not end it), so "Do not load mass-ulw or ulw-research" arms neither. A request that starts a new sentence still arms ("Don't use tmux. ulw this"), and so does a negation outside that verb list ("do not stop until done, ulw").
+- **Delegated sessions:** `skill-pointers` now applies the same `readSessionRole` rule `ultrawork` got in #9602, so a task child, DAG child or team member never gets a pointer from its own brief.
+
+Telemetry records the new suppression reasons `identifier_reference` and `negated_mention`.
+
+Measured: upstream's replay of 83 stored delegated briefs went from 83/83 to 0/83 ultrawork arms (47 identifier, 36 negated). Over 14 days of local root sessions the identifier rule removes about 926 arms, nearly all automated text naming lanes and paths; the 8 typed requests that open with a skill name still arm.
+
+Tests: `ultrawork-references.test.ts` and the new `skill-pointers-suppression.test.ts` cases fail on `dev`; removing the identifier guard, the negation mask, the URL mask, the pointer's trailing guard, its chain allowance or its delegated-session guard each fails them again. Live: `scripts/qa/skill-pointers-e2e.mjs` gains identifier-reference, negated-mention, lead-relay and request-after-prohibition scenarios.
+
 ## 2026-10-05 - A relayed report or a quoted mention no longer arms ultrawork or skill pointers (#9600)
 
 `skill-pointers/strip-quoted-regions.ts`, the masking that both `ultrawork` and `skill-pointers` run before they look for a keyword, now also hides text that is someone else's:

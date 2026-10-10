@@ -1,8 +1,10 @@
 
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { resolveUlwLoopSessionScope } from "../ulw-loop/session-scope"
-import { stripQuotedRegions } from "./strip-quoted-regions"
+import { NOT_AFTER_IDENTIFIER, NOT_BEFORE_PATH, NOT_INTO_IDENTIFIER, stripQuotedRegions } from "./strip-quoted-regions"
 
 export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const ULW_PLAN_CUSTOM_TYPE = "omo-ulw-plan:skill-pointer"
@@ -50,34 +52,37 @@ const ULTIMATE_BROWSING_COMPANION: SkillCompanion = {
 
 // After quoted regions are removed, patterns match independently and overlapping
 // mentions all fire ("mass ulw-loop" injects the mass-ulw
-// AND ulw-loop pointers while the ultrawork component arms on the same text). `\b` on
-// both edges is the only boundary rule; `[\s-]*` accepts spaced, hyphenated, and fused
-// spellings alike.
+// AND ulw-loop pointers while the ultrawork component arms on the same text). Each pattern
+// is wrapped by `skillNamePattern`, so a name inside a longer identifier or path does not
+// match; `[\s-]*` accepts spaced, hyphenated, and fused spellings alike.
 //
 // The mass aliases that carry no literal "ulw" (`mulw`, `meth`) and the reversed spelling
 // (`ulw mass`) leave no `ulw <skill>` for the per-skill patterns to match, so each of them
 // also stands in for the `ulw` half: "mulw research" names the same composite as
 // "mass ulw research" and loads both skills.
 const MASS_ALIAS = String.raw`(?:mass[\s-]*ulw|ulw[\s-]*mass|mulw|meth)`
+// A skill name is a request only as a word of its own: not a segment of a longer identifier
+// (`mass-ulw-refactor`, `senpi-ulw-loop`) and not part of a path or file name (`.omo/ulw-plan/`).
+const skillNamePattern = (body: string): RegExp => new RegExp(String.raw`${NOT_AFTER_IDENTIFIER}\b${body}\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`, "i")
 const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "mass-ulw",
     customType: MASS_ULW_CUSTOM_TYPE,
-    pattern: new RegExp(String.raw`\b${MASS_ALIAS}\b`, "i"),
+    pattern: skillNamePattern(MASS_ALIAS),
     expandedBlockPattern: /<skill\s+name="mass-ulw"/i,
     instruction: "dispatch each phase's dependency-ordered lanes as one run of the workflow tool composed in an eval cell, start a new run per phase rather than one graph for the whole job, and when a ulw-loop or ulw-execute contract is active let it own the goal",
   },
   {
     skillName: "ulw-plan",
     customType: ULW_PLAN_CUSTOM_TYPE,
-    pattern: /\bulw[\s-]*plan\b/i,
+    pattern: skillNamePattern(String.raw`ulw[\s-]*plan`),
     expandedBlockPattern: /<skill\s+name="ulw-plan"/i,
     instruction: "run the explore-first planning workflow and produce one decision-complete work plan",
   },
   {
     skillName: "ulw-loop",
     customType: ULW_LOOP_CUSTOM_TYPE,
-    pattern: /\bulw[\s-]*loop\b/i,
+    pattern: skillNamePattern(String.raw`ulw[\s-]*loop`),
     expandedBlockPattern: /<skill\s+name="ulw-loop"/i,
     instruction: "run the goal-driven ultrawork loop with evidence-bound execution",
     extra: ulwLoopToolSentence,
@@ -85,7 +90,7 @@ const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "ulw-research",
     customType: ULW_RESEARCH_CUSTOM_TYPE,
-    pattern: new RegExp(String.raw`\b(?:ulw|${MASS_ALIAS})[\s-]*research\b`, "i"),
+    pattern: skillNamePattern(String.raw`(?:ulw|${MASS_ALIAS})[\s-]*research`),
     expandedBlockPattern: /<skill\s+name="ulw-research"/i,
     instruction: "orchestrate team-first maximum-saturation research",
     companions: [ULTIMATE_BROWSING_COMPANION],
@@ -132,6 +137,12 @@ function handleInput(
   }
 
   if (payload.source === "extension") {
+    return { action: "continue" }
+  }
+
+  // A delegated session (task child, DAG child, team member) is driven by its brief, the same rule the
+  // ultrawork component applies: a skill its brief names is context for the work, never a request (#9740).
+  if (readSessionRole(pi) !== undefined) {
     return { action: "continue" }
   }
 

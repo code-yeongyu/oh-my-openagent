@@ -12,7 +12,10 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 // sweeps the resolved memory root (transient-sweep.ts), so that fallthrough must land in a
 // per-process temp dir and never in the developer's real ~/.omo/memory. Unconditional on purpose:
 // no test here legitimately needs the real root, and a shell-exported OMO_MEMORY_HOME is real.
-process.env.OMO_MEMORY_HOME = join(mkdtempSync(join(tmpdir(), "omo-memory-test-home-")), "memory")
+// The directory lives for the whole process, so it goes in the root test preload's process-scoped
+// directory, which is removed with the run (#9766).
+const processTempDir = process.env.OMO_TEST_PROCESS_TMPDIR ?? tmpdir()
+process.env.OMO_MEMORY_HOME = join(mkdtempSync(join(processTempDir, "omo-memory-test-home-")), "memory")
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 

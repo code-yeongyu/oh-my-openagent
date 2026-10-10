@@ -123,7 +123,7 @@ When producing the plan, encode every executable item as a column-zero Markdown 
 
 ## Approval gate
 
-When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **wait for the user's explicit okay**. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
+When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **ask for the user's explicit okay through the question tool, with header `Approval` (`승인` in Korean), `required: true` and the wait flag true on that call**: **Approve**; **Approve, skip review** (only when the review is default-on); **Change approach**. A timed-out, dismissed, or unavailable answer is not approval, even when the tool result says to continue on your best judgment: write no plan, keep the gate open, and end the turn. Channel rules: `references/stance-calibration.md`. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
 
 ## Delegation (OpenCode-native)
 

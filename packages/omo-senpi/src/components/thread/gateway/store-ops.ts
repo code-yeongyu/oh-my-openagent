@@ -274,19 +274,51 @@ function schemaVersion(ctx: StoreContext): number {
  * never wait behind another process's transaction); otherwise each step re-reads the version under
  * the lock, so two processes opening a fresh store at once apply every migration exactly once.
  */
+export class GatewayMigrationError extends Error {
+  readonly code = "gateway_migration_failed"
+  constructor(
+    readonly version: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = "GatewayMigrationError"
+  }
+}
+
 export async function migrate(ctx: StoreContext): Promise<void> {
   if (schemaVersion(ctx) >= GATEWAY_MIGRATIONS.length) return
   for (;;) {
-    const applied = await transaction(ctx, "migrate", () => {
-      const version = schemaVersion(ctx)
-      if (version >= GATEWAY_MIGRATIONS.length) return false
-      for (const statement of GATEWAY_MIGRATIONS[version]) ctx.sql.exec(statement)
-      ctx.sql.exec(`PRAGMA user_version = ${version + 1}`)
-      return true
-    })
-    if (!applied) return
+    const version = schemaVersion(ctx)
+    if (version >= GATEWAY_MIGRATIONS.length) return
+    // The CHECK-widening v7 rebuild must run with foreign_keys OFF, which SQLite only honors when
+    // the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key
+    // actions from extension tables referencing `bindings`). The pragma is restored to its prior
+    // value afterwards, and foreign_key_check is verified from TypeScript before the bump commits.
+    const needsForeignKeysOff = GATEWAY_NEEDS_FK_OFF.has(version)
+    const priorForeignKeys = needsForeignKeysOff ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1) : 1
+    if (needsForeignKeysOff) ctx.sql.exec("PRAGMA foreign_keys = OFF")
+    try {
+      await transaction(ctx, "migrate", () => {
+        const current = schemaVersion(ctx)
+        if (current !== version) return
+        for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
+        if (needsForeignKeysOff) {
+          const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
+          const introduced = violations.filter((row) => row.parent === "bindings")
+          if (introduced.length > 0) {
+            throw new GatewayMigrationError(current + 1, `gateway schema ${current + 1} would leave a foreign-key violation referencing bindings; staying at v${current}`)
+          }
+        }
+        ctx.sql.exec(`PRAGMA user_version = ${current + 1}`)
+      })
+    } finally {
+      if (needsForeignKeysOff) ctx.sql.exec(`PRAGMA foreign_keys = ${priorForeignKeys === 0 ? "OFF" : "ON"}`)
+    }
   }
 }
+
+/** Migration indexes (0-based) whose steps must run with foreign_keys OFF; see migrate(). */
+const GATEWAY_NEEDS_FK_OFF: ReadonlySet<number> = new Set([6])
 
 type ReceiptRecord = {
   readonly args_hash: string
