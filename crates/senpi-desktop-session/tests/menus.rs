@@ -11,7 +11,7 @@ use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::MenuPathParams;
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::types::DesktopSessionOptions;
+use senpi_desktop_core::types::{DesktopSessionOptions, FrontWindow};
 use senpi_desktop_safety::{FakeClock, StopPathId, StopSource, Supervisor};
 use senpi_desktop_session::{BackendFactory, Op, Response, Session, SessionSafety, SessionTimeouts};
 
@@ -95,6 +95,26 @@ fn code(result: CoreResult<Response>) -> Option<ErrorCode> {
     result.err().map(|error| error.code)
 }
 
+/// The fixture's front window, which the key-focus guard captures before a
+/// menu selection and hands key focus back to after it.
+fn front() -> FrontWindow {
+    FrontWindow {
+        pid: 4242,
+        window_id: Some("101".to_owned()),
+        app: "Code".to_owned(),
+        key_window_ax_title: Some("Editor".to_owned()),
+    }
+}
+
+/// One selection's transaction: capture the front window, the ops between,
+/// then restore key focus to it.
+fn guarded(ops: Vec<SinkOp>) -> Vec<SinkOp> {
+    let mut sequence = vec![SinkOp::QueryFrontWindow];
+    sequence.extend(ops);
+    sequence.push(SinkOp::RestoreKeyFocus(front()));
+    sequence
+}
+
 fn recorded(sinks: &Mutex<Vec<RecordingSink>>) -> Vec<SinkOp> {
     sinks.lock().last().expect("open built a backend").ops()
 }
@@ -155,10 +175,10 @@ async fn select_records_the_path_and_emits_exactly_one_audit_event() {
     assert_eq!(selected, Response::Unit);
     assert_eq!(
         recorded(sinks),
-        [SinkOp::MenuSelect {
+        guarded(vec![SinkOp::MenuSelect {
             window: "101".to_owned(),
             path: vec!["File".to_owned(), "Save".to_owned()],
-        }]
+        }])
     );
     let audits = audits.lock();
     assert_eq!(audits.len(), 1, "{audits:?}");
@@ -182,9 +202,14 @@ async fn a_disabled_submenu_is_refused_and_dispatches_nothing() {
     // When
     let refused = session.submit(select("101", &["Edit", "Undo"])).wait().await;
     // Then: the failure is audited and no menu command was dispatched; the
-    // transaction's release after a failed mutation is the only op
+    // transaction only releases input and hands key focus back
     assert_eq!(code(refused), Some(ErrorCode::AxFailed));
-    assert_eq!(recorded(sinks), [SinkOp::ReleaseAll], "{:?}", recorded(sinks));
+    assert_eq!(
+        recorded(sinks),
+        guarded(vec![SinkOp::ReleaseAll]),
+        "{:?}",
+        recorded(sinks)
+    );
     assert_eq!(audits.lock().len(), 1, "{:?}", audits.lock());
 }
 
@@ -207,12 +232,8 @@ async fn an_invalid_path_is_refused_before_the_backend() {
     // Each refusal happens inside the transaction: audited, and only the
     // transaction's release reaches the backend
     assert_eq!(audits.lock().len(), 2, "{:?}", audits.lock());
-    assert_eq!(
-        recorded(sinks),
-        [SinkOp::ReleaseAll, SinkOp::ReleaseAll],
-        "{:?}",
-        recorded(sinks)
-    );
+    let one = guarded(vec![SinkOp::ReleaseAll]);
+    assert_eq!(recorded(sinks), [one.clone(), one].concat(), "{:?}", recorded(sinks));
 }
 
 #[tokio::test]
