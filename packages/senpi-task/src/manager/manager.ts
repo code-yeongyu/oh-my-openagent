@@ -635,7 +635,7 @@ class TaskManagerImpl implements TaskManager {
     this.#released.delete(taskId)
     this.#runStats.delete(taskId)
     // Queue ownership follows the teardown path, never the status of the turn being released.
-    if (options.path === "end") this.#steering.dropPending(taskId, "task_forgotten")
+    if (options.path === "end") this.#steering.dropPending(taskId, options.reason ?? "task_forgotten")
     this.#settleWaiters(taskId)
   }
 
@@ -845,7 +845,6 @@ class TaskManagerImpl implements TaskManager {
     this.#recordSpawnFacts(record.task_id, handle)
     void this.#isolation.stamp(record.task_id, handle)
     this.#outcome.trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
-    void this.#steering.notifyStarted(record.task_id)
     const recorded = this.#tryLoad(record.task_id)
     return {
       ok: true,
@@ -1050,6 +1049,7 @@ class TaskManagerImpl implements TaskManager {
     // child's own assistant-message observations keep it current (subscribeEffectiveModel).
     const updated: TaskRecord = stampSpawnEffectiveModel(specApplied, handle.effectiveModel?.())
     if (updated !== current) this.#options.store.replace(updated)
+    void this.#steering.notifyStarted(taskId)
   }
 
   // One child subscription feeds BOTH durable facts: the JSONL transcript log and the run-stats

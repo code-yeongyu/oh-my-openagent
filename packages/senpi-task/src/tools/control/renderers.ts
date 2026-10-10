@@ -59,7 +59,7 @@ export function renderTaskCancelResult(
   theme: ControlRenderTheme,
 ): RenderComponent {
   const row = taskCancelResultRow(result.details)
-  const dropped = result.details.kind === "cancelled" || result.details.kind === "cancel_pending" ? result.details.undelivered_messages ?? 0 : 0
+  const dropped = result.details.kind === "cancelled" || result.details.kind === "cancel_pending" || result.details.kind === "released" ? result.details.undelivered_messages ?? 0 : 0
   return linesComponent([theme.fg(row.color, normalizeRendererText(withDroppedSteeringNotice(row.text, dropped)))])
 }
 

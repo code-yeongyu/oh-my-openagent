@@ -7,6 +7,7 @@ import { isHostSessionRecord } from "./host-session"
 import { reconcileScopedRevival } from "./reconcile-revival"
 import { newestSessionPath } from "./session-path"
 import { suspendHandle } from "./shutdown"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 
 
 /**
@@ -116,17 +117,19 @@ export async function retryDeferredScopedChild(
     || observed.notification.run_epoch !== expected.notification.run_epoch) return
   context.store.appendEvent(taskId, { type: "revival_retry_exhausted", payload: { reason, attempts } })
   // A live parent owns the deadline and confirmed cleanup, including daemon-hosted children.
-  if (context.registry.ownsRecord?.(observed) === true || (observed.pending_steering?.length ?? 0) > 0) return
+  if (context.registry.ownsRecord?.(observed) === true) return
   // Capacity and a live foreign owner resolve when the other side moves, not when this session
   // retries harder. A daemon session's transcript still belongs to its host and is never lost.
   if (isHostSessionRecord(observed) || !LOST_ON_EXHAUSTION.has(reason) || foreignOwnerAlive(context, observed)) return
   let applied = false
   const message = `revival deferred: ${reason}; exhausted ${attempts} retry attempts`
   context.store.mutate(taskId, (fresh) => {
-    if (!canRetry(context, fresh, parentSessionId) || (fresh.pending_steering?.length ?? 0) > 0 || isHostSessionRecord(fresh) || foreignOwnerAlive(context, fresh)
+    if (!canRetry(context, fresh, parentSessionId) || isHostSessionRecord(fresh) || foreignOwnerAlive(context, fresh)
       || fresh.host_pid !== observed.host_pid || fresh.residency_claim !== observed.residency_claim
       || fresh.notification.run_epoch !== observed.notification.run_epoch || fresh.updated_at !== observed.updated_at) return fresh
-    const result = markRecordLostForReconciliation(fresh, { timestamp: nowIso(context), error_message: message })
+    const result = markRecordLostForReconciliation(fresh, {
+      timestamp: nowIso(context), error_message: withDroppedSteeringNotice(message, fresh.pending_steering?.length ?? 0),
+    })
     applied = result.applied
     return result.record
   })

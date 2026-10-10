@@ -48,7 +48,6 @@ export async function expireSuspendedChild(
       ? context.store.mutate(observed.task_id, (fresh) => {
           if (
             !parentLive() ||
-            (fresh.pending_steering?.length ?? 0) > 0 ||
             (fresh.residency_state === "resident" && fresh.suspension_reason === undefined
               && fresh.recovery_deadline_at === undefined && !isSuspensionExpiry(fresh)) ||
             (fresh.status !== "pending" && fresh.status !== "running") ||
@@ -133,6 +132,9 @@ export async function expireSuspendedChild(
     const { pending_steering: _undelivered, ...rest } = current
     return rest
   })
+  if (undelivered > 0) context.store.appendEvent(record.task_id, {
+    type: "steer_dropped", payload: { count: undelivered, reason: "target_gone" },
+  })
   // Dispose/release before notification. This is NOT a cancellation: externally caused failure
   // must take the normal fail transition so the waiting parent receives one result.
   context.dequeuePending(record.task_id)
@@ -160,6 +162,8 @@ export async function expireSuspendedChild(
 async function stopLocalChild(context: LifecycleContext, record: TaskRecord): Promise<boolean> {
   if (context.failedTeardowns.has(record.task_id)) return false
   if (record.execution_mode === "process" && !(await terminateOldRpc(context, record))) return false
-  await destroyResidentTask(context, record.task_id, "cancel")
+  // Expiry owns the queue and the terminal result after the stop. Teardown must not publish a
+  // separate lost result through forget(end) before that result includes the undelivered count.
+  await destroyResidentTask(context, record.task_id, "revive_failure")
   return true
 }

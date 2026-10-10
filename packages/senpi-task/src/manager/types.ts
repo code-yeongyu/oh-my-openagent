@@ -219,7 +219,7 @@ export type ContinueResult =
     }
   | { readonly kind: "not_continuable"; readonly task_id?: string; readonly reason: string; readonly suggestion: string }
 
-export type ForgetOptions = { readonly path: "park" | "evict" | "end" }
+export type ForgetOptions = { readonly path: "park" | "evict" } | { readonly path: "end"; readonly reason?: "target_gone" }
 
 export type ListScope =
   | { readonly scope: "parent-session"; readonly session_id: string }

@@ -48,7 +48,10 @@ export function coldReviveHarness(options: {
       resumed.push({ spec, path })
       return options.resume === undefined ? fake.handle : options.resume(spec, path, fake.handle)
     } }, process: new FakeRunner() },
-    destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
+    destruction: {
+      destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause),
+      parkTerminalResident: id => lifecycle.parkTerminalResident(id),
+    },
   })
   const registry = createManagerResidencyRegistry(() => manager)
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config, now: options.now,

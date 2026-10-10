@@ -77,8 +77,13 @@ export function createSteeringControls(
     }
     if (record.status !== "running") {
       // A finished child can still hold its process or session (omo#9785); cancel is the way to release it.
-      if (options?.abort !== "skip" && record.residency_state === "resident" && (await port.destruction.parkTerminalResident?.(record.task_id)) === true) {
-        return { kind: "released", task_id: record.task_id, status: record.status }
+      const undelivered = options?.abort === "skip" ? 0 : record.pending_steering?.length ?? 0
+      if (undelivered > 0) clearPersistedQueue(record.task_id)
+      const released = options?.abort !== "skip" && record.residency_state === "resident"
+        && (await port.destruction.parkTerminalResident?.(record.task_id)) === true
+      if (released || undelivered > 0) {
+        return { kind: "released", task_id: record.task_id, status: record.status,
+          ...(undelivered > 0 ? { undelivered_messages: undelivered } : {}) }
       }
       const reasonText = record.status === "cancelled" ? `Task ${record.task_id} is already cancelled.` : `Task ${record.task_id} is ${record.status}, not running.`
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }

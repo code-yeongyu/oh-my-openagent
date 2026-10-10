@@ -8,6 +8,7 @@ import { isHostSessionRecord } from "./host-session"
 import type { DestroyCause, ResidentHandle } from "./port"
 import { withinTeardownBudget } from "./teardown-budget"
 import { suspendHandle } from "./shutdown"
+import { newestSessionPath } from "./session-path"
 
 /**
  * THE single-writer destruction port. This is the ONLY function in the package that invokes a
@@ -15,11 +16,8 @@ import { suspendHandle } from "./shutdown"
  * kill. Cancel (todo 10), LRU eviction, TTL, and reconciliation all route here so terminal state
  * never auto-disposes and every teardown is bookkept identically.
  *
- * The ONLY sibling caller of handle abort/terminate/dispose is shutdown.ts's
- * suspendOnSessionShutdown (a deliberate deviation from the single-writer rule, recorded in the
- * work plan): suspension is NOT destruction - this port's contract is terminal teardown (forget +
- * dispose transition), while suspension must keep the record continuable as persisted_only /
- * rpc_detached, so it cannot route through destroyResidentTask.
+ * Revivable eviction delegates to shutdown.ts's suspendHandle: it releases the runtime but keeps
+ * the transcript and queue. Every permanent end and failed-rung handoff still closes the child.
  */
 /**
  * What an orphan (a child with no live handle in this process) looks like to the destruction port.
@@ -51,18 +49,15 @@ export async function destroyResidentTask(
   }
   const claimedEviction = cause === "evict" ? (context.registry.tryClaimEviction?.(taskId) ?? true) : false
   if (cause === "evict" && !claimedEviction) return
-  // Deliberate teardown drops the child's runtime parent kernel-tool binding: nothing may keep a
-  // strong reference to a kernel this child can never be revived onto. Parking never lands here.
   try {
-    if (cause !== "cancel" && cause !== "cancel_without_abort" && cause !== "ttl" && cause !== "target_gone") {
+    // Handoffs retain their ownership until the next rung launches. Reconciliation must end the
+    // orphan before deciding whether its transcript remains revivable.
+    if (cause === "evict" || cause === "revive_failure") {
       const queued = context.store.load(taskId)
-      if ((queued?.pending_steering?.length ?? 0) > 0) {
-        const handle = context.registry.get(taskId)
-        if (handle !== undefined) await suspendHandle(context, handle, cause)
-        else context.store.transition(taskId, {
-          type: queued?.execution_mode === "process" ? "detach_rpc" : "persist_only",
-          timestamp: nowIso(context),
-        })
+      const handle = context.registry.get(taskId)
+      if ((queued?.pending_steering?.length ?? 0) > 0 && queued?.killed !== true
+        && queued?.status !== "cancelled" && queued?.status !== "lost" && handle !== undefined) {
+        await suspendHandle(context, handle, cause)
         return
       }
     }
@@ -78,6 +73,7 @@ export async function destroyResidentTask(
       } finally {
         if (cause !== "fallback_handoff") context.registry.forget(taskId, {
           path: cause === "revive_failure" ? "park" : cause === "evict" ? "evict" : "end",
+          ...(cause === "target_gone" || cause === "reconcile_lost" || cause === "ttl" ? { reason: "target_gone" as const } : {}),
         })
         if (cause === "revive_failure") recordRevivalFailure(context, taskId)
       }
@@ -87,7 +83,18 @@ export async function destroyResidentTask(
     } else if (cause === "reconcile_lost" || cause === "ttl" || cause === "revive_failure" || cause === "target_gone") {
       await terminateOrphan(context, taskId, orphan)
       if (cause === "revive_failure") recordRevivalFailure(context, taskId)
-      if (cause === "target_gone" || cause === "ttl") context.registry.forget(taskId, { path: "end" })
+      const record = context.store.load(taskId)
+      if (cause === "reconcile_lost" && record !== null && record.killed !== true
+        && record.status !== "cancelled" && record.status !== "lost"
+        && (record.pending_steering?.length ?? 0) > 0
+        && (isHostSessionRecord(record) || newestSessionPath(context, taskId) !== undefined)) {
+        context.registry.forget(taskId, { path: "park" })
+        context.store.transition(taskId, {
+          type: record.execution_mode === "process" ? "detach_rpc" : "persist_only", timestamp: nowIso(context),
+        })
+        return
+      }
+      if (cause !== "revive_failure") context.registry.forget(taskId, { path: "end", reason: "target_gone" })
     } else if (cause === "cancel" || cause === "cancel_without_abort") {
       await closeParkedSession(context, taskId)
       context.registry.forget(taskId, { path: "end" })

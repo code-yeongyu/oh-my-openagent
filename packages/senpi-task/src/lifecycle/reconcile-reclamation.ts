@@ -56,7 +56,7 @@ async function reclaimResidentExclusive(
   }
 
   if (claimed.killed === true || claimed.status === "cancelled" || claimed.status === "lost") {
-    await destroyResidentTask(context, claimed.task_id, claimed.status === "lost" ? "target_gone" : "cancel")
+    await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
     return {
       task_id: claimed.task_id,
       kind: claimed.status === "lost" ? "lost" : "resumed",

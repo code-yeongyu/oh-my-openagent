@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
 
 import { createManagerResidencyRegistry } from "../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle } from "../lifecycle/create"
@@ -63,8 +64,24 @@ describe("runtime fallback over a live daemon session", () => {
       if (task.kind !== "started") throw new Error("expected the task to start")
       const [original] = host.sessions()
       if (original === undefined) throw new Error("expected the failed rung's session")
+      store.mutate(task.task_id, record => ({ ...record, pending_steering: [
+        { id: "queued-1", message: "Q1", deliver_as: "steer" },
+        { id: "queued-2", message: "Q2", deliver_as: "steer" },
+      ] }))
+      let deliveries = 0
+      const drained = Promise.withResolvers<void>()
+      const append = store.appendEvent.bind(store)
+      spyOn(store, "appendEvent").mockImplementation((id, event) => {
+        const result = append(id, event)
+        if (id === task.task_id && event.type === "steered") {
+          deliveries += 1
+          if (deliveries === 2) drained.resolve()
+        }
+        return result
+      })
       if (!acknowledged) host.withholdReply("close_session")
       const settled = acknowledged ? undefined : manager.waitFor(task.task_id, { signal: AbortSignal.timeout(10_000) })
+      const nextOpened = acknowledged ? host.waitForCommand("prompt") : undefined
 
       try {
         // when
@@ -74,8 +91,13 @@ describe("runtime fallback over a live daemon session", () => {
 
         // then
         if (acknowledged) {
-          const nextOpened = host.waitForCommand("prompt")
           await nextOpened
+          await bounded(drained.promise)
+          expect(launched).toHaveLength(2)
+          expect(store.load(task.task_id)?.pending_steering).toBeUndefined()
+          expect(deliveries).toBe(2)
+          expect(store.load(task.task_id)?.model).toBe("test/next")
+          expect(host.commands.filter(command => command.type === "steer").map(command => command.payload.message)).toEqual(["Q1", "Q2"])
           expect(host.sessions().map((session) => session.sessionPath)).not.toContain(original.sessionPath)
         } else {
           if (settled === undefined) throw new Error("expected a terminal wait for the unconfirmed close")

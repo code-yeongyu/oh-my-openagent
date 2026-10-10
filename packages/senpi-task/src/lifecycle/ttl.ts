@@ -11,6 +11,7 @@ import { endClosingFallbackChild } from "./fallback-closing-child"
 import { isHostSessionRecord } from "./host-session"
 import { closeHostSession } from "./host-session-close"
 import type { CleanupResult } from "./types"
+import { expireSuspendedChild } from "./suspended-expiry"
 
 /**
  * Delete terminal records + artifacts older than task.ttl_ms. Non-terminal records are always kept
@@ -75,6 +76,22 @@ async function sweepExpired(context: LifecycleContext, owner: ExpungeOwner, dele
   const cutoff = context.now() - context.config.ttl_ms
   for (const record of context.store.list().records) {
     if (handled.has(record.task_id)) continue
+    if ((record.pending_steering?.length ?? 0) > 0 && !shouldRetain(context, record, cutoff, true)) {
+      if (!TERMINAL_STATUSES.has(record.status)) {
+        await expireSuspendedChild(context, record, () => true)
+      } else {
+        let claimed = false
+        context.store.mutate(record.task_id, fresh => {
+          if ((fresh.pending_steering?.length ?? 0) === 0 || shouldRetain(context, fresh, cutoff, true)) return fresh
+          claimed = true
+          // Fence revival before close I/O; forget(end) records the drop and its terminal notice.
+          return { ...fresh, killed: true }
+        })
+        if (claimed) await destroyResidentTask(context, record.task_id, "target_gone")
+      }
+      retained.push(record.task_id)
+      continue
+    }
     if (shouldRetain(context, record, cutoff)) {
       retained.push(record.task_id)
       continue
@@ -192,17 +209,17 @@ async function endExpiredChild(context: LifecycleContext, record: TaskRecord): P
   return true
 }
 
-function shouldRetain(context: LifecycleContext, record: TaskRecord, cutoff: number): boolean {
-  if ((record.pending_steering?.length ?? 0) > 0) return true
+function shouldRetain(context: LifecycleContext, record: TaskRecord, cutoff: number, expiringQueue = false): boolean {
+  if (!expiringQueue && (record.pending_steering?.length ?? 0) > 0) return true
   // The session-scoped background closer owns these obligations. TTL must neither wait on their
   // sockets again nor remove their durable pointer before a confirmed close clears it.
-  if (record.fallback_closing_child?.requires_confirmation === true) return true
+  if (!expiringQueue && record.fallback_closing_child?.requires_confirmation === true) return true
   if (context.registry.get(record.task_id) !== undefined) return true
   if (hasLiveHostClaim(context, record)) return true
-  if (!TERMINAL_STATUSES.has(record.status)) return true
+  if (!expiringQueue && !TERMINAL_STATUSES.has(record.status)) return true
   const retainedAt = record.terminal_at ?? record.updated_at
   if (Date.parse(retainedAt) > cutoff) return true
-  if (hasUndeliveredTerminalNotification(record)) return true
+  if (!expiringQueue && hasUndeliveredTerminalNotification(record)) return true
   if (record.status === "lost" && record.execution_mode === "process") {
     // The lost-record pid-dead proof rule: breadcrumbs are kept until the process is proven dead.
     return record.pid === undefined || context.signaller.isAlive(record.pid)

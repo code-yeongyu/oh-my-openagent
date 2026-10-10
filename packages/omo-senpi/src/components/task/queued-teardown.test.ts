@@ -4,7 +4,7 @@ import { cleanupProjects } from "../../../../senpi-task/src/manager/__fixtures__
 
 afterEach(cleanupProjects)
 
-for (const path of ["LRU eviction", "interrupted idle reclaim", "completion", "revive_failure", "reconcile_lost", "fallback_handoff"] as const) {
+for (const path of ["LRU eviction", "interrupted idle reclaim", "completion", "revive_failure"] as const) {
   test(`${path} parks its queued continuation and revival delivers it first in order`, async () => {
     let now = 1000
     const h = coldReviveHarness({ cap: 1, idleTimeoutMs: 37, now: () => now })
@@ -21,11 +21,9 @@ for (const path of ["LRU eviction", "interrupted idle reclaim", "completion", "r
       await terminal
       if (path === "LRU eviction") {
         expect((await h.lifecycle.admitResident("parent")).kind).toBe("evicted")
-      } else if (path === "interrupted idle reclaim") {
+      } else if (path === "interrupted idle reclaim" || path === "completion") {
         now += 37
         expect(await h.lifecycle.reclaimIdleResidents?.()).toEqual([h.record.task_id])
-      } else if (path === "completion") {
-        expect(await h.lifecycle.parkTerminalResident(h.record.task_id)).toBe(true)
       } else {
         await h.lifecycle.destroyResidentTask(h.record.task_id, path)
       }
@@ -43,8 +41,8 @@ for (const path of ["LRU eviction", "interrupted idle reclaim", "completion", "r
   })
 }
 
-test("TTL retains a parked queue and its next revival delivers the entries in order", async () => {
-  const h = coldReviveHarness({ ttlMs: 37, now: () => 1100 })
+test("before TTL a parked queue's next revival delivers the entries in order", async () => {
+  const h = coldReviveHarness({ ttlMs: 200, now: () => 1100 })
   const pending = ["Q1", "Q2"].map((message, index) => ({
     id: `ttl-${index}`, message, deliver_as: "steer" as const,
   }))

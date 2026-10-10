@@ -62,8 +62,9 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
       })
     case "released":
       return toolResult(
-        `Task ${outcome.task_id} had already finished (${outcome.status}); its child was still resident and is now stopped. The result stays readable with task_output, and task_send revives it.`,
-        { kind: "released", task_id: outcome.task_id, status: outcome.status },
+        withDroppedSteeringNotice(`Task ${outcome.task_id} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with task_output, and task_send revives it.`, outcome.undelivered_messages ?? 0),
+        { kind: "released", task_id: outcome.task_id, status: outcome.status,
+          ...(outcome.undelivered_messages === undefined ? {} : { undelivered_messages: outcome.undelivered_messages }) },
       )
     case "stale":
       // task_cancel never names a run, so only a handle-fenced caller reaches this; keep the tool's result shapes.
