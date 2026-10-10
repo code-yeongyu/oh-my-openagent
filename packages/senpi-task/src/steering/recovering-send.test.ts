@@ -62,30 +62,52 @@ describe("steering a recovering child (#9861)", () => {
     expect(child.steerCalls).toEqual(["first", "second"])
   })
 
-  // Contract: a drain always settles, even when each delivery queues another message. Before the
-  // pass limit and the per-pass yield, notifyStarted never returned and starved every timer (#9861).
-  test("a child whose deliveries keep queueing more messages still settles", async () => {
+  // Waits on an explicit condition, bounded by a circuit breaker so a regression fails instead of hanging.
+  async function eventually(check: () => boolean, label: string): Promise<void> {
+    const deadline = Date.now() + 5_000
+    while (!check()) {
+      if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}`)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+  }
+
+  // Contract: no queued message is ever stranded. A producer that keeps queueing past the pass limit
+  // still has every message delivered once it stops, with no further start or send (#9861).
+  test("a queue that refills past the pass limit empties once the producer stops", async () => {
     const h = makeHarness()
     const record = h.seedRecord()
     await h.engine.sendToTask({ idOrName: record.task_id, message: "seed", deliverAs: "steer" })
     h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
     const child = makeFakeHandle(record.task_id, "rpc")
-    let deliveries = 0
-    // A send that lands while a drain is delivering is persisted to the queue (as a revival or a
-    // parked window does), not delivered inline; append one per delivery so the queue never empties.
-    h.setLive(record.task_id, { ...child.handle, steer: async () => {
-      deliveries += 1
-      h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: [...(fresh.pending_steering ?? []),
-        { id: `more-${deliveries}`, message: `more ${deliveries}`, deliver_as: "steer" as const }] }))
+    const delivered: string[] = []
+    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
+      delivered.push(message)
+      // Sends that land while a drain delivers are persisted, as a parked window or revival does.
+      if (delivered.length <= 40) {
+        h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: [...(fresh.pending_steering ?? []),
+          { id: `more-${delivered.length}`, message: `more ${delivered.length}`, deliver_as: "steer" as const }] }))
+      }
     } })
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const settled = await Promise.race([
-      h.engine.notifyStarted(record.task_id).then(() => "settled"),
-      new Promise<string>((resolve) => { timer = setTimeout(() => resolve("drain never settled within 5 s"), 5_000) }),
-    ])
-    clearTimeout(timer)
-    expect(settled).toBe("settled")
-    expect(deliveries).toBeGreaterThan(0)
+    await h.engine.notifyStarted(record.task_id)
+    await eventually(() => (h.store.load(record.task_id)?.pending_steering?.length ?? 0) === 0, "the queue to empty")
+    expect(delivered).toHaveLength(41)
+    expect(delivered.at(-1)).toBe("more 40")
+  })
+
+  // Contract: while anything is queued, a new send to a running child goes behind it, never ahead.
+  test("a send to a running child with a non-empty queue is delivered after what was queued", async () => {
+    const h = makeHarness()
+    const record = h.seedRecord()
+    h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
+    h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: [
+      { id: "left-1", message: "left over 1", deliver_as: "steer" as const },
+      { id: "left-2", message: "left over 2", deliver_as: "steer" as const }] }))
+    const child = makeFakeHandle(record.task_id, "rpc")
+    h.setLive(record.task_id, child.handle)
+    const sent = await h.engine.sendToTask({ idOrName: record.task_id, message: "user next", deliverAs: "steer" })
+    expect(sent.kind).toBe("queued")
+    await eventually(() => child.steerCalls.length === 3, "all three deliveries")
+    expect(child.steerCalls).toEqual(["left over 1", "left over 2", "user next"])
   })
 
   // Contract: queued entries have distinct ids, so clearing one delivered entry never drops another.
@@ -96,8 +118,17 @@ describe("steering a recovering child (#9861)", () => {
     await h.engine.sendToTask({ idOrName: record.task_id, message: "second", deliverAs: "steer" })
     h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: fresh.pending_steering?.slice(1) }))
     await h.engine.sendToTask({ idOrName: record.task_id, message: "third", deliverAs: "steer" })
-    const ids = h.store.load(record.task_id)?.pending_steering?.map((entry) => entry.id) ?? []
-    expect(new Set(ids).size).toBe(ids.length)
+    h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
+    const child = makeFakeHandle(record.task_id, "rpc")
+    // "second" is refused before delivery (the drain stops and keeps it); "third" must still be queued.
+    let refusedOnce = false
+    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
+      if (message === "second" && !refusedOnce) { refusedOnce = true; return }
+      child.steerCalls.push(message)
+    } })
+    await h.engine.notifyStarted(record.task_id)
+    await eventually(() => (h.store.load(record.task_id)?.pending_steering?.length ?? 0) === 0, "the queue to empty")
+    expect(child.steerCalls).toContain("third")
   })
 
   test("an ended recovery answers with the terminal result instead of a host refusal", async () => {

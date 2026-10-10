@@ -31,7 +31,7 @@ const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output 
 export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   const pendingSends = new Map<string, number>()
   const coldRevivals = new Set<string>()
-  const { enqueuePending, clearPersistedQueue, notifyStarted } = createPendingSteering(port, tryLoad)
+  const { enqueuePending, clearPersistedQueue, notifyStarted, isDraining } = createPendingSteering(port, tryLoad)
 
   // Prelaunch steering is DURABLE: messages sent to a still-pending (queued) child append to the
   // record's pending_steering via store.mutate, so the queue survives a process restart (and a
@@ -146,6 +146,11 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       }
     }
 
+    // While anything is queued or draining for this child, a new message goes behind it, so a later
+    // send never overtakes an earlier one (#9861).
+    if (mode === "steer" && ((record.pending_steering?.length ?? 0) > 0 || isDraining(record.task_id))) {
+      return enqueuePending(record, input.message, deliverAs)
+    }
     if (mode === "steer") return steerRunning(record, handle, input.message, deliverAs)
     return reviveTerminal(port, record, handle, input.message, nowIso, beginSend, endSend, reservation)
   }
@@ -200,7 +205,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   function dropPending(taskId: string): void {
-    clearPersistedQueue(taskId)
+    clearPersistedQueue(taskId, undefined, "task_released")
   }
 
   return { sendToTask, ...createSteeringControls(port, resolve, clearPersistedQueue), notifyStarted, hasPendingSends, dropPending }

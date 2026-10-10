@@ -8,13 +8,17 @@ const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 // A drain re-reads the queue after each delivered batch, so a child whose deliveries keep queueing
 // more messages could drain forever. Each pass yields to the event loop (timers and teardown still
-// run), and a drain stops after this many passes; what is left waits for the next start (#9861).
+// run), and a drain stops after this many passes. Nothing is stranded (#9861): a drain requested
+// while one runs drains again when it ends, and entries left at the pass limit get a follow-up drain
+// on an unref'd timer, so a busy queue keeps a timer gap between batches instead of spinning.
 const MAX_DRAIN_PASSES = 16
+const FOLLOW_UP_DRAIN_MS = 25
 const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
 
 // The durable record is the only message queue. Drain single-flight, retaining refused deliveries.
 export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: string) => TaskRecord | undefined) {
   const draining = new Map<string, Promise<void>>()
+  const requestedAgain = new Set<string>()
   const nowIso = () => new Date(port.now()).toISOString()
 
   function enqueuePending(record: TaskRecord, message: string, deliverAs: SendDelivery): SendOutcome {
@@ -53,31 +57,47 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
   // Removes persisted queue entries. With drainedIds, only the entries that were just delivered
   // are cleared, so a concurrent enqueue that landed after the drain read survives; without it
   // the whole queue goes (cancel / manager-forget paths, where the child will never start).
-  function clearPersistedQueue(taskId: string, drainedIds?: ReadonlySet<string>): void {
+  function clearPersistedQueue(taskId: string, drainedIds?: ReadonlySet<string>, dropReason?: string): void {
+    let dropped = 0
     port.store.mutate(taskId, (fresh) => {
       const queue = fresh.pending_steering
       if (queue === undefined || queue.length === 0) return fresh
       const remaining = drainedIds === undefined ? [] : queue.filter((entry) => !drainedIds.has(entry.id))
       if (remaining.length === queue.length) return fresh
+      if (drainedIds === undefined) dropped = queue.length
       if (remaining.length === 0) {
         const { pending_steering: _cleared, ...rest } = fresh
         return rest
       }
       return { ...fresh, pending_steering: remaining }
     })
+    // Undelivered messages never vanish silently: a whole-queue clear records how many it dropped and why.
+    if (dropped > 0) port.store.appendEvent(taskId, { type: "steer_dropped", payload: { count: dropped, reason: dropReason ?? "queue_cleared" } })
+  }
+
+  function isDraining(taskId: string): boolean {
+    return draining.has(taskId)
   }
 
   function notifyStarted(taskId: string): Promise<void> {
     const existing = draining.get(taskId)
-    if (existing !== undefined) return existing
+    if (existing !== undefined) {
+      // An entry queued after the running drain's last read would otherwise wait for the next start.
+      requestedAgain.add(taskId)
+      return existing
+    }
     const work = Promise.resolve().then(async () => {
       // Re-read after each delivered batch: sends accepted during delivery retain their order.
       for (let pass = 0; pass < MAX_DRAIN_PASSES; pass += 1) {
         if (!(await drainPending(taskId))) return
         await nextTurn()
       }
-      log("senpi-task steering drain stopped after its pass limit", { taskId, passes: MAX_DRAIN_PASSES })
-    }).finally(() => draining.delete(taskId))
+      port.store.appendEvent(taskId, { type: "steer_drain_deferred", payload: { passes: MAX_DRAIN_PASSES } })
+      setTimeout(() => void notifyStarted(taskId), FOLLOW_UP_DRAIN_MS).unref?.()
+    }).finally(() => {
+      draining.delete(taskId)
+      if (requestedAgain.delete(taskId)) void notifyStarted(taskId)
+    })
     draining.set(taskId, work)
     return work
   }
@@ -132,5 +152,5 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
     return delivered.size === queue.length
   }
 
-  return { enqueuePending, clearPersistedQueue, notifyStarted }
+  return { enqueuePending, clearPersistedQueue, notifyStarted, isDraining }
 }
