@@ -10,8 +10,9 @@
 //! queued under one grant runs under no other: the grant generation captured
 //! when the request was enqueued must still be the live grant at admission.
 //! The grant authorizes foreground only; an omitted delivery stays
-//! background. `raiseWindow` is exempt because the call is itself the asked
-//! focus change (upstream gates only `takeover` input).
+//! background. `raiseWindow` needs the grant too: raising a window takes the
+//! user's foreground, the most visible focus steal of all. This is
+//! deliberately stricter than upstream, which gates only `takeover` input.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -74,9 +75,9 @@ impl Worker {
 
 /// A mutation queued under `queued` (the slot generation at dequeue time)
 /// may deliver to the foreground only when that generation is this worker's
-/// live grant. `raiseWindow` is the asked focus change itself and needs none.
-pub(crate) fn admits(action: MutatingAction, delivery: DeliveryMode, queued: Option<u64>, live: Option<u64>) -> bool {
-    if action == MutatingAction::RaiseWindow || delivery == DeliveryMode::Background {
+/// live grant.
+pub(crate) fn admits(delivery: DeliveryMode, queued: Option<u64>, live: Option<u64>) -> bool {
+    if delivery == DeliveryMode::Background {
         return true;
     }
     live.is_some() && queued == live
@@ -94,18 +95,19 @@ impl Worker {
     /// worker's live grant, before the gate or any backend call. The
     /// admission error is audited like any other refusal.
     pub(crate) fn admit_control(&self, mutation: &crate::mutate::Mutation<'_>) -> CoreResult<()> {
-        if admits(
-            mutation.action,
-            mutation.delivery,
-            self.queued_generation,
-            self.live_generation(),
-        ) {
+        if admits(mutation.delivery, self.queued_generation, self.live_generation()) {
             return Ok(());
         }
-        Err(DesktopError::control_required(format!(
+        if mutation.action == MutatingAction::RaiseWindow {
+            return Err(DesktopError::control_required(
+                "raising a window takes your foreground: approve the grant to allow it \
+                 (computer.control.acquire asks the human first)",
+            ));
+        }
+        Err(DesktopError::control_required(
             "foreground delivery needs this session's live control grant; the host shows the human \
-             the reason and calls control.grant first (background delivery needs no grant)"
-        )))
+             the reason and calls control.grant first (background delivery needs no grant)",
+        ))
     }
 }
 

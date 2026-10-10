@@ -130,7 +130,6 @@ impl Harness {
     /// Whether a mutation carrying `queued` would be admitted foreground.
     pub(crate) fn queued_admits_foreground(&self, queued: Option<u64>) -> bool {
         crate::grant::admits(
-            MutatingAction::Click,
             DeliveryMode::Foreground,
             queued,
             self.worker.live_generation(),

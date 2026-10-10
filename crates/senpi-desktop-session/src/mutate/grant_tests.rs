@@ -135,18 +135,41 @@ fn ax_click_foreground_needs_the_grant() {
     assert_eq!(harness.sink.ops(), Vec::new());
 }
 
+fn raise(id: &str) -> crate::request::Op {
+    crate::request::Op::RaiseWindow(senpi_desktop_core::protocol_params::RaiseWindowParams {
+        window_id: id.to_owned(),
+    })
+}
+
 #[test]
-fn raise_window_is_itself_the_asked_focus_change_and_needs_no_grant() {
+fn raising_a_window_without_a_grant_is_refused_and_says_how_to_allow_it() {
+    let _lock = test_lock().lock();
+    // Given: nobody granted foreground control (the host never got an answer)
+    let mut harness = harness(&two_windows());
+    // When
+    let reply = harness.process(raise("101"));
+    // Then: refused before any backend call, and the message names the grant
+    let error = reply.expect_err("raise needs the grant");
+    assert_eq!(error.code, ErrorCode::ControlRequired);
+    assert!(
+        error.message.contains("raising a window takes your foreground"),
+        "{}",
+        error.message
+    );
+    assert_eq!(harness.sink.ops(), Vec::new());
+}
+
+#[test]
+fn raising_a_window_with_a_live_grant_is_admitted() {
     let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
-    let raise = crate::request::Op::RaiseWindow(senpi_desktop_core::protocol_params::RaiseWindowParams {
-        window_id: "101".to_owned(),
-    });
+    harness.process(grant_control("raise")).expect("grants");
     // When
-    let reply = harness.process(raise);
+    let reply = harness.process(raise("101"));
     // Then
     assert!(reply.is_ok(), "{reply:?}");
+    assert!(!harness.sink.ops().is_empty());
 }
 
 #[test]
