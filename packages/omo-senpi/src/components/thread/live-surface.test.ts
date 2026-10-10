@@ -174,7 +174,7 @@ describe("live thread request correlation", () => {
       { success: true, data: { sessions: [{ sessionId: "route-a", cwd: "/w" }] } },
       async (surface) => {
         const sessions = await surface.listSessions()
-        expect(sessions).toEqual([{ sessionId: "route-a", cwd: "/w", socket: surface.socket, endpoint_kind: "rpc_host" }])
+        expect(sessions).toEqual([{ sessionId: "route-a", cwd: "/w", socket: surface.socket, endpoint_kind: "rpc_host", controls: ["send", "read", "rename", "set_model", "set_reasoning", "interrupt"] }])
       },
       () => [
         { type: "agent_start", sessionId: "route-other" },

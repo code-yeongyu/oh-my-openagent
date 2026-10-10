@@ -108,7 +108,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("quick follows the approved 9-rung chain", () => {
+  test("quick follows the approved 9-rung chain with Haiku 5.5 medium after Luna Fast", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -121,6 +121,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["openai", "chatgpt-subscription"],
         model: "gpt-6-luna-fast",
         variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot"],
+        model: "claude-haiku-5-5",
+        variant: "medium",
       },
       {
         providers: ["deepseek"],
@@ -145,11 +150,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["xai"],
         model: "grok-4.20-0309-non-reasoning",
-      },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot"],
-        model: "claude-haiku-4-5",
-        variant: "off",
       },
       { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
       { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }

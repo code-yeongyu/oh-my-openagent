@@ -1,3 +1,6 @@
+import { parseVariantFromModelID } from "./model-string-parser"
+import { isReasoningLevelOrAuto } from "./reasoning-level"
+
 function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model
 }
@@ -5,6 +8,13 @@ function extractModelName(model: string): string {
 export function isGptModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   return modelName.includes("gpt")
+}
+
+export function isGpt6AstraModel(model: string | undefined): boolean {
+  if (!model) return false
+  const { modelID, variant } = parseVariantFromModelID(model.toLowerCase(), { allowMaxSuffix: true })
+  if (variant !== undefined && !isReasoningLevelOrAuto(variant)) return false
+  return /^(?:gpt-6-astra|gpt-6-astra-fast)$/.test(extractModelName(modelID))
 }
 
 export function isClaudeOpus46Model(model: string): boolean {

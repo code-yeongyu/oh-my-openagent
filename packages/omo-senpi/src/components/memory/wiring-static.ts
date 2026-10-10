@@ -34,6 +34,7 @@ import type { MemoryWiringOptions } from "./wiring-types"
 import type { MemoryIdentityContext } from "./context"
 import { createMemoryPromptHandler as createPromptHandler } from "./prompt"
 import { createProjectionPins, PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
+import { projectionLimits } from "./projection-limits"
 
 export function registerMemoryStatic(input: {
   readonly pi: SenpiExtensionAPI
@@ -89,7 +90,15 @@ export function registerMemoryStatic(input: {
     ...(entryApi === undefined ? {} : { recordPin: (record) => entryApi.appendEntry(PROJECTION_PIN_ENTRY_TYPE, record) }),
     onRepin: (sessionId, reason) => options.logger?.info("omo-senpi memory projection repinned", { sessionId, reason }),
     resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
+    resolveProjectionLimits: (identity) => projectionLimits(loadCommandSettings().settings, identity),
     resolveNudgeTurns: (repo, sessionId, identity) => nudgeWiring.nudgeTurns(repo, sessionId, identity),
+    onNoticeInputFailed: (notice, sessionId, error) => {
+      options.logger?.warn("omo-senpi memory notice input failed; this turn has no such notice", {
+        notice,
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    },
     resolveSoulNotice: async (repo, sessionId, identity) => {
       const context = resolveContext(sessionId)
       if (context === undefined || context.identity !== identity) return undefined

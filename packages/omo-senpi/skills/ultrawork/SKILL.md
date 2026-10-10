@@ -40,10 +40,12 @@ concurrency, transaction boundaries, or cache invalidation; a
 refactor crossing domain boundaries; or the user signaled care
 ("carefully", "thoroughly", "design first") or demanded review of
 this session's work.
+<!-- omo-ultrawork-astra:tier-unsure:start -->
 When unsure, take HEAVY. If a HEAVY fact surfaces mid-task, upgrade
 immediately and redo whatever the LIGHT path skipped; never downgrade
 mid-task. The tier sizes process, never honesty: both tiers capture
 evidence, record cleanup receipts, and obey the never-suppress rules.
+<!-- omo-ultrawork-astra:tier-unsure:end -->
 
 LIGHT — the deliverable follows a known pattern with no open design
 decisions (one-spot bugfix, an endpoint following an existing
@@ -129,6 +131,7 @@ Boulder plus `.omo/ulw-execute/ledger.jsonl`), and its checklist is
 the plan.
 
 ## 0. Survey the skills, gather context, then size the work
+<!-- omo-ultrawork-astra:skill-survey:start -->
 First, survey the loaded skill list and read the description of each
 loosely relevant skill. Decide explicitly which skills this task will
 use and prefer using every genuinely applicable one — name them in the
@@ -136,6 +139,7 @@ notepad with a one-line reason each. Skipping a skill that fits the
 task is a defect. Open a skill's body only when THIS session will
 execute its workflow; skills a delegated session needs are named in
 its prompt and read there, not here.
+<!-- omo-ultrawork-astra:skill-survey:end -->
 Next, fire the first discovery wave under Finding things below — one
 eval cell, with parallel lookups covering the code, git history of paths
 to touch, memory, and prior session evidence. Record the current problem,
@@ -317,12 +321,15 @@ side effects.
 # Execution loop (READ → CHANGE → RUN → CLEAN)
 Until every success criterion PASSES with its evidence captured:
 1. Pick next criterion → mark in_progress → update notepad `## Now`.
+<!-- omo-ultrawork-astra:read-step:start -->
 2. READ what already proves the area BEFORE touching it. Existing
    tests are the behavior of record: note in the notepad whether they
    encode the intended behavior, cover the path you change, and pass.
    One WRONG before your change is a FINDING to report — NEVER edit a
    test green. A bug: reproduce it first and capture the failure. A
    refactor: the existing tests are green on the unchanged code first.
+<!-- omo-ultrawork-astra:read-step:end -->
+<!-- omo-ultrawork-astra:change-step:start -->
 3. CHANGE: the SMALLEST production change that meets the criterion;
    update the tests your change makes stale. Add a test ONLY when
    BOTH hold: the repository keeps tests for this behavior AND a
@@ -339,10 +346,14 @@ Until every success criterion PASSES with its evidence captured:
    `toBe` equality between shipped copies; otherwise review + QA-by-read,
    NO test. Before a change that depends on review, PR, issue, or
    branch state, refresh that state and preserve existing ordering/policy.
+<!-- omo-ultrawork-astra:change-step:end -->
+<!-- omo-ultrawork-astra:run-step:start -->
 4. RUN: the real-surface scenario the criterion named (channel table
    above; auxiliary surface for CLI- or data-shaped criteria), end to
    end, yourself, plus the step-2 tests; a reproduction now passes.
    Paste the artifact path into the notepad.
+<!-- omo-ultrawork-astra:run-step:end -->
+<!-- omo-ultrawork-astra:cleanup-step:start -->
 5. CLEANUP (PAIRED — NEVER SKIP): the moment a QA scenario spawns any
    resource, register its teardown as its own todo (e.g.
    `cleanup: kill server pid for criterion 2 — verify kill -0 fails`).
@@ -356,9 +367,11 @@ Until every success criterion PASSES with its evidence captured:
    vars. Append a one-line cleanup receipt to the notepad next to the
    artifact, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo;
    rm -rf /tmp/ulw.aB12cD`. No receipt → criterion stays in_progress.
+<!-- omo-ultrawork-astra:cleanup-step:end -->
 6. Verify: LSP diagnostics clean on changed files; no test skipped or
    xfail-ed this turn.
 7. Mark completed. Append non-obvious findings / learnings.
+<!-- omo-ultrawork-astra:evidence-step:start -->
 8. Evidence stays valid per target until an input changes; record with
    each artifact the commit and what it exercised. After each increment
    rerun what moved — the tests of every touched file and of the files
@@ -367,6 +380,7 @@ Until every success criterion PASSES with its evidence captured:
    rest. The full set (scenarios, suite, typecheck, build) runs once
    more right before the final message. Record PASS/FAIL beside each
    artifact. Loop until all PASS.
+<!-- omo-ultrawork-astra:evidence-step:end -->
 
 Within a step, follow Finding things; READ before CHANGE, never in
 parallel with it.
@@ -499,6 +513,7 @@ commits this session — then stage + draft the message instead.
   for the regression it names is NOT evidence: mock-call assertions,
   pinned constants, a fixture equal to the default it must override,
   an expected value re-derived from the output under test.
+<!-- omo-ultrawork-astra:blast-radius:start -->
 - Make the smallest correct change per unit, and fix in THIS run every
   defect inside the change's blast radius — the request not delivered,
   a regression this change introduces, an invalid proof, a failing test
@@ -508,9 +523,12 @@ commits this session — then stage + draft the message instead.
   message; a deferral never turns a criterion into PASS. Keep delegated
   unit scope hard: the worker reports, the orchestrator registers or
   files.
+<!-- omo-ultrawork-astra:blast-radius:end -->
 - Never suppress lints / errors / test failures. Never delete, skip,
   `.only`, `.skip`, `xfail`, or comment out tests to green the suite.
+<!-- omo-ultrawork-astra:claim-done:start -->
 - Never claim done from inference — only from captured evidence.
+<!-- omo-ultrawork-astra:claim-done:end -->
 
 # Output discipline
 - First line literally: `ULTRAWORK MODE ENABLED!`
@@ -528,18 +546,22 @@ commits this session — then stage + draft the message instead.
 - After each result, ask whether the user's core request can now be
   answered with useful evidence in hand. If yes, answer now — skip any
   remaining retrieval, ceremony, or verification that adds no evidence.
+<!-- omo-ultrawork-astra:stop-goal-ledger:start -->
 - The STOP GOAL: every scenario PASSES with captured evidence, every
   cleanup receipt is recorded, notepad is current, and (if gate
   triggered) reviewer approved unconditionally. Above ALL of that, the
+<!-- omo-ultrawork-astra:stop-goal-ledger:end -->
   decisive test — outranking every other consideration — is: are the
   completion conditions FUNDAMENTALLY fulfilled, is the user's problem
   ACTUALLY SOLVED in observable behavior? If no, you are NOT done,
   whatever the ledger says. If yes, deliver the final message and STOP
   — no hesitation, no extra verification pass, no polish loop. Work
   past the stop goal is scope creep, not diligence.
+<!-- omo-ultrawork-astra:leftover-qa:start -->
 - Leftover QA state (live process, `tmux` session, browser context,
   bound port, temp file / dir) means NOT done. Tear it down, record
   the receipt, then continue.
+<!-- omo-ultrawork-astra:leftover-qa:end -->
 - After 2 identical failed attempts at one step, surface what was tried
   and ask the user through the question tool before another retry; if
   the question times out, continue on best judgment.

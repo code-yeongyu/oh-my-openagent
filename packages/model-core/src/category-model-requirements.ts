@@ -76,6 +76,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   quick: {
     fallbackChain: [
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot"],
+        model: "claude-haiku-5-5",
+        variant: "medium",
+      },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
@@ -85,11 +90,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "minimax-m3", variant: "max" },
       { providers: ["opencode-go"], model: "minimax-m2.7", variant: "max" },
       { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot"],
-        model: "claude-haiku-4-5",
-        variant: "off",
-      },
       // Trailing: only a Z.ai-only or Xiaomi-only machine reaches these (#9202).
       { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
       { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }

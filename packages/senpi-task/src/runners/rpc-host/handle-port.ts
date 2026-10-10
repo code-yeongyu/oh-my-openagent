@@ -11,6 +11,7 @@ import type { HostShardEvents } from "./handle-reattach"
 import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked } from "./session-client"
 import type { TransportRecoveryOptions } from "./transport-recovery"
+import type { CatalogModelIdentity } from "../pinned-model-equivalence"
 
 /**
  * What a child handle needs FROM a daemon session and what it exposes TO the manager. The seam is
@@ -25,6 +26,10 @@ export interface HostSessionLiveness {
   readonly steering?: readonly unknown[]
   readonly followUp?: readonly unknown[]
   readonly pendingMessageCount?: number
+  // The host's effective model for this session (senpi's get_state carries it); the post-open pin
+  // check compares it with the requested provider/modelId (#9722).
+  readonly model?: CatalogModelIdentity
+  readonly serviceTier?: string
 }
 
 /** `HostSessionClient` satisfies this structurally. The transport error itself is never read. */

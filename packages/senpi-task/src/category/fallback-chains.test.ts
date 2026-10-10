@@ -61,12 +61,12 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
       ],
       quick: [
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
+        { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
         { providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"], model: "qwen3.6-flash", variant: "low" },
         { providers: ["opencode-go"], model: "minimax-m3" },
         { providers: ["opencode-go"], model: "minimax-m2.7" },
         { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
-        { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"], model: "claude-haiku-4-5", variant: "off" },
         { providers: ["zai", "zai-coding-cn"], model: "glm-5.3-flash", variant: "low" },
         { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
       ],

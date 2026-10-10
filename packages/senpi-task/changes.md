@@ -1,3 +1,204 @@
+## 2026-10-09 - Bound suspended-child cleanup and protect session startup (#9350)
+
+Rollback preparation maps `failure_kind: "suspended_unresumable"` to R0's `session_unavailable`, keeping the `suspended_unresumable:<cause>` error text. The R0 contract fixture checks the failure kind and the other closed enum fields, including nested model, isolation, owner and run-stat fields. Preparation reports open strict closure obligations in its return value and warning log, naming the affected tasks and warning that the old daemon session may still be running.
+
+Rollback is not blocked on background closure. Older binaries keep the ended record visible but do not keep retrying the strict close. A newer binary resumes those retries only if the obligation field survived: an older binary rewriting the record can drop the field. The rollback warning is printed on stderr as well as included in the JSON report.
+
+An unconfirmed local stop now keeps its existing expiry claim and follows the deferred-revival backoff: 5, 15, 30, 60, 120, then 300 seconds between attempts, capped at 300 seconds. Recovery still checks every five seconds, but intervening ticks do not rewrite the record, append another claim event, or signal the child. A failed stop remains nonterminal until the existing stop path confirms it.
+
+Strict daemon closure retries run in a session-scoped background pass, one pass per lifecycle, rather than blocking `session_start` and its subsequent TTL sweep. A timed-out close retains its in-process identity reservation until the transport settles; repeated startup/cleanup calls cannot accumulate hung requests for the same old session. TTL retains strict obligations until their matching confirmed close clears them. Because the pass is scoped to the owning session, a strict close is retried only when that session starts again or runs its cleanup: if the session is never reopened, its old daemon session is not closed by retry.
+
+The lifecycle fixture now observes every terminal status and reconstructs the observed store, manager and notifier on restart. Tests cover parent shutdown during the budget, at the locked expiry claim, and after the claim (one buffered result); unconfirmed local-stop backoff; stale residency and closure identities; and startup with hung own/foreign obligations. Removing either parent guard, the residency-claim guard, or closure identity comparisons now fails the corresponding regression.
+
+## 2026-10-09 - Suspended children recover while their parent is still live (#9350)
+
+The lifecycle now observes the adapter's existing store-mutation channel. A manager `onParked` event, daemon-loss park, or reconcile deferral immediately attempts scoped revival through the existing admission lease, residency claim and `reviveClaimed`; there is no second respawn path. Observation runs after the synchronous park/forget operation.
+
+Only `pending` and `running` children in `persisted_only` or `rpc_detached` qualify, and only while the registry identifies this engine as their live parent owner. All suspension reasons qualify, including legacy records without a reason. Terminal statuses (including `interrupted` and finished idle evictions), explicit pending user cancellations, and live foreign owners are excluded. Shutdown/disposal stops supervision; an absent parent's children keep their session-start recovery behavior.
+
+`LIVE_PARENT_SUSPENSION_BUDGET_MS` is 300,000 ms, with recovery checks every 5,000 ms. Five minutes matches the sustained interval in the existing deferred-revival policy and exceeds both the 1/4/16-second daemon-loss ladder and the usual 20-second generation-drain budget. The deadline belongs to the suspension episode, not `updated_at`, so failed retries cannot extend it.
+
+At expiry, an atomic epoch/claim check fences the unfinished run against revival. In-process and child-process children use the existing destruction and confirmed process-stop paths. A failed stop is not falsely reported as confirmed. Failure uses the existing `fail` transition (`status: "error"`), `failure_kind: "suspended_unresumable"`, and `error_message` beginning `suspended_unresumable:<cause>`. The terminal run releases its queue/lane and residency; normal notification bookkeeping delivers one parent result and manager waiters settle.
+
+Daemon-only contract change: an unconfirmed close no longer leaves the live parent waiting forever. The record fails while retaining `fallback_closing_child` with `requires_confirmation: true`. Cleanup and session-start recovery retry this durable obligation regardless of TTL age. Silence, refusal and timeout do not clear it. A late confirmed close clears only the matching socket/session/instance/routing identity, never the task's status or notification epoch. A timed-out request keeps its identity reservation until it settles; a refused request can be retried. Transcripts and partial output remain available.
+
+The unconfirmed-close result tells the parent that the old session may still be running on an unreachable host, closing is being retried, and re-dispatch has no at-most-once guarantee: work may run twice, so side effects must be checked before re-running. A confirmed local stop carries no such caveat. Error records already leave live widget rows while remaining in `/tasks` history.
+
+`lifecycle/live-parent-recovery.test.ts` covers immediate recovery, both local execution modes, unreachable and timed-out daemon closure, retry/restart persistence, late closure, both revival/expiry orderings, pending children, absent parents, and finished idle eviction with injected clocks and lifecycle/manager fixtures.
+
+## 2026-10-09 - Cancelling a running child that never answers its abort no longer hangs (#9791)
+
+`steering/controls.ts` awaited `handle.abort()` before it destroyed a running child (`task_cancel`), and before it recorded an interrupt. An RPC abort waits for the child's answer with no timeout, so a child that never answered held `task_cancel` (or the interrupt) forever. #9785 had bounded the destruction port and the idle sweep, but not this step.
+
+The abort now goes through the same `withinTeardownBudget` as the destruction steps (10 s, `lifecycle/teardown-budget.ts`). Past the budget the step is logged with the task id and pid, and the cancel moves on to destruction. Destruction terminates the child: SIGTERM, then SIGKILL after the escalation window, waiting for the exit. A rejected abort is still logged and skipped as before. `SteeringPort.abortDeadline` is the injectable budget; production uses the default.
+
+`steering/cancel-running-abort-budget.test.ts` uses a running child whose abort never settles:
+- `task_cancel` completes, destroys the child and records `cancelled` once the budget expires;
+- an interrupt completes and records `interrupted`.
+
+Both hang on the unbounded abort. The budget is test-driven, so nothing waits on a wall clock.
+
+Test tidy-ups from the #9785 review:
+- The sibling-session sweep test is named for what it checks: one session's engine leaves a sibling session's handle-less child alone.
+- `ResidencyRegistry.ownsRecord` takes `Pick<TaskRecord, "parent_session_id">`, so the omo-senpi adapter test needs no `as never` casts.
+
+## 2026-10-08 - A child that will not stop no longer holds every finished child resident (#9785)
+
+The idle reclaimer (`lifecycle/residency.ts`) skips a tick while a sweep is running, and a sweep only ended when every resident's teardown had finished. Each teardown step awaited the child with no limit:
+- `abort()`: an RPC command whose answer the protocol client waits for forever.
+- `terminate()`.
+- `dispose()`.
+
+So one child that never answered `abort` stalled the sweep. Every later tick saw the sweep still running and skipped, and finished children piled up resident until the session ended. A report measured 19 such children at about 2.2 GB each. Sweeps also ran residents one after another, so even a bounded slow child delayed the rest.
+
+- `lifecycle/teardown-budget.ts` (new): `withinTeardownBudget` gives one teardown step at most `TEARDOWN_STEP_BUDGET_MS` (10 s).
+  - That is longer than an RPC child's own SIGTERM-to-SIGKILL escalation (5 s) plus its exit observation (2 s), so a terminate still making progress is never cut short.
+  - A step past its budget is logged with the task id and pid, and teardown moves on. A rejection still propagates as before.
+  - The budget is an injectable lifecycle dependency, `teardownStepDeadline`.
+- Bounded steps:
+  - `lifecycle/shutdown.ts` `suspendHandle`, the idle park path: abort, terminate and dispose.
+  - `lifecycle/destroy.ts` `teardownHandle`, the destruction port used by cancel, eviction and TTL.
+  - Not bounded yet: the abort that `steering/controls.ts` sends a *running* child before it destroys it. That is follow-up work.
+  - An RPC child whose abort hangs is therefore still terminated, which escalates to SIGKILL, and is parked.
+- A finished child with no live handle in this process still held its resident slot until a session restart reconciled it, which measured 17 h for errored children. A typical case is a child whose session the host refused to open ("The task host refused the child session (open_failed)").
+  - The sweep and `task_cancel` now park such a record directly (`parkHandlelessResident`), when nothing can still be running for it:
+    - the record belongs to this engine's own session;
+    - no daemon session;
+    - no live child pid.
+  - One process can host an engine per session, so `host_pid` alone cannot tell this session's record from a live sibling's. The new `ResidencyRegistry.ownsRecord` answers that; the omo-senpi adapter compares the record's parent session with the engine's current session, and a registry without it parks nothing.
+  - A child whose teardown threw in this process is excluded (`LifecycleContext.failedTeardowns`), because a failed dispose is not a successful park. A later teardown that succeeds clears the mark.
+  - Live QA through a real `senpi` hit exactly this case.
+- `reclaimIdleResidents` reclaims each resident on its own, concurrently. One slow child no longer delays the others, and because every step is bounded, the sweep always settles and the next tick runs. Errored children were already terminal here; they are now actually reached.
+- `task_cancel` on a finished child that is still resident here now stops its child and parks the record, and reports `released`.
+  - The record is parked (`persisted_only` / `rpc_detached`), so the result stays readable and `task_send` still revives it.
+  - Before, the call answered "is error, not running. No change." and nothing released the child short of a session restart.
+  - A second cancel is a no-op. A child resident in another process is left alone.
+  - Only a finished result is released. A cancelled, lost or killed resident belongs to destruction, which may still be in flight, so cancel leaves it to that path.
+  - An interrupted resident is never released: it is resumable, and a resume can hold its slot before its handle exists.
+  - A cancel that skips abort (DAG cancellation) never releases, so DAG behaviour is unchanged.
+  - Mechanism: `lifecycle/park-terminal-resident.ts`, `TaskLifecycle.parkTerminalResident`, and the optional `DestructionPort.parkTerminalResident`. The new `released` cancel outcome is handled in `tools/control`, the renderers and `eval-handles/steer-refs.ts`.
+  - Team deletion still ends a released member for good (`team/runtime.ts`).
+
+Tests:
+- `lifecycle/idle-sweep-stuck-child.test.ts`:
+  - A stuck RPC resident ahead of a healthy one no longer delays it. Fails on `dev`.
+  - A stuck child is terminated and parked once its budgets expire, and the sweep settles. Fails on `dev`.
+  - An errored in-process resident is parked.
+  - A handle-less errored resident (session never opened) is parked by the sweep.
+  - A sweep leaves a sibling session's handle-less child in the same process alone.
+
+  The budgets are driven by the test, so nothing waits on a wall clock.
+- `steering/cancel-terminal-resident.test.ts`:
+  - Cancel releases an errored resident, and a repeat is a no-op. Both fail without the change.
+  - A cancelled resident is not released or torn down a second time.
+  - A skip-abort cancel leaves a resident alone.
+  - A handle-less errored resident is released.
+  - One whose child pid is still alive is left alone.
+  - A sibling session's handle-less child is left alone.
+  - An interrupted resident is not released.
+  - A foreign resident is untouched.
+- `team/runtime-delete.test.ts`: deleting a team whose finished member was released still destroys that member once.
+- `idle-park.test.ts`: now asserts each child's own step order instead of a global one, since residents are no longer serialized.
+
+## 2026-10-05 - A process-runner child gets its own fallback chain (#9582)
+
+`runners/rpc-process.ts`: a task child started as its own `senpi --mode rpc` process (`task.process_runner: "child-process"`, and every child on win32) now receives the fallback chain resolved for its category. When the engine advertises `retry_fallback_command`, the runner sends `set_retry_fallback` with the same profile a daemon-hosted child gets on `open_session` (`runners/retry-fallback-profile.ts`, now shared with `rpc-host/open-session.ts`). It sends it before the resumed session is switched in and before the first prompt, because senpi refuses it once the session has a turn. The engine holds it in memory only, so the user's settings file is never written, and a usage limit after a tool call now switches models inside the running session instead of ending the child.
+
+The chain never holds a start up. If the engine refuses `set_retry_fallback`, or does not answer it (or `get_protocol_info`) within 10 s, the runner names the task in a warning and sends the first prompt anyway; the child then falls back only when a turn fails before any tool call, the same as on an older engine. A child that died meanwhile still fails on that prompt with its exit recorded, and its warning says the child exited instead of blaming the engine.
+
+`runners/rpc/handle.ts`: a process child's events now go through the same early-event buffer the host runner got in #9518 (`rpc-host/handle-listeners.ts`). The manager subscribes only after `start` returns, and a fast first turn (a tool call and an in-session fallback hop included) used to finish in that window, so `tool_execution` and `retry_fallback_applied` never reached the task record and it kept naming the spent model. `rpc-process-early-events.test.ts` (both cases fail on `dev`): an observer attached after the first turn still receives it in order, and two observers attached together each get it once, with later events arriving live. Subscribers still run after the handle has recorded each event, as on `dev` and on the host handle, so a live observer reads current state (`lastAssistantText()` at `message_end`); the third case pins that order.
+
+An engine without the capability gets nothing new and the user is told once. A child without a chain sends nothing, so its command stream is unchanged.
+
+`rpc-process-fallback-chain.test.ts` covers the chain sent before the prompt, the chain sent before `switch_session` on a resume, a chainless child unchanged, and an older engine warned once. Three of the four fail on `dev`. The fake RPC child (`rpc/__fixtures__/fake-child.mjs`) answers `get_protocol_info` with `FAKE_CAPABILITIES` and can log every command it receives (`FAKE_COMMAND_LOG`).
+
+## 2026-10-08 - Explicit task model pins are honoured or fail typed, and the record names the child's model (#9722)
+
+A `provider/model:level` pin was planned verbatim, the in-process registry
+context dropped the unresolvable id silently, and the child rode the settings
+default while the record kept claiming the pin. `senpi/explicit-pin.ts` parses
+the pin once with senpi's `resolveCliModel` and `manager/parent-registry-context.ts`
+`provide()` now asserts the spec model instead of filtering it, matching resume;
+`runners/rpc/model-admission.ts` and `rpc-host/open-session.ts` strip the suffix
+with the same grammar, so a valid pin admits and sends the base id plus the
+level. After start, the in-process runner and the host opener compare the
+child's effective model with the pin and fail typed on a substitution, the
+in-process mismatch disposes its session, and an unreadable host state fails
+closed. A pinned child starts with `initialModelProvenance: "cli"`, and a
+`:<service-tier>` pin is a typed `invalid_target` instead of a silently dropped
+tier. Legacy records whose ids still carry a `:level` suffix resolve by their
+canonical base on respawn.
+
+`manager/manager.ts` start-time and runtime fallback specs refresh `resolvedModel`
+to the attempt's own rung, so the post-start check no longer rejects the
+fallback child it asked for. The record's new `effective_model` is stamped from
+the child itself (`effectiveModel` on the managed handle: the in-process
+session's model, the host's `get_state` model), kept current from the child's
+assistant-message observations (`manager/observed-model.ts`), and surfaced on
+the `started` result and in `task_output`.
+
+Tests: `runners/explicit-pin.integration.test.ts` drives the real manager plus
+in-process child against a fake provider whose isolated settings default is a
+different model (honoured pin with record truth, typed refusal naming the pin
+and the default route, late same-provider registration, tier rejection).
+Mutation-verified: removing either post-start check or either suffix split
+fails its test.
+
+## 2026-10-07 - Resumed children retry deferred revival and settle unowned failures (#9498)
+
+`lifecycle/host-session-revive.ts` extends the existing per-child single-flight
+retry to the resumed session's own `capacity`, `lock_contended`,
+`model_unavailable`, `session_unavailable`, `rollback_failed` and
+`foreign_live_owner` deferrals. `lifecycle/deferred-revival.ts` uses the existing
+`hostRetry` backoffs and scoped admission lease, excluding other children from
+that attempt's admission while still counting them toward capacity. Every retry
+re-reads terminality, kill intent, handles and ownership; a new claim or epoch
+stops a stale retry.
+
+`lifecycle/reconcile.ts` carries the initial live-owner exclusion into scoped
+admission's fresh store selector too: filtering only the observed candidate
+array did not protect a suspended record still owned by a live foreign process.
+
+After the bounded retries, unowned model/session/rollback/lock failures become
+`lost` through `markRecordLostForReconciliation` and the lifecycle destruction
+port. The error and events name the last deferral and retry count. The adapter's
+completion bridge observes the `lost` mutation and delivers the parent's notification.
+Capacity and live owners remain suspended because the other side must release
+them; daemon-hosted children are never lost. Configuration-only deferrals such
+as `reattach_disabled` are not scheduled.
+
+`lifecycle/deferred-revival.test.ts` exercises revival on the first retry,
+exhaustion with terminal `task_output` breadcrumbs, capacity with the
+`task_send` refusal policy, and daemon preservation, using fixture clocks and
+pre-subscribed event promises rather than sleeps.
+
+## 2026-10-07 - An eval handle's send and cancel replies come only from the post-engine check, and a rolled-back epoch is never issued again (#9562)
+
+A: `eval-handles/steer-refs.ts` now holds send and cancel, and no task record or `taskSnapshot` is in scope there. Every reply comes from `eval-handles/run-after-engine.ts`. `fenceBeforeEngine` fences the ref and returns a `PriorRun` whose record is private. Its `reread` re-reads the task after the engine returned and yields a `RunAfterEngine`, which builds the reply (`delivered`, `phase`, `stale`). `steer-refs.ts` imports no `taskSnapshot`, so every send and cancel reply there goes through the re-read run (review: this is a convention of the module, not a type guarantee, since `deps.tasks.get()` still returns a record). `control.ts` keeps only result and output. `afterEngine` is gone from the exports, `SEND_HOST_STATUS` moved to `run-after-engine.ts` and `WATCH_HOST_STATUS` to `watch.ts`.
+
+B: `rollbackDetachedRevival` records the epoch of a run it undid as `burnt_epoch` (persisted; `store/record-parse.ts` reads it back). `state/run-fence.ts` adds `nextRunEpoch(record)`: one above every epoch the task ever issued. Every site that issues an epoch uses it:
+- revive (`buildRevived`);
+- model fallback;
+- fallback handoff;
+- reattach;
+- a self-resumed turn;
+- the concurrency lease keys;
+- workpool worker admission and reconcile.
+
+A handle minted for an undone run therefore stays stale and never names a later run. The watch's terminal revision (`epoch * 2 + 1`) cannot collide with a later run either. A rollback that undid only a claim, where no run started, burns nothing. Workpool crash recovery (`workpool/dispatcher.ts`) rebuilds a recovered turn's worker from the task's own `run_epoch` instead of `binding - 1`, so a turn bound above a burnt epoch is dispatched after a restart instead of refused (`workpool/delivery.test.ts`).
+
+`lifecycle/revive-rollback-epochs.test.ts` covers:
+- the next revive starting above the undone epoch;
+- a send through the undone run's handle being refused before it reaches the newer run;
+- the burnt epoch surviving a reload from disk;
+- a claim-only rollback taking the very next epoch.
+
+On the previous sources the first three fail and the fourth passes. The table row that answered a cancel `cancel_pending` with a newer run started is dropped: a pending cancel blocks revive and steer, so that state is unreachable. The rollback-watch test now also asserts `host_status`.
+
+## 2026-10-06 - The GPT-6 Astra DAG directives are a spot-check, not a replay (omo#8168)
+
+`completion/dag-verification-directive.ts`: `ASTRA_DAG_VERIFICATION_DIRECTIVE` tells the parent to read the node's VERIFY output against the scope its prompt set, in both directions, and to rerun a check only when that output is missing, failing, or contradicts the scope; `ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE` defers the combined checks to the run's verification node. The #9642 texts asked the Astra parent to reconstruct every node's scope and inspect every artifact, which on a model whose prior is already to verify broadly reproduced the per-node rerun loop the directive was meant to end. `DAG_VERIFICATION_DIRECTIVE` (every other receiver) is unchanged.
+
 ## 2026-10-04 - Package-local test runs get the hermetic home (#9578)
 
 `test-support/warm-lazy-runtime.ts`, the package's own `bun test` preload, now installs the repo's hermetic home and agent dir before warming the lazy barrels, so `bun test` from inside `packages/senpi-task` can no longer start a task host in the real agent dir.

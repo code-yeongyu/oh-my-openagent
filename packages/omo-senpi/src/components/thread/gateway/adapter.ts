@@ -96,11 +96,20 @@ export type SessionAdmissionGate = {
   readonly turn_epoch: number
 }
 
+/** senpi `SessionControlSender`: who sent a delivery, for the surfaces a human reads. */
+export type DeliverySender =
+  | { readonly kind: "agent"; readonly session_id: string; readonly name?: string }
+  | { readonly kind: "command_line"; readonly user?: string }
+  | { readonly kind: "external"; readonly platform: string; readonly author?: string }
+
 export type AdmitExternalMessageInput = {
   readonly delivery_id: string
   readonly text: string
   readonly deliverAs: "steer" | "followUp"
   readonly expected_turn_id?: number
+  /** Ignored by a senpi from before delivery senders; the header in `text` still names the sender. */
+  readonly sender?: DeliverySender
+  readonly display_text?: string
 }
 
 /**

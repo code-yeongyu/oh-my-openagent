@@ -57,12 +57,15 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
   return tokens === undefined ? base : { ...base, tokens }
 }
 
-export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
+export function buildCompletionMessage(
+  details: readonly CompletionDetails[],
+  verificationDirective = DAG_VERIFICATION_DIRECTIVE,
+): ParentNotifierMessage {
   const body = completionMessageLines(details).join("\n")
   const carriesDag = details.some((detail) => detail.dag !== undefined)
   return {
     customType: "senpi-task.completion",
-    content: carriesDag ? `${body}\n\n${DAG_VERIFICATION_DIRECTIVE}` : body,
+    content: carriesDag ? `${body}\n\n${verificationDirective}` : body,
     display: false,
     details,
   }
@@ -73,7 +76,9 @@ export function completionMessageLines(details: readonly CompletionDetails[], wi
 }
 
 function finalResponseForNotification(record: TaskRecord, stateDir: string | undefined): { readonly text: string; readonly file?: string } {
-  const source = record.final_response ?? record.error_message ?? ""
+  const source = record.failure_kind === "suspended_unresumable"
+    ? [record.error_message, record.final_response].filter(Boolean).join("\n\n")
+    : record.final_response ?? record.error_message ?? ""
   if (source.length <= FINAL_RESPONSE_TRANSPORT_LIMIT) return { text: source }
   if (stateDir === undefined) return { text: source.slice(0, FINAL_RESPONSE_TRANSPORT_LIMIT) }
 

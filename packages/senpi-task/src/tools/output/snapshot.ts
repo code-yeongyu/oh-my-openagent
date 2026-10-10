@@ -17,6 +17,7 @@ const SUSPENSION_REASON_EXPLANATIONS: Readonly<Record<NonNullable<TaskRecord["su
   host_incompatible: "suspended (its host is incompatible; never reopened elsewhere)",
   idle_evicted: "suspended (its host parked the idle session; reopens on the next message)",
   own_host_unreachable: "suspended (the host this session runs behind is unreachable)",
+  revival_deferred: "suspended (its session was resumed, but reviving it was deferred)",
   store_index_unavailable: "suspended (task store index unavailable)",
 }
 
@@ -36,6 +37,7 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     execution_mode: record.execution_mode,
     model: record.model,
     ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
+    ...(record.effective_model !== undefined ? { effective_model: record.effective_model } : {}),
     parent_session_id: record.parent_session_id,
     root_session_id: record.root_session_id,
     age_ms: ageMs(record, now),
@@ -60,6 +62,9 @@ function isSuspended(record: TaskRecord): boolean {
 
 function suspendedExplanation(record: TaskRecord): string {
   const reason = record.suspension_reason
+  if (reason === "revival_deferred" && record.revival_deferred_reason !== undefined) {
+    return `suspended (its session was resumed, but reviving it was deferred: ${record.revival_deferred_reason})`
+  }
   return reason === undefined ? SUSPENDED_EXPLANATION : SUSPENSION_REASON_EXPLANATIONS[reason]
 }
 

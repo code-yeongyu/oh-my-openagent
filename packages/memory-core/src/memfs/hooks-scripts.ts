@@ -11,6 +11,32 @@ import { getPostCommitHookScript } from "../sync/mirror"
  */
 
 /**
+ * POSIX-ERE copies of the TypeScript secret pattern classes in `sync/redact.ts`, kept in the
+ * SAME ORDER. The hook is a regex-only defense in depth for hand commits: no zero-width or
+ * format-character normalisation exists here (that is the authoritative TypeScript gates'
+ * job), and ERE has no `\\b`, `(?:...)` or `\\S`, so boundaries and alternations are spelled out.
+ */
+export const HOOK_SECRET_PATTERNS = [
+  { class: "aws_access_key", ere: "(^|[^A-Za-z0-9_])AKIA[0-9A-Z]{16}([^A-Za-z0-9_]|$)" },
+  {
+    class: "credential_assignment",
+    ere: "(^|[^A-Za-z0-9_])([Bb][Ee][Aa][Rr][Ee][Rr]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][-_]?[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd])[[:space:]]*[=:][[:space:]]*[^[:space:]]{1,255}",
+  },
+  {
+    class: "authorization_header",
+    ere: "(^|[^A-Za-z0-9_])[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn][[:space:]]*:[[:space:]]*[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]]+[^[:space:]]{1,255}",
+  },
+  { class: "openai_key", ere: "(^|[^A-Za-z0-9_])sk-(proj-)?[-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
+  { class: "vendor_token", ere: "(^|[^A-Za-z0-9_])(ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
+] as const
+
+const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere }) => [
+  `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`,
+  `        printf 'memory pre-commit: %s contains secret-like content (${patternClass})\\n' "$p"`,
+  "      fi",
+].join("\n")).join("\n")
+
+/**
  * Pre-commit validator for staged memory markdown.
  *
  * Rules (letta parity plus the strict-YAML contract shared with the skill loader):
@@ -169,6 +195,32 @@ errors=$(
 if [ -n "$errors" ]; then
   echo "Frontmatter validation failed:"
   printf '%s\\n' "$errors"
+  exit 1
+fi
+
+
+# Secret-like material backstop for hand commits (regex-only defense in depth;
+# the authoritative gates scan with evasion normalisation before this runs).
+# Content is read by blob id from the raw diff (renames shown as an add, so a
+# moved file is scanned too), so no file name (quoted,
+# non-ASCII or carrying shell metacharacters) decides what gets scanned; the
+# name is only ever printed, as data, in git's own quoting.
+secret_failed=$(
+  git diff --cached --no-renames --diff-filter=AMT --raw --no-abbrev |
+    while IFS= read -r line; do
+      meta=\${line%%"$TAB"*}
+      p=\${line#*"$TAB"}
+      set -- $meta
+      [ "$2" = "160000" ] && continue
+      blob=$(git cat-file blob "$4" 2>/dev/null) || {
+        printf 'memory pre-commit: %s could not be read for secret screening\\n' "$p"
+        continue
+      }
+${SECRET_SCAN_LINES}
+    done
+)
+if [ -n "$secret_failed" ]; then
+  printf '%s\\n' "$secret_failed"
   exit 1
 fi
 

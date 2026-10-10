@@ -28,6 +28,7 @@ export interface HostRpcClient {
   followUp(message: string): Promise<HostQueuedInputDisposition>
   abort(): Promise<void>
   getState(): Promise<RpcSessionState>
+  getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
 }

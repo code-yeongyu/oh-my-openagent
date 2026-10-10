@@ -1,10 +1,13 @@
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
+import { splitModelDecorators } from "../../senpi/explicit-pin"
+import type { HostSessionLiveness } from "./handle-port"
 import {
   SESSION_START_FAILURE_REASONS,
   isTaskStartFailureReason,
   type TaskStartFailureReason,
 } from "../../state"
 import { RunnerError } from "../in-process/runner-error"
+import { differsOnlyByPriorityAlias, reportedEffectiveModel, startedOnPinnedModel } from "../pinned-model-equivalence"
 import type { RpcRunnerSpec } from "../types"
 import { HostUnavailableError } from "./daemon"
 import {
@@ -13,22 +16,29 @@ import {
   type OpenedHostSession,
 } from "./session-client"
 import { buildChildContext } from "./session-context"
+import { childRetryFallbackProfile } from "../retry-fallback-profile"
 import type { HostRetryFallbackProfile, HostSessionOpenInput } from "./session-transport"
 
 const SESSION_FAILURE_REASONS = new Set<TaskStartFailureReason>(SESSION_START_FAILURE_REASONS)
 
 export async function openTaskHostSession(input: {
-  readonly client: { open(request: HostSessionOpenInput): Promise<OpenedHostSession> }
+  readonly client: {
+    open(request: HostSessionOpenInput): Promise<OpenedHostSession>
+    getState?(): Promise<HostSessionLiveness>
+    getAvailableModels?(): Promise<readonly unknown[]>
+    close?(): Promise<void>
+  }
   readonly spec: RpcRunnerSpec
   readonly sessionPath: string
 }): Promise<OpenedHostSession> {
   const model = splitModelRef(input.spec.model)
-  const thinkingLevel = asSenpiThinkingLevel(input.spec.reasoning ?? input.spec.variant)
+  const thinkingLevel = asSenpiThinkingLevel(input.spec.reasoning ?? input.spec.variant) ?? asSenpiThinkingLevel(model?.thinkingLevel)
+  let opened: OpenedHostSession
   try {
-    return await input.client.open({
+    opened = await input.client.open({
       sessionPath: input.sessionPath,
       cwd: input.spec.cwd,
-      ...(model === undefined ? {} : model),
+      ...(model === undefined ? {} : { provider: model.provider, modelId: model.modelId }),
       ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
       ...buildChildContext(input.spec),
       retainOnDisconnect: true,
@@ -45,6 +55,68 @@ export async function openTaskHostSession(input: {
       cause: error,
     })
   }
+  // Post-start check (#9722): a FRESH open (attached !== true) must have opened on the requested
+  // base id. The host answers get_state with its effective model; a mismatch, an unreadable
+  // state, or a state carrying NO model all fail typed - a check that silently skips on error is
+  // no check at all. An ATTACHED open re-joins a session that is already running its own model -
+  // recovery re-opens must not re-assert the pin against it, and this read is skipped entirely so
+  // a held or model-less get_state can never break a reattach. The open succeeded, so this
+  // channel is closed here - the caller never sees a handle.
+  const freshOpen = opened.attached !== true
+  if (model !== undefined && freshOpen) {
+    let effective: HostSessionLiveness["model"]
+    let serviceTier: string | undefined
+    try {
+      const state = await input.client.getState?.()
+      effective = state?.model
+      serviceTier = state?.serviceTier
+    } catch (error) {
+      await input.client.close?.().catch(() => undefined)
+      throw new RunnerError({
+        kind: "model_unavailable",
+        message: `the host's effective model could not be read after opening the requested ${model.provider}/${model.modelId}; refusing to start unverified`,
+        cause: error,
+      })
+    }
+    if (effective === undefined) {
+      await input.client.close?.().catch(() => undefined)
+      throw new RunnerError({
+        kind: "model_unavailable",
+        message: `the host reported no model after opening the requested ${model.provider}/${model.modelId}; refusing to start unverified`,
+      })
+    }
+    const pinned = { provider: model.provider, id: model.modelId }
+    let pinnedEntry: unknown = pinned
+    if (differsOnlyByPriorityAlias(effective, pinned)) {
+      try {
+        if (input.client.getAvailableModels === undefined) throw new Error("get_available_models is unavailable")
+        const catalog = await input.client.getAvailableModels()
+        pinnedEntry = catalog.find(entry => typeof entry === "object" && entry !== null
+          && "provider" in entry && entry.provider === pinned.provider && "id" in entry && entry.id === pinned.id)
+      } catch (error) {
+        await input.client.close?.().catch(() => undefined)
+        throw new RunnerError({
+          kind: "model_unavailable",
+          message: `the host's model catalog could not be read for the requested ${pinned.provider}/${pinned.id}; refusing to start unverified`,
+          cause: error,
+        })
+      }
+    }
+    if (pinnedEntry === undefined || !startedOnPinnedModel(effective, pinned, pinnedEntry)) {
+      await input.client.close?.().catch(() => undefined)
+      throw new RunnerError({
+        kind: "model_unavailable",
+        message: `the host opened the child on ${effective.provider}/${effective.id} instead of the requested ${model.provider}/${model.modelId}; refusing the substitution`,
+      })
+    }
+    return { ...opened, reportedModel: reportedEffectiveModel(effective, serviceTier) }
+  }
+  if (freshOpen && input.client.getState !== undefined) {
+    const state = await input.client.getState().catch(() => undefined)
+    const effective = state?.model
+    return effective === undefined ? opened : { ...opened, reportedModel: reportedEffectiveModel(effective, state?.serviceTier) }
+  }
+  return opened
 }
 
 function sessionFailureReason(error: unknown): TaskStartFailureReason | undefined {
@@ -62,19 +134,26 @@ function sessionFailureReason(error: unknown): TaskStartFailureReason | undefine
   return undefined
 }
 
-/**
- * The child's own fallback chain after its model, when it has one. A child without a chain sends no
- * profile, so the host keeps applying the fallback the user's settings give that session.
- */
+/** A child without a chain sends no profile, so the host keeps applying its own settings' fallback. */
 function childRetryFallback(spec: RpcRunnerSpec): { readonly retryFallback?: HostRetryFallbackProfile } {
-  const chain = spec.fallbackModels ?? []
-  if (spec.model === undefined || chain.length === 0) return {}
-  return { retryFallback: { modelFallback: true, fallbackChains: { [spec.model]: [...chain] } } }
+  const retryFallback = childRetryFallbackProfile(spec)
+  return retryFallback === undefined ? {} : { retryFallback }
 }
 
-function splitModelRef(model: string | undefined): { readonly provider: string; readonly modelId: string } | undefined {
+/**
+ * Split a task model reference into the wire's provider/modelId pair, first stripping any
+ * `:<thinking-level>`/`:<service-tier>` decorators with the same grammar senpi's `--model` parses
+ * (#9722): the suffix rides `thinkingLevel` instead of being sent as part of the id. A reference
+ * with no usable provider/model boundary yields undefined, so the host keeps its own resolution.
+ */
+function splitModelRef(model: string | undefined): { readonly provider: string; readonly modelId: string; readonly thinkingLevel?: string } | undefined {
   if (model === undefined) return undefined
-  const separator = model.indexOf("/")
-  if (separator <= 0 || separator === model.length - 1) return undefined
-  return { provider: model.slice(0, separator), modelId: model.slice(separator + 1) }
+  const { base, thinkingLevel } = splitModelDecorators(model)
+  const separator = base.indexOf("/")
+  if (separator <= 0 || separator === base.length - 1) return undefined
+  return {
+    provider: base.slice(0, separator),
+    modelId: base.slice(separator + 1),
+    ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
+  }
 }

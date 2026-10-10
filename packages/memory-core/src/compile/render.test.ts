@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { markMemoryBlock, renderExternalProjection, replaceMemoryBlock, stripMemoryBlock } from "./render"
+import { renderExternalProjection } from "./external-projection"
+import { markMemoryBlock, replaceMemoryBlock, stripMemoryBlock } from "./render"
 
 describe("renderExternalProjection", () => {
   it("#given nested paths and no root files #when rendered #then each file-holding directory gets one sorted comma line under a bare root", () => {

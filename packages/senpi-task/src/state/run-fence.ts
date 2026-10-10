@@ -18,3 +18,11 @@ export function fenceRun(record: TaskRecord, refEpoch: number): RunFence {
   if (record.run_start_epoch === undefined) return refEpoch === current ? "live" : "legacy"
   return refEpoch >= record.run_start_epoch ? "live" : "superseded"
 }
+
+/**
+ * The epoch the next run, or the next in-run move, takes: one above every epoch this record ever issued, including one a
+ * rollback took back. Epochs therefore never repeat for a task, and a ref names at most one run for its whole life.
+ */
+export function nextRunEpoch(record: TaskRecord): number {
+  return Math.max(record.notification.run_epoch, record.burnt_epoch ?? 0) + 1
+}

@@ -13,6 +13,8 @@ import { CTX, makeDeps } from "../tools/task/__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "../tools/task/execute"
 import { renderTaskResultLines } from "../tools/task/renderers"
 import type { ManagedChildHandle } from "./child-handle"
+import { RunnerError } from "../runners/in-process"
+import type { ManagedStartSpec } from "./types"
 import {
   FakeRunner,
   baseSpec,
@@ -185,6 +187,54 @@ describe("TaskManager.start", () => {
     expect(next.status).toBe("running")
   })
 
+  test("#given a fallback chain whose first rung is refused #when the start advances #then the next attempt spec carries that rung as its resolvedModel (#9722)", async () => {
+    // given: rung A is refused by the runner as model_unavailable; rung B must be attempted
+    const chainPlanner = () => ({
+      kind: "resolved" as const,
+      plan: {
+        model: "vendor-a/primary-model",
+        resolved_model: {
+          source: "category" as const,
+          provider: "vendor-a",
+          model_id: "primary-model",
+          display: "vendor-a/primary-model",
+        },
+        fallback_models: [
+          {
+            source: "category" as const,
+            provider: "vendor-b",
+            model_id: "fallback-model",
+            display: "vendor-b/fallback-model",
+          },
+        ],
+      },
+    })
+    const runner = new (class extends FakeRunner {
+      override start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
+        if (spec.model === "vendor-a/primary-model") {
+          this.startedSpecs.push(spec)
+          return Promise.reject(
+            new RunnerError({ kind: "model_unavailable", message: "vendor-a cannot serve this model" }),
+          )
+        }
+        return super.start(spec)
+      }
+    })()
+    const { manager } = makeManager({ planner: chainPlanner, inProcess: runner, process: runner })
+
+    // when
+    const result = await manager.start(baseSpec({}))
+    if (result.kind !== "started") throw new Error("expected started")
+    await flush()
+
+    // then: the fallback attempt names its OWN model in both fields the post-start check reads -
+    // a stale resolvedModel from rung A would make the runner reject the rung-B child it asked for
+    const fallbackSpec = runner.startedSpecs.find((spec) => spec.model === "vendor-b/fallback-model")
+    if (fallbackSpec === undefined) throw new Error("no fallback start was attempted")
+    expect(fallbackSpec.resolvedModel).toMatchObject({ provider: "vendor-b", model_id: "fallback-model" })
+    expect(runner.startedSpecs.map((spec) => spec.model)).toEqual(["vendor-a/primary-model", "vendor-b/fallback-model"])
+  })
+
   test("#given a requested name that collides in the same parent #when started #then a -2 suffix and a warning are returned", async () => {
     // given
     const { manager } = makeManager({})
@@ -252,6 +302,115 @@ describe("TaskManager.start", () => {
     // rebuilds; message transcripts still never land on the record.
     expect(rawRecord).toContain("private prompt payload")
     expect(rawRecord).not.toContain('"messages"')
+  })
+
+  test("#given a child session whose effective model differs from the plan #when the child is up #then the record's effective model is the CHILD'S, kept current from its own observations (#9722)", async () => {
+    // given: the plan names model A; the child actually started on model B and says so itself
+    const resolvedModel: ResolvedModelRecord = {
+      provider: "anthropic",
+      model_id: "model-a",
+      display: "anthropic/model-a",
+      reasoning: "medium",
+      source: "explicit",
+    }
+    const planner: ChildPlanner = () => ({
+      kind: "resolved",
+      plan: { model: "anthropic/model-a", resolved_model: resolvedModel },
+    })
+    const runner = new FakeRunner()
+    const { manager, store } = makeManager({ planner, inProcess: runner })
+
+    // when
+    const result = await manager.start(baseSpec({}))
+    if (result.kind !== "started") throw new Error("expected started")
+    const fake = runner.handles.get(result.task_id)
+    if (fake === undefined) throw new Error("expected live handle")
+    await fake.waitForSubscription()
+    await flush()
+    fake.emit({
+      type: "message_end",
+      message: { role: "assistant", provider: "anthropic", model: "model-b" },
+    })
+
+    // then: the record names the model the CHILD reported, never a copy of the plan
+    expect(store.load(result.task_id)?.effective_model).toMatchObject({
+      provider: "anthropic",
+      model_id: "model-b",
+    })
+    expect(store.load(result.task_id)?.effective_model?.model_id).not.toBe(resolvedModel.model_id)
+    expect(store.load(result.task_id)?.resolved_model).toEqual(resolvedModel)
+
+    // and when: the child moves to a third model
+    fake.emit({
+      type: "message_end",
+      message: { role: "assistant", provider: "anthropic", model: "model-c" },
+    })
+
+    // then: the record follows the child again; the plan fields keep stating intent
+    expect(store.load(result.task_id)?.effective_model?.model_id).toBe("model-c")
+    expect(store.load(result.task_id)?.resolved_model).toEqual(resolvedModel)
+  })
+
+  test("#given a child reporting its own model at spawn #when no message has arrived #then the record and the started result carry the child's, never the plan's (#9722 M2)", async () => {
+    // given: the plan names model A; the child's spawn-time read says it actually opened on model B
+    const resolvedModel: ResolvedModelRecord = {
+      provider: "anthropic",
+      model_id: "model-a",
+      display: "anthropic/model-a",
+      reasoning: "medium",
+      source: "explicit",
+    }
+    const planner: ChildPlanner = () => ({
+      kind: "resolved",
+      plan: { model: "anthropic/model-a", resolved_model: resolvedModel },
+    })
+    const runner = new FakeRunner()
+    runner.childEffectiveModel = { provider: "anthropic", id: "model-b" }
+    const { manager, store } = makeManager({ planner, inProcess: runner })
+
+    // when
+    const result = await manager.start(baseSpec({}))
+    if (result.kind !== "started") throw new Error("expected started")
+    const fake = runner.handles.get(result.task_id)
+    if (fake === undefined) throw new Error("expected live handle")
+    await fake.waitForSubscription()
+    await flush()
+
+    // then: BEFORE any assistant message, the spawn stamp is the child's own read
+    expect(store.load(result.task_id)?.effective_model).toMatchObject({ provider: "anthropic", model_id: "model-b" })
+    expect(store.load(result.task_id)?.resolved_model).toEqual(resolvedModel)
+    expect(result.effective_model).toMatchObject({ provider: "anthropic", model_id: "model-b" })
+    expect(result.resolved_model).toEqual(resolvedModel)
+  })
+
+  test("#given a host-session child reporting its open model #when spawned #then its reported model reaches the record and the started result (#9722 M1)", async () => {
+    // given: the plan names model A; the host's get_state says the session opened on model B
+    const resolvedModel: ResolvedModelRecord = {
+      provider: "anthropic",
+      model_id: "model-a",
+      display: "anthropic/model-a",
+      reasoning: "medium",
+      source: "explicit",
+    }
+    const planner: ChildPlanner = () => ({
+      kind: "resolved",
+      plan: { model: "anthropic/model-a", resolved_model: resolvedModel },
+    })
+    const runner = new FakeRunner()
+    runner.childEffectiveModel = { provider: "anthropic", id: "model-b" }
+    const { manager, store } = makeManager({ planner, process: runner, config: settings({ default_execution_mode: "process" }) })
+
+    // when
+    const result = await manager.start(baseSpec({}))
+    if (result.kind !== "started") throw new Error("expected started")
+    const fake = runner.handles.get(result.task_id)
+    if (fake === undefined) throw new Error("expected live handle")
+    await fake.waitForSubscription()
+    await flush()
+
+    // then
+    expect(store.load(result.task_id)?.effective_model).toMatchObject({ provider: "anthropic", model_id: "model-b" })
+    expect(result.effective_model).toMatchObject({ provider: "anthropic", model_id: "model-b" })
   })
 
   test("#given a resolved ultrabrain plan whose runner throws #when the real task mapping renders start_failed #then resolved context reaches the error row without the prompt", async () => {
@@ -420,8 +579,8 @@ describe("TaskManager child subscriptions", () => {
     await flush()
 
     const promoted = runner.handles.get(queued.task_id)
-    // Owned transcript + run-stats subscriptions plus the deferred external child listener.
-    expect(promoted?.subscribeCount()).toBe(3)
+    // Owned transcript + run-stats + effective-model subscriptions plus the deferred external child listener.
+    expect(promoted?.subscribeCount()).toBe(4)
     unsubscribe()
     expect(promoted?.unsubscribeCount()).toBe(1)
   })

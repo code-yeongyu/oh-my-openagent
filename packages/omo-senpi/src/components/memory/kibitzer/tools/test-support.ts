@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -14,15 +14,9 @@ import { createSessionBranchSnapshot } from "./session-read"
 export const IDENTITY = "agent-kibitzer-tools-test"
 export const AUTHOR: GitCommitAuthor = { agentId: IDENTITY, authorName: "Kibitzer Tools Test Agent" }
 
-const roots: string[] = []
-
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })))
-})
-
 export async function tempRoot(prefix = "omo-kibitzer-tools-"): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), prefix))
-  roots.push(root)
+  onTestFinished(() => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 }))
   return root
 }
 
@@ -42,6 +36,15 @@ export async function writeMemory(repo: GitMemoryRepo, path: string, body: strin
 export async function commitMemory(repo: GitMemoryRepo, path: string, body: string, description = "Seed"): Promise<void> {
   await writeMemory(repo, path, body, description)
   await repo.commitWrite([path], `seed ${path}`, AUTHOR)
+}
+
+/** Commits through raw git with no hook, the way content written before secret screening existed sits in a repo. */
+export async function commitLegacyMemory(repo: GitMemoryRepo, path: string, body: string): Promise<void> {
+  await writeMemory(repo, path, body)
+  for (const argv of [["add", "--", path], ["commit", "--no-verify", "-m", `legacy ${path}`]]) {
+    const result = Bun.spawnSync(["git", ...argv], { cwd: repo.dir })
+    if (result.exitCode !== 0) throw new Error(`git ${argv[0]} failed: ${result.stderr.toString()}`)
+  }
 }
 
 export interface Harness {

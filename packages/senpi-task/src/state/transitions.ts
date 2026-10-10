@@ -232,9 +232,10 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
     case "cancel":
       return current === "running" || current === "pending"
     case "complete":
-    case "fail":
     case "interrupt":
       return current === "running"
+    case "fail":
+      return current === "running" || (current === "pending" && transition.failure_kind === "suspended_unresumable")
     case "lose":
       return false
     case "evict":

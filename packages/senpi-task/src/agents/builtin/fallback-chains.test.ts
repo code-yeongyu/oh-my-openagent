@@ -43,18 +43,18 @@ describe("AGENT_FALLBACK_CHAINS", () => {
       explore: [
         { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
+        { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-        { providers: ["opencode-go"], model: "minimax-m2.7" },
-        { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-4-5" }
+        { providers: ["opencode-go"], model: "minimax-m2.7" }
       ],
       librarian: [
         { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
+        { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-        { providers: ["opencode-go"], model: "minimax-m2.7" },
-        { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-4-5" }
+        { providers: ["opencode-go"], model: "minimax-m2.7" }
       ],
       "plan-consultant": [
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },

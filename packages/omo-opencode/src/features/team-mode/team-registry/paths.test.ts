@@ -114,6 +114,7 @@ describe("paths", () => {
   test("ensureBaseDirs creates all dirs with mode 0700", async () => {
     // given
     const baseDir = path.join(tmpdir(), `omo-test-${randomUUID()}`)
+    temporaryDirectories.push(baseDir)
 
     // when
     await ensureBaseDirs(baseDir)

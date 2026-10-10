@@ -219,6 +219,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
         callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
+        callerName: () => pi.getSessionName?.(),
         callerCause: () => run.cause,
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,

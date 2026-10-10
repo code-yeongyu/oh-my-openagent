@@ -1,3 +1,4 @@
+import { onTestFinished } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -97,6 +98,23 @@ export async function startHostWorld(options: FakeHostOptions = {}): Promise<Hos
   const host = await startFakeHost(options)
   const projectDir = mkdtempSync(join(tmpdir(), "dh-world-"))
   const parents: ParentSession[] = []
+  let cleanedUp: Promise<void> | undefined
+  const cleanup = (): Promise<void> => {
+    cleanedUp ??= (async () => {
+      // Detach every live child BEFORE the daemon goes away, so no late outcome writes into a
+      // store directory this cleanup is about to delete.
+      for (const parent of parents.splice(0)) {
+        await parent.lifecycle.suspendOnSessionShutdown({ parentSessionId: parent.sessionId, reason: "suite_cleanup" })
+        parent.lifecycle.dispose?.()
+      }
+      await host.stop()
+      rmSync(projectDir, { recursive: true, force: true })
+    })()
+    return cleanedUp
+  }
+  // A test that throws before reaching its own cleanup() call still stops the host and removes the
+  // project dir (#9766); the memo makes the test's explicit call and this one the same teardown.
+  onTestFinished(cleanup)
   return {
     host,
     projectDir,
@@ -110,16 +128,7 @@ export async function startHostWorld(options: FakeHostOptions = {}): Promise<Hos
         command.type === "prompt" && typeof command.payload.message === "string" ? [command.payload.message] : [],
       ),
     commandsOfType: (type) => host.commands.filter((command) => command.type === type).length,
-    cleanup: async () => {
-      // Detach every live child BEFORE the daemon goes away, so no late outcome writes into a
-      // store directory this cleanup is about to delete.
-      for (const parent of parents.splice(0)) {
-        await parent.lifecycle.suspendOnSessionShutdown({ parentSessionId: parent.sessionId, reason: "suite_cleanup" })
-        parent.lifecycle.dispose?.()
-      }
-      await host.stop()
-      rmSync(projectDir, { recursive: true, force: true })
-    },
+    cleanup,
   }
 }
 

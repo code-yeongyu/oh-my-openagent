@@ -1,4 +1,5 @@
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import type { TeardownStepDeadline } from "./teardown-budget"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
@@ -55,6 +56,9 @@ export type ResidencyRegistry = {
   isEvicting?(taskId: string): boolean
   tryBeginSend?(taskId: string): boolean
   endSend?(taskId: string): void
+  // Whether THIS engine's session owns the record (omo#9785). One process can host one engine per
+  // session, so host_pid alone cannot tell a handle-less child of this session from a live sibling's.
+  ownsRecord?(record: Pick<TaskRecord, "parent_session_id">): boolean
 }
 
 // Injectable OS-process signalling so unit tests never spawn real children. Defaults use
@@ -171,6 +175,8 @@ export type IdleReclaimerScheduler = {
 }
 
 export type LifecycleDeps = {
+  // Adapter's existing mutation channel: parks from manager, daemon loss and reconcile all flow here.
+  readonly onStoreMutation?: (listener: () => void) => () => void
   readonly revivePolicy?: RevivePolicyPort
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
@@ -195,6 +201,9 @@ export type LifecycleDeps = {
   readonly reconcileAdmission?: BatchAdmissionOptions
   // Injectable timer seam keeps lifecycle tests deterministic and prevents test-created timers.
   readonly idleReclaimerScheduler?: IdleReclaimerScheduler
+  readonly hostCloseScheduler?: IdleReclaimerScheduler
+  // How long one teardown step (abort, terminate, dispose) may hold its caller (omo#9785).
+  readonly teardownStepDeadline?: TeardownStepDeadline
   // The engine's runtime-only parent kernel-tool map. Destruction and expunge release a child's
   // binding through it; idle parking keeps the binding so a same-host revive still reaches it.
   readonly kernelToolBindings?: KernelToolBindingRegistry

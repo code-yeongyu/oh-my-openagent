@@ -336,6 +336,7 @@ describe("task 13 senpi QA scripts", () => {
 				id: "call-9119",
 			},
 			1,
+			"mock-1",
 		);
 		const toolEvents: Array<{
 			type: string;

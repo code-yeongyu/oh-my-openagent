@@ -107,6 +107,7 @@ describe("dag wake", () => {
     )
     expect(harness.delivered[0]?.message.details).toEqual([{
       customType: DAG_WAKE_MESSAGE_TYPE,
+      contentRange: [0, harness.delivered[0]?.message.content.length],
       details: {
         runId: "dag_1",
         name: "release-pipeline",

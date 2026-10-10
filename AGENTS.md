@@ -246,6 +246,8 @@ Defaults                   (Zod schema defaults)
 
 Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"`
 
+**Reserved in `~/.omo`:** `desktop/` and `desktop.init-*` belong to the OmO desktop app (its data home: a live SQLite database and worktrees; `OMO_DESKTOP_HOME` is the desktop's variable, code-yeongyu/omo-desktop-app#1829). No omo code may create, reset, archive, flatten, migrate, prune, copy or sync those entries; any code that walks `~/.omo` top-level entries must skip them. A project-scoped path (`<project>/.omo`) is the OmO home when the project directory is `$HOME`, so code that copies, migrates, syncs or walks a project's `.omo` must refuse that case (`legacy-workspace-migration.ts` does) (#9727).
+
 ## THREE-TIER MCP SYSTEM
 
 | Tier | Source | Loader | Mechanism |
@@ -348,6 +350,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 - Never em dashes / en dashes / AI filler ("simply", "obviously", "clearly", "moreover", "furthermore") in generated content.
 - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`).
 - Never empty catch blocks `catch(e) {}`.
+- Never let code that copies, migrates, syncs or walks a project's `.omo` run when the project directory is `$HOME` (there `.omo` is the OmO home), and never touch `~/.omo/desktop*`, the desktop app's live data (#9727).
 - Never test with Arrange-Act-Assert comments — use given/when/then.
 - **Prompt/prose contract tests are forbidden.** Never assert authored agent prompt, `SKILL.md`, rule, `AGENTS.md`, or markdown-instruction wording, headings, section order, fragments, snapshots, negative past wording, or authored text length. Test only machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, or observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation. Pure prose has no automated-test seam; review and QA-by-read are the correct verification.
 - Never dump business logic into `index.ts` — barrel exports only.
@@ -408,7 +411,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 | `cla.yml` | issue_comment / PR | CLA assistant for contributors |
 | `lint-workflows.yml` | push/PR touching `.github/workflows/**` | actionlint only (`shellcheck=""` disables shellcheck) |
 | `web-ci.yml` | push/PR to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself | format-check, lint, type-check, next build, opennextjs-cloudflare build |
-| `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v3` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets) |
+| `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v4` to the Sisyphus Labs account (`omo-production` environment, `CLOUDFLARE_API_TOKEN` scoped to Workers scripts + omo.dev zone routes) |
 | `package-labels.yml` | issues opened/edited + pull_request_target | Auto-applies package labels (`opencode` / `lazycodex` / `lazycodex-generated`) |
 | `stats.yml` | weekly cron (Sun) / dispatch | Runs `script/stats.ts` (npm + GitHub-release download counts) |
 

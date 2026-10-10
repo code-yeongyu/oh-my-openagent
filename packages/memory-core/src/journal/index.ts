@@ -33,3 +33,9 @@ export {
   type JournalLock,
   type TranscriptJournalOptions,
 } from "./store"
+export {
+  sweepEmptyTranscriptJournals,
+  type EmptyJournalKeepReason,
+  type EmptyJournalSweepOptions,
+  type EmptyJournalSweepResult,
+} from "./sweep"

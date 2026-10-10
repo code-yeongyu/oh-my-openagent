@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
+import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
+
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity } from "./commands.test-support"
 import { derivePeopleGraph, registerPeopleCommand, resolvePersonQuery } from "./people"
@@ -108,4 +110,30 @@ describe("/people command", () => {
     expect(ctx.ui.notifications).toEqual([{ message: text, level: "error" }])
   }, 30_000)
 
+  test("#given a card line carrying an aws key #when /people renders the card #then the key is masked", async () => {
+    // given
+    // given: a card committed before secret screening existed, so the repo has no screening hook
+    const { root, identity } = await tempIdentity()
+    tempDirs.push(root)
+    await new GitMemoryRepo({ dir: identity.identityPaths.repo, agentId: identity.identity, installHooks: () => undefined }).init({
+      seedFiles: [
+        {
+          relativePath: "people/alice-wong/card.md",
+          content: ["---", "description: Person - Alice Wong", "kind: person", "---", "", "IDENTITY: engineer", "ATTRIBUTE: AKIAABCDEFGHIJKLMNOP", ""].join("\n"),
+        },
+      ],
+    })
+    const deps = fakeDeps(identity)
+    const pi = new MemoryFakeExtensionAPI()
+    registerPeopleCommand(pi, deps)
+    const ctx = fakeCommandContext()
+
+    // when
+    const text = await invoke(pi, "people", "alice-wong", ctx)
+
+    // then
+    expect(text).not.toContain("AKIAABCDEFGHIJKLMNOP")
+    expect(text).toContain("***")
+    expect(ctx.ui.notifications.at(-1)).toEqual({ message: text, level: "info" })
+  }, 30_000)
 })

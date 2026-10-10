@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
+import { deliverySender } from "./gateway/provenance"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -357,8 +358,8 @@ function gatewayFixture() {
       },
     },
   }
-  const run = async (name: ThreadToolName, args: unknown, callerId: string, callId: string): Promise<ThreadToolResult> => {
-    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, sessionsDirectory: () => join(f.stateDirectory, "sessions"), store: f.store, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd() })
+  const run = async (name: ThreadToolName, args: unknown, callerId: string, callId: string, callerName?: string): Promise<ThreadToolResult> => {
+    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, sessionsDirectory: () => join(f.stateDirectory, "sessions"), store: f.store, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd(), callerName: () => callerName })
     const tool = tools.find((candidate) => candidate.name === name)
     const result = await tool!.execute(callId, args, undefined, undefined, { sessionManager: { getSessionId: () => callerId } } as never)
     return result.details.result as ThreadToolResult
@@ -388,6 +389,17 @@ describe("thread_send through the session gateway", () => {
     expect(second).toMatchObject({ kind: "ok", deduplicated: true })
     expect(await g.f.store.list({ target_durable_id: "dur-tui" })).toHaveLength(1)
     expect(g.wakes).toHaveLength(1)
+  })
+
+  test("#given a named caller and an unnamed one #when each sends to a terminal #then the receiver is told the sending session's id and, only when it has one, its current name", async () => {
+    const g = gatewayFixture()
+    await g.run("thread_send", { thread: "dur-tui", message: "from the planner" }, "dur-host", "call-1", "  planner ")
+    await g.run("thread_send", { thread: "dur-tui", message: "from an unnamed session" }, "dur-other", "call-2")
+    const rows = await g.f.store.list({ target_durable_id: "dur-tui" })
+    expect(rows.map((row) => ({ body: row.body, sender: deliverySender(row) }))).toEqual([
+      { body: "from the planner", sender: { kind: "agent", session_id: "dur-host", name: "planner" } },
+      { body: "from an unnamed session", sender: { kind: "agent", session_id: "dur-other" } },
+    ])
   })
 
   test("#given the gateway send path #when a session sends to itself #then it is refused loop_detected before any row is written", async () => {

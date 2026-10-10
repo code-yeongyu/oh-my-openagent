@@ -1,4 +1,5 @@
 import { log } from "@oh-my-opencode/utils"
+import { defaultTeardownStepDeadline, withinTeardownBudget } from "../lifecycle/teardown-budget"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
 import { runMoved, staleCancel } from "./stale-run"
@@ -12,6 +13,13 @@ export function createSteeringControls(
   clearPersistedQueue: (taskId: string) => void,
 ) {
   const nowIso = (): string => new Date(port.now()).toISOString()
+
+  // A child that never answers its abort must not hold the cancel or interrupt forever (omo#9791): past the
+  // budget the caller moves on, and for a cancel the destruction that follows terminates the child (SIGKILL
+  // escalation for a process child) and waits for its exit.
+  function boundedAbort(handle: ManagedChildHandle, taskId: string): Promise<void> {
+    return withinTeardownBudget(port.abortDeadline ?? defaultTeardownStepDeadline, { taskId, pid: handle.pid }, "abort", () => handle.abort())
+  }
 
   async function interruptTask(idOrName: string): Promise<InterruptOutcome> {
     const record = resolve(idOrName)
@@ -30,7 +38,7 @@ export function createSteeringControls(
       return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be interrupted from running.` }
     }
     const handle = port.liveHandle(record.task_id)
-    if (handle !== undefined) await handle.abort()
+    if (handle !== undefined) await boundedAbort(handle, record.task_id)
     const partial = handle?.lastAssistantText()
     if (partial !== undefined && partial.length > 0) {
       port.store.replace({ ...result.record, final_response: partial })
@@ -65,6 +73,10 @@ export function createSteeringControls(
       return { kind: "cancelled", task_id: record.task_id, previous_status: "pending" }
     }
     if (record.status !== "running") {
+      // A finished child can still hold its process or session (omo#9785); cancel is the way to release it.
+      if (options?.abort !== "skip" && record.residency_state === "resident" && (await port.destruction.parkTerminalResident?.(record.task_id)) === true) {
+        return { kind: "released", task_id: record.task_id, status: record.status }
+      }
       const reasonText = record.status === "cancelled" ? `Task ${record.task_id} is already cancelled.` : `Task ${record.task_id} is ${record.status}, not running.`
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
     }
@@ -96,7 +108,7 @@ export function createSteeringControls(
     // An exited RPC child's abort rejection must not skip destruction and leak residency.
     if (handle !== undefined && options?.abort !== "skip") {
       try {
-        await handle.abort()
+        await boundedAbort(handle, record.task_id)
       } catch (error) {
         log("senpi-task steering cancel abort rejected", {
           taskId: record.task_id,

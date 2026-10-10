@@ -120,6 +120,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         },
         switchSession: (target: string): Promise<RpcSwitchSessionResult> =>
           target === sessionPath ? Promise.resolve({ cancelled: false }) : switchOnPort(target),
+        ...(opened.reportedModel === undefined ? {} : { reportedModel: opened.reportedModel }),
       })
     },
   }

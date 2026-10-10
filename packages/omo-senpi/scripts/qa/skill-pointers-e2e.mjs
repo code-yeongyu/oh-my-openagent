@@ -67,6 +67,57 @@ const SCENARIOS = [
     forbidMarkers: [ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
+  // #9600: a relayed report or a quoted mention describes someone else's request, so nothing arms.
+  {
+    name: "relayed-report",
+    prompt: "[REPORT] lane | filed | the executor quoted mass ulw research and ulw-loop in its brief",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  {
+    name: "quoted-mention",
+    prompt: "the user typed \u201Cmass ulw research the market\u201D and it armed; is that expected?",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  // #9738 / #9740: a skill name inside an identifier or path, or named only to forbid it, is a reference.
+  {
+    name: "identifier-reference",
+    prompt: "what happened in the mass-ulw-refactor session? see the senpi-ulw-loop lane and .omo/ulw-plan/draft.md",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  {
+    name: "negated-mention",
+    prompt: "Do not load mass-ulw or ulw-research or launch your own workflow. Summarize the release notes.",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  {
+    name: "lead-relay-naming-five-skills",
+    prompt: "Lead (w46:p1), bugwatch: build both rules; this report fired the mass-ulw, ulw-plan, ulw-loop, ulw-research and ultimate-browsing pointers",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    expectTranscriptMarkers: [],
+  },
+  {
+    name: "request-after-prohibition",
+    prompt: "Don't use tmux. ulw this",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    expectTranscriptMarkers: ["<ultrawork-mode>"],
+  },
+  {
+    name: "korean-sentence-ending-keyword",
+    prompt: "\uC774 \uBC84\uADF8 \uACE0\uCCD0\uC918 ulw",
+    expectHidden: [],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    expectTranscriptMarkers: ["<ultrawork-mode>"],
+  },
 ]
 
 function collectFiles(root, files) {
@@ -156,7 +207,9 @@ function runScenario(resolvedSenpi, scenario) {
         timeout: 60_000,
       },
     )
-    const transcript = run.status === 0 ? readSandboxText(sandbox.agentDir) : ""
+    // Only the session transcript counts: the engine's runtime snapshot under the agent dir ships docs
+    // that mention these markers, which would satisfy or trip a whole-dir scan on its own.
+    const transcript = run.status === 0 ? readSandboxText(join(sandbox.agentDir, "sessions")) : ""
     const session = inspectSession(sandbox.agentDir)
 
     const failures = []

@@ -32,15 +32,46 @@ const signal = new AbortController().signal
 const values = (items: readonly AutocompleteItemLike[] | undefined): string[] => (items ?? []).map((item) => item.value)
 
 describe("bare skill command autocomplete", () => {
-  test("#given senpi lists skill:<name> rows #when the user types /ulw #then each loaded alias sits above its own skill row", async () => {
-    const base = new FakeProvider({ prefix: "/ulw", items: [{ value: "skill:ulw-execute", label: "skill:ulw-execute" }, { value: "skill:ulw-plan", label: "skill:ulw-plan" }] })
+  test("#given senpi lists skill:<name> rows #when the user types /ulw #then each loaded skill is one row, its bare alias in its skill row's place (#9648)", async () => {
+    const base = new FakeProvider({
+      prefix: "/ulw",
+      items: [{ value: "skill:ulw-execute", label: "skill:ulw-execute" }, { value: "settings", label: "settings" }, { value: "skill:ulw-plan", label: "skill:ulw-plan" }],
+    })
     const wrapped = wrapWithBareSkillCommands(base, NAMES, () => COMMANDS)
 
     const result = await wrapped.getSuggestions(["/ulw"], 0, 4, { signal })
 
     expect(result?.prefix).toBe("/ulw")
-    expect(values(result?.items)).toEqual(["ulw-execute", "skill:ulw-execute", "ulw-plan", "skill:ulw-plan"])
+    expect(values(result?.items)).toEqual(["ulw-execute", "settings", "ulw-plan"])
     expect(result?.items[0]?.description).toBe("Executes a work plan.")
+  })
+
+  test("#given a same-named command shadows a skill's bare name #when the user types /init #then that skill keeps its skill:<name> row, the only way to reach it (#9648)", async () => {
+    const base = new FakeProvider({
+      prefix: "/init",
+      items: [{ value: "init", label: "init" }, { value: "skill:init", label: "skill:init" }, { value: "skill:init-deep", label: "skill:init-deep" }],
+    })
+    const shadowed = new Set(["init"])
+    const wrapped = wrapWithBareSkillCommands(base, shadowed, () => [...COMMANDS, { name: "skill:init", source: "skill" }])
+
+    const result = await wrapped.getSuggestions(["/init"], 0, 5, { signal })
+
+    expect(values(result?.items)).toEqual(["init", "skill:init", "skill:init-deep"])
+  })
+
+  test("#given the user types /skill: #when suggestions are requested #then senpi's skill:<name> list is returned unchanged (#9648)", async () => {
+    const page = { prefix: "/skill:", items: [{ value: "skill:ulw-execute", label: "skill:ulw-execute" }, { value: "skill:ulw-plan", label: "skill:ulw-plan" }] }
+    const wrapped = wrapWithBareSkillCommands(new FakeProvider(page), NAMES, () => COMMANDS)
+
+    expect(await wrapped.getSuggestions(["/skill:"], 0, 7, { signal })).toBe(page)
+    expect(await wrapped.getSuggestions(["/skill:ulw"], 0, 10, { signal })).toBe(page)
+  })
+
+  test("#given the user types /skill without the colon #when suggestions are requested #then the skill:<name> rows stay, since that is where the user is going (#9648)", async () => {
+    const page = { prefix: "/skill", items: [{ value: "skill:ulw-execute", label: "skill:ulw-execute" }, { value: "skill:ulw-plan", label: "skill:ulw-plan" }] }
+    const wrapped = wrapWithBareSkillCommands(new FakeProvider(page), NAMES, () => COMMANDS)
+
+    expect(values((await wrapped.getSuggestions(["/skill"], 0, 6, { signal }))?.items)).toEqual(["skill:ulw-execute", "skill:ulw-plan"])
   })
 
   test("#given senpi marks a skill row as awaiting arguments #when the user types /ulw #then its alias waits too and shows the same hint", async () => {
@@ -56,7 +87,7 @@ describe("bare skill command autocomplete", () => {
     const result = await wrapped.getSuggestions(["/ulw"], 0, 4, { signal })
 
     expect(result?.items[0]).toEqual({ value: "ulw-execute", label: "ulw-execute", description: "[plan-name] — Executes a work plan.", awaitsArguments: true })
-    expect(result?.items[2]).toEqual({ value: "ulw-plan", label: "ulw-plan", description: "Plans first." })
+    expect(result?.items[1]).toEqual({ value: "ulw-plan", label: "ulw-plan", description: "Plans first." })
   })
 
   test("#given ulw-research is disabled #when the user types /ulw #then its alias is not offered", async () => {

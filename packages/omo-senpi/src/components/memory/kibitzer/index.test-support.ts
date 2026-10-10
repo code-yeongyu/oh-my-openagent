@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -26,11 +26,6 @@ export const registry = {
   getProviderAuth: () => undefined,
 }
 
-const roots: string[] = []
-afterEach(async () => {
-  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
-})
-
 interface Harness {
   readonly root: string
   readonly context: MemoryIdentityContext
@@ -55,7 +50,7 @@ interface Harness {
 
 export async function harness(overrides: Partial<OmoMemorySettings> = {}): Promise<Harness> {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-kibitzer-composition-")))
-  roots.push(root)
+  onTestFinished(() => rm(root, { recursive: true, force: true }))
   const identityPaths = buildIdentityPaths(join(root, "memory"), IDENTITY)
   const context = createMemoryIdentityContext({
     identity: IDENTITY,
