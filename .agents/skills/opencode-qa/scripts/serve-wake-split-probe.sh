@@ -9,7 +9,8 @@
 # Two assertion modes:
 #   --expect reproduced   exit 0 if terminal_stops>1 OR child_task_sessions>1 OR mechanism arm true
 #   --expect fixed        exit 0 if terminal_stops==1, child_task_sessions==1,
-#                         fixed branch counts hold, and route logs show live dispatch
+#                         fixed branch counts hold (including one live-routed wake retry),
+#                         and route logs show live dispatch
 #
 # Usage:
 #   serve-wake-split-probe.sh [--expect reproduced|fixed] [--evidence-dir DIR]
@@ -426,6 +427,7 @@ swsp_fixed_topology_observed() {
 
   [ "$has_live_dispatch" = "true" ] || return 1
 
+  # One live-routed wake can be the reply-required liveness retry after the parent turn.
   if [ "${terminal_stops:-0}" -ne 1 ] \
     || [ "${child_task_sessions:-0}" -ne 1 ] \
     || [ "${parent_tool_call_turns:-0}" -ne 2 ] \
@@ -434,7 +436,7 @@ swsp_fixed_topology_observed() {
     || [ "${parent_hold_branches:-0}" -ne 1 ] \
     || [ "${child_branches:-0}" -ne 1 ] \
     || [ "${default_branches:-0}" -lt 1 ] \
-    || [ "${wake_branches:-0}" -ne 0 ] 2>/dev/null; then
+    || [ "${wake_branches:-0}" -gt 1 ] 2>/dev/null; then
     return 1
   fi
 
@@ -614,6 +616,20 @@ swsp_self_test() {
   else
     swsp_log "FAIL: fixed topology rejected scoped live dispatch plus deterministic DB/provider evidence"
     fails=$((fails+1))
+  fi
+
+  if swsp_fixed_topology_observed 3 2 1 1 1 1 1 1 1 true; then
+    swsp_info "PASS: fixed topology accepts one live-routed post-turn wake retry"
+  else
+    swsp_log "FAIL: fixed topology rejected one live-routed post-turn wake retry"
+    fails=$((fails+1))
+  fi
+
+  if swsp_fixed_topology_observed 3 2 1 1 1 1 1 2 1 true; then
+    swsp_log "FAIL: fixed topology accepted duplicate wake retries"
+    fails=$((fails+1))
+  else
+    swsp_info "PASS: fixed topology rejects duplicate wake retries"
   fi
 
   if swsp_fixed_topology_observed 3 2 1 1 1 1 1 0 1 false; then
