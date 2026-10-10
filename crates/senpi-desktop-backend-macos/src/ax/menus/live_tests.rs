@@ -53,10 +53,18 @@ fn launch(binary: &Path, title: &str, record: &Path, extra: Option<&str>) -> (Fi
     }
     let fixture = Fixture(command.spawn().unwrap());
     println!("fixture_pid={} title={title}", fixture.0.id());
+    let second = extra.map(|_| format!("{title}-second"));
     let started = Instant::now();
     loop {
-        if let Some(window) = capture().windows().unwrap().into_iter().find(|w| w.title == title) {
-            println!("window_id={} window_title={:?}", window.id, window.title);
+        let windows = capture().windows().unwrap();
+        let second_listed = second
+            .as_ref()
+            .is_none_or(|second| windows.iter().any(|w| &w.title == second));
+        if let Some(window) = windows.into_iter().find(|w| w.title == title).filter(|_| second_listed) {
+            println!(
+                "window_id={} window_title={:?} second_listed={second_listed}",
+                window.id, window.title
+            );
             return (fixture, window);
         }
         assert!(
