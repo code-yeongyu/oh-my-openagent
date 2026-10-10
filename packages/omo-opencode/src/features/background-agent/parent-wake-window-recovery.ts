@@ -30,6 +30,14 @@ export async function handleDispatchedParentWakeWindowElapsed(
     return
   }
 
+  if (!input.wake.shouldReply) {
+    input.dispatchedTracker.clearWake(input.sessionID)
+    log("[background-agent] Cleared no-reply parent wake; missing assistant output is expected:", {
+      sessionID: input.sessionID,
+    })
+    return
+  }
+
   const retryCount = input.wake.noAssistantOutputRetryCount ?? 0
   if (retryCount >= MAX_NO_ASSISTANT_OUTPUT_RETRIES) {
     input.dispatchedTracker.clearWake(input.sessionID)
