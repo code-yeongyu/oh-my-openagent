@@ -335,6 +335,33 @@ describe("thread component legacy mailbox import", () => {
       rmSync(agentDir, { recursive: true, force: true })
     }
   })
+
+  test("#given an unreadable legacy mailbox #when the store reopens after its idle worker retired #then the failure is reported once, not at every reopen", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-legacy-invalid-"))
+    try {
+      const stateDirectory = join(agentDir, "state")
+      // mailbox.jsonl as a directory: the legacy import cannot read it at any open.
+      mkdirSync(join(stateDirectory, "mailbox", "mailbox.jsonl"), { recursive: true })
+      const warnings: string[] = []
+      let retired!: () => void
+      const firstRetire = new Promise<void>((resolve) => { retired = resolve })
+      const store = createGatewayStore({ agentDir, legacyMailboxDirectories: [join(stateDirectory, "mailbox")], _test: { idleRetireMs: 1, onWorkerRetired: () => retired() } })
+      let invalidSeen = 0
+      let secondInvalid!: () => void
+      const reopened = new Promise<void>((resolve) => { secondInvalid = resolve })
+      store.onEvent((event) => { if (event.kind === "legacy_mailbox_invalid" && ++invalidSeen === 2) secondInvalid() })
+      const f = eventApi()
+      createThreadComponent({ host: host(), stateDirectory, agentDir: () => agentDir, store }).register(f.pi as never, context(warnings) as never)
+      await store.stats()
+      await within(firstRetire, 10_000, "the idle store worker to retire")
+      await store.stats()
+      await within(reopened, 10_000, "the reopened store to retry the unreadable mailbox")
+      expect(warnings.filter((message) => message.includes("legacy thread mailbox"))).toHaveLength(1)
+      await store.dispose()
+    } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe("thread component startup and shutdown touch no store they do not need", () => {

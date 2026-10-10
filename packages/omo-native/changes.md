@@ -1,3 +1,35 @@
+## 2026-10-09 - Settle native logout refresh failures and crash recovery (#9833)
+
+The regenerated auth bundle distinguishes refresh refusals from unconfirmed outcomes. Both clear locally and exit successfully. The unconfirmed-revocation warning is skipped only for `account_deleted` and `reauth_required`, where the service has already revoked the device; `unauthorized`, `invalid_grant` and every unconfirmed outcome warn. Crash recovery never replays a refresh token marked uncertain.
+
+## 2026-10-09 - Recover native sign-in after TLS and opener failures (#9831 follow-up)
+
+The refreshed authentication bundle treats certificate and proven connection failures as retryable, refreshes safe expired credentials before logout revocation, and preserves an accepted callback despite browser-opener failure. Secret-output and chooser/C1-control regression tests cover the native command surface.
+
+## 2026-10-09 - Harden native service sign-in recovery (#9831)
+
+The regenerated authentication bundle retains offline credentials, prevents replay of refresh tokens with unknown outcomes, sanitizes terminal output, backs off device polling on rate limits, and attempts server-side device revocation on logout while always clearing local credentials.
+
+## 2026-10-09 - Route CLI service sign-in before launching the engine (#9829)
+
+The npm launcher and compiled entry now handle `omo login`, `omo logout`, and `omo whoami` as standalone service commands. They share the toolkit's PKCE/device flows and OS-only credential storage. The npm payload includes a generated command bundle, checked against source before shipping; a runtime without Bun.secrets reports the requirement instead of saving credentials to disk.
+
+## 2026-10-04 - Every bun is held to the engine's 1.4 floor; a too-old bun you chose says so at startup (#9563)
+
+The engine needs bun 1.4 (`node:sqlite`, and the `worker_threads` compatibility the JS eval kernel uses), and `BUN_MIN_VERSION` said so, but `bin/lib/bun-runtime.js` applied the floor only to a bun it discovered on an npm install. A `bun add -g` install re-exec'd under its bun with no probe, and the POSIX bun-global shim runs bun directly, where "already on bun" stayed put whatever the version. So on bun 1.3.x, `/computer on` failed with `ResolveMessage: No such built-in module: node:sqlite`, the first of several things that could not work there.
+
+Now every path checks the floor. A bun the user chose (a bun-global install or `OMO_RUNTIME=bun`) that is older stops at startup with `omo: OmO needs Bun >= 1.4.0 (found 1.3.14); run \`bun upgrade\`` instead of silently switching runtimes. Any other install keeps using node when the bun it finds is older. A process already running on an older bun that nobody chose hands off to a real node (bun's own `node` shim does not count), pinned with `OMO_RUNTIME=node` so it cannot bounce back. With no real node, it fails with the same message. Bun 1.4+ is unchanged, apart from one `bun --version` probe on the node-launched path of a bun-global install.
+
+## 2026-10-04 - The provisioned-handoff test's teardown no longer fails the Windows shard (#9556)
+
+`packages/omo-native/test/provisioned-handoff.test.ts` removed its temp root with a bare `rmSync` in `afterAll`. On Windows, a file the just-exited compiled `omo` child still held made it throw `EBUSY`; bun reported that as an unnamed failed test and failed `test (windows-latest, 2/2)` on unrelated PRs. The teardown now uses the shared `test-support/remove-tree.ts` `removeTree`, which retries a transient `EBUSY`/`EPERM` within a bounded budget and still throws a persistent one.
+
+## 2026-10-04 - Every one-shot engine command reaches the engine, so `omo models discover` works (#9572)
+
+The engine dispatches its one-shot commands on `argv[0]`, but the launcher handed only a fixed list straight through (`install, remove, list, config, auth, app-server, host`, plus `update`) and put `--extension <plugin>` in front of everything else. So `omo models discover <provider>` started an interactive session instead of discovering models, and `omo schedule ...` and the `uninstall` alias of `remove` did the same.
+
+`bin/lib/engine-commands.js` (`isEngineCommand`) now names every command the engine dispatches before a session starts, including `models discover`, `schedule` and `uninstall`. The npm launcher and the compiled entry (`compile-args.ts`) both hand those over unchanged. `app-server` keeps its plugin after its arguments, and a prompt that merely starts with `models` is still a chat launch with the plugin. `test/engine-commands.test.ts` walks the installed engine's own dispatch (`cli/deferred-commands`, the package verbs, auth, `models discover`), so a command the engine adds fails until the launcher routes it.
+
 ## 2026-10-02 - Gate each platform publish on that platform's release-binary smoke (#9385)
 
 In `.github/workflows/publish-platform.yml` the build leg uploaded the npm payload artifact (`binary-<platform>`)

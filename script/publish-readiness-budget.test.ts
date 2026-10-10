@@ -135,8 +135,8 @@ describe("publish.yml post-publish-verify registry readiness", () => {
   test("#given metadata is ready but the tarball stays unavailable #when readiness exhausts its budget #then it probes HEAD every attempt and names tarball availability", () => {
     const outcome = runReadiness({ metadataReadyAfterViews: 0, tarballReadyAfterHeads: Number.MAX_SAFE_INTEGER })
     expect(outcome.status).not.toBe(0)
-    expect(outcome.curlCalls).toBe(60)
-    expect(outcome.sleeps).toBe(59)
+    expect(outcome.curlCalls).toBe(240)
+    expect(outcome.sleeps).toBe(239)
     expect(outcome.stdout + outcome.stderr).toContain("metadata and tarball did not become ready")
     expect(outcome.stdout + outcome.stderr).toContain("tarball availability")
   }, READINESS_TEST_TIMEOUT_MS)
@@ -147,8 +147,9 @@ describe("publish.yml post-publish-verify registry readiness", () => {
       const outcome = runReadiness({ metadataReadyAfterViews: Number.MAX_SAFE_INTEGER, tarballReadyAfterHeads: Number.MAX_SAFE_INTEGER })
       expect(outcome.status).not.toBe(0)
       expect(outcome.stdout + outcome.stderr).toContain("propagat")
-      // Budget is wall-clock shaped, not "5 tries": sleeps x interval must cover several minutes.
-      expect(outcome.sleeps).toBeGreaterThanOrEqual(20)
+      // Budget is wall-clock shaped, not "5 tries": sleeps x the 15 s interval must cover npm's
+      // measured processing delay, which reached ~55 minutes for omo-ai@5.1.13 (#9492).
+      expect(outcome.sleeps * 15).toBeGreaterThanOrEqual(55 * 60)
     },
     READINESS_TEST_TIMEOUT_MS,
   )

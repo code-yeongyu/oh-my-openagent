@@ -1,3 +1,5 @@
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
+
 import type { EventTelemetryClient, EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
@@ -45,7 +47,7 @@ export function createOmoNativePromptComponent(options: OmoNativePromptComponent
 
         const sessionId = extractSessionId(eventCtx) ?? "anonymous"
         const snapshot = armingSnapshot(sessionId)
-        const classification = classifyUltraworkInput({ text: input.text, source: input.source }, snapshot)
+        const classification = classifyUltraworkInput({ text: input.text, source: input.source, sessionRole: readSessionRole(pi) }, snapshot)
         const ordinal = nextRealPromptOrdinal(realPromptOrdinals, sessionId, input.source)
         pending.set(input.inputId, {
           classification,

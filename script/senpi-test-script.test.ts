@@ -113,6 +113,11 @@ describe("Senpi compatibility test script", () => {
         await mkdir(join(pluginRoot, "skills", skillName), { recursive: true })
         await writeFile(join(pluginRoot, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
       }
+      // The browser skill's bundled omowright runtime is a required payload artifact (issue #9661);
+      // the packed layout mirrors it so the installer's integrity check passes.
+      await mkdir(join(pluginRoot, "skills", "browser", "runtime", "omowright"), { recursive: true })
+      await writeFile(join(pluginRoot, "skills", "browser", "runtime", "omowright", "index.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "skills", "browser", "runtime", "omowright", "page-bundle.js"), "\n")
       // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
       await mkdir(join(pluginRoot, "skills-conditional", "x-search"), { recursive: true })
       await writeFile(join(pluginRoot, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
@@ -122,6 +127,7 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "omo-member.js"), "export const runMember = () => undefined\n")
       await writeFile(join(pluginRoot, "extensions", "omo-computer-use.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-memory-doctor.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-memfs.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")

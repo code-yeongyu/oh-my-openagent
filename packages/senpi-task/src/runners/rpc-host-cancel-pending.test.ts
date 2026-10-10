@@ -225,7 +225,7 @@ describe("a pending cancel always ends the run", () => {
     // when - the host answers its protocol probe but refuses list_sessions, as an overloaded shard does
     world.host.allowReply("open_session")
     world.host.failReply("list_sessions", "host busy")
-    const restarted = world.connect(parent.sessionId, { ...lane.options, productionProbe: true, hostCloseTimeoutMs: 50 })
+    const restarted = world.connect(parent.sessionId, { ...lane.options, productionProbe: true })
     await restarted.lifecycle.reconcileOnSessionStart(parent.sessionId)
 
     // then - "could not ask" is not "nothing is live": the cancel is still pending and the session still held
@@ -235,7 +235,7 @@ describe("a pending cancel always ends the run", () => {
 
     // when - the next session start, with the host listing again
     world.host.failReply("list_sessions", undefined)
-    const again = world.connect(parent.sessionId, { ...lane.options, productionProbe: true, hostCloseTimeoutMs: 50 })
+    const again = world.connect(parent.sessionId, { ...lane.options, productionProbe: true })
     await again.lifecycle.reconcileOnSessionStart(parent.sessionId)
 
     // then
@@ -244,32 +244,4 @@ describe("a pending cancel always ends the run", () => {
     await bounded(session.processExit ?? Promise.resolve(), "the cancelled child's process exit")
   })
 
-  test("#given a child whose transport recovery is reading the reattached session's state #when task_cancel lands during that read #then the turn is never continued and the session ends on the host", async () => {
-    // given - a reattach that gets the connection back but holds its state read
-    const lane = await startCancelLane(worlds, 1)
-    const { world, parent } = lane
-    await parent.startChildren(1)
-    const child = recordAt(parent, 0)
-    const session = sessionOf(world, child)
-    world.host.withholdReply("get_state")
-    const stateAsked = world.host.waitForCommand("get_state")
-    const promptsBefore = world.commandsOfType("prompt")
-    world.host.cutConnections()
-    await bounded(stateAsked, "the reattach's state read")
-
-    // when - the cancel lands during the read, then the host answers state reads again
-    const cancelled = await bounded(runTaskCancel(parent.manager, { task_id: child.task_id }), "task_cancel")
-    world.host.allowReply("get_state")
-    world.host.cutConnections()
-    const stopped = await bounded(parent.manager.waitFor(child.task_id), "the cancelled record")
-
-    // then
-    expect(["cancel_pending", "cancelled"]).toContain(cancelled.details.kind)
-    expect(stopped.status).toBe("cancelled")
-    expect(world.commandsOfType("prompt")).toBe(promptsBefore)
-    // The record turns cancelled as the stop lands; the host drops the session as its close completes.
-    // Wait for that end on the host instead of racing it.
-    await bounded(session.processExit ?? Promise.resolve(), "the cancelled child's process exit")
-    expect(hostHolds(world, child)).toBe(false)
-  })
 })

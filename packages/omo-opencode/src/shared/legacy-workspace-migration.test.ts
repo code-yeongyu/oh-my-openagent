@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { migrateLegacyWorkspaceDirectory } from "./legacy-workspace-migration"
@@ -87,6 +87,49 @@ describe("migrateLegacyWorkspaceDirectory", () => {
     expect(result.migrated).toBe(false)
     expect(result.skipped).toContain(join(".omo", "plans", "linked.md"))
     expect(existsSync(join(testDirectory, ".omo", "plans", "linked.md"))).toBe(false)
+  })
+
+  test("#given the directory is the user's home #when migrating #then leaves the home ~/.omo untouched", () => {
+    // given: OpenCode started in $HOME, where ~/.omo is the OmO home (agent dir, memory, the desktop app's
+    // live database under ~/.omo/desktop), not a project workspace (#9727)
+    const previousHome = process.env.HOME
+    process.env.HOME = testDirectory
+    mkdirSync(join(testDirectory, ".sisyphus", "desktop"), { recursive: true })
+    mkdirSync(join(testDirectory, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(join(testDirectory, ".sisyphus", "desktop", "state.sqlite-wal"), "foreign", "utf-8")
+    writeFileSync(join(testDirectory, ".sisyphus", "plans", "work.md"), "# Plan", "utf-8")
+    mkdirSync(join(testDirectory, ".omo", "desktop"), { recursive: true })
+    writeFileSync(join(testDirectory, ".omo", "desktop", "state.sqlite"), "live", "utf-8")
+
+    try {
+      // when
+      const result = migrateLegacyWorkspaceDirectory(testDirectory)
+
+      // then
+      expect(result.migrated).toBe(false)
+      expect(readdirSync(join(testDirectory, ".omo")).sort()).toEqual(["desktop"])
+      expect(readdirSync(join(testDirectory, ".omo", "desktop"))).toEqual(["state.sqlite"])
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME
+      else process.env.HOME = previousHome
+    }
+  })
+
+  test("#given a dangling symlink at the target path #when migrating #then never writes through it", () => {
+    // given: a target entry that exists as a link to a path outside .omo, but whose destination is missing
+    const outsidePath = join(testDirectory, "outside", "work.md")
+    mkdirSync(join(testDirectory, "outside"), { recursive: true })
+    mkdirSync(join(testDirectory, ".sisyphus", "plans"), { recursive: true })
+    mkdirSync(join(testDirectory, ".omo", "plans"), { recursive: true })
+    writeFileSync(join(testDirectory, ".sisyphus", "plans", "work.md"), "legacy", "utf-8")
+    symlinkSync(outsidePath, join(testDirectory, ".omo", "plans", "work.md"))
+
+    // when
+    const result = migrateLegacyWorkspaceDirectory(testDirectory)
+
+    // then
+    expect(existsSync(outsidePath)).toBe(false)
+    expect(result.skipped).toContain(join(".omo", "plans", "work.md"))
   })
 
   test("#given no legacy workspace #when migrating #then reports no migration", () => {

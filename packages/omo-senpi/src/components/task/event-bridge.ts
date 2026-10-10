@@ -9,6 +9,7 @@ import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
+import { wireDagVerificationContext } from "./dag-verification-context"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -42,6 +43,7 @@ export function wireEventBridge(
   deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  wireDagVerificationContext(pi, engine.runtime)
   const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)

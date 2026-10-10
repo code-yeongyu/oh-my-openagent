@@ -4,6 +4,7 @@ import type { ManagedChildHandle } from "../manager/child-handle"
 import { isTransportLostMessage, messageability } from "../state"
 import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
+import { runMoved, staleSend } from "./stale-run"
 import {
   DEFAULT_SEND_DELIVERY,
   type SendDelivery,
@@ -60,6 +61,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     }
     const denied = scopeDenied(record, input)
     if (denied !== undefined) return denied
+    // A fenced send acts on exactly this record's run: every revive below re-checks that run_epoch
+    // inside its own record mutation, so a run that moves after this check is never revived twice.
+    if (runMoved(record, input.expectedRunEpoch)) return staleSend(record)
     // One-shot policy runs after ownership is established but BEFORE the pending enqueue and
     // messageability: a one-shot agent refuses task_send in every state (running, pending,
     // terminal, cross-session alike), and an unauthorized caller learns only the scope denial.

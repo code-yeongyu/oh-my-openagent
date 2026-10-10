@@ -1,4 +1,5 @@
-import type { ParentNotifier, ParentNotifierMessage } from "@oh-my-opencode/senpi-task"
+import { isGpt6AstraModel } from "@oh-my-opencode/model-core"
+import { ASTRA_DAG_VERIFICATION_DIRECTIVE, buildCompletionMessage, type ParentNotifier, type ParentNotifierMessage } from "@oh-my-opencode/senpi-task"
 
 import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -27,18 +28,24 @@ export function createParentNotifier(
   coordinator?: IdleInjectionCoordinator,
   isStreaming?: () => boolean,
   onDeliveryFailed?: (taskIds: readonly string[], error: unknown) => void,
+  getReceiverModel?: () => string | undefined,
 ): ParentNotifier {
   return {
     enqueue(message: ParentNotifierMessage): void {
+      const content = (): string => message.details.some((detail) => detail.dag !== undefined)
+        ? buildCompletionMessage(message.details, isGpt6AstraModel(getReceiverModel?.()) ? ASTRA_DAG_VERIFICATION_DIRECTIVE : undefined).content
+        : message.content
       if (coordinator !== undefined) {
         const taskIds = message.details.map((detail) => detail.task_id)
         const accepted = coordinator.enqueue({
           key: injectionKey(message),
           source: "task-completion",
           customType: message.customType,
-          content: message.content,
+          // The coordinator reads this at flush, after any model switch inside its batch window.
+          get content() { return content() },
           display: message.display,
           details: message.details,
+          ...(message.details.some((detail) => detail.dag !== undefined) ? { contextScoped: true } : {}),
           onDeliveryFailed: (error) => onDeliveryFailed?.(taskIds, error),
         })
         // Refused: the coordinator retired with the session, so nothing is queued and no receipt is
@@ -54,7 +61,7 @@ export function createParentNotifier(
       pi.sendMessage(
         {
           customType: message.customType,
-          content: message.content,
+          content: content(),
           display: message.display,
           details: message.details,
         },

@@ -209,7 +209,10 @@
     --lit-follow-fade: 22vh;
     --lit-follow-gap: 1.25em;
     --lit-follow-rise: var(--space-6);
-    --lit-line: 78vh;
+    /* The manifesto reveal fully lights a word once its bottom (plus its in-line stagger) is above
+       --lit-line - --lit-band (83vh). Measured at word tops, the fully lit depth is 0.81 of the
+       viewport at the median and 0.76 at worst across 390/1440/1920, en and ko (#9591: the top 75-80%). */
+    --lit-line: 91vh;
     --lit-band: 8vh;
     --dur-swap-out: 80ms;
     --dur-swap-in: 220ms;

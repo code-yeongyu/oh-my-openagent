@@ -321,6 +321,57 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.message?.content).not.toContain("compacted out")
   }, 30_000)
 
+  test("#given the nudge check times out in git #when before_agent_start compiles #then the turn proceeds with the memory block, no nudge, nothing thrown, and the failure is reported once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const failures: Array<{ input: string; sessionId: string; message: string }> = []
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async () => {
+        throw new Error("git log --fixed-strings --all-match timed out after 5000ms")
+      },
+      onNoticeInputFailed: (input, sessionId, error) => {
+        failures.push({ input, sessionId, message: error instanceof Error ? error.message : String(error) })
+      },
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    expect(result?.systemPrompt).toContain("BASE PROMPT")
+    // The compiled memory block (persona body "first") is still injected.
+    expect(result?.systemPrompt).toContain("first")
+    expect(result?.message?.content ?? "").not.toContain(MEMORY_NUDGE_METADATA_TOKEN)
+    expect(failures).toEqual([{ input: "nudge", sessionId: "session-1", message: "git log --fixed-strings --all-match timed out after 5000ms" }])
+  }, 30_000)
+
+  test("#given the soul notice read fails while the nudge works #when before_agent_start compiles #then the nudge still lands and only the soul notice is dropped", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const failed: string[] = []
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async () => 3,
+      resolveSoulNotice: async () => {
+        throw new Error("notice lock unreadable")
+      },
+      onNoticeInputFailed: (input) => failed.push(input),
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    expect(result?.message?.content).toContain(MEMORY_NUDGE_METADATA_TOKEN)
+    expect(result?.message?.content).not.toContain(MEMORY_SOUL_METADATA_TOKEN)
+    expect(failed).toEqual(["soul"])
+  }, 30_000)
+
   test("#given a reflection soul notice #when before_agent_start compiles #then the late message carries the soul token and short sha", async () => {
     // given
     const { repo, context } = await fixture()
@@ -432,6 +483,26 @@ describe("createMemoryPromptHandler", () => {
     // then — same bytes, and the second prompt added no tree listing and no blob reads
     expect(second?.systemPrompt).toBe(first?.systemPrompt)
     expect({ lsTree: repo.lsTreeCalls - afterFirst.lsTree, show: repo.showCalls - afterFirst.show }).toEqual({ lsTree: 0, show: 0 })
+  }, 30_000)
+
+  test("#given a configured per-directory limit #when before_agent_start compiles #then the projection shows that many names and counts the rest", async () => {
+    // given
+    const { repo, context } = await fixture()
+    for (const name of ["a", "b", "c"]) await writeFile(join(repo.dir, `note-${name}.md`), `---\ndescription: ${name}\n---\nx\n`)
+    await repo.commitWrite(["note-a.md", "note-b.md", "note-c.md"], "notes", { agentId: IDENTITY, authorName: "t" })
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveProjectionLimits: () => ({ maxEntriesPerDirectory: 1, maxBytes: 0 }),
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    const line = result?.systemPrompt?.split("\n").find((candidate) => candidate.startsWith("$MEMORY_DIR/: "))
+    expect(line).toBe("$MEMORY_DIR/: note-a.md (+2 more; read $MEMORY_DIR/ to list)")
   }, 30_000)
 
   test("#given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated", async () => {

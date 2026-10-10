@@ -1,3 +1,215 @@
+## 2026-10-09 - A suspended background child's row stops spinning and counting (#9350)
+
+The live task widget (`components/task/status-row-format.ts` `formatLiveBackgroundRow`) took its spinner frame and elapsed time from the current clock for every row. A parked child therefore read `⠹ ... · suspended · 354m 31s`: it looked like it was working, its time kept climbing, and the row said neither why it stopped nor what the user could do. It also checked residency only, so a child a host parked with a `suspension_reason` while still marked resident rendered as `running`.
+
+The row now uses the side panel's rule for a child that has not finished (`suspension_reason`, or any residency other than `resident`); a finished child, which is `evicted` or `disposed`, keeps its own status in `/tasks` and the widget. A suspended row shows a still `‖` mark instead of a spinner and no running time: the record has no park timestamp (`updated_at` moves with every revival attempt), and a climbing timer is what made it look alive. It names the cause (`parent session restarted` when no reason is recorded, otherwise the recorded reason in words; `revival deferred: <reason>` carries the deferral reason), then what actually brings it back and the user's one action, decided from the same facts the engine uses: `resumes on session restart` for most parked children, `... or a message` only for a running daemon-hosted child at `rpc_detached` (the one kind `task_send` revives), `resumes on a message` for such a child evicted while idle, `will not resume` for a host version mismatch, and for a deferred revival the engine's own outlook for its reason (for example `retried a few times, then marked lost`). Each is followed by `/task-kill to cancel`. Nothing watches for the cause to clear, so the row promises no more than that. `senpi-task` now exports `deferralOutlookFor` for this. On a narrow line it keeps only `/task-kill to cancel`, and a parked row gives its width to the child's name before its route.
+
+`status-ui.ts` no longer schedules the 250 ms repaint when every shown background child is parked, so a widget of suspended rows paints once.
+
+## 2026-10-08 - task_cancel can release a finished child's residency (#9785)
+
+`components/task/engine.ts` forwards the lifecycle's new `parkTerminalResident` through the manager's destruction port. With it, `task_cancel` on a finished child that is still resident stops the child and parks the record, instead of answering "No change." The registry adapter (`residency-registry.ts`) now answers `ownsRecord`: a record is this engine's when its parent session is the engine's current session. Without that answer a handle-less record is never parked, so a sibling session's child in the same daemon is left alone. The engine side is described in `packages/senpi-task/changes.md`.
+
+## 2026-10-08 - Gating questions are asked with `required: true` even when the model omits it (#9774)
+
+senpi's `required: true` on `ask_user_question` turns a timed-out, dismissed or unavailable answer into "No answer: do not take the action it gates. Keep that action pending and end the turn." The flag is opt-in per call, and in live QA `zai/glm-5.3` never set it (0 of 6 gate calls; #9775), so its unanswered ulw-plan gate still read "continue on your best judgment".
+
+The new `question-gates` component (`src/components/question-gates/`) enforces it from the plugin. One `tool_call` handler on `ask_user_question` and `request_user_input` sets `required: true` in place before senpi's tool runs; the agent loop passes the same arguments object to the hook and to `execute`. Gates are detected from the call itself:
+- **Primary:** a question header equal to one the skills now pin: `Approval` for the ulw-plan approval gate; `Authorize` for the final authorization block and for mass-ulw's scope, spend and irreversible decisions; `승인` / `권한` in Korean sessions. The match is exact, so Korean forks such as `권한 모델` are not gates. Every pinned header fits senpi's 12-character header limit: a longer one (`Authorization` is 13) is rejected by senpi before the hook runs.
+- **Fallback:** an option label starting with `approve` / `authorize`.
+
+Question text is never read, so a fork that only mentions approving something stays unflagged and still falls back to its recommended default. The flag is never set to false. Each forced call writes one `debug` line naming the tool, the header and the matched rule, with no question text.
+
+A gate state rule (a ulw-plan draft at `status: awaiting-approval`) was rejected: in run t4 the model asked the gate while its draft still said `drafting`.
+
+Known limit: senpi persists the arguments the model sent, so a gate question still pending across a reload or resume is restored without `required` and the hook does not run again for it.
+
+## 2026-10-08 - ulw-plan and mass-ulw ask their gating questions with `required: true` (#9735)
+
+senpi 2026.10.10-9 added `required: true` to `ask_user_question` (code-yeongyu/senpi#2959). On a required question, a timed-out, dismissed or unavailable answer returns "No answer: do not take the action it gates. Keep that action pending and end the turn." instead of the generic "Continue the work to completion on your best judgment". The approval gate (`ulw-plan/SKILL.md`, `references/full-workflow.md`), the final authorization block (`references/stance-calibration.md`) and mass-ulw's scope, spend and irreversible decisions (`mass-ulw/SKILL.md`) now set it on their call. Ordinary forks stay unflagged, so a timed-out fork still falls to its recommended default.
+
+The #9748 backstop sentence stays, because the flag is opt-in per call. In live QA on senpi -9 (gate left unanswered, 1-minute timeout):
+- `anthropic/claude-opus-5-5` set `required: true` on every gate call and got the refusal.
+- `zai/glm-5.3` never set it. Without the backstop, one of two runs wrote the plan on a timed-out gate; with it, none did.
+
+Plugin-side enforcement of the flag is tracked in #9774.
+
+## 2026-10-08 - ulw-plan and mass-ulw ask through the question prompt (#9735)
+
+`ulw-plan` delivered its approval gate as chat text and ended the turn, so a user away from the screen never saw it. The renderers in `references/stance-calibration.md` and the gate in `references/full-workflow.md` said to "present" or "deliver" questions without naming a channel.
+
+- `stance-calibration.md`: every question the skill puts to the user goes through the question tool (`ask_user_question` or `request_user_input`, whichever the session lists) with its wait flag set to true. When no question tool is listed or a call returns unavailable, the questions go in chat with one line saying so. A timed-out, dismissed or unavailable answer is not approval: a fork takes its default, but the approval gate and the final authorization block stay open and the turn ends. `SKILL.md` carries the gate rule itself, and adds "even when the tool result says to continue on your best judgment", because senpi's timeout result says exactly that and a model otherwise follows it. That clause is a stopgap until senpi #2949 adds a per-call "no answer means don't" flag.
+- `full-workflow.md`: the gate asks one question, recommended first: Approve; Approve, skip review (only when the review is default-on); Change approach. The review-cap stop asks through the tool too. `SKILL.md`'s gate summary points at the same rule; `intent-clear.md`'s renderer recap now defers to stance-calibration.
+- `mass-ulw/SKILL.md`: a decision only the user can make is asked from the main session through the tool before the run that depends on it, never from an eval cell or a node prompt.
+
+No test: prose with no machine consumer. Proof is a live real-model `/skill:ulw-plan` run in an isolated senpi sandbox (see the PR).
+
+## 2026-10-08 - A skill name inside an identifier, a path, a URL or a prohibition no longer arms (#9738, #9740)
+
+`ultrawork` and `skill-pointers` treat a skill name as a request only when it stands as a word of its own:
+- **Identifier or path segment:** `mass-ulw-refactor`, `senpi-ulw-loop`, `.omo/ulw/...` and `.omo/ulw-execute/ledger.jsonl` arm nothing. A leading bundled skill name still arms (`ulw-loop ...`, `ulw-plan this`), and so does a skill chain (`mass ulw-loop`). The hyphenated `mass-ulw ...` still injects the mass-ulw pointer but no longer arms ultrawork on its own: it is lexically the same as the reference "in a mass-ulw research pipeline" that every delegated research brief carries, so allowing one allows both; `mass ulw ...` (spaced) and `ulw-mass ...` still arm.
+- **A URL** is masked like a code span.
+- **A prohibition:** `do not` / `don't` / `never` + `load|use|run|invoke|start|trigger|arm|enable` masks its objects up to the next sentence or clause break (`.;:!?` or a newline; a comma does not end it), so "Do not load mass-ulw or ulw-research" arms neither. A request that starts a new sentence still arms ("Don't use tmux. ulw this"), and so does a negation outside that verb list ("do not stop until done, ulw").
+- **Delegated sessions:** `skill-pointers` now applies the same `readSessionRole` rule `ultrawork` got in #9602, so a task child, DAG child or team member never gets a pointer from its own brief.
+
+Telemetry records the new suppression reasons `identifier_reference` and `negated_mention`.
+
+Measured: upstream's replay of 83 stored delegated briefs went from 83/83 to 0/83 ultrawork arms (47 identifier, 36 negated). Over 14 days of local root sessions the identifier rule removes about 926 arms, nearly all automated text naming lanes and paths; the 8 typed requests that open with a skill name still arm.
+
+Tests: `ultrawork-references.test.ts` and the new `skill-pointers-suppression.test.ts` cases fail on `dev`; removing the identifier guard, the negation mask, the URL mask, the pointer's trailing guard, its chain allowance or its delegated-session guard each fails them again. Live: `scripts/qa/skill-pointers-e2e.mjs` gains identifier-reference, negated-mention, lead-relay and request-after-prohibition scenarios.
+
+## 2026-10-05 - A relayed report or a quoted mention no longer arms ultrawork or skill pointers (#9600)
+
+`skill-pointers/strip-quoted-regions.ts`, the masking that both `ultrawork` and `skill-pointers` run before they look for a keyword, now also hides text that is someone else's:
+- **A relayed message:** one that opens with a sender header is masked whole. The header is a bracketed tag such as `[REPORT]` or `[a -> b]`, or `Name (id), recipient:` / `Name (id) to recipient:`. A report pasted into a root session that describes a bug and so mentions `ulw`, `mass ulw` or a skill name used to arm the directive and inject pointers there.
+- **A Markdown block-quote line** (`> ...`).
+- **A span inside straight or curly double quotes** on one line.
+
+Typed asks keep arming: the keyword at the end of a Korean sentence, `mass ulw research ...`, a short mid-message `..., ulw, and ...`, and a leading `ulw <task>`. Measured over two weeks of local sessions, a third of all arms were relayed reports. A first-or-last-word rule or a slash-only rule would instead have dropped most typed arms, because mid-message is the most common typed form.
+
+Live: `scripts/qa/skill-pointers-e2e.mjs` gains a relayed-report, a quoted-mention and a Korean sentence-ending scenario. It now judges only the session transcript, because the engine's runtime snapshot under the agent dir ships docs containing `<ultrawork-mode>`, which made every whole-dir check pass or fail regardless of the session.
+
+Tests: `ultrawork-arming.test.ts` (relayed and quoted inputs do not arm; four typed forms still arm) and `skill-pointers-suppression.test.ts` (relayed and quoted mentions inject no pointer). Both fail on `dev`, and removing any one of the three masks fails them again.
+## 2026-10-06 - The slash picker lists each bundled skill once (#9648)
+
+`components/skill-commands/autocomplete.ts`: the top-level `/` list showed every bundled skill twice, as its bare alias (#9042) and its `skill:<name>` row. The alias now takes the `skill:<name>` row's place, so each skill is one row and senpi's ranking of everything else is unchanged; an alias whose skill row is not on the page is still offered at the end. A bare `/` is left as senpi lists it (senpi lists no `skill:` rows there). Typing `/skill:` still lists every skill under its `skill:` name. A skill whose bare name a same-named template or command shadows keeps its `skill:<name>` row, the only way left to reach it. Submitting either form is unchanged: the bare form is still rewritten to the `/skill:` form and recorded as a human invocation.
+## 2026-10-05 - Live fallback QA covers process children and a turn near compaction (#9582)
+
+`scripts/qa/task-runtime-fallback-e2e.mjs`:
+- `limit-after-tool` now requires the tool call before the in-session hop on every process runner. The child-process `N/A` is gone now that a process child carries its own chain.
+- New scenario `limit-near-compaction`: the same tool-then-limit turn, but the tool-call response reports a context past the compaction threshold of a 128K window (114K input; senpi refuses to start a session under its start minimum, about 52K here and more where more tools load). The engine's pre-retry compaction therefore runs on the spent model first, and the child must still end on its fallback model with the settings file byte-identical.
+- The driver runs on Windows too: the process table comes from the CIM process list instead of `ps`/`pgrep`, and `senpi` resolves through PATHEXT.
+
+`task-runtime-fallback-mock-provider.ts` serves the new model. `task-runtime-fallback-e2e.windows.test.ts` runs the child-process runner through `user-fallback`, `limit-after-tool` and `limit-near-compaction` on Windows, where every task child is a process child.
+## 2026-10-07 - A bundled visualize skill for inline HTML pages (#9700)
+
+Agents can show a self-contained HTML page inline in a thread (senpi `show_html_page`, the desktop `html_preview` / `html_render`), but nothing told them how to make the page good.
+
+- `skills/visualize/SKILL.md`: a short router. Figures come from `data-scientist` (DuckDB or Polars, every number traceable to its query, chart choice from its `references/visualization.md`) and design from `frontend`. The skill itself owns only what is particular to an inline page: no network, the host's theme tokens, fluid width, a figure that reads with scripts off, designed empty states, fallbacks for pages opened outside the app, axis labels kept out of a stretched SVG, and render-and-look in both themes at 390 px and the reply width before showing.
+- Registered as a native senpi skill: `plugin/scripts/native-skill-sources.mjs` (+ test), `skills-sync.test.ts` (expected and native names), telemetry `BUILTIN_SKILL_NAMES`, and the skills AGENTS.md tables.
+
+## 2026-10-07 - Lost background revival notifies the parent after session start (#9498)
+
+`components/task/completion-bridge.ts` observes the nonterminal-to-`lost` edge
+inside a store mutation, as well as normal terminal transitions. Bounded revival
+retries can exhaust after startup notification recovery has returned; the old
+transition-only bridge would persist `lost` without waking the parent until
+another session start. The normal notifier still owns epoch deduplication and
+delivery. Mutating an already-lost record never sends another notification.
+
+`completion-bridge.test.ts` starts a background child and applies the real
+reconciliation loss reducer twice through the observing store. The parent gets
+exactly one lost notification; the pre-fix bridge sends none.
+
+## 2026-10-07 - Memory maintenance runs write receipts, unrecoverable runs are quarantined, and recovery is kill-tested (#9689)
+
+Reflection and dream runs recorded their outcome only in per-run files, and startup reconciliation had three dead ends: invalid terminal timestamps threw a `TypeError` on every pass, an unreadable ledger kept the reservation forever, and a supervisor that died after its child committed a valid tip failed the run and deleted the worktree.
+
+- `packages/memory-core/src/receipts/`: `receipts.jsonl` under the identity's runtime dir, appended under its own `receipts` lock. `appendMemoryReceiptOnce` dedupes by `(kind, runId, event, generation)` or `(facts, batchId, event)`. `readMemoryReceipts` returns newest first and counts a partial trailing line. `maybeKillAt(point)` SIGKILLs the process when `OMO_MEMORY_KILL_POINT` names the point (TerminateProcess on win32); it is a test seam only.
+- `components/memory/receipts-port.ts`: `emitMemoryReceipt` writes after the durable artifact and only warns on failure. Emitters cover `launched` (first attempt), settlement (`merged`/`no_changes`/`failed`), abandonment, quarantine, recovery, and every facts terminal write. `final.json` and `abandoned.json` carry `generation`.
+- `worker/run-receipt-backfill.ts`: the reconciliation scan rebuilds a missing receipt from `final.json`, `abandoned.json` or `quarantined.json`. A sentinel's own kind, trigger, origin and generation win, so a pre-ledger sentinel needs no ledger.
+- `worker/run-reconciliation-prelaunch.ts` (moved out of `run-reconciliation.ts`): under a launcher proven dead on this host, four cases quarantine the run:
+  - invalid generation timestamps;
+  - an unreadable ledger with no terminal artifact;
+  - a run dir past the launch window with no prelaunch file;
+  - a terminal claim that cannot be read (`RunTerminalClaimUnrecoverableError`).
+
+  memory-core `reflection/quarantine.ts` writes `reservation.quarantined.json`, then `quarantined.json`. The reservation is released, and no run file is moved or deleted. A launch interrupted before its ledger keeps its run dir. Its worktree is discarded, and a pre-ledger `abandoned.json` (`launch_interrupted`, identity fields copied from the held reservation) is made durable before release; before this, the run dir was `rm`-ed.
+- `worker/run-finalization.ts` `recoverUnpublishedWorktreeTip`: when the supervisor exited without an outcome, a tip that passes `validateCompletion` is published as a success marked `recoveredFromWorktree`, followed by a `recovered` receipt, and then takes the normal merge path. The launcher (`SUPERVISOR_EXIT_PREFIX` errors only) and `reconcileDeadSupervisor` (child dead or absent) both use it. Reconciliation settling another process's matching outcome also writes `recovered` first.
+- Kill points: `runner-execution.ts` (after-reserve, after-worktree), `create-run-worktree.ts` (after-prelaunch), `memory-run-supervisor.ts` (after-child-exit), `run-finalization-git.ts` (after-validate, after-merge), `run-finalization-settlement.ts` (before-receipt).
+- `commands/doctor-receipts.ts`: the `receipts` and `quarantined-runs` checks and their `--json` fields. `abandoned-runs` skips `launch_interrupted`.
+- Tests:
+  - `run-crash-recovery.e2e.test.ts`: a driver child (`__fixtures__/crash-driver.ts`, explicit env) runs the real runner, supervisor and mock model child, is killed at each point, then reconciles in a second child. 11/11 pass, also with the kill point set in the test process's env, and 0/11 on the pre-change source.
+  - `run-quarantine.test.ts`: 9 cases, including a live-launcher control and a finished-run control.
+  - `run-receipts.test.ts`, `facts-receipts.test.ts`, the memory-core receipts tests, and the doctor cases.
+
+## 2026-10-07 - The memory file list in the prompt is bounded by recency, count and bytes (#9687)
+
+The compiled memory block ends with `<external_projection>`, which named every memory file outside `system/` in name order with no limit. A real long-lived corpus measured 3,281 files and 157,834 bytes (about 39K tokens) on every turn, with 1,962 names on one line.
+
+- `components/memory/prompt.ts`: the handler passes the identity's projection limits into `MemoryBlockCache.compile`. `wiring-static.ts` reads them from the memory settings; `projection-limits.ts` merges a per-agent `agents.<name>.projection` over the base.
+- `commands/doctor-projection.ts`: `/doctor` gains a `projection` line with the names shown and omitted and the byte size against the limits. It is `warn` when names are omitted or no listing fits the byte budget. `doctor-runtime.ts` adds it after `tokens`.
+- Tests:
+  - `prompt.test.ts`: a per-directory limit of 1 shows one name and counts the other two.
+  - `doctor.test.ts`: the in-limits, omitted and overflow lines.
+
+## 2026-10-07 - The Windows task e2e waits for the child's completion instead of reading once (#9481)
+
+`scripts/qa/task-rpc-e2e.mjs` checked `completion_push_arrives` by reading the task records once, right after scenario A's parent session returned. On a slow Windows runner the child's completion write can land just after that read, so the check failed with "no completion recorded" while every other check passed (#9222, #9331 twice, #9529, #9655).
+
+- `scripts/qa/task-rpc-e2e-scenarios.mjs`: new `waitForProcessCompletion(stateDir, timeoutMs = 60 s)`. It waits for a process-mode record to reach `completed` through the existing `waitForRecord` (file watchers plus a 250 ms re-read, with a read after the watchers start so a write in between is not missed). Past the deadline it returns the process tasks' last statuses.
+- The driver uses it, and the FAIL reason and facts now carry the last observed status.
+- `task-rpc-e2e-scenarios.test.mjs`:
+  - a record that is still `running` when the check starts and turns `completed` right after: the old single read reports no completion, and the wait reports it;
+  - a child that never completes: the wait fails at its deadline with `lastStatuses: ["running"]`.
+
+## 2026-10-06 - The memory nudge no longer walks the whole memory history on every prompt, and the memory repo gets packed (#9667)
+
+Every prompt's `before_agent_start` asked git whether this session had saved memory yet, with `git log --grep` over the identity's entire history. Commits set `gc.auto=0`, so the repo was never packed. A long-lived identity measured 11,821 commits and 41,588 loose objects (632 MiB) next to a 3.6 MiB pack. The query took up to 2.2 s per prompt on an idle machine and passed the 30 s git timeout under memory pressure, and the timeout then escaped the extension as a raw `Extension omo.js error: git log ... timed out after 30000ms` stack in the TUI.
+
+- `components/memory/nudge-wiring.ts`: each session keeps the HEAD it last checked and the turn of its newest save. The first check reads only commits since the session began (its header, else its oldest entry, minus one hour), stops after 20 matches and has a 5 s git cap. Every later check reads only `<checked HEAD>..HEAD`. On that same repo the check takes 17-23 ms, against 0.33-2.2 s before.
+- `components/memory/prompt.ts`: a failed or timed-out notice input (the nudge count or the soul notice) gives that turn no such notice and is reported through `onNoticeInputFailed`, which `wiring-static.ts` sends to the component logger as a warning. Nothing is thrown into the extension, so nothing reaches the TUI.
+- `components/memory/memory-maintenance.ts` (new), scheduled from `afterBind` in `wiring.ts`: 30 s after a session binds, one background pass per identity. The pass holds the identity's new `memory-maintenance` lock (`memory-core` `memoryMaintenanceLockPath`), and a session that finds it held skips rather than waits, so many sessions sharing one repo produce one runner. The 12 h stamp (`omo.maintenanceAt` in the repo's own config) is read and written under that lock. The pass is also skipped below 2,000 loose objects or when the repo does not exist yet. The timer is unref'd, and session shutdown calls `dispose()`, which cancels a pending pass and stops a running git (SIGTERM through a new `signal` on the git exec, surfaced as `GitAbortedError`). Failures are logged, never raised. `gc.auto=0` stays, so no commit is held up by a repack.
+- `memory-core` `GitMemoryRepo`: `log()` takes `since` and `timeoutMs`. New `maintain()` runs git's `loose-objects` maintenance task, then `prune-packed`. Both only remove an object that a pack also holds, so concurrent commits are safe. (`incremental-repack` fails on a repo without a multi-pack-index and is not used.) On a copy of the repo above: 41,596 loose objects to 0 in 29.7 s, one 38.9 MiB pack, `git fsck --connectivity-only` clean.
+
+Tests:
+- `prompt.test.ts`: a nudge timeout leaves the turn with its memory block and no nudge, and reports the failure once. A failed soul notice keeps the nudge. Both fail before this change.
+- `nudge-wiring.test.ts`: a resumed session's save from an earlier run still resets the count, and a save buried among 50 commits of another session is seen by the next check.
+- `memory-maintenance.test.ts`: a repo full of loose objects is packed with every commit still readable. A commit made while a pass runs survives. A second process within the interval does not run again. Ten sessions starting together pack once. A lock held by another process means a quiet skip. A session that exits before its pass runs leaves the repo untouched. A loose object no commit references yet (a writer mid-commit) survives the pass. A repo that does not exist yet is a quiet no-op.
+
+## 2026-10-06 - A delivered message tells the receiver who sent it (#9660)
+
+The gateway drain now hands the receiving session the sender and the message as written, apart from the provenance header:
+- `deliverySender` in `gateway/provenance.ts` builds the sender: `agent` with the sending session's id and its name at send time, `command_line` for `omo thread send`, or `external` with the platform and author.
+- `drain.ts` passes it with `display_text` to `admitExternalMessage`.
+- `thread_send` and `thread_handoff` give the gateway the caller's current session name (`callerName`, from `pi.getSessionName`). Without it, a live run labelled the message only "Sent by another agent", because the drain had nothing but the session id.
+
+The model still reads the `[OMO_GATEWAY v=1 ...]` header. senpi's terminal renders the sender as "Sent by another agent · <name>" or "Sent from the command line" (senpi#2819); a senpi without that support ignores the two fields.
+
+Tests (`engine.test.ts`):
+- a named and an unnamed session sender;
+- a command-line sender.
+
+Dropping the sender, or naming a session by its id, fails them.
+
+## 2026-10-06 - The thread tools switch a terminal session's model and level and interrupt its turn (#9660)
+
+`thread_set_model`, `thread_set_reasoning` and `thread_interrupt` failed with `unsupported` against every terminal session, which is most live sessions. The client refused every command outside a fixed read-mostly list, and the terminal endpoint did not take them either.
+
+**What changed**
+- `live-surface.ts` asks a terminal once for `get_protocol_info` and remembers the `commands` it lists. A command the terminal lists is sent; any other is still refused as `unsupported` before a connection opens. A terminal on an older engine lists none and keeps the old behavior. Its refusal now says the terminal runs an engine from before terminal session controls, and how to get them.
+- `thread_list` rows carry `controls`, from `endpoint-controls.ts`: what a caller can do to that thread (`send`, `read`, `rename`, `set_model`, `set_reasoning`, `interrupt`). A host takes all six; an older terminal takes the first three.
+
+**Tests** (`live-surface-tui.test.ts`, against a terminal endpoint that answers as senpi's does):
+- a model switch, a supported and an unsupported level, an unknown model, an interrupt mid-turn and one on an idle session;
+- each row's `controls`, next to an older terminal and a host;
+- reverting to the fixed command list fails the test.
+
+## 2026-10-05 - An idle gateway store no longer keeps its worker thread alive
+
+Every session that touches the gateway store (each terminal with a control endpoint, and every sender) started one store worker thread and kept it until the session ended. A measured idle worker retains 2.94 MB: an empty Bun worker plus the bundled store code and SQLite. That put the terminal control endpoint's idle cost at about 4.1 MB against the 3 MB budget.
+
+`store.ts` now retires the worker after `GATEWAY_STORE_IDLE_RETIRE_MS` (60 s) with no store call in flight. The worker is detached first, so a call made from that moment starts a fresh worker instead of posting to the closing one. Only then is its database closed and the thread terminated. A call holds the worker from its entry to its settle, the open included, so a worker with a request in flight never retires and no request is failed or replayed by a retire. The next call pays one open, about 12 ms, and the fresh worker gets the extension registrations restored as after a crash.
+
+Tests (`store-idle-retire.test.ts`; the last one in `component.test.ts`):
+- after the idle interval the worker thread exits, and the next write lands on a fresh worker that keeps the registrations;
+- writes made before, during and after a retire each commit exactly once, in the order they were made. A retire that terminates without detaching first fails this;
+- a peer's send to a session whose worker retired is `started` and applied;
+- `dispose()` called while a worker is retiring resolves only after that worker has exited, so a caller that removes the agent directory next never races an open database handle;
+- an unreadable legacy mailbox is retried at every store open, and now that the store reopens after each idle minute, its warning is logged once per session rather than at each reopen.
+
+## 2026-10-04 - Package-local test runs get the hermetic home (#9578)
+
+`bunfig.toml` preloads `../senpi-task/test-support/warm-lazy-runtime.ts`, so `bun test` from inside `packages/omo-senpi` gets the same hermetic home, agent dir and warmed lazy barrels as a repo-root run. Before, a package-local run had no preload at all: it used the real home and failed 17 entry-renderer tests on the unwarmed pi-tui barrel.
+
+## 2026-10-04 - ulw-plan no longer names a delegation category that does not exist (#9561)
+
+The `ulw-plan` skill's delegation-router row listed a `git` category that no edition ships (`SKILL.md`), and its reference copy (`references/full-workflow.md`) also still listed `deep`, which was split into `deep-low` and `deep-high`. A plan that followed either name sent `task(category: ...)` to a category the user's session does not have. Both rows now list exactly the built-in categories.
+
+## 2026-10-04 - The committed gateway rules sidecar is no longer an ignored path
+
+`packages/omo-senpi/.gitignore` ignores `/plugin/extensions/*` and re-admits each committed bundle with a `!` line. The `gateway_rules` store-extension sidecar (`gateway-rules-extension.mjs`, from #9540) was committed without its `!` line, so `script/tracked-ignored-paths-audit.test.ts` failed on `dev` and on the v5.1.17 release-state PR. A local `git add` of a fresh regen would also silently skip that file. Added the negation next to its sibling `gateway-store-worker.mjs`.
+
 ## 2026-10-04 - A runtime advisory no longer makes a failed reflection child look like a provider outage (#9553)
 
 On Windows every failed memory reflection child was recorded as "refused by its provider", and automatic reflection parked for hours. `worker/model-miss.ts` `providerFailureDetail` took the first stderr line as the provider's answer. On a Bun host on win32 that line is Bun's `child reaper unavailable under Bun on win32: ...` advisory, printed once per terminated worker thread before anything the child says. The shared retryable-error classifier matches the bare word `unavailable`, so any failure became `provider_unavailable`, the real cause was hidden, and every candidate in the chain was marked as refused.
@@ -20,6 +232,12 @@ Tests (`model-miss.test.ts`, the exact advisory text):
 ## 2026-10-04 - Escape untrusted gateway rule text and add `sessionsWithRules`
 
 - Behavioral rule lines, scope and version render with `&`, `<` and `>` escaped, so a rule carrying the end sentinel or the closing tag can neither break the byte-identical turn guarantee nor close the block early; the `rules_changed` delivery text escapes scope and version the same way. New `sessionsWithRules({scope})` op lists a scope's `gateway_rules_blocks` rows ordered by session id so the gateway can clear sessions whose binding ended while the connector was down.
+
+## 2026-10-04 - Live QA: a task child's fallback after a tool call, and the user's settings untouched (#9512)
+
+`scripts/qa/task-runtime-fallback-e2e.mjs` gains a `limit-after-tool` scenario. The child's primary model makes a real `bash` tool call, then hits a usage limit on the request carrying the tool result, so the fallback has to happen inside the running turn. Every scenario now also records a sha256 of the sandbox `settings.json` before and after the run, and `limit-after-tool` fails unless they match.
+
+On the host-session runner the scenario requires the tool call (`tool_execution`) before the in-session hop (`retry_fallback_applied`), and the record's model to end on the fallback. On the per-child process runner the tool check reads `N/A`, because that runner cannot carry a per-session chain and falls back at the manager level instead. `task-runtime-fallback-mock-provider.ts` serves the `limit-after-tool` model.
 
 ## 2026-10-03 - Ultrawork routing item 4 carries a size test before it fans out (#9499)
 
@@ -604,4 +822,3 @@ With senpi 2026.9.29-4 adopted (wake, admitExternalMessage, terminal control end
 - `components/task/category-unavailable-warning.ts`: when only an unlisted provider serves a hidden category's chain,
   the one notice per session names it and the exact opt-in line
   (`categories.<name>.model = "<gateway>/<model>"`); `details.unlisted_provider_model` carries it for remote clients.
-

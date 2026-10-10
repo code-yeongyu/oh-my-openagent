@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { delimiter, isAbsolute, join, relative, sep } from "node:path"
+import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { doctorCoverageLines } from "./category-coverage.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
@@ -19,7 +20,6 @@ import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
 import { printSetupReport } from "./setup-report.js"
 
-const earlyCommands = new Set(["install", "remove", "list", "config", "auth", "app-server", "host"])
 // Identity the engine adopts for this install: what the user sees, where state lives, which
 // environment prefix is read first, what goes on the wire, and which channel to check for
 // updates. The engine consumes this once and scrubs it, so nested engine processes are
@@ -326,7 +326,8 @@ export async function runLauncher(args = process.argv.slice(2)) {
     })
     return
   }
-  if (earlyCommands.has(command) || command === "update") {
+  // One-shot engine commands go over unchanged: the engine dispatches them on argv[0] (#9572).
+  if (isEngineCommand(args)) {
     await spawnSenpi(args, false)
     return
   }

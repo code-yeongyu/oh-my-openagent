@@ -38,18 +38,30 @@ export interface HostSessionOpener {
 
 /** Open a daemon session, wire its recoverable handle, and deliver only a fresh child's first turn. */
 export function createHostSessionOpener(input: HostSessionOpenerInput): HostSessionOpener {
-  const openAdmitted = (
+  let fallbackProfileUnsupportedNoticed = false
+  const noticeFallbackProfileUnsupported = (opened: OpenedHostSession): void => {
+    if (opened.retryFallbackDropped !== true || fallbackProfileUnsupportedNoticed) return
+    fallbackProfileUnsupportedNoticed = true
+    input.onWarning(
+      `the task host (engine ${opened.engineVersion}) does not advertise retry_fallback_profile, so daemon-hosted ` +
+        "children switch to their fallback models only when a turn fails before any tool call until the host is upgraded",
+    )
+  }
+  const openAdmitted = async (
     client: ReturnType<CreateHostSessionChannel>,
     spec: RpcRunnerSpec,
     sessionPath: string,
-  ): Promise<OpenedHostSession> =>
-    openHostSessionWithAdmission({
+  ): Promise<OpenedHostSession> => {
+    const opened = await openHostSessionWithAdmission({
       open: () => openTaskHostSession({ client, spec, sessionPath }),
       now: input.now,
       sleep: input.sleep,
       admissionWaitMs: input.admissionWaitMs,
       onWarning: input.onWarning,
     })
+    noticeFallbackProfileUnsupported(opened)
+    return opened
+  }
 
   const startTurn = async (handle: ReturnType<typeof createHostSessionHandle>, spec: RpcRunnerSpec): Promise<void> => {
     try {
@@ -108,6 +120,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         },
         switchSession: (target: string): Promise<RpcSwitchSessionResult> =>
           target === sessionPath ? Promise.resolve({ cancelled: false }) : switchOnPort(target),
+        ...(opened.reportedModel === undefined ? {} : { reportedModel: opened.reportedModel }),
       })
     },
   }

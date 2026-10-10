@@ -88,6 +88,15 @@ function parseArgs(argv: readonly string[]): BuildOptions {
 const PREBUILT_NATIVE_INPUTS = [
   { artifactPath: join("packages", "lsp-daemon", "dist"), buildScript: "build:lsp-daemon" },
   { artifactPath: join("packages", "ast-grep-mcp", "dist", "cli.js"), buildScript: "build:ast-grep-mcp" },
+  // The browser skill's bundled omowright runtime is gitignored and produced only by
+  // build:materialize-frontend (stage-omowright-runtime.mjs). runSenpiPluginBuild passes
+  // OMO_SKIP_MATERIALIZE=1 to the native chain, which skips that staging, so without this input a
+  // fresh checkout ships the binary payload's browser skill with no runtime and loadOmowright()
+  // always fails (issue #9661). Stage it up front like the other prebuilt inputs.
+  {
+    artifactPath: join("packages", "shared-skills", "skills", "browser", "runtime", "omowright", "index.js"),
+    buildScript: "build:materialize-frontend",
+  },
 ] as const
 
 export interface PrebuiltInputDependencies {

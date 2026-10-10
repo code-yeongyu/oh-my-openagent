@@ -5,6 +5,7 @@ import type {
   TaskTransition,
   TaskTransitionResult,
 } from "./types"
+import { fenceRun } from "./run-fence"
 
 const terminalStatuses = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
 const residencyTransitionTypes = new Set<TaskTransition["type"]>([
@@ -121,6 +122,13 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
 }
 
 export function transitionTaskRecord(record: TaskRecord, transition: TaskTransition): TaskTransitionResult {
+  if (transition.type === "cancel" && transition.expected_run_epoch !== undefined && fenceRun(record, transition.expected_run_epoch) !== "live") {
+    return {
+      applied: false,
+      record,
+      audit: { type: "epoch_mismatch_ignored", expected_run_epoch: transition.expected_run_epoch, run_epoch: record.notification.run_epoch },
+    }
+  }
   const nextStatus = transitionStatus(transition, record.status)
   const changesOnlyResidency = residencyTransitionTypes.has(transition.type)
   if (terminalStatuses.has(record.status) && !changesOnlyResidency) {
@@ -224,9 +232,10 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
     case "cancel":
       return current === "running" || current === "pending"
     case "complete":
-    case "fail":
     case "interrupt":
       return current === "running"
+    case "fail":
+      return current === "running" || (current === "pending" && transition.failure_kind === "suspended_unresumable")
     case "lose":
       return false
     case "evict":

@@ -14,6 +14,7 @@ import type {
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime } from "./dag-runtime"
 import { composeTaskEngine } from "./engine"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 
 const roots: string[] = []
 
@@ -79,7 +80,7 @@ describe("createDagRuntime skill wiring", () => {
         missing: [],
       }),
     })
-    engine.runtime.captureFrom({ sessionManager: { getSessionId: () => "session-shared-skill" } })
+    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "session-shared-skill" } })
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
     await runtime.attach()
 

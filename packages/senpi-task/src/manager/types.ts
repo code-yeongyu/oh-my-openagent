@@ -150,6 +150,9 @@ export type StartResult =
       readonly status: "running" | "pending"
       readonly name: string
       readonly resolved_model?: ResolvedModelRecord
+      // The model the child ACTUALLY started on, read from the child itself (never the plan) -
+      // absent for a queued start that has not launched yet (#9722).
+      readonly effective_model?: ResolvedModelRecord
       readonly queue_position?: number
       readonly name_warning?: string
       // Where an isolated child is working. The merge outcome is NOT here: it does not exist yet.

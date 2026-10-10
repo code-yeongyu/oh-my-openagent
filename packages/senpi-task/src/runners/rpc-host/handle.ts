@@ -44,7 +44,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   let client: HostSessionPort = options.client
   let session: HostSessionIdentity = options.session
   let openDisposition: HostSessionOpenDisposition = options.openDisposition
-  const listeners = createHandleListeners()
+  const listeners = createHandleListeners({
+    onListenerError: (error) => log("senpi-task early event replay listener failed", { taskId, error: String(error) }),
+  })
   const waiters = createHandleWaiters()
   let reachedIdle = false
   let sessionId: string | undefined

@@ -12,6 +12,7 @@ import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChi
 import { sessionTailFinishedText, sessionTailNeedsContinuation } from "./interrupted-turn"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
 import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
+import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 
 const CONTINUATION_MESSAGE =
   "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
@@ -66,6 +67,7 @@ async function respawnFresh(input: {
       prompt: rebuilt.spec.prompt,
       model: input.record.model,
       ...(input.record.resolved_model?.variant === undefined ? {} : { variant: input.record.resolved_model.variant }),
+      ...(input.record.fallback_models === undefined ? {} : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,
@@ -147,6 +149,7 @@ async function respawnProcess(input: {
       ...(input.record.host_session === undefined ? {} : { hostSocket: input.record.host_session.socket }),
       model: input.record.model,
       ...(input.record.resolved_model?.variant === undefined ? {} : { variant: input.record.resolved_model.variant }),
+      ...(input.record.fallback_models === undefined ? {} : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,

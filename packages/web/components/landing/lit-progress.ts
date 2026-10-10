@@ -71,12 +71,46 @@ function armRevealDriver(): void {
       // viewport), so reading order holds at any width.
       const bodyRect = body.getBoundingClientRect()
       const lineWidth = Math.max(1, bodyRect.width)
-      for (const { node, bottom, height, left } of words) {
-        const withinLine = (((left - bodyRect.left) % lineWidth) / lineWidth) * height * 2
-        node.style.setProperty(
-          "--lit-local",
-          String(clamp01((endTop - bottom - withinLine) / (height * 1.6) + 1)),
-        )
+      // Mixed-script glyph metrics can differ by subpixels on the same visual line.
+      // Cluster within half a line-height instead of treating every distinct bottom as a wrap.
+      const lineHeight =
+        Number.parseFloat(getComputedStyle(body).lineHeight) ||
+        Math.max(1, ...words.map(({ height }) => height)) * 1.5
+      const lines: { bottom: number; height: number; words: typeof words }[] = []
+      for (const word of [...words].sort((a, b) => a.bottom - b.bottom)) {
+        const line = lines.at(-1)
+        if (line && word.bottom - line.bottom < lineHeight / 2) {
+          line.bottom = Math.max(line.bottom, word.bottom)
+          line.height = Math.max(line.height, word.height)
+          line.words.push(word)
+        } else {
+          lines.push({ bottom: word.bottom, height: word.height, words: [word] })
+        }
+      }
+      const brightness = new Map<HTMLElement, number>()
+      for (const [index, line] of lines.entries()) {
+        const next = lines[index + 1]
+        const previous = lines[index - 1]
+        const spacing = next
+          ? next.bottom - line.bottom
+          : previous
+            ? line.bottom - previous.bottom
+            : line.height * 2
+        const stagger = Math.min(line.height * 2, spacing)
+        for (const { node, left } of line.words) {
+          const withinLine = clamp01((left - bodyRect.left) / lineWidth) * stagger
+          brightness.set(
+            node,
+            clamp01((endTop - line.bottom - withinLine) / (line.height * 1.6) + 1),
+          )
+        }
+      }
+      // Font fallback can change line boxes and fade heights. Preserve DOM reading order even
+      // when those metrics split one visual line: no later word may overtake an earlier word.
+      let preceding = 1
+      for (const { node } of words) {
+        preceding = Math.min(preceding, brightness.get(node) ?? 1)
+        node.style.setProperty("--lit-local", String(preceding))
       }
     }
   }

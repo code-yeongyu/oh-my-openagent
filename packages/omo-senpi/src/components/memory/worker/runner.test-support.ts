@@ -85,10 +85,25 @@ function fakeSenpiCatalog(childMode: string, listed: readonly HarnessModel[]): s
 }
 const supervisorFixture = join(import.meta.dir, "memory-run-supervisor.ts")
 
+async function reserveDream(store: ReflectionReservationStore, journal: TranscriptJournal) {
+  const snapshot = await journal.captureReflectionSnapshot()
+  if (!snapshot) throw new Error("expected a dream snapshot")
+  return store.tryReserve({
+    trigger: "dream",
+    origin: "idle",
+    conversationIds: ["conversation-a"],
+    snapshots: [{ conversationId: "conversation-a", snapshot }],
+  })
+}
+
 export async function createRunnerHarness(options: {
   readonly childMode:
     | "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
-    | "extension-provider" | "extension-provider-unreachable"
+    | "extension-provider" | "extension-provider-unreachable" | "noop" | "commit-fail" | "commit-hang" | "commit-late-ok"
+  /** Builds the identity under this directory instead of a fresh temp dir. */
+  readonly root?: string
+  /** Reserves a dream run (origin `idle`) instead of a step-count reflection. */
+  readonly dream?: boolean
   readonly categoryAvailable?: boolean
   readonly config?: OmoConfig
   readonly models?: readonly HarnessModel[]
@@ -102,7 +117,7 @@ export async function createRunnerHarness(options: {
   readonly resolveParentSessionFile?: () => string | undefined
   readonly resolveParentCacheReusable?: () => boolean
 }): Promise<RunnerHarness> {
-  const root = await mkdtemp(join(tmpdir(), "memory-reflection-worker-"))
+  const root = options.root ?? await mkdtemp(join(tmpdir(), "memory-reflection-worker-"))
   const identity: MemoryIdentity = {
     id: "agent-test",
     safeSlug: "agent-test",
@@ -133,7 +148,9 @@ export async function createRunnerHarness(options: {
     },
     createRunId: () => `run-${++nextRun}`,
   })
-  const reserved = await store.evaluate("conversation-a", { kind: "settled", success: true })
+  const reserved = options.dream === true
+    ? await reserveDream(store, journal)
+    : await store.evaluate("conversation-a", { kind: "settled", success: true })
   if (!reserved || reserved.status !== "active") throw new Error("expected active reflection reservation")
 
   const model: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }

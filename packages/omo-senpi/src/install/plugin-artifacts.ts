@@ -12,6 +12,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo-task.js"),
   join("extensions", "omo-computer-use.js"),
   join("extensions", "omo-memory-doctor.js"),
+  join("extensions", "omo-memory-memfs.js"),
   join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
   join("extensions", "memory-run-supervisor.mjs"),
@@ -20,6 +21,13 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   ...PERSONA_ASSET_FILES.map((filename) => join("extensions", filename)),
   join("skills", "ast-grep", "SKILL.md"),
   join("skills", "browser", "SKILL.md"),
+  // The bundled omowright runtime the browser skill loads at runtime (issue #9661): staged by
+  // build:materialize-frontend and gitignored, so it must be required explicitly or a payload
+  // without it ships a browser skill whose loadOmowright() always fails.
+  join("skills", "browser", "runtime", "omowright", "index.js"),
+  // index.js reads page-bundle.js from beside itself when it is imported, so a payload with only
+  // index.js fails the same way (#9661).
+  join("skills", "browser", "runtime", "omowright", "page-bundle.js"),
   join("skills", "coding-agent-sessions", "SKILL.md"),
   join("skills", "debugging", "SKILL.md"),
   join("skills", "frontend", "SKILL.md"),

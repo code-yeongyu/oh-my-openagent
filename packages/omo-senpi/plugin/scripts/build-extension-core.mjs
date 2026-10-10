@@ -72,10 +72,14 @@ const threadSdkEntryPath = join(packageRoot, "src", "extension", "thread-sdk.ts"
 const threadSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, THREAD_SDK_RELATIVE_PATH)
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
+const sidePanelRuntimeEntryPath = join(packageRoot, "src", "components", "side-panel", "runtime.ts")
+const sidePanelRuntimeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-side-panel.js")
 const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
 const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
 const memoryDoctorEntryPath = join(packageRoot, "src", "components", "memory", "commands", "doctor-runtime.ts")
+const memoryMemfsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "memfs-runtime.ts")
 const memoryDoctorOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-doctor.js")
+const memoryMemfsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-memfs.js")
 // The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
 // same contract as the staged personas, so omo.js carries none of the ~29 KB of prelude text (#9113).
 export const COMPUTER_PRELUDE_ASSET_NAME = "assets.generated.json"
@@ -87,6 +91,7 @@ const externalSpecifiers = [
   "#omo-task-runtime",
   "#omo-computer-use-runtime",
   "#omo-memory-doctor-runtime",
+  "#omo-memory-memfs-runtime",
   "#omo-agent-toolkit-sdk",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
@@ -115,9 +120,11 @@ export const extensionBuildPaths = {
   toolkitSdkOutputPath,
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
+  sidePanelRuntimeOutputPath,
   rollbackRuntimeOutputPath,
   computerUseOutputPath,
   memoryDoctorOutputPath,
+  memoryMemfsOutputPath,
   gatewayStoreWorkerOutputPath,
   gatewayRulesExtensionOutputPath,
 }
@@ -133,10 +140,12 @@ export function resolveOutputs(options) {
     memberOutput: sibling(options.memberOutputPath, memberOutputPath, "omo-member.js"),
     supervisorOutput: sibling(options.supervisorOutputPath, supervisorOutputPath, "memory-run-supervisor.mjs"),
     advisorRuntimeOutput: sibling(options.advisorRuntimeOutputPath, advisorRuntimeOutputPath, "omo-init-deep-advisor.js"),
+    sidePanelRuntimeOutput: sibling(options.sidePanelRuntimeOutputPath, sidePanelRuntimeOutputPath, "omo-side-panel.js"),
     toolkitSdkOutput: sibling(options.toolkitSdkOutputPath, toolkitSdkOutputPath, join("runtime", "agent-toolkit-sdk", "sdk.js")),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
     memoryDoctorOutput: sibling(options.memoryDoctorOutputPath, memoryDoctorOutputPath, "omo-memory-doctor.js"),
+    memoryMemfsOutput: sibling(options.memoryMemfsOutputPath, memoryMemfsOutputPath, "omo-memory-memfs.js"),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
     gatewayRulesExtensionOutput: sibling(options.gatewayRulesExtensionOutputPath, gatewayRulesExtensionOutputPath, GATEWAY_RULES_EXTENSION_NAME),
@@ -158,11 +167,13 @@ export async function buildExtension(options = {}) {
     memberOutput,
     supervisorOutput,
     advisorRuntimeOutput,
+    sidePanelRuntimeOutput,
     toolkitSdkOutput,
     threadSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
     memoryDoctorOutput,
+    memoryMemfsOutput,
     gatewayStoreWorkerOutput,
     gatewayRulesExtensionOutput,
   } = resolveOutputs(options)
@@ -172,8 +183,10 @@ export async function buildExtension(options = {}) {
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
   const advisorRuntimeInputs = await buildEntry(advisorRuntimeEntryPath, advisorRuntimeOutput, buildDefines)
+  const sidePanelRuntimeInputs = await buildEntry(sidePanelRuntimeEntryPath, sidePanelRuntimeOutput, buildDefines)
   const rollbackRuntimeInputs = await buildEntry(rollbackRuntimeEntryPath, rollbackRuntimeOutput, buildDefines, sdkExternalSpecifiers)
   const memoryDoctorInputs = await buildEntry(memoryDoctorEntryPath, memoryDoctorOutput, buildDefines)
+  const memoryMemfsInputs = await buildEntry(memoryMemfsEntryPath, memoryMemfsOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
   const gatewayRulesExtensionInputs = await buildEntry(gatewayRulesExtensionEntryPath, gatewayRulesExtensionOutput, buildDefines)
@@ -190,10 +203,12 @@ export async function buildExtension(options = {}) {
     memberInputs,
     supervisorInputs,
     advisorRuntimeInputs,
+    sidePanelRuntimeInputs,
     toolkitSdkInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
     memoryDoctorInputs,
+    memoryMemfsInputs,
     gatewayStoreWorkerInputs,
     gatewayRulesExtensionInputs,
     threadSdkInputs,

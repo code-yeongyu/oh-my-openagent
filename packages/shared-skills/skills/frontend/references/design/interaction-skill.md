@@ -19,7 +19,7 @@ The contract, in order:
 2. **Read its real source** through the recipe (section 2). Never guess spring values, exit orchestration, or gesture thresholds from a preview description.
 3. **Extract the mechanism**, not the pixels: the spring config, the layout strategy (`layoutId` shared layout vs height morph vs clip-path), what animates in what order on enter/exit, where blur crossfades sit, and what the reduced-motion path swaps to.
 4. **Adapt to the project.** Concrete durations, easings, and spring params come from the project `DESIGN.md` Motion & Interaction section. Where beui.dev and `DESIGN.md` disagree, `DESIGN.md` wins. A value that is not in `DESIGN.md` gets added there first, then used.
-5. **No matching pattern?** Compose from the nearest two, or state explicitly that the interaction is novel and record its mechanism in `DESIGN.md` before building it.
+5. **No matching pattern?** Run `component-catalogs.md` section 3. If nothing fits there either, compose from the nearest two, or state explicitly that the interaction is novel and record its mechanism in `DESIGN.md` before building it.
 
 ## 2. Consultation recipe (curl-only, verified 2026-07)
 

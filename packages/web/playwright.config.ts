@@ -20,6 +20,8 @@ export default defineConfig({
       args: [
         "--use-mock-keychain",
         "--password-store=basic",
+        // Keep glyph screenshot references and actual text on grayscale AA in Linux CI.
+        "--disable-lcd-text",
         "--js-flags=--max-old-space-size=2048",
       ],
     },

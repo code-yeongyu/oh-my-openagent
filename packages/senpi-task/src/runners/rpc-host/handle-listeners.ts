@@ -23,10 +23,47 @@ export interface HandleListeners {
   clearActive(): void
 }
 
+/**
+ * Events a warm host delivers before the manager subscribes. The manager attaches its observers only
+ * after `start` returns, and a warm host can run a whole first turn (a fallback hop included) in that
+ * window (#9512). Every one of them is kept until the first observer attaches - a partial history
+ * would bring the record gap back - then replayed to each observer attached in that same tick and
+ * released.
+ *
+ * Until the release, the buffer is the single ordered log: an event that arrives meanwhile (even one a
+ * listener causes during its own replay) is appended to it, reaches an observer still replaying through
+ * its read cursor, and goes live only to observers that already finished replaying. Every observer
+ * therefore sees each event exactly once, in emission order. A listener that throws during replay is
+ * reported through `onListenerError` instead of escaping `subscribe`, which runs after the child is
+ * already live.
+ */
+
+export interface HandleListenersOptions {
+  onListenerError?(error: unknown): void
+}
+
 /** Listener registries that survive a transport replacement and retire with the active handle. */
-export function createHandleListeners(): HandleListeners {
+export function createHandleListeners(options: HandleListenersOptions = {}): HandleListeners {
   const extensionEvents = createChildExtensionEvents()
   const eventListeners = new Set<ChildEventListener>()
+  let earlyEvents: ChildEvent[] | undefined = []
+  const replayed = new Set<ChildEventListener>()
+  const releaseEarlyEvents = (): void => {
+    earlyEvents = undefined
+    replayed.clear()
+  }
+  const replayEarlyEvents = (listener: ChildEventListener): void => {
+    if (earlyEvents === undefined) return
+    if (eventListeners.size === 1) queueMicrotask(releaseEarlyEvents)
+    for (let index = 0; earlyEvents !== undefined && index < earlyEvents.length; index++) {
+      try {
+        listener(earlyEvents[index] as ChildEvent)
+      } catch (error) {
+        options.onListenerError?.(error)
+      }
+    }
+    if (earlyEvents !== undefined) replayed.add(listener)
+  }
   const parkedListeners = new Set<(event: HostSessionParked) => void>()
   const turnResumedListeners = new Set<() => void>()
   const resumedListeners = new Set<() => void>()
@@ -34,6 +71,7 @@ export function createHandleListeners(): HandleListeners {
   const registrations: ListenerRegistrations = {
     subscribe: (listener) => {
       eventListeners.add(listener)
+      replayEarlyEvents(listener)
       return () => eventListeners.delete(listener)
     },
     subscribeExtensionEvents: extensionEvents.subscribe,
@@ -55,6 +93,11 @@ export function createHandleListeners(): HandleListeners {
     extensionEvents,
     registrations,
     emitEvent: (event) => {
+      if (earlyEvents !== undefined) {
+        earlyEvents.push(event)
+        for (const listener of [...replayed]) if (eventListeners.has(listener)) listener(event)
+        return
+      }
       for (const listener of eventListeners) listener(event)
     },
     emitParked: (event) => {
@@ -67,6 +110,7 @@ export function createHandleListeners(): HandleListeners {
       for (const listener of resumedListeners) listener()
     },
     clearActive: () => {
+      releaseEarlyEvents()
       extensionEvents.clear()
       eventListeners.clear()
       turnResumedListeners.clear()

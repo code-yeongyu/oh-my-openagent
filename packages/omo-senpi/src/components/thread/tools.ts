@@ -159,7 +159,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
         return output(failure("host_unavailable", `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`, "Retry when the shared Senpi host is running."))
       }
       if (message.startsWith("unsupported:")) {
-        return output(failure("unsupported", `The target's endpoint does not accept ${message.slice("unsupported:".length)}: a terminal session only takes messages through its own inbox.`, "Use thread_read to follow the terminal session, or act on a thread served by a host.", { command: message.slice("unsupported:".length) }))
+        return output(failure("unsupported", `The target's endpoint does not accept ${message.slice("unsupported:".length)}: that terminal runs an engine from before terminal session controls.`, "Update omo where that terminal runs and restart it, or use thread_send and thread_read; thread_list shows each thread's controls.", { command: message.slice("unsupported:".length) }))
       }
       return output(failure("internal_error", `Thread operation failed: ${message}`, "Call thread_list and retry after checking the target."))
     }
@@ -281,8 +281,9 @@ async function deliverThroughGateway(
   }
   const turn = options.callerTurnId?.()
   const cause = options.callerCause?.()
+  const name = options.callerName?.()?.trim()
   const sent = await engine.deliver({
-    sender: { kind: "session", durable_id: callerId, ...(turn === undefined ? {} : { turn_id: turn }), ...(cause === undefined ? {} : { cause_delivery_id: cause }) },
+    sender: { kind: "session", durable_id: callerId, ...(name === undefined || name === "" ? {} : { name }), ...(turn === undefined ? {} : { turn_id: turn }), ...(cause === undefined ? {} : { cause_delivery_id: cause }) },
     target: threadId,
     text: value.message,
     mode: value.delivery ?? "auto",

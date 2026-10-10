@@ -19,10 +19,14 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
     writer) while the launch answers from the cached or empty value. `omo setup` and `omo doctor` always run
     full live detection and never read the cache.
   - `bun-runtime.js` / `child-process.js` — `maybeReexecUnderBun`, `findBunBinary`, `probeBunVersion`,
-    `spawnNode`/`runChild`. Runtime policy: a machine with bun runs omo on bun, no config needed - a
-    bun-global install trusts the bun that installed it, every other install (npm, project-local,
-    bunx) probes the discovered bun once per node boot and hands over when it is >= `BUN_MIN_VERSION`
-    (1.4.0); `OMO_RUNTIME=node` always stays on node, `OMO_RUNTIME=bun` always re-execs (no floor).
+    `spawnNode`/`runChild`. Runtime policy: a machine with bun runs omo on bun, no config needed, and
+    every bun is held to `BUN_MIN_VERSION` (1.4.0; node:sqlite + worker_threads). A bun the user chose
+    (a bun-global install or `OMO_RUNTIME=bun`) that is older fails at startup with `OmO needs Bun >= 1.4.0
+    (found X); run \`bun upgrade\`` instead of silently switching runtimes; any other install (npm,
+    project-local, bunx) probes the discovered bun and stays on node when it is older. A process already
+    running on an older bun nobody chose (`resolveBunGuard`) hands off to a real node pinned with
+    `OMO_RUNTIME=node`, or fails with the same message when there is none (#9563). `OMO_RUNTIME=node`
+    always stays on node.
     POSIX handoffs use `execve` with argv[0], preserving the PID, args and environment without a
     resident wrapper. Windows, missing execve and thrown execve retain async `runChild`. The fallback forwards `SIGTERM`/`SIGHUP`, waits up to
     `OMO_SIGNAL_GRACE_MS` (default 10s), then re-raises an ignored signal. It waits for `SIGINT`

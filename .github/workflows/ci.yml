@@ -68,6 +68,14 @@ jobs:
           jq -r '"runtime_touching=\(.runtimeTouching)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq . <<< "$MODE_JSON"
 
+      # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
+      - name: Report-only temp-leak list only shrinks
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node script/check-temp-leak-report-only.mjs "$(git merge-base "$BASE_SHA" "$GITHUB_SHA")"
+
       - name: Write job summary
         if: always()
         shell: bash

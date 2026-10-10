@@ -47,6 +47,7 @@ export type { TaskId } from "./id"
 export { messageability } from "./messageability"
 export { isTransportLostMessage, TRANSPORT_LOST_REASON } from "./transport-loss"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"
+export { fenceRun, nextRunEpoch, type RunFence } from "./run-fence"
 export {
   TASK_START_FAILURE_KINDS,
   TASK_START_FAILURE_REASONS,

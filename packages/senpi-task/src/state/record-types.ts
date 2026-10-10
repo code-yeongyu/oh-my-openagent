@@ -80,6 +80,13 @@ export type TaskRecordInput = {
   readonly fallback_models?: readonly ResolvedModelRecord[]
   readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly resolved_model?: ResolvedModelRecord
+  /**
+   * The model the child ACTUALLY started on, recorded once the runner is up (#9722) and kept
+   * current from the child's own model observations - `model`/`resolved_model` state the plan,
+   * this states the route that ran. Absent on records predating the field or a child whose
+   * effective model could not be observed.
+   */
+  readonly effective_model?: ResolvedModelRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]
   readonly notify_on_terminal: boolean
@@ -109,6 +116,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly host_pid?: number
   readonly child_session_id?: string
   readonly spawn_spec?: TaskSpawnSpec
+  /** Mirrors TaskRecordInput.effective_model; see there. */
+  readonly effective_model?: ResolvedModelRecord
   readonly final_response?: string
   readonly error_message?: string
   readonly killed?: boolean
@@ -116,12 +125,28 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly notification: TaskNotification
   readonly revive_delivery_uncertain?: ReviveDeliveryUncertainty
   readonly resumed_run_epoch?: number
+  // The run_epoch the current user-visible run began at: the spawn epoch, then the epoch of each
+  // revive (a send to a finished task, a self-resumed turn). run_epoch also moves inside one run
+  // (start-time model fallback, runtime fallback handoff, reattach), so a handle minted anywhere in
+  // [run_start_epoch, run_epoch] still names the current run. Absent on records written before it.
+  readonly run_start_epoch?: number
+  // The highest epoch a rollback took back (`rollbackDetachedRevival`). It was issued once, so it is never issued
+  // again: the next run starts above it, and a handle minted for the undone run stays stale instead of naming a
+  // later one. Absent when no rollback ever undid a run.
+  readonly burnt_epoch?: number
   readonly start_queued?: StartQueued
   readonly suspension_reason?: SuspensionReason
+  // With `suspension_reason: "revival_deferred"`: the reconcile outcome's reason (capacity, lock_contended, ...).
+  readonly revival_deferred_reason?: string
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly fallback_handoff_epoch?: number
-  readonly fallback_closing_child?: { readonly pid?: number; readonly host_session?: HostSessionIdentity }
+  readonly fallback_closing_child?: {
+    readonly pid?: number
+    readonly host_session?: HostSessionIdentity
+    // #9350: silence is not proof of closure after a suspended daemon child is failed.
+    readonly requires_confirmation?: boolean
+  }
   readonly residency_claim?: string
   // task_cancel accepted while the child was unreachable (omo#9403). The cancel is final: every
   // revival reads it and finishes the cancel instead of running the child again.

@@ -191,8 +191,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       // into the store once, when this session starts and the mailbox still exists on disk.
       const legacyMailbox = join(stateDirectory, "mailbox")
       const store = options.store ?? createGatewayStore({ agentDir: agentDir(), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
+      // the next call, so the same failure would repeat each time: it is reported once per session.
+      const reportedInvalidMailboxes = new Set<string>()
       store.onEvent((event) => {
-        if (event.kind === "legacy_mailbox_invalid") ctx.logger.warn(`thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (retried at the next start): ${event.error}`)
+        if (event.kind === "legacy_mailbox_invalid" && !reportedInvalidMailboxes.has(event.directory)) {
+          reportedInvalidMailboxes.add(event.directory)
+          ctx.logger.warn(`thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (it is retried each time the store opens): ${event.error}`)
+        }
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
       const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
@@ -213,6 +219,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
         callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
+        callerName: () => pi.getSessionName?.(),
         callerCause: () => run.cause,
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,

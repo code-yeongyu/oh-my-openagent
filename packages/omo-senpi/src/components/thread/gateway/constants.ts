@@ -14,6 +14,15 @@ export const GATEWAY_BUSY_TIMEOUT_MS = 5_000
  */
 export const GATEWAY_LOCK_WAIT_MAX_MS = 30_000
 
+/**
+ * How long a gateway store worker stays alive with no store call in flight before it retires. An
+ * idle worker thread retains about 3 MB (an empty Bun worker plus the bundled store code and
+ * SQLite); a terminal that is not sending or receiving holds none of it, and the next store call
+ * starts a fresh worker for the cost of one open (about 12 ms). A minute keeps a burst of calls
+ * (one wake's drain, a tool call and its receipt settle) on one worker.
+ */
+export const GATEWAY_STORE_IDLE_RETIRE_MS = 60_000
+
 export const MAX_HOPS = 4
 
 export const PAIR_BUCKET_BURST = 8

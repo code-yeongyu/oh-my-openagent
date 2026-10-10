@@ -11,6 +11,15 @@ const cells = [
   { language: "js", code: "var packagedSentinel = 41; print('JS_OK', packagedSentinel + 1); display(await tool.read({ path: 'fixture.txt' }))", summary: "Run packaged JavaScript and host read" },
   { language: "py", code: "packaged_sentinel = 41\\nprint('PY_OK', packaged_sentinel + 1)\\nimport os\\nprint('PY_PID', os.getpid())", summary: "Run packaged Python" },
   { action: "list", summary: "List packaged cells" },
+  { language: "js", isolate: true, code: "return [typeof process, typeof fetch, (await tool.read({ path: 'fixture.txt' })).text.trim()]", summary: "Probe the sandbox" },
+  { language: "js", isolate: true, code: "store('k', 1)", summary: "Try to keep state in the sandbox" },
+  // The large cell blocks until cell 7 writes release.flag, so the peek between them always sees it still running.
+  { language: "js", isolate: true, code: "print('x'.repeat(4194304)); await tool.bash({ command: 'i=0; while [ ! -f release.flag ]; do i=$((i+1)); [ $i -gt 120 ] && exit 1; sleep 1; done' }); return 'BIG_DONE'", summary: "Stream one large item from the sandbox" },
+  { action: "peek", cell_id: "eval-smoke-5", summary: "Peek at the large sandbox cell" },
+  { language: "py", code: "open('release.flag', 'w').close()\\nprint('RELEASED')", summary: "Release the large sandbox cell" },
+  // Queued behind the large cell in the js queue: it runs only after that cell settled. Its completion notification is
+  // written asynchronously and may land later; the smoke reads the spill path from the session, not from this cell.
+  { language: "js", code: "'AFTER_LARGE'", summary: "Run after the large sandbox cell" },
 ]
 export default function register(pi) {
   for (const kind of ["tool_call", "tool_result"]) {

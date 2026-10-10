@@ -1,4 +1,5 @@
 import { GATEWAY_PROVENANCE_SENTENCE } from "./constants"
+import type { DeliverySender } from "./adapter"
 import type { DeliveryRow } from "./types"
 
 function headerValue(value: string): string {
@@ -19,6 +20,18 @@ function authorFields(row: DeliveryRow): string[] {
     `author_id=${quotedHeaderValue(author.platform_user_id)}`,
     ...(author.user_id === undefined ? [] : [`author_user_id=${quotedHeaderValue(author.user_id)}`]),
   ]
+}
+
+/** Who sent the delivery, as a human surface labels it: the header in the text stays the model's provenance. */
+export function deliverySender(row: DeliveryRow): DeliverySender {
+  const origin = row.envelope.origin
+  if ("session" in origin) {
+    const name = row.envelope.actor === origin.session ? undefined : row.envelope.actor
+    return { kind: "agent", session_id: origin.session, ...(name === undefined ? {} : { name }) }
+  }
+  if (origin.external.platform === "cli") return { kind: "command_line", user: origin.external.account_id }
+  const author = origin.external.author?.display
+  return { kind: "external", platform: origin.external.platform, ...(author === undefined ? {} : { author }) }
 }
 
 export function renderDeliveryText(row: DeliveryRow): string {
