@@ -30,7 +30,7 @@ const ALLOWLIST: AllowlistEntry[] = [
     file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
     call: "httpsGet(url, { headers: { Accept: \"application/vnd.github+json\", \"User-Agent\": \"lazycodex-auto-update\", }, }, (response) => { if (response.statusCode !== 200) { response.resume(); resolve(undefined); return; } let body = \"\"; response.setEncoding(\"utf8\"); response.on(\"data\", (chunk) => { body += chunk; if (body.length > 128_000) request.destroy(); }); response.on(\"end\", () => { try { const parsed = JSON.parse(body); resolve(typeof parsed.body === \"string\" && parsed.body.trim() ? truncateReleaseNotes(parsed.body) : undefined); } catch (error) { if (error instanceof Error) { resolve(undefined); return; } throw error; } }); })",
     count: 1,
-    reason: "the only outbound call; the url argument is the api.github.com template prefix built at :107 (repo and version interpolate into the path, not the host) and https.get URL-parses it before TLS (senpi#3078).",
+    reason: "the only outbound call; the url argument is the api.github.com template prefix built in fetchGithubReleaseNotes (repo and version interpolate into the path, not the host) and https.get URL-parses it before TLS (senpi#3078).",
   },
   {
     file: "packages/omo-codex/plugin/skills/browser/runtime/omowright/index.js",
