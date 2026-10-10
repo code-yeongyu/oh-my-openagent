@@ -200,7 +200,14 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
 
-    if (isAbortError(error)) {
+    // A terminal-quota 402 can surface as an abort-classified error (LiteLLM
+    // terminal_quota_exhausted, or the stream dying right after Payment
+    // Required). It is a quota signal, not a user cancellation: it must fall
+    // through to the fallback chain instead of silently ending the session.
+    const terminalQuota402Abort =
+      classifyErrorType(error) === "abort" && extractStatusCode(error, config.retry_on_errors) === 402
+
+    if (isAbortError(error) && !terminalQuota402Abort) {
       // If we triggered this abort to swap in a fallback model, consume the
       // flag and preserve state — wiping attemptCount here is what causes
       // the infinite retry loop (issue #4006).
@@ -249,14 +256,22 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     })
 
     if (!isRetryableError(error, config.retry_on_errors)) {
-      log(`[${HOOK_NAME}] Error not retryable, skipping fallback`, {
+      if (!terminalQuota402Abort) {
+        log(`[${HOOK_NAME}] Error not retryable, skipping fallback`, {
+          sessionID,
+          retryable: false,
+          statusCode: extractStatusCode(error, config.retry_on_errors),
+          errorName: extractErrorName(error),
+          errorType: classifyErrorType(error),
+        })
+        return
+      }
+      log(`[${HOOK_NAME}] session.error terminal-quota 402 abort with fallback chain; dispatching session-stable fallback`, {
         sessionID,
-        retryable: false,
         statusCode: extractStatusCode(error, config.retry_on_errors),
         errorName: extractErrorName(error),
         errorType: classifyErrorType(error),
       })
-      return
     }
 
     let state = sessionStates.get(sessionID)
