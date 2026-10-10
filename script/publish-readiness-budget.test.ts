@@ -131,6 +131,13 @@ export -f clock advance date sleep timeout lookup npm curl
 }
 
 describe("publish.yml post-publish-verify registry readiness", () => {
+  test("#given fast registry probes #when configuring retries #then the attempt ceiling preserves the full readiness window", () => {
+    // Virtual request costs keep slow Windows shells practical; separately guard fast-probe capacity.
+    const config = Object.fromEntries([...readiness.run!.matchAll(/^READINESS_(INTERVAL_SECONDS|ATTEMPTS|BUDGET_SECONDS)=(\d+)$/gm)]
+      .map(([, key, value]) => [key, Number(value)]))
+    expect(config.ATTEMPTS * config.INTERVAL_SECONDS).toBeGreaterThanOrEqual(config.BUDGET_SECONDS)
+  })
+
   test.each([false, true])("#given all packages served (prerelease=%s) #when verified #then each exact version, own channel and release gitHead is checked", (prerelease) => {
     const outcome = runReadiness({ prerelease })
     expect(outcome.status).toBe(0)
@@ -153,7 +160,7 @@ describe("publish.yml post-publish-verify registry readiness", () => {
 
   test.each([300, 55 * 60])("#given delayed sibling metadata and tarball (%s s) #when readiness polls #then it waits for both", (delay) => {
     const outcome = runReadiness(delay === 55 * 60
-      ? { probeSeconds: 0, registry: { "lazycodex-ai": { metadataAfter: delay, tarballAfter: delay } } }
+      ? { registry: { "lazycodex-ai": { metadataAfter: delay, tarballAfter: delay } } }
       : { registry: { "oh-my-opencode": { metadataAfter: delay }, "lazycodex-ai": { tarballAfter: delay } } })
     expect(outcome.status).toBe(0)
     expect(outcome.elapsed).toBeGreaterThanOrEqual(delay)
