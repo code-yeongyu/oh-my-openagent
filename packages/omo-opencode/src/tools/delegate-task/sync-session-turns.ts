@@ -61,3 +61,22 @@ export function getTerminalSessionError(messages: readonly SessionMessage[]): st
   const errorMessage = extractErrorMessage(lastAssistant.info.error)
   return errorMessage && errorMessage.length > 0 ? errorMessage : "Session error"
 }
+
+export type SyncOutcomeState = "completed" | "interrupted" | "failed"
+
+/**
+ * Classify how the child session's final turn actually ended. Reaching lifecycle
+ * completion (poll loop idle) is not success: an interrupted or errored final
+ * turn must stay distinguishable from a clean terminal finish.
+ */
+export function classifySyncOutcome(messages: readonly SessionMessage[]): SyncOutcomeState {
+  const { lastAssistant } = getLastSessionTurns(messages)
+  if (!lastAssistant?.info) return "interrupted"
+  if ("error" in lastAssistant.info) return "failed"
+  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) {
+    return "interrupted"
+  }
+  const finish = lastAssistant.info.finish
+  if (!finish || NON_TERMINAL_FINISH_REASONS.has(finish)) return "interrupted"
+  return "completed"
+}
