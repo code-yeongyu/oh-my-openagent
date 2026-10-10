@@ -1,7 +1,8 @@
-import { PassThrough } from "node:stream";
+import { PassThrough, Writable } from "node:stream";
 
 import { describe, expect, it } from "bun:test";
 
+import { reportBestEffortCleanupError } from "./cleanup-errors.js";
 import { JsonRpcConnection } from "./json-rpc-connection.js";
 
 type JsonMessage = Record<string, unknown>;
@@ -93,5 +94,74 @@ describe("JsonRpcConnection cancellation", () => {
 
 		serverToClient.write(encodeMessage({ jsonrpc: "2.0", id: requestId ?? null, result: { items: [] } }));
 		expect(connection.pendingRequestCount()).toBe(0);
+	});
+});
+
+describe("JsonRpcConnection cleanup", () => {
+	it("#given an in-flight server request #when disposed before its handler settles #then no response writes to the child", async () => {
+		const reader = new PassThrough();
+		const writer = new PassThrough();
+		const recorder = recordJsonRpcMessages(writer);
+		const connection = new JsonRpcConnection(reader, writer);
+		let finishRequest: ((value: null) => void) | undefined;
+		const response = new Promise<null>((resolve) => {
+			finishRequest = resolve;
+		});
+		let requestStarted: (() => void) | undefined;
+		const started = new Promise<void>((resolve) => {
+			requestStarted = resolve;
+		});
+		connection.onRequest("workspace/applyEdit", () => {
+			requestStarted?.();
+			return response;
+		});
+		const errors: Error[] = [];
+		let reportError: (() => void) | undefined;
+		const reported = new Promise<void>((resolve) => {
+			reportError = resolve;
+		});
+		connection.onError((error) => {
+			errors.push(error);
+			reportError?.();
+		});
+		connection.listen();
+		reader.write(encodeMessage({ jsonrpc: "2.0", id: 1, method: "workspace/applyEdit" }));
+		await started;
+		connection.dispose();
+		finishRequest?.(null);
+		await reported;
+		expect(recorder.messages).toHaveLength(0);
+		expect(errors.map((error) => error.message)).toEqual(["JSON-RPC connection is disposed"]);
+		reader.destroy();
+		writer.destroy();
+	});
+
+	it("#given a queued child-stdin write #when disposal precedes an asynchronous EPIPE #then cleanup reports the error until the writer closes", async () => {
+		const reader = new PassThrough();
+		let failWrite: ((error: Error) => void) | undefined;
+		const writer = new Writable({
+			write(_chunk, _encoding, callback) {
+				failWrite = callback;
+			},
+		});
+		const messages: string[] = [];
+		const connection = new JsonRpcConnection(reader, writer);
+		connection.onError((error) => {
+			reportBestEffortCleanupError("connection error notification", error, (message) => messages.push(message));
+		});
+		connection.listen();
+		const write = connection.sendNotification("exit");
+		const rejected = write.catch((error: unknown) => error);
+		const closed = new Promise<void>((resolve) => writer.once("close", resolve));
+		connection.dispose();
+
+		expect(writer.listenerCount("error")).toBe(1);
+		failWrite?.(Object.assign(new Error("EPIPE: broken pipe, write"), { code: "EPIPE" }));
+		expect(await rejected).toMatchObject({ code: "EPIPE" });
+		await closed;
+
+		expect(messages).toEqual(["[lsp] ignored connection error notification failure during cleanup: EPIPE: broken pipe, write"]);
+		expect(writer.listenerCount("error")).toBe(0);
+		reader.destroy();
 	});
 });

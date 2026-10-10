@@ -43,6 +43,7 @@ export class JsonRpcConnection {
 		this.reader.on("end", this.handleClose);
 		this.reader.on("error", this.handleStreamError);
 		this.writer.on("error", this.handleStreamError);
+		this.writer.once("close", this.handleWriterClose);
 	}
 
 	onNotification(method: string, handler: NotificationHandler): void {
@@ -154,7 +155,8 @@ export class JsonRpcConnection {
 		this.reader.off("close", this.handleClose);
 		this.reader.off("end", this.handleClose);
 		this.reader.off("error", this.handleStreamError);
-		this.writer.off("error", this.handleStreamError);
+		// A queued write can emit an error after dispose (notably EPIPE on Windows).
+		// The writer owns that lifetime; keep its diagnostic handler until close.
 		for (const pending of this.pendingRequests.values()) {
 			pending.cleanup();
 			pending.reject(new Error("JSON-RPC connection disposed"));
@@ -174,6 +176,10 @@ export class JsonRpcConnection {
 		for (const handler of this.closeHandlers) {
 			handler();
 		}
+	};
+
+	private readonly handleWriterClose = (): void => {
+		this.writer.off("error", this.handleStreamError);
 	};
 
 	private readonly handleStreamError = (error: Error): void => {
@@ -304,6 +310,7 @@ export class JsonRpcConnection {
 	}
 
 	private writeMessage(message: Record<string, unknown>): Promise<void> {
+		if (this.disposed) return Promise.reject(new Error("JSON-RPC connection is disposed"));
 		const body = JSON.stringify(message);
 		const payload = `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`;
 		return new Promise((resolve, reject) => {
