@@ -65,14 +65,23 @@ fn grant_and_revoke_are_audited_without_the_raw_reason() {
     let scenario = Scenario::two_displays_with(&json!({}));
     let mut engine = headless(scenario.backend(), &[]);
     make_stop_path_live(&mut engine);
-    // When
-    grant(&mut engine, "a reason the audit must not quote");
-    engine.invoke("control.revoke", json!({}));
-    // Then: one audit each; the reason appears only as a digest
-    let audits: Vec<Value> = engine
-        .drain()
-        .into_iter()
+    // When: both requests are sent raw, so no reply wait skips an audit
+    // notification that precedes it; drain then returns every line in order
+    engine.request(
+        10,
+        "control.grant",
+        json!({"reason": "a reason the audit must not quote", "confirmationId": "confirm-1"}),
+    );
+    engine.request(11, "control.revoke", json!({}));
+    let messages = engine.drain();
+    // Then: both requests answered; one audit each; the reason only as a digest
+    let replies: Vec<&Value> = messages.iter().filter(|message| message.get("id").is_some()).collect();
+    assert_eq!(replies.len(), 2, "{messages:?}");
+    assert!(replies.iter().all(|reply| reply.get("error").is_none()), "{replies:?}");
+    let audits: Vec<Value> = messages
+        .iter()
         .filter(|message| message["method"] == json!("audit"))
+        .cloned()
         .collect();
     let actions: Vec<&str> = audits
         .iter()
