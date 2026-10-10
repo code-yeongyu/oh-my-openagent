@@ -47,6 +47,7 @@ export interface SearchResult {
   excerpt: string
   match_count: number
   timestamp?: number
+  archived?: boolean
 }
 
 export interface SessionMetadata {
@@ -59,6 +60,7 @@ export interface SessionMetadata {
   time: {
     created: number
     updated: number
+    archived?: number
   }
   summary?: {
     additions: number
@@ -73,6 +75,7 @@ export interface SessionListArgs {
   from_date?: string
   to_date?: string
   project_path?: string
+  include_archived?: boolean
 }
 
 export interface SessionReadArgs {
@@ -88,6 +91,7 @@ export interface SessionSearchArgs {
   session_id?: string
   case_sensitive?: boolean
   limit?: number
+  include_archived?: boolean
 }
 
 export interface SessionInfoArgs {
