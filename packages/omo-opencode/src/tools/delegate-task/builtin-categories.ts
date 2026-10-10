@@ -1,4 +1,7 @@
 import type { CategoryConfig } from "../../config/schema"
+import { isAnyFallbackModelAvailable } from "../../shared/fallback-model-availability"
+import { isModelAvailable } from "../../shared/model-availability"
+import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 import { GOOGLE_CATEGORIES } from "./google-categories"
 import { KIMI_CATEGORIES } from "./kimi-categories"
@@ -56,4 +59,21 @@ export const BUILTIN_CATEGORY_REQUIRES_MODEL: Record<string, readonly string[]> 
 export function builtinCategoryGateModels(categoryName: string, requirementGateModel: string | undefined): readonly string[] {
   if (requirementGateModel !== undefined) return [requirementGateModel]
   return BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName] ?? []
+}
+
+export function builtinCategoryRequiredModels(categoryName: string): readonly string[] {
+  const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+  const gateModels = builtinCategoryGateModels(categoryName, requirement?.requiresModel)
+  if (gateModels.length > 0) return gateModels
+  return requirement?.requiresAnyModel ? requirement.fallbackChain.map((entry) => entry.model) : []
+}
+
+export function isBuiltinCategoryAvailable(categoryName: string, availableModels: Set<string>): boolean {
+  const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+  const gateModels = builtinCategoryGateModels(categoryName, requirement?.requiresModel)
+
+  return (
+    (gateModels.length === 0 || gateModels.some((model) => isModelAvailable(model, availableModels))) &&
+    (!requirement?.requiresAnyModel || isAnyFallbackModelAvailable(requirement.fallbackChain, availableModels))
+  )
 }
