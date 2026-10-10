@@ -1,8 +1,11 @@
 import type { ChildProcess } from "node:child_process"
+import { EventEmitter, once } from "node:events"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterEach, describe, expect, test } from "bun:test"
+import { PassThrough, Writable } from "node:stream"
+import { setImmediate } from "node:timers/promises"
+import { afterEach, describe, expect, jest, test } from "bun:test"
 
 import { spawnFakeChild } from "./rpc/__fixtures__/spawn-fake"
 import { terminateRpcChild } from "./rpc/terminate"
@@ -63,6 +66,68 @@ function processRunner(
         .split("\n")
         .filter((line) => line.length > 0)
         .map((line) => JSON.parse(line)),
+  }
+}
+
+// A real Writable keeps commands FIFO while a held write callback simulates pipe backpressure.
+// Only the engine's responses and write completion are controlled; the runner/client are real.
+function controlledEngine(options: { readonly holdProtocol?: boolean; readonly holdChainWrite?: boolean } = {}) {
+  const stdout = new PassThrough()
+  const events = new EventEmitter()
+  const commands: string[] = []
+  const warnings: string[] = []
+  let protocol: { id: string; type: string } | undefined
+  let releaseChain: (() => void) | undefined
+  const reply = (command: { id: string; type: string }, data?: unknown): void => {
+    stdout.write(`${JSON.stringify({ type: "response", id: command.id, command: command.type, success: true, data })}\n`)
+  }
+  const replyProtocol = (): void => {
+    if (protocol === undefined) throw new Error("capability probe has not arrived")
+    reply(protocol, { capabilities: ["retry_fallback_command"] })
+  }
+  const stdin = new Writable({
+    write(chunk, _encoding, callback) {
+      const command = JSON.parse(String(chunk)) as { id: string; type: string }
+      const accept = (): void => {
+        commands.push(command.type)
+        if (command.type === "get_protocol_info") {
+          protocol = command
+          if (!options.holdProtocol) replyProtocol()
+        } else if (command.type !== "set_retry_fallback") {
+          reply(command, command.type === "switch_session" ? { cancelled: false } : undefined)
+        }
+        callback()
+      }
+      if (command.type === "set_retry_fallback" && options.holdChainWrite) releaseChain = accept
+      else accept()
+      events.emit(command.type)
+    },
+  })
+  const child = Object.assign(new EventEmitter(), { stdin, stdout, stderr: new PassThrough() }) as unknown as ChildProcess
+  const runner = new RpcProcessRunner({
+    modelAdmission: async () => {},
+    spawnChild: () => child,
+    fallbackChainDeadlineMs: 300,
+    onWarning: (message) => {
+      warnings.push(message)
+      events.emit("warning")
+    },
+  })
+  return {
+    runner, commands, warnings, replyProtocol,
+    next: (event: string) => once(events, event, { signal: AbortSignal.timeout(5_000) }).catch((error) => {
+      throw new Error(`waited 5s for RPC engine event '${event}', never fired`, { cause: error })
+    }),
+    releaseChain: () => {
+      if (releaseChain === undefined) throw new Error("chain write has not arrived")
+      releaseChain()
+    },
+    close: () => {
+      child.emit("close", 0, null)
+      stdin.destroy()
+      stdout.destroy()
+      child.stderr?.destroy()
+    },
   }
 }
 
@@ -143,20 +208,69 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     expect(engine.warnings[0]).toContain("refused")
   })
 
-  test("#given an engine that never answers the chain #when a child with fallback models starts #then its first prompt goes out after the deadline instead of waiting forever", async () => {
-    // given
-    const engine = processRunner(["retry_fallback_command"], { retryFallback: "hang", fallbackChainDeadlineMs: 300 })
+  test("#given a held chain write and no reply #when its deadline fires #then the prompt remains behind the chain in the pipe", async () => {
+    jest.useFakeTimers()
+    const engine = controlledEngine({ holdProtocol: true, holdChainWrite: true })
+    try {
+      // given: arm before starting; advancing time never depends on a subprocess booting quickly.
+      const probe = engine.next("get_protocol_info")
+      const chainWrite = engine.next("set_retry_fallback")
+      const warning = engine.next("warning")
+      const started = engine.runner.start(spec("st_p7", CHAINED))
+      await probe
+      await setImmediate()
+      jest.advanceTimersByTime(100)
+      engine.replyProtocol()
+      await chainWrite
+      await setImmediate()
 
-    // when
-    const handle = await engine.runner.start(spec("st_p7", CHAINED))
+      // when: the remaining shared budget elapses while Writable is still blocked on the chain.
+      jest.advanceTimersByTime(200)
+      await warning
+      await setImmediate()
+      expect(engine.commands).toEqual(["get_protocol_info"])
+      engine.releaseChain()
+      await started
 
-    // then
-    await handle.waitForIdle()
-    expect(handle.lastAssistantText()).toBe("hello")
-    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
-    expect(engine.warnings).toHaveLength(1)
-    expect(engine.warnings[0]).toContain("st_p7")
-    expect(engine.warnings[0]).toContain("no answer")
+      // then: the queued prompt cannot overtake the chain, even though its write completed late.
+      expect(engine.commands).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
+      expect(engine.warnings).toHaveLength(1)
+      expect(engine.warnings[0]).toContain("st_p7")
+      expect(engine.warnings[0]).toContain("no answer")
+    } finally {
+      engine.close()
+      jest.useRealTimers()
+    }
+  })
+
+  test.each([false, true])("#given a late capability reply (resume=%s) #when setup times out #then no chain is sent after work starts", async (resume) => {
+    jest.useFakeTimers()
+    const engine = controlledEngine({ holdProtocol: true })
+    try {
+      // given
+      const probe = engine.next("get_protocol_info")
+      const started = engine.runner.start(spec("st_late", {
+        ...CHAINED,
+        ...(resume ? { resumeSessionPath: join(tempDir(), "resumed.jsonl") } : {}),
+      }))
+      await probe
+      await setImmediate()
+
+      // when: first work is released before the held probe answer arrives.
+      jest.advanceTimersByTime(300)
+      await started
+      engine.replyProtocol()
+      await setImmediate()
+
+      // then: settling an abandoned read must never write launch-time configuration afterward.
+      expect(engine.commands).toEqual(["get_protocol_info", resume ? "switch_session" : "prompt"])
+      expect(engine.warnings).toHaveLength(1)
+      expect(engine.warnings[0]).toContain("st_late")
+      expect(engine.warnings[0]).toContain("no answer")
+    } finally {
+      engine.close()
+      jest.useRealTimers()
+    }
   })
 
   test("#given a child that exits while its chain is being sent #when it starts #then the start fails on the dead child and the warning says it exited, not that the chain was refused", async () => {
