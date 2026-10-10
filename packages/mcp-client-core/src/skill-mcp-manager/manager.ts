@@ -4,6 +4,7 @@ import { McpOAuthProvider } from "../mcp-oauth/provider"
 import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
 import { handlePostRequestAuthError, handleStepUpIfNeeded } from "./oauth-handler"
+import { buildRequestOptions } from "./request-options"
 import type {
   McpClient,
   OAuthProviderFactory,
@@ -14,6 +15,7 @@ import type {
 
 export interface SkillMcpClientOptions {
   cdpUrl?: string
+  requestTimeoutMs?: number
 }
 
 export function buildSkillMcpClientKey(info: SkillMcpClientInfo, options?: SkillMcpClientOptions): string {
@@ -87,19 +89,19 @@ export class SkillMcpManager {
 
   async listTools(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Tool[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listTools()
+    const result = await client.listTools(undefined, buildRequestOptions(context.config, options))
     return result.tools
   }
 
   async listResources(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Resource[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listResources()
+    const result = await client.listResources(undefined, buildRequestOptions(context.config, options))
     return result.resources
   }
 
   async listPrompts(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Prompt[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listPrompts()
+    const result = await client.listPrompts(undefined, buildRequestOptions(context.config, options))
     return result.prompts
   }
 
@@ -111,14 +113,14 @@ export class SkillMcpManager {
     options?: SkillMcpClientOptions
   ): Promise<unknown> {
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.callTool({ name, arguments: args })
+      const result = await client.callTool({ name, arguments: args }, undefined, buildRequestOptions(context.config, options))
       return result.content
     })
   }
 
   async readResource(info: SkillMcpClientInfo, context: SkillMcpServerContext, uri: string, options?: SkillMcpClientOptions): Promise<unknown> {
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.readResource({ uri })
+      const result = await client.readResource({ uri }, buildRequestOptions(context.config, options))
       return result.contents
     })
   }
@@ -131,7 +133,7 @@ export class SkillMcpManager {
     options?: SkillMcpClientOptions
   ): Promise<unknown> {
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.getPrompt({ name, arguments: args })
+      const result = await client.getPrompt({ name, arguments: args }, buildRequestOptions(context.config, options))
       return result.messages
     })
   }
