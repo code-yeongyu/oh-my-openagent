@@ -9,9 +9,8 @@ use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, PointParams};
 use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_core::types::{DesktopSessionOptions, PointerOptions};
-use senpi_desktop_safety::{FakeClock, StopPathId, Supervisor};
+use senpi_desktop_safety::{FakeClock, StopPathId, StopSource, Supervisor};
 use senpi_desktop_session::{BackendSelection, ControlSlot, Op, Response, Session, SessionSafety, SessionTimeouts};
-use serde_json::json;
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -24,18 +23,23 @@ fn scenario() -> BackendSelection {
     BackendSelection::FakeScenario(Box::new(FakeScenario::from_json(&json.to_string()).expect("parses")))
 }
 
-fn live_stop_path(slot: &Arc<ControlSlot>) -> SessionSafety {
+fn live_supervisor() -> Arc<Supervisor> {
     let supervisor = Arc::new(Supervisor::new(Arc::new(FakeClock::new(0))));
     supervisor.set_live(StopPathId::Global, true);
-    SessionSafety {
-        supervisor,
+    supervisor
+}
+
+fn start_with(slot: &Arc<ControlSlot>, supervisor: &Arc<Supervisor>) -> Session {
+    let safety = SessionSafety {
+        supervisor: Arc::clone(supervisor),
         audit: Box::new(|_| {}),
         control_slot: Arc::clone(slot),
-    }
+    };
+    Session::start_supervised(scenario(), SessionTimeouts::default(), safety).expect("session starts")
 }
 
 fn start(slot: &Arc<ControlSlot>) -> Session {
-    Session::start_supervised(scenario(), SessionTimeouts::default(), live_stop_path(slot)).expect("session starts")
+    start_with(slot, &live_supervisor())
 }
 
 fn grant(reason: &str) -> Op {
@@ -126,7 +130,8 @@ async fn a_second_sessions_grant_is_refused_and_close_releases_the_slot() {
 #[tokio::test]
 async fn foreground_delivery_needs_the_grant_and_a_suspension_revokes_it() {
     // Given
-    let session = start(&ControlSlot::new());
+    let supervisor = live_supervisor();
+    let session = start_with(&ControlSlot::new(), &supervisor);
     open(&session).await;
     let frame = capture(&session).await;
     // When: no grant
@@ -143,6 +148,15 @@ async fn foreground_delivery_needs_the_grant_and_a_suspension_revokes_it() {
         session.submit(foreground_click(&frame)).wait().await,
         Ok(Response::Unit)
     );
+    // When: the user stops and then resumes
+    supervisor.trigger_stop(StopSource::Hotkey);
+    supervisor.reset_for_test();
+    supervisor.set_live(StopPathId::Global, true);
+    // Then: the grant did not survive the stop
+    assert!(!state(&session).await.active);
+    assert_eq!(
+        code(session.submit(foreground_click(&frame)).wait().await),
+        Some(ErrorCode::ControlRequired)
+    );
     session.close().wait().await.expect("closes");
-    let _ = json!(());
 }

@@ -5,10 +5,11 @@
 //! host after the user confirmed (`control.grant`, host-only). At most one
 //! session of the process holds the slot; a second session's grant is refused
 //! `InputBusy`, never stolen. `control.revoke`, `session.close`, and a stop
-//! (observed at the next served request through the supervisor's stop epoch)
-//! each release the grant; `stopPath.resume` never restores it. A mutation
-//! queued under one grant runs under no other: the grant generation captured
-//! when the request was enqueued must still be the live grant at admission.
+//! (the supervisor's stop epoch, checked at admission and reconciled at the
+//! next served request) each release the grant; a grant is refused while the
+//! stop is latched, and `stopPath.resume` never restores one. Requests run on
+//! one serial queue, so nothing queued before a revoke runs after it; the
+//! fence against a late human "yes" lives in the host (B5b).
 //! The grant authorizes foreground only; an omitted delivery stays
 //! background. `raiseWindow` needs the grant too: raising a window takes the
 //! user's foreground, the most visible focus steal of all. This is
@@ -78,47 +79,32 @@ impl ControlSlot {
         static SLOT: OnceLock<Arc<ControlSlot>> = OnceLock::new();
         Arc::clone(SLOT.get_or_init(ControlSlot::new))
     }
-
-    /// The owner's current generation, captured when a request is dequeued.
-    pub(crate) fn generation_for(&self, instance: u64) -> Option<u64> {
-        self.owner
-            .lock()
-            .as_ref()
-            .filter(|owner| owner.instance == instance)
-            .map(|owner| owner.generation)
-    }
 }
 
 impl Worker {
-    /// Serializes the request's slot check with the grant's stop epoch.
+    /// How many stops the supervisor has seen; a grant from an earlier epoch
+    /// was revoked by a stop.
     pub(crate) fn stop_epoch(&self) -> u64 {
         self.safety.supervisor.stop_epoch()
     }
 }
 
-/// A mutation queued under `queued` (the slot generation at dequeue time)
-/// may deliver to the foreground only when that generation is this worker's
-/// live grant.
-pub(crate) fn admits(delivery: DeliveryMode, queued: Option<u64>, live: Option<u64>) -> bool {
-    if delivery == DeliveryMode::Background {
-        return true;
-    }
-    live.is_some() && queued == live
+/// Foreground delivery is admitted only while this worker holds a live grant
+/// that no stop has revoked since it was granted.
+pub(crate) fn admits(delivery: DeliveryMode, live: bool) -> bool {
+    delivery == DeliveryMode::Background || live
 }
 
 impl Worker {
-    /// The live grant's generation, when this worker holds the slot.
-    pub(crate) fn live_generation(&self) -> Option<u64> {
-        self.control.as_ref().map(|grant| grant.generation)
-    }
-}
-
-impl Worker {
-    /// Refuses a foreground mutation whose queued generation is not this
-    /// worker's live grant, before the gate or any backend call. The
-    /// admission error is audited like any other refusal.
+    /// Refuses a foreground mutation without this session's live grant whose
+    /// stop epoch is still current. Runs after the fail-closed gate and before
+    /// any capture or backend call; the refusal is audited like any other.
     pub(crate) fn admit_control(&self, mutation: &crate::mutate::Mutation<'_>) -> CoreResult<()> {
-        if admits(mutation.delivery, self.queued_generation, self.live_generation()) {
+        let live = self
+            .control
+            .as_ref()
+            .is_some_and(|grant| grant.stop_epoch == self.stop_epoch());
+        if admits(mutation.delivery, live) {
             return Ok(());
         }
         if mutation.action == MutatingAction::RaiseWindow {
@@ -139,6 +125,14 @@ impl Worker {
     /// second session is refused `InputBusy` and never steals it; the same
     /// session re-grants with a fresh generation.
     pub(crate) fn try_grant(&mut self, params: &ControlGrantParams) -> CoreResult<ControlStateResult> {
+        // A confirm answered as the user hits the stop chord must not grant:
+        // the grant would record the post-stop epoch and survive resume. The
+        // epoch is read first: a stop bumps it before latching suspension, so
+        // a stop landing after this read leaves the grant with a stale epoch.
+        let stop_epoch = self.stop_epoch();
+        if self.safety.supervisor.is_suspended() {
+            return Err(DesktopError::from(senpi_desktop_safety::GateError::Suspended));
+        }
         let mut slot = self.safety.control_slot.owner.lock();
         if let Some(owner) = slot.as_ref() {
             if owner.instance != self.instance {
@@ -154,7 +148,7 @@ impl Worker {
             reason: params.reason.clone(),
             generation,
             granted_at: crate::audit::rfc3339_ms(crate::audit::unix_now_ms()),
-            stop_epoch: self.stop_epoch(),
+            stop_epoch,
         };
         *slot = Some(SlotOwner {
             instance: self.instance,
@@ -169,9 +163,7 @@ impl Worker {
         Ok(state)
     }
 
-    /// `control.revoke`: idempotent; frees the slot this session owns. Every
-    /// revocation is a generation boundary: nothing queued under the old
-    /// generation runs under the next grant.
+    /// `control.revoke`: idempotent; frees the slot this session owns.
     pub(crate) fn try_revoke(&mut self) -> CoreResult<()> {
         self.release_control();
         Ok(())

@@ -56,6 +56,12 @@ impl BackendFactory for Factory {
 /// An open session over the fixture with `overlay`'s top-level keys
 /// replaced, and a live, fresh global stop path.
 pub(crate) fn harness(overlay: &Value) -> Harness {
+    harness_with_slot(overlay, crate::grant::ControlSlot::new())
+}
+
+/// A harness whose session shares `slot` with other harnesses, as the
+/// engine's sessions share the process-wide slot.
+pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::ControlSlot>) -> Harness {
     let mut json: Value = serde_json::from_str(FIXTURE).expect("fixture is JSON");
     for (key, value) in overlay.as_object().expect("overlay is an object") {
         json[key] = value.clone();
@@ -70,7 +76,7 @@ pub(crate) fn harness(overlay: &Value) -> Harness {
     let safety = SessionSafety {
         supervisor: Arc::clone(&supervisor),
         audit: Box::new(move |event| recorded.lock().push(event.clone())),
-        control_slot: crate::grant::ControlSlot::new(),
+        control_slot: slot,
     };
     let panics = Panics::default();
     let factory = Factory {
@@ -99,6 +105,11 @@ impl Harness {
         self.worker.process(op, &|| false)
     }
 
+    /// Grants foreground control for this harness's session.
+    pub(crate) fn grant(&mut self, reason: &str) {
+        self.process(grant_control(reason)).expect("grants");
+    }
+
     /// Captures `target` and returns the frame id.
     pub(crate) fn capture(&mut self, target: &str) -> String {
         let params = CaptureParams {
@@ -123,18 +134,9 @@ impl Harness {
         self.audits.lock().clone()
     }
 
-    /// The worker's live grant generation, as a dequeue would capture it.
-    pub(crate) fn queue_generation(&self) -> Option<u64> {
-        self.worker.safety.control_slot.generation_for(self.worker.instance)
-    }
-
-    /// Whether a mutation carrying `queued` would be admitted foreground.
-    pub(crate) fn queued_admits_foreground(&self, queued: Option<u64>) -> bool {
-        crate::grant::admits(
-            DeliveryMode::Foreground,
-            queued,
-            self.worker.live_generation(),
-        )
+    /// This session's live grant generation, `None` without a grant.
+    pub(crate) fn grant_generation(&self) -> Option<u64> {
+        self.worker.control.as_ref().map(|grant| grant.generation)
     }
 }
 

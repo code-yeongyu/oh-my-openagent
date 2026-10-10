@@ -37,8 +37,6 @@ pub(crate) struct Worker {
     pub(crate) instance: u64,
     /// This session's live foreground control grant, when it holds the slot.
     pub(crate) control: Option<crate::grant::ControlGrant>,
-    /// The grant generation captured when the in-flight op was dequeued.
-    pub(crate) queued_generation: Option<u64>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -66,7 +64,6 @@ impl Worker {
             gc: ArtifactGc::default(),
             instance: crate::grant::next_instance(),
             control: None,
-            queued_generation: None,
         };
         worker.refresh_capabilities();
         worker
@@ -104,19 +101,7 @@ impl Worker {
 
     /// `cancelled` reports that the request's waiter gave up; only mutating
     /// requests consult it.
-    #[cfg(test)]
     pub(crate) fn process(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
-        let queued = self.safety.control_slot.generation_for(self.instance);
-        self.process_captured(op, cancelled, queued)
-    }
-
-    /// Serves `op` with the grant generation captured when it was enqueued.
-    pub(crate) fn process_captured(
-        &mut self,
-        op: Op,
-        cancelled: &dyn Fn() -> bool,
-        queued: Option<u64>,
-    ) -> CoreResult<Response> {
         if self.options.is_none() {
             return Err(DesktopError::new(
                 ErrorCode::Closed,
@@ -125,7 +110,6 @@ impl Worker {
         }
         self.reconcile_grant();
         self.maybe_gc();
-        self.queued_generation = queued;
         let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {

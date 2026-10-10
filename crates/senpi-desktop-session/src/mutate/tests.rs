@@ -162,8 +162,10 @@ fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
 #[test]
 fn every_mutating_request_emits_one_audit_event() {
     for action in MutatingAction::ALL {
-        // Given
+        // Given: raiseWindow and foreground deliveries need the grant
         let mut harness = harness(&json!({}));
+        harness.grant("audit sweep");
+        harness.audits.lock().clear();
         let op = request_for(&mut harness, action);
         // When
         let reply = harness.process(op);

@@ -215,9 +215,9 @@ fn spawn(case: Case) -> thread::JoinHandle<Value> {
     })
 }
 
-/// Every case, including `InputBusy`, which one engine process cannot drive
-/// (the control slot is process-wide and never stolen): it is driven at the
-/// session-crate level by two workers. The conformance table exempts it.
+/// Every code driven over the wire. `InputBusy` is not among them: one engine
+/// process holds one session, so a second session's grant cannot be driven
+/// here; the session crate drives it with two sessions sharing one slot.
 fn driven_codes() -> Vec<String> {
     cases().into_iter().map(|case| case.code.to_owned()).collect()
 }

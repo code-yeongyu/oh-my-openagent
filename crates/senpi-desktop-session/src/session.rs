@@ -154,11 +154,8 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
             Message::Open { options, reply } => (reply, guarded(|| Ok(Response::Capabilities(worker.open(options))))),
             Message::Op { op, reply } => {
                 // `$/cancel` or a deadline drops the waiter: that is the
-                // request's cancellation signal while it runs. The grant
-                // generation is captured as the op is dequeued, so an op
-                // queued before a revoke+regrant runs under no new grant.
-                let queued = worker.safety.control_slot.generation_for(worker.instance);
-                let result = guarded(|| worker.process_captured(op, &|| reply.is_disconnected(), queued));
+                // request's cancellation signal while it runs.
+                let result = guarded(|| worker.process(op, &|| reply.is_disconnected()));
                 (reply, result)
             }
         };
