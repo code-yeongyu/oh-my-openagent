@@ -123,9 +123,9 @@ describe("tmux pane auth environment propagation", () => {
 		const args = recorder.getCall(0)[1]
 		expect(args.slice(0, 2)).toEqual(["respawn-pane", "-k"])
 		expectAuthEnvArgs(args)
-		expect(args.at(-1)).toBe(
-			`/bin/sh -c "opencode attach 'http://127.0.0.1:4321/path with spaces' --session 'session with spaces' --dir '/tmp/project with spaces'"`,
-		)
+	expect(args.at(-1)).toBe(
+		`/bin/sh -c "while :; do opencode attach 'http://127.0.0.1:4321/path with spaces' --session 'session with spaces' --dir '/tmp/project with spaces'; code=\\$?; case \\$code in 0|130|143) exit \\$code;; esac; printf '%s\\\\n' \\"OMO attach failed (exit \\$code); retrying in 2s...\\"; sleep 2; done"`,
+	)
 	})
 
 	it("#given auth env vars #when pane lifecycle commands spawn or respawn #then every tmux call site receives env args", async () => {
