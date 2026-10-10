@@ -152,7 +152,7 @@ function createControlFacade(scope: RunScope, method: ReturnType<typeof facadeMe
 				if (budgetMs < MIN_CONFIRM_BUDGET_MS) {
 					throw new ComputerRunError(
 						"assertion",
-						"control.acquire needs at least 3 s of run time left to ask the human; call it earlier or give the run a longer timeout",
+						"control.acquire needs at least 8 s of run time left (time for the human to answer, then to act); call it earlier or give the run a longer timeout",
 					);
 				}
 				const approved = await confirm(reason, context.signal, budgetMs);

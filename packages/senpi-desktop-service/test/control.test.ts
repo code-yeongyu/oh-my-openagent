@@ -299,6 +299,22 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		expect(methods(log)).not.toContain("control.grant");
 	});
 
+	it("does not send a revoke again once one succeeded", async () => {
+		// Given: a grant released by a revoke that succeeded
+		const { service, log } = await openDesktop();
+		await run(service, `await desktop.control.acquire({ reason: "click Run" }); await desktop.control.release();`, {
+			confirmControl: () => Promise.resolve(true),
+		});
+
+		// When: the turn ends
+		await service.revokeControl();
+		// One engine round trip: a second revoke would be logged before this reply.
+		await service.call("control.state", {});
+
+		// Then
+		expect(methods(log).filter((method) => method === "control.revoke")).toHaveLength(1);
+	});
+
 	it("a run that fails without a grant sends no control.revoke", async () => {
 		// Given: nothing to revoke, so the engine audit stays free of no-op revocations
 		const { service, log } = await openDesktop();
