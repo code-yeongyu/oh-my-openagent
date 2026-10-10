@@ -21,15 +21,19 @@ describe("shared GPT prompt identities", () => {
     })
   }
 
-  for (const model of ["openai/gpt-5.5", "openai/gpt-5.6-sol", "github-copilot/gpt-6-astra"]) {
-    test(`routes ${model} through the shared Atlas GPT prompt source`, () => {
+  for (const [model, expectedSource] of [
+    ["openai/gpt-5.5", "gpt-5.5"],
+    ["openai/gpt-5.6-sol", "gpt-5.6"],
+    ["github-copilot/gpt-6-astra", "gpt-6-astra"],
+  ] as const) {
+    test(`routes ${model} through its dedicated Atlas prompt source`, () => {
       // given a supported GPT model
 
       // when the Atlas prompt source is resolved
       const source = getAtlasPromptSource(model)
 
-      // then both versions use the model-neutral GPT-family source
-      expect(source).toBe("gpt")
+      // then each version routes to its dedicated Atlas variant
+      expect(source).toBe(expectedSource)
     })
   }
 })
