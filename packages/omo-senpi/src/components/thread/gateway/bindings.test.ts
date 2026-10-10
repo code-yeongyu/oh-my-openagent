@@ -77,11 +77,11 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
   test("#given the Notion and Feishu connectors #when a thread is bound on each by its native platform name #then the tool schema takes the name and the store keeps it", async () => {
     const h = open()
     const relay = relayOn(h)
-    for (const platform of ["notion", "feishu"] as const) {
+    for (const platform of ["notion", "feishu", "whatsapp"] as const) {
       expect(parseThreadParams(threadToolParamSchemas.thread_bind, { platform, account_id: "qa", chat_id: "c1" }).kind).toBe("ok")
       ok(await relay.bind({ principal: "session:A", binding: thread(`S-${platform}`, { platform }) }))
     }
-    expect(ok(await relay.bindings({ filter: { status: "active" } })).bindings.map((binding) => binding.platform).sort()).toEqual(["feishu", "notion"])
+    expect(ok(await relay.bindings({ filter: { status: "active" } })).bindings.map((binding) => binding.platform).sort()).toEqual(["feishu", "notion", "whatsapp"])
   })
 
   test("#given identifiers carrying a C1 control or a Unicode line separator #when a thread is bound with them #then the bind is invalid_arguments and nothing is stored", async () => {

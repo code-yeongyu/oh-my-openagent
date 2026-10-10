@@ -5,6 +5,23 @@ import type { TaskTargetErrorCode } from "../tools/task/validation"
 export type DagRunId = string & { readonly __brand: "DagRunId" }
 export type DagNodeId = string & { readonly __brand: "DagNodeId" }
 
+// A run id or node id is used verbatim as ONE path segment under the DAG state directory
+// (<stateDir>/dag/results/<runId>/<nodeId>.txt), so it must not be empty, a traversal segment
+// ("." / ".."), or contain a separator, a NUL byte, or ":" (an NTFS alternate-data-stream
+// separator on Windows). This is the single owner of that contract: the graph compiler rejects an
+// unsafe node id at the boundary, and the store refuses one at the sink so no caller can
+// reintroduce the write/read primitive by bypassing the checked accessors. The store also adds a
+// containment check after the join, so the rule does not rest on this deny-list alone.
+export function isSafeDagPathSegment(value: string): boolean {
+  return value.length > 0
+    && value !== "."
+    && value !== ".."
+    && !value.includes("/")
+    && !value.includes("\\")
+    && !value.includes("\0")
+    && !value.includes(":")
+}
+
 export const DAG_RUN_STATUSES = [
   "pending",
   "running",

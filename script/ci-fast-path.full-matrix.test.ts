@@ -94,6 +94,53 @@ function jobSteps(jobName: string): readonly Record<string, unknown>[] {
 }
 
 describe("full-matrix classification", () => {
+  describe("#given a merge group instead of a pull request", () => {
+    test.each([
+      ["runtime", ["packages/utils/src/index.ts"], true],
+      ["repository prose", ["README.md"], true],
+      ["docs-only", ["docs/guide/installation.md"], true],
+      ["web-only", ["packages/web/app/page.tsx"], true],
+      ["unavailable diff", [], false],
+    ])("#then %s always runs heavy validation on the full matrix", (_name, changedPaths, diffAvailable) => {
+      const input = {
+        message: "Merge pull request #6955 from code-yeongyu/release/v5.0.0-beta.8-source-state",
+        changedPaths,
+        diffAvailable,
+        mergeParents: 2,
+      }
+      const queued = classify({ ...input, eventName: "merge_group" })
+      expect(queued.runHeavy).toBe(true)
+      expect(queued.fullMatrix).toBe(true)
+      expect(queued.generatedReleasePush).toBe(false)
+    })
+
+    test.each(["docs/guide/installation.md", "packages/web/app/page.tsx"])(
+      "#then a pull request touching only %s retains the fast path",
+      (path) => {
+        const mode = classify({ eventName: "pull_request", changedPaths: [path] })
+        expect(mode.runHeavy).toBe(false)
+        expect(mode.fullMatrix).toBe(false)
+      },
+    )
+
+    test("#then only a generated-release push takes the release fast path", () => {
+      const input = {
+        message: "Merge pull request #6955 from code-yeongyu/release/v5.0.0-beta.8-source-state",
+        changedPaths: ["package.json"],
+        mergeParents: 2,
+      }
+      expect(classify({ ...input, eventName: "push" })).toEqual({
+        generatedReleasePush: true,
+        webOnly: false,
+        runHeavy: false,
+        fullMatrix: true,
+        runtimeTouching: true,
+      })
+      expect(classify({ ...input, message: "fix: normal push", eventName: "push" }).runHeavy).toBe(true)
+      expect(classify({ ...input, eventName: "merge_group" }).runHeavy).toBe(true)
+    })
+  })
+
   describe("#given a push event", () => {
     test("#then the full matrix always runs", () => {
       // given / when
