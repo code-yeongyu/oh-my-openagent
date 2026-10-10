@@ -16,9 +16,17 @@ final class Delegate: NSObject, NSApplicationDelegate {
         let title = args.count > 1 ? args[1] : "senpi-menu-fixture"
         recordPath = args.count > 2 ? args[2] : ""
 
+        // AppKit renders the main menu's first item as the application menu
+        // (titled with the process name), so File must come second.
         let mainMenu = NSMenu()
+        let appItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        appItem.submenu = NSMenu(title: "")
+        mainMenu.addItem(appItem)
         let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
         let fileMenu = NSMenu(title: "File")
+        // Manual enabling, so Revert stays disabled even though the delegate
+        // responds to its action.
+        fileMenu.autoenablesItems = false
         fileMenu.addItem(NSMenuItem(title: "Save", action: #selector(record(_:)), keyEquivalent: "s"))
         fileMenu.addItem(NSMenuItem.separator())
         let exportItem = NSMenuItem(title: "Export…", action: nil, keyEquivalent: "")
