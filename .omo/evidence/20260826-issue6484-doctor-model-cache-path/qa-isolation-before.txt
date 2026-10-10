@@ -1,0 +1,19 @@
+== real-surface isolation snapshot BEFORE ==
+03190245dcb0223d7be5ac113955374f3651bb8af6fa5e799b9e7dcb21b87226  /home/viprix/.cache/oh-my-opencode/model-capabilities.json
+53a8420651b3014f8554d95a04c4bda4310556449a0e296c5db9f99ea9d9919d  /home/viprix/.cache/oh-my-opencode/connected-providers.json
+fe60677b5e60531d0343ba969ce80a7d573dc5432f245979e71be919b737c764  /home/viprix/.cache/oh-my-opencode/provider-models.json
+--
+bin
+bun
+models.json
+oh-my-opencode
+opencode
+packages
+skills
+--
+sha256sum: /home/viprix/.omo/codegraph/projects/Desktop-81ec17049876dd10/codegraph.lock: No such file or directory
+sha256sum: /home/viprix/.omo/sessions/--home-viprix-Desktop-Trunet: No such file or directory
+sha256sum: GMTO--/2026-08-12T10-19-37-370Z_019ff57c-141a-7e39-ae6d-d347a4851c07.jsonl: No such file or directory
+sha256sum: /home/viprix/.omo/sessions/--home-viprix-Desktop-Trunet: No such file or directory
+sha256sum: GMTO--/2026-08-12T10-23-34-036Z_019ff57f-b094-73fc-9e91-8c86d04335d2.jsonl: No such file or directory
+1fdfc3217e16cd84ac138d4a35b9acc79f13ec396a986b2b174598ac51a346a0  -
