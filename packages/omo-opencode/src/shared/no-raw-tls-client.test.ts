@@ -410,4 +410,94 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       expect(evaluateShippedSource(scan, [pinnedCallEntry()])).toEqual({ offenders: [], stale: [] })
     })
   })
+  describe("review round: tracked-only scan, binding pins, widened forms (failing-first)", () => {
+    test("#given widened module-access and binding forms #when scanned #then each is caught", () => {
+      const samples: Array<[string, string]> = [
+        ["binding call", 'import { connect } from "node:http2"; export const go = (h) => connect(h);'],
+        ["binding call", 'import { connect as h2c } from "node:http2"; h2c(h);'],
+        ["binding call", 'import { get as g } from "node:https"; g(url);'],
+        ["binding call", 'import { TLSSocket } from "node:tls"; new TLSSocket(sock);'],
+        ["module access", 'import * as h2 from "node:http2"; h2.connect(h);'],
+        ["module access", 'import h2 from "node:http2"; h2.connect(h);'],
+        ["module access", 'process.getBuiltinModule("node:tls");'],
+        ["module access", 'process.getBuiltinModule("https");'],
+        ["module access", 'process.getBuiltinModule("node:http2");'],
+        ["module access", 'export { connect } from "node:tls";'],
+        ["module access", 'export * from "node:https";'],
+        ["template import", "const m = await import(`node:tls`);"],
+        ["template require", "const m = require(`node:https`);"],
+      ]
+      for (const [kind, sample] of samples) {
+        const hits = findRawTlsClients(sample)
+        expect(hits.length > 0, kind + " sample not caught: " + sample).toBe(true)
+      }
+    })
+
+    test("#given inert neighbors #when scanned #then nothing is flagged", () => {
+      const samples = [
+        'import { createServer } from "node:http2"; createServer(h);',
+        'import { createServer } from "node:https";',
+        'import { connect } from "node:tlsx"; connect(h);',
+        'import type { Agent } from "node:https";',
+        'import { connect } from "node:tls";',
+      ]
+      for (const sample of samples) {
+        expect(findRawTlsClients(sample), "unexpected hit: " + sample).toEqual([])
+      }
+    })
+
+    test("#given a named-import binding #when pinned by its call #then new binding calls still fail", () => {
+      const entries = [
+        { file: "pkg/b.mjs", call: 'httpsGet(url, { redaction: "none" })', count: 1, reason: "host is a literal" },
+      ]
+      const exact: ScanItem[] = [
+        { path: "pkg/b.mjs", content: 'import { get as httpsGet } from "node:https";\nhttpsGet(url, { redaction: "none" });\n' },
+      ]
+      expect(evaluateShippedSource(exact, entries)).toEqual({ offenders: [], stale: [] })
+      const extra: ScanItem[] = [
+        { path: "pkg/b.mjs", content: 'import { get as httpsGet } from "node:https";\nhttpsGet(url, { redaction: "none" });\nhttpsGet({ host, servername: host });\n' },
+      ]
+      expect(evaluateShippedSource(extra, entries).offenders.length > 0, "new binding call must fail").toBe(true)
+      const importPinned = [
+        { file: "pkg/b.mjs", call: 'import { get as httpsGet } from "node:https"', count: 1, reason: "x" },
+      ]
+      expect(evaluateShippedSource(exact, importPinned).stale.length > 0, "import-pinned entries must go stale").toBe(true)
+    })
+
+    test("#given calls with tricky strings #when normalized #then string contents stay distinct", () => {
+      const paren = findRawTlsClients('tls.connect({ host: ")" + h });')
+      expect(paren[0]?.text).toBe('tls.connect({ host: ")" + h })')
+      const withSpaces = findRawTlsClients('tls.connect({ host: "a  b" });')
+      const single = findRawTlsClients('tls.connect({ host: "a b" });')
+      expect(withSpaces[0]?.text).not.toBe(single[0]?.text)
+      const long1 = 'tls.connect({ pad: "' + "x".repeat(500) + '" });'
+      const long2 = 'tls.connect({ pad: "' + "x".repeat(499) + 'y" });'
+      const t1 = findRawTlsClients(long1)[0]?.text
+      const t2 = findRawTlsClients(long2)[0]?.text
+      expect(t1 !== undefined && t2 !== undefined && t1 !== t2, ">400-char calls must not collide").toBe(true)
+    })
+
+    test("#given the scan #when collected #then only tracked files under shipped roots are scanned", () => {
+      const tracked = new Set(listTrackedFiles())
+      for (const file of collectShippedSourceFiles()) {
+        expect(tracked.has(file), "untracked file scanned: " + file).toBe(true)
+      }
+      const collected = new Set(collectShippedSourceFiles())
+      const shipped = [
+        "bin/platform.js",
+        "postinstall.mjs",
+        "packages/shared-skills/index.mjs",
+        "packages/omo-native/compile-entry.ts",
+        "packages/omo-codex/scripts/check-model-catalog-parity.mjs",
+      ]
+      for (const file of shipped) {
+        expect(collected.has(file), "shipped file not scanned: " + file).toBe(true)
+      }
+    })
+
+    test("#given source reads #when a file is missing or a path is a directory #then only ENOENT is tolerated", () => {
+      expect(readSourceFile(path.join(WORKSPACE_ROOT, "definitely-missing-file.ts"))).toBe(null)
+      expect(() => readSourceFile(path.join(WORKSPACE_ROOT, "bin"))).toThrow()
+    })
+  })
 })
