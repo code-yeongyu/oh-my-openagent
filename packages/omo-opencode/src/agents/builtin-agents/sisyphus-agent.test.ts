@@ -1,9 +1,14 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import * as connectedProvidersCache from "../../shared/connected-providers-cache";
 import { maybeCreateSisyphusConfig } from "./sisyphus-agent";
 import type { AgentOverrides } from "../types";
 import type { CategoryConfig } from "../../config/schema";
+
+afterEach(() => {
+  connectedProvidersCache._resetMemCacheForTesting();
+});
 
 describe("maybeCreateSisyphusConfig", () => {
   describe("#given GPT model with user override allowing apply_patch", () => {
@@ -312,6 +317,89 @@ describe("maybeCreateSisyphusConfig", () => {
       expect(config).toBeDefined();
       expect(config?.model).toBe("openai/gpt-4o");
       expect(config?.permission).toHaveProperty("apply_patch", "allow");
+    });
+  });
+
+  describe("#given first-run registration without a user model override", () => {
+    test("#when applyModelResolution already found a connected system default #then that result is kept", () => {
+      // given — #8131: isFirstRunNoCache must not replace a successful resolution
+      // with unfiltered providers[0] (anthropic) on a Copilot-only machine.
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null);
+
+      try {
+        // when
+        const config = maybeCreateSisyphusConfig({
+          disabledAgents: [],
+          agentOverrides: {},
+          availableModels: new Set(),
+          systemDefaultModel: "github-copilot/claude-opus-5",
+          isFirstRunNoCache: true,
+          availableAgents: [],
+          availableSkills: [],
+          availableCategories: [],
+          mergedCategories: {},
+          useTaskSystem: false,
+        });
+
+        // then
+        expect(config).toBeDefined();
+        expect(config?.model).toBe("github-copilot/claude-opus-5");
+      } finally {
+        cacheSpy.mockRestore();
+      }
+    });
+
+    test("#when availableModels already contain a fallback provider #then that availability-filtered result is kept", () => {
+      // given
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null);
+
+      try {
+        // when
+        const config = maybeCreateSisyphusConfig({
+          disabledAgents: [],
+          agentOverrides: {},
+          availableModels: new Set(["github-copilot/claude-opus-5"]),
+          systemDefaultModel: "anthropic/claude-opus-5",
+          isFirstRunNoCache: true,
+          availableAgents: [],
+          availableSkills: [],
+          availableCategories: [],
+          mergedCategories: {},
+          useTaskSystem: false,
+        });
+
+        // then
+        expect(config).toBeDefined();
+        expect(config?.model).toBe("github-copilot/claude-opus-5");
+      } finally {
+        cacheSpy.mockRestore();
+      }
+    });
+
+    test("#when availability-aware resolution produces nothing #then first-entry providers[0] is used", () => {
+      // given
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null);
+
+      try {
+        // when
+        const config = maybeCreateSisyphusConfig({
+          disabledAgents: [],
+          agentOverrides: {},
+          availableModels: new Set(),
+          isFirstRunNoCache: true,
+          availableAgents: [],
+          availableSkills: [],
+          availableCategories: [],
+          mergedCategories: {},
+          useTaskSystem: false,
+        });
+
+        // then
+        expect(config).toBeDefined();
+        expect(config?.model).toBe("anthropic/claude-opus-5");
+      } finally {
+        cacheSpy.mockRestore();
+      }
     });
   });
 });
