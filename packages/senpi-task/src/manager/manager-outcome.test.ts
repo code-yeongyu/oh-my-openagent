@@ -49,7 +49,7 @@ describe("TaskManager outcome guards", () => {
     })
 
     // when - suspension order: forget the handle, persist the record, THEN the abort settles
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     store.transition(taskId, { type: "persist_only", timestamp: iso() })
     inProcess.handles.get(taskId)?.settle({ status: "cancelled" })
     await flush()
@@ -68,7 +68,7 @@ describe("TaskManager outcome guards", () => {
     const started = await manager.start(baseSpec())
     if (started.kind !== "started") throw new Error("expected started")
     const taskId = started.task_id
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     store.transition(taskId, { type: "persist_only", timestamp: iso() })
 
     // when
@@ -91,7 +91,7 @@ describe("TaskManager outcome guards", () => {
     const started = await manager.start(baseSpec())
     if (started.kind !== "started") throw new Error("expected started")
     const taskId = started.task_id
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     store.transition(taskId, { type: "persist_only", timestamp: iso() })
 
     // when
@@ -113,7 +113,7 @@ describe("TaskManager outcome guards", () => {
     const taskId = started.task_id
 
     // when - the tightest abort-during-suspend race: ownership is gone, residency not yet updated
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     inProcess.handles.get(taskId)?.settle({ status: "cancelled" })
     await flush()
 

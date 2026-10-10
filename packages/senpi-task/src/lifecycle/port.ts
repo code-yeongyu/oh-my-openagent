@@ -2,6 +2,7 @@ import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { TeardownStepDeadline } from "./teardown-budget"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
+import type { ForgetOptions } from "../manager/types"
 import type { TaskRecord } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
@@ -23,6 +24,7 @@ export type DestroyCause =
   | "fallback_handoff"
   | "revive_failure"
   | "recovery_detach"
+  | "target_gone"
 
 // The teardown surface the destruction port operates against. In production this wraps a live
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle
@@ -47,7 +49,7 @@ export type ResidentHandle = {
 export type ResidencyRegistry = {
   get(taskId: string): ResidentHandle | undefined
   entries(): readonly ResidentHandle[]
-  forget(taskId: string): void
+  forget(taskId: string, options: ForgetOptions): void
   // A terminal resident with a queued send must NOT be evicted (codex is_unloadable parity).
   hasPendingSends(taskId: string): boolean
   // Only sends being delivered right now (no durable queue). A finished child's durable queue does not

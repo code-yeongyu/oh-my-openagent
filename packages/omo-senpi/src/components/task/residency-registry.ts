@@ -16,12 +16,12 @@ export function createManagerResidencyRegistry(getManager: () => ResidencyManage
         .residentTaskIds()
         .map((taskId) => toResidentHandle(getManager().getResidentHandle(taskId)))
         .filter((handle): handle is ResidentHandle => handle !== undefined),
-    forget: (taskId) => getManager().forget(taskId),
+    forget: (taskId, options) => getManager().forget(taskId, options),
     // The durable steering queue is the steering engine's source of truth. A queued message must
     // keep a RUNNING resident alive until it is delivered or explicitly dropped; a finished one parks
     // with its queue kept on the record for the next revival (#9861).
     hasPendingSends: (taskId) => getManager().hasPendingSends?.(taskId) ?? false,
-    hasInFlightSends: (taskId) => getManager().hasInFlightSends?.(taskId) ?? false,
+    hasInFlightSends: (taskId) => getManager().hasInFlightSends?.(taskId) ?? getManager().hasPendingSends?.(taskId) ?? false,
     tryClaimEviction: (taskId) => getManager().tryClaimEviction?.(taskId) ?? true,
     releaseEviction: (taskId) => getManager().releaseEviction?.(taskId),
     isEvicting: (taskId) => getManager().isEvicting?.(taskId) ?? false,

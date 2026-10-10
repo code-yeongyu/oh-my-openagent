@@ -50,7 +50,7 @@ function makeUnlimitedManager(residency: Record<string, unknown> = { residency_m
       const handle = toResidentHandle(manager().getResidentHandle(taskId))
       return handle === undefined ? [] : [handle]
     }),
-    forget: (taskId) => manager().forget(taskId),
+    forget: (taskId, options) => manager().forget(taskId, options),
     hasPendingSends: () => false,
   }
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })

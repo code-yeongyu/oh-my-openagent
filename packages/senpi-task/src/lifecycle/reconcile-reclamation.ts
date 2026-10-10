@@ -56,7 +56,7 @@ async function reclaimResidentExclusive(
   }
 
   if (claimed.killed === true || claimed.status === "cancelled" || claimed.status === "lost") {
-    await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
+    await destroyResidentTask(context, claimed.task_id, claimed.status === "lost" ? "target_gone" : "cancel")
     return {
       task_id: claimed.task_id,
       kind: claimed.status === "lost" ? "lost" : "resumed",
@@ -67,7 +67,7 @@ async function reclaimResidentExclusive(
   // own session dir, so preferring the record keeps a parked session from reading as transcript-less.
   const sessionPath = hostSessionResumePath(claimed) ?? sessionPathFor(claimed.task_id)
   if (TERMINAL_STATUSES.has(claimed.status) && sessionPath === undefined) {
-    context.store.transition(claimed.task_id, { type: "dispose", timestamp: nowIso(context) })
+    await destroyResidentTask(context, claimed.task_id, "target_gone")
     return {
       task_id: claimed.task_id,
       kind: "resumed",
@@ -81,6 +81,10 @@ async function reclaimResidentExclusive(
   }
   const rollbackResidency: SuspendedResidency = claimed.execution_mode === "process" ? "rpc_detached" : "persisted_only"
   if (context.config.reattach_on_reconcile === false) {
+    if ((claimed.pending_steering?.length ?? 0) > 0) {
+      await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
+      return { task_id: claimed.task_id, kind: "deferred", reason: "reattach disabled; queued continuation parked" }
+    }
     const marked = await markCrashedResident(context, claimed, "reattach disabled for crashed resident")
     if (marked) await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
     return { task_id: claimed.task_id, kind: "lost", reason: "reattach disabled for crashed resident" }

@@ -1,5 +1,5 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
-import { isTransportLostMessage, messageability } from "../state"
+import { isTransportLostMessage, markRecordLostForReconciliation, messageability } from "../state"
 import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
 import type { TaskRecord } from "../state"
 import { runMoved, staleSend } from "./stale-run"
@@ -23,6 +23,7 @@ import { reviveDetachedTerminalOnSend, reviveTerminal } from "./revive"
 import { reviveRunningOnSend } from "./revive-running"
 import { createSteeringControls } from "./controls"
 import { createPendingSteering } from "./pending-steering"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
@@ -208,9 +209,13 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return (pendingSends.get(taskId) ?? 0) > 0 || (tryLoad(taskId)?.pending_steering?.length ?? 0) > 0
   }
 
-  function dropPending(taskId: string): void {
-    clearPersistedQueue(taskId, undefined, "task_released")
+  function dropPending(taskId: string, reason: Parameters<SteeringEngine["dropPending"]>[1]): void {
+    const dropped = clearPersistedQueue(taskId, undefined, reason)
+    if (dropped > 0) port.store.mutate(taskId, fresh => markRecordLostForReconciliation(fresh, {
+      timestamp: nowIso(),
+      error_message: withDroppedSteeringNotice(fresh.error_message ?? "Task was forgotten.", dropped),
+    }).record)
   }
 
-  return { sendToTask, ...createSteeringControls(port, resolve, clearPersistedQueue), notifyStarted, hasPendingSends, hasInFlightSends, dropPending }
+  return { sendToTask, ...createSteeringControls(port, resolve, (taskId) => { clearPersistedQueue(taskId, undefined, "cancelled") }), notifyStarted, hasPendingSends, hasInFlightSends, dropPending }
 }

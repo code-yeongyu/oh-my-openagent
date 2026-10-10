@@ -86,7 +86,7 @@ describe("runtime fallback over a live daemon session", () => {
         }
       } finally {
         for (const handle of launched) await handle.dispose()
-        for (const id of manager.residentTaskIds()) manager.forget(id)
+        for (const id of manager.residentTaskIds()) manager.forget(id, { path: "end" })
         lifecycle.dispose?.()
         manager.workpools.dispose()
       }

@@ -117,7 +117,7 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
       const handle = registry.get(id)
       return handle === undefined ? [] : [handle]
     }),
-    forget: (id: string) => manager.forget(id),
+    forget: (id: string, options: Parameters<typeof manager.forget>[1]) => manager.forget(id, options),
     hasPendingSends: () => false,
     ownsRecord: (record: { readonly parent_session_id: string }) =>
       state.live && record.parent_session_id === "parent-1",

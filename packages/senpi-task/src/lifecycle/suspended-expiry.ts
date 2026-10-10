@@ -48,6 +48,7 @@ export async function expireSuspendedChild(
       ? context.store.mutate(observed.task_id, (fresh) => {
           if (
             !parentLive() ||
+            (fresh.pending_steering?.length ?? 0) > 0 ||
             (fresh.residency_state === "resident" && fresh.suspension_reason === undefined
               && fresh.recovery_deadline_at === undefined && !isSuspensionExpiry(fresh)) ||
             (fresh.status !== "pending" && fresh.status !== "running") ||
@@ -147,7 +148,7 @@ export async function expireSuspendedChild(
     failure_kind: "suspended_unresumable",
     killed: true,
   })
-  context.registry.forget(record.task_id)
+  context.registry.forget(record.task_id, { path: "end" })
   retries.delete(record.task_id)
   if (result.applied)
     context.store.appendEvent(record.task_id, {

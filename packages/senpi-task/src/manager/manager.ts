@@ -57,12 +57,15 @@ import { reattachManagedTask } from "./manager-reattach"
 import { PendingStops } from "./pending-stops"
 import { respawnWithWorkpool } from "./workpool-respawn"
 import { NameRegistry } from "./names"
+import { newestSessionPath } from "../lifecycle/session-path"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { TaskSequence } from "./task-sequence"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeChildFacts } from "./child-facts"
 import { stampSpawnEffectiveModel } from "./observed-model"
 import type {
   ContinueResult,
+  ForgetOptions,
   ListScope,
   ListedTask,
   ManagedRunner,
@@ -244,7 +247,7 @@ class TaskManagerImpl implements TaskManager {
       tryLoad: (taskId) => this.#tryLoad(taskId),
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       releaseSlot: (taskId, model, epoch) => this.#releaseSlot(taskId, model, epoch),
-      forget: (taskId) => this.forget(taskId),
+      forget: (taskId, options) => this.forget(taskId, options),
       settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
       stopSettlement: (taskId) => this.#stopsPending.settlement(taskId),
@@ -606,7 +609,7 @@ class TaskManagerImpl implements TaskManager {
     })
   }
 
-  forget(taskId: string): void {
+  forget(taskId: string, options: ForgetOptions): void {
     const stopped = this.#tryLoad(taskId)
     if (stopped?.killed === true && isTerminalRecord(stopped)) {
       this.#removeCapacityWaiter(taskId)
@@ -631,12 +634,8 @@ class TaskManagerImpl implements TaskManager {
     this.#background.delete(taskId)
     this.#released.delete(taskId)
     this.#runStats.delete(taskId)
-    // A parked child keeps its durable queue for the next revival, and so does a finished one whose
-    // handle is being released to park it (the record parks just after this): its queued messages are
-    // delivered first when it is revived (#9861). Only a child that will never run again drops it here.
-    const forgotten = this.#tryLoad(taskId)
-    const parking = forgotten != null && (forgotten.status === "completed" || forgotten.status === "error") && forgotten.killed !== true
-    if (!parking && forgotten?.residency_state !== "persisted_only" && forgotten?.residency_state !== "rpc_detached") this.#steering.dropPending(taskId)
+    // Queue ownership follows the teardown path, never the status of the turn being released.
+    if (options.path === "end") this.#steering.dropPending(taskId, "task_forgotten")
     this.#settleWaiters(taskId)
   }
 
@@ -785,7 +784,7 @@ class TaskManagerImpl implements TaskManager {
     const startResult = this.#options.store.transition(initial.record.task_id, { type: "start", timestamp: nowIso(this.#now) })
     if (!startResult.applied) {
       this.#releaseSlot(initial.record.task_id, initial.model, initial.record.notification.run_epoch)
-      this.#steering.dropPending(initial.record.task_id)
+      if (startResult.record.status === "cancelled") this.#steering.dropPending(initial.record.task_id, "cancelled")
       this.#settleWaiters(initial.record.task_id)
       return { ok: false, error: "task was cancelled before launch" }
     }
@@ -814,15 +813,8 @@ class TaskManagerImpl implements TaskManager {
           context = advanced.context
           continue
         }
-        const failure = describeStartFailure(error)
         this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
-        if (failOwnedRun(this.#options.store, launchRunOf(record), nowIso(this.#now), failure)) {
-          this.#options.store.appendEvent(record.task_id, {
-            type: "task_start_failed",
-            payload: { error_message: failure.errorMessage, ...failure.eventFacts },
-          })
-          this.#steering.dropPending(record.task_id)
-        }
+        const failure = this.#recordStartFailure(record, error)
         this.#settleWaiters(record.task_id)
         return {
           ok: false,
@@ -861,6 +853,25 @@ class TaskManagerImpl implements TaskManager {
       ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
       ...(recorded?.effective_model === undefined ? {} : { effective_model: recorded.effective_model }),
     }
+  }
+
+  #recordStartFailure(record: TaskRecord, error: unknown): ReturnType<typeof describeStartFailure> {
+    const original = describeStartFailure(error)
+    const fresh = this.#tryLoad(record.task_id)
+    const queued = fresh?.pending_steering?.length ?? 0
+    const park = queued > 0 && (fresh?.host_session !== undefined
+      || newestSessionPath({ store: this.#options.store }, record.task_id) !== undefined)
+    const failure = { ...original, errorMessage: park ? original.errorMessage
+      : withDroppedSteeringNotice(original.errorMessage, queued) }
+    if (!failOwnedRun(this.#options.store, launchRunOf(record), nowIso(this.#now), failure)) return original
+    this.#options.store.appendEvent(record.task_id, {
+      type: "task_start_failed", payload: { error_message: failure.errorMessage, ...failure.eventFacts },
+    })
+    if (park) this.#options.store.transition(record.task_id, {
+      type: record.execution_mode === "process" ? "detach_rpc" : "persist_only", timestamp: nowIso(this.#now),
+    })
+    else if (queued > 0) this.#steering.dropPending(record.task_id, "target_gone")
+    return failure
   }
 
   /**
@@ -1383,20 +1394,12 @@ class TaskManagerImpl implements TaskManager {
         }
         return
       }
-      const failure = describeStartFailure(error)
       this.#releaseSlot(
         context.record.task_id,
         context.model,
         context.record.notification.run_epoch,
       )
-      // The primary launch path records this breadcrumb; a fallback launch that dies must not be the
-      // one failure that leaves the event log with no cause at all. A stale attempt records nothing.
-      if (failOwnedRun(this.#options.store, launchRunOf(context.record), nowIso(this.#now), failure)) {
-        this.#options.store.appendEvent(context.record.task_id, {
-          type: "task_start_failed",
-          payload: { error_message: failure.errorMessage, ...failure.eventFacts },
-        })
-      }
+      this.#recordStartFailure(context.record, error)
       this.#settleWaiters(context.record.task_id)
       return
     }

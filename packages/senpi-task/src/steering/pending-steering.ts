@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { log } from "@oh-my-opencode/utils"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
 import type { SendDelivery, SendOutcome, SteeringPort } from "./types"
 
@@ -57,7 +58,7 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
   // Removes persisted queue entries. With drainedIds, only the entries that were just delivered
   // are cleared, so a concurrent enqueue that landed after the drain read survives; without it
   // the whole queue goes (cancel / manager-forget paths, where the child will never start).
-  function clearPersistedQueue(taskId: string, drainedIds?: ReadonlySet<string>, dropReason?: string): void {
+  function clearPersistedQueue(taskId: string, drainedIds?: ReadonlySet<string>, dropReason?: string): number {
     let dropped = 0
     port.store.mutate(taskId, (fresh) => {
       const queue = fresh.pending_steering
@@ -67,12 +68,13 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       if (drainedIds === undefined) dropped = queue.length
       if (remaining.length === 0) {
         const { pending_steering: _cleared, ...rest } = fresh
-        return rest
+        return dropped === 0 ? rest : { ...rest, error_message: withDroppedSteeringNotice(fresh.error_message, dropped) }
       }
       return { ...fresh, pending_steering: remaining }
     })
     // Undelivered messages never vanish silently: a whole-queue clear records how many it dropped and why.
     if (dropped > 0) port.store.appendEvent(taskId, { type: "steer_dropped", payload: { count: dropped, reason: dropReason ?? "queue_cleared" } })
+    return dropped
   }
 
   function isDraining(taskId: string): boolean {

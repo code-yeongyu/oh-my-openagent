@@ -15,7 +15,7 @@ import type { AdmissionResult } from "./types"
 /**
  * Residency cap gate (codex residency contract). A resident is a spawned-not-disposed child of the
  * parent session. Under the cap -> admit. At the cap -> LRU-evict the OLDEST terminal, idle resident
- * (skipping any with a queued send) via the destruction port. If nothing is evictable -> reject with
+ * via the destruction port, which parks rather than destroys a queued continuation. If nothing is evictable -> reject with
  * AgentLimitReached naming the residents so the caller can explain why. An unbounded cap
  * ("unlimited" or 0) admits every child and never evicts.
  */
@@ -126,7 +126,7 @@ export function startIdleResidentReclaimer(
 }
 
 // Oldest-first scan (updated_at is touched on every steer/revive, so it tracks recency of use). The
-// first terminal resident with no pending send is the LRU victim. EVERY terminal status (including
+// first terminal resident with no in-flight send is the LRU victim; a durable queue forces parking. EVERY terminal status (including
 // lost and cancelled) is reclaimable: a lost child is unreachable and must never pin a slot.
 function lruEvictable(context: LifecycleContext, residents: readonly TaskRecord[]): TaskRecord | undefined {
   return [...residents]

@@ -2,6 +2,8 @@ import { afterEach, expect, spyOn, test } from "bun:test"
 import { cleanupProjects as cleanupManagers } from "../manager/__fixtures__/manager-fakes"
 import { cleanupProjects } from "./__fixtures__/lifecycle-fakes"
 import { bounded, liveParentFixture } from "./__fixtures__/live-parent-fakes"
+import { runTaskCancel } from "../tools/control/cancel"
+import { renderTaskCancelResult } from "../tools/control/renderers"
 
 const fixtures: ReturnType<typeof liveParentFixture>[] = []
 function fixture(mode?: Parameters<typeof liveParentFixture>[0]) {
@@ -15,7 +17,7 @@ afterEach(() => {
   cleanupManagers()
 })
 
-test("queued steers are cleared and accounted for in the single terminal result", async () => {
+test("queued steers survive expiry and only explicit cancellation drops and reports them", async () => {
   const f = fixture()
   const id = await f.start()
   const attempted = f.wait("live_parent_recovery_attempt")
@@ -26,15 +28,24 @@ test("queued steers are cleared and accounted for in the single terminal result"
   }
   f.state.permanentFailure = true
   f.state.failureCode = "host_incompatible"
-  const ended = f.wait("suspended_unresumable")
-  f.advance(5_000)
-  await ended
+  const retried = f.wait("live_parent_recovery_attempt")
+  f.advance(300_000)
+  await retried
+  expect(f.store.load(id)?.status).toBe("running")
+  expect(f.store.load(id)?.pending_steering?.map(entry => entry.message)).toEqual(["first", "second"])
+  expect(f.messages).toHaveLength(0)
+  const result = await runTaskCancel(f.manager, { task_id: id })
+  expect(result.details).toMatchObject({ kind: "cancelled", undelivered_messages: 2 })
   const record = f.store.load(id)
   expect(record?.pending_steering).toBeUndefined()
-  expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload)
-    .toMatchObject({ undelivered_messages: 2 })
-  expect(f.messages).toHaveLength(1)
-  expect(f.messages[0]?.content).toContain(record?.error_message ?? "missing terminal result")
+  expect(f.recordedEvents.find((event) => event.type === "steer_dropped")?.payload)
+    .toMatchObject({ count: 2, reason: "cancelled" })
+  expect(result.content.filter(part => part.type === "text").map(part => part.text).join("\n"))
+    .toContain(record?.error_message ?? "missing terminal result")
+  expect(renderTaskCancelResult(result, { expanded: false, isPartial: false },
+    { fg: (_color, text) => text, italic: text => text }).render(200).join("\n"))
+    .toContain(record?.error_message ?? "missing terminal result")
+  expect(f.messages).toHaveLength(0)
 })
 
 test("an attached live handle survives stale expired recovery markers", async () => {
@@ -186,4 +197,33 @@ test("recovery detach forgets a handle even when its disposal rejects", async ()
   expect(f.store.load(id)?.status).toBe("running")
   expect(f.store.load(id)?.residency_state).toBe("rpc_detached")
   expect(f.state.closes).toBe(0)
+})
+
+test("explicit end reports a forgotten target's dropped queue to its parent", async () => {
+  const f = fixture()
+  const id = await f.start()
+  f.store.mutate(id, record => ({ ...record, pending_steering: [
+    { id: "forgotten-1", message: "Q1", deliver_as: "steer" },
+    { id: "forgotten-2", message: "Q2", deliver_as: "steer" },
+  ] }))
+  const notified = Promise.withResolvers<void>()
+  const push = f.messages.push.bind(f.messages)
+  const notification = spyOn(f.messages, "push").mockImplementation((...messages) => {
+    const length = push(...messages)
+    notified.resolve()
+    return length
+  })
+  try {
+    f.manager.forget(id, { path: "end" })
+    await bounded(notified.promise)
+    const record = f.store.load(id)
+    expect(record?.status).toBe("lost")
+    expect(record?.pending_steering).toBeUndefined()
+    expect(f.messages).toHaveLength(1)
+    expect(f.messages[0]?.content).toContain(record?.error_message ?? "missing drop notice")
+    expect(f.recordedEvents.filter(event => event.type === "steer_dropped").map(event => event.payload))
+      .toEqual([{ count: 2, reason: "task_forgotten" }])
+  } finally {
+    notification.mockRestore()
+  }
 })

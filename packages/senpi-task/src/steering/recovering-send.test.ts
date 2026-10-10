@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
 import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
 import { cleanupSteering, makeFakeHandle, makeHarness } from "./__fixtures__/steering-fakes"
 
@@ -62,13 +63,15 @@ describe("steering a recovering child (#9861)", () => {
     expect(child.steerCalls).toEqual(["first", "second"])
   })
 
-  // Waits on an explicit condition, bounded by a circuit breaker so a regression fails instead of hanging.
-  async function eventually(check: () => boolean, label: string): Promise<void> {
-    const deadline = Date.now() + 5_000
-    while (!check()) {
-      if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}`)
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+  function queueEmptied(h: ReturnType<typeof makeHarness>, taskId: string): Promise<void> {
+    const empty = Promise.withResolvers<void>()
+    const mutate = h.store.mutate.bind(h.store)
+    const observation = spyOn(h.store, "mutate").mockImplementation((id, update) => {
+      const result = mutate(id, update)
+      if (id === taskId && result !== null && (result.pending_steering?.length ?? 0) === 0) empty.resolve()
+      return result
+    })
+    return bounded(empty.promise).finally(() => observation.mockRestore())
   }
 
   // Contract: no queued message is ever stranded. A producer that keeps queueing past the pass limit
@@ -88,8 +91,9 @@ describe("steering a recovering child (#9861)", () => {
           { id: `more-${delivered.length}`, message: `more ${delivered.length}`, deliver_as: "steer" as const }] }))
       }
     } })
+    const empty = queueEmptied(h, record.task_id)
     await h.engine.notifyStarted(record.task_id)
-    await eventually(() => (h.store.load(record.task_id)?.pending_steering?.length ?? 0) === 0, "the queue to empty")
+    await empty
     expect(delivered).toHaveLength(41)
     expect(delivered.at(-1)).toBe("more 40")
   })
@@ -104,9 +108,10 @@ describe("steering a recovering child (#9861)", () => {
       { id: "left-2", message: "left over 2", deliver_as: "steer" as const }] }))
     const child = makeFakeHandle(record.task_id, "rpc")
     h.setLive(record.task_id, child.handle)
+    const empty = queueEmptied(h, record.task_id)
     const sent = await h.engine.sendToTask({ idOrName: record.task_id, message: "user next", deliverAs: "steer" })
     expect(sent.kind).toBe("queued")
-    await eventually(() => child.steerCalls.length === 3, "all three deliveries")
+    await empty
     expect(child.steerCalls).toEqual(["left over 1", "left over 2", "user next"])
   })
 
@@ -126,8 +131,9 @@ describe("steering a recovering child (#9861)", () => {
       if (message === "second" && !refusedOnce) { refusedOnce = true; return }
       child.steerCalls.push(message)
     } })
+    const empty = queueEmptied(h, record.task_id)
     await h.engine.notifyStarted(record.task_id)
-    await eventually(() => (h.store.load(record.task_id)?.pending_steering?.length ?? 0) === 0, "the queue to empty")
+    await empty
     expect(child.steerCalls).toContain("third")
   })
 
@@ -144,5 +150,43 @@ describe("steering a recovering child (#9861)", () => {
     expect(sent.reason).toContain("suspended_unresumable:host_draining")
     expect(sent.reason).toContain("retained work")
     expect(h.store.load(record.task_id)?.pending_steering).toBeUndefined()
+  })
+
+  test("notifyStarted joining the final empty read re-drains a late queued message", async () => {
+    const h = makeHarness()
+    const record = h.seedRecord()
+    await h.engine.sendToTask({ idOrName: record.task_id, message: "first", deliverAs: "steer" })
+    h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
+    const child = makeFakeHandle(record.task_id, "rpc")
+    const lateDelivered = Promise.withResolvers<void>()
+    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
+      child.steerCalls.push(message)
+      if (message === "late") lateDelivered.resolve()
+    } })
+    let inject = true
+    let joined: Promise<void> | undefined
+    const load = h.store.load.bind(h.store)
+    const observation = spyOn(h.store, "load").mockImplementation((id) => {
+      const fresh = load(id)
+      if (inject && id === record.task_id && fresh !== null && fresh.pending_steering === undefined) {
+        inject = false
+        h.store.mutate(id, current => ({ ...current, pending_steering: [
+          { id: "after-final-read", message: "late", deliver_as: "steer" },
+        ] }))
+        joined = h.engine.notifyStarted(id)
+      }
+      return fresh
+    })
+    try {
+      const draining = h.engine.notifyStarted(record.task_id)
+      await draining
+      expect(joined).toBe(draining)
+      await bounded(lateDelivered.promise)
+      await h.engine.notifyStarted(record.task_id)
+      expect(child.steerCalls).toEqual(["first", "late"])
+      expect(h.store.load(record.task_id)?.pending_steering).toBeUndefined()
+    } finally {
+      observation.mockRestore()
+    }
   })
 })

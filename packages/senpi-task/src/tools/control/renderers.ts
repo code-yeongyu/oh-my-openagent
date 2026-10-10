@@ -13,6 +13,7 @@ import {
 import type { TaskCancelInput } from "./cancel"
 import type { MemberScopedTaskSendInput, TaskSendInput, StructuredMessageInput } from "./send-schema"
 import type { CancelResultDetails, SendResultDetails } from "./types"
+import { withDroppedSteeringNotice } from "../../state/queued-steering"
 
 export type ControlRenderTheme = Pick<Theme, "fg" | "italic">
 
@@ -58,7 +59,8 @@ export function renderTaskCancelResult(
   theme: ControlRenderTheme,
 ): RenderComponent {
   const row = taskCancelResultRow(result.details)
-  return linesComponent([theme.fg(row.color, normalizeRendererText(row.text))])
+  const dropped = result.details.kind === "cancelled" || result.details.kind === "cancel_pending" ? result.details.undelivered_messages ?? 0 : 0
+  return linesComponent([theme.fg(row.color, normalizeRendererText(withDroppedSteeringNotice(row.text, dropped)))])
 }
 
 function widthComponent(renderLine: (width: number) => string): RenderComponent {

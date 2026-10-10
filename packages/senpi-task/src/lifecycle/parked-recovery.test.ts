@@ -77,7 +77,7 @@ describe("parked recovery contract (#9861)", () => {
   test("a parked record with a live foreign owner still ends at its deadline", async () => {
     const f = fixture("host-session")
     const id = await f.start()
-    f.manager.forget(id)
+    f.manager.forget(id, { path: "park" })
     f.alivePids.add(55555)
     f.store.mutate(id, (record) => ({ ...record, residency_state: "rpc_detached", host_pid: 55555 }))
     const armed = f.until(() => f.store.load(id)?.recovery_deadline_at !== undefined)
@@ -173,7 +173,7 @@ describe("parked recovery contract (#9861)", () => {
     test(`an unfinished ${residency} legacy record also gets a bounded recovery`, async () => {
       const f = fixture()
       const id = await f.start()
-      f.manager.forget(id)
+      f.manager.forget(id, { path: "park" })
       const attempted = f.wait("live_parent_recovery_attempt")
       f.store.mutate(id, (record) => ({ ...record, residency_state: residency }))
       await attempted

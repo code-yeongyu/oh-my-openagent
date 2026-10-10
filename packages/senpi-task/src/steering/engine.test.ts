@@ -370,7 +370,7 @@ describe("steering pending cancellation", () => {
     expect(harness.store.load(record.task_id)?.pending_steering).toHaveLength(2)
 
     // when the manager forgets the task before it ever launches, then a stale start fires
-    harness.engine.dropPending(record.task_id)
+    harness.engine.dropPending(record.task_id, "task_forgotten")
     const fake = makeFakeHandle(record.task_id, "in-process")
     harness.setLive(record.task_id, fake.handle)
     await harness.engine.notifyStarted(record.task_id)

@@ -6,12 +6,12 @@ import type { ReconcileOutcome } from "./types"
 
 export async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
   if (record.status === "lost" || record.status === "cancelled") {
-    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
+    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, record.status === "lost" ? "target_gone" : "cancel")
     return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }
   }
   if (record.residency_state !== "resident") return { task_id: record.task_id, kind: "resumed" }
   if (newestSessionPath(context, record.task_id) === undefined) {
-    await destroyResidentTask(context, record.task_id, "reconcile_lost")
+    await destroyResidentTask(context, record.task_id, "target_gone")
     return {
       task_id: record.task_id,
       kind: "resumed",

@@ -49,10 +49,12 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
   const requestStarted = Promise.withResolvers<string>()
   const releaseResponse = Promise.withResolvers<void>()
   let calls = 0
+  const providerRequests: string[] = []
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async (request) => {
     calls += 1
     trace?.mark("provider_request", { call: calls })
     const body = await request.text()
+    providerRequests.push(body)
     requestStarted.resolve(body)
     await releaseResponse.promise
     const chunk = { id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta: { content: misleading ? "" : "RESUMED_SENTINEL" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }
@@ -201,7 +203,16 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     const leaseProbe = await runTaskSend(manager, { to: record.task_id, message: "LEASE_PROBE" }, "fixture-parent")
     assert.equal(leaseProbe.details.kind, "revived")
     await manager.waitFor(record.task_id, { signal: AbortSignal.timeout(15000) })
-    return { cadenceMs, unrefs, transitions, parked, earlyParkAfterSend, memberExtensionRestored, messageCount, pendingSteeringPreserved: true, outputReadable: true, mode, source: "real-manager/task_send/AgentSession", result: result.details, status: completed.status, run_epoch: completed.notification.run_epoch, restoredTools: toolSurfaces, transcriptPreserved: readFileSync(sessionPath, "utf8").includes("TRANSCRIPT_SENTINEL"), transcriptBeforeBytes: before.length, leaseReleased: leaseProbe.details.kind === "revived", providerCalls: calls, isolatedAgentDir: agentDir }
+    assert.equal(calls, 2)
+    const queuedRequest = providerRequests[1]
+    assert(queuedRequest !== undefined)
+    const revivedRecord = store.load(record.task_id)
+    assert(revivedRecord)
+    const pendingIndex = queuedRequest.indexOf("PENDING_SENTINEL")
+    const pendingSteeringPreserved = pendingIndex >= 0 && pendingIndex < queuedRequest.indexOf("LEASE_PROBE")
+      && revivedRecord.pending_steering === undefined
+    assert(pendingSteeringPreserved, "revival must deliver the parked queue before the new message and clear it")
+    return { cadenceMs, unrefs, transitions, parked, earlyParkAfterSend, memberExtensionRestored, messageCount, pendingSteeringPreserved, outputReadable: true, mode, source: "real-manager/task_send/AgentSession", result: result.details, status: completed.status, run_epoch: completed.notification.run_epoch, restoredTools: toolSurfaces, transcriptPreserved: readFileSync(sessionPath, "utf8").includes("TRANSCRIPT_SENTINEL"), transcriptBeforeBytes: before.length, leaseReleased: leaseProbe.details.kind === "revived", providerCalls: calls, isolatedAgentDir: agentDir }
   } catch (error) {
     throw trace === undefined ? error : trace.failure("Cold revival failed", error)
   } finally {

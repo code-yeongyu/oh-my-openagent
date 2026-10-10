@@ -17,7 +17,7 @@ describe("TaskManager lane lease of a suspended child", () => {
     if (first.kind !== "started") throw new Error("expected first to start")
 
     // when the child is suspended the way session shutdown does it: forget, then park
-    manager.forget(first.task_id)
+    manager.forget(first.task_id, { path: "park" })
     store.transition(first.task_id, { type: "persist_only", timestamp: new Date().toISOString() })
     await flush()
 
@@ -33,7 +33,7 @@ describe("TaskManager lane lease of a suspended child", () => {
     const first = await manager.start(baseSpec({ name: "first" }))
     if (first.kind !== "started") throw new Error("expected first to start")
     const staleHandle = inProcess.handles.get(first.task_id)
-    manager.forget(first.task_id)
+    manager.forget(first.task_id, { path: "park" })
     store.transition(first.task_id, { type: "persist_only", timestamp: new Date().toISOString() })
     const second = await manager.start(baseSpec({ name: "second" }))
     expect(second).toMatchObject({ kind: "started", status: "running" })

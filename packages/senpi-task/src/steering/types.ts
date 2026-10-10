@@ -104,10 +104,10 @@ export type CancelOptions = {
 }
 
 export type CancelOutcome =
-  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }
+  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly undelivered_messages?: number }
   // The child is unreachable right now: the cancel runs on its host before anything else once it is
   // reachable (or the child ends when its connection does not come back), and only then is it cancelled.
-  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string }
+  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string; readonly undelivered_messages?: number }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   // The task had already finished; cancel released the child it still kept resident (omo#9785).
   | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus }
@@ -126,7 +126,7 @@ export type SteeringEngine = {
   notifyStarted(taskId: string): Promise<void>
   // Called by the manager when a task is forgotten (destroyed/evicted/failed to launch) so buffered
   // messages for a child that will never start are not retained for the session.
-  dropPending(taskId: string): void
+  dropPending(taskId: string, reason: "cancelled" | "target_gone" | "task_forgotten"): void
 }
 
 export type { TaskRecord }

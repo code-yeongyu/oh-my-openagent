@@ -66,7 +66,8 @@ export function startLiveParentRecovery(
       if (context.registry.get(record.task_id) !== undefined) return
       const expired = context.now() >= episode.deadline
       if (isSuspensionExpiry(record)
-        || PERMANENT_REVIVAL_REASONS.has(record.revival_deferred_reason ?? record.suspension_reason ?? "")) {
+        || ((record.pending_steering?.length ?? 0) === 0
+          && PERMANENT_REVIVAL_REASONS.has(record.revival_deferred_reason ?? record.suspension_reason ?? ""))) {
         await expireSuspendedChild(context, record, () => owned(record))
         return
       }
@@ -145,6 +146,7 @@ export function startLiveParentRecovery(
         episodes.delete(record.task_id)
       // A failed attempt may have held the claim across the deadline. Settle its expiry now.
       else if (context.now() >= episode.deadline && !isSuspensionExpiry(fresh)
+        && (fresh.pending_steering?.length ?? 0) === 0
         && context.registry.get(record.task_id) === undefined) scan()
     }
   }
@@ -180,7 +182,8 @@ export function startLiveParentRecovery(
         )
       }
       if (episode.expiring) continue
-      if (context.now() >= episode.deadline && context.registry.get(record.task_id) === undefined
+      if (context.now() >= episode.deadline && (record.pending_steering?.length ?? 0) === 0
+        && context.registry.get(record.task_id) === undefined
         && (episode.deadlineAttempted ? !episode.busy || retry
           : episode.busy || (reconcilingRuns > 0 && record.residency_state === "resident"))) {
         episode.expiring = true
