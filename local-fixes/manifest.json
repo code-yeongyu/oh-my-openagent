@@ -325,6 +325,19 @@
       ],
       "overlapsWith": [],
       "orderNote": "Independent of 01-20; touches only packages/omo-opencode/src/v2/agent-markdown.ts. Complemented outside this repo by carrying v1's opencode.json agent block and default_agent into the v2 profile config (the cutover dropped both)."
+    },
+    {
+      "id": "22-hook-spawn-windowshide",
+      "title": "Hide shell-hook console windows when the backend has no console",
+      "commit": "4dcc1b377e4a8602aec00ddc47b03146f77971ee",
+      "patch": "patches/22-hook-spawn-windowshide.patch",
+      "pr": null,
+      "why": "executeHookCommand spawned shell children without windowsHide. A console-less backend therefore gave each hook child a visible console, handed to Windows Terminal when it is the default terminal (X-119/G-17 mechanism; reproduced 2026-10-10). Pass windowsHide=true without changing detachment, streams, environment, or timeout cleanup. A registered background service must not be killed merely because its initiating parent exited.",
+      "markers": [
+        "HOOK_SPAWN_WINDOWSHIDE"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-21; touches packages/utils/src/command-executor/execute-hook-command.ts. Runtime constant is consumed by the actual spawn option and survives bundling; comments are not used as markers. Companion open-code-review.ts spawn fixes live outside this repo. Activation of the rebuilt plugin in existing backends requires separate verification; restart remains owner-initiated."
     }
   ],
   "externalFixes": [
