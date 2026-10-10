@@ -167,7 +167,13 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 
 	try {
 		signal.throwIfAborted();
-		const script = new vm.Script(`(async () => {\n${code}\n})()`, { filename: FILENAME, lineOffset: -1 });
+		// The evaluation promise is marked handled inside the vm before its microtasks drain: code that throws
+		// before its first await rejects it right then, ahead of the host's handler, which Node would report
+		// as an unhandled rejection in the host. The rejection itself still reaches the host below unchanged.
+		const script = new vm.Script(`((run) => (run.catch(() => undefined), run))((async () => {\n${code}\n})())`, {
+			filename: FILENAME,
+			lineOffset: -1,
+		});
 		const evaluation: unknown = script.runInContext(sandbox, { timeout: timeoutMs });
 		const returnValue = await new Promise((resolve, reject) => {
 			signal.addEventListener("abort", () => reject(signal.reason), { once: true });
