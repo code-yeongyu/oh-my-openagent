@@ -3,6 +3,7 @@ import { afterEach, beforeEach, mock, setDefaultTimeout } from "bun:test"
 import { rmSync } from "node:fs"
 import { join } from "node:path"
 import { _resetForTesting as resetClaudeSessionState } from "./packages/omo-opencode/src/features/claude-code-session-state/state"
+import { _resetForTesting as resetAgentRegistrySnapshot } from "./packages/omo-opencode/src/features/agent-registry-recovery/registry-snapshot"
 import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./packages/omo-opencode/src/features/task-toast-manager/manager"
 import { _resetForTesting as resetModelFallbackState } from "./packages/omo-opencode/src/hooks/model-fallback/hook"
 import { RULES_INJECTOR_STORAGE } from "./packages/omo-opencode/src/hooks/rules-injector/constants"
@@ -71,6 +72,7 @@ beforeEach(() => {
   cleanupOmoCacheDir(getOmoOpenCodeCacheDir())
   cleanupRulesInjectorStorage()
   resetClaudeSessionState()
+  resetAgentRegistrySnapshot()
   resetTaskToastManager()
   resetModelFallbackState()
   resetConnectedProvidersCache()

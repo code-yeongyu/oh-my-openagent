@@ -1,0 +1,10 @@
+== GET /agent before dispose ==
+"name":"build" "name":"compaction" "name":"explore" "name":"general" "name":"plan" "name":"probe-agent" "name":"summary" "name":"title"
+== GET /config agent keys ==
+['probe-agent']
+== POST /instance/dispose ==
+true
+== GET /agent after dispose ==
+"name":"build" "name":"compaction" "name":"explore" "name":"general" "name":"plan" "name":"probe-agent" "name":"summary" "name":"title"
+== server alive check ==
+200
