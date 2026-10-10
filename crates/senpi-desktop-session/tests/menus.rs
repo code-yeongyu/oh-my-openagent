@@ -170,7 +170,7 @@ async fn select_records_the_path_and_emits_exactly_one_audit_event() {
 }
 
 #[tokio::test]
-async fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
+async fn a_disabled_submenu_is_refused_and_dispatches_nothing() {
     // Given
     let started = start("{}");
     let (session, sinks, audits) = (&started.session, &started.sinks, &started.audits);
@@ -192,7 +192,7 @@ async fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
 async fn an_invalid_path_is_refused_before_the_backend() {
     // Given
     let started = start("{}");
-    let (session, sinks) = (&started.session, &started.sinks);
+    let (session, sinks, audits) = (&started.session, &started.sinks, &started.audits);
     session
         .open(DesktopSessionOptions::default())
         .wait()
@@ -204,7 +204,15 @@ async fn an_invalid_path_is_refused_before_the_backend() {
     // Then
     assert_eq!(code(empty), Some(ErrorCode::InvalidTarget));
     assert_eq!(code(blank), Some(ErrorCode::InvalidTarget));
-    assert_eq!(recorded(sinks), [], "{:?}", recorded(sinks));
+    // Each refusal happens inside the transaction: audited, and only the
+    // transaction's release reaches the backend
+    assert_eq!(audits.lock().len(), 2, "{:?}", audits.lock());
+    assert_eq!(
+        recorded(sinks),
+        [SinkOp::ReleaseAll, SinkOp::ReleaseAll],
+        "{:?}",
+        recorded(sinks)
+    );
 }
 
 #[tokio::test]

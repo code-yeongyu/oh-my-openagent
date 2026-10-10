@@ -95,8 +95,13 @@ impl Backend for PanickyFake {
     fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
         self.inner.menu_items(window, path)
     }
-    fn menu_select(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<()> {
-        self.inner.menu_select(window, path)
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        self.inner.menu_select(window, path, check_stop)
     }
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
         self.inner.ax()

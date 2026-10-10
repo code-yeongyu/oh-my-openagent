@@ -86,7 +86,7 @@ fn selecting_an_exact_title_records_one_sink_op() {
     let window = window(&mut backend);
     // When
     backend
-        .menu_select(&window, &labels(&["File", "Save"]))
+        .menu_select(&window, &labels(&["File", "Save"]), &|| Ok(()))
         .expect("select succeeds");
     // Then
     assert_eq!(
@@ -106,7 +106,7 @@ fn selecting_with_an_ellipsis_normalized_title_matches_the_native_label() {
     let window = window(&mut backend);
     // When: "Export" and "Export..." both name "Export…"
     backend
-        .menu_select(&window, &labels(&["File", "Export", "PDF"]))
+        .menu_select(&window, &labels(&["File", "Export", "PDF"]), &|| Ok(()))
         .expect("select succeeds");
     // Then: the sink records the native path of the chosen item
     assert_eq!(
@@ -131,7 +131,7 @@ fn an_ambiguous_label_is_refused_and_dispatches_nothing() {
     let window = window(&mut backend);
     // When
     let refused = backend
-        .menu_select(&window, &labels(&["File", "save"]))
+        .menu_select(&window, &labels(&["File", "save"]), &|| Ok(()))
         .expect_err("save names both Save and SAVE");
     // Then
     assert_eq!(refused.code, ErrorCode::AxFailed, "{refused}");
@@ -147,7 +147,7 @@ fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
     let window = window(&mut backend);
     // When
     let refused = backend
-        .menu_select(&window, &labels(&["Edit", "Undo"]))
+        .menu_select(&window, &labels(&["Edit", "Undo"]), &|| Ok(()))
         .expect_err("Undo lives under a disabled submenu");
     // Then: the walk already refuses at the disabled submenu
     assert_eq!(refused.code, ErrorCode::AxFailed, "{refused}");
@@ -167,7 +167,7 @@ fn a_disabled_submenu_in_the_path_is_refused_before_the_leaf() {
     let window = window(&mut backend);
     // When
     let refused = backend
-        .menu_select(&window, &labels(&["File", "Save"]))
+        .menu_select(&window, &labels(&["File", "Save"]), &|| Ok(()))
         .expect_err("the disabled submenu stops the walk");
     // Then
     assert_eq!(refused.code, ErrorCode::AxFailed, "{refused}");
@@ -183,7 +183,7 @@ fn a_submenu_as_the_leaf_is_not_a_command() {
     let window = window(&mut backend);
     // When
     let refused = backend
-        .menu_select(&window, &labels(&["File", "Export…"]))
+        .menu_select(&window, &labels(&["File", "Export…"]), &|| Ok(()))
         .expect_err("Export… opens a submenu");
     // Then
     assert_eq!(refused.code, ErrorCode::AxFailed, "{refused}");
@@ -198,7 +198,7 @@ fn an_invalid_path_is_refused_before_the_backend_walks() {
     let window = window(&mut backend);
     // When: an empty label never reaches native matching
     let refused = backend
-        .menu_select(&window, &labels(&["File", " "]))
+        .menu_select(&window, &labels(&["File", " "]), &|| Ok(()))
         .expect_err("a blank label is an invalid path");
     // Then
     assert_eq!(refused.code, ErrorCode::InvalidTarget, "{refused}");
@@ -213,7 +213,7 @@ fn selecting_with_an_empty_path_is_invalid_but_listing_is_not() {
     // When / Then
     assert!(backend.menu_items(&window, &[]).is_ok());
     let refused = backend
-        .menu_select(&window, &[])
+        .menu_select(&window, &[], &|| Ok(()))
         .expect_err("an empty path names no command");
     assert_eq!(refused.code, ErrorCode::InvalidTarget, "{refused}");
 }
@@ -227,7 +227,62 @@ fn a_backend_without_menus_reports_ax_unsupported() {
     let items = backend.menu_items(&window, &[]).expect_err("no menus");
     assert_eq!(items.code, ErrorCode::AxUnsupported, "{items}");
     let select = backend
-        .menu_select(&window, &labels(&["File", "Save"]))
+        .menu_select(&window, &labels(&["File", "Save"]), &|| Ok(()))
         .expect_err("no menus");
     assert_eq!(select.code, ErrorCode::AxUnsupported, "{select}");
+}
+
+#[test]
+fn a_stop_landing_mid_walk_dispatches_nothing() {
+    // Given: the stop lands once the walk has opened the first submenu
+    let mut backend = backend("{}");
+    let sink = backend.sink();
+    let window = window(&mut backend);
+    let levels = std::cell::Cell::new(0);
+    let check_stop = || {
+        levels.set(levels.get() + 1);
+        if levels.get() > 1 {
+            Err(senpi_desktop_core::error::DesktopError::new(
+                ErrorCode::Suspended,
+                "stop chord",
+            ))
+        } else {
+            Ok(())
+        }
+    };
+    // When
+    let error = backend
+        .menu_select(&window, &labels(&["File", "Export…", "PDF"]), &check_stop)
+        .expect_err("a stop mid-walk refuses");
+    // Then
+    assert_eq!(error.code, ErrorCode::Suspended);
+    assert_eq!(levels.get(), 2);
+    assert_eq!(sink.ops(), []);
+}
+
+#[test]
+fn the_stop_is_checked_again_right_before_the_press() {
+    // Given: every level passes, and the stop lands only on the final check
+    let mut backend = backend("{}");
+    let sink = backend.sink();
+    let window = window(&mut backend);
+    let checks = std::cell::Cell::new(0);
+    let check_stop = || {
+        checks.set(checks.get() + 1);
+        if checks.get() == 2 {
+            Err(senpi_desktop_core::error::DesktopError::new(
+                ErrorCode::Cancelled,
+                "cancelled",
+            ))
+        } else {
+            Ok(())
+        }
+    };
+    // When: File > Save walks one level, then checks before the press
+    let error = backend
+        .menu_select(&window, &labels(&["File", "Save"]), &check_stop)
+        .expect_err("a stop before the press refuses");
+    // Then
+    assert_eq!(error.code, ErrorCode::Cancelled);
+    assert_eq!(sink.ops(), []);
 }

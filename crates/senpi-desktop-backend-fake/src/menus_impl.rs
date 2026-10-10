@@ -45,10 +45,16 @@ impl FakeBackend {
 
     /// Walks `path` submenu by submenu, refusing a disabled submenu before
     /// descending, and returns the items of the menu it lands on.
-    fn walk(&self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+    fn walk(
+        &self,
+        window: &DesktopWindow,
+        path: &[String],
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<Vec<MenuItem>> {
         let mut nodes = self.menu_tree(window)?;
         let mut actual_path: Vec<String> = Vec::with_capacity(path.len());
         for label in path {
+            check_stop()?;
             let listed = children(nodes, &actual_path);
             let items: Vec<MenuItem> = listed.iter().map(|(_, item)| item.clone()).collect();
             let index = match_index(&items, label)?;
@@ -73,16 +79,22 @@ impl FakeBackend {
     pub(crate) fn menu_items_impl(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
         self.begin(crate::method::FakeMethod::MenuItems)?;
         validate_path(path, true)?;
-        self.walk(window, path)
+        self.walk(window, path, &|| Ok(()))
     }
 
-    pub(crate) fn menu_select_impl(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<()> {
+    pub(crate) fn menu_select_impl(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
         self.begin(crate::method::FakeMethod::MenuSelect)?;
         validate_path(path, false)?;
         let (parents, leaf) = path.split_at(path.len() - 1);
-        let items = self.walk(window, parents)?;
+        let items = self.walk(window, parents, check_stop)?;
         let index = match_index(&items, &leaf[0])?;
         require_command(&items[index])?;
+        check_stop()?;
         self.record(SinkOp::MenuSelect {
             window: window.id.clone(),
             path: items[index].path.clone(),

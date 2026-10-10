@@ -41,16 +41,6 @@ export interface AuditEvent {
 	readonly keys?: readonly string[] | null;
 }
 
-/** One immediate child of a native application menu; `path` holds native labels, ellipses included. */
-export interface MenuItem {
-	readonly title: string;
-	readonly path: readonly string[];
-	readonly enabled: boolean;
-	readonly checked: boolean;
-	readonly hasSubmenu: boolean;
-	readonly shortcut?: string | null;
-}
-
 /** Runtime truth about what this host's backend can do right now (frozen field set). */
 export interface DesktopCapabilities {
 	readonly backend: string;

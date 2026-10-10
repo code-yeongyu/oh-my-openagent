@@ -190,8 +190,13 @@ impl Backend for FakeBackend {
         self.menu_items_impl(window, path)
     }
 
-    fn menu_select(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<()> {
-        self.menu_select_impl(window, path)
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        self.menu_select_impl(window, path, check_stop)
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {

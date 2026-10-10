@@ -140,8 +140,15 @@ pub trait Backend: Send {
     }
 
     /// Invokes the leaf command `path` names in `window`'s menu. Backends
-    /// without menus yet refuse with `AxUnsupported`.
-    fn menu_select(&mut self, _window: &DesktopWindow, _path: &[String]) -> CoreResult<()> {
+    /// call `check_stop` at every menu level they open and immediately before
+    /// the native press, so a stop chord or cancel landing mid-walk dispatches
+    /// nothing. Backends without menus yet refuse with `AxUnsupported`.
+    fn menu_select(
+        &mut self,
+        _window: &DesktopWindow,
+        _path: &[String],
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
         Err(DesktopError::ax_unsupported())
     }
 
