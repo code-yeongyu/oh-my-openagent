@@ -13,6 +13,9 @@ use crate::mutate::Mutation;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
 
+#[cfg(test)]
+mod tests;
+
 impl Worker {
     /// Listing is a read: the path is validated, then the backend answers
     /// without any mutation transaction or audit event.
