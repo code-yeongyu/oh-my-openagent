@@ -18,7 +18,7 @@ pub(crate) use self::select::select;
 #[cfg(test)]
 use self::describe::render_shortcut;
 #[cfg(test)]
-use self::walk::{submenu_child, SubmenuNode};
+use self::walk::pick_submenu_index;
 
 /// The immediate children of `window`'s menu at `path` (empty = the menu bar).
 pub(crate) fn items(window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {

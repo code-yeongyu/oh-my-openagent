@@ -7,7 +7,7 @@ use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::menus::MenuItem;
 
 use super::super::element;
-use super::walk::{element_pid, required_string, submenu_child_index};
+use super::walk::{element_pid, required_string, submenu_element};
 
 pub(super) fn describe(element: &AXUIElement, parent: &[String], pid: libc::pid_t) -> CoreResult<MenuItem> {
     if element_pid(element)? != pid {
@@ -21,7 +21,7 @@ pub(super) fn describe(element: &AXUIElement, parent: &[String], pid: libc::pid_
         path,
         enabled: element::copy_bool(element, "AXEnabled").unwrap_or(false),
         checked: element::copy_string(element, "AXMenuItemMarkChar").is_some_and(|mark| !mark.is_empty()),
-        has_submenu: submenu_child_index(element)?.is_some(),
+        has_submenu: submenu_element(element)?.is_some(),
         shortcut: shortcut(element),
     })
 }

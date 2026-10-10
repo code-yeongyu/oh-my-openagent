@@ -12,7 +12,7 @@ use senpi_desktop_core::types::DesktopWindow;
 use super::super::{element, tree};
 use super::describe::describe;
 
-pub(super) const MAX_MENU_CHILDREN: usize = 4096;
+const MAX_MENU_CHILDREN: usize = 4096;
 
 /// The window's owning app element, its pid, and its CGWindowID; refuses when
 /// the exact native window cannot be proven by id.
@@ -65,7 +65,7 @@ pub(super) fn resolve_menu(
         let (elements, items) = children(&menu, &actual_path, pid, check_stop)?;
         let index = match_index(&items, label)?;
         require_enabled(&items[index])?;
-        menu = match submenu_child_index(&elements[index])? {
+        menu = match submenu_element(&elements[index])? {
             Some(submenu) => submenu,
             None => {
                 return Err(DesktopError::ax_failed(format!(
@@ -91,7 +91,7 @@ pub(super) fn children(
     if element_pid(menu)? != pid {
         return Err(DesktopError::ax_failed("menu belongs to a different application"));
     }
-    let children = bounded_children(menu)?;
+    let children = bounded_children(menu, false)?;
     let mut elements = Vec::with_capacity(children.len());
     let mut items = Vec::with_capacity(children.len());
     for child in children {
@@ -118,9 +118,13 @@ pub(super) fn required_string(element: &AXUIElement, attribute: &str) -> CoreRes
         .map_err(|_| DesktopError::ax_failed(format!("{attribute} was not a string")))
 }
 
-fn bounded_children(element: &AXUIElement) -> CoreResult<Vec<CFRetained<AXUIElement>>> {
+/// `optional` treats only "no value" / "unsupported" as no children; any
+/// other AX failure is an error, so a failed read never looks like an empty
+/// menu.
+fn bounded_children(element: &AXUIElement, optional: bool) -> CoreResult<Vec<CFRetained<AXUIElement>>> {
     let value = match element::copy_attribute_result(element, "AXChildren") {
         Ok(Some(value)) => value,
+        Ok(None) | Err(AXError::NoValue | AXError::AttributeUnsupported) if optional => return Ok(Vec::new()),
         other => {
             return Err(DesktopError::ax_failed(format!(
                 "reading native menu children failed: {other:?}"
@@ -150,8 +154,8 @@ fn bounded_children(element: &AXUIElement) -> CoreResult<Vec<CFRetained<AXUIElem
 
 /// The single `AXMenu` child of `element`, or `None` when there is no
 /// submenu; a second `AXMenu` child is ambiguous and refused.
-pub(super) fn submenu_child_index(element: &AXUIElement) -> CoreResult<Option<CFRetained<AXUIElement>>> {
-    let children = element::copy_elements(element, "AXChildren").unwrap_or_default();
+pub(super) fn submenu_element(element: &AXUIElement) -> CoreResult<Option<CFRetained<AXUIElement>>> {
+    let children = bounded_children(element, true)?;
     let mut roles = Vec::with_capacity(children.len());
     for child in &children {
         roles.push(required_string(child, "AXRole")?);
@@ -175,16 +179,4 @@ pub(super) fn pick_submenu_index(roles: &[String]) -> CoreResult<Option<usize>> 
         }
     }
     Ok(found)
-}
-
-/// Test seam over the submenu-child choice so it runs headless.
-#[cfg(test)]
-pub(super) trait SubmenuNode {
-    fn child_roles(&self) -> Vec<&'static str>;
-}
-
-#[cfg(test)]
-pub(super) fn submenu_child(node: &impl SubmenuNode) -> Option<usize> {
-    let roles: Vec<String> = node.child_roles().into_iter().map(str::to_string).collect();
-    pick_submenu_index(&roles).ok().flatten()
 }

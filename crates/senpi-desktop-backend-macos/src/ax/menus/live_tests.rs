@@ -7,8 +7,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+use senpi_desktop_core::error::{CoreResult, ErrorCode};
+use senpi_desktop_core::types::{DesktopWindow, DisplaySelector};
+
 use super::{items, select};
 use crate::ax::is_trusted;
+use crate::capture::{MacCapture, Screencapture};
+use crate::input::{CanaryMode, MacInput};
 use crate::responsible;
 
 const FIXTURE_SOURCE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/menu_fixture.swift");
@@ -36,13 +41,30 @@ fn build_fixture(dir: &Path) -> PathBuf {
     binary
 }
 
-/// Polls for the fixture's window in the live `windows()` list by title.
-fn find_window(title: &str) -> Option<senpi_desktop_core::types::DesktopWindow> {
-    let capture = crate::capture::MacCapture::new(
-        senpi_desktop_core::types::DisplaySelector::All,
-        crate::capture::Screencapture::system(),
-    );
-    capture.windows().ok()?.into_iter().find(|window| window.title == title)
+fn capture() -> MacCapture {
+    MacCapture::new(DisplaySelector::All, Screencapture::system())
+}
+
+fn launch(binary: &Path, title: &str, record: &Path, extra: Option<&str>) -> (Fixture, DesktopWindow) {
+    let mut command = Command::new(binary);
+    command.arg(title).arg(record);
+    if let Some(extra) = extra {
+        command.arg(extra);
+    }
+    let fixture = Fixture(command.spawn().unwrap());
+    println!("fixture_pid={} title={title}", fixture.0.id());
+    let started = Instant::now();
+    loop {
+        if let Some(window) = capture().windows().unwrap().into_iter().find(|w| w.title == title) {
+            println!("window_id={} window_title={:?}", window.id, window.title);
+            return (fixture, window);
+        }
+        assert!(
+            started.elapsed() < WINDOW_DEADLINE,
+            "the fixture's window never appeared"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }
 
 /// AXPress posts the menu action; the fixture runs it on its own run loop
@@ -58,9 +80,17 @@ fn wait_for_record(path: &Path) -> String {
     }
 }
 
-#[test]
-#[ignore = "needs a logged-in macOS session, an Accessibility grant and swiftc"]
-fn menu_listing_and_select_against_a_real_nsmenu() {
+/// Selects through the production make-key step: the same `MacInput` path the
+/// backend uses, so the activation record is the real one.
+fn select_via(input: &mut MacInput, window: &DesktopWindow, path: &[&str]) -> CoreResult<()> {
+    let path: Vec<String> = path.iter().map(|label| (*label).to_owned()).collect();
+    let capture = capture();
+    select(window, &path, &|| Ok(()), &mut || {
+        input.make_menu_window_key(window, &capture)
+    })
+}
+
+fn report_origin() {
     match responsible::current() {
         Some(process) => println!(
             "responsible_pid={} responsible_executable={} responsible_bundle={:?}",
@@ -72,56 +102,69 @@ fn menu_listing_and_select_against_a_real_nsmenu() {
     }
     println!("ax_trusted={}", is_trusted());
     assert!(is_trusted(), "the launching process has no Accessibility grant");
+}
 
+#[test]
+#[ignore = "needs a logged-in macOS session, an Accessibility grant and swiftc"]
+fn menu_listing_and_select_against_a_real_nsmenu() {
+    report_origin();
     let dir = tempfile::tempdir().unwrap();
     let record = dir.path().join("record.txt");
     let title = format!("senpi-menu-live-{}", std::process::id());
-    let child = Command::new(build_fixture(dir.path()))
-        .arg(&title)
-        .arg(&record)
-        .spawn()
-        .unwrap();
-    let fixture = Fixture(child);
-    println!("fixture_pid={} record={}", fixture.0.id(), record.display());
+    let (_fixture, window) = launch(&build_fixture(dir.path()), &title, &record, None);
+    let mut input = MacInput::new(CanaryMode::Off).unwrap();
 
-    let started = Instant::now();
-    let window = loop {
-        if let Some(window) = find_window(&title) {
-            break window;
-        }
-        assert!(
-            started.elapsed() < WINDOW_DEADLINE,
-            "the fixture's window never appeared"
-        );
-        std::thread::sleep(Duration::from_millis(50));
-    };
-    println!("window_id={} window_title={:?}", window.id, window.title);
-
-    let file_path = vec!["File".to_string()];
-    let listed = items(&window, &file_path).map_err(|error| error.message);
+    let listed = items(&window, &["File".to_string()]).map_err(|error| error.message);
     println!("list_file_ok={}", listed.is_ok());
     let items = listed.unwrap();
     let titles: Vec<&str> = items.iter().map(|item| item.title.as_str()).collect();
     println!("file_items={titles:?}");
     let save = items.iter().find(|item| item.title == "Save");
-    println!("save_shortcut={:?}", save.map(|item| item.shortcut.clone()));
+    println!("save_shortcut={:?}", save.and_then(|item| item.shortcut.clone()));
     assert!(save.is_some_and(|item| item.shortcut.as_deref() == Some("Cmd+S")));
     let revert = items.iter().find(|item| item.title == "Revert");
     println!("revert_enabled={:?}", revert.map(|item| item.enabled));
     assert_eq!(revert.map(|item| item.enabled), Some(false));
 
-    let chosen = select(&window, &["File".into(), "Save".into()], &|| Ok(())).map_err(|e| e.message);
+    let chosen = select_via(&mut input, &window, &["File", "Save"]).map_err(|e| e.message);
     println!("select_save_ok={}", chosen.is_ok());
     assert_eq!(chosen, Ok(()));
     let recorded = wait_for_record(&record);
     println!("recorded={recorded:?}");
-    assert!(recorded.contains("Save"), "the fixture recorded {recorded:?}");
+    assert_eq!(recorded, "Save\n");
+    let activated = input.take_last_activated();
+    println!("last_activated={activated:?}");
+    let pid = libc::pid_t::try_from(window.pid.unwrap()).unwrap();
+    assert_eq!(activated, Some((pid, window.id.parse::<u32>().unwrap())));
 
-    let disabled = select(&window, &["File".into(), "Revert".into()], &|| Ok(())).map_err(|e| e.message);
+    let disabled = select_via(&mut input, &window, &["File", "Revert"]).map_err(|e| (e.code, e.message));
     println!("select_revert_err={:?}", disabled.as_ref().err());
-    assert!(disabled.is_err());
-
-    let submenu_leaf = select(&window, &["File".into(), "Export…".into()], &|| Ok(())).map_err(|e| e.message);
+    assert_eq!(disabled.map_err(|(code, _)| code), Err(ErrorCode::AxFailed));
+    let submenu_leaf = select_via(&mut input, &window, &["File", "Export…"]).map_err(|e| (e.code, e.message));
     println!("select_export_err={:?}", submenu_leaf.as_ref().err());
-    assert!(submenu_leaf.is_err());
+    assert_eq!(submenu_leaf.map_err(|(code, _)| code), Err(ErrorCode::AxFailed));
+    let after_refusals = std::fs::read_to_string(&record).unwrap_or_default();
+    println!("recorded_after_refusals={after_refusals:?}");
+    assert_eq!(after_refusals, "Save\n", "a refused selection dispatched a command");
+}
+
+#[test]
+#[ignore = "needs a logged-in macOS session, an Accessibility grant and swiftc"]
+fn an_app_with_two_windows_is_refused_before_any_activation() {
+    report_origin();
+    let dir = tempfile::tempdir().unwrap();
+    let record = dir.path().join("record.txt");
+    let title = format!("senpi-menu-two-{}", std::process::id());
+    let (_fixture, window) = launch(&build_fixture(dir.path()), &title, &record, Some("two"));
+    let mut input = MacInput::new(CanaryMode::Off).unwrap();
+
+    let refused = select_via(&mut input, &window, &["File", "Save"]).map_err(|e| (e.code, e.message));
+    println!("two_window_select_err={:?}", refused.as_ref().err());
+    assert_eq!(refused.map_err(|(code, _)| code), Err(ErrorCode::BackgroundUnavailable));
+    let recorded = wait_for_record(&record);
+    println!("two_window_recorded={recorded:?}");
+    assert_eq!(recorded, "", "a refused selection dispatched a command");
+    let activated = input.take_last_activated();
+    println!("two_window_last_activated={activated:?}");
+    assert_eq!(activated, None);
 }

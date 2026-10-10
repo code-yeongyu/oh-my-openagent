@@ -17,28 +17,33 @@ fn an_item_without_a_command_key_has_no_shortcut() {
     assert_eq!(render_shortcut("", 0), None);
 }
 
-#[test]
-fn submenu_child_returns_the_single_axmenu_child() {
-    struct Stub(Vec<&'static str>);
-    impl SubmenuNode for Stub {
-        fn child_roles(&self) -> Vec<&'static str> {
-            self.0.clone()
-        }
-    }
-    assert_eq!(submenu_child(&Stub(vec!["AXMenu"])), Some(0));
-    assert_eq!(submenu_child(&Stub(vec!["AXMenuItem", "AXMenu"])), Some(1));
-    assert_eq!(submenu_child(&Stub(vec![])), None);
-    assert_eq!(submenu_child(&Stub(vec!["AXMenuItem", "AXSeparatorItem"])), None);
+fn roles(names: &[&str]) -> Vec<String> {
+    names.iter().map(|name| (*name).to_owned()).collect()
 }
 
 #[test]
-fn a_second_axmenu_child_is_ambiguous_and_refused() {
-    struct Stub(Vec<&'static str>);
-    impl SubmenuNode for Stub {
-        fn child_roles(&self) -> Vec<&'static str> {
-            self.0.clone()
-        }
-    }
-    let ambiguous = submenu_child(&Stub(vec!["AXMenu", "AXMenu"]));
-    assert_eq!(ambiguous, None, "two AXMenu children must not descend");
+fn the_single_axmenu_child_is_the_submenu() {
+    assert_eq!(pick_submenu_index(&roles(&["AXMenu"])).ok(), Some(Some(0)));
+    assert_eq!(
+        pick_submenu_index(&roles(&["AXMenuItem", "AXMenu"])).ok(),
+        Some(Some(1))
+    );
+}
+
+#[test]
+fn no_axmenu_child_means_no_submenu() {
+    assert_eq!(pick_submenu_index(&roles(&[])).ok(), Some(None));
+    assert_eq!(
+        pick_submenu_index(&roles(&["AXMenuItem", "AXSeparatorItem"])).ok(),
+        Some(None)
+    );
+}
+
+#[test]
+fn a_second_axmenu_child_is_refused_not_treated_as_no_submenu() {
+    let ambiguous = pick_submenu_index(&roles(&["AXMenu", "AXMenuItem", "AXMenu"]));
+    assert_eq!(
+        ambiguous.map_err(|error| error.code),
+        Err(senpi_desktop_core::error::ErrorCode::AxFailed)
+    );
 }

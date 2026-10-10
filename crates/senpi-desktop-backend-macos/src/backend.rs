@@ -178,7 +178,10 @@ impl Backend for MacosBackend {
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
         Self::require_input_permission()?;
-        crate::ax::menus::select(window, path, check_stop)
+        let (input, capture) = (&mut self.input, &self.capture);
+        crate::ax::menus::select(window, path, check_stop, &mut || {
+            input.make_menu_window_key(window, capture)
+        })
     }
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {

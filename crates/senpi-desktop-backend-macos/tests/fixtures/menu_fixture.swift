@@ -1,10 +1,12 @@
 // A one-window AppKit app with a real NSMenu, for the menu live test.
 // argv[1] = window title, argv[2] = path of the temp file the fixture records
-// each invoked menu command's title to.
+// each invoked menu command's title to, optional argv[3] = "two" for a second
+// window (the multi-window refusal case).
 import AppKit
 
 final class Delegate: NSObject, NSApplicationDelegate {
     var window: NSWindow?
+    var secondWindow: NSWindow?
     var recordPath: String = ""
 
     @objc func record(_ sender: NSMenuItem) {
@@ -56,6 +58,17 @@ final class Delegate: NSObject, NSApplicationDelegate {
         window.title = title
         window.orderFrontRegardless()
         self.window = window
+        if args.count > 3 && args[3] == "two" {
+            let second = NSWindow(
+                contentRect: NSRect(x: 660, y: 260, width: 360, height: 120),
+                styleMask: [.titled],
+                backing: .buffered,
+                defer: false
+            )
+            second.title = title + "-second"
+            second.orderFrontRegardless()
+            self.secondWindow = second
+        }
     }
 }
 

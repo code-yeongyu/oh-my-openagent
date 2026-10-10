@@ -1,5 +1,9 @@
-//! Selecting a leaf menu command: re-validating the leaf after the key-window
-//! change and pressing it through `AXPress`.
+//! Selecting a leaf menu command: the window is made key first, the whole
+//! walk and the leaf's re-validation run in that key context, and the press is
+//! followed by a settle so AppKit runs the command before focus is handed back.
+
+use std::thread;
+use std::time::Duration;
 
 use objc2_application_services::AXUIElement;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
@@ -10,13 +14,21 @@ use super::super::{actions, element};
 use super::describe::describe;
 use super::walk::{children, context, resolve_menu};
 
+/// AXPress posts the command; the target runs it on its own run loop. Wait
+/// before the session hands key focus back (upstream's post-action settle).
+const POST_PRESS_SETTLE: Duration = Duration::from_millis(50);
+
 pub(crate) fn select(
     window: &DesktopWindow,
     path: &[String],
     check_stop: &dyn Fn() -> CoreResult<()>,
+    make_key: &mut dyn FnMut() -> CoreResult<()>,
 ) -> CoreResult<()> {
     validate_path(path, false)?;
     let (app, pid, wid) = context(window)?;
+    check_stop()?;
+    make_key()?;
+    require_key_context(pid, wid)?;
     let (parents, leaf) = path.split_at(path.len() - 1);
     let (menu, actual_path) = resolve_menu(&app, parents, pid, check_stop)?;
     let (elements, items) = children(&menu, &actual_path, pid, check_stop)?;
@@ -28,9 +40,9 @@ pub(crate) fn select(
             "menu command does not advertise AXPress; nothing was dispatched",
         ));
     }
-    // Re-read the leaf: the app may re-validate the command after the key-window change.
+    // Re-read the leaf in the key context: the app re-validates commands
+    // against its key window.
     require_command(&describe(element, &actual_path, pid)?)?;
-    crate::skylight::activate_without_raise(pid, wid)?;
     require_key_context(pid, wid)?;
     check_stop()?;
     actions::perform(element, "AXPress").map_err(|error| {
@@ -38,7 +50,9 @@ pub(crate) fn select(
             "{}; the menu command may already have taken effect; inspect the target before retrying",
             error.message
         ))
-    })
+    })?;
+    thread::sleep(POST_PRESS_SETTLE);
+    Ok(())
 }
 
 /// Menu dispatch requires the exact key window; refuse when macOS did not
