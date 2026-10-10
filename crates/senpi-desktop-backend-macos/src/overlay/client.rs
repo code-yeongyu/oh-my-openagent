@@ -54,6 +54,10 @@ impl Helper {
         self.child.id()
     }
 
+    pub fn running(&mut self) -> io::Result<bool> {
+        Ok(self.child.try_wait()?.is_none())
+    }
+
     pub fn send(&mut self, command: Message) -> io::Result<Reply> {
         let token = command.token();
         wire::write(&mut self.input, &command)?;
@@ -102,5 +106,44 @@ impl Drop for Helper {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+#[path = "capture_tests.rs"]
+mod capture_tests;
+
+#[cfg(test)]
+mod tests {
+    use super::super::{Overlay, State};
+    use super::Helper;
+    use parking_lot::Mutex;
+    use std::process::{Command, Stdio};
+    use std::sync::{mpsc, Arc};
+
+    #[test]
+    fn overlay_availability_reports_an_exited_helper_without_waiting_for_input() {
+        // The real OS child has exited; no fixture supplies an availability value.
+        let mut child = Command::new("/usr/bin/true")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
+        let input = child.stdin.take().unwrap();
+        let pid = child.id();
+        assert!(child.wait().unwrap().success());
+        let (_sender, replies) = mpsc::channel();
+        let overlay = Overlay(Arc::new(Mutex::new(State {
+            helper: Some(Helper {
+                child,
+                input,
+                replies,
+            }),
+            pid: Some(pid),
+            token: 1,
+        })));
+
+        assert!(!overlay.available(), "an exited helper is not available");
+        assert!(overlay.0.lock().helper.is_none());
     }
 }

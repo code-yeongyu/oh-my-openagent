@@ -32,7 +32,7 @@ impl MacosBackend {
         let overlay = crate::overlay::Overlay::default();
         Ok(Self {
             capture: MacCapture::new(display, Screencapture::system()).with_overlay(overlay.clone()),
-            input: MacInput::new(CanaryMode::Session)?,
+            input: MacInput::new(CanaryMode::Session)?.with_overlay(overlay.clone()),
             ax: MacAx::with_overlay(overlay.clone()),
             overlay,
         })
@@ -48,6 +48,9 @@ impl MacosBackend {
     }
 
     fn show_typing_target(&self, target: &Target) {
+        if !self.overlay.available() {
+            return;
+        }
         if let Ok(windows) = self.capture.windows() {
             let window = windows.iter().find(|window| match target {
                 Target::Desktop => window.focused,
@@ -156,15 +159,6 @@ impl Backend for MacosBackend {
         mode: DeliveryMode,
     ) -> CoreResult<()> {
         Self::require_input_permission()?;
-        let end = match &event {
-            PointerEvent::Click { x, y, .. } | PointerEvent::Move { x, y }
-                | PointerEvent::Scroll { x, y, .. } => Some((*x, *y)),
-            PointerEvent::Drag { path, .. } => {
-                if let Some((x, y)) = path.first() { self.overlay.target(*x, *y); }
-                path.last().copied()
-            }
-        };
-        if let Some((x, y)) = end { self.overlay.target(x, y); }
         self.input.pointer(target, event, mode, &self.capture)
     }
 
@@ -197,6 +191,7 @@ impl Backend for MacosBackend {
 
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         Self::require_input_permission()?;
+        self.show_typing_target(target);
         self.input.key_chord(target, keys, mode, &self.capture)
     }
 

@@ -41,6 +41,7 @@ export class ComputerHandle {
 	readonly #settings: () => ComputerSettings;
 	readonly #listeners = new Set<ActivationListener>();
 	#enabledOverride: boolean | undefined;
+	#showCursorOverride: boolean | undefined;
 	#opened: OpenedSession | undefined;
 	#active = false;
 
@@ -54,7 +55,10 @@ export class ComputerHandle {
 	}
 
 	settings(): ComputerSettings {
-		return this.#settings();
+		const settings = this.#settings();
+		return this.#showCursorOverride === undefined
+			? settings
+			: { ...settings, showCursor: this.#showCursorOverride };
 	}
 
 	/** `computer.enabled`, unless `/computer on|off` overrode it for this session. */
@@ -76,6 +80,12 @@ export class ComputerHandle {
 		this.#enabledOverride = enabled;
 	}
 
+	/** Session-scoped display-only override; never persisted. */
+	async setShowCursor(showCursor: boolean, context: ComputerHostContext): Promise<void> {
+		this.#showCursorOverride = showCursor;
+		if (this.running) await this.#ensureOpen(this.settings(), context);
+	}
+
 	/** Subscribes to activation changes; the host turns them into the active-tool set (todo 26). */
 	onActivationChange(listener: ActivationListener): () => void {
 		this.#listeners.add(listener);
@@ -88,7 +98,7 @@ export class ComputerHandle {
 	 */
 	async activate(context: ComputerHostContext): Promise<StopPathStatus> {
 		if (!this.enabled) throw new ComputerDisabledError();
-		const settings = this.#settings();
+		const settings = this.settings();
 		await this.#ensureOpen(settings, context);
 		const status = await this.#service.ensureStopPath(settings.stopHotkey);
 		this.#setActive(true);

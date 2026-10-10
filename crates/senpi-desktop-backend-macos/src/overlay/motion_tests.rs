@@ -1,6 +1,4 @@
-#[path = "motion.rs"]
-mod motion;
-use motion::{cocoa_origin, Motion};
+use super::motion::{cocoa_origin, Motion};
 
 #[test]
 fn first_target_starts_at_the_target_not_the_real_pointer() {
@@ -31,6 +29,19 @@ fn idle_fades_without_wall_clock_sleeps() {
     assert_eq!(cursor.frame(1050.0).unwrap().alpha, 1.0);
     assert!((cursor.frame(1140.0).unwrap().alpha - 0.5).abs() < 1e-6);
     assert_eq!(cursor.frame(1230.0).unwrap().alpha, 0.0);
+}
+
+#[test]
+fn continuous_gesture_targets_keep_the_cursor_visible_then_fade_after_the_last_point() {
+    let mut cursor = Motion::default();
+    for (index, time) in [0.0, 900.0, 1800.0, 2700.0].into_iter().enumerate() {
+        cursor.target(f64::from(u32::try_from(index).unwrap()) * 40.0, 80.0, time);
+        assert_eq!(cursor.frame(time).unwrap().alpha, 1.0);
+    }
+    let arrived = cursor.frame(2880.0).unwrap();
+    assert_eq!((arrived.x, arrived.y), (120.0, 80.0));
+    assert_eq!(cursor.frame(3700.0).unwrap().alpha, 1.0);
+    assert_eq!(cursor.frame(3880.0).unwrap().alpha, 0.0);
 }
 
 #[test]

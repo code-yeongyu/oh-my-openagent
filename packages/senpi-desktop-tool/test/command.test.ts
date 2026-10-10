@@ -116,4 +116,53 @@ describe("/computer command", HANG_GUARD, () => {
 		// Then
 		expect(text).toBe(COMPUTER_COMMAND_USAGE);
 	});
+
+	it("toggles only the cursor setting without activating or disabling computer use", async () => {
+		// Given: a configured cursor and an engine that has not started.
+		const { handle, log } = desktopFixture();
+
+		// When: the user turns only the virtual cursor off, then on.
+		await runComputerCommand("cursor off", handle, hostContext());
+		expect({
+			showCursor: handle.settings().showCursor,
+			enabled: handle.enabled,
+			active: handle.active,
+			children: log.children.length,
+		}).toEqual({ showCursor: false, enabled: true, active: false, children: 0 });
+		await runComputerCommand("cursor on", handle, hostContext());
+
+		// Then: the session override is reversible and never starts the engine.
+		expect({ showCursor: handle.settings().showCursor, children: log.children.length }).toEqual({
+			showCursor: true,
+			children: 0,
+		});
+	});
+
+	it("does not mutate the cursor setting for an invalid toggle", async () => {
+		const { handle, log } = desktopFixture({ showCursor: false });
+		const text = await runComputerCommand("cursor sideways", handle, hostContext());
+		expect({ usage: text === COMPUTER_COMMAND_USAGE, showCursor: handle.settings().showCursor, requests: log.requests })
+			.toEqual({ usage: true, showCursor: false, requests: [] });
+	});
+
+	it("changes cursor visibility without rearming input or changing activation in a running session", async () => {
+		const { handle, log } = desktopFixture();
+		await runComputerCommand("on", handle, hostContext());
+		await runComputerCommand("stop", handle, hostContext());
+		const changes: boolean[] = [];
+		handle.onActivationChange((active) => changes.push(active));
+		const before = log.requests.length;
+
+		await runComputerCommand("cursor off", handle, hostContext());
+		await runComputerCommand("cursor on", handle, hostContext());
+
+		expect({
+			lifecycle: log.requests.slice(before).map((request) => request.method)
+				.filter((method) => method.startsWith("stopPath.") || method.startsWith("control.")),
+			changes,
+			active: handle.active,
+			enabled: handle.enabled,
+			suspended: (await handle.stopPathStatus())?.suspended,
+		}).toEqual({ lifecycle: [], changes: [], active: true, enabled: true, suspended: true });
+	});
 });

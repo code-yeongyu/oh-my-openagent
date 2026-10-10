@@ -3,8 +3,8 @@
 //! Never prompts for permission and never uses ScreenCaptureKit.
 
 mod displays;
-mod fallback;
-mod screencapture;
+pub(crate) mod fallback;
+pub(crate) mod screencapture;
 mod windows;
 
 use image::RgbaImage;

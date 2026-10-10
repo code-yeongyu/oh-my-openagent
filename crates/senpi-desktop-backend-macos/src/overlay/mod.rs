@@ -41,7 +41,22 @@ impl Overlay {
     }
 
     pub fn available(&self) -> bool {
-        self.0.lock().helper.is_some()
+        let mut state = self.0.lock();
+        let Some(helper) = state.helper.as_mut() else {
+            return false;
+        };
+        match helper.running() {
+            Ok(true) => true,
+            Ok(false) => {
+                state.helper = None;
+                false
+            }
+            Err(error) => {
+                eprintln!("cursor-overlay: liveness check failed; disabling: {error}");
+                state.helper = None;
+                false
+            }
+        }
     }
 
     pub fn owner_pid(&self) -> Option<u32> {

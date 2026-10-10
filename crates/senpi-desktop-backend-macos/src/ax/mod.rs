@@ -35,6 +35,9 @@ impl MacAx {
     }
 
     fn show_target(&self, h: &AxHandle) {
+        if !self.overlay.available() {
+            return;
+        }
         if let Ok(element) = element(h) {
             if let Some(bounds) = element::bounds(element) {
                 self.overlay.target(bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0);
@@ -63,6 +66,10 @@ impl MacAx {
 
     /// `AXRaise` on the window's AX root; the `raise_window` primitive.
     pub fn raise(&mut self, window: &DesktopWindow) -> CoreResult<()> {
+        self.overlay.target(
+            f64::from(window.x) + f64::from(window.width) / 2.0,
+            f64::from(window.y) + f64::from(window.height) / 2.0,
+        );
         actions::perform(&*tree::window_root(window)?, "AXRaise")
     }
 }
