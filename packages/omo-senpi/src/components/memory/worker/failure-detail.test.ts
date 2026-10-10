@@ -101,3 +101,20 @@ describe("failureFingerprint", () => {
     expect(failureFingerprint(undefined, undefined)).toBe("failed:")
   })
 })
+
+
+describe("strict supervisor failure causes", () => {
+  test("#given warnings and source text before an error #when strict extraction is requested #then only the actual error is selected", () => {
+    const detail = 'Warning: diagnostic mode enabled\nconst source = true\n\u001b[31mError: supervisor startup failed\u001b[0m\n    at startup (entry.ts:1:2)'
+    expect(childFailureCause(detail, { structuredOnly: true })).toBe("Error: supervisor startup failed")
+  })
+
+  test.each(["Warning: diagnostic mode enabled", 'const source = "private code"', "Error was logged earlier"]) (
+    "#given %s without a structured failure #when strict extraction is requested #then no cause is invented",
+    (detail) => expect(childFailureCause(detail, { structuredOnly: true })).toBeUndefined(),
+  )
+
+  test("#given legacy unstructured child detail #when default extraction is requested #then its existing fallback stays unchanged", () => {
+    expect(childFailureCause("plain child failure")).toBe("plain child failure")
+  })
+})

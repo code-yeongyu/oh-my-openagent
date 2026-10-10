@@ -49,6 +49,14 @@ export function reflectionRemediation(reason: string | undefined, detail: string
     }
     return "no model for the memory reflection category could be admitted; the models that were tried are named in the failure detail"
   }
+  // A supervisor failure can happen before any child exists. Keep its diagnostics separate,
+  // including legacy timeout records classified as spawn_failed rather than supervisor_failed.
+  if (reason === "supervisor_failed"
+    || combined.includes("memory run supervisor exited with")
+    || combined.includes("memory run supervisor did not publish an outcome")) {
+    if (combined.includes("api key") || combined.includes("auth_missing")) return "run /login <provider>"
+    return "inspect runtime/reflection/runs/<runId>/supervisor-stderr.log"
+  }
   // Only a PRE-SPAWN failure means the executable could not be resolved. A child that started and
   // then died on a missing file also reports ENOENT, and pointing at SENPI_BIN there is a
   // misdiagnosis: the omo launcher deletes SENPI_BIN from the engine environment, so that advice

@@ -34,13 +34,21 @@ const MACHINERY = [
 /** A line that names the failure: `ENOENT: ...`, `TypeError: ...`, `error: ...`. */
 const CAUSE_SHAPED = /^(?:[A-Z][A-Za-z]*(?:Error|Exception)|E[A-Z]{2,}|[Ee]rror|[Ww]arning|[Ff]atal)\b/
 
-export function childFailureCause(detail: string | undefined): string | undefined {
+// Supervisor logs may contain source or arbitrary startup output with no actual failure line.
+// Unlike child detail, they must never fall back to that unstructured output or to a warning.
+const STRUCTURED_FAILURE = /^(?:[A-Z][A-Za-z]*(?:Error|Exception)|E[A-Z]{2,}|[Ee]rror|[Ff]atal):\s*\S/
+
+export function childFailureCause(
+  detail: string | undefined,
+  options: { readonly structuredOnly?: boolean } = {},
+): string | undefined {
   if (detail === undefined) return detail
   const lines = detail
     .split("\n")
     .map((line) => line.replace(TERMINAL_CONTROL, "").replace(/\s+/g, " ").trim())
     .filter((line) => line.length > 0 && !MACHINERY.some((pattern) => pattern.test(line)))
-  const cause = lines.find((line) => CAUSE_SHAPED.test(line)) ?? lines[0]
+  const pattern = options.structuredOnly ? STRUCTURED_FAILURE : CAUSE_SHAPED
+  const cause = lines.find((line) => pattern.test(line)) ?? (options.structuredOnly ? undefined : lines[0])
   if (cause === undefined) return undefined
   return cause.length <= FAILURE_CAUSE_MAX_CHARS
     ? cause

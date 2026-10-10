@@ -71,13 +71,13 @@ export async function readRunJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T
 }
 
-export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o600): Promise<void> {
+async function writeRunTextAtomicWithMode(path: string, content: string, mode: number): Promise<void> {
   const temporary = `${path}.tmp-${process.pid}-${randomUUID()}`
   const file = await open(temporary, "wx", mode)
   let renamed = false
   try {
     try {
-      await file.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8")
+      await file.writeFile(content, "utf8")
       await file.sync()
     } finally {
       await file.close()
@@ -88,6 +88,14 @@ export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o
   } finally {
     if (!renamed) await unlinkRunArtifact(temporary)
   }
+}
+
+export async function writeRunTextAtomic(path: string, content: string, mode = 0o600): Promise<void> {
+  await writeRunTextAtomicWithMode(path, content, mode)
+}
+
+export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o600): Promise<void> {
+  await writeRunTextAtomicWithMode(path, `${JSON.stringify(value, null, 2)}\n`, mode)
 }
 
 async function syncDirectory(path: string): Promise<void> {
@@ -118,8 +126,17 @@ export async function readRunTextTail(path: string, maxBytes: number): Promise<s
     const length = Math.min(size, maxBytes)
     const buffer = Buffer.alloc(length)
     await file.read(buffer, 0, length, Math.max(0, size - length))
-    const text = buffer.toString("utf8")
-    return size > maxBytes ? `[truncated to last ${maxBytes} bytes]\n${text}` : text
+    // Do not turn a sliced UTF-8 continuation byte into a larger replacement character.
+    let start = 0
+    if (size > maxBytes) {
+      while (start < buffer.length && (buffer[start]! & 0xc0) === 0x80) start += 1
+    }
+    const decoded = Buffer.from(buffer.subarray(start).toString("utf8"), "utf8")
+    // Invalid bytes elsewhere also expand when decoded. Keep the serialized diagnostic bounded.
+    start = Math.max(0, decoded.length - maxBytes)
+    while (start < decoded.length && (decoded[start]! & 0xc0) === 0x80) start += 1
+    const text = decoded.subarray(start).toString("utf8")
+    return size > maxBytes || start > 0 ? `[truncated to last ${maxBytes} bytes]\n${text}` : text
   } finally {
     await file.close()
   }

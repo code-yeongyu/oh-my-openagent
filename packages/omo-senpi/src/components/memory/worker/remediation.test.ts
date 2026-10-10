@@ -157,3 +157,23 @@ describe("reflectionRemediation", () => {
     })
   })
 })
+
+
+describe("supervisor failure remediation", () => {
+  test.each(["Error: No API key for provider", "auth_missing: provider"])(
+    "#given supervisor credentials are missing with %s #when remediated #then actionable login guidance survives",
+    (detail) => expect(reflectionRemediation("supervisor_failed", detail)).toContain("/login"),
+  )
+
+  test.each([
+    ["supervisor_failed", "memory run supervisor exited with 1: Error: launcher failed"],
+    ["supervisor_failed", "ENOENT: supervisor resource is missing"],
+    ["supervisor_failed", "memory run supervisor exited with 1: execvp() failed"],
+    ["spawn_failed", "memory run supervisor did not publish an outcome before its deadline"],
+  ])("#given %s with %s #when remediated #then the operator can find the supervisor evidence", (reason, detail) => {
+    const hint = reflectionRemediation(reason, detail)
+    expect(hint).toContain("runtime/reflection/runs/<runId>/supervisor-stderr.log")
+    expect(hint).not.toContain("child-stderr.log")
+    expect(hint).not.toContain("SENPI_BIN")
+  })
+})

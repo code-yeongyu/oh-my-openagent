@@ -1,12 +1,21 @@
 import { spawn } from "node:child_process"
-import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+} from "@oh-my-opencode/memory-core/fs"
 import { mkdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
+import { childFailureCause, FAILURE_CAUSE_MAX_CHARS } from "./failure-detail"
+
 import {
   readRunJson,
+  readRunTextTail,
   runOutcomeMatchesLedger,
   writeRunJsonAtomic,
+  writeRunTextAtomic,
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
@@ -31,9 +40,32 @@ export const SUPERVISOR_EXIT_PREFIX = "memory run supervisor exited with"
 
 const DEFAULT_GRACE_MS = 5_000
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024
+// Read before sealing: a bounded tail can start in the middle of the retained error line.
+// UTF-8 can use four bytes per character. The lookback remains bounded even for noisy output.
+const SUPERVISOR_CAUSE_READ_SLACK_BYTES = FAILURE_CAUSE_MAX_CHARS * 4 + 16
 // Publication can still be waiting for the terminal gate after the child deadline expires.
 // Keep the parent alive for one additional default grace window so the durable outcome can land.
 const OUTCOME_PUBLICATION_MARGIN_MS = 5_000
+
+async function supervisorFailureMessage(message: string, path: string, maxBytes: number): Promise<string> {
+  try {
+    const stderr = await readRunTextTail(path, maxBytes + SUPERVISOR_CAUSE_READ_SLACK_BYTES)
+    const cause = childFailureCause(stderr, { structuredOnly: true })
+    return cause === undefined ? message : `${message}: ${cause}`
+  } catch {
+    // Diagnostic I/O must not replace the supervisor status used by worktree recovery.
+    return message
+  }
+}
+
+async function boundSupervisorStderr(path: string, maxBytes: number): Promise<void> {
+  try {
+    await writeRunTextAtomic(path, await readRunTextTail(path, maxBytes))
+  } catch {
+    // Preserve the primary failure even if the diagnostic artifact cannot be sealed.
+    return
+  }
+}
 
 export async function runReflectionChild(
   spawnArgs: ReflectionSpawnArgs,
@@ -133,6 +165,7 @@ async function runSupervisedChild(input: {
   await mkdir(input.runDir, { recursive: true, mode: 0o700 })
   const stdoutPath = join(input.runDir, "child-stdout.log")
   const stderrPath = join(input.runDir, "child-stderr.log")
+  const supervisorStderrPath = join(input.runDir, "supervisor-stderr.log")
   const launch: RunLaunchManifest = {
     version: 1,
     runId: input.runId,
@@ -161,18 +194,21 @@ async function runSupervisedChild(input: {
   await writeRunJsonAtomic(join(input.runDir, "ledger.json"), ledger)
   await writeRunJsonAtomic(join(input.runDir, "launch.json"), launch)
 
-  const supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
-    env: { ...process.env, ...input.env, BUN_BE_BUN: "1" },
-    detached: true,
-    stdio: "ignore",
-    // win32 gives a detached child its own console, which flashes an empty terminal window on the
-    // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
-    windowsHide: true,
-  })
-  supervisor.unref()
-  if (input.receiptsDir !== undefined && input.attempt === 1) {
-    await emitMemoryReceipt(input.receiptsDir, runReceipt(launchedRun(input.ledger), "launched"), undefined, input.receiptWarn)
+  const supervisorStderrFd = openSync(supervisorStderrPath, "w", 0o600)
+  let supervisor: ReturnType<typeof spawn>
+  try {
+    supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
+      env: { ...process.env, ...input.env, BUN_BE_BUN: "1" },
+      detached: true,
+      stdio: ["ignore", "ignore", supervisorStderrFd],
+      // win32 gives a detached child its own console, which flashes an empty terminal window on the
+      // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
+      windowsHide: true,
+    })
+  } finally {
+    closeSync(supervisorStderrFd)
   }
+  supervisor.unref()
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
   const publishingPath = join(input.runDir, "publishing.json")
@@ -214,17 +250,36 @@ async function runSupervisedChild(input: {
       Date.now,
       outcomeWait.signal,
     ).then((result) => settle({ kind: "outcome", result }))
+  // Subscribe before receipt I/O: a supervisor can fail while the receipt writer is awaiting a lock.
+  if (input.receiptsDir !== undefined && input.attempt === 1) {
+    await emitMemoryReceipt(input.receiptsDir, runReceipt(launchedRun(input.ledger), "launched"), undefined, input.receiptWarn)
+  }
   const result = await completion.finally(() => {
     outcomeWait.abort()
     supervisor.off("error", onError)
     supervisor.off("close", onClose)
   })
-  if (result.kind === "error" && !hasCompleteOutcome()) throw result.error
+  if (result.kind === "error" && !hasCompleteOutcome()) {
+    result.error.message = await supervisorFailureMessage(result.error.message, supervisorStderrPath, input.maxOutputBytes)
+    throw result.error
+  }
   if (result.kind === "close" && !hasCompleteOutcome()) {
-    throw new Error(`${SUPERVISOR_EXIT_PREFIX} ${result.exit.code ?? result.exit.signal ?? "unknown status"}`)
+    // Read the cause before sealing the log: the bounded tail can slice the error line's prefix.
+    const message = await supervisorFailureMessage(
+      `${SUPERVISOR_EXIT_PREFIX} ${result.exit.code ?? result.exit.signal ?? "unknown status"}`,
+      supervisorStderrPath,
+      input.maxOutputBytes,
+    )
+    await boundSupervisorStderr(supervisorStderrPath, input.maxOutputBytes)
+    throw new Error(message)
   }
   if (result.kind === "outcome" && result.result === "timeout") {
-    throw new Error("memory run supervisor did not publish an outcome before its deadline")
+    // The detached supervisor may still be writing. Do not replace its open stderr inode.
+    throw new Error(await supervisorFailureMessage(
+      "memory run supervisor did not publish an outcome before its deadline",
+      supervisorStderrPath,
+      input.maxOutputBytes,
+    ))
   }
   const outcome = await readRunJson<RunOutcome>(outcomePath)
   if (!runOutcomeMatchesLedger(ledger, outcome)) {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -220,10 +220,11 @@ describe("supervised child outcome authority", () => {
 
     // then
     try {
-      await expect(run).rejects.toThrow("memory run supervisor did not publish an outcome before its deadline")
+      await expect(run).rejects.toThrow("memory run supervisor did not publish an outcome before its deadline: Error: waiting for publication")
     } finally {
       await writeFile(join(runDir, "release"), "")
       expect(await waitForRunSentinel(join(runDir, "released.json"), Date.now() + 5_000, Date.now)).toBe("present")
     }
+    expect(await readFile(join(runDir, "supervisor-stderr.log"), "utf8")).toContain("late supervisor stderr")
   }, 30_000)
 })
