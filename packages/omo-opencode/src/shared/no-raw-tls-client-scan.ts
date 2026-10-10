@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { findRawTlsClients } from "./no-raw-tls-client"
@@ -101,10 +101,17 @@ export function isScannedSourceFile(relativePath: string): boolean {
 // omowright repo now has its own guard, omowright#41). git ls-files never
 // lists these files - they exist only after a build - so this explicit
 // probe is how the guard reaches them: scanned and pinned when present,
-// entries skipped when no build ran (nothing exists to guard).
+// entries skipped when no build ran (nothing exists to guard). The list
+// is also the complete manifest of what stage-omowright-runtime.mjs
+// stages per plugin tree (STAGED_FILES: index.js + page-bundle.js):
+// evaluateBuiltRuntimeProbe fails CI on a missing entry and on any
+// staged runtime file the list does not name, so a staging-path change
+// cannot silently shrink the guard's scope.
 export const KNOWN_BUILT_RUNTIMES = [
   "packages/omo-codex/plugin/skills/browser/runtime/omowright/index.js",
+  "packages/omo-codex/plugin/skills/browser/runtime/omowright/page-bundle.js",
   "packages/omo-senpi/plugin/skills/browser/runtime/omowright/index.js",
+  "packages/omo-senpi/plugin/skills/browser/runtime/omowright/page-bundle.js",
 ]
 
 // Truly third-party npm-dependency bundles would be named here, one
@@ -114,6 +121,86 @@ export const THIRD_PARTY_EXCLUDED_BUNDLES: string[] = []
 
 export function isKnownBuiltRuntime(relativePath: string): boolean {
   return KNOWN_BUILT_RUNTIMES.includes(relativePath)
+}
+
+export type BuiltRuntimeProbeVerdict = { scanned: string[]; failures: string[] }
+
+// CI contract for the gitignored built runtimes (review B4): locally an
+// absent runtime just means no build ran, but CI always builds before
+// running tests, so an absent KNOWN_BUILT_RUNTIMES file means the staging
+// path drifted and the guard silently lost coverage. When CI is set,
+// every known runtime must exist, and every scannable file discovered
+// under a plugin skills runtime/omowright/ directory must be listed.
+export function evaluateBuiltRuntimeProbe(input: {
+  known: readonly string[]
+  present: (relativePath: string) => boolean
+  discovered: readonly string[]
+  ci: string | undefined
+}): BuiltRuntimeProbeVerdict {
+  const scanned: string[] = []
+  const failures: string[] = []
+  for (const runtime of input.known) {
+    if (input.present(runtime)) {
+      scanned.push(runtime)
+      continue
+    }
+    if (input.ci !== undefined) {
+      failures.push(
+        "CI: expected built runtime to exist: " +
+          runtime +
+          " (KNOWN_BUILT_RUNTIMES). The omowright staging path may have moved; update KNOWN_BUILT_RUNTIMES so the guard still scans it.",
+      )
+    }
+  }
+  if (input.ci !== undefined) {
+    for (const found of input.discovered) {
+      if (!input.known.includes(found)) {
+        failures.push("CI: built omowright runtime missing from KNOWN_BUILT_RUNTIMES: " + found + ". Add it so the guard scans it.")
+      }
+    }
+  }
+  return { scanned, failures }
+}
+
+// Every scannable file under a packages/*/plugin/skills/**/runtime/
+// omowright/ directory - gitignored build output that only a tree walk
+// reaches (git ls-files never lists it). Symlinked directories are
+// followed so a symlinked skills sync cannot hide staged files.
+export function discoverPluginBuiltRuntimes(): string[] {
+  const found: string[] = []
+  const isDirectory = (
+    dir: string,
+    entry: { name: string; isDirectory(): boolean; isSymbolicLink(): boolean },
+  ): boolean => {
+    if (entry.isDirectory()) return true
+    if (!entry.isSymbolicLink()) return false
+    return statSync(path.join(dir, entry.name)).isDirectory()
+  }
+  const walk = (dir: string, relative: string, inside: boolean): void => {
+    let entries: Array<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }>
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+      throw error
+    }
+    for (const entry of entries) {
+      if (entry.name === "node_modules") continue
+      const rel = relative + "/" + entry.name
+      if (isDirectory(dir, entry)) {
+        const entersOmowright = entry.name === "omowright" && relative.endsWith("/runtime")
+        walk(path.join(dir, entry.name), rel, inside || entersOmowright)
+      } else if (inside && isScannedSourceFile(rel)) {
+        found.push(rel)
+      }
+    }
+  }
+  for (const pkg of readdirSync(path.join(WORKSPACE_ROOT, "packages"), { withFileTypes: true })) {
+    if (pkg.name === "node_modules") continue
+    if (!isDirectory(path.join(WORKSPACE_ROOT, "packages"), pkg)) continue
+    walk(path.join(WORKSPACE_ROOT, "packages", pkg.name, "plugin", "skills"), "packages/" + pkg.name + "/plugin/skills", false)
+  }
+  return [...new Set(found)].sort()
 }
 
 // The guard's own files: their pattern definitions and guidance name the
@@ -159,7 +246,9 @@ function isUnderRoots(relativePath: string, roots: string[]): boolean {
 // Tracked files only (review O1): install and build output (node_modules,
 // dist, gitignored bundles) never enter the scan, so the verdict cannot
 // depend on whether a build ran. The omowright built runtimes are the one
-// deliberate exception: they are probed and scanned when present.
+// deliberate exception: they are probed and scanned when present, and in
+// CI the probe also fails when a known runtime is missing or a staged
+// runtime file is unlisted (review B4).
 export function collectShippedSourceFiles(): string[] {
   const roots = shippedRootEntries()
   const files = listTrackedFiles().filter(
@@ -167,12 +256,19 @@ export function collectShippedSourceFiles(): string[] {
       !GUARD_OWN_FILES.has(file) &&
       isScannedSourceFile(file) &&
       !THIRD_PARTY_EXCLUDED_BUNDLES.includes(file) &&
-      (isUnderRoots(file, roots) || isKnownBuiltRuntime(file)),
+      isUnderRoots(file, roots),
   )
-  for (const runtime of KNOWN_BUILT_RUNTIMES) {
-    if (readSourceFile(path.join(WORKSPACE_ROOT, runtime)) !== null && isScannedSourceFile(runtime)) {
-      files.push(runtime)
-    }
+  const probe = evaluateBuiltRuntimeProbe({
+    known: KNOWN_BUILT_RUNTIMES,
+    present: (runtime) => readSourceFile(path.join(WORKSPACE_ROOT, runtime)) !== null,
+    discovered: discoverPluginBuiltRuntimes(),
+    ci: process.env.CI,
+  })
+  if (probe.failures.length > 0) {
+    throw new Error(probe.failures.join("\n"))
+  }
+  for (const runtime of probe.scanned) {
+    if (isScannedSourceFile(runtime)) files.push(runtime)
   }
   return [...new Set(files)].sort()
 }
