@@ -147,7 +147,7 @@ export class FakeRegistry implements ResidencyRegistry {
     return [...this.#handles.values()]
   }
 
-  forget(taskId: string): void {
+  forget(taskId: string, _options: Parameters<ResidencyRegistry["forget"]>[1]): void {
     this.#handles.delete(taskId)
     this.forgotten.push(taskId)
   }

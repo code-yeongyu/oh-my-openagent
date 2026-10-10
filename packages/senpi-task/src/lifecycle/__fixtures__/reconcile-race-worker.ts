@@ -35,7 +35,7 @@ const lifecycle = createTaskLifecycle({
   registry: {
     get: () => undefined,
     entries: () => [],
-    forget: () => undefined,
+    forget: (_taskId, _options) => undefined,
     hasPendingSends: () => false,
   },
   config: OmoTaskSettingsSchema.parse({}),
