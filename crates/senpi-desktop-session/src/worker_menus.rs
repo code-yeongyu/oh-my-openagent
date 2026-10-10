@@ -13,6 +13,9 @@ use crate::mutate::Mutation;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
 
+#[cfg(test)]
+mod tests;
+
 impl Worker {
     /// Listing is a read: the path is validated, then the backend answers
     /// without any mutation transaction or audit event.
@@ -39,13 +42,15 @@ impl Worker {
         self.mutate(&mutation, cancelled, |worker| {
             validate_path(&params.path, false)?;
             let window = worker.window(&Target::Window(params.window_id.clone()))?;
+            // Cancellation is read first, so a stop racing it still wins.
             let check_stop = || {
+                let is_cancelled = cancelled();
                 if supervisor.is_suspended() {
                     Err(DesktopError::new(
                         ErrorCode::Suspended,
                         "input was suspended during the menu walk",
                     ))
-                } else if cancelled() {
+                } else if is_cancelled {
                     Err(DesktopError::new(
                         ErrorCode::Cancelled,
                         "the request was cancelled during the menu walk",
