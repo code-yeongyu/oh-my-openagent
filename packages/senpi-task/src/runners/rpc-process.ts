@@ -138,7 +138,7 @@ export class RpcProcessRunner {
   private async applyFallbackChain(client: RpcProtocolClient, spec: RpcRunnerSpec): Promise<void> {
     const retryFallback = childRetryFallbackProfile(spec)
     if (retryFallback === undefined) return
-    const outcome = await withDeadline(this.sendFallbackChain(client, retryFallback), this.fallbackChainDeadlineMs)
+    const outcome = await this.sendFallbackChain(client, retryFallback)
     if (outcome === "applied") return
     if (outcome === "unsupported") {
       this.noticeFallbackChainUnsupported()
@@ -159,13 +159,25 @@ export class RpcProcessRunner {
   private async sendFallbackChain(
     client: RpcProtocolClient,
     retryFallback: NonNullable<ReturnType<typeof childRetryFallbackProfile>>,
-  ): Promise<"applied" | "unsupported" | { readonly refused: string }> {
+  ): Promise<"applied" | "unsupported" | "timeout" | { readonly refused: string }> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), this.fallbackChainDeadlineMs)
+    })
     try {
-      if (!(await engineAcceptsFallbackChain(client))) return "unsupported"
-      const response = await client.send({ type: "set_retry_fallback", retryFallback })
+      // A late probe answer must not dispatch launch-time settings after the first prompt or resume.
+      const acceptsChain = await Promise.race([engineAcceptsFallbackChain(client), deadline])
+      if (acceptsChain === "timeout") return "timeout"
+      if (!acceptsChain) return "unsupported"
+      // send enqueues the write synchronously; Writable keeps a later prompt behind it under backpressure.
+      // Only the response wait may outlive setup, using the same total deadline as the capability probe.
+      const response = await Promise.race([client.send({ type: "set_retry_fallback", retryFallback }), deadline])
+      if (response === "timeout") return "timeout"
       return response.success ? "applied" : { refused: `refused: ${response.error}` }
     } catch (error) {
       return { refused: `refused: ${error instanceof Error ? error.message : String(error)}` }
+    } finally {
+      clearTimeout(timer)
     }
   }
 
@@ -176,18 +188,6 @@ export class RpcProcessRunner {
       "this senpi engine cannot take a task child's fallback chain (no retry_fallback_command), so children " +
         "started as their own process switch to their fallback models only when a turn fails before any tool call",
     )
-  }
-}
-
-async function withDeadline<T>(work: Promise<T>, ms: number): Promise<T | "timeout"> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<"timeout">((resolve) => {
-    timer = setTimeout(() => resolve("timeout"), ms)
-  })
-  try {
-    return await Promise.race([work, deadline])
-  } finally {
-    clearTimeout(timer)
   }
 }
 
