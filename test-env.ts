@@ -19,3 +19,12 @@ const xdgRoot = mkdtempSync(join(tmpdir(), "omo-test-xdg-"))
 markTestInfrastructureDir(xdgRoot)
 process.env.XDG_DATA_HOME = join(xdgRoot, "data")
 process.env.XDG_CACHE_HOME = join(xdgRoot, "cache")
+
+// Memory registration sweeps its default root. os.homedir() can retain the host
+// home despite test-setup's HOME override, so isolate this once in the preload,
+// rather than leaking a module-load override from memory.test-support.ts.
+process.env.OMO_MEMORY_HOME = join(xdgRoot, "memory")
+
+// Keep the telemetry opt-out in the worker baseline even if a failing local
+// afterEach prevents Bun from reaching the preload cleanup hook.
+process.env.OMO_DISABLE_POSTHOG = "true"
