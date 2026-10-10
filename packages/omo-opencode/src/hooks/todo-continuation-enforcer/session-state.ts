@@ -13,7 +13,6 @@ interface TrackedSessionState {
   state: SessionState
   lastAccessedAt: number
   lastCompletedCount?: number
-  lastTodoSnapshot?: string
 }
 
 export interface ContinuationProgressUpdate {
@@ -38,20 +37,6 @@ export interface SessionStateStore {
   cleanup: (sessionID: string) => void
   cancelAllCountdowns: () => void
   shutdown: () => void
-}
-
-function getTodoSnapshot(todos: Todo[]): string {
-  // Only compare {id → status} mappings. Content/priority changes do not represent
-  // meaningful progress and must not reset the stagnation counter (issue #4013 P0.2).
-  const entries = todos
-    .map((todo) => ({
-      key: todo.id ?? `${todo.content}:${todo.priority}`,
-      status: todo.status,
-    }))
-    .sort((left, right) => left.key.localeCompare(right.key))
-    .map(({ key, status }) => `${key}=${status}`)
-
-  return entries.join("|")
 }
 
 export function createSessionStateStore(): SessionStateStore {
@@ -123,23 +108,15 @@ export function createSessionStateStore(): SessionStateStore {
     const previousIncompleteCount = state.lastIncompleteCount
     const previousStagnationCount = state.stagnationCount
     const currentCompletedCount = todos?.filter((todo) => todo.status === "completed").length
-    const currentTodoSnapshot = todos ? getTodoSnapshot(todos) : undefined
     const hasCompletedMoreTodos =
       currentCompletedCount !== undefined
       && trackedSession.lastCompletedCount !== undefined
       && currentCompletedCount > trackedSession.lastCompletedCount
-    const hasTodoSnapshotChanged =
-      currentTodoSnapshot !== undefined
-      && trackedSession.lastTodoSnapshot !== undefined
-      && currentTodoSnapshot !== trackedSession.lastTodoSnapshot
     const hadSuccessfulInjectionAwaitingProgressCheck = state.awaitingPostInjectionProgressCheck === true
 
     state.lastIncompleteCount = incompleteCount
     if (currentCompletedCount !== undefined) {
       trackedSession.lastCompletedCount = currentCompletedCount
-    }
-    if (currentTodoSnapshot !== undefined) {
-      trackedSession.lastTodoSnapshot = currentTodoSnapshot
     }
 
     if (previousIncompleteCount === undefined) {
@@ -153,7 +130,12 @@ export function createSessionStateStore(): SessionStateStore {
       }
     }
 
-    const hasProgressed = incompleteCount < previousIncompleteCount || hasCompletedMoreTodos || hasTodoSnapshotChanged
+    // Only monotonic completion progress resets stagnation (issue #5120): a
+    // completed-count increase or an incomplete-count decrease. Any other todo
+    // diff (status churn, add/remove without completion) is planning echo and
+    // must keep counting toward the stagnation stop, same as content/priority
+    // drift in issue #4013 P0.2.
+    const hasProgressed = incompleteCount < previousIncompleteCount || hasCompletedMoreTodos
 
     if (hasProgressed) {
       state.stagnationCount = 0
@@ -215,7 +197,6 @@ export function createSessionStateStore(): SessionStateStore {
     state.pendingUserMessageID = undefined
     state.allTodosCompletedAt = undefined
     trackedSession.lastCompletedCount = undefined
-    trackedSession.lastTodoSnapshot = undefined
   }
 
   function cancelCountdown(sessionID: string): void {
