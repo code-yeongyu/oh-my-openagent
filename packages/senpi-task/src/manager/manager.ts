@@ -77,6 +77,7 @@ import type {
   TaskManagerOptions,
 } from "./types"
 import { describeStartFailure } from "./start-failure"
+import { failStrandedHandoff, type StrandedHandoffFailure } from "./fail-stranded-handoff"
 
 type PreparedIsolation = Extract<IsolationPreparation, { readonly ok: true }>
 
@@ -1242,30 +1243,8 @@ class TaskManagerImpl implements TaskManager {
    * this owner still holds this epoch's handoff; the fail transition then applies only from `running`,
    * so a cancel or interrupt that landed first stands.
    */
-  #failStrandedHandoff(input: {
-    readonly taskId: string
-    readonly epoch: number
-    readonly owner: number | undefined
-    readonly nextModel: string
-    readonly error: unknown
-  }): void {
-    const reason = input.error instanceof Error ? input.error.message : String(input.error)
-    log("senpi-task runtime fallback teardown rejected", { taskId: input.taskId, error: reason })
-    let owned = false
-    this.#options.store.mutate(input.taskId, (fresh) => {
-      if (!isFallbackHandoff(fresh) || fresh.status !== "running" || fresh.notification.run_epoch !== input.epoch || fresh.host_pid !== input.owner) return fresh
-      owned = true
-      // Only the handoff marker goes: fallback_closing_child stays until #keepUnclosedChild hands the
-      // child's identity to its cleanup owner in one write, so no committed state lacks both.
-      const { fallback_handoff_epoch: _ended, ...rest } = fresh
-      return rest
-    })
-    if (!owned) return
-    const message = `Runtime fallback could not close the failed model's child (${reason}); ${input.nextModel} was not started.`
-    const failed = this.#options.store.transition(input.taskId, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
-    if (failed.applied) {
-      this.#options.store.appendEvent(input.taskId, { type: "task_fallback_teardown_failed", payload: { error_message: reason, next_model: input.nextModel } })
-    }
+  #failStrandedHandoff(input: StrandedHandoffFailure): void {
+    failStrandedHandoff(this.#options.store, nowIso(this.#now), input)
   }
 
   /** A launch still owns its task only while the task runs on the same epoch under the same owner. */

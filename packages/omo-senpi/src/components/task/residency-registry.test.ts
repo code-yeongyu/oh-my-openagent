@@ -68,7 +68,7 @@ function registryFor(handle: ManagedChildHandle, pendingSteering: readonly unkno
   const manager = {
     getResidentHandle: (taskId: string) => (taskId === handle.task_id ? handle : undefined),
     residentTaskIds: () => [handle.task_id],
-    forget: () => undefined,
+    forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) => undefined,
     hasPendingSends: (taskId: string) => taskId === handle.task_id && pendingSteering.length > 0,
     get: () => undefined,
   }
@@ -166,7 +166,7 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
 })
 
 describe("createManagerResidencyRegistry ownership (#9785)", () => {
-  const manager = { forget: () => undefined, get: () => undefined, getResidentHandle: () => undefined, hasPendingSends: () => false, residentTaskIds: () => [] }
+  const manager = { forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) => undefined, get: () => undefined, getResidentHandle: () => undefined, hasPendingSends: () => false, residentTaskIds: () => [] }
 
   it("#given an engine serving one session #when asked about records #then only that session's own records are owned", () => {
     // given
