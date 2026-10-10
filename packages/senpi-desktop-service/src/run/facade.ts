@@ -106,6 +106,9 @@ export function createDesktopFacade(scope: RunScope) {
 	};
 }
 
+/** Run time kept back from a pending confirm for `control.grant` and the action that follows it. */
+const CONFIRM_RUN_MARGIN_MS = 5_000;
+
 /** The `control.state` result shape, mirrored from the engine's `ControlStateResult` (#9651 B5). */
 export interface ControlState {
 	readonly active: boolean;
@@ -142,7 +145,9 @@ function createControlFacade(scope: RunScope, method: ReturnType<typeof facadeMe
 				if (current.active) return current;
 				const confirm = scope.confirmControl;
 				if (confirm === undefined) return { active: false };
-				const approved = await confirm(reason, context.signal);
+				// The confirm must settle before the run budget ends, leaving time to send the grant and act on it.
+				const budgetMs = Math.max(0, context.deadline - Date.now() - CONFIRM_RUN_MARGIN_MS);
+				const approved = await confirm(reason, context.signal, budgetMs);
 				context.signal.throwIfAborted();
 				if (approved !== true) return { active: false };
 				return expectResult(

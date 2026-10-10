@@ -2,10 +2,13 @@ import { type ControlConfirmRequest, DEFAULT_TIMEOUT_SECONDS } from "@oh-my-open
 
 /**
  * Bounds the `control.acquire` human confirm; an RPC/desktop client that never answers stays ungranted.
- * It ends 15 s before the default run budget, so an unanswered confirm reports `{ active: false }` to the
- * model instead of the run timing out first.
+ * It ends 15 s before the default run budget, and a run with less time left caps it further (the request's
+ * `budgetMs`), so an unanswered confirm reports `{ active: false }` instead of the run timing out first.
  */
 export const CONTROL_CONFIRM_TIMEOUT_MS = (DEFAULT_TIMEOUT_SECONDS - 15) * 1000
+
+/** Below this, a confirm could not be read and answered before the run ends. */
+const MIN_CONFIRM_MS = 3_000
 
 /** Title of the foreground-control confirm, upstream oh-my-pi's wording. */
 export const CONTROL_CONFIRM_TITLE = "Allow foreground computer control?"
@@ -40,7 +43,9 @@ export async function confirmComputerControl(
 ): Promise<boolean> {
   const confirm = request.context.ui?.confirm
   if (request.context.hasUI === false || confirm === undefined || request.signal.aborted) return false
-  const timeoutMs = options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS
+  const timeoutMs = Math.min(options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS, request.budgetMs ?? Number.POSITIVE_INFINITY)
+  // Too little run time left for a human to read and answer: no prompt, no grant.
+  if (timeoutMs < MIN_CONFIRM_MS) return false
   const scheduleTimeout = options.scheduleTimeout ?? realScheduler
   return await new Promise<boolean>((resolve) => {
     let settled = false

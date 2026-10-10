@@ -40,7 +40,7 @@ function hint(code: string, stopHotkey: string): string | undefined {
 		case "COMPUTER_BACKGROUND_UNAVAILABLE":
 			return "This window cannot take background input; use the computer tool's accessibility actions instead.";
 		case "COMPUTER_CONTROL_REQUIRED":
-			return "Call computer.control.acquire({ reason }) and let the human confirm before acting in the foreground; do not retry this action until that returns { active: true }.";
+			return "Call desktop.control.acquire({ reason }) in computer run code (computer.control.acquire in an eval kernel) and let the human confirm before acting in the foreground; do not retry this action until that returns { active: true }.";
 		case "COMPUTER_INPUT_BUSY":
 			return "Another session holds the foreground control grant; it is never stolen, so continue in the background or retry once that session releases it.";
 		default:

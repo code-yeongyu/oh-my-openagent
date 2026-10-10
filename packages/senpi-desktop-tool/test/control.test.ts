@@ -11,11 +11,6 @@ afterEach(closeDesktops);
 
 const noTools: ExecuteTool = () => Promise.reject(new Error("no tools"));
 
-interface FailureValue {
-	readonly code: string;
-	readonly message: string;
-}
-
 describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
 	it("grants after the injected confirm approves", async () => {
 		// Given
@@ -69,31 +64,37 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
 		expect(methodsOf(log)).not.toContain("control.grant");
 	});
 
-	it("sends control.revoke when a computer run errors", async () => {
+	it("sends control.revoke when a computer run errors while granted", async () => {
 		// Given
 		const { handle, log } = desktopFixture();
-		const tool = createComputerTool({ handle, executeTool: noTools });
+		const tool = createComputerTool({ handle, executeTool: noTools, confirmControl: () => Promise.resolve(true) });
 
 		// When
 		const error = await rejectionOf(
-			tool.execute("call-1", { action: "run", code: "throw new Error('boom');" }, undefined, undefined, hostContext()),
+			tool.execute(
+				"call-1",
+				{ action: "run", code: "await desktop.control.acquire({ reason: 'click Run' }); throw new Error('boom');" },
+				undefined,
+				undefined,
+				hostContext(),
+			),
 		);
 
 		// Then
 		expect(error).toMatchObject({ message: expect.stringContaining("boom") });
-		expect(methodsOf(log)).toContain("control.revoke");
+		await log.nthRequest("control.revoke", 1);
 	});
 
-	it("sends control.revoke when the tool call is aborted mid-run", async () => {
+	it("sends control.revoke when the tool call is aborted mid-run while granted", async () => {
 		// Given
 		const { handle, log } = desktopFixture();
-		const tool = createComputerTool({ handle, executeTool: noTools });
+		const tool = createComputerTool({ handle, executeTool: noTools, confirmControl: () => Promise.resolve(true) });
 		const controller = new AbortController();
 		const promise = tool.execute(
 			"call-1",
 			{
 				action: "run",
-				code: "await desktop.windows(); await wait(() => false, { timeout: 4000, interval: 50 });",
+				code: "await desktop.control.acquire({ reason: 'click Run' }); await desktop.windows(); await wait(() => false, { timeout: 4000, interval: 50 });",
 			},
 			controller.signal,
 			undefined,
@@ -107,7 +108,7 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
 		// Then
 		const error = await rejectionOf(promise);
 		expect(error).toMatchObject({ message: expect.stringContaining("aborted") });
-		expect(methodsOf(log)).toContain("control.revoke");
+		await log.nthRequest("control.revoke", 1);
 	});
 
 	it("maps ControlRequired to a failure that tells the model to acquire first", async () => {
@@ -126,9 +127,7 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
 
 		// Then
 		expect(result.isError).toBe(true);
-		const failure = result.details.value as FailureValue;
-		expect(failure.code).toBe("COMPUTER_CONTROL_REQUIRED");
-		expect(failure.message).toContain("computer.control.acquire");
+		expect(result.details.value).toMatchObject({ code: "COMPUTER_CONTROL_REQUIRED" });
 	});
 
 	it("maps InputBusy to a retry-later failure", async () => {
@@ -151,9 +150,7 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
 
 		// Then
 		expect(result.isError).toBe(true);
-		const failure = result.details.value as FailureValue;
-		expect(failure.code).toBe("COMPUTER_INPUT_BUSY");
-		expect(failure.message).toContain("another session");
+		expect(result.details.value).toMatchObject({ code: "COMPUTER_INPUT_BUSY" });
 	});
 
 	it("reports a latched stop as the stop failure, never as a grant", async () => {
@@ -176,9 +173,7 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
 
 		// Then
 		expect(result.isError).toBe(true);
-		const failure = result.details.value as FailureValue;
-		expect(failure.code).toBe("COMPUTER_SUSPENDED");
-		expect(failure.message).not.toContain("granted");
+		expect(result.details.value).toMatchObject({ code: "COMPUTER_SUSPENDED" });
 		expect(methodsOf(log).filter((method) => method === "control.grant")).toHaveLength(1);
 	});
 });

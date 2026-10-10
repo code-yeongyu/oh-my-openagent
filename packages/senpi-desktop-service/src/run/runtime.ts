@@ -120,6 +120,7 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 		snapshot,
 		output: new RunOutput(),
 		screenshots: [],
+		deadline,
 	};
 	const drain = new vm.Script("");
 	const resumeVm = () => {
@@ -185,9 +186,10 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 	} catch (error) {
 		const failure = isVmTimeout(error) ? timeout() : error;
 		// A failed run revokes the control grant (lead add (a) of #9651), so the next foreground action
-		// asks the human again; an interrupted (aborted) run lands here too. The revoke is bounded and best
-		// effort: it completes before the run's failure is reported, and its own failure never replaces it.
-		await host.service.revokeControl().catch(() => undefined);
+		// asks the human again; an interrupted (aborted) run lands here too. The revoke is written to the
+		// engine's serial queue before the run settles, so the run still settles at its own deadline, and
+		// nothing sent afterwards can overtake it. Its failure goes to the service's error hub.
+		void host.service.revokeControl().catch(() => undefined);
 		throw failure;
 	} finally {
 		clearTimeout(timer);

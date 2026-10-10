@@ -49,6 +49,8 @@ export interface RunContext {
 	readonly output: RunOutput;
 	/** Artifacts written during the run; appended by `screenshot()`. */
 	readonly screenshots: ComputerScreenshot[];
+	/** Epoch ms when the run budget ends; a human confirm must answer before it. */
+	readonly deadline: number;
 }
 
 /** One engine request on behalf of the run, carrying the run signal. */
@@ -61,7 +63,8 @@ export type Resume = <T>(promise: Promise<T>) => Promise<T>;
  * The human confirmation behind `desktop.control.acquire`; absent on a headless run, which then
  * never grants (#9651 B5b).
  */
-export type ConfirmControl = (reason: string, signal: AbortSignal) => Promise<boolean>;
+/** The human confirm; `budgetMs` is how long the run can still wait for the answer. */
+export type ConfirmControl = (reason: string, signal: AbortSignal, budgetMs: number) => Promise<boolean>;
 
 /** What every facade method needs: the run it belongs to, its engine channel, and the vm resume hook. */
 export interface RunScope {

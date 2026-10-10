@@ -24,6 +24,8 @@ export interface ControlConfirmRequest {
 	readonly context: ComputerHostContext;
 	readonly reason: string;
 	readonly signal: AbortSignal;
+	/** How long the run can still wait for the answer; the confirm must settle within it. */
+	readonly budgetMs?: number;
 }
 
 export interface ComputerToolDeps {
@@ -102,8 +104,8 @@ export async function runComputer(
 			...(confirmControl === undefined
 				? {}
 				: {
-						confirmControl: (reason: string, runSignal: AbortSignal) =>
-							confirmControl({ context, reason, signal: runSignal }),
+						confirmControl: (reason: string, runSignal: AbortSignal, budgetMs: number) =>
+							confirmControl({ context, reason, signal: runSignal, budgetMs }),
 					}),
 		},
 	);

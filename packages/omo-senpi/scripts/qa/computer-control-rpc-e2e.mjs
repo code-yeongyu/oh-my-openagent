@@ -20,6 +20,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { watchUntil } from "./kibitzer-sidecar-support.mjs"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -27,6 +28,8 @@ const repoRoot = resolve(scriptDir, "..", "..", "..", "..")
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const fakeDesktop = join(repoRoot, "crates", "senpi-desktop-backend-fake", "fixtures", "two-displays-one-window.json")
 const CONFIRM_TITLE = "Allow foreground computer control?"
+// The host's confirm bound (CONTROL_CONFIRM_TIMEOUT_MS) for the default 60 s run.
+const CONFIRM_TIMEOUT_MS = 45_000
 const REASON = "QA: click Run in the fixture window"
 // The host bounds the confirm at 45 s (CONTROL_CONFIRM_TIMEOUT_MS, under the 60 s run budget); the turn gets slack.
 const TURN_TIMEOUT_MS = 150_000
@@ -189,13 +192,14 @@ function runScenario({ name, answer }) {
             finish("agent_end")
             continue
           }
-          // The grant's revoke rides agent_end: wait for its audit line (bounded), not a fixed delay.
-          const deadline = Date.now() + 10_000
-          const awaitRevoke = () => {
-            if (auditActions(sandbox.root).includes("control.revoke") || Date.now() > deadline) finish("agent_end")
-            else setTimeout(awaitRevoke, 100)
-          }
-          awaitRevoke()
+          // The grant's revoke rides agent_end: watch for its audit line (bounded), never a fixed delay.
+          watchUntil(sandbox.root, () => auditActions(sandbox.root).includes("control.revoke"), {
+            timeoutMs: 10_000,
+            description: "the control.revoke audit after agent_end",
+          }).then(
+            () => finish("agent_end"),
+            () => finish("agent_end-without-revoke"),
+          )
         }
       }
     })
@@ -213,7 +217,9 @@ const scenarios = [
       ["the confirm left senpi as an extension_ui_request", outcome.confirms.length === 1],
       ["it carries the upstream title", outcome.confirms[0]?.title === CONFIRM_TITLE],
       ["it carries the model's reason", outcome.confirms[0]?.message?.includes(REASON) === true],
+      ["it carries the host's timeout", outcome.confirms[0]?.timeout === CONFIRM_TIMEOUT_MS],
       ["the turn ended on its own", outcome.ended],
+      ["it waited for the timeout, not less", outcome.elapsedMs >= CONFIRM_TIMEOUT_MS],
       ["the run reported no grant", resultText(computerResult(outcome)).includes('"active":false')],
       ["the engine never saw control.grant", !outcome.audits.includes("control.grant")],
     ],

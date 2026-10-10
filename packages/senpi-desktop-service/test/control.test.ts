@@ -38,12 +38,13 @@ function snapshot(readOnly: boolean): ComputerSessionSnapshot {
 
 const noTools: ExecuteTool = (name) => Promise.reject(new Error(`unexpected tool ${name}`));
 
-type ConfirmControl = (reason: string, signal: AbortSignal) => Promise<boolean>;
+type ConfirmControl = (reason: string, signal: AbortSignal, budgetMs: number) => Promise<boolean>;
 
 interface RunOptions {
 	readonly readOnly?: boolean;
 	readonly signal?: AbortSignal;
 	readonly confirmControl?: ConfirmControl;
+	readonly timeoutMs?: number;
 }
 
 function run(service: DesktopService, code: string, options: RunOptions = {}) {
@@ -51,7 +52,7 @@ function run(service: DesktopService, code: string, options: RunOptions = {}) {
 		{
 			code,
 			snapshot: snapshot(options.readOnly ?? false),
-			timeoutMs: RUN_TIMEOUT_MS,
+			timeoutMs: options.timeoutMs ?? RUN_TIMEOUT_MS,
 			...(options.signal === undefined ? {} : { signal: options.signal }),
 		},
 		{
@@ -196,12 +197,9 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		// Given
 		const { service, log } = await openDesktop();
 		const controller = new AbortController();
-		let confirmStarted!: () => void;
-		const started = new Promise<void>((resolve) => {
-			confirmStarted = resolve;
-		});
+		const started = Promise.withResolvers<void>();
 		const confirmControl: ConfirmControl = (_reason, signal) => {
-			confirmStarted();
+			started.resolve();
 			return new Promise<boolean>((resolve) => {
 				// The late "yes": only ever answers once the run is already aborting.
 				if (signal.aborted) return resolve(true);
@@ -212,7 +210,7 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 			signal: controller.signal,
 			confirmControl,
 		});
-		await started;
+		await started.promise;
 
 		// When
 		controller.abort();
@@ -221,6 +219,26 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		const error = await rejectionOf(promise);
 		expect(error).toMatchObject({ reason: "aborted" });
 		expect(methods(log)).not.toContain("control.grant");
+	});
+
+	it("hands the confirm the run time that is left, minus the grant margin", async () => {
+		// Given: a 20 s run; the confirm must settle before the run ends (#9899 review M1)
+		const { service } = await openDesktop();
+		const budgets: number[] = [];
+
+		// When
+		await run(service, `return await desktop.control.acquire({ reason: "click Run" });`, {
+			timeoutMs: 20_000,
+			confirmControl: (_reason, _signal, budgetMs) => {
+				budgets.push(budgetMs);
+				return Promise.resolve(false);
+			},
+		});
+
+		// Then
+		expect(budgets).toHaveLength(1);
+		expect(budgets[0]).toBeGreaterThan(10_000);
+		expect(budgets[0]).toBeLessThanOrEqual(15_000);
 	});
 
 	it("a run that fails while granted revokes the grant before reporting its failure", async () => {
@@ -236,7 +254,8 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 
 		// Then
 		expect(error).toMatchObject({ message: "boom" });
-		expect(methods(log)).toContain("control.revoke");
+		// The revoke is not awaited by the run (it settles at its own deadline); it is already on the wire.
+		await log.nthRequest("control.revoke", 1);
 		expect((await run(service, `return await desktop.control.state();`)).returnValue).toEqual({ active: false });
 	});
 
@@ -246,6 +265,8 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 
 		// When
 		await rejectionOf(run(service, `throw new Error("boom");`));
+		// One engine round trip: a revoke the failed run sent would be logged before this reply.
+		await service.call("control.state", {});
 
 		// Then
 		expect(methods(log)).not.toContain("control.revoke");
@@ -256,27 +277,24 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		// has already been torn down when the late yes arrives, so the fence discards it (#9651 B5b).
 		const { service, log } = await openDesktop();
 		const controller = new AbortController();
-		let answer!: (approved: boolean) => void;
-		let confirmStarted!: () => void;
-		const started = new Promise<void>((resolve) => {
-			confirmStarted = resolve;
-		});
+		const answer = Promise.withResolvers<boolean>();
+		const started = Promise.withResolvers<void>();
 		const confirmControl: ConfirmControl = () => {
-			confirmStarted();
-			return new Promise<boolean>((resolve) => {
-				answer = resolve;
-			});
+			started.resolve();
+			return answer.promise;
 		};
 		const promise = run(service, `return await desktop.control.acquire({ reason: "click Run" });`, {
 			signal: controller.signal,
 			confirmControl,
 		});
-		await started;
+		await started.promise;
 
 		// When
 		controller.abort();
 		const error = await rejectionOf(promise);
-		answer(true);
+		answer.resolve(true);
+		// One engine round trip after the yes: a grant sent in response would be logged before this reply.
+		await service.call("control.state", {});
 
 		// Then
 		expect(error).toMatchObject({ reason: "aborted" });

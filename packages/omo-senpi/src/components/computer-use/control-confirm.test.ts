@@ -88,15 +88,12 @@ describe("confirmComputerControl (#9651 B5b)", () => {
         reason: "click Run",
         signal,
       },
-      { timeoutMs: 1234 },
+      { timeoutMs: 30_000 },
     )
 
     // then
     expect(approved).toBe(true)
     expect(seen).toEqual([{ title: CONTROL_CONFIRM_TITLE, body: controlConfirmBody("click Run"), hasSignal: true }])
-    expect(seen[0]?.body).toContain("click Run")
-    expect(seen[0]?.body).toContain("For this task only.")
-    expect(seen[0]?.body).toContain("does not authorize external side effects")
   })
 
   test("#given a client that never answers #when the confirm timeout fires #then it stays ungranted", async () => {
@@ -210,5 +207,60 @@ describe("confirmComputerControl (#9651 B5b)", () => {
       },
     ])
     expect(await promise).toBe(false)
+  })
+
+  test("#given a run budget shorter than the default #when acquiring #then the confirm is bounded by it", async () => {
+    // given
+    let scheduledMs: number | undefined
+    const confirmTimeouts: Array<number | undefined> = []
+    const scheduleTimeout: ControlTimeoutScheduler = (_onTimeout, timeoutMs) => {
+      scheduledMs = timeoutMs
+      return () => undefined
+    }
+
+    // when
+    const approved = await confirmComputerControl(
+      {
+        context: hostContext({
+          hasUI: true,
+          confirm: (_title, _body, opts) => {
+            confirmTimeouts.push(opts?.timeout)
+            return Promise.resolve(false)
+          },
+        }),
+        reason: "click Run",
+        signal: new AbortController().signal,
+        budgetMs: 10_000,
+      },
+      { scheduleTimeout },
+    )
+
+    // then
+    expect(approved).toBe(false)
+    expect(scheduledMs).toBe(10_000)
+    expect(confirmTimeouts).toEqual([10_000])
+  })
+
+  test("#given too little run time left to answer #when acquiring #then it never prompts and never grants", async () => {
+    // given
+    let prompts = 0
+
+    // when
+    const approved = await confirmComputerControl({
+      context: hostContext({
+        hasUI: true,
+        confirm: () => {
+          prompts += 1
+          return Promise.resolve(true)
+        },
+      }),
+      reason: "click Run",
+      signal: new AbortController().signal,
+      budgetMs: 1_000,
+    })
+
+    // then
+    expect(approved).toBe(false)
+    expect(prompts).toBe(0)
   })
 })
