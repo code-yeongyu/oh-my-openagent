@@ -145,14 +145,14 @@ test("a committed own-crash ERROR survives a later parent death", async () => {
   }
 })
 
-test("a shutdown-detached provisional exit is LOST instead of replayed on resume", async () => {
+test.each(["parent-1", "new-parent", undefined])("a shutdown-detached provisional exit is LOST instead of replayed on resume (%s)", async (sessionId) => {
   const f = await exitedTask()
   try {
     // Given shutdown detached the dead child's record before the process exited.
     f.store.transition(f.taskId, { type: "detach_rpc", timestamp: new Date(f.clock.now()).toISOString() })
     f.manager.forget(f.taskId)
     // When the parent resumes, suspension must not erase the unconfirmed exit.
-    await f.lifecycle.reconcileOnSessionStart("parent-1")
+    await f.lifecycle.reconcileOnSessionStart(sessionId)
     expect(f.store.load(f.taskId)?.status).toBe("lost")
     expect(f.events()).toContain("reconcile_lost")
     expect(f.respawns()).toBe(0)

@@ -24,10 +24,15 @@ export async function reconcileProvisionalExit(context: LifecycleContext, observ
   }
   const claimed = context.store.load(observed.task_id)
   if (claimed === null) return { task_id: observed.task_id, kind: "resumed", reason: "record removed" }
+  return settleProvisionalExitLoss(context, claimed)
+}
+
+/** Shared by startup and deferred revival after either path has claimed the record. */
+export async function settleProvisionalExitLoss(context: LifecycleContext, claimed: TaskRecord): Promise<ReconcileOutcome> {
   // Accepted conservative edge: an independent crash followed by parent death during confirmation
   // is LOST too. Only a manager that committed ERROR while still alive may establish failure.
   await markLost(context, claimed, "owner exited before confirming the child's unexpected exit")
-  return context.store.load(observed.task_id)?.status === "lost"
-    ? { task_id: observed.task_id, kind: "lost", reason: "unconfirmed child exit after owner loss" }
-    : { task_id: observed.task_id, kind: "foreign_live_owner", reason: "provisional exit claim changed" }
+  return context.store.load(claimed.task_id)?.status === "lost"
+    ? { task_id: claimed.task_id, kind: "lost", reason: "unconfirmed child exit after owner loss" }
+    : { task_id: claimed.task_id, kind: "foreign_live_owner", reason: "provisional exit claim changed" }
 }

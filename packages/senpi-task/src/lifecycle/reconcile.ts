@@ -16,7 +16,7 @@ import { reclaimOrphanedResident } from "./residency"
 import { newestSessionPath } from "./session-path"
 import { reconcileLegacyTerminal, terminateClaimedPid } from "./reconcile-terminal"
 import type { ReconcileOutcome, ReconcileResult } from "./types"
-import { reconcileProvisionalExit } from "./provisional-exit"
+import { reconcileProvisionalExit, settleProvisionalExitLoss } from "./provisional-exit"
 import { hasForeignLiveOwner } from "./reconcile-owner"
 
 const HEARTBEAT_FRESH_MS = 30_000
@@ -136,6 +136,7 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   }
 
   if (TERMINAL_STATUSES.has(record.status)) return reconcileLegacyTerminal(context, record)
+  if (record.provisional_exit !== undefined) return settleProvisionalExitLoss(context, record)
 
   // A daemon-hosted child has no pid at all. Its liveness is the daemon plus its session path, and
   // "the daemon is gone" parks it - the pid-shaped path below would mark it lost for having no pid.

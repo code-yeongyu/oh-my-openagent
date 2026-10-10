@@ -10,6 +10,7 @@ import { clearSuspensionReason, markSuspensionReason } from "./host-session-reco
 import { detachTerminalResident } from "./reconcile-terminal"
 import { getLifecycleReattachPorts, type RespawnFailureCode, type RespawnPort, type RespawnResult } from "./port"
 import { markCrashedResident } from "./reconcile-crashed-resident"
+import { settleProvisionalExitLoss } from "./provisional-exit"
 import { finishPendingCancel } from "./pending-cancel"
 import { reclaimOrphanedResident } from "./residency"
 import { deferred, disposeClaimed, markLost, rollbackOrDeferred, terminateOldRpc, type SuspendedResidency } from "./revive-rollback"
@@ -100,6 +101,9 @@ export async function reviveClaimed(
   sessionPath: string | undefined,
   options: ReviveClaimedOptions = {},
 ): Promise<ReconcileOutcome> {
+  if (claimed.provisional_exit !== undefined && !TERMINAL_STATUSES.has(claimed.status)) {
+    return settleProvisionalExitLoss(context, claimed)
+  }
   if (claimed.isolation !== undefined) {
     if (context.deferUnresumable)
       return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "isolated_not_revivable", claimed)
