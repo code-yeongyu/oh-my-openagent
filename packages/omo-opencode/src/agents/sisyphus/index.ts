@@ -20,6 +20,7 @@ export { buildDefaultSisyphusPrompt, buildTaskManagementSection } from "./defaul
 export { buildClaudeOpus47SisyphusPrompt } from "./claude-opus-4-7";
 export { buildClaudeOpus48SisyphusPrompt } from "./claude-opus-4-8";
 export { buildClaudeOpus5SisyphusPrompt } from "./claude-opus-5";
+export { buildClaudeFable51SisyphusPrompt } from "./fable-5-1";
 export { buildClaudeFable5SisyphusPrompt } from "./claude-fable-5";
 export {
   buildGeminiToolMandate,
