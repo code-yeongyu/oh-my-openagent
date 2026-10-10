@@ -150,18 +150,18 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toBe(originalText)
     })
 
-    it("should do nothing for slash in middle of text", async () => {
-      // given slash in middle
+    it("should do nothing for unknown command mid-sentence (feature inactive)", async () => {
+      // given slash in middle naming an unknown command
       const hook = createAutoSlashCommandHook()
       const sessionID = `test-session-middle-${Date.now()}`
       const input = createMockInput(sessionID)
-      const output = createMockOutput("Please run /commit later")
+      const output = createMockOutput("Please run /nonexistent-command-xyz later")
       const originalText = output.parts[0].text
 
       // when hook is called
       await hook["chat.message"](input, output)
 
-      // then should not detect (not at start)
+      // then should not modify (command not found = feature inactive)
       expect(output.parts[0].text).toBe(originalText)
     })
   })
@@ -461,6 +461,24 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("<auto-slash-command>")
       expect(output.parts[0].text).toContain("/my-test-skill Command")
       expect(output.parts[0].text).toContain("This is the skill template content")
+    })
+
+    it("should expand a skill invoked mid-sentence and keep the surrounding prose", async () => {
+      // given a hook with a skill and prose around the invocation
+      const skill = createTestSkill("my-test-skill", "This is the skill template content")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const sessionID = `test-session-skill-mid-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("Please use /my-test-skill now")
+
+      // when hook processes the message
+      await hook["chat.message"](input, output)
+
+      // then the command span is replaced and the prose before it survives
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("/my-test-skill Command")
+      expect(output.parts[0].text).toContain("This is the skill template content")
+      expect(output.parts[0].text?.startsWith("Please use ")).toBe(true)
     })
 
     it("does not replace synthetic slash text with a skill template", async () => {

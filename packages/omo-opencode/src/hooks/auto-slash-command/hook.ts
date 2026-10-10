@@ -11,6 +11,7 @@ import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
 } from "./constants"
+import { replaceSlashCommandSpan } from "./replace-command-span"
 import { createProcessedCommandStore } from "./processed-command-store"
 import type {
   AutoSlashCommandHookInput,
@@ -151,7 +152,9 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       }
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
-      output.parts[idx].text = taggedContent
+      if (!replaceSlashCommandSpan(output.parts[idx], taggedContent)) {
+        output.parts[idx].text = taggedContent
+      }
 
       log(`[auto-slash-command] Replaced message with command template`, {
         sessionID: input.sessionID,
@@ -213,7 +216,9 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       const idx = findSlashCommandPartIndex(output.parts)
       if (idx >= 0) {
-        output.parts[idx].text = taggedContent
+        if (!replaceSlashCommandSpan(output.parts[idx], taggedContent)) {
+          output.parts[idx].text = taggedContent
+        }
       } else {
         output.parts.unshift({ type: "text", text: taggedContent })
       }

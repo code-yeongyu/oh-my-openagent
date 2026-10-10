@@ -1,7 +1,7 @@
 import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import {
   EXCLUDED_COMMANDS,
-  SLASH_COMMAND_PATTERN,
+  SLASH_COMMAND_PATTERN_ANYWHERE,
 } from "./constants"
 import type { ParsedSlashCommand } from "./types"
 
@@ -12,22 +12,22 @@ export function removeCodeBlocks(text: string): string {
 }
 
 export function parseSlashCommand(text: string): ParsedSlashCommand | null {
-  const trimmed = text.trim()
+  const match = text.match(SLASH_COMMAND_PATTERN_ANYWHERE)
 
-  if (!trimmed.startsWith("/")) {
-    return null
-  }
-
-  const match = trimmed.match(SLASH_COMMAND_PATTERN)
   if (!match) {
     return null
   }
 
-  const [raw, command, args] = match
+  const [fullMatch, boundary, command, args] = match
+  const raw = fullMatch.slice(boundary.length)
+  const start = (match.index ?? 0) + boundary.length
+
   return {
     command: command.toLowerCase(),
     args: args.trim(),
     raw,
+    start,
+    end: start + raw.length,
   }
 }
 
@@ -37,13 +37,8 @@ export function isExcludedCommand(command: string): boolean {
 
 export function detectSlashCommand(text: string): ParsedSlashCommand | null {
   const textWithoutCodeBlocks = removeCodeBlocks(text)
-  const trimmed = textWithoutCodeBlocks.trim()
 
-  if (!trimmed.startsWith("/")) {
-    return null
-  }
-
-  const parsed = parseSlashCommand(trimmed)
+  const parsed = parseSlashCommand(textWithoutCodeBlocks)
 
   if (!parsed) {
     return null
@@ -74,9 +69,8 @@ export function findSlashCommandPartIndex(
   for (let idx = 0; idx < parts.length; idx += 1) {
     const part = parts[idx]
     if (!isRealUserTextPart(part)) continue
-    if ((part.text ?? "").trim().startsWith("/")) {
-      return idx
-    }
+    if (parseSlashCommand(part.text ?? "") === null) continue
+    return idx
   }
   return -1
 }
