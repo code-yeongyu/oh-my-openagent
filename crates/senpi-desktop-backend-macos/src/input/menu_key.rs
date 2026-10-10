@@ -24,9 +24,9 @@ impl MacInput {
             .count();
         if siblings > 1 {
             return Err(DesktopError::background_unavailable(format!(
-                "window {wid} is one of {siblings} windows in its application; a menu command runs \
-                 against whichever window the application treats as key, so it was refused and \
-                 nothing was dispatched; use ax actions on the target window instead",
+                "this app has several windows ({siblings}); menu commands need the foreground grant \
+                 to target window {wid} (#9888), so nothing was dispatched; use ax actions on the \
+                 target window instead",
             )));
         }
         skylight::activate_without_raise(pid, wid).map_err(|error| {
