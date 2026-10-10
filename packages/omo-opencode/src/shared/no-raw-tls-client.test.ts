@@ -1,79 +1,45 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
 import path from "node:path"
-
-// Guard for the "stay on Bun 1.4.2" decision (senpi#3078, revisit-condition 3).
-//
-// Bun 1.4.2 carries CVE-2026-48618: its TLS hostname check accepts
-// look-alike-dot hosts (U+3002, U+FF0E, U+FF61), fixed in 1.4.3. Staying on
-// 1.4.2 is safe only while every shipped outbound TLS path derives its host
-// from a parsed URL: new URL() normalizes the look-alike dots, so the
-// normalized name is rejected correctly on 1.4.2 as well. This test fails
-// CI when shipped production source gains a direct low-level TLS/HTTPS
-// client call that is not on the reviewed allowlist below, so the decision
-// cannot silently go stale.
-
-function repoRootFrom(start: string): string {
-  let dir = start
-  for (;;) {
-    if (existsSync(path.join(dir, "bun.lock")) || existsSync(path.join(dir, ".git"))) {
-      return dir
-    }
-    const parent = path.dirname(dir)
-    if (parent === dir) {
-      throw new Error("repo root sentinel not found")
-    }
-    dir = parent
-  }
-}
-
-const WORKSPACE_ROOT = repoRootFrom(import.meta.dir)
-const PACKAGES_DIR = path.join(WORKSPACE_ROOT, "packages")
-// omo ships package src plus plugin/extension source; there is no root src/.
-const SHIPPED_SOURCE_DIRS = ["src", "plugin"]
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"])
-const EXCLUDED_SEGMENTS = new Set([
-  "test",
-  "tests",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "test-support",
-  "test-fixtures",
-  "references",
-  "docs",
-])
-
-type AllowlistEntry = {
-  file: string
-  call: string
-  count: number
-  reason: string
-}
-
-type ScanItem = {
-  path: string
-  content: string
-}
-
-type ScanVerdict = {
-  offenders: string[]
-  stale: string[]
-}
+import {
+  type AllowlistEntry,
+  type ScanItem,
+  collectShippedSourceFiles,
+  evaluateShippedSource,
+  findRawTlsClients,
+  isKnownBuiltRuntime,
+  isScannedSourceFile,
+  listTrackedFiles,
+  readSourceFile,
+  WORKSPACE_ROOT,
+} from "./no-raw-tls-client-scan"
 
 // Reviewed allowlist. Each entry pins one exact call: the repo-relative
-// file, the detected call's normalized text (whitespace collapsed, exactly
-// as the failure message prints it), the expected occurrence count, and a
-// one-line reason stating where the host comes from. A reason is only
-// valid if the host is "new URL(...).hostname" or a literal. Adding or
-// editing an entry is a reviewed act: name the host provenance and
-// reference senpi#3078.
+// file, the detected call's normalized text (whitespace collapsed outside
+// string literals, exactly as the failure message prints it), the expected
+// occurrence count, and a one-line reason stating where the host comes
+// from. A reason is valid only if the host reaches TLS through a URL parse
+// - new URL(...).hostname, or an API such as https.get(urlString) /
+// http2.connect(authority) that parses its argument - or is a literal.
+// Adding or editing an entry is a reviewed act: name the host provenance
+// and reference senpi#3078.
 const ALLOWLIST: AllowlistEntry[] = [
   {
     file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
-    call: 'import { get as httpsGet } from "node:https"',
+    call: "httpsGet(url, { headers: { Accept: \"application/vnd.github+json\", \"User-Agent\": \"lazycodex-auto-update\", }, }, (response) => { if (response.statusCode !== 200) { response.resume(); resolve(undefined); return; } let body = \"\"; response.setEncoding(\"utf8\"); response.on(\"data\", (chunk) => { body += chunk; if (body.length > 128_000) request.destroy(); }); response.on(\"end\", () => { try { const parsed = JSON.parse(body); resolve(typeof parsed.body === \"string\" && parsed.body.trim() ? truncateReleaseNotes(parsed.body) : undefined); } catch (error) { if (error instanceof Error) { resolve(undefined); return; } throw error; } }); })",
     count: 1,
-    reason: "httpsGet(url) at :109 receives the :107 template whose host is the fixed api.github.com prefix - repo and version interpolate into the path - and https.get parses the URL string before TLS (senpi#3078).",
+    reason: "the only outbound call; the url argument is the api.github.com template prefix built at :107 (repo and version interpolate into the path, not the host) and https.get URL-parses it before TLS (senpi#3078).",
+  },
+  {
+    file: "packages/omo-codex/plugin/skills/browser/runtime/omowright/index.js",
+    call: "tls.connect(options)",
+    count: 1,
+    reason: "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
+  },
+  {
+    file: "packages/omo-senpi/plugin/skills/browser/runtime/omowright/index.js",
+    call: "tls.connect(options)",
+    count: 1,
+    reason: "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
   },
 ]
 
@@ -81,198 +47,19 @@ const OFFENDER_GUIDANCE = [
   "Shipped source must not gain raw TLS/HTTPS client calls.",
   "Bun 1.4.2 is pinned (senpi#3078) and carries CVE-2026-48618: its TLS hostname",
   "check accepts look-alike-dot hosts. We are safe only because every shipped",
-  "outbound TLS path takes its host from a parsed URL - new URL() normalizes the",
-  "dots. If this call site's host provably comes from new URL(...).hostname or a",
-  "literal, add a reviewed entry to ALLOWLIST in",
+  "outbound TLS path reaches its host through a URL parse - new URL() normalizes",
+  "the dots, and APIs like https.get(urlString)/http2.connect(authority) parse",
+  "their argument. If this call's host provably does the same, or is a literal,",
+  "add a reviewed entry to ALLOWLIST in",
   "packages/omo-opencode/src/shared/no-raw-tls-client.test.ts:",
-  '    { file: "<path>", call: "<exact normalized call text>", count: <n>, reason: "<where the host comes from>" },',
+  '    { file: "<path>", call: "<exact normalized call text>", count: <n>, reason: "<host provenance>" },',
   "Otherwise route the request through fetch(), which parses the URL.",
 ].join("\n")
 
-// Direct client calls: the host argument bypasses URL parsing unless the
-// allowlist proves otherwise. Bun.connect is flagged in every form because
-// its tls: option path bypasses fetch's URL handling entirely.
-const CALL_PATTERNS: Array<[string, RegExp]> = [
-  ["tls.connect(", /\btls\s*\.\s*connect\s*\(/g],
-  ["https.request(", /\bhttps\s*\.\s*request\s*\(/g],
-  ["https.get(", /\bhttps\s*\.\s*get\s*\(/g],
-  ["http2.connect(", /\bhttp2\s*\.\s*connect\s*\(/g],
-  ["Bun.connect(", /\bBun\s*\.\s*connect\s*\(/g],
-  ["new https.Agent(", /\bnew\s+https\s*\.\s*Agent\s*\(/g],
-  ["new tls.TLSSocket(", /\bnew\s+tls\s*\.\s*TLSSocket\s*\(/g],
-  ["checkServerIdentity", /\bcheckServerIdentity\b/g],
-]
-
-// Import forms. The module specifier is anchored on both quotes, so
-// "node:tlsx" or "./tls" never match. Group 1 catches "import type", which
-// is erased at compile time and cannot reach the runtime.
-const IMPORT_FROM =
-  /import\s+(type\s+)?([^;'"]*?)\s*from\s*["']((?:node:)?(?:tls|https))["']/g
-const REQUIRE_FORM = /\brequire\s*\(\s*["']((?:node:)?(?:tls|https))["']\s*\)/g
-const DYNAMIC_IMPORT_FORM = /\bimport\s*\(\s*["']((?:node:)?(?:tls|https))["']\s*\)/g
-const MODULE_FORMS: Array<[RegExp, string]> = [
-  [REQUIRE_FORM, "require"],
-  [DYNAMIC_IMPORT_FORM, "import"],
-]
-
-// A node:https import is flagged only when it grants request/get: namespace,
-// default, require and dynamic forms grant the whole module; named imports
-// are flagged only when request/get is among them, so
-// "import { createServer } from 'node:https'" (inbound server) stays clean.
-function httpsImportGrantsRequestGet(clause: string): boolean {
-  if (/\*\s*as\b/.test(clause)) return true
-  const named = clause.match(/\{([^}]*)\}/)
-  if (!named) return /[\w$]/.test(clause)
-  const outsideBraces = clause.replace(/\{[^}]*\}/g, "").replace(/,/g, "").trim()
-  if (/[\w$]/.test(outsideBraces)) return true
-  const names = named[1].split(",").map((part) => part.trim().split(/\s+as\s+/)[0].trim())
-  return names.includes("request") || names.includes("get")
-}
-
-function normalizeCallText(text: string): string {
-  return text
-    .replace(/\s+/g, " ")
-    .replace(/\(\s+/g, "(")
-    .replace(/,\s*\)/g, ")")
-    .replace(/\s+\)/g, ")")
-}
-
-// The matched call plus its balanced argument list, normalized, so a
-// reformatted call still matches its pinned allowlist text.
-function callText(content: string, match: RegExpMatchArray): string {
-  const open = (match.index ?? 0) + match[0].length - 1
-  let depth = 0
-  let close = -1
-  for (let i = open; i < content.length && i < open + 400; i += 1) {
-    const character = content[i]
-    if (character === "(") {
-      depth += 1
-    } else if (character === ")") {
-      depth -= 1
-      if (depth === 0) {
-        close = i
-        break
-      }
-    }
-  }
-  if (close === -1) close = Math.min(content.length, open + 400) - 1
-  return normalizeCallText(content.slice(match.index ?? 0, close + 1))
-}
-
-function lineNumber(content: string, index: number): number {
-  let line = 1
-  for (let i = 0; i < index; i += 1) {
-    if (content[i] === "\n") line += 1
-  }
-  return line
-}
-
-function findRawTlsClients(content: string): Array<{ line: number; id: string; text: string }> {
-  const hits: Array<{ line: number; id: string }> = []
-  for (const [id, pattern] of CALL_PATTERNS) {
-    for (const match of content.matchAll(pattern)) {
-      hits.push({ line: lineNumber(content, match.index ?? 0), id, text: callText(content, match) })
-    }
-  }
-  for (const match of content.matchAll(IMPORT_FROM)) {
-    const typeClause = match[1]
-    const clause = match[2]
-    const moduleName = match[3]
-    if (typeClause) continue
-    if (moduleName.endsWith("tls")) {
-      hits.push({
-        line: lineNumber(content, match.index ?? 0),
-        id: 'import from "' + moduleName + '"',
-        text: normalizeCallText(match[0]),
-      })
-    } else if (httpsImportGrantsRequestGet(clause)) {
-      hits.push({
-        line: lineNumber(content, match.index ?? 0),
-        id: "import granting request/get from node:https",
-        text: normalizeCallText(match[0]),
-      })
-    }
-  }
-  for (const [pattern, label] of MODULE_FORMS) {
-    for (const match of content.matchAll(pattern)) {
-      hits.push({
-        line: lineNumber(content, match.index ?? 0),
-        id: label + '("' + match[1] + '")',
-        text: normalizeCallText(match[0]),
-      })
-    }
-  }
-  return hits.sort((a, b) => a.line - b.line || a.id.localeCompare(b.id))
-}
-
-function isScannedSourceFile(relativePath: string): boolean {
-  const name = relativePath.slice(relativePath.lastIndexOf("/") + 1)
-  if (/\.(test|spec)\.[a-z]+$/.test(name)) return false
-  if (name.endsWith(".d.ts")) return false
-  if (!SOURCE_EXTENSIONS.has(path.extname(name))) return false
-  const segments = relativePath.split("/")
-  if (segments.some((segment) => EXCLUDED_SEGMENTS.has(segment))) return false
-  return true
-}
-
-function evaluateShippedSource(scan: ScanItem[], allowlist: AllowlistEntry[]): ScanVerdict {
-  const offenders: string[] = []
-  const matched = new Map<AllowlistEntry, number>(allowlist.map((entry) => [entry, 0] as const))
-  const scannedPaths = new Set(scan.map((item) => item.path))
-  for (const item of scan) {
-    for (const hit of findRawTlsClients(item.content)) {
-      const entry = allowlist.find((candidate) => candidate.file === item.path && candidate.call === hit.text)
-      if (entry) {
-        matched.set(entry, (matched.get(entry) ?? 0) + 1)
-        continue
-      }
-      offenders.push(item.path + ":" + hit.line + "  " + hit.text)
-    }
-  }
-  const stale: string[] = []
-  for (const entry of allowlist) {
-    const seen = matched.get(entry) ?? 0
-    if (!scannedPaths.has(entry.file)) {
-      stale.push(entry.file + ": stale allowlist entry (no longer scanned)")
-    } else if (seen !== entry.count) {
-      stale.push(entry.file + ": expected " + entry.call + " x" + entry.count + ", found x" + seen)
-    }
-    if (!entry.reason || !entry.reason.trim()) {
-      stale.push(entry.file + ": allowlist entry without a reason")
-    }
-  }
-  return { offenders, stale }
-}
-
-function collectShippedSourceFiles(): string[] {
-  const files: string[] = []
-  const walk = (directory: string, relativeDirectory: string) => {
-    let entries
-    try {
-      entries = readdirSync(directory, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const entry of entries) {
-      const relativePath = relativeDirectory + "/" + entry.name
-      if (entry.isDirectory()) {
-        walk(path.join(directory, entry.name), relativePath)
-        continue
-      }
-      if (isScannedSourceFile(relativePath)) files.push(relativePath)
-    }
-  }
-  for (const pkg of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
-    if (!pkg.isDirectory()) continue
-    for (const dirName of SHIPPED_SOURCE_DIRS) {
-      walk(path.join(PACKAGES_DIR, pkg.name, dirName), "packages/" + pkg.name + "/" + dirName)
-    }
-  }
-  return files.sort()
-}
+const STALE_GUIDANCE = "Every allowlist entry must match the shipped tree: file scanned, normalized call text found, occurrence count exact, reason present."
 
 describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)", () => {
-  test("#given raw TLS client samples #when scanned #then every direct pattern and import form is caught with line numbers", () => {
+  test("#given raw client samples #when scanned #then every direct pattern, module form and binding is caught with line numbers", () => {
     const samples: Array<[string, string]> = [
       ["tls.connect(", 'await tls.connect({ host: hostname, port: 443 });'],
       ["https.request(", "https.request(url, onResponse);"],
@@ -282,17 +69,21 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       ["new https.Agent(", "new https.Agent({ keepAlive: true });"],
       ["new tls.TLSSocket(", "new tls.TLSSocket(socket, options);"],
       ["checkServerIdentity", "const options = { checkServerIdentity: () => undefined };"],
-      ['import from "node:tls"', 'import * as tls from "node:tls";'],
-      ['import from "node:tls"', 'import { connect } from "node:tls";'],
-      ['import from "tls"', 'import { connect as tlsConnect } from "tls";'],
       ['require("node:tls")', 'const tls = require("node:tls");'],
+      ['require("https")', "const https = require('https');"],
       ['import("node:tls")', 'const tls = await import("node:tls");'],
-      ["import granting request/get from node:https", 'import { request } from "node:https";'],
-      ["import granting request/get from node:https", 'import { get as httpsGet } from "node:https";'],
-      ["import granting request/get from node:https", 'import * as https from "node:https";'],
-      ["import granting request/get from node:https", 'import https from "node:https";'],
-      ['require("node:https")', 'const https = require("node:https");'],
-      ['import("node:https")', 'const https = await import("node:https");'],
+      ['getBuiltinModule("node:tls")', 'const tls = process.getBuiltinModule("node:tls");'],
+      ['getBuiltinModule("node:http2")', 'const h2 = process.getBuiltinModule("node:http2");'],
+      ['re-export from "node:tls"', 'export { connect } from "node:tls";'],
+      ['re-export from "node:https"', 'export * from "node:https";'],
+      ['module access: import from "node:http2"', 'import * as http2 from "node:http2";'],
+      ['module access: import from "node:https"', 'import https from "node:https";'],
+      ['binding call: httpsGet (imported from "node:https")', 'import { get as httpsGet } from "node:https";\nhttpsGet(url);'],
+      ['binding call: connect (imported from "node:http2")', 'import { connect } from "node:http2";\nconnect(host);'],
+      ['binding call: h2c (imported from "node:http2")', 'import { connect as h2c } from "node:http2";\nh2c(host);'],
+      ['binding call: TLSSocket (imported from "node:tls")', 'import { TLSSocket } from "node:tls";\nnew TLSSocket(sock);'],
+      ['template import of "node:tls"', "const tls = await import(`node:tls`);"],
+      ['template require of "node:https"', "const m = require(`node:https`);"],
     ]
     for (const [id, sample] of samples) {
       const hits = findRawTlsClients(sample)
@@ -302,12 +93,13 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     expect(positioned).toEqual([{ line: 3, id: "tls.connect(", text: 'tls.connect({ host: "x", port: 1 })' }])
   })
 
-  test("#given URL-parsed and inbound-server neighbors #when scanned #then nothing is flagged", () => {
+  test("#given inert neighbors #when scanned #then nothing is flagged", () => {
     const samples = [
+      'import { createServer } from "node:http2"; createServer(h);',
       'import { createServer } from "node:https";',
+      'import { connect } from "node:tlsx"; connect(h);',
       'import type { Agent } from "node:https";',
-      'import { connect } from "node:tlsx";',
-      'import { connect } from "./tls";',
+      'import { connect } from "node:tls";',
       "const response = await fetch(url);",
       "const { hostname } = new URL(url);",
       "tls.createServer(options, handler);",
@@ -324,26 +116,49 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     expect(isScannedSourceFile("packages/omo-opencode/src/shared/client.ts")).toBe(true)
     expect(isScannedSourceFile("packages/omo-codex/plugin/components/bootstrap/src/cli.ts")).toBe(true)
     expect(isScannedSourceFile("packages/omo-codex/plugin/scripts/tool.mjs")).toBe(true)
+    expect(isScannedSourceFile("bin/platform.js")).toBe(true)
     expect(isScannedSourceFile("packages/memory-core/src/fs/client.test.ts")).toBe(false)
     expect(isScannedSourceFile("packages/memory-core/src/README.md")).toBe(false)
     expect(isScannedSourceFile("packages/omo-codex/plugin/components/bootstrap/test/download.test.ts")).toBe(false)
     expect(isScannedSourceFile("packages/memory-core/src/types.d.ts")).toBe(false)
   })
 
-  test("#given shipped production source #when scanned #then no raw TLS client call exists outside the reviewed allowlist", () => {
+  test("#given the scan #when collected #then only tracked files under shipped roots are scanned", () => {
+    const tracked = new Set(listTrackedFiles())
     const files = collectShippedSourceFiles()
-    expect(files.length).toBeGreaterThan(1000)
-    const scan: ScanItem[] = files.map((relativePath) => ({
-      path: relativePath,
-      content: readFileSync(path.join(WORKSPACE_ROOT, relativePath), "utf8"),
-    }))
-    const verdict = evaluateShippedSource(scan, ALLOWLIST)
-    expect(verdict.offenders, OFFENDER_GUIDANCE).toEqual([])
-    expect(
-      verdict.stale,
-      "Every allowlist entry must match the shipped tree: file scanned, reason present.",
-    ).toEqual([])
+    for (const file of files) {
+      expect(tracked.has(file) || isKnownBuiltRuntime(file), "untracked file scanned: " + file).toBe(true)
+    }
+    const collected = new Set(files)
+    for (const shipped of [
+      "bin/platform.js",
+      "postinstall.mjs",
+      "packages/shared-skills/index.mjs",
+      "packages/omo-native/compile-entry.ts",
+      "packages/omo-codex/scripts/check-model-catalog-parity.mjs",
+    ]) {
+      expect(collected.has(shipped), "shipped file not scanned: " + shipped).toBe(true)
+    }
   })
+
+  test("#given source reads #when a file is missing or a path is a directory #then only ENOENT is tolerated", () => {
+    expect(readSourceFile(path.join(WORKSPACE_ROOT, "definitely-missing-file.ts"))).toBe(null)
+    expect(() => readSourceFile(path.join(WORKSPACE_ROOT, "bin"))).toThrow()
+  })
+
+  test("#given calls with tricky strings #when normalized #then string contents stay distinct", () => {
+    const paren = findRawTlsClients('tls.connect({ host: ")" + h });')
+    expect(paren[0]?.text).toBe('tls.connect({ host: ")" + h })')
+    const withSpaces = findRawTlsClients('tls.connect({ host: "a  b" });')
+    const single = findRawTlsClients('tls.connect({ host: "a b" });')
+    expect(withSpaces[0]?.text).not.toBe(single[0]?.text)
+    const long1 = 'tls.connect({ pad: "' + "x".repeat(500) + '" });'
+    const long2 = 'tls.connect({ pad: "' + "x".repeat(499) + 'y" });'
+    const t1 = findRawTlsClients(long1)[0]?.text
+    const t2 = findRawTlsClients(long2)[0]?.text
+    expect(t1 !== undefined && t2 !== undefined && t1 !== t2, ">400-char calls must not collide").toBe(true)
+  })
+
   describe("allowlist pins exact call sites (in-memory)", () => {
     const pinnedCallEntry = (): AllowlistEntry => ({
       file: "pkg/a.ts",
@@ -355,16 +170,12 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     test("#given the exact allowlisted calls #when evaluated #then they pass with the exact counts", () => {
       const entries: AllowlistEntry[] = [
         pinnedCallEntry(),
-        {
-          file: "pkg/b.mjs",
-          call: 'import { get as httpsGet } from "node:https"',
-          count: 1,
-          reason: "host is the api.example.com literal",
-        },
+        { file: "pkg/b.mjs", call: 'require("node:https")', count: 1, reason: "host is a literal" },
+        { file: "pkg/b.mjs", call: "https.get(url)", count: 1, reason: "host is a literal" },
       ]
       const scan: ScanItem[] = [
         { path: "pkg/a.ts", content: "one();\nhttp2.connect(baseUrl);\ntwo();\nhttp2.connect(baseUrl);\n" },
-        { path: "pkg/b.mjs", content: 'import { get as httpsGet } from "node:https";\n' },
+        { path: "pkg/b.mjs", content: 'const https = require("node:https");\nhttps.get(url);\n' },
       ]
       expect(evaluateShippedSource(scan, entries)).toEqual({ offenders: [], stale: [] })
     })
@@ -403,51 +214,8 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       ).toBe(true)
     })
 
-    test("#given reformatted calls #when evaluated #then they still match the pinned text", () => {
-      const scan: ScanItem[] = [
-        { path: "pkg/a.ts", content: "http2.connect(\n  baseUrl,\n);\nhttp2.connect( baseUrl );\n" },
-      ]
-      expect(evaluateShippedSource(scan, [pinnedCallEntry()])).toEqual({ offenders: [], stale: [] })
-    })
-  })
-  describe("review round: tracked-only scan, binding pins, widened forms (failing-first)", () => {
-    test("#given widened module-access and binding forms #when scanned #then each is caught", () => {
-      const samples: Array<[string, string]> = [
-        ["binding call", 'import { connect } from "node:http2"; export const go = (h) => connect(h);'],
-        ["binding call", 'import { connect as h2c } from "node:http2"; h2c(h);'],
-        ["binding call", 'import { get as g } from "node:https"; g(url);'],
-        ["binding call", 'import { TLSSocket } from "node:tls"; new TLSSocket(sock);'],
-        ["module access", 'import * as h2 from "node:http2"; h2.connect(h);'],
-        ["module access", 'import h2 from "node:http2"; h2.connect(h);'],
-        ["module access", 'process.getBuiltinModule("node:tls");'],
-        ["module access", 'process.getBuiltinModule("https");'],
-        ["module access", 'process.getBuiltinModule("node:http2");'],
-        ["module access", 'export { connect } from "node:tls";'],
-        ["module access", 'export * from "node:https";'],
-        ["template import", "const m = await import(`node:tls`);"],
-        ["template require", "const m = require(`node:https`);"],
-      ]
-      for (const [kind, sample] of samples) {
-        const hits = findRawTlsClients(sample)
-        expect(hits.length > 0, kind + " sample not caught: " + sample).toBe(true)
-      }
-    })
-
-    test("#given inert neighbors #when scanned #then nothing is flagged", () => {
-      const samples = [
-        'import { createServer } from "node:http2"; createServer(h);',
-        'import { createServer } from "node:https";',
-        'import { connect } from "node:tlsx"; connect(h);',
-        'import type { Agent } from "node:https";',
-        'import { connect } from "node:tls";',
-      ]
-      for (const sample of samples) {
-        expect(findRawTlsClients(sample), "unexpected hit: " + sample).toEqual([])
-      }
-    })
-
     test("#given a named-import binding #when pinned by its call #then new binding calls still fail", () => {
-      const entries = [
+      const entries: AllowlistEntry[] = [
         { file: "pkg/b.mjs", call: 'httpsGet(url, { redaction: "none" })', count: 1, reason: "host is a literal" },
       ]
       const exact: ScanItem[] = [
@@ -458,46 +226,39 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
         { path: "pkg/b.mjs", content: 'import { get as httpsGet } from "node:https";\nhttpsGet(url, { redaction: "none" });\nhttpsGet({ host, servername: host });\n' },
       ]
       expect(evaluateShippedSource(extra, entries).offenders.length > 0, "new binding call must fail").toBe(true)
-      const importPinned = [
+      const importPinned: AllowlistEntry[] = [
         { file: "pkg/b.mjs", call: 'import { get as httpsGet } from "node:https"', count: 1, reason: "x" },
       ]
       expect(evaluateShippedSource(exact, importPinned).stale.length > 0, "import-pinned entries must go stale").toBe(true)
     })
 
-    test("#given calls with tricky strings #when normalized #then string contents stay distinct", () => {
-      const paren = findRawTlsClients('tls.connect({ host: ")" + h });')
-      expect(paren[0]?.text).toBe('tls.connect({ host: ")" + h })')
-      const withSpaces = findRawTlsClients('tls.connect({ host: "a  b" });')
-      const single = findRawTlsClients('tls.connect({ host: "a b" });')
-      expect(withSpaces[0]?.text).not.toBe(single[0]?.text)
-      const long1 = 'tls.connect({ pad: "' + "x".repeat(500) + '" });'
-      const long2 = 'tls.connect({ pad: "' + "x".repeat(499) + 'y" });'
-      const t1 = findRawTlsClients(long1)[0]?.text
-      const t2 = findRawTlsClients(long2)[0]?.text
-      expect(t1 !== undefined && t2 !== undefined && t1 !== t2, ">400-char calls must not collide").toBe(true)
-    })
-
-    test("#given the scan #when collected #then only tracked files under shipped roots are scanned", () => {
-      const tracked = new Set(listTrackedFiles())
-      for (const file of collectShippedSourceFiles()) {
-        expect(tracked.has(file), "untracked file scanned: " + file).toBe(true)
-      }
-      const collected = new Set(collectShippedSourceFiles())
-      const shipped = [
-        "bin/platform.js",
-        "postinstall.mjs",
-        "packages/shared-skills/index.mjs",
-        "packages/omo-native/compile-entry.ts",
-        "packages/omo-codex/scripts/check-model-catalog-parity.mjs",
+    test("#given reformatted calls #when evaluated #then they still match the pinned text", () => {
+      const scan: ScanItem[] = [
+        { path: "pkg/a.ts", content: "http2.connect(\n  baseUrl,\n);\nhttp2.connect( baseUrl );\n" },
       ]
-      for (const file of shipped) {
-        expect(collected.has(file), "shipped file not scanned: " + file).toBe(true)
-      }
+      expect(evaluateShippedSource(scan, [pinnedCallEntry()])).toEqual({ offenders: [], stale: [] })
     })
+  })
 
-    test("#given source reads #when a file is missing or a path is a directory #then only ENOENT is tolerated", () => {
-      expect(readSourceFile(path.join(WORKSPACE_ROOT, "definitely-missing-file.ts"))).toBe(null)
-      expect(() => readSourceFile(path.join(WORKSPACE_ROOT, "bin"))).toThrow()
-    })
+  test("#given shipped production source #when scanned #then no raw TLS client call exists outside the reviewed allowlist", () => {
+    const files = collectShippedSourceFiles()
+    expect(files.length).toBeGreaterThan(1000)
+    const scan: ScanItem[] = []
+    for (const file of files) {
+      const content = readSourceFile(path.join(WORKSPACE_ROOT, file))
+      if (content !== null) scan.push({ path: file, content })
+    }
+    // Built-runtime entries are skipped when no build ran: the omowright
+    // runtime is gitignored build output, and CI always builds before
+    // running tests, so absence locally means there is nothing to guard.
+    const effective = ALLOWLIST.filter(
+      (entry) => scan.some((item) => item.path === entry.file) || !isKnownBuiltRuntime(entry.file),
+    )
+    const verdict = evaluateShippedSource(scan, effective)
+    expect(verdict.offenders, OFFENDER_GUIDANCE).toEqual([])
+    expect(verdict.stale, STALE_GUIDANCE).toEqual([])
+    for (const entry of ALLOWLIST) {
+      expect(entry.reason.trim().length > 0, "allowlist entry without a reason: " + entry.file).toBe(true)
+    }
   })
 })
