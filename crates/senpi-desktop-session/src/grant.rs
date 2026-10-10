@@ -96,9 +96,9 @@ pub(crate) fn admits(delivery: DeliveryMode, live: bool) -> bool {
 }
 
 impl Worker {
-    /// Refuses a foreground mutation without this session's live grant,
-    /// worker's live grant, before the gate or any backend call. The
-    /// admission error is audited like any other refusal.
+    /// Refuses a foreground mutation without this session's live grant whose
+    /// stop epoch is still current. Runs after the fail-closed gate and before
+    /// any capture or backend call; the refusal is audited like any other.
     pub(crate) fn admit_control(&self, mutation: &crate::mutate::Mutation<'_>) -> CoreResult<()> {
         let live = self
             .control
@@ -126,7 +126,10 @@ impl Worker {
     /// session re-grants with a fresh generation.
     pub(crate) fn try_grant(&mut self, params: &ControlGrantParams) -> CoreResult<ControlStateResult> {
         // A confirm answered as the user hits the stop chord must not grant:
-        // the grant would record the post-stop epoch and survive resume.
+        // the grant would record the post-stop epoch and survive resume. The
+        // epoch is read first: a stop bumps it before latching suspension, so
+        // a stop landing after this read leaves the grant with a stale epoch.
+        let stop_epoch = self.stop_epoch();
         if self.safety.supervisor.is_suspended() {
             return Err(DesktopError::from(senpi_desktop_safety::GateError::Suspended));
         }
@@ -145,7 +148,7 @@ impl Worker {
             reason: params.reason.clone(),
             generation,
             granted_at: crate::audit::rfc3339_ms(crate::audit::unix_now_ms()),
-            stop_epoch: self.stop_epoch(),
+            stop_epoch,
         };
         *slot = Some(SlotOwner {
             instance: self.instance,
