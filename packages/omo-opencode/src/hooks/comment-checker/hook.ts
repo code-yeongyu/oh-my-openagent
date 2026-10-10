@@ -42,6 +42,9 @@ export function createCommentCheckerHooks(
     processWithCli: typeof processWithCli
     processApplyPatchEditsWithCli: typeof processApplyPatchEditsWithCli
   },
+  lifecycle?: {
+    startPendingCallCleanup: typeof startPendingCallCleanup
+  },
 ) {
   const runner = cliRunner ?? {
     initializeCommentCheckerCli,
@@ -50,6 +53,7 @@ export function createCommentCheckerHooks(
     processWithCli,
     processApplyPatchEditsWithCli,
   }
+  const startCleanup = lifecycle?.startPendingCallCleanup ?? startPendingCallCleanup
   debugLog("createCommentCheckerHooks called", { config })
 
   return {
@@ -58,7 +62,7 @@ export function createCommentCheckerHooks(
       output: { args: Record<string, unknown> },
     ): Promise<void> => {
       ensureCommentCheckerInitialization(() => {
-        startPendingCallCleanup()
+        startCleanup()
         runner.initializeCommentCheckerCli(debugLog)
       })
 

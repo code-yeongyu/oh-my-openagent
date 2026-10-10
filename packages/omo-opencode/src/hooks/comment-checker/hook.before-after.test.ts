@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-
-const hookModulePath = "./hook?before-after"
-const hookModule: typeof import("./hook") = await import(hookModulePath)
-const { createCommentCheckerHooks } = hookModule
+import { createCommentCheckerHooks } from "./hook"
+import { stopPendingCallCleanup } from "./pending-calls"
+import { _resetCommentCheckerInitializationForTesting } from "./initialization-gate"
 
 const processWithCli = mock(async () => {})
 const cliRunner = {
@@ -12,8 +11,6 @@ const cliRunner = {
   processWithCli,
   processApplyPatchEditsWithCli: async () => {},
 }
-const { stopPendingCallCleanup } = await import("./pending-calls")
-const { _resetCommentCheckerInitializationForTesting } = await import("./initialization-gate")
 
 describe("comment-checker mutation tool routing", () => {
   beforeEach(() => {
