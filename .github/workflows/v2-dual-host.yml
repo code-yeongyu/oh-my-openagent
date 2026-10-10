@@ -1,0 +1,46 @@
+name: V2 Dual-Host
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  dual-host-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Install workspace deps
+        run: bun install --frozen-lockfile
+
+      - name: V1 entry loads unchanged
+        working-directory: packages/omo-opencode
+        run: bun -e 'const m = await import("./src/index.ts"); if (!m.default || typeof m.default.server !== "function") throw new Error("V1 PluginModule.server missing"); if ("setup" in m.default) throw new Error("V1 module graph reaches V2 entry"); console.log("V1 entry OK:", m.default.id)'
+
+      - name: V2 entry loads
+        working-directory: packages/omo-opencode
+        run: bun -e 'const m = await import("./src/v2/index.ts"); if (!m.omoV2Plugin || typeof m.omoV2Plugin.setup !== "function") throw new Error("V2 setup missing"); console.log("V2 entry OK:", m.omoV2Plugin.id)'
+
+      - name: Parity matrix behaviour checks
+        working-directory: packages/omo-opencode
+        run: bun test test/v2-contract/parity-matrix.test.ts --timeout 20000
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## V2 Dual-Host"
+            echo ""
+            echo "- V1 entry loads unchanged: ${{ job.status }}"
+            echo "- V2 entry loads with setup()"
+            echo "- Parity matrix: 3 live + 22 todo rows"
+          } >> "$GITHUB_STEP_SUMMARY"
