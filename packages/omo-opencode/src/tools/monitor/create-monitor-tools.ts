@@ -1,3 +1,4 @@
+import { createPrWatchTools } from "./pr-watch-tools"
 import type { ToolDefinition } from "@opencode-ai/plugin"
 
 import type { MonitorManager } from "../../features/monitor"
@@ -24,6 +25,7 @@ export function createMonitorTools(manager: MonitorManager, ctx: PluginContext):
   const pluginConfig: MonitorToolsConfig = hasPluginConfig(ctx) ? ctx.pluginConfig : { monitor: { enabled: true } }
 
   return {
+    ...createPrWatchTools(manager.prWatches),
     monitor_start: createMonitorStart(manager, pluginConfig, ctx),
     monitor_stop: createMonitorStop(manager, ctx),
     monitor_list: createMonitorList(manager, { sessionID: "" }),
