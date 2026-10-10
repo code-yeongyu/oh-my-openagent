@@ -8,9 +8,7 @@ use senpi_desktop_core::ax::{AxBackend, AxRegistry};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::types::{
-    DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target,
-};
+use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
 use crate::mutate::SessionSafety;
@@ -35,6 +33,12 @@ pub(crate) struct Worker {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
     pub(crate) gc: ArtifactGc,
+    /// Identifies this worker as the control slot's owner.
+    pub(crate) instance: u64,
+    /// This session's live foreground control grant, when it holds the slot.
+    pub(crate) control: Option<crate::grant::ControlGrant>,
+    /// The grant generation captured when the in-flight op was dequeued.
+    pub(crate) queued_generation: Option<u64>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -60,6 +64,9 @@ impl Worker {
             session_id: String::new(),
             run_id: String::new(),
             gc: ArtifactGc::default(),
+            instance: crate::grant::next_instance(),
+            control: None,
+            queued_generation: None,
         };
         worker.refresh_capabilities();
         worker
@@ -98,13 +105,26 @@ impl Worker {
     /// `cancelled` reports that the request's waiter gave up; only mutating
     /// requests consult it.
     pub(crate) fn process(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
+        let queued = crate::grant::generation_for(self.instance);
+        self.process_captured(op, cancelled, queued)
+    }
+
+    /// Serves `op` with the grant generation captured when it was enqueued.
+    pub(crate) fn process_captured(
+        &mut self,
+        op: Op,
+        cancelled: &dyn Fn() -> bool,
+        queued: Option<u64>,
+    ) -> CoreResult<Response> {
         if self.options.is_none() {
             return Err(DesktopError::new(
                 ErrorCode::Closed,
                 "desktop session is not open; call session.open first",
             ));
         }
+        self.reconcile_grant();
         self.maybe_gc();
+        self.queued_generation = queued;
         let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
@@ -132,6 +152,9 @@ impl Worker {
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
+            Op::ControlGrant(params) => self.control_grant(&params),
+            Op::ControlRevoke => self.control_revoke(),
+            Op::ControlState => Ok(Response::ControlState(self.control_state())),
         }
     }
 

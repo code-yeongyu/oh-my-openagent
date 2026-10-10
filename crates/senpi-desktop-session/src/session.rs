@@ -151,14 +151,14 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
             // A waiter that already gave up (deadline or `$/cancel`) dropped
             // its receiver: its request must not reach the desktop.
             Message::Open { reply, .. } | Message::Op { reply, .. } if reply.is_disconnected() => continue,
-            Message::Open { options, reply } => (
-                reply,
-                guarded(|| Ok(Response::Capabilities(worker.open(options)))),
-            ),
+            Message::Open { options, reply } => (reply, guarded(|| Ok(Response::Capabilities(worker.open(options))))),
             Message::Op { op, reply } => {
                 // `$/cancel` or a deadline drops the waiter: that is the
-                // request's cancellation signal while it runs.
-                let result = guarded(|| worker.process(op, &|| reply.is_disconnected()));
+                // request's cancellation signal while it runs. The grant
+                // generation is captured as the op is dequeued, so an op
+                // queued before a revoke+regrant runs under no new grant.
+                let queued = crate::grant::generation_for(worker.instance);
+                let result = guarded(|| worker.process_captured(op, &|| reply.is_disconnected(), queued));
                 (reply, result)
             }
         };
@@ -204,8 +204,7 @@ impl Pending {
     /// The request's own error, `Timeout` past the deadline, or `Internal`
     /// when the session thread ended without replying.
     pub async fn wait(self) -> CoreResult<Response> {
-        let timed_out =
-            |what: &str| DesktopError::timeout(format!("{what} within {} ms", self.budget.as_millis()));
+        let timed_out = |what: &str| DesktopError::timeout(format!("{what} within {} ms", self.budget.as_millis()));
         let lost = || DesktopError::internal(format!("{THREAD_NAME} ended without replying"));
         match self.kind {
             PendingKind::Ready(result) => *result,

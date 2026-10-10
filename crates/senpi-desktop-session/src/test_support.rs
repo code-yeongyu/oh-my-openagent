@@ -11,11 +11,9 @@ use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, Faults, RecordingSin
 use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::frame::FrameGeometry;
-use senpi_desktop_core::protocol_params::{CaptureParams, PointParams};
+use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, PointParams};
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::types::{
-    DesktopCapabilities, DesktopSessionOptions, PointerOptions, Target,
-};
+use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, PointerOptions, Target};
 use senpi_desktop_safety::{Clock, FakeClock, MutatingAction, StopPathId, Supervisor};
 use serde_json::{json, Value};
 
@@ -123,12 +121,35 @@ impl Harness {
     pub(crate) fn audits(&self) -> Vec<AuditEvent> {
         self.audits.lock().clone()
     }
+
+    /// The worker's live grant generation, as a dequeue would capture it.
+    pub(crate) fn queue_generation(&self) -> Option<u64> {
+        crate::grant::generation_for(self.worker.instance)
+    }
+
+    /// Whether a mutation carrying `queued` would be admitted foreground.
+    pub(crate) fn queued_admits_foreground(&self, queued: Option<u64>) -> bool {
+        crate::grant::admits(
+            MutatingAction::Click,
+            DeliveryMode::Foreground,
+            queued,
+            self.worker.live_generation(),
+        )
+    }
 }
 
 pub(crate) fn delivery(mode: &str) -> Option<PointerOptions> {
     Some(PointerOptions {
         delivery_mode: Some(mode.to_owned()),
         ..PointerOptions::default()
+    })
+}
+
+/// A `control.grant` request for `reason` with a fixed confirmation id.
+pub(crate) fn grant_control(reason: &str) -> Op {
+    Op::ControlGrant(ControlGrantParams {
+        reason: reason.to_owned(),
+        confirmation_id: "confirm-1".to_owned(),
     })
 }
 

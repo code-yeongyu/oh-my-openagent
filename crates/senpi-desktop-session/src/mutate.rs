@@ -17,8 +17,8 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_safety::{
-    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate,
-    StopPolicy, Supervisor,
+    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate, StopPolicy,
+    Supervisor,
 };
 
 use crate::audit::audit_event;
@@ -125,6 +125,9 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> CoreResult<(T, AuditEvent)> {
+        // A dequeued op keeps the generation captured then; a direct call
+        // (worker_input/ax already set it, tests) takes the live one.
+        self.queued_generation = self.queued_generation.take().or_else(|| self.live_generation());
         let started = Instant::now();
         let (result, focus_restored) = match self.admit(cancelled) {
             Ok(_transaction) => self.transaction(mutation, cancelled, act),
@@ -146,6 +149,9 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> (Result<T, TransactionError>, Option<bool>) {
+        if let Err(refused) = self.admit_control(mutation) {
+            return (Err(TransactionError::Primary(refused)), None);
+        }
         if let Err(refused) = self.gate(mutation) {
             return (Err(TransactionError::Primary(refused)), None);
         }
@@ -242,9 +248,7 @@ impl Worker {
             mutation.frame_id.map(FrameId::new),
         );
         match result {
-            Err(GateError::PermissionDenied { permission }) => {
-                Err(self.backend()?.permission_denied(permission))
-            }
+            Err(GateError::PermissionDenied { permission }) => Err(self.backend()?.permission_denied(permission)),
             other => other.map_err(DesktopError::from),
         }
     }
@@ -258,10 +262,12 @@ fn input_may_proceed(input_permission: &str) -> bool {
 }
 
 #[cfg(test)]
+mod grant_tests;
+#[cfg(test)]
 mod permission_tests;
 #[cfg(test)]
 mod stop_tests;
 #[cfg(test)]
-mod typing_tests;
-#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod typing_tests;

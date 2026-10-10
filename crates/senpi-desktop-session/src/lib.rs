@@ -7,6 +7,7 @@
 
 mod audit;
 mod budget;
+mod grant;
 mod mutate;
 mod pointer;
 mod request;

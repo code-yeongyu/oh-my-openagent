@@ -77,6 +77,15 @@ pub struct RaiseWindowParams {
     pub window_id: String,
 }
 
+/// `control.grant`: `confirmationId` is the host's receipt of the human
+/// confirmation it showed; the engine never sees the confirm itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlGrantParams {
+    pub reason: String,
+    pub confirmation_id: String,
+}
+
 /// `clipboard.write` params and `clipboard.read` result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

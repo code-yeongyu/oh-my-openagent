@@ -62,6 +62,14 @@ const failNext = (method: string): Message => ({ fail_next: [{ method, code: "In
 async function foregroundClick(engine: EngineProcess): Promise<Message> {
 	await makeStopPathLive(engine);
 	await capture(engine, WINDOW);
+	await engine.call("control.grant", { reason: "restore failure cases", confirmationId: "confirm-1" });
+	return engine.call("click", { target: WINDOW, x: 10, y: 10, opts: { deliveryMode: "foreground" } });
+}
+
+/** A foreground click with no control grant: `ControlRequired`. */
+async function ungrantedForegroundClick(engine: EngineProcess): Promise<Message> {
+	await makeStopPathLive(engine);
+	await capture(engine, WINDOW);
 	return engine.call("click", { target: WINDOW, x: 10, y: 10, opts: { deliveryMode: "foreground" } });
 }
 
@@ -221,4 +229,12 @@ export const ERROR_CODE_CASES: readonly ErrorCodeCase[] = [
 	{ code: "CursorRestoreFailed", overlay: failNext("warp_cursor"), drive: foregroundClick },
 	{ code: "FocusRestoreFailed", overlay: failNext("restore_front_window"), drive: foregroundClick },
 	{ code: "TransactionFailed", overlay: failNext("front_window"), drive: foregroundClick },
+	{ code: "ControlRequired", overlay: {}, drive: ungrantedForegroundClick },
 ];
+
+/**
+ * `InputBusy` needs two sessions holding the process-wide control slot, but
+ * one engine binary owns one session. It is driven at the session-crate
+ * level (two workers); the conformance table exempts it from the wire drive.
+ */
+export const WIRE_EXEMPT_CODES: readonly string[] = ["InputBusy"];

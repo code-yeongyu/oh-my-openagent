@@ -10,9 +10,10 @@ use senpi_desktop_core::types::DesktopPoint;
 use serde_json::json;
 
 use super::TransactionError;
+use crate::grant::test_lock as grant_test_lock;
 use crate::request::Op;
 use crate::test_support::{
-    click_window, delivery, foreground_click, foreground_click_mutation, harness, op_names, two_windows,
+    click_window, delivery, foreground_click, foreground_click_mutation, grant_control, harness, op_names, two_windows,
 };
 
 fn chord(mode: &str) -> Op {
@@ -30,19 +31,15 @@ fn keypress_backend_failure_releases_before_restore_and_keeps_primary_error() {
         ("foreground", vec!["front", "release", "restore-front", "warp"]),
     ];
     for (mode, expected) in cases {
+        let _grant_lock = grant_test_lock().lock();
         // Given
         let mut harness = harness(&two_windows());
-        harness
-            .faults
-            .fail_next(FakeMethod::KeyChord, ErrorCode::InputFailed);
+        harness.process(grant_control("one")).expect("grants");
+        harness.faults.fail_next(FakeMethod::KeyChord, ErrorCode::InputFailed);
         // When
         let reply = harness.process(chord(mode));
         // Then
-        assert_eq!(
-            reply.map_err(|error| error.code),
-            Err(ErrorCode::InputFailed),
-            "{mode}"
-        );
+        assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::InputFailed), "{mode}");
         assert_eq!(op_names(&harness), expected, "{mode}");
     }
 }
@@ -60,46 +57,34 @@ fn keypress_persistent_release_failure_retains_ownership_until_recovery() {
         .faults
         .fail_next(FakeMethod::RestoreKeyFocus, ErrorCode::WindowNotFound);
     let first = harness.process(chord("background"));
-    assert_eq!(
-        first.map_err(|error| error.code),
-        Err(ErrorCode::FocusRestoreFailed)
-    );
+    assert_eq!(first.map_err(|error| error.code), Err(ErrorCode::FocusRestoreFailed));
     // When: the next request fails again.
     let second = harness.process(chord("background"));
     // Then: that transaction released the held input (the first release
     // failed, so it recorded nothing).
     assert_eq!(second.map_err(|error| error.code), Err(ErrorCode::InputFailed));
-    let releases = op_names(&harness)
-        .into_iter()
-        .filter(|op| *op == "release")
-        .count();
+    let releases = op_names(&harness).into_iter().filter(|op| *op == "release").count();
     assert_eq!(releases, 1);
 }
 
 #[test]
 fn transaction_captures_once_and_restore_failure_retains_primary() {
+    let _grant_lock = grant_test_lock().lock();
     // Given: a foreground drag off the frame, and a cursor that cannot return.
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     let frame_id = harness.capture("101");
-    harness
-        .faults
-        .fail_next(FakeMethod::WarpCursor, ErrorCode::InputFailed);
+    harness.faults.fail_next(FakeMethod::WarpCursor, ErrorCode::InputFailed);
     let op = Op::Drag(DragParams {
         target: "101".to_owned(),
-        path: vec![
-            DesktopPoint { x: 10.0, y: 10.0 },
-            DesktopPoint { x: 5000.0, y: 10.0 },
-        ],
+        path: vec![DesktopPoint { x: 10.0, y: 10.0 }, DesktopPoint { x: 5000.0, y: 10.0 }],
         frame_id: Some(frame_id),
         opts: delivery("foreground"),
     });
     // When
     let reply = harness.process(op);
     // Then: one capture, one restore attempt (its queued failure is spent).
-    assert_eq!(
-        reply.map_err(|error| error.code),
-        Err(ErrorCode::CursorRestoreFailed)
-    );
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::CursorRestoreFailed));
     assert_eq!(op_names(&harness), ["front", "release", "restore-front"]);
     let next_warp = harness
         .worker
@@ -110,8 +95,10 @@ fn transaction_captures_once_and_restore_failure_retains_primary() {
 
 #[test]
 fn transaction_capture_failure_runs_no_input_or_restore() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     let frame_id = harness.capture("101");
     harness
         .faults
@@ -119,28 +106,23 @@ fn transaction_capture_failure_runs_no_input_or_restore() {
     // When
     let reply = harness.process(click_window(&frame_id, delivery("foreground")));
     // Then
-    assert_eq!(
-        reply.map_err(|error| error.code),
-        Err(ErrorCode::TransactionFailed)
-    );
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::TransactionFailed));
     assert_eq!(op_names(&harness), ["front"]);
 }
 
 #[test]
 fn transaction_panic_releases_held_input_and_restores_cursor() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     // When: the backend panics right after delivering the click.
     let result = harness
         .worker
-        .mutate(
-            &foreground_click_mutation(),
-            &|| false,
-            |worker| -> CoreResult<()> {
-                foreground_click(worker)?;
-                panic!("injected transaction panic")
-            },
-        )
+        .mutate(&foreground_click_mutation(), &|| false, |worker| -> CoreResult<()> {
+            foreground_click(worker)?;
+            panic!("injected transaction panic")
+        })
         .map(|((), _audit)| ());
     // Then
     assert_eq!(result.map_err(|error| error.code), Err(ErrorCode::Internal));
@@ -152,12 +134,12 @@ fn transaction_panic_releases_held_input_and_restores_cursor() {
 
 #[test]
 fn release_panic_still_restores_cursor_once() {
+    let _grant_lock = grant_test_lock().lock();
     // Given: the click fails and the release that follows it panics.
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     let frame_id = harness.capture("101");
-    harness
-        .faults
-        .fail_next(FakeMethod::Click, ErrorCode::InputFailed);
+    harness.faults.fail_next(FakeMethod::Click, ErrorCode::InputFailed);
     harness.panics.panic_next(FakeMethod::ReleaseAll);
     // When
     let reply = harness.process(click_window(&frame_id, delivery("foreground")));
@@ -168,8 +150,10 @@ fn release_panic_still_restores_cursor_once() {
 
 #[test]
 fn restore_panic_is_mapped_without_escaping_transaction() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     harness.panics.panic_next(FakeMethod::RestoreFrontWindow);
     // When
     let (result, focus_restored) =
@@ -178,10 +162,7 @@ fn restore_panic_is_mapped_without_escaping_transaction() {
             .transaction(&foreground_click_mutation(), &|| false, foreground_click);
     // Then: mapped, and the cursor is still put back.
     assert!(
-        matches!(
-            result,
-            Err(TransactionError::FocusRestoreFailed { primary: None, .. })
-        ),
+        matches!(result, Err(TransactionError::FocusRestoreFailed { primary: None, .. })),
         "{result:?}"
     );
     assert_eq!(focus_restored, Some(false));

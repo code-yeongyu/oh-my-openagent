@@ -3,9 +3,10 @@ use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::protocol_params::TypeTextParams;
 
 use super::TransactionError;
+use crate::grant::test_lock as grant_test_lock;
 use crate::request::Op;
 use crate::test_support::{
-    click_window, delivery, foreground_click, foreground_click_mutation, harness, op_names, two_windows,
+    click_window, delivery, foreground_click, foreground_click_mutation, grant_control, harness, op_names, two_windows,
 };
 
 #[test]
@@ -21,8 +22,10 @@ fn background_click_never_warps_or_refocuses() {
 
 #[test]
 fn foreground_click_restores_front_then_cursor_in_that_order() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     let frame = harness.capture("101");
     // When
     harness
@@ -60,8 +63,10 @@ fn background_keys_hand_key_focus_back_without_touching_the_cursor() {
 
 #[test]
 fn focus_restore_failure_after_a_successful_click_has_no_primary() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     harness
         .faults
         .fail_next(FakeMethod::RestoreFrontWindow, ErrorCode::WindowNotFound);
@@ -72,10 +77,7 @@ fn focus_restore_failure_after_a_successful_click_has_no_primary() {
             .transaction(&foreground_click_mutation(), &|| false, foreground_click);
     // Then
     assert!(
-        matches!(
-            result,
-            Err(TransactionError::FocusRestoreFailed { primary: None, .. })
-        ),
+        matches!(result, Err(TransactionError::FocusRestoreFailed { primary: None, .. })),
         "{result:?}"
     );
     assert_eq!(focus_restored, Some(false));
@@ -83,11 +85,11 @@ fn focus_restore_failure_after_a_successful_click_has_no_primary() {
 
 #[test]
 fn focus_restore_failure_after_a_failed_click_keeps_the_primary() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
-    harness
-        .faults
-        .fail_next(FakeMethod::Click, ErrorCode::InputFailed);
+    harness.process(grant_control("one")).expect("grants");
+    harness.faults.fail_next(FakeMethod::Click, ErrorCode::InputFailed);
     harness
         .faults
         .fail_next(FakeMethod::RestoreFrontWindow, ErrorCode::WindowNotFound);
@@ -105,14 +107,12 @@ fn focus_restore_failure_after_a_failed_click_keeps_the_primary() {
 
 #[test]
 fn cursor_restore_failure_after_a_failed_click_keeps_the_primary() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
-    harness
-        .faults
-        .fail_next(FakeMethod::Click, ErrorCode::InputFailed);
-    harness
-        .faults
-        .fail_next(FakeMethod::WarpCursor, ErrorCode::InputFailed);
+    harness.process(grant_control("one")).expect("grants");
+    harness.faults.fail_next(FakeMethod::Click, ErrorCode::InputFailed);
+    harness.faults.fail_next(FakeMethod::WarpCursor, ErrorCode::InputFailed);
     // When
     let (result, _) = harness
         .worker
@@ -127,8 +127,10 @@ fn cursor_restore_failure_after_a_failed_click_keeps_the_primary() {
 
 #[test]
 fn a_failed_restore_reaches_the_wire_and_the_audit_as_focus_restore_failed() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     let frame = harness.capture("101");
     harness
         .faults
@@ -136,10 +138,7 @@ fn a_failed_restore_reaches_the_wire_and_the_audit_as_focus_restore_failed() {
     // When
     let reply = harness.process(click_window(&frame, delivery("foreground")));
     // Then
-    assert_eq!(
-        reply.map_err(|error| error.code),
-        Err(ErrorCode::FocusRestoreFailed)
-    );
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::FocusRestoreFailed));
     let audit = harness.audits().pop().expect("one audit");
     assert_eq!(
         (audit.code, audit.focus_restored),

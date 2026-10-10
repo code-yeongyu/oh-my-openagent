@@ -14,32 +14,28 @@ use senpi_desktop_core::keys::parse_keys;
 use senpi_desktop_core::protocol_params::{KeyChordParams, TypeTextParams};
 use senpi_desktop_core::types::Target;
 use senpi_desktop_safety::{
-    FakeClock, GateError, MutatingAction, StopPathId, StopPathReason, StopSource, Supervisor,
-    HEARTBEAT_FRESH_MS,
+    FakeClock, GateError, MutatingAction, StopPathId, StopPathReason, StopSource, Supervisor, HEARTBEAT_FRESH_MS,
 };
 use serde_json::json;
 
 use super::{Mutation, INPUT_TRANSACTION};
+use crate::grant::test_lock as grant_test_lock;
 use crate::request::{Op, Response};
-use crate::test_support::{delivery, foreground_click_mutation, harness, op_names, two_windows, Harness};
+use crate::test_support::{
+    delivery, foreground_click_mutation, grant_control, harness, op_names, two_windows, Harness,
+};
 use crate::worker::Worker;
 
 const HANG_GUARD: Duration = Duration::from_secs(30);
 
 fn chord_mutation() -> Mutation<'static> {
-    Mutation::new(
-        MutatingAction::KeyChord,
-        "101".to_owned(),
-        DeliveryMode::Background,
-    )
+    Mutation::new(MutatingAction::KeyChord, "101".to_owned(), DeliveryMode::Background)
 }
 
 fn press(worker: &mut Worker, keys: &[&str]) -> CoreResult<()> {
     let keys = parse_keys(&keys.iter().map(|key| (*key).to_owned()).collect::<Vec<_>>())?;
     let target = Target::Window("101".to_owned());
-    worker
-        .backend()?
-        .key_chord(&target, &keys, DeliveryMode::Background)
+    worker.backend()?.key_chord(&target, &keys, DeliveryMode::Background)
 }
 
 fn chord_op(keys: &[&str], mode: &str) -> Op {
@@ -66,10 +62,7 @@ fn assert_chord_stop(keys: &[&str], stop: fn(&Supervisor, &FakeClock), expected:
         .map(|((), _audit)| ());
     // Then: the chord was sent once, then released, then key focus restored.
     assert_eq!(result, Err(DesktopError::from(expected)));
-    assert_eq!(
-        op_names(&harness),
-        ["front", "key", "release", "restore-key-focus"]
-    );
+    assert_eq!(op_names(&harness), ["front", "key", "release", "restore-key-focus"]);
 }
 
 #[test]
@@ -128,9 +121,7 @@ fn keypress_admission_race_preserves_suspension_before_the_first_key() {
         true
     };
     // When
-    let reply = harness
-        .worker
-        .process(chord_op(&["enter"], "background"), &racing);
+    let reply = harness.worker.process(chord_op(&["enter"], "background"), &racing);
     // Then
     assert_eq!(reply, Err(DesktopError::from(GateError::Suspended)));
     assert_eq!(harness.sink.ops(), Vec::new());
@@ -170,8 +161,10 @@ fn non_key_actions_preserve_liveness_and_cancellation_semantics() {
 
 #[test]
 fn cancelled_before_transaction_admission_does_not_capture_or_restore() {
+    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     // When
     let result = harness
         .worker
@@ -184,9 +177,11 @@ fn cancelled_before_transaction_admission_does_not_capture_or_restore() {
 
 #[test]
 fn mutex_admission_observes_cancellation_without_capturing_cursor() {
+    let _grant_lock = grant_test_lock().lock();
     // Given: another transaction holds the lock; the waiter cancels on its
     // third look.
     let mut harness = harness(&two_windows());
+    harness.process(grant_control("one")).expect("grants");
     let polls = Cell::new(0_u32);
     let cancel_on_third_poll = || {
         polls.set(polls.get() + 1);
@@ -227,18 +222,13 @@ fn cancellation_after_capture_sends_no_input_and_restores_once() {
     for (mode, expected) in cases {
         // Given: the waiter gives up once the front window was captured.
         let mut harness: Harness = harness(&two_windows());
+        harness.process(grant_control("one")).expect("grants");
         let sink = harness.sink.clone();
         let captured = || sink.ops().contains(&SinkOp::QueryFrontWindow);
         // When
-        let reply = harness
-            .worker
-            .process(chord_op(&["enter", "tab"], mode), &captured);
+        let reply = harness.worker.process(chord_op(&["enter", "tab"], mode), &captured);
         // Then
-        assert_eq!(
-            reply.map_err(|error| error.code),
-            Err(ErrorCode::Cancelled),
-            "{mode}"
-        );
+        assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::Cancelled), "{mode}");
         assert_eq!(op_names(&harness), expected, "{mode}");
     }
 }

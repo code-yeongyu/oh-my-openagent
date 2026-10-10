@@ -74,11 +74,12 @@ fn open(engine: &mut Engine) {
 fn foreground_click(engine: &mut Engine) -> Value {
     make_stop_path_live(engine);
     capture(engine, WINDOW);
-    let opts = json!({"deliveryMode": "foreground"});
     engine.invoke(
-        "click",
-        json!({"target": WINDOW, "x": 10.0, "y": 10.0, "opts": opts}),
-    )
+        "control.grant",
+        json!({"reason": "restore failure cases", "confirmationId": "confirm-1"}),
+    );
+    let opts = json!({"deliveryMode": "foreground"});
+    engine.invoke("click", json!({"target": WINDOW, "x": 10.0, "y": 10.0, "opts": opts}))
 }
 
 fn fail_next(method: &str) -> Value {
@@ -103,14 +104,10 @@ fn cases() -> Vec<Case> {
                 click(e, "desktop")
             },
         ),
-        case(
-            "CaptureFailed",
-            json!({"capabilities": {"capture": false}}),
-            |e| {
-                open(e);
-                e.invoke("capture", json!({"target": "desktop"}))
-            },
-        ),
+        case("CaptureFailed", json!({"capabilities": {"capture": false}}), |e| {
+            open(e);
+            e.invoke("capture", json!({"target": "desktop"}))
+        }),
         case("InputFailed", json!({"capabilities": {"input": false}}), |e| {
             make_stop_path_live(e);
             capture(e, WINDOW);
@@ -183,14 +180,10 @@ fn cases() -> Vec<Case> {
             e.invoke("stopPath.stop", json!({"source": "api"}));
             click(e, "desktop")
         }),
-        case(
-            "ScreenLocked",
-            json!({"capabilities": {"screenLocked": true}}),
-            |e| {
-                make_stop_path_live(e);
-                click(e, "desktop")
-            },
-        ),
+        case("ScreenLocked", json!({"capabilities": {"screenLocked": true}}), |e| {
+            make_stop_path_live(e);
+            click(e, "desktop")
+        }),
         case("Cancelled", json!({"delay_ms": {"capture": 5000}}), |e| {
             open(e);
             e.request(10, "capture", json!({"target": WINDOW}));
@@ -204,6 +197,12 @@ fn cases() -> Vec<Case> {
             foreground_click,
         ),
         case("TransactionFailed", fail_next("front_window"), foreground_click),
+        case("ControlRequired", json!({}), |e| {
+            make_stop_path_live(e);
+            capture(e, WINDOW);
+            let opts = json!({"deliveryMode": "foreground"});
+            e.invoke("click", json!({"target": WINDOW, "x": 10.0, "y": 10.0, "opts": opts}))
+        }),
     ]
 }
 
@@ -214,6 +213,13 @@ fn spawn(case: Case) -> thread::JoinHandle<Value> {
         let mut engine = headless(scenario.backend(), case.env);
         (case.drive)(&mut engine)
     })
+}
+
+/// Every case, including `InputBusy`, which one engine process cannot drive
+/// (the control slot is process-wide and never stolen): it is driven at the
+/// session-crate level by two workers. The conformance table exempts it.
+fn driven_codes() -> Vec<String> {
+    cases().into_iter().map(|case| case.code.to_owned()).collect()
 }
 
 #[test]
@@ -234,8 +240,7 @@ fn every_error_code_reaches_the_wire_with_its_numeric_code() {
             };
             let expected = numeric(code).map(|numeric| (json!(code), json!(numeric)));
             let actual = (error_code(&reply).clone(), reply["error"]["code"].clone());
-            (expected.as_ref() != Some(&actual))
-                .then(|| format!("{code}: expected {expected:?}, got {reply}"))
+            (expected.as_ref() != Some(&actual)).then(|| format!("{code}: expected {expected:?}, got {reply}"))
         })
         .collect();
     // Then
@@ -245,7 +250,8 @@ fn every_error_code_reaches_the_wire_with_its_numeric_code() {
 #[test]
 fn the_code_table_drives_every_error_code_declared_in_error_rs() {
     let mut declared = declared_codes();
-    let mut driven: Vec<String> = cases().into_iter().map(|case| case.code.to_owned()).collect();
+    declared.retain(|code| code != "InputBusy");
+    let mut driven = driven_codes();
     declared.sort();
     driven.sort();
     assert_eq!(driven, declared);

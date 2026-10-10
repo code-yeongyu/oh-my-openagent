@@ -14,7 +14,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
 };
@@ -127,6 +127,8 @@ impl StopPathState {
 /// Kill-switch state shared by the session loop and every stop path.
 pub struct Supervisor {
     suspended: AtomicBool,
+    /// Bumped by every stop, so a control grant granted before one is dead.
+    stop_epoch: AtomicU64,
     /// Guards every write to `suspended` so the flag and its source agree.
     stopped_by: Mutex<Option<StopSource>>,
     stop_paths: Mutex<HashMap<StopPathId, StopPathState>>,
@@ -140,6 +142,7 @@ impl Supervisor {
     pub fn new(clock: Arc<dyn Clock>) -> Self {
         Self {
             suspended: AtomicBool::new(false),
+            stop_epoch: AtomicU64::new(0),
             stopped_by: Mutex::new(None),
             stop_paths: Mutex::new(HashMap::new()),
             global_failure: Mutex::new(None),
@@ -171,9 +174,17 @@ impl Supervisor {
 
     /// Latch suspension. The first source is kept until [`Self::reset`].
     pub fn trigger_stop(&self, source: StopSource) {
+        self.stop_epoch.fetch_add(1, Ordering::SeqCst);
         let mut stopped_by = self.stopped_by.lock();
         stopped_by.get_or_insert(source);
         self.suspended.store(true, Ordering::SeqCst);
+    }
+
+    /// How many stops this supervisor observed; a control grant's epoch at
+    /// grant time is how the session tells a later stop happened.
+    #[must_use]
+    pub fn stop_epoch(&self) -> u64 {
+        self.stop_epoch.load(Ordering::SeqCst)
     }
 
     /// Lift suspension. User-only: the proof comes from the host's resume token.
@@ -186,6 +197,15 @@ impl Supervisor {
     #[must_use]
     pub fn is_suspended(&self) -> bool {
         self.suspended.load(Ordering::SeqCst)
+    }
+
+    /// The only user-only proof a test can make: no resume token exists.
+    /// Hidden: the engine's stop paths redeem a real [`ResumeToken`].
+    #[doc(hidden)]
+    pub fn reset_for_test(&self) {
+        let mut stopped_by = self.stopped_by.lock();
+        *stopped_by = None;
+        self.suspended.store(false, Ordering::SeqCst);
     }
 
     #[must_use]
