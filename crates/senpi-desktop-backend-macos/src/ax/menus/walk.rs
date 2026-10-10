@@ -178,10 +178,12 @@ pub(super) fn pick_submenu_index(roles: &[String]) -> CoreResult<Option<usize>> 
 }
 
 /// Test seam over the submenu-child choice so it runs headless.
+#[cfg(test)]
 pub(super) trait SubmenuNode {
     fn child_roles(&self) -> Vec<&'static str>;
 }
 
+#[cfg(test)]
 pub(super) fn submenu_child(node: &impl SubmenuNode) -> Option<usize> {
     let roles: Vec<String> = node.child_roles().into_iter().map(str::to_string).collect();
     pick_submenu_index(&roles).ok().flatten()
