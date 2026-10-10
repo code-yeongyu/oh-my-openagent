@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process"
-import { mkdirSync, rmSync, watch, writeFileSync } from "node:fs"
+import { mkdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { createSandbox, seedSandbox } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
-const { readRecords, readTaskEventTypes, pidAlive } = await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
+const { parseEvents, readRecords, readTaskEventTypes, pidAlive } = await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
 const { killProcessGroup } = await import(pathToFileURL(join(scriptDir, "team-e2e-process.mjs")).href)
 
 const mockProviderEntry = join(scriptDir, "task-rpc-e2e-mock-provider.ts")
@@ -103,7 +103,7 @@ export async function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps, chi
     child.once("close", (code, closeSignal) => resolve([code, closeSignal]))
     child.once("error", () => resolve([null, null]))
   })
-  return { status, signal, stdout, stderr }
+  return { status, signal, stdout, stderr, pid: child.pid }
 }
 
 function driveSenpiAsync(senpiBin, sandbox, sessionDir, parentSteps, childSteps, prompt) {
@@ -289,6 +289,15 @@ export async function runKillCheck(senpiBin) {
   }
 }
 
+// The full event payloads, or the read error itself, so a failure always names the path that wrote the record.
+function readTaskEvents(stateDir, taskId) {
+  try {
+    return parseEvents(readFileSync(join(stateDir, "logs", `${taskId}.jsonl`), "utf8"))
+  } catch (error) {
+    return { readError: String(error) }
+  }
+}
+
 export async function runReconcileCheck(senpiBin) {
   const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox(RECONCILE_PROJECT_OMO_CONFIG)
   const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pr"), CHILD_STEPS_HANG, "drive the reconcile scenario")
@@ -307,8 +316,11 @@ export async function runReconcileCheck(senpiBin) {
       }
     }
     await cleanupSenpiHost(parent)
+    const afterCrash = readRecords(stateDir).find((r) => r.task_id === running.task_id)
+    const ownerAliveAfterCrash = typeof running.host_pid === "number" && pidAlive(running.host_pid)
     const relaunch = await driveSenpi(senpiBin, sandbox, sessionDir, RECONCILE_RELAUNCH_STEPS, CHILD_STEPS_COMPLETE, "relaunch for reconcile")
     const lost = readRecords(stateDir).find((r) => r.task_id === running.task_id && r.status === "lost")
+    const latest = readRecords(stateDir).find((r) => r.task_id === running.task_id)
     const eventTypes = readTaskEventTypes(stateDir, running.task_id)
     const lostEvent = eventTypes.includes("reconcile_lost")
     const orphanDead = pidAlive(orphanPid) === false
@@ -322,7 +334,20 @@ export async function runReconcileCheck(senpiBin) {
       facts: {
         orphanPid,
         orphanDead,
-        status: lost?.status,
+        parentPid: parent.pid,
+        relaunchPid: relaunch.pid,
+        sandboxRoot: sandbox.root,
+        ownerAliveAfterCrash,
+        ownerAliveAfterRelaunch: typeof running.host_pid === "number" && pidAlive(running.host_pid),
+        runningRecord: running,
+        afterCrashRecord: afterCrash,
+        finalRecord: latest,
+        events: readTaskEvents(stateDir, running.task_id),
+        status: latest?.status,
+        error_message: latest?.error_message,
+        failure_kind: latest?.failure_kind,
+        failure_reason: latest?.failure_reason,
+        killed: latest?.killed,
         eventTypes,
         breadcrumb: (lost?.error_message ?? "").slice(0, 120),
       },
