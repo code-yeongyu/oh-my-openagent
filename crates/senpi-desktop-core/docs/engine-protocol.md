@@ -13,6 +13,9 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `engine.hello` | read | no | no | `EmptyParams` | `HelloResult` | `ErrorCode` |
 | `session.open` | exec | yes | no | `DesktopSessionOptions` | `SessionOpenResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `session.close` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.grant` | exec | yes | no | `ControlGrantParams` | `ControlStateResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.revoke` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.state` | read | no | no | `EmptyParams` | `ControlStateResult` | `ErrorCode` |
 | `capabilities` | read | no | no | `EmptyParams` | `DesktopCapabilities` | `ErrorCode` |
 | `displays` | read | no | no | `EmptyParams` | `Vec<DesktopDisplay>` | `ErrorCode` |
 | `windows` | read | no | no | `EmptyParams` | `Vec<DesktopWindow>` | `ErrorCode` |
@@ -81,6 +84,8 @@ An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-
 | `CursorRestoreFailed` | `-32018` |
 | `FocusRestoreFailed` | `-32019` |
 | `TransactionFailed` | `-32020` |
+| `InputBusy` | `-32021` |
+| `ControlRequired` | `-32022` |
 
 ## Conformance corpus
 

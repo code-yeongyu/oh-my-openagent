@@ -37,6 +37,39 @@
         "type": "null"
       }
     },
+    "control.grant": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ControlGrantParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
+    "control.revoke": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "control.state": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
     "capabilities": {
       "effect": "read",
       "hostOnly": false,
@@ -474,7 +507,9 @@
     "Cancelled": -32017,
     "CursorRestoreFailed": -32018,
     "FocusRestoreFailed": -32019,
-    "TransactionFailed": -32020
+    "TransactionFailed": -32020,
+    "InputBusy": -32021,
+    "ControlRequired": -32022
   },
   "standardErrors": {
     "parseError": -32700,
@@ -660,6 +695,42 @@
         "resumeToken"
       ],
       "description": "`session.open` reply. `resume_token` is the only way to lift a stop latch\n(`stopPath.resume`) and is never forwarded past the host process.",
+      "additionalProperties": false
+    },
+    "ControlGrantParams": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "confirmationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "confirmationId"
+      ],
+      "description": "`control.grant`: `confirmationId` is the host's receipt of the human\nconfirmation it showed; the engine never sees the confirm itself.",
+      "additionalProperties": false
+    },
+    "ControlStateResult": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "grantedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "description": "`control.grant` and `control.state` reply: this session's live foreground\ncontrol grant. `reason` and `granted_at` are present exactly when\n`active` is true.",
       "additionalProperties": false
     },
     "DesktopCapabilities": {
@@ -1785,6 +1856,9 @@
         "engine.hello",
         "session.open",
         "session.close",
+        "control.grant",
+        "control.revoke",
+        "control.state",
         "capabilities",
         "displays",
         "windows",
@@ -1851,6 +1925,16 @@
           "type": "string",
           "const": "Cancelled",
           "description": "A request aborted by `$/cancel` or a host abort."
+        },
+        {
+          "type": "string",
+          "const": "InputBusy",
+          "description": "Another session holds the foreground control grant. The slot is never\nstolen; the caller can retry after it releases."
+        },
+        {
+          "type": "string",
+          "const": "ControlRequired",
+          "description": "Foreground delivery without this session's live control grant."
         }
       ],
       "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."

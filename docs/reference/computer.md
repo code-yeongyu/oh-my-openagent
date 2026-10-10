@@ -39,6 +39,8 @@ Scroll amounts (`dx`/`dy` of `scroll`, and `scroll_x`/`scroll_y` of `computer_ac
 
 Input defaults to background delivery when supported. On macOS it leaves the frontmost app, its focused window, the cursor and the destination of the user's next keystroke unchanged, but a clicked target window may rise directly under the user's front window. Foreground delivery uses a focus guard to restore the previous window and cursor; restoration failures are reported instead of hidden. A stop chord, screen lock, lost stop path or missing OS permission refuses input before a backend action.
 
+Foreground delivery also needs this session's live control grant. The host asks the human to confirm, then calls `control.grant { reason, confirmationId }` (host-only); `control.revoke` releases it, `session.close` and a stop chord revoke it too, and `stopPath.resume` never restores it. At most one session of the process holds the grant; another session's grant is refused `InputBusy`, never stolen. `control.state` (public) reports `{ active, reason?, grantedAt? }`. The grant authorizes foreground only - an omitted delivery stays background.
+
 ## Error codes
 
 A failed call carries one engine error code (`crates/senpi-desktop-core/src/error.rs`). The ones a user or model acts on:
@@ -50,6 +52,8 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `StopPathUnavailable` | The global stop chord could not be armed, so input is refused | Use a host where the chord arms, or `allow_host_relay_only_stop` |
 | `ScreenLocked` | The screen is locked | Unlock the session |
 | `BackgroundUnavailable` | The target refuses background delivery | Use accessibility actions or `delivery: "foreground"` |
+| `ControlRequired` | Foreground delivery without this session's live control grant | Have the host confirm with the human, then `control.grant` |
+| `InputBusy` | Another session holds the foreground control grant | Retry after that session revokes or closes |
 | `InvalidCoordinateFrame` | The coordinates do not belong to the latest screenshot of that target, or the target moved or resized | Take a new screenshot of the same target |
 | `StaleRef` | An accessibility ref from an older snapshot | Take a new `ax()` snapshot |
 | `WindowNotFound`, `InvalidTarget` | The window closed, or the filter matched nothing or several windows | List windows again and pick one |

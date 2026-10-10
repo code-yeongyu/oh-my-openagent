@@ -12,6 +12,9 @@ export const ENGINE_METHODS = [
 	"engine.hello",
 	"session.open",
 	"session.close",
+	"control.grant",
+	"control.revoke",
+	"control.state",
 	"capabilities",
 	"displays",
 	"windows",
@@ -76,6 +79,8 @@ export const ERROR_CODES = [
 	"CursorRestoreFailed",
 	"FocusRestoreFailed",
 	"TransactionFailed",
+	"InputBusy",
+	"ControlRequired",
 ] as const;
 
 export type EngineMethod = (typeof ENGINE_METHODS)[number];
