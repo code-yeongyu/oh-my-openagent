@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { expect, test } from "bun:test"
-import { readFile, stat } from "node:fs/promises"
+import { readFile, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { getTasksDir, resolveBaseDir } from "../team-registry"
@@ -30,6 +30,33 @@ test("createTask assigns distinct ids during concurrent creation", async () => {
     await fixture.cleanup()
   }
 }, 30_000)
+
+test("createTask recovers next id from task files when high watermark is corrupt", async () => {
+  // given
+  const fixture = await createTasklistFixture()
+
+  try {
+    const firstTask = await createTask(fixture.teamRunId, createTaskInput({ subject: "first task" }), fixture.config)
+    await createTask(fixture.teamRunId, createTaskInput({ subject: "second task" }), fixture.config)
+    const tasksDirectory = getTasksDir(resolveBaseDir(fixture.config), fixture.teamRunId)
+    await writeFile(path.join(tasksDirectory, ".highwatermark"), "not-a-number")
+
+    // when
+    const recoveredTask = await createTask(
+      fixture.teamRunId,
+      createTaskInput({ subject: "recovered task" }),
+      fixture.config,
+    )
+
+    // then
+    const firstTaskContent = await readFile(path.join(tasksDirectory, `${firstTask.id}.json`), "utf8")
+    expect(recoveredTask.id).toBe("3")
+    expect(JSON.parse(firstTaskContent).subject).toBe("first task")
+    await expect(readFile(path.join(tasksDirectory, "3.json"), "utf8")).resolves.toContain("recovered task")
+  } finally {
+    await fixture.cleanup()
+  }
+})
 
 test("#given traversal team run id #when creating a task #then no task directory escapes the team base", async () => {
   // given
