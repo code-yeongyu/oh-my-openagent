@@ -19,7 +19,6 @@ use senpi_desktop_safety::{
 use serde_json::json;
 
 use super::{Mutation, INPUT_TRANSACTION};
-use crate::grant::test_lock as grant_test_lock;
 use crate::request::{Op, Response};
 use crate::test_support::{
     delivery, foreground_click_mutation, grant_control, harness, op_names, two_windows, Harness,
@@ -161,7 +160,6 @@ fn non_key_actions_preserve_liveness_and_cancellation_semantics() {
 
 #[test]
 fn cancelled_before_transaction_admission_does_not_capture_or_restore() {
-    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     harness.process(grant_control("one")).expect("grants");
@@ -177,7 +175,6 @@ fn cancelled_before_transaction_admission_does_not_capture_or_restore() {
 
 #[test]
 fn mutex_admission_observes_cancellation_without_capturing_cursor() {
-    let _grant_lock = grant_test_lock().lock();
     // Given: another transaction holds the lock; the waiter cancels on its
     // third look.
     let mut harness = harness(&two_windows());

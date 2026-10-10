@@ -10,7 +10,6 @@ use senpi_desktop_core::types::DesktopPoint;
 use serde_json::json;
 
 use super::TransactionError;
-use crate::grant::test_lock as grant_test_lock;
 use crate::request::Op;
 use crate::test_support::{
     click_window, delivery, foreground_click, foreground_click_mutation, grant_control, harness, op_names, two_windows,
@@ -31,7 +30,6 @@ fn keypress_backend_failure_releases_before_restore_and_keeps_primary_error() {
         ("foreground", vec!["front", "release", "restore-front", "warp"]),
     ];
     for (mode, expected) in cases {
-        let _grant_lock = grant_test_lock().lock();
         // Given
         let mut harness = harness(&two_windows());
         harness.process(grant_control("one")).expect("grants");
@@ -69,7 +67,6 @@ fn keypress_persistent_release_failure_retains_ownership_until_recovery() {
 
 #[test]
 fn transaction_captures_once_and_restore_failure_retains_primary() {
-    let _grant_lock = grant_test_lock().lock();
     // Given: a foreground drag off the frame, and a cursor that cannot return.
     let mut harness = harness(&two_windows());
     harness.process(grant_control("one")).expect("grants");
@@ -95,7 +92,6 @@ fn transaction_captures_once_and_restore_failure_retains_primary() {
 
 #[test]
 fn transaction_capture_failure_runs_no_input_or_restore() {
-    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     harness.process(grant_control("one")).expect("grants");
@@ -112,7 +108,6 @@ fn transaction_capture_failure_runs_no_input_or_restore() {
 
 #[test]
 fn transaction_panic_releases_held_input_and_restores_cursor() {
-    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     harness.process(grant_control("one")).expect("grants");
@@ -134,7 +129,6 @@ fn transaction_panic_releases_held_input_and_restores_cursor() {
 
 #[test]
 fn release_panic_still_restores_cursor_once() {
-    let _grant_lock = grant_test_lock().lock();
     // Given: the click fails and the release that follows it panics.
     let mut harness = harness(&two_windows());
     harness.process(grant_control("one")).expect("grants");
@@ -150,7 +144,6 @@ fn release_panic_still_restores_cursor_once() {
 
 #[test]
 fn restore_panic_is_mapped_without_escaping_transaction() {
-    let _grant_lock = grant_test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     harness.process(grant_control("one")).expect("grants");

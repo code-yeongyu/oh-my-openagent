@@ -8,14 +8,12 @@ use std::sync::Arc;
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_safety::StopSource;
 
-use crate::grant::test_lock;
 use crate::test_support::{
     click_window, delivery, foreground_click, foreground_click_mutation, grant_control, harness, op_names, two_windows,
 };
 
 #[test]
 fn foreground_without_a_grant_is_refused_without_input_or_capture() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     let frame = harness.capture("101");
@@ -30,7 +28,6 @@ fn foreground_without_a_grant_is_refused_without_input_or_capture() {
 
 #[test]
 fn background_delivery_needs_no_grant() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     let frame = harness.capture("101");
@@ -43,7 +40,6 @@ fn background_delivery_needs_no_grant() {
 
 #[test]
 fn a_granted_session_may_deliver_to_the_foreground() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     let frame = harness.capture("101");
@@ -59,7 +55,6 @@ fn a_granted_session_may_deliver_to_the_foreground() {
 
 #[test]
 fn a_revoked_grant_refuses_the_next_foreground_delivery() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     let frame = harness.capture("101");
@@ -74,7 +69,6 @@ fn a_revoked_grant_refuses_the_next_foreground_delivery() {
 
 #[test]
 fn a_suspension_revokes_the_grant_and_resume_does_not_restore_it() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     let frame = harness.capture("101");
@@ -95,7 +89,6 @@ fn a_suspension_revokes_the_grant_and_resume_does_not_restore_it() {
 
 #[test]
 fn an_op_queued_before_a_revoke_and_regrant_never_runs_under_the_new_grant() {
-    let _lock = test_lock().lock();
     // Given: a grant held, then replaced before a queued op is served.
     let mut harness = harness(&two_windows());
     harness.process(grant_control("first")).expect("grants");
@@ -113,7 +106,6 @@ fn an_op_queued_before_a_revoke_and_regrant_never_runs_under_the_new_grant() {
 
 #[test]
 fn ax_click_foreground_needs_the_grant() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     let reference = harness.focused_ref();
@@ -136,7 +128,6 @@ fn raise(id: &str) -> crate::request::Op {
 
 #[test]
 fn raising_a_window_without_a_grant_is_refused_and_says_how_to_allow_it() {
-    let _lock = test_lock().lock();
     // Given: nobody granted foreground control (the host never got an answer)
     let mut harness = harness(&two_windows());
     // When
@@ -154,7 +145,6 @@ fn raising_a_window_without_a_grant_is_refused_and_says_how_to_allow_it() {
 
 #[test]
 fn raising_a_window_with_a_live_grant_is_admitted() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     harness.process(grant_control("raise")).expect("grants");
@@ -167,7 +157,6 @@ fn raising_a_window_with_a_live_grant_is_admitted() {
 
 #[test]
 fn an_op_admitted_under_the_old_generation_still_finishes_its_transaction() {
-    let _lock = test_lock().lock();
     // Given: the grant is revoked from another thread mid-transaction.
     let mut harness = harness(&two_windows());
     let supervisor = Arc::clone(&harness.supervisor);

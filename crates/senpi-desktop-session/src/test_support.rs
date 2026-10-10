@@ -70,6 +70,7 @@ pub(crate) fn harness(overlay: &Value) -> Harness {
     let safety = SessionSafety {
         supervisor: Arc::clone(&supervisor),
         audit: Box::new(move |event| recorded.lock().push(event.clone())),
+        control_slot: crate::grant::ControlSlot::new(),
     };
     let panics = Panics::default();
     let factory = Factory {
@@ -124,7 +125,7 @@ impl Harness {
 
     /// The worker's live grant generation, as a dequeue would capture it.
     pub(crate) fn queue_generation(&self) -> Option<u64> {
-        crate::grant::generation_for(self.worker.instance)
+        self.worker.safety.control_slot.generation_for(self.worker.instance)
     }
 
     /// Whether a mutation carrying `queued` would be admitted foreground.

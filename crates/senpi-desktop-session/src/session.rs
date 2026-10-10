@@ -157,7 +157,7 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
                 // request's cancellation signal while it runs. The grant
                 // generation is captured as the op is dequeued, so an op
                 // queued before a revoke+regrant runs under no new grant.
-                let queued = crate::grant::generation_for(worker.instance);
+                let queued = worker.safety.control_slot.generation_for(worker.instance);
                 let result = guarded(|| worker.process_captured(op, &|| reply.is_disconnected(), queued));
                 (reply, result)
             }

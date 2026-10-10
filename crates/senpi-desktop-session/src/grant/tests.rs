@@ -4,7 +4,6 @@ use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_safety::{StopPathId, StopSource};
 use serde_json::json;
 
-use super::test_lock;
 use crate::request::{Op, Response};
 use crate::test_support::{grant_control, harness, two_windows, Harness};
 
@@ -23,7 +22,6 @@ fn state(harness: &mut Harness) -> ControlStateResult {
 
 #[test]
 fn grant_reports_the_live_grant_and_revoke_is_idempotent() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&json!({}));
     // When
@@ -53,7 +51,6 @@ fn grant_reports_the_live_grant_and_revoke_is_idempotent() {
 
 #[test]
 fn a_second_sessions_grant_is_refused_and_the_first_keeps_its_grant() {
-    let _lock = test_lock().lock();
     // Given: two sessions in this process; the first holds the grant.
     let mut first = harness(&json!({}));
     let mut second = harness(&json!({}));
@@ -75,7 +72,6 @@ fn a_second_sessions_grant_is_refused_and_the_first_keeps_its_grant() {
 
 #[test]
 fn a_suspension_revokes_and_resume_never_restores_the_grant() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&json!({}));
     grant(&mut harness, "with the human watching");
@@ -96,23 +92,23 @@ fn a_suspension_revokes_and_resume_never_restores_the_grant() {
 
 #[test]
 fn re_grant_by_the_same_session_replaces_the_generation() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&json!({}));
-    let first = grant(&mut harness, "one");
+    grant(&mut harness, "one");
+    let first_generation = harness.queue_generation();
     // When
     let second = grant(&mut harness, "two");
-    // Then
-    let (Response::ControlState(one), Response::ControlState(two)) = (first, second) else {
+    // Then: a fresh generation (timestamps can share a millisecond)
+    let Response::ControlState(two) = second else {
         unreachable!()
     };
-    assert_ne!(one.granted_at, two.granted_at);
+    assert!(first_generation.is_some());
+    assert_ne!(harness.queue_generation(), first_generation);
     assert_eq!(two.reason.as_deref(), Some("two"));
 }
 
 #[test]
 fn grant_and_revoke_each_emit_exactly_one_audit_with_the_reason_hashed() {
-    let _lock = test_lock().lock();
     // Given
     let mut harness = harness(&two_windows());
     // When
@@ -147,7 +143,6 @@ fn grant_and_revoke_each_emit_exactly_one_audit_with_the_reason_hashed() {
 
 #[test]
 fn close_releases_the_slot_for_the_next_session() {
-    let _lock = test_lock().lock();
     // Given
     let mut first = harness(&json!({}));
     grant(&mut first, "first");

@@ -15,6 +15,7 @@
 //! deliberately stricter than upstream, which gates only `takeover` input.
 
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
 use senpi_desktop_core::backend::DeliveryMode;
@@ -48,22 +49,44 @@ pub(crate) struct ControlGrant {
     pub(crate) stop_epoch: u64,
 }
 
-/// Who the process-wide slot belongs to right now.
+/// Who the slot belongs to right now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SlotOwner {
     instance: u64,
     generation: u64,
 }
 
-static CONTROL_SLOT: Mutex<Option<SlotOwner>> = parking_lot::const_mutex(None);
+/// The foreground-control slot: at most one session holds it, and a second
+/// session's grant is refused, never stolen. The engine shares one per
+/// process ([`ControlSlot::process_wide`]); tests give each harness its own,
+/// so parallel tests never contend for a global.
+#[derive(Debug, Default)]
+pub struct ControlSlot {
+    owner: Mutex<Option<SlotOwner>>,
+}
 
-/// The owner's current generation, captured when a request is enqueued.
-pub(crate) fn generation_for(instance: u64) -> Option<u64> {
-    CONTROL_SLOT
-        .lock()
-        .as_ref()
-        .filter(|owner| owner.instance == instance)
-        .map(|owner| owner.generation)
+impl ControlSlot {
+    /// A fresh, unowned slot.
+    #[must_use]
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    /// The one slot every session of this process shares.
+    #[must_use]
+    pub fn process_wide() -> Arc<Self> {
+        static SLOT: OnceLock<Arc<ControlSlot>> = OnceLock::new();
+        Arc::clone(SLOT.get_or_init(ControlSlot::new))
+    }
+
+    /// The owner's current generation, captured when a request is dequeued.
+    pub(crate) fn generation_for(&self, instance: u64) -> Option<u64> {
+        self.owner
+            .lock()
+            .as_ref()
+            .filter(|owner| owner.instance == instance)
+            .map(|owner| owner.generation)
+    }
 }
 
 impl Worker {
@@ -112,11 +135,11 @@ impl Worker {
 }
 
 impl Worker {
-    /// `control.grant`: takes the process-wide slot for this session. A
+    /// `control.grant`: takes the slot for this session. A
     /// second session is refused `InputBusy` and never steals it; the same
     /// session re-grants with a fresh generation.
     pub(crate) fn try_grant(&mut self, params: &ControlGrantParams) -> CoreResult<ControlStateResult> {
-        let mut slot = CONTROL_SLOT.lock();
+        let mut slot = self.safety.control_slot.owner.lock();
         if let Some(owner) = slot.as_ref() {
             if owner.instance != self.instance {
                 return Err(DesktopError::input_busy(
@@ -157,7 +180,7 @@ impl Worker {
     /// Releases this worker's slot share: `session.close` and `Drop`. Not an
     /// audit event: `session.close` and the stop revocation have their own.
     pub(crate) fn release_control(&mut self) {
-        let mut slot = CONTROL_SLOT.lock();
+        let mut slot = self.safety.control_slot.owner.lock();
         if slot.as_ref().is_some_and(|owner| owner.instance == self.instance) {
             *slot = None;
         }
@@ -228,12 +251,6 @@ impl Drop for Worker {
     fn drop(&mut self) {
         self.release_control();
     }
-}
-
-#[cfg(test)]
-pub(crate) fn test_lock() -> &'static Mutex<()> {
-    static LOCK: Mutex<()> = parking_lot::const_mutex(());
-    &LOCK
 }
 
 #[cfg(test)]

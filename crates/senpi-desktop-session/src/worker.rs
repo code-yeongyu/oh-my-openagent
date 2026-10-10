@@ -106,7 +106,7 @@ impl Worker {
     /// requests consult it.
     #[cfg(test)]
     pub(crate) fn process(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
-        let queued = crate::grant::generation_for(self.instance);
+        let queued = self.safety.control_slot.generation_for(self.instance);
         self.process_captured(op, cancelled, queued)
     }
 

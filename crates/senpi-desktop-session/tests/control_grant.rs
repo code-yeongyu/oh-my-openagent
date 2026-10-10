@@ -1,5 +1,6 @@
-//! The control grant across `Session`s of one process: the slot is
-//! process-wide, refused grants never steal, and `session.close` releases.
+//! The control grant across `Session`s sharing one slot (as the engine's
+//! sessions share the process-wide one): refused grants never steal, and
+//! `session.close` releases.
 
 use std::sync::Arc;
 
@@ -9,7 +10,7 @@ use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, Poi
 use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_core::types::{DesktopSessionOptions, PointerOptions};
 use senpi_desktop_safety::{FakeClock, StopPathId, Supervisor};
-use senpi_desktop_session::{BackendSelection, Op, Response, Session, SessionSafety, SessionTimeouts};
+use senpi_desktop_session::{BackendSelection, ControlSlot, Op, Response, Session, SessionSafety, SessionTimeouts};
 use serde_json::json;
 
 const FIXTURE: &str = concat!(
@@ -23,17 +24,18 @@ fn scenario() -> BackendSelection {
     BackendSelection::FakeScenario(Box::new(FakeScenario::from_json(&json.to_string()).expect("parses")))
 }
 
-fn live_stop_path() -> SessionSafety {
+fn live_stop_path(slot: &Arc<ControlSlot>) -> SessionSafety {
     let supervisor = Arc::new(Supervisor::new(Arc::new(FakeClock::new(0))));
     supervisor.set_live(StopPathId::Global, true);
     SessionSafety {
         supervisor,
         audit: Box::new(|_| {}),
+        control_slot: Arc::clone(slot),
     }
 }
 
-fn start() -> Session {
-    Session::start_supervised(scenario(), SessionTimeouts::default(), live_stop_path()).expect("session starts")
+fn start(slot: &Arc<ControlSlot>) -> Session {
+    Session::start_supervised(scenario(), SessionTimeouts::default(), live_stop_path(slot)).expect("session starts")
 }
 
 fn grant(reason: &str) -> Op {
@@ -92,8 +94,9 @@ async fn state(session: &Session) -> ControlStateResult {
 
 #[tokio::test]
 async fn a_second_sessions_grant_is_refused_and_close_releases_the_slot() {
-    // Given: session A holds the process-wide grant.
-    let first = start();
+    // Given: two sessions share one slot, and session A holds the grant.
+    let slot = ControlSlot::new();
+    let first = start(&slot);
     open(&first).await;
     let granted = first.submit(grant("first")).wait().await.expect("grants");
     assert!(matches!(
@@ -101,7 +104,7 @@ async fn a_second_sessions_grant_is_refused_and_close_releases_the_slot() {
         Response::ControlState(ControlStateResult { active: true, .. })
     ));
     // When: session B asks
-    let second = start();
+    let second = start(&slot);
     open(&second).await;
     let refused = second.submit(grant("second")).wait().await;
     // Then: InputBusy, and A keeps its grant
@@ -123,7 +126,7 @@ async fn a_second_sessions_grant_is_refused_and_close_releases_the_slot() {
 #[tokio::test]
 async fn foreground_delivery_needs_the_grant_and_a_suspension_revokes_it() {
     // Given
-    let session = start();
+    let session = start(&ControlSlot::new());
     open(&session).await;
     let frame = capture(&session).await;
     // When: no grant

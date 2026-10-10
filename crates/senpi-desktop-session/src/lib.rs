@@ -23,6 +23,7 @@ mod worker_capture;
 mod worker_clipboard;
 mod worker_input;
 
+pub use grant::ControlSlot;
 pub use mutate::SessionSafety;
 pub use request::{Op, Response};
 pub use selection::{BackendFactory, BackendSelection, SelectionError};

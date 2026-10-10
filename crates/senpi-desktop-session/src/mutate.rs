@@ -22,6 +22,7 @@ use senpi_desktop_safety::{
 };
 
 use crate::audit::audit_event;
+use crate::grant::ControlSlot;
 use crate::restore::{Guard, TransactionError};
 use crate::session::guarded;
 use crate::worker::Worker;
@@ -41,6 +42,9 @@ pub struct SessionSafety {
     /// Receives one [`AuditEvent`] per mutating request, success or failure;
     /// the engine forwards it as the `audit` notification.
     pub audit: Box<dyn Fn(&AuditEvent) + Send>,
+    /// Who holds the foreground-control grant. The engine passes
+    /// [`ControlSlot::process_wide`] so its sessions share one slot.
+    pub control_slot: Arc<ControlSlot>,
 }
 
 impl SessionSafety {
@@ -51,6 +55,7 @@ impl SessionSafety {
         Self {
             supervisor: Arc::new(Supervisor::new(Arc::new(MonotonicClock::new()))),
             audit: Box::new(|_| {}),
+            control_slot: ControlSlot::process_wide(),
         }
     }
 }
