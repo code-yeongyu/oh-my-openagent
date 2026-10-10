@@ -22,8 +22,9 @@ export function failStrandedHandoff(store: TaskRecordStore, timestamp: string, i
       || fresh.notification.run_epoch !== input.epoch || fresh.host_pid !== input.owner) return fresh
     owned = true
     undelivered = fresh.pending_steering?.length ?? 0
-    // Keep the closing child's identity until its cleanup owner takes over.
-    const { fallback_handoff_epoch: _ended, ...rest } = fresh
+    // Keep the closing child's identity until its cleanup owner takes over. The queue ends here, inside
+    // the one failure result, so a later teardown has nothing left to report a second time.
+    const { fallback_handoff_epoch: _ended, pending_steering: _dropped, ...rest } = fresh
     return rest
   })
   if (!owned) return
@@ -32,6 +33,7 @@ export function failStrandedHandoff(store: TaskRecordStore, timestamp: string, i
     undelivered,
   )
   const failed = store.transition(input.taskId, { type: "fail", timestamp, error_message: message })
+  if (undelivered > 0) store.appendEvent(input.taskId, { type: "steer_dropped", payload: { count: undelivered, reason: "fallback_failed" } })
   if (failed.applied) {
     store.appendEvent(input.taskId, {
       type: "task_fallback_teardown_failed", payload: { error_message: reason, next_model: input.nextModel },

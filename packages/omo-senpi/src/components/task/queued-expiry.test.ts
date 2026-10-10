@@ -57,8 +57,8 @@ for (const residency of ["persisted_only", "rpc_detached"] as const) {
 }
 
 for (const expiry of ["target_gone", "ttl"] as const) {
-  for (const notified of [false, true]) {
-    test(`${expiry} ends a terminal queued target and reports it once after prior notification=${notified}`, async () => {
+  for (const status of ["completed", "interrupted", "error"] as const) for (const notified of [false, true]) {
+    test(`${expiry} ends a ${status} queued target and reports it once after prior notification=${notified}`, async () => {
       let now = 1000
       const messages: ParentNotifierMessage[] = []
       const h = coldReviveHarness({
@@ -73,7 +73,7 @@ for (const expiry of ["target_gone", "ttl"] as const) {
       const events = spyOn(h.store, "appendEvent")
       try {
         h.store.mutate(h.record.task_id, record => ({
-          ...record, updated_at: new Date(now).toISOString(), terminal_at: new Date(now).toISOString(),
+          ...record, status, updated_at: new Date(now).toISOString(), terminal_at: new Date(now).toISOString(),
           notification: { ...record.notification, notified_epoch: notified ? record.notification.run_epoch : -1 },
           pending_steering: [{ id: "expired", message: "Q1", deliver_as: "steer" }],
         }))

@@ -11,11 +11,7 @@ export function withDroppedSteeringNotice(message: string | undefined, count: nu
 /** A terminal turn's later queued continuation owes its own terminal result when its target ends. */
 export function endDroppedSteering(record: TaskRecord, timestamp: string, count: number): TaskRecord {
   const error_message = withDroppedSteeringNotice(record.error_message ?? "Task target is no longer available.", count)
-  // A failed run already owes its failure result; its queue is not a later completed continuation.
-  if (record.status === "error") {
-    return { ...record, killed: true, failure_kind: "suspended_unresumable", error_message, updated_at: timestamp }
-  }
-  if (record.status === "completed" || record.status === "interrupted") {
+  if (record.status === "completed" || record.status === "error" || record.status === "interrupted") {
     return {
       ...record, status: "error", killed: true, failure_kind: "suspended_unresumable",
       error_message, updated_at: timestamp, terminal_at: timestamp,
