@@ -112,9 +112,9 @@ export const atlasPromptVariants: BundledVariantTable = Object.fromEntries(
 // The parity contract consumed by runtime-preset-parity.test.ts: same ids in, same variant out.
 // Each case pairs a representative model id with the Atlas variant it must resolve to through
 // resolveVariant. The expected variant is the plugin's own resolution, so the fixture stays honest
-// when routing changes; the senpi runtime shares this case shape via its PROMPT_PRESET_MODEL_CASES
-// (senpi PR #3075), and once the published @code-yeongyu/senpi carries that contract the parity
-// test converges to import and resolve the runtime's fixture instead of this local mirror.
+// when routing changes; the runtime's shared PROMPT_PRESET_MODEL_CASES fixture mirrors this case
+// shape, and once it is published to a consumable surface the parity test converges to import and
+// resolve the runtime's fixture instead of this local mirror.
 export type RuntimePresetCase = {
   readonly providerID: string
   readonly modelID: string
