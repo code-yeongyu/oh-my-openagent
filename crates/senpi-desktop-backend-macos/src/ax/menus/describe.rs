@@ -35,7 +35,7 @@ fn shortcut(element: &AXUIElement) -> Option<String> {
         .downcast::<CFNumber>()
         .ok()?
         .as_i64()?;
-    Some(render_shortcut(&key, modifiers))
+    render_shortcut(&key, modifiers)
 }
 
 pub(super) fn render_shortcut(key: &str, modifiers: i64) -> Option<String> {
