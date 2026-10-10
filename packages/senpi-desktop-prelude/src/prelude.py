@@ -109,11 +109,30 @@ def _make_computer():
         def write(self, text):
             return _call([_step("clipboard.write", (text,), {})])
 
+    class _Control:
+        __slots__ = ()
+
+        def __repr__(self):
+            return "<computer.control>"
+
+        def acquire(self, *args, **kwargs):
+            """Ask the human for the foreground-control grant; returns { active }."""
+            return _call([_step("control.acquire", args, kwargs)])
+
+        def release(self):
+            """Release the foreground-control grant."""
+            return _call([_step("control.release", (), {})])
+
+        def state(self):
+            """Read the foreground-control grant state."""
+            return _call([_step("control.state", (), {})])
+
     class _Computer:
-        __slots__ = ("clipboard",)
+        __slots__ = ("clipboard", "control")
 
         def __init__(self):
             self.clipboard = _Clipboard()
+            self.control = _Control()
 
         def __repr__(self):
             return "<computer>"

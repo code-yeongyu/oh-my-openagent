@@ -196,8 +196,23 @@ interface ComputerDesktop extends ComputerInputTarget {
 		read(): Promise<string>;
 		write(text: string): Promise<void>;
 	};
+	readonly control: {
+		/** Ask the human for the foreground-control grant; returns `{ active }` (false when headless or refused). */
+		acquire(options: { reason: string }): Promise<ComputerControlState>;
+		/** Release the foreground-control grant; belongs in `finally`. */
+		release(): Promise<void>;
+		/** Read the foreground-control grant state. */
+		state(): Promise<ComputerControlState>;
+	};
 	/** Native backend capabilities, permission state, stop path, and focus guard. */
 	capabilities(): Promise<ComputerCapabilities>;
+}
+
+/** The foreground-control grant state (#9651). */
+interface ComputerControlState {
+	active: boolean;
+	reason?: string | null;
+	grantedAt?: string | null;
 }
 
 /** Scope object passed as the first argument to a computer run function. */

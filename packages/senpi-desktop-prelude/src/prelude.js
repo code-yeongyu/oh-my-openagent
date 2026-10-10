@@ -104,6 +104,11 @@
 		read: () => callValue([step("clipboard.read", [])]),
 		write: text => callValue([step("clipboard.write", [text])]),
 	});
+	computer.control = Object.freeze({
+		acquire: options => callValue([step("control.acquire", [options])]),
+		release: () => callValue([step("control.release", [])]),
+		state: () => callValue([step("control.state", [])]),
+	});
 	computer.run = async (fnOrCode, options) => {
 		if (typeof fnOrCode !== "function" && typeof fnOrCode !== "string") {
 			throw new TypeError("computer.run() expects a function or code string");
