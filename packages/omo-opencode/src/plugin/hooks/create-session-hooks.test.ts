@@ -1,10 +1,11 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 import { createSessionHooks } from "./create-session-hooks"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { resetVersionCache, setVersionCache } from "../../shared/opencode-version"
 
 const mockContext = unsafeTestValue<PluginContext>({
   directory: "/tmp",
@@ -23,6 +24,35 @@ const mockModelCacheState = {} as ModelCacheState
 const mockBackgroundManager = unsafeTestValue<BackgroundManager>({})
 
 describe("createSessionHooks", () => {
+  describe("Hephaestus AGENTS.md registration", () => {
+    afterEach(resetVersionCache)
+
+    it.each([
+      { version: "1.1.36", enabled: true, registered: true },
+      { version: "1.1.37", enabled: true, registered: false },
+      { version: "1.18.33", enabled: true, registered: false },
+      { version: null, enabled: true, registered: true },
+      { version: "1.1.36", enabled: false, registered: false },
+      { version: null, enabled: false, registered: false },
+    ])("registers=$registered when version=$version and enabled=$enabled", ({ version, enabled, registered }) => {
+      // given
+      setVersionCache(version)
+
+      // when
+      const result = createSessionHooks({
+        ctx: mockContext,
+        pluginConfig: unsafeTestValue<OhMyOpenCodeConfig>({}),
+        modelCacheState: mockModelCacheState,
+        backgroundManager: mockBackgroundManager,
+        isHookEnabled: (hookName) => enabled && hookName === "hephaestus-agents-md-injector",
+        safeHookEnabled: true,
+      })
+
+      // then
+      expect(result.hephaestusAgentsMdInjector !== null).toBe(registered)
+    })
+  })
+
   it("keeps model fallback disabled when config is unset", () => {
     // given
     const pluginConfig = {} as OhMyOpenCodeConfig
