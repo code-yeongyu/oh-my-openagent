@@ -44,9 +44,13 @@ export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellTy
 	return buildEnvPrefix(envRecord, resolvedShellType)
 }
 
+/**
+ * Commit-identity contract: commits our tooling causes in a user's repository carry the
+ * operator's own author/committer and never a GitHub-resolvable automation identity. The
+ * body footer is opt-in (default off) and `include_co_authored_by` is a deprecated no-op.
+ */
 export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
-	const commitFooter = config?.commit_footer ?? true
-	const includeCoAuthoredBy = config?.include_co_authored_by ?? true
+	const commitFooter = config?.commit_footer ?? false
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
 	const shellType = detectShellType()
@@ -56,8 +60,8 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 
 	let result = gitEnvPrefix ? injectGitEnvPrefix(template, shellPrefix, codeBlockLang) : template
 
-	if (commitFooter || includeCoAuthoredBy) {
-		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, shellPrefix)
+	if (commitFooter) {
+		const injection = buildCommitFooterInjection(commitFooter, shellPrefix)
 		const insertionPoint = result.indexOf("```\n</execution>")
 
 		result =
@@ -133,67 +137,28 @@ function prefixGitCommandsInCodeBlock(codeBlock: string, prefix: string): string
 		.join("\n")
 }
 
-function buildCommitFooterInjection(
-	commitFooter: boolean | string,
-	includeCoAuthoredBy: boolean,
-	gitEnvPrefix: string,
-): string {
-	const sections: string[] = []
+function buildCommitFooterInjection(commitFooter: true | string, gitEnvPrefix: string): string {
 	const cmdPrefix = gitEnvPrefix ? `${gitEnvPrefix} ` : ""
+	const footerText =
+		typeof commitFooter === "string"
+			? commitFooter
+			: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
 
-	sections.push("### 5.5 Commit Footer & Co-Author")
-	sections.push("")
-	sections.push("Add Sisyphus attribution to EVERY commit:")
-	sections.push("")
-
-	if (commitFooter) {
-		const footerText =
-			typeof commitFooter === "string"
-				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
-		sections.push("1. **Footer in commit body:**")
-		sections.push("```")
-		sections.push(footerText)
-		sections.push("```")
-		sections.push("")
-	}
-
-	if (includeCoAuthoredBy) {
-		sections.push(`${commitFooter ? "2" : "1"}. **Co-authored-by trailer:**`)
-		sections.push("```")
-		sections.push("Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>")
-		sections.push("```")
-		sections.push("")
-	}
-
-	if (commitFooter && includeCoAuthoredBy) {
-		const footerText =
-			typeof commitFooter === "string"
-				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
-		sections.push("**Example (both enabled):**")
-		sections.push("```bash")
-		sections.push(
-			`${cmdPrefix}git commit -m "{Commit Message}" -m "${footerText}" -m "Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>"`
-		)
-		sections.push("```")
-	} else if (commitFooter) {
-		const footerText =
-			typeof commitFooter === "string"
-				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
-		sections.push("**Example:**")
-		sections.push("```bash")
-		sections.push(`${cmdPrefix}git commit -m "{Commit Message}" -m "${footerText}"`)
-		sections.push("```")
-	} else if (includeCoAuthoredBy) {
-		sections.push("**Example:**")
-		sections.push("```bash")
-		sections.push(
-			`${cmdPrefix}git commit -m "{Commit Message}" -m "Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>"`
-		)
-		sections.push("```")
-	}
-
-	return sections.join("\n")
+	return [
+		"### 5.5 Commit Footer",
+		"",
+		"Add Sisyphus attribution to EVERY commit:",
+		"",
+		"1. **Footer in commit body:**",
+		"```",
+		footerText,
+		"```",
+		"",
+		"Do NOT add a Co-authored-by trailer.",
+		"",
+		"**Example:**",
+		"```bash",
+		`${cmdPrefix}git commit -m "{Commit Message}" -m "${footerText}"`,
+		"```",
+	].join("\n")
 }

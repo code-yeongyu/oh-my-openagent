@@ -43,6 +43,12 @@ export function writeRecord(path: string, record: TaskRecord, mode: WriteRecordM
     }
   }
 
+  atomicReplace(path, payload, platform)
+}
+
+// Shared by task records and plain workpool data. Callers own the short record lock.
+export function atomicReplace(path: string, payload: string, platform: NodeJS.Platform = process.platform): void {
+  mkdirSync(dirname(path), { recursive: true })
   // pid + random segment: two writers in one process (or a pid reused across a crash) never share
   // a temp name, and the finally leaves nothing behind when the rename is refused.
   const tmpPath = `${path}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ChildProcess, ChildProcessWithoutNullStreams } from "node:child_process"
 import { spawn } from "node:child_process"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -16,6 +16,7 @@ import {
   pidTerminalWithin,
   readPidFileWhenWritten,
 } from "./process-liveness.test-support"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const workerPath = fileURLToPath(new URL("./subprocess-worker.ts", import.meta.url))
 const temporaryDirectories: string[] = []
@@ -98,7 +99,7 @@ afterEach(async () => {
     }
   }
   await Promise.all(temporaryDirectories.splice(0).map(async (directory) => {
-    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
   }))
 })
 

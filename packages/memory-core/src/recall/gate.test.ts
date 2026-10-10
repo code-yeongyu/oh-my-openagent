@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { PendingNudges, validateNudges } from "./gate"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
@@ -15,7 +16,7 @@ async function createPendingDir(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
   )
 })
 

@@ -8,6 +8,7 @@ import { dagDefinitionAmendedEvent, dagRunCreatedEvent, type DagRunEventType } f
 import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprintInputV1 } from "./fingerprint"
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
 import { createDagJournal, type DagJournalCheckpoint } from "./journal"
+import { readDagNodeActivityAt } from "./node-activity"
 import { readDagDirectory, type DagEventPage, type DagFileStore } from "./store"
 import { DAG_SETTINGS_DEFAULTS } from "./types"
 import type {
@@ -134,6 +135,13 @@ export type DagRunRecordV1 = DagJournalCheckpoint & {
   readonly previousLeaseHolderPid?: number
 }
 
+type CachedRunSummary = {
+  readonly ino: number
+  readonly size: number
+  readonly mtimeMs: number
+  readonly summary: DagRunSummary
+}
+
 export type DagRunSummary = {
   readonly runId: DagRunId
   readonly runKey: string
@@ -215,6 +223,40 @@ export function createDagManager(options: DagManagerOptions): DagManager {
   const now = options.now ?? Date.now
   const newRunId = options.newRunId ?? (() => `dag_${randomUUID()}` as DagRunId)
   const settings: DagSettings = { ...DAG_SETTINGS_DEFAULTS, ...options.settings }
+  // list() sits on the DAG widget's 1Hz repaint path AND on the runtime mutation listener that
+  // fires for every checkpoint write, so parsing each checkpoint in the runs directory made one
+  // frame re-read the whole of DAG history: 710 checkpoints / 68MB / 473ms per call on a real
+  // state dir, which starved the TUI writer and froze the screen after resuming a DAG-bearing
+  // session. A summary is a pure projection of the persisted record, and every checkpoint write
+  // lands as a temp+rename (store.ts writeFileAtomic) that allocates a new inode, so a matching
+  // (ino, size, mtimeMs) means byte-identical content. The directory listing stays authoritative -
+  // this caches the parse, never the membership - so a run can never go missing from the list.
+  const summaryCache = new Map<DagRunId, CachedRunSummary>()
+
+  function runSummary(runId: DagRunId): DagRunSummary | undefined {
+    const stats = fs.statSync(store.paths.run(runId), { throwIfNoEntry: false })
+    const cached = summaryCache.get(runId)
+    if (stats !== undefined && cached !== undefined && cached.ino === stats.ino && cached.size === stats.size && cached.mtimeMs === stats.mtimeMs) {
+      return cached.summary
+    }
+    const record = store.readCheckpoint<DagRunRecordV1>(runId)
+    if (record === null) {
+      summaryCache.delete(runId)
+      return undefined
+    }
+    const summary: DagRunSummary = {
+      runId: record.runId,
+      runKey: record.runKey,
+      name: record.name,
+      parentSessionId: record.parentSessionId,
+      status: record.status,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      counts: countNodes(record.nodes),
+    }
+    if (stats !== undefined) summaryCache.set(runId, { ino: stats.ino, size: stats.size, mtimeMs: stats.mtimeMs, summary })
+    return summary
+  }
 
   function ownedRecord(runId: DagRunId, parentSessionId: string): DagRunRecordV1 {
     const record = store.readCheckpoint<DagRunRecordV1>(runId)
@@ -248,29 +290,24 @@ export function createDagManager(options: DagManagerOptions): DagManager {
       ownedRecord(runId, parentSessionId)
       return {
         runId,
-        snapshot: () => projectSnapshot(ownedRecord(runId, parentSessionId)),
+        snapshot: () => projectSnapshot(ownedRecord(runId, parentSessionId), store.stateDir),
       }
     },
-    snapshot: (runId, parentSessionId) => projectSnapshot(ownedRecord(runId, parentSessionId)),
+    snapshot: (runId, parentSessionId) => projectSnapshot(ownedRecord(runId, parentSessionId), store.stateDir),
     record: ownedRecord,
     list(parentSessionId, listOptions) {
       const limit = resolveLimit(listOptions?.limit, LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT)
       const summaries: DagRunSummary[] = []
+      const present = new Set<DagRunId>()
       for (const entry of readDagDirectory(store.paths.runs)) {
         if (!entry.isFile() || !entry.name.endsWith(".json")) continue
-        const record = store.readCheckpoint<DagRunRecordV1>(entry.name.slice(0, -5) as DagRunId)
-        if (record === null || record.parentSessionId !== parentSessionId) continue
-        summaries.push({
-          runId: record.runId,
-          runKey: record.runKey,
-          name: record.name,
-          parentSessionId: record.parentSessionId,
-          status: record.status,
-          createdAt: record.createdAt,
-          updatedAt: record.updatedAt,
-          counts: countNodes(record.nodes),
-        })
+        const runId = entry.name.slice(0, -5) as DagRunId
+        present.add(runId)
+        const summary = runSummary(runId)
+        if (summary === undefined || summary.parentSessionId !== parentSessionId) continue
+        summaries.push(summary)
       }
+      for (const runId of summaryCache.keys()) if (!present.has(runId)) summaryCache.delete(runId)
       summaries.sort((a, b) => {
         const byUpdated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
         if (byUpdated !== 0) return byUpdated
@@ -347,7 +384,7 @@ function startRun(params: DagStartParams, context: StartContext): DagStartResult
         })
       }
       // Reuse never re-materializes skills: the run keeps its creation-time effectivePrompt.
-      return { reused: true, snapshot: projectSnapshot(existing) }
+      return { reused: true, snapshot: projectSnapshot(existing, context.store.stateDir) }
     }
 
     const runId = context.newRunId()
@@ -409,7 +446,7 @@ function startRun(params: DagStartParams, context: StartContext): DagStartResult
       nodeCount: compiled.nodes.length,
       edgeCount: compiled.edges.length,
     }))
-    return { reused: false, snapshot: projectSnapshot(journal.snapshot()) }
+    return { reused: false, snapshot: projectSnapshot(journal.snapshot(), context.store.stateDir) }
   })
 }
 
@@ -483,7 +520,7 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     const oldNode = oldNodes.get(compiledNode.id)
     if (oldNode === undefined) return compiledNode
     if (!invalidated.has(compiledNode.id)) return oldNode
-    const { error: _error, resultArtifact: _resultArtifact, runStats: _runStats, completedAt: _completedAt, startedAt: _startedAt, ...kept } = oldNode as DagNode & {
+    const { error: _error, resultArtifact: _resultArtifact, runStats: _runStats, completedAt: _completedAt, startedAt: _startedAt, output: _output, outputBytes: _outputBytes, ...kept } = oldNode as DagNode & {
       readonly resultArtifact?: unknown
     }
     return {
@@ -548,7 +585,7 @@ export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent):
       ...record,
       nodes: record.nodes.map((node) => {
         if (node.id !== event.nodeId) return node
-        const { error: _error, resultArtifact: _resultArtifact, runStats: _runStats, completedAt: _completedAt, startedAt: _startedAt, ...kept } = node as DagNode & {
+        const { error: _error, resultArtifact: _resultArtifact, runStats: _runStats, completedAt: _completedAt, startedAt: _startedAt, output: _output, outputBytes: _outputBytes, ...kept } = node as DagNode & {
           readonly resultArtifact?: unknown
         }
         return { ...kept, state: "pending", execAttempt: event.execAttempt }
@@ -686,7 +723,19 @@ function materializeAmendedDefinition(
   }
 }
 
-function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
+// States whose node still owns a child that could be doing work right now. The activity clock is
+// projected for exactly these, so a settled node never reports a stale "last seen" time.
+const LIVE_CHILD_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["scheduled", "running"])
+
+function withNodeActivity(nodes: readonly DagNode[], stateDir: string): readonly DagNode[] {
+  return nodes.map((node) => {
+    if (node.taskId === undefined || !LIVE_CHILD_NODE_STATES.has(node.state)) return node
+    const lastActivityAt = readDagNodeActivityAt(stateDir, node.taskId)
+    return lastActivityAt === undefined ? node : { ...node, lastActivityAt }
+  })
+}
+
+function projectSnapshot(record: DagRunRecordV1, stateDir: string): DagRunSnapshot {
   return {
     schemaVersion: 1,
     runId: record.runId,
@@ -701,7 +750,7 @@ function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
     ...(record.completedAt === undefined ? {} : { completedAt: record.completedAt }),
     definitionFingerprint: record.definitionFingerprint,
     lastSeq: record.checkpointSeq,
-    nodes: record.nodes,
+    nodes: withNodeActivity(record.nodes, stateDir),
     edges: record.edges,
     waves: record.waves,
     criticalPath: record.criticalPath,

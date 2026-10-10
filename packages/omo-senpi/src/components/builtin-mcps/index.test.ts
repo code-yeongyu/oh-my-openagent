@@ -13,6 +13,7 @@ const GREP_APP_DECLARATION = {
   enabled: true,
   auth: false,
   lifecycle: "lazy",
+  exposure: "search",
 }
 
 const ANONYMOUS_CONTEXT7_DECLARATION = {
@@ -21,6 +22,7 @@ const ANONYMOUS_CONTEXT7_DECLARATION = {
   enabled: true,
   auth: false,
   lifecycle: "lazy",
+  exposure: "search",
 }
 
 function recordingLogger(): ComponentLogger & { readonly entries: Array<{ level: string; message: string; details?: unknown }> } {
@@ -81,6 +83,7 @@ describe("createBuiltinMcpsComponent", () => {
           auth: "bearer",
           bearerTokenEnv: "CONTEXT7_API_KEY",
           lifecycle: "lazy",
+          exposure: "search",
         },
       },
       { name: "grep_app", config: GREP_APP_DECLARATION },

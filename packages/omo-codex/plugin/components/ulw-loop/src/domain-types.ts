@@ -19,6 +19,7 @@ export interface UlwLoopSuccessCriterion {
 	status: UlwLoopCriterionStatus;
 	capturedAt?: string;
 	notes?: string;
+	artifacts?: string[];
 }
 
 export interface UlwLoopItem {
@@ -63,6 +64,9 @@ export interface UlwLoopValidationBatch {
 
 export interface UlwLoopPlan {
 	version: 1;
+	revision?: number;
+	brief?: string;
+	ledgerResetRevision?: number;
 	evidenceLayoutVersion?: 2;
 	createdAt: string;
 	updatedAt: string;
@@ -72,6 +76,7 @@ export interface UlwLoopPlan {
 	codexGoalMode?: UlwLoopCodexGoalMode;
 	codexObjective?: string;
 	codexObjectiveAliases?: string[];
+	acknowledgedDriverObjectives?: string[];
 	aggregateCompletion?: UlwLoopAggregateCompletion;
 	activeGoalId?: string;
 	validationBatches?: readonly UlwLoopValidationBatch[];
@@ -158,6 +163,8 @@ export interface UlwLoopQualityGateSenpi extends UlwLoopQualityGateCommon {
 export type UlwLoopQualityGate = UlwLoopQualityGateLazycodex | UlwLoopQualityGateSenpi;
 
 export interface UlwLoopLedgerEntry {
+	revision?: number;
+	id?: string;
 	at: string;
 	kind: UlwLoopLedgerEventKind;
 	goalId?: string;
@@ -168,6 +175,7 @@ export interface UlwLoopLedgerEntry {
 	codexGoal?: unknown;
 	evidence?: string;
 	capturedEvidence?: string;
+	artifacts?: string[];
 	qualityGate?: unknown;
 	steering?: UlwLoopSteeringAudit;
 	before?: unknown;

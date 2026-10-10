@@ -121,7 +121,15 @@ describe("runSenpiStartupMigration", () => {
 
     // then
     expect(result.error).toBeUndefined()
-    expect(result.results.map((entry) => entry.status)).toEqual(["migrated", "migrated", "migrated"])
+    expect(result.results.map((entry) => entry.status)).toEqual([
+      "migrated",
+      "migrated",
+      "migrated",
+      "skipped",
+      "skipped",
+      "skipped",
+      "skipped",
+    ])
     expect(parse(fileSystem.readFileSync("/home/alice/.omo/omo.jsonc", "utf-8"))).toMatchObject({
       _migrations: [
         "2026-07-opencode-config-unification",
@@ -214,10 +222,10 @@ describe("createConfigStartupComponent", () => {
     // then
     expect(notifications).toEqual([
       {
-        message: "omo-senpi: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
+        message: "OmO Native: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
         type: "info",
       },
-      { message: "omo-senpi: configuration diagnostics: JSONC parse error", type: "warning" },
+      { message: "OmO Native: configuration diagnostics: JSONC parse error", type: "warning" },
     ])
     expect(logs).toEqual([])
   })
@@ -245,11 +253,11 @@ describe("createConfigStartupComponent", () => {
     // then
     expect(notifications).toEqual([
       {
-        message: "omo-senpi: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
+        message: "OmO Native: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
         type: "info",
       },
       {
-        message: "omo-senpi: configuration migration: skipped: [opencode].model_fallback legacy=true kept=false",
+        message: "OmO Native: configuration migration: skipped: [opencode].model_fallback legacy=true kept=false",
         type: "warning",
       },
     ])
@@ -277,7 +285,7 @@ describe("createConfigStartupComponent", () => {
     await pi.dispatch("session_start", {})
 
     // then
-    expect(logs).toEqual(["warn:omo-senpi: configuration diagnostics: Invalid omo config"])
+    expect(logs).toEqual(["warn:OmO Native: configuration diagnostics: Invalid omo config"])
   })
 
   test("#given a retired agents.momus key in omo.json #when session_start captures a UI #then nothing is reported about it", async () => {
@@ -324,6 +332,32 @@ describe("notificationMessages", () => {
 
     // then: the one-release alias window closed, so the keys are plain custom agents
     expect(notices).toEqual([])
+  })
+
+  test("#given category and agent pins naming Devin SWE-2 ids Cascade does not serve #when notices are built #then one warning names each and the served lanes", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: {
+          quick: { model: "devin/swe-2-low" },
+          "deep-low": { models: ["devin/swe-2-max", { model: "devin/swe-2-high-lite" }] },
+          writing: { model: "devin/swe-2-high", fallback_models: ["devin/swe-2"] },
+        },
+        agents: { scout: { model: "devin/swe-2-medium" } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([{
+      message: "OmO Native: Devin does not serve devin/swe-2-low (categories.quick.model), devin/swe-2-high-lite (categories.deep-low.models[1]), devin/swe-2 (categories.writing.fallback_models[0]); SWE-2 runs as devin/swe-2-medium, devin/swe-2-high or devin/swe-2-max",
+      type: "warning",
+    }])
   })
 
   test("#given only canonical and custom agent keys #when notices are built #then no alias-deprecated notice is produced", () => {

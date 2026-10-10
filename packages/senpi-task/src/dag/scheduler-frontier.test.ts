@@ -50,14 +50,14 @@ function definition(nodes: DagDefinition["nodes"]): DagDefinition {
   return { key: "frontier-test", name: "frontier test", nodes }
 }
 
-function recordFor(input: DagDefinition): DagRunRecordV1 {
+function recordFor(input: DagDefinition, id: DagRunId = runId): DagRunRecordV1 {
   const createdAt = "2026-08-25T00:00:00.000Z"
   const compiled = compileDag(input, { at: createdAt })
   if (!compiled.ok) throw new Error("test DAG did not compile")
   return {
     schemaVersion: 1,
     checkpointSeq: 0,
-    runId,
+    runId: id,
     runKey: input.key,
     name: input.name,
     parentSessionId,
@@ -104,6 +104,10 @@ class FrontierFakeManager implements TaskManager {
     readonly resolveCompletion: (record: TaskRecord) => void
   }>()
   readonly #startedSignals = new Map<string, ReturnType<typeof deferred<void>>>()
+  readonly #deniedSignals = new Map<string, ReturnType<typeof deferred<void>>>()
+  // Session-scoped residency wake, mirroring the real manager: armed per parent session, fired
+  // whenever a resident of that session settles (#8396).
+  readonly #residencyWaiters = new Map<string, ReturnType<typeof deferred<void>>>()
   #taskCounter = 0
 
   constructor(options: FakeOptions = {}) {
@@ -120,6 +124,32 @@ class FrontierFakeManager implements TaskManager {
     return signal.promise
   }
 
+  whenDenied(nodeId: string): Promise<void> {
+    let signal = this.#deniedSignals.get(nodeId)
+    if (signal === undefined) {
+      signal = deferred<void>()
+      this.#deniedSignals.set(nodeId, signal)
+    }
+    if (this.denials.includes(nodeId)) signal.resolve()
+    return signal.promise
+  }
+
+  residencyChanged(session: string): Promise<void> {
+    let waiter = this.#residencyWaiters.get(session)
+    if (waiter === undefined) {
+      waiter = deferred<void>()
+      this.#residencyWaiters.set(session, waiter)
+    }
+    return waiter.promise
+  }
+
+  #notifyResidency(session: string): void {
+    const waiter = this.#residencyWaiters.get(session)
+    if (waiter === undefined) return
+    this.#residencyWaiters.delete(session)
+    waiter.resolve()
+  }
+
   recordOf(nodeId: string): TaskRecord | undefined {
     return [...this.#tasks.values()].find((entry) => String(entry.record.owner?.nodeId) === nodeId)?.record
   }
@@ -134,6 +164,7 @@ class FrontierFakeManager implements TaskManager {
       ...(status === "completed" ? { final_response: `done ${nodeId}` } : { error_message: `${status} ${nodeId}` }),
     }
     entry.resolveCompletion(entry.record)
+    this.#notifyResidency(entry.record.parent_session_id)
   }
 
   async startOwned(_spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
@@ -146,10 +177,17 @@ class FrontierFakeManager implements TaskManager {
     const limit = this.#options.residencyLimit ?? Number.POSITIVE_INFINITY
     const residents = [...this.#tasks.values()]
       .filter((entry) => entry.record.status === "pending" || entry.record.status === "running")
-      .length
-    if (residents >= limit) {
+      .map((entry) => entry.record)
+    if (residents.length >= limit) {
       this.denials.push(nodeId)
-      return { kind: "residency_denied", reason: "resident child cap reached" }
+      this.#deniedSignals.get(nodeId)?.resolve()
+      return {
+        kind: "residency_denied",
+        reason: "resident child cap reached",
+        cause: "residents",
+        max_children: limit,
+        residents: residents.map((record) => ({ task_id: record.task_id, name: record.name ?? record.task_id, status: record.status })),
+      }
     }
     this.#taskCounter += 1
     const taskId = `task-${this.#taskCounter}`
@@ -207,10 +245,15 @@ class FrontierFakeManager implements TaskManager {
   wasBackground(): boolean { return true }
 }
 
-function frontierFixture(input: DagDefinition, manager: FrontierFakeManager) {
-  const store = createDagFileStore({ project_dir: tempProject() })
-  const initialRecord = recordFor(input)
-  store.writeCheckpoint(runId, initialRecord)
+function frontierFixture(
+  input: DagDefinition,
+  manager: FrontierFakeManager,
+  options: { readonly runId?: DagRunId; readonly store?: DagFileStore } = {},
+) {
+  const store = options.store ?? createDagFileStore({ project_dir: tempProject() })
+  const id = options.runId ?? runId
+  const initialRecord = recordFor(input, id)
+  store.writeCheckpoint(id, initialRecord)
   let eventTime = Date.parse("2026-08-25T00:00:02.000Z")
   const scheduler = createDagScheduler({
     store,
@@ -218,8 +261,25 @@ function frontierFixture(input: DagDefinition, manager: FrontierFakeManager) {
     initialRecord,
     now: () => eventTime++,
   })
-  const events = (): readonly DagRunEvent[] => store.readEvents(runId, 0, { limit: 200 }).events
+  const events = (): readonly DagRunEvent[] => store.readEvents(id, 0, { limit: 200 }).events
   return { scheduler, events, store }
+}
+
+type NodeTransition = Extract<DagRunEvent, { readonly type: "dag.node.transitioned" }>
+
+// Resolves with the FIRST transition of the node the predicate accepts; subscribe before run().
+function whenNodeTransition(
+  scheduler: ReturnType<typeof createDagScheduler>,
+  nodeId: string,
+  accept: (event: NodeTransition) => boolean,
+): Promise<NodeTransition> {
+  return new Promise<NodeTransition>((resolve) => {
+    const unsubscribe = scheduler.subscribe((event) => {
+      if (event.type !== "dag.node.transitioned" || String(event.nodeId) !== nodeId || !accept(event)) return
+      unsubscribe()
+      resolve(event)
+    })
+  })
 }
 
 // Event-driven settle observation: resolves once the node reaches the state, never by sleeping.
@@ -333,6 +393,42 @@ describe("DAG scheduler dependency-frontier admission", () => {
     expect(result.status).toBe("completed")
     expect(result.nodes.every((entry) => entry.state === "completed")).toBe(true)
     expect(result.nodes.find((entry) => entry.id === "b")?.error).toBeUndefined()
+  })
+
+  test("#given a sibling run holding every resident slot of the session #when a second run starts #then its node queues for residency and is admitted once a sibling child settles (#8396)", async () => {
+    // given - ONE task manager (one parent session) with cap 2; run A saturates it with two leaves.
+    const manager = new FrontierFakeManager({ residencyLimit: 2 })
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const runA = frontierFixture(definition([node("a1"), node("a2")]), manager, { runId: "run-frontier-a" as DagRunId, store })
+    const runB = frontierFixture(definition([node("b1")]), manager, { runId: "run-frontier-b" as DagRunId, store })
+    const runningA = runA.scheduler.run()
+    await Promise.all([manager.whenStarted("a1"), manager.whenStarted("a2")])
+
+    // when - run B starts with nothing of its own attached; the only slot holders belong to run A.
+    const b1Outcome = whenNodeTransition(runB.scheduler, "b1", (event) =>
+      event.to === "failed" || event.reason.kind === "residency_queued")
+    const runningB = runB.scheduler.run()
+    await manager.whenDenied("b1")
+    const outcome = await b1Outcome
+
+    // then - b1 is parked as scheduled, not failed: run-local emptiness is not session emptiness.
+    expect(outcome).toMatchObject({ from: "scheduled", to: "scheduled", reason: { kind: "residency_queued", residents: 2, heldByOtherOwners: 2 } })
+    const parked = runB.scheduler.snapshot().nodes.find((entry) => String(entry.id) === "b1")
+    expect(parked?.state).toBe("scheduled")
+    expect(parked?.error).toBeUndefined()
+
+    // when - a sibling child of run A settles: the freed slot wakes run B without any of B's own tasks.
+    manager.complete("a1")
+    await manager.whenStarted("b1")
+
+    // then - both runs settle clean; B's journal never recorded a failure.
+    manager.complete("a2")
+    manager.complete("b1")
+    const [resultA, resultB] = await Promise.all([runningA, runningB])
+    expect(resultA.status).toBe("completed")
+    expect(resultB.status).toBe("completed")
+    expect(runB.events().filter((event) => event.type === "dag.node.transitioned" && event.to === "failed")).toEqual([])
+    expect(manager.starts).toEqual(["a1", "a2", "b1"])
   })
 
   test("#given frontier admission #when the run settles #then every wave index reports exactly one completed grouping with full membership", async () => {

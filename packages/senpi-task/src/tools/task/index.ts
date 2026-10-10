@@ -26,6 +26,7 @@ export type {
   TaskAgentInfo,
   TaskAncestry,
   TaskCategoryInfo,
+  TaskHandleDetails,
   TaskToolContext,
   TaskToolDeps,
   TaskToolDetails,

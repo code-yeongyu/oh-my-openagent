@@ -10,7 +10,7 @@ describe("reflectionRemediation", () => {
       // when
       const hint = reflectionRemediation(
         "category_unavailable",
-        'Reflection category "quick" could not resolve a usable model (cause: model_unavailable); missing providers: kimi-coding, openai-codex',
+        'Reflection category "quick" could not resolve a usable model (cause: model_unavailable); missing providers: kimi-coding, chatgpt-subscription',
       )
 
       // then
@@ -75,6 +75,57 @@ describe("reflectionRemediation", () => {
     })
   })
 
+  describe("#given a model-admission exhaustion reported as spawn_failed", () => {
+    // `MemoryModelExhaustedError` is finalized with reason `spawn_failed` (run-finalization
+    // `overrideFailedReservationRun`, and runner-execution's pre-ledger branch), but NO child was
+    // ever spawned and no executable was ever resolved. Its detail always carries the
+    // `attempted:<models>` roster that `formatMemoryModelExhaustion` appends, which is the only
+    // marker separating it from a real executable-resolution failure.
+    const attempted = "attempted:openai/gpt-5.6-luna-fast,apitopia/kimi-for-coding-highspeed,anthropic/claude-haiku-4-5"
+
+    test("#when every candidate was rate limited #then the hint names the provider outage instead of SENPI_BIN", () => {
+      // given: the verbatim detail a parked identity recorded when all three candidates were refused
+      const detail = `provider_unavailable:OpenAI API error (429): {"type":"usage_limit_reached","message":"The usage limit has been reached"} | 503: {"message":"All providers are temporarily cooling down"} | {"type":"error","error":{"type":"rate_limit_error","message":"All tokens rate limited"}}; ${attempted}`
+
+      // when
+      const hint = reflectionRemediation("spawn_failed", detail)
+
+      // then
+      expect(hint).toContain("provider")
+      expect(hint).toContain("/reflect")
+      expect(hint).not.toContain("SENPI_BIN")
+      expect(hint).not.toContain("child-stderr.log")
+    })
+
+    test("#when a candidate had no credentials #then the login hint fires instead of SENPI_BIN", () => {
+      // given: the auth_missing arm of the same exhaustion format, which the spawn_failed branch shadowed
+      const hint = reflectionRemediation("spawn_failed", `auth_missing:chatgpt-subscription,kimi-coding; ${attempted}`)
+
+      // then
+      expect(hint).toContain("/login")
+      expect(hint).not.toContain("SENPI_BIN")
+    })
+
+    test("#when the prompt overflowed every candidate #then the hint names the context escape hatches", () => {
+      // given: context_overflow had no branch at all and fell through to the child log
+      const hint = reflectionRemediation("spawn_failed", `context_overflow:prompt is 412000 tokens, limit is 272000; ${attempted}`)
+
+      // then
+      expect(hint).toContain("memory.reflection")
+      expect(hint).not.toContain("SENPI_BIN")
+      expect(hint).not.toContain("child-stderr.log")
+    })
+
+    test("#when the exhaustion kind is unrecognized #then it still avoids SENPI_BIN and the nonexistent child log", () => {
+      // given: a future miss kind, still carrying the roster marker
+      const hint = reflectionRemediation("spawn_failed", `something_new:upstream said no; ${attempted}`)
+
+      // then
+      expect(hint).not.toContain("SENPI_BIN")
+      expect(hint).not.toContain("child-stderr.log")
+    })
+  })
+
   describe("#given the pre-existing failure taxonomies", () => {
     test("#when the child could not see the model #then the category/model hint is kept", () => {
       expect(reflectionRemediation("child_exit", "Model not found: apitopia/kimi")).toContain("memory.reflection")
@@ -82,6 +133,11 @@ describe("reflectionRemediation", () => {
 
     test("#when spawn failed #then the SENPI_BIN hint is kept", () => {
       expect(reflectionRemediation("spawn_failed", "execvp ENOENT")).toContain("SENPI_BIN")
+    })
+
+    test("#when no launcher could be resolved at all #then the SENPI_BIN hint is kept", () => {
+      // given: the verbatim throw from senpi-command `resolveSenpiLaunch`, which carries no model roster
+      expect(reflectionRemediation("spawn_failed", "Unable to resolve a runnable Senpi launcher")).toContain("SENPI_BIN")
     })
 
     test("#when a running child dies on a missing file #then the hint points at the child log, not SENPI_BIN", () => {
@@ -99,5 +155,25 @@ describe("reflectionRemediation", () => {
     test("#when nothing matches #then the child log hint remains the default for post-spawn failures", () => {
       expect(reflectionRemediation("child_exit", "exit code 1")).toContain("child-stderr.log")
     })
+  })
+})
+
+
+describe("supervisor failure remediation", () => {
+  test.each(["Error: No API key for provider", "auth_missing: provider"])(
+    "#given supervisor credentials are missing with %s #when remediated #then actionable login guidance survives",
+    (detail) => expect(reflectionRemediation("supervisor_failed", detail)).toContain("/login"),
+  )
+
+  test.each([
+    ["supervisor_failed", "memory run supervisor exited with 1: Error: launcher failed"],
+    ["supervisor_failed", "ENOENT: supervisor resource is missing"],
+    ["supervisor_failed", "memory run supervisor exited with 1: execvp() failed"],
+    ["spawn_failed", "memory run supervisor did not publish an outcome before its deadline"],
+  ])("#given %s with %s #when remediated #then the operator can find the supervisor evidence", (reason, detail) => {
+    const hint = reflectionRemediation(reason, detail)
+    expect(hint).toContain("runtime/reflection/runs/<runId>/supervisor-stderr.log")
+    expect(hint).not.toContain("child-stderr.log")
+    expect(hint).not.toContain("SENPI_BIN")
   })
 })

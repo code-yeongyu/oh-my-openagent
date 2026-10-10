@@ -43,7 +43,7 @@ const EXPECTED_JOURNALED_EVENT_TYPES = [
 ] as const
 
 describe("dag domain types", () => {
-  test("#given the journaled payload union #when its type tags are enumerated #then it has exactly 14 members and excludes live activity", () => {
+  test("#given the journaled payload union #when its type tags are enumerated #then it has exactly 17 members and excludes live activity", () => {
     // given / when
     const tags = [...DAG_RUN_EVENT_TYPES]
 
@@ -190,6 +190,7 @@ describe("dag domain types", () => {
       "task_lost",
       "task_cancelled",
       "resume_task_missing",
+      "resume_task_orphaned",
       "journal_corrupt",
     ])
     expect(DAG_NODE_TRANSITION_REASONS).toEqual([

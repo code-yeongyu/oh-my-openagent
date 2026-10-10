@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
@@ -63,7 +63,7 @@ describe("missingDependencyResult", () => {
 
 	it("#given not installed lookup #when converted #then includes install decision availability", () => {
 		const root = tempRoot();
-		const installDecisionsPath = join(homedir(), ".codex", "lsp-install-decisions.json");
+		const installDecisionsPath = join(root, "lsp-install-decisions.json");
 		const context = parseLspRequestContext({
 			cwd: root,
 			projectConfigPaths: [join(root, ".codex", "lsp-client.json")],
@@ -99,7 +99,37 @@ describe("missingDependencyResult", () => {
 				installHint: "npm install -g typescript-language-server typescript",
 				installDecisionTool: true,
 				installDecisionsPath,
+				decision: null,
 			},
 		});
+	});
+
+	it("#given a recorded decision #when a not installed lookup is converted #then availability carries it", () => {
+		const root = tempRoot();
+		const installDecisionsPath = join(root, "lsp-install-decisions.json");
+		writeFileSync(
+			installDecisionsPath,
+			JSON.stringify({ biome: { decision: "declined", decidedAt: "2026-09-29T00:00:00.000Z" } }),
+		);
+		const context = parseLspRequestContext({
+			cwd: root,
+			projectConfigPaths: [join(root, ".codex", "lsp-client.json")],
+			userConfigPath: join(root, "lsp-client.json"),
+			installDecisionsPath,
+			capabilities: { installDecisionTool: false },
+		});
+
+		const result = runWithRequestContext(context, () =>
+			missingDependencyResult(
+				new LspServerLookupError("LSP server 'biome' is NOT INSTALLED.", {
+					status: "not_installed",
+					server: { id: "biome", command: ["biome", "lsp-proxy"], extensions: [".json"] },
+					installHint: "npm install -g @biomejs/biome",
+				}),
+				{ filePath: "a.json" },
+			),
+		);
+
+		expect(result?.details).toMatchObject({ availability: { kind: "not_installed", decision: "declined" } });
 	});
 });

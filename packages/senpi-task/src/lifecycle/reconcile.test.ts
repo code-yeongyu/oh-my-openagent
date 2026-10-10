@@ -21,6 +21,7 @@ import {
   settings,
   tempStore,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -144,7 +145,7 @@ function createHarness(options: HarnessOptions) {
   const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner)
   const signals: SignalCall[] = []
   const alive = options.alive === true ? new Set([900]) : new Set<number>()
-  const lifecycle = createTaskLifecycle({ store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller: fakeSignaller(alive, signals), orphanKillDelayMs: 0 })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller: fakeSignaller(alive, signals), orphanKillDelayMs: 0 })
   return { store, sessionPath, respawnRunner, signals, lifecycle, ...managed }
 }
 
@@ -182,6 +183,7 @@ describe("reconcileOnSessionStart reattach", () => {
       dispose: async () => undefined,
     }
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),
@@ -245,7 +247,7 @@ describe("reconcileOnSessionStart reattach", () => {
     seedRecord(store, { task_id: "st_00000004", status: "running", residency_state: "resident", execution_mode: "in-process" })
     const respawnRunner = new FakeRespawnRunner()
     createManager(store, respawnRunner)
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []) })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []) })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -268,6 +270,7 @@ describe("reconcileOnSessionStart reattach", () => {
       hasPendingSends: (taskId: string) => registry.hasPendingSends(taskId),
     }
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: pointLookupMissRegistry,
       config: settings(),
@@ -289,7 +292,7 @@ describe("reconcileOnSessionStart reattach", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000011", status: "running", residency_state: "resident", execution_mode: "in-process" })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -304,7 +307,7 @@ describe("reconcileOnSessionStart reattach", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000012", status: "lost", residency_state: "resident", execution_mode: "in-process" })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -323,7 +326,7 @@ describe("reconcileOnSessionStart reattach", () => {
     persistSessions(store, taskId)
     const respawnRunner = new FakeRespawnRunner()
     createManager(store, respawnRunner)
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set([901]), []), orphanKillDelayMs: 0 })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set([901]), []), orphanKillDelayMs: 0 })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -463,6 +466,7 @@ describe("reconcileOnSessionStart reattach", () => {
       },
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),
@@ -510,6 +514,7 @@ describe("reconcileOnSessionStart reattach", () => {
       }),
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),
@@ -587,6 +592,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
       host_pid: foreignPid,
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),
@@ -610,6 +616,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     // given a sibling senpi process in the same project still owns this child
     const { store, calls, alive } = crossProcessHarness({ host_pid: foreignPid, ownerAlive: true })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings({ reattach_on_reconcile: false }),
@@ -635,6 +642,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     // given the foreign owner is gone, so the live orphan child is genuinely unreachable
     const { store, calls, alive } = crossProcessHarness({ host_pid: foreignPid, ownerAlive: false })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings({ reattach_on_reconcile: false }),
@@ -665,6 +673,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     createManager(store, respawnRunner, 5, new FakeRunner(), thisPid)
     const calls: SignalCall[] = []
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),
@@ -688,6 +697,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
     // given a record persisted before owner pids were recorded
     const { store, calls, alive } = crossProcessHarness({ ownerAlive: false })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings({ reattach_on_reconcile: false }),
@@ -717,6 +727,7 @@ describe("reconcileOnSessionStart cross-process ownership", () => {
       host_pid: thisPid,
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),

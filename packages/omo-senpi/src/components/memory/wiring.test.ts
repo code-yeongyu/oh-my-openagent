@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
@@ -21,10 +22,12 @@ import {
   type MemoryStatusResult,
   type RefreshMemoryStatusInput,
 } from "./status"
+import { withinMs } from "./kibitzer/sidecar.test-support"
 import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
+import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 const roots: string[] = []
 
 // afterBind starts background git pipelines it never exposes a drain handle for
@@ -123,7 +126,7 @@ describe("memory pressure dream wiring", () => {
 })
 
 describe("memory pressure compile wiring", () => {
-  test("#given a bound fixture repo below pressure #when a committed write crosses the threshold #then the next real compile refresh adds pressure metadata without truncating memory", async () => {
+  test("#given a bound fixture repo below pressure #when a committed write crosses the threshold #then the next session's compile adds pressure metadata without truncating memory", async () => {
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-pressure-wiring-")))
     roots.push(root)
     const identity = "pressure-agent"
@@ -140,17 +143,16 @@ describe("memory pressure compile wiring", () => {
     })
     const pi = new MemoryFakeExtensionAPI()
     createMemoryWiring({
-      sessions: new Map([["session-pressure", { context }]]),
+      sessions: new Map([["session-pressure", { context }], ["session-pressure-next", { context }]]),
       loadConfig: () => loadedMemoryConfig(memorySettings({ compile_warn_tokens: 100 })),
       cwd: () => root,
       env: {},
     }).registerStatic(pi, componentContext())
-    const eventCtx = sessionContext("session-pressure")
 
     const [below] = await pi.dispatch(
       "before_agent_start",
       { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
-      eventCtx,
+      sessionContext("session-pressure"),
     )
     await writeFile(
       join(repo.dir, "system/persona.md"),
@@ -160,10 +162,11 @@ describe("memory pressure compile wiring", () => {
       agentId: identity,
       authorName: "Pressure Agent",
     })
+    // A running session keeps its pinned projection (#8470); the next session compiles the new commit.
     const [pressured] = await pi.dispatch(
       "before_agent_start",
       { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
-      eventCtx,
+      sessionContext("session-pressure-next"),
     )
 
     const belowPrompt = (below as { systemPrompt?: string } | undefined)?.systemPrompt ?? ""
@@ -219,10 +222,14 @@ describe("memory recall wiring", () => {
       .filter((result): result is { message?: { customType?: string; display?: boolean }; systemPrompt?: string } => result !== undefined)
     const recall = messages.find((result) => result.message?.customType === RECALL_CUSTOM_TYPE)
     const notice = messages.find((result) => result.message?.customType === MEMORY_NOTICE_CUSTOM_TYPE)
+    const projection = messages.find((result) => result.systemPrompt !== undefined)
     expect(recall).toBeUndefined()
-    // The kibitzer prompt trigger may append its gate observability entry; nothing else may land.
-    expect(pi.entries.filter((entry) => entry.customType !== "omo-kibitzer:gate")).toEqual([])
-    expect(notice?.systemPrompt).toContain("persona")
+    // This branch never compacted and nothing else is volatile, so the projection carries no notice message.
+    expect(notice).toBeUndefined()
+    // The kibitzer prompt trigger may append its gate observability entry and the projection records its
+    // session pin; nothing else may land.
+    expect(pi.entries.filter((entry) => entry.customType !== "omo-kibitzer:gate" && entry.customType !== PROJECTION_PIN_ENTRY_TYPE)).toEqual([])
+    expect(projection?.systemPrompt).toContain("persona")
   }, 30_000)
 })
 
@@ -455,7 +462,7 @@ const eventCtx = {
 describe("memory wiring reflection completion delivery", () => {
   describe("#given a pending completion and a bound session with a real UI callback", () => {
     describe("#when afterBind drains the identity completion directory", () => {
-      test("#then the callback receives the completion notification payload and level", async () => {
+      test("#then the completion is consumed into the transcript without a toast", async () => {
         // given
         const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-wiring-notify-")))
         roots.push(root)
@@ -508,10 +515,10 @@ describe("memory wiring reflection completion delivery", () => {
         await wiring.afterBind(pi, sessionId, identity, bindContext)
 
         // then
-        expect(notifications).toEqual([{
-          message: "Delivered 1 memory reflection completions; 1 need attention.",
-          level: "warning",
-        }])
+        expect(notifications).toEqual([])
+        expect(JSON.parse(await readFile(join(completionsDir, "run-notify.json"), "utf8"))).toMatchObject({
+          delivery: { status: "consumed", sessionId },
+        })
       })
     })
   })
@@ -615,8 +622,10 @@ async function liveFooterHarness(): Promise<{
 }
 
 describe("facts shutdown wiring", () => {
-  test("#given an active facts launch #when the session shuts down #then facts cancellation runs before the shutdown drain", async () => {
-    // given
+  const FIXED_NOW = 10_000
+  const fixedClock = () => FIXED_NOW
+
+  async function factsShutdownFixture() {
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-facts-shutdown-")))
     roots.push(root)
     const sessionId = "session-facts-shutdown"
@@ -639,17 +648,182 @@ describe("facts shutdown wiring", () => {
       }),
     })
     wiring.registerShutdownEvaluator(async () => { sequence.push("drain") })
+    return { wiring, sessionId, sequence }
+  }
+
+  test("#given an active facts launch #when the session shuts down within its budget #then facts cancellation runs before the shutdown drain", async () => {
+    // given
+    const { wiring, sessionId, sequence } = await factsShutdownFixture()
 
     // when
     await wiring.onSessionShutdown({
       reason: "quit",
       sessionId,
-      deadlineAt: Date.now() + 1_000,
-      now: () => Date.now(),
+      deadlineAt: FIXED_NOW + 60_000,
+      now: fixedClock,
     })
 
     // then
-    expect(sequence.indexOf("cancel")).toBeLessThan(sequence.indexOf("drain"))
+    expect(sequence).toEqual(["cancel", "drain"])
+  })
+
+  test("#given an active facts launch #when the session shuts down past its deadline #then facts cancellation still runs and the shutdown drain is skipped", async () => {
+    // given
+    const { wiring, sessionId, sequence } = await factsShutdownFixture()
+
+    // when
+    await wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId,
+      deadlineAt: FIXED_NOW - 1,
+      now: fixedClock,
+    })
+
+    // then
+    expect(sequence).toEqual(["cancel"])
+  })
+})
+
+describe("session shutdown pre-drain bounds", () => {
+  const ROLLOUTS = "reference/rollouts.md"
+  const mockModel: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
+  const mockRegistry = {
+    getAvailable: () => [mockModel],
+    find: (provider: string, modelId: string) => (provider === mockModel.provider && modelId === mockModel.id ? mockModel : undefined),
+    getProviderAuth: () => undefined,
+  }
+
+  interface BoundedShutdownFixture {
+    readonly wiring: ReturnType<typeof createMemoryWiring>
+    readonly warnings: { readonly message: string; readonly details: unknown }[]
+    readonly sessionId: string
+    readonly eventCtx: Record<string, unknown>
+    readonly pi: MemoryFakeExtensionAPI
+  }
+
+  /** A bound session over a real memory repo, so the Kibitzer composition and the drain are the live ones. */
+  async function boundedShutdownFixture(
+    overrides: Partial<Parameters<typeof createMemoryWiring>[0]> = {},
+  ): Promise<BoundedShutdownFixture> {
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-bounds-")))
+    roots.push(root)
+    const identityName = "shutdown-bounds-agent"
+    const paths = buildIdentityPaths(join(root, "memory"), identityName)
+    const repo = new GitMemoryRepo({ dir: paths.repo, agentId: identityName })
+    await repo.init({
+      seedFiles: [
+        { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\npersona\n" },
+        { relativePath: ROLLOUTS, content: "---\ndescription: Rollout guidance\n---\nDrain nodes before a rollout.\n" },
+      ],
+    })
+    const context = createMemoryIdentityContext({
+      identity: identityName,
+      identityPaths: paths,
+      binding: { identity: identityName, repoPathHash: "hash", boundAt: 1 },
+    })
+    const sessionId = "session-shutdown-bounds"
+    const warnings: { message: string; details: unknown }[] = []
+    const memory = memorySettings()
+    const wiring = createMemoryWiring({
+      sessions: new Map([[sessionId, { context }]]),
+      loadConfig: () => ({ ...loadedMemoryConfig(memory), config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } } }),
+      cwd: () => root,
+      env: {},
+      logger: {
+        info: () => {},
+        warn: (message, details) => { warnings.push({ message, details }) },
+        error: () => {},
+      },
+      createRuntime: () => ({ reconcile: async () => {} } as unknown as MemoryIdentityRuntime),
+      ...overrides,
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    wiring.registerStatic(pi, componentContext())
+    const branch = [{ type: "message", message: { role: "user", content: "Drain nodes before rollout." } }]
+    return {
+      wiring,
+      warnings,
+      sessionId,
+      pi,
+      eventCtx: {
+        sessionManager: { getSessionId: () => sessionId, getEntries: () => branch, getBranch: () => branch },
+        hasPendingMessages: () => false,
+        isIdle: () => false,
+        modelRegistry: mockRegistry,
+      },
+    }
+  }
+
+  function budgetWarnings(warnings: readonly { readonly message: string; readonly details: unknown }[], step: string): unknown[] {
+    return warnings
+      .filter((call) => call.message === "memory shutdown drain hit its budget")
+      .map((call) => call.details)
+      .filter((details) => (details as { step?: string } | undefined)?.step === step)
+  }
+
+  test("#given a Kibitzer whose shutdown never resolves #when the session shuts down #then the handler returns at the drain deadline and the drain still runs", async () => {
+    // given: the resident child start never returns, so the sidecar's shutdown is stuck behind the
+    // per-session mutex exactly as a stalled startChild strands it in production.
+    const started = Promise.withResolvers<void>()
+    const f = await boundedShutdownFixture({
+      kibitzerChildStarter: {
+        createRunner: () => ({
+          start: async () => {
+            started.resolve()
+            return await new Promise<never>(() => {})
+          },
+        }),
+      },
+    })
+    await f.pi.dispatch("tool_call", { toolName: "read", input: { path: ROLLOUTS } }, f.eventCtx)
+    await withinMs(started.promise, "the resident child start", 10_000)
+
+    // when
+    const startedAt = Date.now()
+    await withinMs(f.wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId: f.sessionId,
+      deadlineAt: Date.now() + 300,
+      now: () => Date.now(),
+    }), "the bounded session shutdown", 10_000)
+    const elapsed = Date.now() - startedAt
+
+    // then
+    expect(elapsed).toBeLessThan(5_000)
+    expect(budgetWarnings(f.warnings, "kibitzer-shutdown")).toHaveLength(1)
+    // The drain that follows the abandoned await still ran: it reported its own spent budget.
+    expect(budgetWarnings(f.warnings, "facts-enqueue")).toHaveLength(1)
+  })
+
+  test("#given facts cancellation that never resolves #when the session shuts down #then the handler returns at the drain deadline and the drain still runs", async () => {
+    // given
+    const entered = Promise.withResolvers<void>()
+    const f = await boundedShutdownFixture({
+      createFactsExtractor: () => ({
+        launchPending: async () => undefined,
+        reconcilePending: async () => undefined,
+        cancelActive: async () => {
+          entered.resolve()
+          await new Promise<void>(() => {})
+        },
+      }),
+    })
+
+    // when
+    const startedAt = Date.now()
+    await withinMs(f.wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId: f.sessionId,
+      deadlineAt: Date.now() + 300,
+      now: () => Date.now(),
+    }), "the bounded session shutdown", 10_000)
+    const elapsed = Date.now() - startedAt
+
+    // then
+    await withinMs(entered.promise, "the facts cancellation", 10_000)
+    expect(elapsed).toBeLessThan(5_000)
+    expect(budgetWarnings(f.warnings, "facts-cancel")).toHaveLength(1)
+    expect(budgetWarnings(f.warnings, "facts-enqueue")).toHaveLength(1)
   })
 })
 

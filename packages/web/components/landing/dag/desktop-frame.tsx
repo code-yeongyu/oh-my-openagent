@@ -83,7 +83,7 @@ export function DesktopFrame({
   const feed = feedAt(clockMs)
 
   return (
-    <div className="border-line bg-ink-1 grid min-w-0 grid-rows-[auto_1fr] overflow-hidden border">
+    <div className="border-line bg-ink-1 rounded-work grid min-w-0 grid-rows-[auto_1fr] overflow-hidden border">
       <div className="bg-ink-2 border-line flex h-9 min-w-0 items-center gap-2 border-b px-3">
         <span aria-hidden="true" className="flex gap-1.5">
           <span className="bg-text-faint size-2 rounded-full" />
@@ -126,7 +126,7 @@ export function DesktopFrame({
             <div className="flex justify-end">
               <p
                 data-dag-user-turn
-                className="bg-ink-3 text-text-hi max-w-[85%] px-3 py-1.5 font-mono text-[13px] leading-[1.5]"
+                className="bg-ink-3 text-text-hi rounded-message max-w-full px-4 py-3 font-mono text-sm leading-relaxed sm:max-w-[85%]"
               >
                 {USER_COMMAND.slice(0, typedCount)}
                 {typing ? (
@@ -137,7 +137,7 @@ export function DesktopFrame({
                 ) : null}
               </p>
             </div>
-            <p className="text-text-lo mt-2 min-h-4 text-xs" aria-live="polite">
+            <p className="text-text-mid mt-4 min-h-5 text-sm leading-relaxed" aria-live="polite">
               {assistantLine === null ? "" : `orchestrator · ${assistantLine}`}
             </p>
           </div>

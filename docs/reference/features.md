@@ -6,24 +6,25 @@ The main agent runs in your session and delegates through the `task` tool: categ
 
 ### Current Agent Model Chains
 
-The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi rungs. The OpenCode edition uses `kimi-for-coding` for the same Kimi chain positions. The same resolved chain is used at spawn time and again if runtime retry fallback needs to recover.
+The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi rungs. The OpenCode edition uses `kimi-for-coding` for the same Kimi chain positions. Senpi lists both OpenAI lanes on every GPT rung: `chatgpt-subscription` (the ChatGPT subscription lane) first, then `openai` (the API-key lane, or an OpenAI-compatible proxy configured under that id). Rung order is the ranking, so a machine holding both an API key and a ChatGPT login is never billed per token for delegated work, and a machine with only `openai` still gets every GPT rung, including in the runtime fallback list. The `ultrabrain`, `deep-low`, `deep-high`, and `unspecified-high` defaults name `chatgpt-subscription`; on an `openai`-only machine they resolve through the same chains. The OpenCode edition lists `openai` first, its single OpenAI provider id. The same resolved chain is used at spawn time and again if runtime retry fallback needs to recover.
 
 | Role | Primary | Full fallback chain |
 | --- | --- | --- |
-| **main agent** | your session model | No chain of its own. Claude Opus 5 or GPT 5.6 Sol recommended; mid-session fallback follows the harness retry chains. |
-| **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **plan-consultant** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/glm-5.2` → `kimi-coding\|kimi-for-coding/kimi-k3`
-| **plan-reviewer** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|openai-codex\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
-| **category: visual-engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
+| **main agent** | your session model | No chain of its own. Claude Opus 5.5 or GPT 5.6 Sol recommended; mid-session fallback follows the harness retry chains. |
+| **explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
+| **librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
+| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **plan-reviewer** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
+| **category: visual-engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
 | **category: architect** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` |
-| **category: ultrabrain** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|openai-codex\|opencode/gpt-6-astra (max)` → `openai\|openai-codex/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|openai-codex\|opencode/gpt-5.6-sol (max)` |
-| **category: deep** | `gpt-6-astra` | `openai\|openai-codex\|github-copilot\|opencode/gpt-6-astra (high)` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` |
-| **category: artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5 (xhigh)` |
-| **category: quick** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed` → `openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` |
-| **category: unspecified-low** | `grok-4.6` | `xai\|github-copilot\|opencode/grok-4.6 (xhigh)` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
-| **category: unspecified-high** | `gpt-6-astra` | `openai\|openai-codex\|github-copilot\|opencode/gpt-6-astra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5 (xhigh)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
-| **category: writing** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (medium)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
+| **category: ultrabrain** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (max)` → `openai\|chatgpt-subscription/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (max)` |
+| **category: deep-low** | `gpt-6.1-sol` | `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription/gpt-6.1-sol-fast (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `openai\|chatgpt-subscription/gpt-5.6-sol-fast (medium)` |
+| **category: deep-high** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (high)` |
+| **category: artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
+| **category: quick** | `gpt-6-luna-fast` | `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `zai\|zai-coding-cn/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
+| **category: unspecified-low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| **category: unspecified-high** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
+| **category: writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
 ### Invoking Agents
 
@@ -162,14 +163,15 @@ By combining these two concepts, you can generate optimal agents through `task`.
 
 | Category             | Default Model                   | Use Cases                                                                                                                   |
 | -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `visual-engineering` | `anthropic/claude-fable-5-1` (max) → `anthropic/claude-opus-5` (max) → `kimi-for-coding/kimi-k3` (max) | Frontend, UI/UX, design, styling, animation                                                                                |
+| `visual-engineering` | `anthropic/claude-fable-5-1` (max) → `anthropic/claude-opus-5-5` (max) → `kimi-for-coding/kimi-k3` (max) | Frontend, UI/UX, design, styling, animation                                                                                |
 | `ultrabrain`         | `openai/gpt-6-astra` (max)      | Deep logical reasoning, complex architecture decisions requiring extensive analysis. Falls back to `gpt-5.6-sol` (max).     |
-| `deep`               | `openai/gpt-6-astra` (high)     | Deep autonomous work for 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one. |
-| `artistry`           | `anthropic/claude-fable-5-1` (max) → `kimi-for-coding/kimi-k3` (max) → `anthropic/claude-opus-5` (xhigh) | Highly creative/artistic tasks, novel ideas                                                                                 |
-| `quick`              | `kimi-for-coding/kimi-for-coding-highspeed` | Trivial tasks - single file changes, typo fixes, simple modifications                                                  |
-| `unspecified-low`    | `xai/grok-4.6` (xhigh)          | Tasks that don't fit other categories, low effort required                                                                  |
-| `unspecified-high`   | `openai/gpt-6-astra` (high)     | Tasks that don't fit other categories, high effort required. Falls back to Claude Opus 5, GLM 5.3, then Kimi K3.          |
-| `writing`            | `anthropic/claude-fable-5-1` (medium) | Documentation, prose, technical writing                                                                                     |
+| `deep-low`           | `openai/gpt-6.1-sol` (medium) | Default deep lane: one goal, one deliverable, decisions the child can settle from what it reads. 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, and multimodal work route here. ONE goal + ONE deliverable per call — multiple goals fan out as parallel calls. Falls back to the Fast tier `gpt-6.1-sol-fast`, then `gpt-5.6-sol` (the only rung GitHub Copilot and OpenCode Zen serve), then `gpt-5.6-sol-fast`, all at medium; unavailable without a GPT-6.1 Sol or GPT-5.6 Sol tier. |
+| `deep-high`          | `openai/gpt-6-astra` (high)     | Escalation deep lane: the goal's central decision cannot be settled from evidence alone (a trade-off, a contract crossing a package or process boundary, a mechanism with no in-repo pattern, or correctness argued from invariants). A `deep-low` child that returns `ESCALATE: deep-high` is re-spawned here with its findings. No model fallback: unavailable without `gpt-6-astra`. |
+| `artistry`           | `anthropic/claude-fable-5-1` (max) → `kimi-for-coding/kimi-k3` (max) → `anthropic/claude-opus-5-5` (max) | Highly creative/artistic tasks, novel ideas                                                                                 |
+| `quick`              | `openai/gpt-6-luna-fast` (low) | Trivial tasks - single file changes, typo fixes, simple modifications                                                  |
+| `unspecified-low`    | `anthropic/claude-sonnet-5-5` (medium) | Tasks that don't fit other categories, low effort required                                                                  |
+| `unspecified-high`   | `anthropic/claude-opus-5-5` (medium) | Tasks that don't fit other categories, high effort required. Falls back to GLM 5.3, then Kimi K3.          |
+| `writing`            | `anthropic/claude-opus-5-5` (low)     | Documentation, prose, technical writing. Unavailable when none of its Claude models is connected; it never falls back to another family. |
 
 ### Usage
 
@@ -191,7 +193,7 @@ You can define custom categories in the `[opencode]` block of the unified config
 | Field               | Type    | Description                                                                 |
 | ------------------- | ------- | --------------------------------------------------------------------------- |
 | `description`       | string  | Human-readable description of the category's purpose. Shown in task prompt. |
-| `model`             | string  | AI model ID to use (e.g., `anthropic/claude-opus-5`)                        |
+| `model`             | string  | AI model ID to use (e.g., `anthropic/claude-opus-5-5`)                        |
 | `models`            | array   | Ordered model chain; the first entry is the primary model and the rest are fallbacks. Entries are strings or objects with per-model settings |
 | `reasoning`         | string  | Canonical reasoning level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `auto`) |
 | `fallback_models`   | string\|array | Deprecated: use `models`. Fallback models on API errors. Supports strings or mixed arrays of strings and object entries with per-model settings |
@@ -231,7 +233,7 @@ You can define custom categories in the `[opencode]` block of the unified config
 
     // 3. Configure thinking model and restrict tools
     "deep-reasoning": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "thinking": {
         "type": "enabled",
         "budgetTokens": 32000,
@@ -297,8 +299,8 @@ Load agent system prompts from external files using `file://` URLs in the `promp
     }
   },
   "categories": {
-    "deep": {
-      "prompt_append": "file:///path/to/deep-category-append.md"
+    "deep-low": {
+      "prompt_append": "file:///path/to/deep-low-category-append.md"
     }
   }
 }
@@ -452,7 +454,7 @@ Skill sets provide specialized workflows with embedded MCP servers and detailed 
 
 ### Built-in Skill Sets
 
-The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`, `frontend`, `git-master`, `init-deep`, `playwright`, `playwright-cli`, `remove-ai-slops`, `review-work`, `security-research`, `security-review`, `team-mode`, and `visual-qa`. Browser provider selection activates one browser skill, and `team-mode` is available only when Team Mode is enabled. The table below highlights selected skills.
+Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git-master`, `init-deep`, `playwright`, `playwright-cli`, `remove-ai-slops`, `review-work`, `security-research`, `security-review`, `team-mode`, and `visual-qa`. Browser provider selection activates one browser skill, and `team-mode` is available only when Team Mode is enabled. The table below highlights selected skills.
 
 #### init-deep
 
@@ -462,7 +464,7 @@ The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`
 | ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **git-master**         | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced).                              |
 | **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
-| **agent-browser**      | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
+| **visual-qa**          | Browser rendering and screenshot evidence               | omowright from js eval: the owned engine for renders on a task-owned profile, the attached engine for pages that need the user's login. |
 | **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
 | **frontend**           | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts strong UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                     |
 | **review-work**        | "review work", "review my work", "QA my work"          | Post-implementation gate review. The orchestrator runs manual QA on the real surface, then one gate reviewer audits goal, code quality, security, missed context, and the QA evidence. Passes only on a clean QA matrix plus APPROVE.                                                                                                                     |
@@ -505,46 +507,36 @@ The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`
 
 ### Browser Automation Options
 
-Oh-My-OpenAgent provides four browser automation providers (`playwright`, `agent-browser`, `dev-browser`, `playwright-cli`), configurable via `browser_automation_engine.provider`.
+On OmO Native and Codex, shipped browser guidance runs through **omowright**,
+staged inside the `browser` skill and loaded from the js-eval kernel. In Codex,
+`browser:control-in-app-browser` stays first for ordinary page control. The
+OpenCode edition keeps its `browser_automation_engine` providers; an obsolete
+provider value fails validation and doctor names the rejected value.
 
-#### Option 1: Playwright MCP (Default)
+#### Owned engine
 
-```yaml
-mcp:
-  playwright:
-    command: npx
-    args: ["@playwright/mcp@latest"]
-```
+`connectPipe({ browserPath, browserArgs, storageRoot })` launches a browser your
+code owns over a pipe (no listening port) with a task-owned profile;
+`connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
+fingerprint for bot-scored targets. The page is Playwright-shaped
+(`snapshot`, `locator(ref)`, `screenshot`, `evaluate`), with coordinate control,
+captcha helpers, network snooping, request routes and flight traces beside it.
+Chrome must already be installed; no managed browser download is required.
 
-**Usage**:
+#### Attached engine
 
-```
-/playwright Navigate to example.com and take a screenshot
-```
+`connectBrowserSkill({ name, focused: false })` drives the browser the user is
+already signed into through BrowserSkill's daemon and extension;
+`bskSnapshot(session)` returns the same tree-and-refs shape without leaving a
+trace in the page. `bskDoctor()` / `bskOnboard()` (wrapped by the skill's
+`browser-doctor.mjs` / `browser-install.mjs`) install the CLI, start the daemon
+and register the Web Store extension in the one browser the user actually uses
+(OS default browser, running app, recent use; `--browser=<id>` overrides, and the
+doctor reports `choose-browser` instead of guessing when those disagree) so the
+user's only step is one **Enable** click. Never launch against, clone, or clear the user's live profile; never fall
+back to the owned engine for a page that needs their login.
 
-#### Option 2: Agent Browser CLI (Vercel)
-
-```json
-{
-  "browser_automation_engine": {
-    "provider": "agent-browser"
-  }
-}
-```
-
-**Requires installation**:
-
-```bash
-bun add -g agent-browser
-```
-
-**Usage**:
-
-```
-Use agent-browser to navigate to example.com and extract the main heading
-```
-
-**Capabilities (Both Providers)**:
+**Browser QA capabilities (choose the tier that supports the criterion)**:
 
 - Navigate and interact with web pages
 - Take screenshots and PDFs
@@ -586,7 +578,7 @@ Same-named skill at higher priority overrides lower.
 
 Loaded skill display priority follows this order: `project > user > opencode > builtin/plugin`.
 
-Disable built-in skills via `disabled_skills: ["playwright"]` in config.
+Disable built-in skills via `disabled_skills: ["playwright"]` in config; the same key at the shared base of `~/.omo/omo.jsonc` hides a skill on every harness, including the bundled `frontend` / `visual-qa` skills on OmO Native.
 
 ### Category + Skill Combo Strategies
 
@@ -602,7 +594,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 
 - **Category**: `ultrabrain`
 - **load_skills**: `[]` (pure reasoning)
-- **Effect**: Uses GPT-6 Astra at max effort through OpenAI or OpenAI Codex when available, then GitHub Copilot, then OpenCode. When Astra is unavailable it walks the same provider order on GPT-5.6 Sol at max effort. The chain is GPT-only.
+- **Effect**: Uses GPT-6 Astra at max effort through OpenAI or ChatGPT Subscription when available, then GitHub Copilot, then OpenCode. When Astra is unavailable it walks the same provider order on GPT-5.6 Sol at max effort. The chain is GPT-only.
 
 #### The Maintainer (Quick Fixes)
 
@@ -678,7 +670,7 @@ AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the
 | Tool                  | Description                                                                                                                                                                                                                             |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **call_omo_agent**    | Spawn explore/librarian agents. Supports `run_in_background`.                                                                                                                                                                           |
-| **task**              | Category-based task delegation. Supports built-in categories like `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, and `writing`, or direct agent targeting via `subagent_type`. |
+| **task**              | Category-based task delegation. Supports built-in categories like `visual-engineering`, `ultrabrain`, `deep-low`, `deep-high`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, and `writing`, or direct agent targeting via `subagent_type`. |
 | **background_output** | Retrieve background task results                                                                                                                                                                                                        |
 | **background_cancel** | Cancel running background tasks                                                                                                                                                                                                         |
 
@@ -695,6 +687,12 @@ path is explicitly allowed.
 | Tool        | Description                                                                                                                                                    |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **look_at** | Analyze media files (PDFs, images, diagrams) via Multimodal-Looker agent. Extracts specific information or summaries from documents, describes visual content. |
+
+### Computer Use (OmO Native)
+
+**Experimental.** OmO Native agents can drive native desktop applications through the `computer` tool: screenshots, window lists, accessibility trees, and mouse and keyboard input on macOS, Linux and Windows. The engine starts only when the tool is first used; input goes to the target in the background by default, a global stop chord (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape elsewhere) suspends it, and `/computer on|off|status|stop|resume` controls it from the prompt. Inspection needs the `computer:read` permission tier and input needs `computer:exec`.
+
+Setup per OS, configuration, the safety model, privacy and troubleshooting are in the [computer use guide](../guide/computer-use.md); the tool contract is in the [computer tool reference](computer.md).
 
 ### Skill Tools
 

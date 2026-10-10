@@ -5,9 +5,17 @@ export { decideDepthPolicy } from "./depth-policy"
 export type { DepthDecision, DepthPolicyInput } from "./depth-policy"
 export { NameRegistry } from "./names"
 export type { NameRegistration } from "./names"
-export { resolveExecutionMode } from "./execution-mode"
-export type { ExecutionMode, ExecutionModeSources } from "./execution-mode"
+export { AUTO_HOST_CAPABILITIES, createExecutionModeGate, resolveAutoExecutionMode, resolveExecutionMode } from "./execution-mode"
+export type {
+  AutoExecutionModeInput,
+  ConfiguredExecutionMode,
+  ExecutionMode,
+  ExecutionModeGate,
+  ExecutionModeSources,
+  ProcessRunnerKind,
+} from "./execution-mode"
 export { adaptInProcessHandle, adaptRpcHandle } from "./child-handle"
+export { HOST_TURN_RESUMED_EVENT } from "./host-turn-resumed"
 export type { ManagedChildEvent, ManagedChildHandle, ManagedChildListener } from "./child-handle"
 export {
   TRANSCRIPT_ASSISTANT_EVENT,

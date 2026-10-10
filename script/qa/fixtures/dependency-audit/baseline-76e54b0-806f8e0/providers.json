@@ -1,0 +1,208 @@
+{
+  "command": [
+    "bun",
+    "script/qa/dependency-audit-capture.ts",
+    "--phase",
+    "baseline",
+    "--binary",
+    "$INPUT_BINARY",
+    "--out",
+    "$OUT"
+  ],
+  "machine": "darwin-arm64-20030cfa6181",
+  "versions": {
+    "bun": "1.4.2",
+    "node": "v26.7.0"
+  },
+  "exitCode": 1,
+  "timestamp": "2026-09-13T10:53:46.988Z",
+  "schemaVersion": 1,
+  "phase": "baseline",
+  "case": "providers",
+  "binarySha256": "c593321c06beacd0af1a94cda7a93fc5d76608e0f62efeb7fc5bf324c6059d76",
+  "pass": false,
+  "rows": [
+    {
+      "mode": "classic",
+      "api": "bedrock-converse-stream",
+      "requestObserved": false,
+      "stopReason": "error",
+      "failureClass": "module-resolution",
+      "errorMessage": "Cannot find module './bedrock-converse-stream.js' imported from /$bunfs/root/omo-darwin-arm64"
+    },
+    {
+      "mode": "classic",
+      "api": "cursor-agent",
+      "requestObserved": false,
+      "stopReason": "error",
+      "failureClass": "module-resolution",
+      "errorMessage": "Cannot find module './cursor-agent.js' imported from /$bunfs/root/omo-darwin-arm64"
+    },
+    {
+      "mode": "classic",
+      "api": "devin-agent",
+      "requestObserved": false,
+      "stopReason": "error",
+      "failureClass": "module-resolution",
+      "errorMessage": "Cannot find module './devin-agent.js' imported from /$bunfs/root/omo-darwin-arm64"
+    },
+    {
+      "mode": "multi",
+      "api": "bedrock-converse-stream",
+      "requestObserved": false,
+      "stopReason": "error",
+      "failureClass": "module-resolution",
+      "errorMessage": "Cannot find module './bedrock-converse-stream.js' imported from /$bunfs/root/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js"
+    },
+    {
+      "mode": "multi",
+      "api": "cursor-agent",
+      "requestObserved": false,
+      "stopReason": "error",
+      "failureClass": "module-resolution",
+      "errorMessage": "Cannot find module './cursor-agent.js' imported from /$bunfs/root/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js"
+    },
+    {
+      "mode": "multi",
+      "api": "devin-agent",
+      "requestObserved": false,
+      "stopReason": "error",
+      "failureClass": "module-resolution",
+      "errorMessage": "Cannot find module './devin-agent.js' imported from /$bunfs/root/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js"
+    }
+  ],
+  "requests": [],
+  "serversClosed": true,
+  "commands": [
+    {
+      "command": [
+        "$SANDBOX/omo",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "omob dev build\nomo   76e54b0a9bfa7bc730afefa877aea03f2c948b08 2026-09-13T12:03:49+09:00 (dev)\nsenpi 806f8e0ab4de7d4237e835c5f3cd4e2378c97f38 2026-09-13T01:17:58Z (main)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "$BINARY",
+        "--mode",
+        "rpc",
+        "--no-session",
+        "--no-extensions",
+        "--extension",
+        "$SANDBOX/fixtures/extension.ts",
+        "--no-skills",
+        "--no-context-files",
+        "--provider",
+        "audit-bedrock",
+        "--model",
+        "audit-v1"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "$BINARY",
+        "--mode",
+        "rpc",
+        "--no-session",
+        "--no-extensions",
+        "--extension",
+        "$SANDBOX/fixtures/extension.ts",
+        "--no-skills",
+        "--no-context-files",
+        "--provider",
+        "audit-cursor",
+        "--model",
+        "audit-v1"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "$BINARY",
+        "--mode",
+        "rpc",
+        "--no-session",
+        "--no-extensions",
+        "--extension",
+        "$SANDBOX/fixtures/extension.ts",
+        "--no-skills",
+        "--no-context-files",
+        "--provider",
+        "audit-devin",
+        "--model",
+        "audit-v1"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "$BINARY",
+        "--mode",
+        "rpc",
+        "--multi-session",
+        "--no-extensions",
+        "--extension",
+        "$SANDBOX/fixtures/extension.ts",
+        "--no-skills",
+        "--no-context-files",
+        "--provider",
+        "audit-bedrock",
+        "--model",
+        "audit-v1"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "$BINARY",
+        "--mode",
+        "rpc",
+        "--multi-session",
+        "--no-extensions",
+        "--extension",
+        "$SANDBOX/fixtures/extension.ts",
+        "--no-skills",
+        "--no-context-files",
+        "--provider",
+        "audit-cursor",
+        "--model",
+        "audit-v1"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "$BINARY",
+        "--mode",
+        "rpc",
+        "--multi-session",
+        "--no-extensions",
+        "--extension",
+        "$SANDBOX/fixtures/extension.ts",
+        "--no-skills",
+        "--no-context-files",
+        "--provider",
+        "audit-devin",
+        "--model",
+        "audit-v1"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "cleanup": "isolated HOME, agent, copied binary, and temporary workspace removed"
+}

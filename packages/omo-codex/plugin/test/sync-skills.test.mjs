@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
+import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter";
 import {
 	canonicalUltraworkDirectiveRelativePath,
 	componentSkillSources,
@@ -259,4 +260,23 @@ test("#given packaged Codex ulw-plan surfaces #when inspected #then dangerous sa
 	// when / then
 	assert.doesNotMatch(packagedWorkflow.content, dangerousBypassPattern, `${packagedWorkflow.path} ships unsafe Codex bypass guidance`);
 	assert.doesNotMatch(componentWorkflow.content, dangerousBypassPattern, `${componentWorkflow.path} ships unsafe Codex bypass guidance`);
+});
+
+test("#given the shared ulw-research runtime and references #when aggregate Codex skills are inspected #then every packaged file is byte-equal to its shared source", async () => {
+	// given
+	const sharedSkillRoot = join(sharedSkillsRootPath(), "ulw-research");
+	const packagedSkillRoot = join(root, "skills", "ulw-research");
+	const keep = createSkillSourceCopyFilter(sharedSkillRoot);
+	const inAssetDirs = (file) => /^(scripts|references)\//.test(file.replaceAll("\\", "/"));
+	const sharedFiles = (await listSkillFiles(sharedSkillRoot)).filter(inAssetDirs).filter((file) => keep(join(sharedSkillRoot, file))).sort();
+
+	// when
+	const packagedFiles = (await listSkillFiles(packagedSkillRoot)).filter(inAssetDirs).sort();
+
+	// then
+	assert.deepEqual(packagedFiles, sharedFiles);
+	for (const file of sharedFiles) {
+		const [packaged, shared] = await Promise.all([readFile(join(packagedSkillRoot, file)), readFile(join(sharedSkillRoot, file))]);
+		assert.ok(packaged.equals(shared), `ulw-research/${file} must ship the shared bytes`);
+	}
 });

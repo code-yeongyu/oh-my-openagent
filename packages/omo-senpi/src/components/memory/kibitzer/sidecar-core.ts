@@ -53,7 +53,10 @@ export interface Turn {
   readonly wake: number
   readonly generation: number
   readonly maxItems: number
+  /** Set at admission, before any child I/O: the wake's whole life is measured from here. */
   readonly startedAt: number
+  /** `startedAt + KIBITZER_WAKE_MAX_TOTAL_MS`: the ceiling no steer re-arm may push the deadline past. */
+  readonly totalDeadlineAt: number
   readonly accepted: RecallNudge[]
   readonly budget: WakeToolBudget
   readonly envelopes: Envelope[]

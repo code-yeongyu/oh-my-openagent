@@ -12,7 +12,7 @@ export function isCommunityContributor(login: string): boolean {
 }
 
 const EXCLUDED_PREFIX_PATTERN = /^(ignore:|test:|chore:|ci:|release:)/i
-const CONTAINED_SURFACE_PATTERN = /\bsenpi\b|\bpi-goal\b|\bpi-webfetch\b/i
+const CONTAINED_SURFACE_PATTERN = /\bsenpi\b/i
 
 export function isExcludedReleaseNoteSubject(subject: string): boolean {
   return EXCLUDED_PREFIX_PATTERN.test(subject) || CONTAINED_SURFACE_PATTERN.test(subject)
@@ -23,12 +23,27 @@ function releaseChannel(version: string): string | null {
   return prerelease?.split(".", 1)[0] ?? null
 }
 
+function versionCore(version: string): string {
+  return version.split("-", 1)[0] ?? version
+}
+
+/**
+ * A prerelease target measures from its own channel. A stable target measures from the last release
+ * users could run before it: the previous stable, or one of its own prereleases (5.0.0-beta.90 for
+ * 5.0.0). Measuring a first stable from the previous stable spans the whole prerelease line (#8894).
+ */
+function isComparableRelease(version: string, target: string, targetChannel: string | null): boolean {
+  const channel = releaseChannel(version)
+  if (channel === targetChannel) return true
+  return targetChannel === null && versionCore(version) === versionCore(target)
+}
+
 export function selectPreviousReleaseTag(currentVersion: string, tags: readonly string[]): string | null {
   const target = currentVersion.replace(/^v/, "")
   const targetChannel = releaseChannel(target)
   const candidates = tags.flatMap((tag) => {
     const version = tag.replace(/^v/, "")
-    if (!RELEASE_VERSION_PATTERN.test(version) || releaseChannel(version) !== targetChannel ||
+    if (!RELEASE_VERSION_PATTERN.test(version) || !isComparableRelease(version, target, targetChannel) ||
       Bun.semver.order(version, target) >= 0) return []
     return [{ tag, version }]
   })

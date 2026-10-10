@@ -141,6 +141,10 @@ function optionalToken(label: string, value: string | undefined): string | undef
 
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
+      return { color: "warning", text: `task_send ${details.kind} ${details.task_id}: ${details.reason}` }
     case "steered":
       return {
         color: statusThemeColor(details.status),
@@ -215,8 +219,12 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
         color: statusThemeColor(details.status),
         text: `task_cancel cancelled ${details.task_id} (${details.previous_status} -> ${details.status})`,
       }
+    case "cancel_pending":
+      return { color: "warning", text: `task_cancel pending ${details.task_id}: ${details.reason}` }
     case "noop":
       return { color: statusThemeColor(details.status), text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}` }
+    case "released":
+      return { color: statusThemeColor(details.status), text: `task_cancel released ${details.task_id} (${details.status}, child stopped)` }
     case "not_found":
       return { color: "error", text: `task_cancel not found: ${details.reason}` }
     case "invalid_arguments":

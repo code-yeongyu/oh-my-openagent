@@ -72,6 +72,27 @@ async function seedSession(
 }
 
 describe("agent toolkit session context", () => {
+	describe("#given a session id that normalizes to null", () => {
+		it("#when an omo-senpi SDK context is created #then it rejects without creating session state", async () => {
+			const cwd = await makeWorkdir();
+
+			expect(() => createAgentToolkit({ cwd, sessionId: "../../x", surface: "omo-senpi" })).toThrowError(
+				expect.objectContaining({ code: "ULW_LOOP_SESSION_ID_INVALID" }),
+			);
+			expect(existsSync(join(cwd, ".omo", "ulw-loop"))).toBe(false);
+		});
+	});
+
+	describe("#given a blank session id", () => {
+		it("#when an SDK context is created #then it reports the required-id error", async () => {
+			const cwd = await makeWorkdir();
+
+			expect(() => createAgentToolkit({ cwd, sessionId: "   ", surface: "omo-senpi" })).toThrowError(
+				expect.objectContaining({ code: "ULW_LOOP_SESSION_ID_REQUIRED" }),
+			);
+		});
+	});
+
 	describe("#given a plan written under session A", () => {
 		it("#when session B reads through its own context #then the read fails closed instead of borrowing A", async () => {
 			const cwd = await makeWorkdir();

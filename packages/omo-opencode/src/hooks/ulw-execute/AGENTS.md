@@ -27,11 +27,12 @@
 
 1. Gate: prompt must contain both `<session-context>` and the marker `"You are starting an Atlas work session."`; otherwise no-op.
 2. Set session agent: `atlas` if registered, else `sisyphus` (`updateSessionAgent` + `output.message.agent`).
-3. `parseUserRequest` on prompt text; `--worktree <path>` validated via `detectWorktreePath` (invalid -> setup instructions block).
-4. No explicit plan? `findRecentSessionPlanPath` derives a preferred plan from session history (bare `ses_` id, #5285).
-5. `buildUlwExecuteContextInfo` routes: resume existing work, auto-select preferred/sole incomplete plan (writes boulder state + notepads), or ask the user to pick.
-6. Substitute `$SESSION_ID`/`$TIMESTAMP` inside every framework `<session-context>` region across all text parts (retry may re-issue the raw template, #4480).
-7. Append context to first text part behind `<!-- omo-ulw-execute-context -->`; marker presence makes double-firing idempotent.
+3. `reconcileStaleWorks` before the state read: a work whose session died abnormally is still `active` on disk, so this is where the next session in the project repairs it to `paused` + `stale_since` (#8413). Session liveness comes from transcript mtimes under `resolveAgentSessionsDirectory`; demotions are logged.
+4. `parseUserRequest` on prompt text; `--worktree <path>` validated via `detectWorktreePath` (invalid -> setup instructions block).
+5. No explicit plan? `findRecentSessionPlanPath` derives a preferred plan from session history (bare `ses_` id, #5285).
+6. `buildUlwExecuteContextInfo` routes: resume existing work, auto-select preferred/sole incomplete plan (writes boulder state + notepads), or ask the user to pick. Resuming a demoted work returns it to `active` and clears `stale_since`.
+7. Substitute `$SESSION_ID`/`$TIMESTAMP` inside every framework `<session-context>` region across all text parts (retry may re-issue the raw template, #4480).
+8. Append context to first text part behind `<!-- omo-ulw-execute-context -->`; marker presence makes double-firing idempotent.
 
 ## WIRING
 

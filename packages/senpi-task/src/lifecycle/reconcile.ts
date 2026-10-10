@@ -1,12 +1,20 @@
+import { log } from "@oh-my-opencode/utils"
+
+import { processOwnerProbe } from "@oh-my-opencode/isolation-core"
+
+import { needsCrashSalvage, salvageCrashedIsolation, sweepIsolations } from "../isolation"
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { isFallbackHandoff } from "./fallback-handoff"
+import { isHostSessionRecord } from "./host-session"
+import { reconcileHostSessionOrphan } from "./host-session-revive"
+import { reviveClaimed } from "./reconcile-reclamation"
 import { getLifecycleReattachPorts } from "./port"
 import { beginLocalReclamation, reconcileScopedRevival } from "./reconcile-revival"
 import { reclaimOrphanedResident } from "./residency"
-import { detachTerminalResident } from "./reconcile-terminal"
 import { newestSessionPath } from "./session-path"
-import { terminateClaimedPid } from "./reconcile-terminal"
+import { reconcileLegacyTerminal, terminateClaimedPid } from "./reconcile-terminal"
 import type { ReconcileOutcome, ReconcileResult } from "./types"
 
 const HEARTBEAT_FRESH_MS = 30_000
@@ -18,11 +26,18 @@ export async function reconcileOnSessionStart(
 ): Promise<ReconcileResult> {
   const outcomes: ReconcileOutcome[] = []
   const candidates: TaskRecord[] = []
+  const excludedFromRevival = new Set(context.reconcileAdmission.excludeTaskIds)
+  // ONE daemon snapshot per pass: every host-session record below is matched against it by session
+  // path, so a hundred children still cost one probeHost and one list_sessions.
+  context.hostSessionProbe.refresh()
 
   // Ownership is checked before terminality, residency, or mode. A live sibling owns the record in
   // every status and this process must not mutate it.
   for (const record of context.store.list().records) {
-    if (hasForeignLiveOwner(context, record)) {
+    if (await hasForeignLiveOwner(context, record, parentSessionId)) {
+      // Scoped admission re-reads the store rather than this candidate array. Carry the
+      // ownership exclusion into that selector too, or a suspended live-owner child is claimed.
+      excludedFromRevival.add(record.task_id)
       outcomes.push(parentSessionId === undefined
         ? {
             task_id: record.task_id,
@@ -44,6 +59,7 @@ export async function reconcileOnSessionStart(
       if (isSuspended(record)) continue
       outcomes.push(await reconcileLegacyRecord(context, record))
     }
+    await reclaimIsolations(context)
     return { outcomes }
   }
 
@@ -65,11 +81,12 @@ export async function reconcileOnSessionStart(
   }
 
   outcomes.push(...await reconcileScopedRevival(
-    context,
+    { ...context, reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival } },
     parentSessionId,
     candidates.filter((record) => record.parent_session_id === parentSessionId),
     (taskId) => newestSessionPath(context, taskId),
   ))
+  await reclaimIsolations(context)
   return { outcomes }
 }
 
@@ -112,6 +129,10 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
 
   if (TERMINAL_STATUSES.has(record.status)) return reconcileLegacyTerminal(context, record)
 
+  // A daemon-hosted child has no pid at all. Its liveness is the daemon plus its session path, and
+  // "the daemon is gone" parks it - the pid-shaped path below would mark it lost for having no pid.
+  if (isHostSessionRecord(record)) return reconcileHostSessionOrphan(context, record)
+
   if (record.execution_mode !== "process") {
     await markLost(context, record.task_id, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
@@ -119,6 +140,11 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
 
   const pid = record.pid
   if (pid === undefined) {
+    // A runtime-fallback handoff whose owner died is revived onto its selected next model; any other
+    // pid-less child (queued, or a workpool worker that may never be replayed) has nothing to revive.
+    if (isFallbackHandoff(record) && context.config.reattach_on_reconcile !== false) {
+      return reviveClaimed(context, record, "rpc_detached", undefined)
+    }
     await markLost(context, record.task_id, "rpc task had no recorded pid")
     return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
   }
@@ -161,28 +187,17 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   return reattachLegacyRecord(context, context.store.load(record.task_id) ?? record, sessionPath)
 }
 
-async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (record.status === "lost" || record.status === "cancelled") {
-    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }
-  }
-  if (record.residency_state !== "resident") return { task_id: record.task_id, kind: "resumed" }
-  if (newestSessionPath(context, record.task_id) === undefined) {
-    await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return {
-      task_id: record.task_id,
-      kind: "resumed",
-      reason: "terminal without transcript disposed; persisted result preserved",
-    }
-  }
-  return detachTerminalResident(context, record)
-}
-
 async function reattachLegacyRecord(
   context: LifecycleContext,
   record: TaskRecord,
   sessionPath: string,
 ): Promise<ReconcileOutcome> {
+  // The legacy process path reserves and respawns directly, so the reviveClaimed guard never sees
+  // it: an isolated record must be stopped HERE or it is relaunched inside a reclaimed clone.
+  if (record.isolation !== undefined) {
+    await markLost(context, record.task_id, "isolated record is never respawned")
+    return { task_id: record.task_id, kind: "lost", reason: "isolated_not_revivable" }
+  }
   const ports = context.reattachPorts ?? getLifecycleReattachPorts(context.store)
   if (ports === undefined) {
     await markLost(context, record.task_id, "reattach ports unavailable")
@@ -222,8 +237,26 @@ async function reattachLegacyRecord(
   return { task_id: record.task_id, kind: "resumed", reason: "respawned and reattached" }
 }
 
-function hasForeignLiveOwner(context: LifecycleContext, record: TaskRecord): boolean {
+async function hasForeignLiveOwner(
+  context: LifecycleContext,
+  record: TaskRecord,
+  parentSessionId: string | undefined,
+): Promise<boolean> {
+  if (isHostSessionRecord(record)) {
+    if (record.residency_state !== "resident") return false
+    const sessionLive = await context.hostSessionProbe.daemonAlive(record.host_session)
+      && await context.hostSessionProbe.sessionLive(record.host_session)
+    if (!sessionLive) return false
+    // The child's session outlives the process that owned its manager (the parent's own host).
+    // When that owner is dead, the parent session reopening elsewhere is the only one left to
+    // observe the child, so it must reclaim the record instead of deferring to a dead owner.
+    return !(record.parent_session_id === parentSessionId && isDeadForeignOwner(context, record))
+  }
   return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
+}
+
+function isDeadForeignOwner(context: LifecycleContext, record: TaskRecord): boolean {
+  return record.host_pid !== undefined && record.host_pid !== context.hostPid && !context.signaller.isAlive(record.host_pid)
 }
 
 // A record stamped with THIS host pid that reached the candidate list is owned by another engine in
@@ -262,4 +295,26 @@ async function markLost(context: LifecycleContext, taskId: string, message: stri
     context.store.appendEvent(taskId, { type: "reconcile_lost", payload: { reason: message } })
   }
   if (record?.residency_state === "resident") await destroyResidentTask(context, taskId, "reconcile_lost")
+}
+
+// Startup order is load-bearing: records are reconciled FIRST so a crashed child is terminal, then
+// its delta is salvaged while the clone still exists, and only then may the sweep reclaim clones
+// whose owner is provably gone. Reversing salvage and sweep would delete unreviewed work.
+async function reclaimIsolations(context: LifecycleContext): Promise<void> {
+  const runtime = context.isolation
+  if (runtime === undefined) return
+  const records = context.store.list().records
+  for (const record of records) {
+    if (!needsCrashSalvage(record, (candidate) => TERMINAL_STATUSES.has(candidate.status))) continue
+    try {
+      await salvageCrashedIsolation({ runtime, stateDir: context.store.stateDir, mutate: context.store.mutate }, record)
+    } catch (error) {
+      log("senpi-task isolation crash salvage failed", { taskId: record.task_id, error: String(error) })
+    }
+  }
+  try {
+    await sweepIsolations(runtime, context.store.list().records, context.isolationProbe ?? processOwnerProbe)
+  } catch (error) {
+    log("senpi-task isolation sweep failed", { error: String(error) })
+  }
 }

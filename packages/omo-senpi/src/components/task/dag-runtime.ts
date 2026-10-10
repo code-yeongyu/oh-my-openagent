@@ -30,6 +30,7 @@ import {
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import { resolveDagForkSource } from "./dag-fork-source"
+import { scheduleDagRetentionSweep, type DagRetentionSweepOptions } from "./dag-retention-sweep"
 import { createDagRpcBridge, type DagBridgeTimers } from "./dag-rpc-bridge"
 import { registerDagRpcHandlers } from "./dag-rpc-handlers"
 import { createDagStatusUi, type DagStatusUiTimers } from "./dag-status-ui"
@@ -85,6 +86,8 @@ export interface DagRuntimeDeps {
   readonly statusUiTimers?: DagStatusUiTimers
   /** Liveness probe + timers for the paused-run lease watch; production uses signal-0 and unref'd timers. */
   readonly leaseWatch?: DagLeaseWatchOptions
+  /** Scheduler for the retention sweep; production defers it off the session-start path. */
+  readonly retentionSweep?: DagRetentionSweepOptions
 }
 
 type RecoveryScope = {
@@ -101,6 +104,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       ...(dagSettings === undefined ? {} : { dag: dagSettings }),
     },
   })
+  scheduleDagRetentionSweep(baseStore, deps)
   const runListeners = new Map<DagRunId, Set<(event: DagRunEvent) => void>>()
   const deliveredSeq = new Map<DagRunId, number>()
   const schedulers = new Map<DagRunId, { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }>()
@@ -141,7 +145,14 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     store,
     taskManager,
     materializeSkills,
-    executionMode: { agents: deps.engine.agents, config: deps.engine.omoConfig },
+    executionMode: {
+      agents: deps.engine.agents,
+      config: deps.engine.omoConfig,
+      // Live read: a DAG node dispatched before the session resolved `auto` names no mode and the
+      // manager decides, so no run is pinned to a guess.
+      autoMode: () => deps.engine.host.executionModeGate.current(),
+    },
+    ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
   }
@@ -373,7 +384,11 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const wakeSource = createDagWakeSource({ pi: deps.pi, manager: queryManager, sessionId: () => deps.engine.runtime.sessionId() })
   const wake = deps.coordinator === undefined
     ? undefined
-    : createDagWake({ coordinator: deps.coordinator, parentState: () => deps.engine.runtime.parentState() })
+    : createDagWake({
+      coordinator: deps.coordinator,
+      parentState: () => deps.engine.runtime.parentState(),
+      getReceiverModel: () => deps.engine.runtime.parentModel(),
+    })
   const terminalWakeSeq = new Map<DagRunId, number>()
   const pausedWakeSeq = new Map<DagRunId, number>()
 
@@ -429,6 +444,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
     // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
     isRunHeldInProcess: (runId) => schedulers.has(runId),
+    ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     stopAdmission: (runId) => stoppedAdmissions.add(runId),

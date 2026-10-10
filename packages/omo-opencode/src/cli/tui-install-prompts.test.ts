@@ -50,9 +50,9 @@ describe("promptInstallPlatform", () => {
     mock.restore()
   })
 
-  test("offers OpenCode, Codex, and Both choices while the senpi platform flag is disabled", async () => {
+  test("offers OpenCode, Codex, Both and OmO Native choices while the native-dev platform flag is disabled", async () => {
     // given
-    delete process.env.OMO_ENABLE_SENPI_PLATFORM
+    delete process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM
     const selectSpy = spyOn(p, "select").mockResolvedValue("opencode")
 
     // when
@@ -67,21 +67,22 @@ describe("promptInstallPlatform", () => {
         { value: "opencode" },
         { value: "codex" },
         { value: "both" },
+        { value: "native", label: "OmO Native" },
       ],
     })
   })
 
-  test("offers the Senpi choice when the senpi platform flag is enabled", async () => {
+  test("offers the native development adapter choice when the native-dev platform flag is enabled", async () => {
     // given
-    process.env.OMO_ENABLE_SENPI_PLATFORM = "1"
-    const selectSpy = spyOn(p, "select").mockResolvedValue("senpi")
+    process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM = "1"
+    const selectSpy = spyOn(p, "select").mockResolvedValue("native-dev")
 
     try {
       // when
       const value = await prompts.promptInstallPlatform("opencode")
 
       // then
-      expect(value).toBe("senpi")
+      expect(value).toBe("native-dev")
       expect(selectSpy).toHaveBeenCalledTimes(1)
       expect(selectSpy.mock.calls[0]?.[0]).toMatchObject({
         initialValue: "opencode",
@@ -89,17 +90,18 @@ describe("promptInstallPlatform", () => {
           { value: "opencode" },
           { value: "codex" },
           { value: "both" },
-          { value: "senpi" },
+          { value: "native", label: "OmO Native" },
+          { value: "native-dev" },
         ],
       })
     } finally {
-      delete process.env.OMO_ENABLE_SENPI_PLATFORM
+      delete process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM
     }
   })
 
   test("preserves Codex as the initial platform", async () => {
     // given
-    delete process.env.OMO_ENABLE_SENPI_PLATFORM
+    delete process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM
     const selectSpy = spyOn(p, "select").mockResolvedValue("codex")
 
     // when
@@ -114,6 +116,7 @@ describe("promptInstallPlatform", () => {
         { value: "opencode" },
         { value: "codex" },
         { value: "both" },
+        { value: "native", label: "OmO Native" },
       ],
     })
   })
@@ -148,19 +151,19 @@ describe("promptInstallConfig platform branching", () => {
     expect(selectSpy).not.toHaveBeenCalled()
   })
 
-  test("skips OpenCode questions when the user selects senpi", async () => {
+  test("skips OpenCode questions when the user selects native-dev", async () => {
     // given
     const selectSpy = spyOn(p, "select").mockResolvedValue("no")
 
     // when
-    const config = await prompts.promptInstallConfig(createDetectedConfig(), "senpi")
+    const config = await prompts.promptInstallConfig(createDetectedConfig(), "native-dev")
 
     // then
     expect(config).toMatchObject({
-      platform: "senpi",
+      platform: "native-dev",
       hasOpenCode: false,
       hasCodex: false,
-      hasSenpi: true,
+      hasNativeDev: true,
     } satisfies Partial<InstallConfig>)
     expect(selectSpy).not.toHaveBeenCalled()
   })

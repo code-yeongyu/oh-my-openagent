@@ -556,7 +556,7 @@ function runSelfTest() {
   if (!html.includes("cols: 120, rows: 40") || !html.includes("window.__snapshot") || !html.includes("window.__write")) throw new Error("self-test: page hooks")
   const booting = { viewport: "❯\n… project • 0/200K (0.0%) (auto)       mock-1", buffer: "" }
   if (isReady(booting) !== undefined) throw new Error("self-test: the editor glyph and model footer alone are not ready - submission is still gated")
-  const busy = { viewport: `❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native) mem:project-3bf12e4b just now`, buffer: `${PARENT_ANSWERS[0]}\n❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native) mem:project-3bf12e4b just now` }
+  const busy = { viewport: `❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native by Q Kim) mem:project-3bf12e4b just now`, buffer: `${PARENT_ANSWERS[0]}\n❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native by Q Kim) mem:project-3bf12e4b just now` }
   if (isReady(busy) === undefined || isIdleWith(PARENT_ANSWERS[0])(busy) !== undefined) throw new Error("self-test: a working turn is ready but not idle")
   const settled = { viewport: `  ${NOTICE_GLYPH} ${NOTICE_TITLE}\n  ${recalledLine(MEMORIES.rollout)}\n  ${MEMORIES.rollout.path}\n ${PARENT_ANSWERS[1]}\n❯\n mock-1`, buffer: "" }
   settled.buffer = settled.viewport

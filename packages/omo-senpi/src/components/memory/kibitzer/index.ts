@@ -34,6 +34,7 @@ import { createKibitzerObservability, kibitzerSidecarSessionDir } from "./observ
 import { resolveKibitzerSidecarSettings, type KibitzerSidecarSettings } from "./settings"
 import { createKibitzerSidecar, type KibitzerSidecar } from "./sidecar"
 import { createKibitzerSidecarChildStarter, type KibitzerSidecarChildStarterOptions } from "./sidecar-model"
+import { kibitzerOfferSignal, kibitzerWakeSignal, sharedKibitzerTelemetryObservers } from "./wake-observers"
 import type { KibitzerWakeOutcome } from "./sidecar-outcome"
 import { createKibitzerSidecarTools } from "./tools"
 import { createKibitzerWakeSlot } from "./wake-slot"
@@ -62,7 +63,7 @@ export interface KibitzerCompositionOptions {
 
 export interface KibitzerComposition {
   readonly delivery: KibitzerDelivery
-  /** Registers the four Kibitzer hooks; call it after the projection and recall-drain handlers. */
+  /** Registers the five Kibitzer hooks; call it after the projection and recall-drain handlers. */
   registerHooks(pi: SenpiExtensionAPI): void
   onCompactionAccepted(sessionId: string, context: MemoryIdentityContext | undefined): void
   /** Aborts and disposes the session's sidecar (releasing its wake lease and its directory) and drains its delivery. */
@@ -156,13 +157,14 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
       createTools: (binding) => createKibitzerSidecarTools({
         workspaceRoot: cwd,
         session: { entries: () => captured.branch },
-        memory: { repo, cache: corpusCache },
+        memory: { repo, cache: corpusCache, queryExpansion: settings.queryExpansion },
         nudge: binding.nudge,
         budget: binding.budget,
       }),
       deliver: (nudges: readonly RecallNudge[]) => delivery.accept(sessionId, context, nudges),
       onWake: (outcome) => {
-        observe.onWake(outcome, context)
+        observe.onWake(outcome, context, { category: settings.category })
+        sharedKibitzerTelemetryObservers().notify(kibitzerWakeSignal(outcome))
         options.onWake?.(outcome, context)
       },
       wakeSlot: createKibitzerWakeSlot({ locksDirectory: context.identityPaths.locks, maxConcurrent: settings.maxConcurrentWakes }),
@@ -210,7 +212,8 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
   async function offer(record: SessionSidecar, snapshot: RecallSessionSnapshot, extraTexts: readonly string[]): Promise<void> {
     const collected = await options.recall.collectCandidatesFromSnapshot(snapshot, extraTexts)
     if (collected === undefined || collected.sessionId !== record.sessionId) return
-    await record.sidecar.offer({ candidates: collected.candidates, surfaced: collected.surfaced, maxItems: collected.maxItems })
+    const result = await record.sidecar.offer({ candidates: collected.candidates, surfaced: collected.surfaced, maxItems: collected.maxItems })
+    sharedKibitzerTelemetryObservers().notify(kibitzerOfferSignal(record.sessionId, result))
   }
 
   function onSettled(eventCtx: unknown): void {

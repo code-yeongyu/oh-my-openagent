@@ -116,6 +116,9 @@ function executePlan(input: {
   const existingSources = plan.sources.filter((source) => fileSystem.existsSync(source.path))
   const target = targetDocument(plan.targetPath, fileSystem)
   const replaceTarget = plan.mode === "replace-target"
+  if (plan.shouldRun !== undefined && !plan.shouldRun(target)) {
+    return { diagnostics: [], journalResumed, status: "skipped" }
+  }
   if (!shouldRunMigration({
     legacySourcesExist: replaceTarget ? fileSystem.existsSync(plan.targetPath) : existingSources.length > 0,
     migrationId: plan.id,

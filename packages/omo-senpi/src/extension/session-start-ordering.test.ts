@@ -66,8 +66,7 @@ describe("session_start component ordering", () => {
       createInitDeepAdvisorComponent(),
       createUltraworkComponent(),
       createUlwLoopComponent({
-        resolveOmoBin: () => "/tmp/omo-agent-toolkit",
-        runCommand: async () => ({ code: 0, stdout: activeStatus() }),
+        readStatus: async () => ({ code: 0, stdout: activeStatus() }),
         // This fixture asserts handler ordering; seeding a real `.omo` ledger would also flip the
         // onboarding/advisor state the test pins, so the plan lookup is stubbed active instead.
         planExists: () => true,

@@ -30,7 +30,7 @@ config/schema/
 ├── notification.ts             # OS notification settings
 ├── git-master.ts               # commit_footer: boolean | string
 ├── git-env-prefix.ts           # Git environment prefix config
-├── browser-automation.ts       # provider: playwright | agent-browser | dev-browser | playwright-cli; playwright_mcp_args (user-config only)
+├── browser-automation.ts       # playwright/dev-browser/playwright-cli enum; rejects retired providers with migration guidance; playwright_mcp_args (user-config only)
 ├── background-task.ts          # Concurrency limits per model/provider, syncPollTimeoutMs
 ├── fallback-models.ts          # FallbackModelsConfigSchema
 ├── runtime-fallback.ts         # RuntimeFallbackConfigSchema (reactive provider fallback)

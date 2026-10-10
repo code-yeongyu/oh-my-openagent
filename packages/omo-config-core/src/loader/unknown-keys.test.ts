@@ -52,12 +52,12 @@ describe("loadOmoConfig unknown-key tolerance", () => {
     }
   })
 
-  test("#given retired keys nested in a profile and a senpi block #when loading the active profile #then both are stripped and the diagnostic carries dotted paths", () => {
+  test("#given retired keys nested in a profile and a native block #when loading the active profile #then both are stripped and the diagnostic carries dotted paths", () => {
     // given
     const fixture = makeFixture()
     writeUserConfig(
       fixture.homeDir,
-      `{"profiles":{"opus":{"retired_key":{},"telemetry":{"enabled":false}}},"[senpi]":{"retired_key":{},"task":{"default_concurrency":3}}}`,
+      `{"profiles":{"opus":{"retired_key":{},"telemetry":{"enabled":false}}},"[native]":{"retired_key":{},"task":{"default_concurrency":3}}}`,
     )
 
     try {
@@ -70,13 +70,13 @@ describe("loadOmoConfig unknown-key tolerance", () => {
       expect(result.config.telemetry?.enabled).toBe(false)
       expect(result.diagnostics).toHaveLength(1)
       expect(result.diagnostics[0]).toMatchObject({ kind: "unknown-keys" })
-      expect(result.diagnostics[0]?.issuePaths).toEqual(["[senpi].retired_key", "profiles.opus.retired_key"])
+      expect(result.diagnostics[0]?.issuePaths).toEqual(["[native].retired_key", "profiles.opus.retired_key"])
     } finally {
       rmSync(fixture.root, { force: true, recursive: true })
     }
   })
 
-  test("#given a prototype-pollution key beside a valid block #when loading the senpi view #then the whole layer is rejected instead of stripped", () => {
+  test("#given a prototype-pollution key beside a valid block #when loading the senpi view #then only the unsafe key is stripped and reported", () => {
     // given
     const fixture = makeFixture()
     writeUserConfig(
@@ -89,18 +89,17 @@ describe("loadOmoConfig unknown-key tolerance", () => {
       const result = loadSenpi(fixture)
 
       // then
-      expect(result.sources.map((source) => source.loaded)).toEqual([false])
-      expect(result.config.categories?.quick).toBeUndefined()
+      expect(result.sources.map((source) => source.loaded)).toEqual([true])
+      expect(result.config.categories?.quick?.model).toBe("user-model")
       expect(result.diagnostics).toHaveLength(1)
-      expect(result.diagnostics[0]).toMatchObject({ kind: "validation" })
-      expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined()
+      expect(result.diagnostics[0]).toMatchObject({ kind: "unknown-keys", issuePaths: ["__proto__"] })
+      expect(Reflect.get({}, "polluted")).toBeUndefined()
     } finally {
       rmSync(fixture.root, { force: true, recursive: true })
     }
   })
 
-  test("#given a prototype-pollution key nested under an otherwise valid agent #when loading the senpi view #then the whole layer is rejected instead of loaded", () => {
-    // given: every schema-visible value is valid, so no zod issue is raised; only the nested prototype is hostile
+  test("#given a prototype-pollution key nested under an otherwise valid agent #when loading the senpi view #then only the unsafe key is stripped and valid siblings load", () => {
     const fixture = makeFixture()
     writeUserConfig(
       fixture.homeDir,
@@ -112,16 +111,13 @@ describe("loadOmoConfig unknown-key tolerance", () => {
       const result = loadSenpi(fixture)
 
       // then
-      expect(result.sources.map((source) => source.loaded)).toEqual([false])
-      expect(result.config.agents?.evil).toBeUndefined()
-      expect(result.config.categories?.quick).toBeUndefined()
+      expect(result.sources.map((source) => source.loaded)).toEqual([true])
+      expect(result.config.agents?.evil?.model).toBe("user-model")
+      expect(result.config.categories?.quick?.model).toBe("user-model")
       expect(result.diagnostics).toHaveLength(1)
-      expect(result.diagnostics[0]).toMatchObject({ kind: "validation" })
-      for (const layer of result.layers) {
-        const evil = (layer.config as { agents?: Record<string, object> }).agents?.evil
-        expect(evil === undefined || Object.getPrototypeOf(evil) === Object.prototype).toBe(true)
-      }
-      expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined()
+      expect(result.diagnostics[0]).toMatchObject({ kind: "unknown-keys", issuePaths: ["agents.evil.__proto__"] })
+      expect(Object.getPrototypeOf(result.config.agents?.evil ?? {})).toBe(Object.prototype)
+      expect(Reflect.get({}, "polluted")).toBeUndefined()
     } finally {
       rmSync(fixture.root, { force: true, recursive: true })
     }

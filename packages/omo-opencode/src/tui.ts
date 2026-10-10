@@ -1,6 +1,7 @@
 import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
 
 import { registerBtwSideTui } from "./features/btw-side"
+import { registerNativeEditionNudgeTui } from "./features/native-edition-nudge"
 import { computeView, viewKey } from "./features/tui-sidebar/compute-view"
 import { POLL_INTERVAL_MS } from "./features/tui-sidebar/constants"
 import { deriveAgents, deriveConfig, deriveJobBoard, deriveLoop, deriveRoster } from "./features/tui-sidebar/derivers"
@@ -10,6 +11,7 @@ import { buildViewNodes } from "./features/tui-sidebar/render-view"
 import type { RosterRow } from "./features/tui-sidebar/state-types"
 import type { SidebarView } from "./features/tui-sidebar/state-types"
 import { log } from "./shared/logger"
+import { trackLoadedPluginSandbox } from "./hooks/auto-update-checker/checker/sandbox-refresh"
 
 type SolidRuntime<Node> = {
   readonly createElement: (tag: string) => Node
@@ -118,6 +120,10 @@ export function handleTuiPollError(
 const module: TuiPluginModule = {
   id: "oh-my-openagent:tui",
   tui: async (api) => {
+    // The TUI plugin runs on OpenCode's main thread, the only thread that
+    // emits `exit`; it applies a sandbox refresh the server plugin requested.
+    trackLoadedPluginSandbox()
+
     const solid = await import("@opentui/solid").catch(() => null)
     if (!solid) {
       return
@@ -127,6 +133,12 @@ const module: TuiPluginModule = {
       await registerBtwSideTui(api, solid)
     } catch (error) {
       log("[btw-side] TUI registration failed", { error })
+    }
+
+    try {
+      registerNativeEditionNudgeTui(api as never)
+    } catch (error) {
+      log("[native-edition-nudge] TUI registration failed", { error })
     }
 
     const directory = api.state.path.directory

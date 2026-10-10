@@ -99,7 +99,7 @@ describe("createSkillContext", () => {
     }
   })
 
-  it("excludes discovered playwright skill when browser provider is agent-browser", async () => {
+  it("excludes discovered playwright skill when browser provider is dev-browser", async () => {
     // given
     const discoveredPlaywrightDir = join(testDirectory, ".claude", "skills", "playwright")
     mkdirSync(discoveredPlaywrightDir, { recursive: true })
@@ -141,7 +141,7 @@ describe("createSkillContext", () => {
     ).mockReturnValue(new Set<string>())
 
     const pluginConfig = OhMyOpenCodeConfigSchema.parse({
-      browser_automation_engine: { provider: "agent-browser" },
+      browser_automation_engine: { provider: "dev-browser" },
     })
 
     try {
@@ -152,8 +152,8 @@ describe("createSkillContext", () => {
       })
 
       // then
-      expect(result.browserProvider).toBe("agent-browser")
-      expect(result.mergedSkills.some((skill) => skill.name === "agent-browser")).toBe(true)
+      expect(result.browserProvider).toBe("dev-browser")
+      expect(result.mergedSkills.some((skill) => skill.name === "dev-browser")).toBe(true)
       expect(result.mergedSkills.some((skill) => skill.name === "playwright")).toBe(false)
       expect(result.availableSkills.some((skill) => skill.name === "playwright")).toBe(false)
     } finally {

@@ -27,6 +27,7 @@ Colocated at `src/` root. These are executable package-contract tests, not docum
 - `extension-node-runtime-audit.test.ts` - extension loads under plain Node/jiti: no Bun-only module properties (`import.meta.dir` / `import.meta.file`) at module scope (v5.0.0-beta.1 regression).
 - `senpi-main-runtime-import-audit.test.ts`, `omo-native-capture-path.audit.test.ts` - import/capture-path surface audits.
 - `skills-sync.test.ts` - synced skills carry no foreign harness tokens (`codex`, `multi_agent`, `spawn_agent`, case-insensitive).
+- `windows-console-hide.test.ts` - every production `node:child_process` call in the package passes `windowsHide: true`, so no spawn opens a console window that steals the user's focus on win32. It resolves the entry points each file imports (the whole `spawn`/`exec`/`fork` family, aliases included) and walks the source tree, because the hand-listed `spawn(`-only predecessor missed the `execFile` probes behind #8501. A foreground process that must keep the user's console opts out with a `windowsHide-exempt:` comment stating why, at the call site.
 
 ## CONVENTIONS
 

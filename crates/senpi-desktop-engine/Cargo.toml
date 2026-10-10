@@ -1,0 +1,34 @@
+[package]
+name = "senpi-desktop-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "senpi-desktop-engine"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+parking_lot.workspace = true
+schemars.workspace = true
+senpi-desktop-backend-fake = { path = "../senpi-desktop-backend-fake" }
+senpi-desktop-core = { path = "../senpi-desktop-core" }
+senpi-desktop-safety = { path = "../senpi-desktop-safety" }
+senpi-desktop-session = { path = "../senpi-desktop-session" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["io-std", "macros", "sync", "time"] }
+ulid.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+senpi-desktop-backend-macos = { path = "../senpi-desktop-backend-macos" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+senpi-desktop-backend-wayland = { path = "../senpi-desktop-backend-wayland" }
+senpi-desktop-backend-x11 = { path = "../senpi-desktop-backend-x11" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+senpi-desktop-backend-win32 = { path = "../senpi-desktop-backend-win32" }

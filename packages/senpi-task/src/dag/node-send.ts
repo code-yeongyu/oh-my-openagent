@@ -117,6 +117,9 @@ function foldSendOutcome(
         runId,
         nodeIds: [nodeId],
       })
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
     case "capacity_deferred":
       throw new DagNodeControlError({
         code: "node_not_continuable",
@@ -139,6 +142,7 @@ function foldSendOutcome(
         nodeIds: [nodeId],
       })
     case "not_continuable":
+    case "stale":
       throw new DagNodeControlError({
         code: "node_not_continuable",
         message: `dag node "${nodeId}" cannot be continued: ${outcome.reason} Retry the node to run it again.`,

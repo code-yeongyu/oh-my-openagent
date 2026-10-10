@@ -7,6 +7,7 @@ import { rmEfaultTolerant } from "../teardown.test-support"
 
 import {
   GitMemoryRepo,
+  auditMemoryRepo,
   buildIdentityPaths,
   loadDreamPersona,
   type MemoryIdentity,
@@ -32,7 +33,7 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant
 
 async function launchDream(
   people: { enabled: boolean; max_entries: number; max_entry_chars: number },
-  options: { readonly seedLedgers?: boolean; readonly targetDoc?: string } = {},
+  options: { readonly seedLedgers?: boolean; readonly targetDoc?: string; readonly auditFixture?: boolean } = {},
 ): Promise<{
   readonly identity: MemoryIdentity
   readonly baseSha: string
@@ -49,6 +50,15 @@ async function launchDream(
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
   await repo.init({ seedFiles: [
     { relativePath: "system/base.md", content: "---\ndescription: Base\n---\nBase.\n" },
+    ...(options.auditFixture ? [
+      { relativePath: ".gitattributes", content: "*.md text eol=lf\n" },
+      { relativePath: "system/boundaries.md", content: "---\ndescription: Boundaries\nread_only: true\n---\nExact user instruction.\n" },
+      { relativePath: "reference/a.md", content: "---\ndescription: Link\n---\n[[reference/moved.md]]\n" },
+      { relativePath: "reference/moved-here.md", content: "---\ndescription: Moved content\n---\nMoved content.\n" },
+      { relativePath: "reference/dup1.md", content: "---\ndescription: Duplicate one\n---\nShared content.\n" },
+      { relativePath: "reference/dup2.md", content: "---\ndescription: Duplicate two\n---\nShared content.\n" },
+      { relativePath: "scratch/stray.md", content: "---\ndescription: Stray\n---\nStray content.\n" },
+    ] : []),
     ...(options.targetDoc === undefined
       ? []
       : [{ relativePath: options.targetDoc, content: "---\ndescription: Style\n---\nOriginal.\n" }]),
@@ -98,7 +108,8 @@ async function launchDream(
     senpiCommand,
     sandbox: (spawn) => {
       calls.push(spawn)
-      return { ...spawn, command: process.execPath, args: [childFixture] }
+      return { ...spawn, command: process.execPath, args: [options.auditFixture
+        ? join(import.meta.dir, "__fixtures__", "dream-audit-child.ts") : childFixture] }
     },
   })
   const run: ReservedRun = {
@@ -118,6 +129,22 @@ async function launchDream(
 }
 
 describe("dream worker dispatch", () => {
+  test("#given three structural defects #when dream receives the audit #then repairs validate and merge", async () => {
+    const item = await launchDream({ enabled: false, max_entries: 40, max_entry_chars: 200 }, { auditFixture: true })
+    expect(item.result.outcome).toBe("merged")
+    const repo = item.identity.paths.repo
+    const gitRepo = new GitMemoryRepo({ dir: repo, agentId: item.identity.id })
+    expect(await readFile(join(repo, "reference/a.md"), "utf8")).toContain("[[reference/moved-here.md]]")
+    expect(await readFile(join(repo, "reference/dup1.md"), "utf8")).toContain("Shared content.")
+    expect(await readFile(join(repo, "reference/dup2.md"), "utf8")).toContain("[[reference/dup1.md]]")
+    expect(existsSync(join(repo, "scratch/stray.md"))).toBe(false)
+    expect(await gitRepo.show("HEAD", "reference/stray.md")).toBe(await gitRepo.show(item.baseSha, "scratch/stray.md"))
+    expect(await gitRepo.show("HEAD", "system/boundaries.md")).toBe(await gitRepo.show(item.baseSha, "system/boundaries.md"))
+    expect(Object.values((await auditMemoryRepo(repo)).counts).every((count) => count === 0)).toBe(true)
+    const report = await readFile(join(item.spawn.paths.sessionDir, "child-stdout.log"), "utf8")
+    expect(report).toContain("fixed link_dangling 1, content_duplicate 1, path_orphan 1 / left none")
+  }, 30_000)
+
   test("#given a dream with people disabled #when the worker launches #then it selects dream inputs and touches no people path", async () => {
     // given
     const expectedPolicy = { version: 1, people: { enabled: false, max_entries: 7, max_entry_chars: 80 } }
@@ -159,7 +186,8 @@ describe("dream worker dispatch", () => {
     expect(item.result.outcome).toBe("merged")
     // git materializes merged files through the runner's autocrlf filter on Windows, so the card
     // can arrive with CRLF endings there; normalize before measuring line lengths.
-    const lines = (await readFile(join(item.identity.paths.repo, "people", "fixture", "card.md"), "utf8")).replace(/\r\n/g, "\n").trim().split("\n")
+    const card = (await readFile(join(item.identity.paths.repo, "people", "fixture", "card.md"), "utf8")).replace(/\r\n/g, "\n")
+    const lines = card.slice(card.indexOf("\n---\n") + "\n---\n".length).trim().split("\n")
     expect(lines).toHaveLength(limits.max_entries)
     expect(lines.every((line) => line.length === limits.max_entry_chars)).toBe(true)
   }, 30_000)

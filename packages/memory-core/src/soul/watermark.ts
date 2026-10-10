@@ -35,6 +35,17 @@ interface SoulHeadWatermark {
   readonly lastNotifiedHead: string
 }
 
+/**
+ * How many commits the soul-notice scan reads before it has to widen. The scan wants the newest
+ * commit the memory tool did not write, so one page answers it unless every commit in that page is
+ * an in-band write.
+ */
+export const SOUL_SCAN_PAGE = 32
+
+function isInBand(commit: { readonly trailers: Record<string, string> }): boolean {
+  return commit.trailers["Omo-Writer"] === "memory-tool"
+}
+
 export async function consumeSoulNoticeDelta(
   repo: GitMemoryRepo,
   options: ConsumeSoulNoticeOptions,
@@ -68,7 +79,14 @@ async function consumeUnderLock(
 
   let commits
   try {
-    commits = await repo.log({ range: `${watermark.lastNotifiedHead}..HEAD`, paths: SOUL_PATHS })
+    // The answer is the NEWEST commit in the range whose writer is not the memory tool, so a first
+    // page that already contains one is the same answer an unbounded scan gives. Only a page that is
+    // entirely memory-tool commits has to look underneath it. Over a long-lived identity the range is
+    // thousands of commits and the unbounded form costs hundreds of milliseconds on every prompt.
+    commits = await repo.log({ range: `${watermark.lastNotifiedHead}..HEAD`, paths: SOUL_PATHS, limit: SOUL_SCAN_PAGE })
+    if (commits.length === SOUL_SCAN_PAGE && commits.every(isInBand)) {
+      commits = await repo.log({ range: `${watermark.lastNotifiedHead}..HEAD`, paths: SOUL_PATHS })
+    }
   } catch (error) {
     if (!(error instanceof GitCommandError)) throw error
     // The recorded head left history (rewritten by an external sync): re-establish
@@ -77,7 +95,7 @@ async function consumeUnderLock(
     return undefined
   }
 
-  const newest = commits.find((commit) => commit.trailers["Omo-Writer"] !== "memory-tool")
+  const newest = commits.find((commit) => !isInBand(commit))
   if (newest === undefined) return undefined
   await writeWatermark(noticesDir, head)
   return { sha: newest.sha, subject: newest.subject }

@@ -7,7 +7,7 @@
  * shipped engine are name/label/alias/keyword 3, group 2, description and
  * searchText 1, which is why every label leads with its verb and the
  * user-worded phrases live in keywords. No keyword string repeats across the
- * six tools and no indexed field carries a negated-use sentence, because the
+ * nine tools and no indexed field carries a negated-use sentence, because the
  * engine indexes negated words positively.
  */
 
@@ -85,7 +85,7 @@ export const THREAD_TOOL_SEARCH_METADATA: readonly ThreadToolSearchEntry[] = [
 		name: "thread_send",
 		label: "Send message to session",
 		description:
-			"Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task" +
+			"Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task; its reply comes back through thread_read, and a bound chat thread's replies through thread_report and thread_answer" +
 			ROUTE_TO_TASK,
 		searchText:
 			"message another session that is already running, talk to an active session while it works, tell the other session to change course",
@@ -120,11 +120,148 @@ export const THREAD_TOOL_SEARCH_METADATA: readonly ThreadToolSearchEntry[] = [
 		exposure: "search",
 		allowLazyActivation: true,
 	},
+	{
+		name: "thread_rename",
+		label: "Rename session",
+		description:
+			"Changes the label a session is listed under, for when the user asks to call a session something clearer",
+		searchText:
+			"rename a session, change what a session is called, fix the name a session was started with, update the session label",
+		searchKeywords: [
+			"rename this session",
+			"call it something else",
+			"change the session name",
+			"give the session a clearer name",
+			"fix the session title",
+		],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_set_model",
+		label: "Switch session model",
+		description:
+			"Moves a session onto a different model, for when the user asks to switch that session to another model or a cheaper one",
+		searchText:
+			"switch the model a session runs on, change the session to a different model, pick a cheaper or stronger model for a session",
+		searchKeywords: [
+			"switch the model",
+			"use a different model",
+			"change to a cheaper model",
+			"a stronger model for that session",
+			"swap the session model",
+		],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_set_reasoning",
+		label: "Set session reasoning level",
+		description:
+			"Sets how much reasoning a session applies, for when the user asks to raise or lower the thinking effort of a session",
+		searchText:
+			"set the reasoning level of a session, make a session think harder, ease the thinking effort of a session, adjust reasoning depth",
+		searchKeywords: [
+			"set the reasoning level",
+			"make it think harder",
+			"less thinking please",
+			"raise the reasoning",
+			"dial down the thinking",
+		],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_bind",
+		label: "Bind session to chat thread",
+		description:
+			"Attaches a session to an external chat thread on Discord, Telegram, Slack, Notion, Feishu, herdr or a custom connector, for when the user wants a chat conversation connected to a session",
+		searchText:
+			"connect a discord or telegram thread to this session, attach a slack conversation to a session, let a chat thread talk to a session",
+		searchKeywords: ["connect a discord thread", "attach session to chat", "link telegram chat", "bind slack thread", "mirror session to chat"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_unbind",
+		label: "Unbind chat thread",
+		description: "Detaches a session from its bound chat thread, for when the user wants that chat connection closed",
+		searchText: "disconnect the chat thread from the session, detach discord from this session, close the chat connection",
+		searchKeywords: ["disconnect the chat thread", "detach from discord", "unlink chat thread", "close the chat connection"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_rebind",
+		label: "Rebind chat thread",
+		description: "Moves a bound chat thread over to another session, for when the user wants that chat served by a different session",
+		searchText: "move the chat thread to another session, reassign the discord thread to a different session, switch which session serves the chat",
+		searchKeywords: ["move the chat to another session", "hand the discord thread over", "reassign chat thread", "switch which session serves the chat"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_bindings",
+		label: "List chat bindings",
+		description: "Shows which chat threads are bound to which sessions with their revisions, for when the user needs a binding id or its revision",
+		searchText: "which chats are connected to which sessions, list bound chat threads, look up a binding id and revision",
+		searchKeywords: ["which chats are connected", "bound chat threads", "binding revisions", "chat connections list"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_report",
+		label: "Report to chat thread",
+		description:
+			"Posts a milestone, result, question or completion from this session to its bound chat thread, for when the user wants progress relayed to that chat; replies flow back through thread_read, thread_report and thread_answer",
+		searchText: "post progress to the discord thread, update the chat with a milestone, relay a question to the chat, announce completion in the chat",
+		searchKeywords: ["post progress to discord", "update the chat thread", "relay a question to chat", "send a milestone", "announce completion to chat"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_outbox",
+		label: "Read chat outbox",
+		description: "Returns the reports waiting for a bound chat thread with a cursor, for when a connector collects what sessions posted",
+		searchText: "pending reports for the chat thread, drain the outbox of a binding, collect what sessions posted for a connector",
+		searchKeywords: ["pending chat reports", "drain the outbox", "connector pull", "messages waiting for the chat"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_outbox_ack",
+		label: "Acknowledge chat outbox",
+		description: "Marks outbox rows up to a cursor as posted to the chat, for when a connector confirms delivery",
+		searchText: "confirm the reports were posted to the chat, acknowledge the outbox cursor, mark relayed reports delivered",
+		searchKeywords: ["confirm posted to chat", "ack outbox cursor", "mark reports delivered", "delivered to discord"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_answer",
+		label: "Answer relayed question",
+		description: "Resolves a question a session relayed to a chat thread with the answer that arrived there, for when a connector hands back a chat user's reply",
+		searchText: "answer the relayed question from the chat, the chat user replied to the question, resolve the pending question with the chat reply",
+		searchKeywords: ["answer from the chat", "reply to relayed question", "chat user answered", "resolve the pending question"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
 ]
 
 /**
  * Family policy carried by exactly one promptGuidelines entry at registration
- * time. Repeating it per tool would dilute every copy and burn six times the
+ * time. Repeating it per tool would dilute every copy and burn nine times the
  * tokens, so the per-tool entries above stay free of policy prose.
  */
 export const THREAD_FAMILY_PROMPT_GUIDELINES =

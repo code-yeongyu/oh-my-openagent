@@ -18,7 +18,7 @@ export async function normalizeBuiltinImports(output, builtinModuleNames) {
   const normalized = bundled.replace(
     /(from\s*["']|import\s*\(\s*["']|import\s*["'])([^"']+)(["'])/g,
     (match, prefix, specifier, suffix) => {
-      if (specifier.startsWith("node:")) return match
+      if (specifier === "bun" || specifier.includes(":")) return match
       if (!builtinModuleNames.includes(specifier)) return match
       return `${prefix}node:${specifier}${suffix}`
     },

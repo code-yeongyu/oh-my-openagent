@@ -1,14 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
+import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
 import { BUILTIN_AGENTS, DEFAULT_CATEGORIES } from "@oh-my-opencode/senpi-task"
 import { BUILTIN_SKILL_NAMES } from "./components/telemetry/product-identity"
+import { createNativeSkillSources } from "../plugin/scripts/native-skill-sources.mjs"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
 const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
 
 const expectedSkillNames = [
   "ast-grep",
+  "browser",
   "coding-agent-sessions",
   "dag-library",
   "data-scientist",
@@ -32,6 +35,7 @@ const expectedSkillNames = [
   "ulw-plan",
   "ulw-research",
   "visual-qa",
+  "visualize",
 ] as const
 
 const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {}
@@ -47,6 +51,7 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   ultrawork: true,
   "ulw-loop": true,
   "ulw-research": true,
+  visualize: true,
 }
 const namePattern = /^[a-z0-9-]{1,64}$/
 const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent|update_plan)\b/i
@@ -133,7 +138,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 24 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 26 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 
@@ -195,6 +200,29 @@ describe("OMO Senpi scoped skill sync", () => {
     }
   })
 
+  test("#given the shared ulw-research runtime #when synced #then scripts and every shared reference ship byte-equal to their shared sources", () => {
+    const sharedSkillRoot = join(repoRoot, "packages", "shared-skills", "skills", "ulw-research")
+    const shippedSkillRoot = join(skillsRoot, "ulw-research")
+    const keep = createSkillSourceCopyFilter(sharedSkillRoot)
+    const toRelative = (root: string) => (file: string) => relative(root, file).replaceAll("\\", "/")
+
+    const sharedScripts = listFiles(join(sharedSkillRoot, "scripts")).filter(keep).map(toRelative(sharedSkillRoot)).sort()
+    const shippedScripts = listFiles(join(shippedSkillRoot, "scripts")).map(toRelative(shippedSkillRoot)).sort()
+
+    expect(shippedScripts).toEqual(sharedScripts)
+    expect(shippedScripts).toContain("scripts/contracts.mjs")
+    expect(shippedScripts.filter((path) => path.endsWith(".test.ts") || path.startsWith("scripts/tests/"))).toEqual([])
+
+    const { sources } = createNativeSkillSources(join(repoRoot, "packages"))
+    const sharedAssetFiles = (sources.find((source) => source.name === "ulw-research")?.sharedAssets ?? []).filter((asset) => asset !== "scripts")
+    expect(sharedAssetFiles.length).toBeGreaterThan(0)
+    for (const relativePath of [...shippedScripts, ...sharedAssetFiles]) {
+      const shipped = readFileSync(join(shippedSkillRoot, relativePath))
+      const shared = readFileSync(join(sharedSkillRoot, relativePath))
+      expect(shipped.equals(shared), `ulw-research/${relativePath} must ship the shared bytes`).toBe(true)
+    }
+  })
+
   test("#given ulw-research skill #when synced #then the X / social lane bullet is shipped", () => {
     const skillFile = join(skillsRoot, "ulw-research", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")
@@ -253,7 +281,7 @@ describe("OMO Senpi scoped skill sync", () => {
     const body = content.slice(content.indexOf("\n# "))
     const targets = [...body.matchAll(taskTargetPattern)].map(([, kind, name]) => `${kind}=${name}`)
 
-    expect(targets).toEqual(["subagent_type=omo-senpi-gate-reviewer"])
+    expect(targets).toEqual(["subagent_type=omo-native-gate-reviewer"])
   })
 
   test("#given shipped task examples #when targets are scanned #then every agent and category exists in Senpi", () => {
@@ -305,4 +333,13 @@ describe("OMO Senpi scoped skill sync", () => {
     const refsDir = join(skillsRoot, "frontend", "references", "design")
     expect(existsSync(refsDir), "frontend/references/design must exist after materialization").toBe(true)
   })
+})
+
+
+test("#given the Native execution skill #when shipped #then the absolute rule scopes the root and dispatch step assigns an executor", () => {
+  const skill = readFileSync(join(skillsRoot, "ulw-execute", "SKILL.md"), "utf8")
+  expect(skill).toContain("## ABSOLUTE RULE (root session): YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER")
+  expect(skill).toContain("NO EXCEPTIONS for the root session that owns the Boulder work; a dispatched executor does its assigned unit itself and does not delegate it again.")
+  expect(skill).toContain("7. Give every dispatched sub-task its completion condition and its role: the brief names the unit, allowed files, acceptance evidence, and states that the worker is its executor, does it itself, and does not delegate it.")
+  expect(skill).not.toContain("## ABSOLUTE RULE:")
 })

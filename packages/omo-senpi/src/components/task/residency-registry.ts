@@ -8,7 +8,7 @@ type ResidencyManager = Pick<TaskManager, "forget" | "get" | "getResidentHandle"
 // forget() delegates to manager.forget() so the registry and the manager's #live map share one
 // prune path (no stale handle after eviction, no unbounded growth). The manager is passed by accessor
 // because lifecycle (which owns the registry) is constructed before the manager in the composition.
-export function createManagerResidencyRegistry(getManager: () => ResidencyManager): ResidencyRegistry {
+export function createManagerResidencyRegistry(getManager: () => ResidencyManager, ownerSessionId?: () => string | undefined): ResidencyRegistry {
   return {
     get: (taskId) => toResidentHandle(getManager().getResidentHandle(taskId)),
     entries: () =>
@@ -25,13 +25,17 @@ export function createManagerResidencyRegistry(getManager: () => ResidencyManage
     isEvicting: (taskId) => getManager().isEvicting?.(taskId) ?? false,
     tryBeginSend: (taskId) => getManager().tryBeginSend?.(taskId) ?? true,
     endSend: (taskId) => getManager().endSend?.(taskId),
+    // One daemon process hosts an engine per session: only this session's own records are ours (#9785).
+    ownsRecord: (record) => ownerSessionId !== undefined && record.parent_session_id === ownerSessionId(),
   }
 }
 
 function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandle | undefined {
   if (handle === undefined) return undefined
-  // pid is defined for rpc children only; in-process children have no OS process to signal.
-  const kind = handle.pid === undefined ? "in-process" : "rpc"
+  // The runner states its own kind. Deriving it from `pid` cannot tell an in-process child from a
+  // daemon SESSION - both have none - and getting that wrong silently disarms the session teardown.
+  // Handles from before the field shipped are in-process by construction.
+  const kind = handle.kind ?? "in-process"
   return {
     task_id: handle.task_id,
     kind,
@@ -39,6 +43,8 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
     abort: () => handle.abort(),
     dispose: () => handle.dispose(),
     terminate: () => {
+      // in-process: no OS process and no session. rpc: SIGTERM/SIGKILL. host-session: the handle's
+      // terminate is `abort` + `close_session` - the ONLY way a daemon session ends.
       if (kind === "in-process") return Promise.resolve()
       if (handle.terminate === undefined) {
         return Promise.reject(new TypeError(`rpc resident ${handle.task_id} has no terminate port`))

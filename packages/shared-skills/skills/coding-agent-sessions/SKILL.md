@@ -66,7 +66,7 @@ The finder prints JSON for stdout and `jq`. Every result includes:
 | `detail_hint` | Ready-to-run `read` command for detailed inspection |
 | `match_reasons` | Search-only array explaining which field/content matched each query |
 
-Each `match_reasons` entry includes `query`, `platform`, `field`, and `snippet`, so you can tell which platform matched and what content caused the hit without opening every transcript.
+Each `match_reasons` entry includes `query`, `platform`, `field`, and `snippet`, so you can tell which platform matched and what content caused the hit without opening every transcript. `field` is `user_message` when the query matched a user prompt that the `first_user_message`/`last_user_message` previews do not cover, such as a prompt in the middle of the session.
 
 ## Filters
 

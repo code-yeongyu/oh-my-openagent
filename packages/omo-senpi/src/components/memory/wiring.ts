@@ -3,6 +3,7 @@ import { MemoryBlockCache, RecallCorpusCache } from "@oh-my-opencode/memory-core
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { createDreamTriggerWiring, resolveDreamTriggerSettings } from "./dream-trigger"
 import { resolveMemorySettings } from "./identity-runtime"
+import { createMemoryMaintenance } from "./memory-maintenance"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
@@ -78,6 +79,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   const kibitzerRef: { current?: KibitzerComposition } = {}
+  const maintenance = createMemoryMaintenance({
+    isLiveSession: (sessionId) => options.sessions.has(sessionId),
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
     for (const tracker of skillsUsageTrackersRef.current.values()) {
@@ -177,6 +182,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       lastEventCtx.current = eventCtx
       reflectionLive.attach(sessionId)
       registerMemoryFilesystemPolicy(pi, identity)
+      maintenance.schedule(identity)
       await runtimeFor(identity).reconcile()
       if (branchEntryCount(eventCtx) > 0) {
         await journalWiringFor(identity).reconcileSession(eventCtx)
@@ -206,14 +212,27 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
 
     async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+      // Background packing is never worth holding an exit for: stop it before the drain.
+      maintenance.dispose()
       // The journal flush runs FIRST, before the pre-drain awaits can consume the fixed budget:
       // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
       // one first-position flush captures everything and the drain must never re-run it.
       const journalFlushed = await shutdownDrain.flushJournal(input)
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
-      await kibitzerRef.current?.onSessionShutdown(input.sessionId)
+      // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
+      // drain deadline: both are started and raced against it, and whichever loses keeps running
+      // detached (the Kibitzer wake lease and the sidecar directory lock are still released).
+      const kibitzer = kibitzerRef.current
+      if (kibitzer !== undefined) {
+        await shutdownDrain.raceDetached(input, "kibitzer-shutdown", () => kibitzer.onSessionShutdown(input.sessionId))
+      }
       const identity = resolveContext(input.sessionId)
-      if (identity !== undefined) await factsWiringFor(identity).cancelActive?.()
+      if (identity !== undefined) {
+        const facts = factsWiringFor(identity)
+        if (facts.cancelActive !== undefined) {
+          await shutdownDrain.raceDetached(input, "facts-cancel", async () => { await facts.cancelActive?.() })
+        }
+      }
       await shutdownDrain.run(input, { journalFlushed })
     },
 

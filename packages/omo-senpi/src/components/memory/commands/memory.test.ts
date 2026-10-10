@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
@@ -11,6 +11,7 @@ import {
   tempIdentity,
 } from "./commands.test-support"
 import { registerMemoryCommand } from "./memory"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
@@ -21,7 +22,7 @@ setDefaultTimeout(60_000)
 
 async function removeTempDir(dir: string): Promise<void> {
   try {
-    await rm(dir, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+    await removeTree(dir, { maxRetries: 30, retryDelay: 200 })
   } catch (error) {
     // A killed Windows child can retain a temp-directory handle beyond the bounded retry window.
     // Ignore only that platform's known cleanup races; all other cleanup defects still fail loudly.

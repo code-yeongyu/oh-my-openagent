@@ -287,8 +287,11 @@ describe("setup suggestion cache", () => {
       const result = runLauncher(fixture, ["setup"])
 
       expect(result.status).toBe(0)
-      expect(result.stdout).toContain("opencode | yes | open-api | api | none")
-      expect(result.stdout).toContain("senpi | no | none | none |")
+      // The live opencode login, classified by the credential stage; the cache holds no provider ids.
+      expect(result.stdout).toContain("open-api")
+      expect(result.stdout).toContain("skipped-unmapped: 1")
+      // Only installed harnesses are reported: the empty engine store gets no row.
+      expect(result.stdout).not.toContain("senpi | no")
     })
 
     test("#when the cache claims a suggestion live state cannot support #then doctor stays silent", () => {

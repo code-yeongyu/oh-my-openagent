@@ -336,7 +336,7 @@ describe("reflection and dream run reconciliation", () => {
   test.each([
     ["final", undefined], ["final", "invalid"], ["final", 123], ["final", null],
     ["abandoned", undefined], ["abandoned", "invalid"], ["abandoned", 123], ["abandoned", null],
-  ] as const)("#given %s has invalid terminal timestamp %s #when reconciled #then corruption is reported without mutating state", async (terminal, timestamp) => {
+  ] as const)("#given %s has invalid terminal timestamp %s #when reconciled #then the reservation is released, the finished run is not quarantined and its artifact is untouched", async (terminal, timestamp) => {
     const item = await fixture()
     await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
     const path = join(item.runDir, `${terminal}.json`)
@@ -346,26 +346,29 @@ describe("reflection and dream run reconciliation", () => {
       [terminal === "final" ? "finishedAt" : "abandonedAt"]: timestamp,
     })
     await queuePendingReservation(item)
-    const before = await item.store.readState()
     const terminalBefore = await readFile(path, "utf8")
+    const launched: string[] = []
 
-    await expect(reconcileReflectionRuns({
+    const results = await reconcileReflectionRuns({
       identity: item.identity,
       reservation: item.store,
-      launch: () => { throw new Error("unexpected launch") },
+      launch: (run) => launched.push(run.runId),
       hostname: () => "fixture-host",
       now: () => Date.parse("2026-08-10T00:01:01.001Z"),
       getPidLiveness: () => "dead",
-    })).rejects.toThrow(TypeError)
+    })
 
-    expect(await item.store.readState()).toEqual(before)
+    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
     expect(await readFile(path, "utf8")).toBe(terminalBefore)
+    expect(launched).toEqual(["run-pending"])
   }, 30_000)
 
-  test("#given an old prelaunch worktree without a ledger and a confirmed-dead launcher #when reconciled #then resources and reservation are released", async () => {
+  test("#given an old prelaunch worktree without a ledger and a confirmed-dead launcher #when reconciled #then resources and reservation are released and the run dir records the interrupted launch", async () => {
     // given
     const item = await fixture()
     await rm(join(item.runDir, "ledger.json"))
+    const prelaunchBefore = await readFile(join(item.runDir, "prelaunch.json"), "utf8")
 
     // when
     const results = await reconcileReflectionRuns({
@@ -381,7 +384,10 @@ describe("reflection and dream run reconciliation", () => {
     expect((await item.store.readState()).active).toBeUndefined()
     expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
     expect(existsSync(item.worktree.dir)).toBe(false)
-    expect(existsSync(item.runDir)).toBe(false)
+    expect(await readFile(join(item.runDir, "prelaunch.json"), "utf8")).toBe(prelaunchBefore)
+    expect(JSON.parse(await readFile(join(item.runDir, "abandoned.json"), "utf8"))).toMatchObject({
+      runId: "run-orphan", reason: "launch_interrupted", kind: "reflection", trigger: "step-count",
+    })
     expect((await item.worktree.exec.run(
       ["show-ref", "--verify", `refs/heads/${item.worktree.branch}`],
       { cwd: item.repo.dir, timeoutMs: 30_000 },

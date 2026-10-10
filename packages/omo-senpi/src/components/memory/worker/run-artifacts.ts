@@ -42,6 +42,22 @@ export interface RunOutcome {
     readonly signal: string | null
   }
   readonly timedOut: boolean
+  /** Published by recovery from a validated worktree tip, not by a supervisor that saw the child exit. */
+  readonly recoveredFromWorktree?: true
+}
+
+export const CHILD_EXIT_FILENAME = "child-exit.json"
+
+/** Written by the child bootstrap the moment the model child exits, before it reports to the supervisor. */
+export interface RunChildExit {
+  readonly version: 1
+  readonly runId: string
+  readonly attempt: number
+  readonly code: number | null
+  readonly signal: string | null
+  readonly finishedAt: string
+  /** The bootstrap's clock had reached the hard deadline, so its own enforcement may have ended the child. */
+  readonly timedOut: boolean
 }
 
 export function runOutcomeMatchesLedger(
@@ -110,8 +126,17 @@ export async function readRunTextTail(path: string, maxBytes: number): Promise<s
     const length = Math.min(size, maxBytes)
     const buffer = Buffer.alloc(length)
     await file.read(buffer, 0, length, Math.max(0, size - length))
-    const text = buffer.toString("utf8")
-    return size > maxBytes ? `[truncated to last ${maxBytes} bytes]\n${text}` : text
+    // Do not turn a sliced UTF-8 continuation byte into a larger replacement character.
+    let start = 0
+    if (size > maxBytes) {
+      while (start < buffer.length && (buffer[start]! & 0xc0) === 0x80) start += 1
+    }
+    const decoded = Buffer.from(buffer.subarray(start).toString("utf8"), "utf8")
+    // Invalid bytes elsewhere also expand when decoded. Keep the serialized diagnostic bounded.
+    start = Math.max(0, decoded.length - maxBytes)
+    while (start < decoded.length && (decoded[start]! & 0xc0) === 0x80) start += 1
+    const text = decoded.subarray(start).toString("utf8")
+    return size > maxBytes || start > 0 ? `[truncated to last ${maxBytes} bytes]\n${text}` : text
   } finally {
     await file.close()
   }

@@ -8,7 +8,7 @@ import { OmoGitMasterSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
 import { createTaskSkillLoader, packagedSkillDirs } from "./task-skill-loader"
 
-const CO_AUTHOR_TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+const CO_AUTHOR_TRAILER_PATTERN = /Co-authored-by:/i
 
 const roots: string[] = []
 
@@ -101,7 +101,7 @@ describe("createTaskSkillLoader", () => {
     expect(resolution.prepend).not.toContain("PACKAGED BODY")
   })
 
-  test("#given default attribution settings #when the git-master skill is loaded #then the co-author directive rides the skill block", () => {
+  test("#given default attribution settings #when the git-master skill is loaded #then the skill block stays untouched", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
@@ -116,7 +116,28 @@ describe("createTaskSkillLoader", () => {
 
     expect(resolution.resolved).toEqual(["git-master"])
     expect(resolution.prepend).toContain("GIT MASTER BODY")
-    expect(resolution.prepend).toContain(CO_AUTHOR_TRAILER)
+    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
+    expect(resolution.prepend).not.toContain("sisyphus-dev-ai")
+    expect(resolution.prepend).not.toContain("Ultraworked with")
+  })
+
+  test("#given the footer opted in #when the git-master skill is loaded #then only the footer directive rides the skill block", () => {
+    const cwd = tempDir()
+    const pluginSkillsDir = tempDir()
+    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
+
+    const loader = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: [pluginSkillsDir],
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({ commit_footer: true, include_co_authored_by: true }),
+    })
+    const resolution = loader(["git-master"], cwd)
+
+    expect(resolution.prepend).toContain("GIT MASTER BODY")
+    expect(resolution.prepend).toContain("Ultraworked with")
+    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
+    expect(resolution.prepend).not.toContain("users.noreply.github.com")
   })
 
   test("#given attribution disabled #when the git-master skill is loaded #then the skill block stays untouched", () => {
@@ -134,11 +155,11 @@ describe("createTaskSkillLoader", () => {
     const resolution = loader(["git-master"], cwd)
 
     expect(resolution.prepend).toContain("GIT MASTER BODY")
-    expect(resolution.prepend).not.toContain(CO_AUTHOR_TRAILER)
+    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
     expect(resolution.prepend).not.toContain("Ultraworked with")
   })
 
-  test("#given default attribution settings #when a non-git-master skill is loaded #then no directive is injected", () => {
+  test("#given the footer opted in #when a non-git-master skill is loaded #then no directive is injected", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "SHARED BODY")
@@ -147,11 +168,11 @@ describe("createTaskSkillLoader", () => {
       agentDir: tempDir(),
       homeDir: tempDir(),
       pluginSkillsDirs: [pluginSkillsDir],
-      loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({ commit_footer: true }),
     })
     const resolution = loader(["shared"], cwd)
 
     expect(resolution.prepend).toContain("SHARED BODY")
-    expect(resolution.prepend).not.toContain(CO_AUTHOR_TRAILER)
+    expect(resolution.prepend).not.toContain("Ultraworked with")
   })
 })

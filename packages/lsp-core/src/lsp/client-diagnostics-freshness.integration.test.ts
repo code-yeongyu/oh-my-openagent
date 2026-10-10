@@ -18,6 +18,27 @@ afterEach(async () => {
 	await harness.cleanup();
 });
 
+/**
+ * Drives one `diagnostics()` call whose ONLY exit is the freshness window closing: an advertised
+ * pull that comes back "method not found" with no publish behind it.
+ *
+ * That call arms exactly two timers in order - the pull request's own timeout, then the push
+ * fallback wait - and the second can only be armed once the first was cleared by the server's
+ * reply. Waiting on the second SCHEDULE (not on a delay value, which both share) is therefore the
+ * exact signal that the fallback, and not a request timeout, is what the advance closes. On a real
+ * clock the same case resolved from whichever of the two real deadlines a starved Windows shard
+ * happened to reach first (#8323).
+ */
+async function resolveThroughFreshnessWindow<T>(clock: ControlledClock, start: () => Promise<T>): Promise<T> {
+	const scheduledBefore = clock.scheduledDelays.length;
+	const pending = start();
+	await clock.waitForScheduled(scheduledBefore + 2);
+	clock.advanceBy(FRESHNESS_WINDOW_MS);
+	return pending;
+}
+
+const FRESHNESS_WINDOW_MS = 500;
+
 describe("LspClient diagnostics freshness", () => {
 	it("#given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload", async () => {
 		const clock = new ControlledClock();
@@ -159,6 +180,9 @@ describe("LspClient diagnostics freshness", () => {
 	});
 
 	it("#given a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart within the same request and resolve from the current version", async () => {
+		// Both pull reports answer this request, so no freshness deadline may fire: a controlled clock
+		// removes the 800ms wall-clock race that a starved shard otherwise wins (#8323).
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
@@ -172,12 +196,12 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 800, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 800, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
 		);
 		await context.client.openFile(context.source);
 
 		const pending = context.client.diagnostics(context.source);
-		await waitForEventCount(
+		await waitForEventCountBySubscription(
 			context.events,
 			(event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic",
 			1,
@@ -196,6 +220,9 @@ describe("LspClient diagnostics freshness", () => {
 	});
 
 	it("#given a full pull report followed by an unchanged report for the same version and resultId #when diagnostics repeat without a local change #then the cached full items are reused", async () => {
+		// Both requests are answered by the server, so a controlled clock keeps the freshness window
+		// from becoming a second deadline the shard can starve (#8323).
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
@@ -208,7 +235,7 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
 		);
 		await context.client.openFile(context.source);
 
@@ -220,6 +247,9 @@ describe("LspClient diagnostics freshness", () => {
 	});
 
 	it("#given a server that claims pull support but closes instead of answering #when diagnostics run #then the transport failure is not labeled clean", async () => {
+		// Deliberately left on the real clock: the client only notices the dead server when the
+		// in-flight pull request's own timeout aborts it, so a timer must actually fire here. Making
+		// the transport reject pending requests from the child's exit event is a separate change.
 		const context = await harness.makeClient(
 			{
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
@@ -233,6 +263,9 @@ describe("LspClient diagnostics freshness", () => {
 	});
 
 	it("#given an advertised pull method that is explicitly unsupported and a matching push publish #when diagnostics run #then the client falls back to push diagnostics", async () => {
+		// The exact-version publish wakes the push-fallback wait, so no deadline may fire; a controlled
+		// clock keeps the 500ms window from winning that race on a starved shard (#8323).
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
@@ -246,7 +279,7 @@ describe("LspClient diagnostics freshness", () => {
 				],
 				diagnosticResponses: [{ error: { code: -32601, message: "Method not found" } }],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
 		);
 
 		const pending = context.client.diagnostics(context.source);
@@ -301,6 +334,7 @@ describe("LspClient diagnostics freshness", () => {
 	});
 
 	it("#given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics", async () => {
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
@@ -309,7 +343,7 @@ describe("LspClient diagnostics freshness", () => {
 					{ error: { code: -32601, message: "Method not found" } },
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
 		);
 
 		const first = await context.client.diagnostics(context.source);
@@ -318,12 +352,13 @@ describe("LspClient diagnostics freshness", () => {
 		writeFileSync(context.source, "const changed = 1;\n");
 		await context.client.openFile(context.source);
 
-		const second = await context.client.diagnostics(context.source);
+		const second = await resolveThroughFreshnessWindow(clock, () => context.client.diagnostics(context.source));
 		expect(second.transientError).toBeUndefined();
 		expect(second.items).toEqual([]);
 	});
 
 	it("#given a pull-supported server with a current cached pull report #when a later pull is rejected as unsupported without any publish and the document is unchanged #then the fallback resolves with the current cached diagnostics", async () => {
+		const clock = new ControlledClock();
 		const context = await harness.makeClient(
 			{
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
@@ -332,13 +367,13 @@ describe("LspClient diagnostics freshness", () => {
 					{ error: { code: -32601, message: "Method not found" } },
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
 		);
 
 		const first = await context.client.diagnostics(context.source);
 		expect(first.items).toEqual([diagnostic("cached-full")]);
 
-		const second = await context.client.diagnostics(context.source);
+		const second = await resolveThroughFreshnessWindow(clock, () => context.client.diagnostics(context.source));
 		expect(second.transientError).toBeUndefined();
 		expect(second.items).toEqual([diagnostic("cached-full")]);
 	});

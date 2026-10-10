@@ -13,11 +13,13 @@ import {
 } from "@oh-my-opencode/telemetry-core"
 import { isOmoTelemetryEnabled, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
+import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { getSenpiTelemetryStateDir, recordSenpiDailyActive } from "./index"
 import { createCategoryConfigCapture } from "./omo-native-category-config"
+import { captureProcessCrashes } from "./omo-native-crash"
 import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
@@ -49,11 +51,18 @@ export type OmoNativeSessionOptions = {
 
 export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions = {}): OmoSenpiComponent {
   let client: EventTelemetryClient | undefined
+  // A shutdown that lands before the deferred tick cancels the capture outright: creating the
+  // client afterwards would leave an unflushed transport behind the session that owns it.
+  let sessionClosed = false
 
   return {
     name: "omo-native-session",
     register(pi, ctx) {
-      pi.on("session_start", (payload, eventCtx) => {
+      // Reading the inventory, loading omo config twice and building the PostHog client is ~14 ms of
+      // analytics on the session_start dispatch path, and nothing in the session observes it. It
+      // runs one tick past the first paint instead, still inside this session.
+      const captureSessionStart = (payload: unknown, eventCtx: unknown): void => {
+        if (sessionClosed) return
         const env = options.env ?? process.env
         const product = createOmoNativeProductConfig()
         if (!isTelemetryClientEnabled({ env, product }) || !configEnabled(options, eventCtx, env)) return
@@ -106,6 +115,16 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           ...(inventory.defaultModel === undefined ? {} : { default_model: inventory.defaultModel }),
         })
 
+        // Crashes recorded by earlier processes can only be sent by a later one: this one.
+        captureProcessCrashes({
+          captureEvent: client.captureEvent,
+          agentDir: resolveAgentHome({ env }),
+          stateDir: getOmoNativeStateDir(env),
+          osProvider,
+          ...(options.now === undefined ? {} : { now: options.now }),
+          ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+        })
+
         // The category map is only observable where BOTH the config and the live model registry are
         // in hand. A host that reports no registry (older host, RPC context) simply ships no snapshot
         // rather than a snapshot that guesses availability.
@@ -126,9 +145,15 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
         }).catch((error: unknown) => {
           ctx.logger.warn("omo-senpi legacy telemetry failed", error)
         })
+      }
+
+      pi.on("session_start", (payload, eventCtx) => {
+        sessionClosed = false
+        deferUntilAfterFirstPaint(ctx, "omo-native session telemetry", () => captureSessionStart(payload, eventCtx))
       })
 
       pi.on("session_shutdown", async () => {
+        sessionClosed = true
         const activeClient = client
         client = undefined
         await activeClient?.shutdown()

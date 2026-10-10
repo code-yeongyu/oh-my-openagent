@@ -10,7 +10,7 @@ import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import * as modelAvailability from "../shared/model-availability"
 import * as shared from "../shared"
 
-const TEST_DEFAULT_MODEL = "anthropic/claude-opus-5"
+const TEST_DEFAULT_MODEL = "anthropic/claude-opus-5-5"
 let createBuiltinAgents: (typeof import("./builtin-agents"))["createBuiltinAgents"]
 
 // The runtime contract is composition against the real skill loader, not any
@@ -140,7 +140,7 @@ describe("createBuiltinAgents with model overrides", () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set([
-        "anthropic/claude-opus-5",
+        "anthropic/claude-opus-5-5",
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
         "zai-coding-plan/glm-5",
@@ -153,7 +153,7 @@ describe("createBuiltinAgents with model overrides", () => {
       const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
       // #then
-      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5")
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5-5")
       expect(agents.sisyphus.thinking).toBeUndefined()
       expect(agents.sisyphus.reasoningEffort).toBeUndefined()
     } finally {
@@ -302,7 +302,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
   test("Sisyphus is created on first run when no availableModels or cache exist", async () => {
     // #given
-    const systemDefaultModel = "anthropic/claude-opus-5"
+    const systemDefaultModel = "anthropic/claude-opus-5-5"
     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
 
@@ -312,7 +312,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5")
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5-5")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -431,7 +431,7 @@ describe("createBuiltinAgents with model overrides", () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set([
-        "anthropic/claude-opus-5",
+        "anthropic/claude-opus-5-5",
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
         "zai-coding-plan/glm-5",
@@ -473,7 +473,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("excludes hidden custom agents from orchestrator prompts", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5", "openai/gpt-5.6-sol"])
+      new Set(["anthropic/claude-opus-5-5", "openai/gpt-5.6-sol"])
     )
 
     const customAgentSummaries = [
@@ -509,7 +509,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("excludes disabled custom agents from orchestrator prompts", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5", "openai/gpt-5.6-sol"])
+      new Set(["anthropic/claude-opus-5-5", "openai/gpt-5.6-sol"])
     )
 
     const customAgentSummaries = [
@@ -545,7 +545,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("excludes custom agents when disabledAgents contains their name (case-insensitive)", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5", "openai/gpt-5.6-sol"])
+      new Set(["anthropic/claude-opus-5-5", "openai/gpt-5.6-sol"])
     )
 
     const disabledAgents = ["ReSeArChEr"]
@@ -581,7 +581,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("does not advertise duplicate custom agents case-insensitively", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5", "openai/gpt-5.5"])
+      new Set(["anthropic/claude-opus-5-5", "openai/gpt-5.5"])
     )
 
     const customAgentSummaries = [
@@ -613,7 +613,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("does not surface custom agent strings in orchestrator prompts", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5", "openai/gpt-5.5"])
+      new Set(["anthropic/claude-opus-5-5", "openai/gpt-5.5"])
     )
 
     const customAgentSummaries = [
@@ -687,7 +687,7 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
     ])
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set([
-        "anthropic/claude-opus-5",
+        "anthropic/claude-opus-5-5",
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
         "zai-coding-plan/glm-5",
@@ -701,7 +701,7 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 
       // #then
       expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5")
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5-5")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -722,7 +722,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
       const providers = options?.connectedProviders ?? []
       return providers.includes("openai")
         ? new Set(["openai/gpt-5.6-sol"])
-        : new Set(["anthropic/claude-opus-5"])
+        : new Set(["anthropic/claude-opus-5-5"])
     })
 
     try {
@@ -741,7 +741,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
   test("hephaestus is not created when no required provider is connected", async () => {
     // #given - only anthropic models available, not in hephaestus requiresProvider
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5"])
+      new Set(["anthropic/claude-opus-5-5"])
     )
     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
 
@@ -821,7 +821,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
 
       // #then
       expect(agents.hephaestus).toBeDefined()
-      expect(agents.hephaestus.model).toBe("openai/gpt-5.6-sol")
+      expect(agents.hephaestus.model).toBe("openai/gpt-6-sol")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -831,10 +831,10 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
   test("hephaestus is not created when explicit config uses an unsupported model", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5"])
+      new Set(["anthropic/claude-opus-5-5"])
     )
     const overrides = {
-      hephaestus: { model: "anthropic/claude-opus-5" },
+      hephaestus: { model: "anthropic/claude-opus-5-5" },
     }
 
     try {
@@ -900,7 +900,7 @@ describe("Sisyphus and Librarian environment context toggle", () => {
 
   beforeEach(() => {
     fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5", "google/gemini-3-flash"])
+      new Set(["anthropic/claude-opus-5-5", "google/gemini-3-flash"])
     )
   })
 
@@ -946,7 +946,7 @@ describe("Atlas is unaffected by environment context toggle", () => {
 
   beforeEach(() => {
     fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5", "openai/gpt-5.5"])
+      new Set(["anthropic/claude-opus-5-5", "openai/gpt-5.5"])
     )
   })
 
@@ -997,7 +997,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
   test("sisyphus is created when at least one fallback model is available", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["anthropic/claude-opus-5"])
+      new Set(["anthropic/claude-opus-5-5"])
     )
 
     try {
@@ -1022,7 +1022,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
 
       // #then
       expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5")
+      expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5-5")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -1033,7 +1033,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
     const overrides = {
-      sisyphus: { model: "anthropic/claude-opus-5" },
+      sisyphus: { model: "anthropic/claude-opus-5-5" },
     }
 
     try {
@@ -1118,7 +1118,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
     }
   })
 
-  test("metis and atlas resolve to Sol in an OpenAI-only environment without a system default", async () => {
+  test("atlas resolves to Sol and metis keeps its chain head in an OpenAI-only environment without a system default", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set(["openai/gpt-5.6-sol"]))
     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
@@ -1130,8 +1130,8 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       // #then
       expect(agents.atlas).toMatchObject({ model: "openai/gpt-5.6-sol", variant: "medium" })
       expect(agents.metis).toBeDefined()
-      expect(agents.metis.model).toBe("anthropic/claude-opus-5")
-      expect(agents.metis.variant).toBe("high")
+      expect(agents.metis.model).toBe("anthropic/claude-fable-5-1")
+      expect(agents.metis.variant).toBe("max")
     } finally {
       fetchSpy.mockRestore()
       cacheSpy.mockRestore()
@@ -1141,7 +1141,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
 
 describe("buildAgent with category and skills", () => {
   const { buildAgent } = require("./agent-builder")
-  const TEST_MODEL = "anthropic/claude-opus-5"
+  const TEST_MODEL = "anthropic/claude-opus-5-5"
 
   beforeEach(() => {
     clearSkillCache()
@@ -1350,42 +1350,29 @@ describe("buildAgent with category and skills", () => {
     expect(agent.prompt).toBe("Base prompt")
   })
 
-  test("agent with agent-browser skill resolves when browserProvider is set", () => {
+  test("agent resolves the selected dev-browser skill", () => {
     // #given
-    const source = {
-      "test-agent": () =>
-        ({
-          description: "Test agent",
-          skills: ["agent-browser"],
-          prompt: "Base prompt",
-        }) as AgentConfig,
-    }
+    const input = { description: "Test agent", skills: ["dev-browser"], prompt: "Base prompt" }
+    const { resolved } = resolveMultipleSkills(input.skills, { browserProvider: "dev-browser" })
+    const expectedContent = [...resolved.values()].join("\n\n")
 
-    // #when - browserProvider is "agent-browser"
-    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL), { browserProvider: "agent-browser" })
+    // #when
+    const agent = resolveAgentSkills(input, { browserProvider: "dev-browser" })
 
-    // #then - agent-browser skill content should be in prompt
-    expect(agent.prompt).toContain("agent-browser")
-    expect(agent.prompt).toContain("Base prompt")
+    // #then - compose the real skill artifact, not pinned instruction prose
+    expect(agent.prompt).toContain(expectedContent)
+    expect(agent.prompt).toContain(input.prompt)
   })
 
-  test("agent with agent-browser skill NOT resolved when browserProvider not set", () => {
+  test("agent leaves the base prompt unchanged for a removed builtin", () => {
     // #given
-    const source = {
-      "test-agent": () =>
-        ({
-          description: "Test agent",
-          skills: ["agent-browser"],
-          prompt: "Base prompt",
-        }) as AgentConfig,
-    }
+    const input = { description: "Test agent", skills: [["agent", "browser"].join("-")], prompt: "Base prompt" }
 
-    // #when - no browserProvider (defaults to playwright)
-    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
+    // #when
+    const agent = resolveAgentSkills(input)
 
-    // #then - agent-browser skill not found, only base prompt remains
-    expect(agent.prompt).toBe("Base prompt")
-    expect(agent.prompt).not.toContain("agent-browser open")
+    // #then
+    expect(agent.prompt).toBe(input.prompt)
   })
 })
 

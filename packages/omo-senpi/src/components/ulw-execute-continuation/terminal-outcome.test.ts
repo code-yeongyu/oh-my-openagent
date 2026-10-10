@@ -159,9 +159,8 @@ async function setup(component: "loop" | "boulder", coordinated: boolean) {
   }
   advance(0)
   const hook = component === "loop" ? createUlwLoopComponent({
-    resolveOmoBin: () => "/fixture/toolkit",
     planExists: () => true,
-    runCommand: async () => {
+    readStatus: async () => {
       onProbe?.()
       return { code: 0, stdout: status }
     },

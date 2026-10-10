@@ -37,6 +37,7 @@ export function useLiveStats(initial: StatsData): StatsData {
         if (!res.ok || cancelled) return
         const data: unknown = await res.json()
         if (cancelled) return
+        if (readStringField(data, "source") !== "live") return
         setStats({
           stars: pickLiveCount(readStringField(data, "stars"), initial.stars),
           totalDownloads: pickLiveCount(

@@ -6,6 +6,7 @@ import {
   buildDefaultSeedFiles,
   cleanupReflectionWorktree,
   installHooks,
+  maybeKillAt,
   type ReflectionFinalizeResult,
   type ReflectionWorktree,
   type ReservedRun,
@@ -29,7 +30,7 @@ import { parseReservationRunLedger } from "./reservation-run-ledger"
 import { requireFinalizedResult } from "./runner-finalization-result"
 import { cleanupSucceeded, errorMessage } from "./runner-results"
 import type { ExecutionResult, ReflectionRunResult, SenpiSubprocessRunnerOptions } from "./runner-types"
-import { runReflectionChild } from "./spawn"
+import { runReflectionChild, SUPERVISOR_EXIT_PREFIX } from "./spawn"
 
 export async function executeReflectionRun(input: {
   readonly run: ReservedRun
@@ -49,7 +50,9 @@ export async function executeReflectionRun(input: {
   }
   let worktree: ReflectionWorktree | undefined
   try {
+    maybeKillAt("after-reserve")
     worktree = await createRunWorktree(repo, run.runId, options.identity.paths)
+    maybeKillAt("after-worktree")
     const activeWorktree = worktree
     const reflection = resolveAgentReflectionSettings(loaded.config.memory, options.identity.id)
     const hardDeadlineAt = input.now() + (options.deadlineMs ?? reflection.timeout_minutes * 60_000)
@@ -101,6 +104,8 @@ export async function executeReflectionRun(input: {
           maxOutputBytes: options.maxOutputBytes,
           sandbox: options.sandbox,
           supervisorPath: options.supervisorPath,
+          receiptsDir: options.identity.paths.runtime,
+          receiptWarn: (message, fields) => options.logger?.warn(message, fields),
         })
       },
     })
@@ -123,7 +128,9 @@ async function finalizeExecutionFailure(
     const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
     const finalized = error instanceof MemoryModelExhaustedError
       ? await overrideFailedReservationRun(input.finalizationContext(), runDir, ledger, error.message)
-      : await failReservationRun(input.finalizationContext(), runDir, ledger, "failed", errorMessage(error))
+      : await failReservationRun(input.finalizationContext(), runDir, ledger, "failed", errorMessage(error), {
+        recoverWorktreeTip: isSupervisorDeathWithoutOutcome(error),
+      })
     return requireFinalizedResult(finalized)
   }
   const discarded = worktree === undefined ? undefined : await discardWorktree(worktree)
@@ -132,6 +139,11 @@ async function finalizeExecutionFailure(
     reason: discarded !== undefined && !cleanupSucceeded(discarded) ? "cleanup_failed" : "spawn_failed",
     detail: [errorMessage(error), discarded?.detail].filter(Boolean).join("; "),
   }
+}
+
+/** Only a supervisor that died before publishing can have left a child's valid tip unrecorded. */
+function isSupervisorDeathWithoutOutcome(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith(SUPERVISOR_EXIT_PREFIX)
 }
 
 async function discardWorktree(worktree: ReflectionWorktree): Promise<ReflectionFinalizeResult> {

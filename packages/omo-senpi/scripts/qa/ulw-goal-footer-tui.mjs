@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
 import { changedRealPaths, classifyRealSenpiChanges, snapshotDir } from "./task-e2e-analysis.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -233,7 +234,7 @@ function childEnv(baseEnv, prepared, senpiBin) {
     env[key] = value
   }
   return {
-    ...env,
+    ...isolatedChildEnv(env, prepared.sandbox.agentDir),
     SENPI_BIN: senpiBin,
     SENPI_CODING_AGENT_DIR: prepared.sandbox.agentDir,
     SENPI_CODING_AGENT_SESSION_DIR: prepared.sessionDir,
@@ -398,7 +399,7 @@ function runSelfTest() {
   if (!parseArgs(["--self-test"]).selfTest) throw new Error("self-test: argument parser failed")
   const prepared = prepareScenario()
   const command = composeCommand("/tmp/senpi", prepared.sessionDir)
-  const env = childEnv({ ...process.env, SENPI_CODING_AGENT_DIR: "/real", OPENAI_API_KEY: "secret" }, prepared, "/tmp/senpi")
+  const env = childEnv({ PATH: process.env.PATH, OMO_CODING_AGENT_DIR: "/real", SENPI_CODING_AGENT_DIR: "/real", OPENAI_API_KEY: "secret" }, prepared, "/tmp/senpi")
   if (command.args.includes("-p") || command.args.includes("--mode")) throw new Error("self-test: command must stay TUI-native")
   if (!command.args.includes("create_goal") && !existsSync(join(prepared.sandbox.cwd, "mock-script.json"))) {
     throw new Error("self-test: goal script missing")

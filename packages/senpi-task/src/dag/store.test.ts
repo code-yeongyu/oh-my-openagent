@@ -33,6 +33,11 @@ afterEach(() => {
 function tempProject(): string {
   const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-store-"))
   cleanupRoots.push(directory)
+  const dagRoot = join(directory, ".omo", "senpi-task", "dag")
+  for (const name of ["keys", "runs", "events", "results", "locks"]) {
+    fs.mkdirSync(join(dagRoot, name), { recursive: true })
+  }
+  fs.writeFileSync(join(directory, ".omo", "senpi-task", ".in-project"), "")
   return directory
 }
 
@@ -308,6 +313,63 @@ describe("createDagFileStore checkpoints and layout", () => {
     expect(writeSecond).toThrow("DAG session run limit reached: 1")
     expect(store.readCheckpoint(otherRunId)).toBeNull()
     expect(fs.readdirSync(store.paths.runs)).toEqual([`${runId}.json`])
+  })
+
+  test("#given the session limit is filled by finished runs #when another run checkpoint is created #then it is admitted because only active runs count", () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { max_runs_per_session: 16 } } })
+    const finished = ["completed", "failed", "cancelled"] as const
+    for (let index = 0; index < 16; index += 1) {
+      const id = `finished-${index}` as DagRunId
+      store.writeCheckpoint(id, { ...checkpoint({ id }), status: finished[index % finished.length] })
+    }
+
+    // when
+    store.writeCheckpoint(otherRunId, checkpoint({ id: otherRunId }))
+
+    // then
+    expect(store.readCheckpoint(otherRunId)).toMatchObject({ status: "running" })
+  })
+
+  test("#given the session limit is filled by active runs #when another run checkpoint is created #then it is refused with the way out", () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { max_runs_per_session: 16 } } })
+    const active = ["pending", "running", "paused"] as const
+    for (let index = 0; index < 16; index += 1) {
+      const id = `active-${index}` as DagRunId
+      store.writeCheckpoint(id, { ...checkpoint({ id }), status: active[index % active.length] })
+    }
+
+    // when
+    const writeNext = () => store.writeCheckpoint(otherRunId, checkpoint({ id: otherRunId }))
+
+    // then
+    expect(writeNext).toThrow("DAG session run limit reached: 16 runs are active")
+    expect(writeNext).toThrow("task.dag.max_runs_per_session")
+    expect(store.readCheckpoint(otherRunId)).toBeNull()
+  })
+
+  test("#given 15 active and several finished runs #when two more runs are written one after the other #then only the first is admitted", () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { max_runs_per_session: 16 } } })
+    for (let index = 0; index < 15; index += 1) {
+      const id = `active-${index}` as DagRunId
+      store.writeCheckpoint(id, checkpoint({ id }))
+    }
+    for (let index = 0; index < 5; index += 1) {
+      const id = `done-${index}` as DagRunId
+      store.writeCheckpoint(id, checkpoint({ id, status: "completed", completedAt: new Date().toISOString() }))
+    }
+    const thirdId = "third-run" as DagRunId
+
+    // when
+    store.writeCheckpoint(otherRunId, checkpoint({ id: otherRunId }))
+    const writeThird = () => store.writeCheckpoint(thirdId, checkpoint({ id: thirdId }))
+
+    // then
+    expect(store.readCheckpoint(otherRunId)).toMatchObject({ status: "running" })
+    expect(writeThird).toThrow("DAG session run limit reached: 16")
+    expect(store.readCheckpoint(thirdId)).toBeNull()
   })
 
   test("#given a parent session and run key #when writing the key #then its filename is the exact nul-delimited sha256", () => {
@@ -724,6 +786,87 @@ describe("createDagFileStore locks and retention", () => {
 
     // then
     expect(entered).toBe(true)
+    expect(fs.existsSync(reclaimSentinel)).toBe(false)
+  })
+
+  test("#given a crashed reclaimer left its sentinel #when Windows briefly refuses the sentinel quarantine rename #then the stale sentinel still cannot wedge or crash acquisition", () => {
+    // given - the shape behind the windows-latest flake: the runner's antivirus or search indexer
+    // briefly holds the sentinel open, so the quarantining rename is refused with EPERM (a sharing
+    // violation POSIX rename does not have) while both recorded holder pids are dead. The refusal
+    // must be retried, not crash the reclaim and not wedge acquisition until the stall budget.
+    const store = createDagFileStore(
+      { project_dir: tempProject() },
+      { isProcessAlive: () => false },
+    )
+    const canonical = store.paths.runLock(runId)
+    const reclaimSentinel = `${canonical}.reclaim`
+    fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
+    fs.writeFileSync(reclaimSentinel, JSON.stringify({ hostPid: 202, token: "crashed-reclaimer" }))
+    const realRename = fs.renameSync
+    let refusals = 0
+    spyOn(fs, "renameSync").mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
+      if (from === reclaimSentinel && refusals < 2) {
+        refusals += 1
+        const error = new Error("operation not permitted")
+        Object.assign(error, { code: "EPERM" })
+        throw error
+      }
+      realRename(from, to)
+    })
+    let entered = false
+
+    // when
+    store.withRunLock(runId, () => {
+      entered = true
+    })
+
+    // then
+    expect(entered).toBe(true)
+    expect(refusals).toBe(2)
+    expect(fs.existsSync(reclaimSentinel)).toBe(false)
+  })
+
+  test("#given a crashed reclaimer left its sentinel on a slow host #when clearing it spans stall budgets of lock reads #then acquisition observes the sentinel's disappearance rather than the clock", () => {
+    // given - the other half of the windows-latest flake: every read of the lock files is slowed by
+    // the runner's antivirus, so clearing the sentinel costs more than LOCK_WAIT_TIMEOUT_MS of
+    // observed I/O even though nothing waits on a live holder. A peer also wins the republished
+    // mutex once, so the clear is observed across two acquisition passes; the budget must follow
+    // that state transition instead of expiring mid-reclaim.
+    let clock = 1_000_000
+    const store = createDagFileStore(
+      { project_dir: tempProject() },
+      { isProcessAlive: () => false, now: () => clock },
+    )
+    const canonical = store.paths.runLock(runId)
+    const reclaimSentinel = `${canonical}.reclaim`
+    fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
+    fs.writeFileSync(reclaimSentinel, JSON.stringify({ hostPid: 202, token: "crashed-reclaimer" }))
+    const realRead = fs.readFileSync
+    spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options?: unknown) => {
+      if (typeof path === "string" && (path === canonical || path === reclaimSentinel)) clock += 600
+      return realRead(path, options as never)
+    }) as typeof fs.readFileSync)
+    const realLink = fs.linkSync
+    let republishLost = false
+    spyOn(fs, "linkSync").mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
+      if (to === reclaimSentinel && !republishLost && !fs.existsSync(reclaimSentinel)) {
+        republishLost = true
+        const error = new Error("file already exists")
+        Object.assign(error, { code: "EEXIST" })
+        throw error
+      }
+      realLink(from, to)
+    })
+    let entered = false
+
+    // when
+    store.withRunLock(runId, () => {
+      entered = true
+    })
+
+    // then
+    expect(entered).toBe(true)
+    expect(republishLost).toBe(true)
     expect(fs.existsSync(reclaimSentinel)).toBe(false)
   })
 

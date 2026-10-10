@@ -42,6 +42,7 @@ export type LeadPollerLifecycle = {
     | { readonly ok: false; readonly reason: string }
   >
   resolveDefaultTeamRunId(): Promise<DefaultTeamRunIdResolution>
+  kick(): void
   shutdown(): void
 }
 
@@ -124,6 +125,15 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
         }
         return
       }
+      // Only this session's own tool calls can create an owned team, so with none the 1 Hz
+      // poll stands down (zero registry reads while idle) until kick() re-arms it.
+      if (owned.length === 0) {
+        standby = true
+        disarmInterval()
+      } else {
+        standby = false
+        armInterval()
+      }
       if (runtimeUnavailable) {
         runtimeUnavailable = false
         deps.logger.info("omo-senpi lead poller runtime recovered")
@@ -172,23 +182,44 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     return { kind: "ambiguous", reason: multipleOwnedReason(owned) }
   }
 
-  const disposeInterval = (deps.scheduleInterval ?? scheduleInterval)(() => {
+  let intervalDisposer: (() => void) | undefined
+  let standby = false
+  const armInterval = (): void => {
+    if (stopped || intervalDisposer !== undefined) return
+    intervalDisposer = (deps.scheduleInterval ?? scheduleInterval)(() => {
+      void tick().catch((error: unknown) => {
+        deps.logger.warn("omo-senpi lead poller tick failed", {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }, POLL_INTERVAL_MS)
+  }
+  const disarmInterval = (): void => {
+    intervalDisposer?.()
+    intervalDisposer = undefined
+  }
+  const kick = (): void => {
+    if (stopped || !standby) return
+    standby = false
+    armInterval()
     void tick().catch((error: unknown) => {
-      deps.logger.warn("omo-senpi lead poller tick failed", {
+      deps.logger.warn("omo-senpi lead poller kick failed", {
         error: error instanceof Error ? error.message : String(error),
       })
     })
-  }, POLL_INTERVAL_MS)
+  }
+  armInterval()
 
   return {
     tick,
     resolveLeadPoller,
     resolveTeamRunId,
     resolveDefaultTeamRunId,
+    kick,
     shutdown() {
       if (stopped) return
       stopped = true
-      disposeInterval()
+      disarmInterval()
       for (const entry of pollers.values()) entry.poller.shutdown()
       pollers.clear()
     },

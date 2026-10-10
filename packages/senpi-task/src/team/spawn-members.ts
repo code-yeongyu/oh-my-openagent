@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises"
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, PlanResolutionError, StartResult } from "../manager"
+import { resolveInheritedExtensionList } from "../runners/rpc/parent-extensions"
 import type { ResolvedModelRecord } from "../state"
 import { assembleMemberExtensions } from "./member-extensions"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
@@ -97,7 +98,11 @@ function toSpawnFailure(teamRunId: string, memberName: string, error: unknown): 
 async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Promise<SpawnedMember> {
   if (member.worktreePath !== undefined) await mkdir(member.worktreePath, { recursive: true })
 
-  const result = await input.manager.start(buildMemberStartSpec(input, member))
+  const launch = input.memberExtension
+  const extensions = launch === undefined
+    ? undefined
+    : assembleMemberExtensions(launch.entryPath, await resolveInheritedExtensionList(launch.inheritedExtensions))
+  const result = await input.manager.start(buildMemberStartSpec(input, member, extensions))
   if (result.kind !== "started") {
     throw new SenpiTeamRuntimeError(
       `member '${member.name}' failed to start: ${describeStartResult(result)}`,
@@ -118,11 +123,12 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
   }
 }
 
-function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): ManagerStartSpec {
+function buildMemberStartSpec(
+  input: SpawnMembersInput,
+  member: TeamMember,
+  extensions: readonly string[] | undefined,
+): ManagerStartSpec {
   const launch = input.memberExtension
-  const extensions = launch === undefined
-    ? undefined
-    : assembleMemberExtensions(launch.entryPath, launch.inheritedExtensions)
   return {
     prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,

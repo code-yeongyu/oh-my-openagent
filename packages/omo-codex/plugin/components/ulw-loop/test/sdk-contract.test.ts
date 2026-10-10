@@ -50,7 +50,7 @@ describe("agent toolkit SDK contract", () => {
 				if (!("qualityGateTemplate" in template.result)) return;
 				expect(template.result.qualityGateTemplate["manualQa"]).toMatchObject({ by: "main-session" });
 				expect(template.result.qualityGateTemplate["gateReview"]).toMatchObject({
-					by: surface === "omo-senpi" ? "category:deep" : "main-session",
+					by: surface === "omo-senpi" ? "category:deep-high" : "main-session",
 				});
 			} finally {
 				await rm(cwd, { recursive: true, force: true });

@@ -19,7 +19,7 @@ const CORE_LOOP_FEATURES = [
 const LOOP_STAGES = ["Human Intent", "Agent Execution", "Verified Result"] as const
 
 export async function CoreLoopSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
 
   return (
     <ManifestoSection data-section="manifesto-core-loop" labelledBy="manifesto-core-loop-title">

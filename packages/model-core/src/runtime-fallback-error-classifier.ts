@@ -85,16 +85,17 @@ function isTerminalQuotaMessage(message: string): boolean {
   )
 }
 
+/** A quota the provider marks as permanent: no reset, so no fallback retry either. */
+export function isTerminalQuotaError(error: unknown): boolean {
+  return getDetailErrorType(error) === "terminal_quota_exhausted" || isTerminalQuotaMessage(getRuntimeFallbackErrorMessage(error))
+}
+
 export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErrorType | undefined {
-  const detailType = getDetailErrorType(error)
-  if (detailType === "terminal_quota_exhausted") {
+  if (isTerminalQuotaError(error)) {
     return "abort"
   }
 
   const message = getRuntimeFallbackErrorMessage(error)
-  if (isTerminalQuotaMessage(message)) {
-    return "abort"
-  }
 
   const errorName = getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
 
@@ -131,11 +132,19 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     errorName?.includes("insufficientquota") ||
     errorName?.includes("billingerror") ||
     errorName?.includes("resourceexhausted") ||
+    errorName?.includes("insufficientcredits") ||
+    errorName?.includes("usagelimit") ||
     /quota.?exceeded/i.test(message) ||
     /exceeded.*quota/i.test(message) ||
+    /quota\b.*\breset/i.test(message) ||
     /usage\s*quota/i.test(message) ||
     /subscription.?(?:quota|limit)/i.test(message) ||
-    /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
+    /insufficient.?(?:quota|balance|funds?|credits?)/i.test(message) ||
+    /credits?\s+exhausted/i.test(message) ||
+    /\b(?:session|weekly|monthly|daily|hourly|\d+[-\s]hour|plan|call)\s+limit\b/i.test(message) ||
+    /\bhit\s+your\b[^.]*\blimit\b/i.test(message) ||
+    /\bin\s+arrears\b/i.test(message) ||
+    /\brecharge\s+and\s+try\b/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
     /resource.?exhausted/i.test(message) ||
@@ -145,6 +154,7 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /credit\s+balance.*too\s+low/i.test(message) ||
     /limit\s+exhausted/i.test(message) ||
     /使用上限/.test(message) ||
+    /用量上限/.test(message) ||
     /达到.*限制/.test(message) ||
     /额度.*不足/.test(message) ||
     /余额.*不足/.test(message) ||

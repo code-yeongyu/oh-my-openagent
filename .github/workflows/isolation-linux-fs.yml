@@ -1,0 +1,119 @@
+name: Isolation Linux filesystems
+
+on:
+  pull_request:
+    paths:
+      - 'packages/isolation-core/**'
+      - '.github/workflows/isolation-linux-fs.yml'
+  push:
+    branches: [dev, master]
+    paths:
+      - 'packages/isolation-core/**'
+      - '.github/workflows/isolation-linux-fs.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: isolation-fs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux-fs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+      - name: Prepare real filesystems
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y btrfs-progs fuse-overlayfs zfsutils-linux
+          truncate -s 512M "$RUNNER_TEMP/btrfs.img"
+          mkfs.btrfs -f "$RUNNER_TEMP/btrfs.img"
+          sudo mkdir -p /mnt/btrfs
+          sudo mount -o loop,user_subvol_rm_allowed "$RUNNER_TEMP/btrfs.img" /mnt/btrfs
+          sudo chown "$(id -u):$(id -g)" /mnt/btrfs
+          echo 'ISOLATION_TEST_BTRFS_ROOT=/mnt/btrfs' >> "$GITHUB_ENV"
+          test -r /dev/fuse && test -w /dev/fuse
+          command -v fusermount3
+          echo 'ISOLATION_TEST_OVERLAY=1' >> "$GITHUB_ENV"
+          test "$(findmnt -n -o FSTYPE -T /tmp)" = ext4
+          echo 'ISOLATION_TEST_EXT4_ROOT=/tmp' >> "$GITHUB_ENV"
+          if sudo modprobe zfs; then
+            truncate -s 512M "$RUNNER_TEMP/zfs.img"
+            sudo zpool create -f omoiso "$RUNNER_TEMP/zfs.img"
+            sudo zfs create -o mountpoint=/mnt/omoiso-repo omoiso/repo
+            sudo chown "$(id -u):$(id -g)" /mnt/omoiso-repo
+            echo 'ISOLATION_TEST_ZFS_DATASET=omoiso/repo' >> "$GITHUB_ENV"
+            echo 'ISOLATION_TEST_ZFS_SUDO=1' >> "$GITHUB_ENV"
+          else
+            echo 'zfs: module unavailable on runner'
+          fi
+      - name: Prove publication, clone parity and teardown
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun test packages/isolation-core -t fs-integration 2>&1 | tee "$RUNNER_TEMP/isolation-fs-green.txt"
+      - name: Mutation - ignoring EOPNOTSUPP must fail on ext4
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=packages/isolation-core/src/backends/reflink.ts
+          cp "$source" "$RUNNER_TEMP/reflink.ts.original"
+          trap 'cp "$RUNNER_TEMP/reflink.ts.original" "$source"' EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('packages/isolation-core/src/backends/reflink.ts')
+          text = p.read_text()
+          old = 'return { available: false, reason: error.message }'
+          assert text.count(old) == 1
+          p.write_text(text.replace(old, 'return { available: true }'))
+          PY
+          set +e
+          bun test packages/isolation-core/src/backends/fs-integration.test.ts -t 'ext4 probe' > "$RUNNER_TEMP/isolation-fs-mutation.txt" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/isolation-fs-mutation.txt"
+          test "$status" -ne 0
+          cp "$RUNNER_TEMP/reflink.ts.original" "$source"
+          bun test packages/isolation-core/src/backends/fs-integration.test.ts -t 'ext4 probe'
+      - name: Teardown filesystems
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if sudo zpool list omoiso >/dev/null 2>&1; then sudo zpool destroy omoiso; fi
+          if mountpoint -q /mnt/btrfs; then sudo umount /mnt/btrfs; fi
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Isolation Linux filesystems"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Proves publication, copy-on-write parity and teardown on real loopback btrfs, ZFS and overlayfs."
+            echo "- Verifies the ext4 probe rejects unsupported reflinks."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Open the failing step logs; the evidence artifacts hold the raw test output."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolation-linux-fs-evidence
+          path: ${{ runner.temp }}/isolation-fs-*.txt

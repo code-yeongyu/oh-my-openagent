@@ -3,7 +3,7 @@ import type { ReflectionSpawnArgs } from "./worker/spawn"
 export type SandboxPolicy = "required" | "auto" | "off"
 
 export interface SandboxTransform {
-  (spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs
+  (spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs | Promise<ReflectionSpawnArgs>
   readonly wasSandboxed: boolean
   readonly warning?: string
 }

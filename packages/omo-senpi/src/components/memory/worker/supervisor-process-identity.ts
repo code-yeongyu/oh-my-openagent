@@ -1,6 +1,6 @@
-import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process"
+import { spawn, spawnSync, type ChildProcess } from "node:child_process"
 import { readdirSync, watch, writeFileSync } from "@oh-my-opencode/memory-core/fs"
-import { readFile } from "@oh-my-opencode/memory-core/fs"
+import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
 
 export type SupervisorRuntimePlatform = "posix" | "win32"
 export type CancelSupervisorDeadline = () => void
@@ -111,6 +111,11 @@ function testCommand(name: string): readonly string[] | undefined {
 function spawnTerminationCommand(command: readonly string[], args: readonly string[], synchronous: boolean): void {
   const [executable, ...prefix] = command
   if (executable === undefined) throw new TypeError("termination command is required")
+  // taskkill runs from the console-less supervisor, so both forms need the same hidden creation flag.
+  // Containment from `process.once("exit")` blocks: that handler cannot await, and an async child's
+  // "error" event is queued on a loop that never turns again, so a taskkill that could not even be
+  // spawned would leave the child tree alive with nothing written anywhere. Every other caller runs
+  // on a live loop and stays async, so the supervisor never blocks on a termination child.
   if (synchronous) {
     const result = spawnSync(executable, [...prefix, ...args], {
       env: process.env,
@@ -120,7 +125,6 @@ function spawnTerminationCommand(command: readonly string[], args: readonly stri
     if (result.error !== undefined) throw result.error
     return
   }
-  // taskkill runs from the console-less supervisor, so it needs the same hidden creation flag.
   const child = spawn(executable, [...prefix, ...args], {
     env: process.env,
     stdio: "ignore",
@@ -172,37 +176,15 @@ export function terminateSupervisorChildHard(
   else signalSupervisorProcessGroup(pid, "SIGKILL")
 }
 
-async function readCommand(command: string, args: readonly string[]): Promise<string | null> {
-  return await new Promise((resolve) => {
-    execFile(command, [...args], { encoding: "utf8", timeout: 2_000 }, (error, stdout) => {
-      if (error !== null) {
-        resolve(null)
-        return
-      }
-      const value = stdout.trim()
-      resolve(value.length > 0 ? value : null)
-    })
-  })
-}
-
-async function readLinuxStartIdentity(pid: number): Promise<string | null> {
-  try {
-    const stat = await readFile(`/proc/${pid}/stat`, "utf8")
-    const commandEnd = stat.lastIndexOf(")")
-    if (commandEnd < 0) return null
-    const fields = stat.slice(commandEnd + 2).trim().split(/\s+/)
-    const startTicks = fields[19]
-    return startTicks === undefined ? null : `linux-proc-start-ticks:${startTicks}`
-  } catch {
-    return null
-  }
-}
-
+/**
+ * The supervisor writes the start identities the parent later compares against its own reading,
+ * so both sides must go through the one memory-core reader: a supervisor-local `ps -o lstart`
+ * scheme against the parent's libproc scheme made every live run look reused (#8304).
+ * Win32 used to return null because the PowerShell probe was too slow to trust; kernel32
+ * GetProcessTimes now answers in-process (#8294), so every platform uses the same reader.
+ * A dead pid still returns null from memory-core and classifies as dead; an unreadable
+ * identity still classifies as unknown.
+ */
 export async function getSupervisorProcessStart(pid: number): Promise<string | null> {
-  if (process.platform === "linux") return await readLinuxStartIdentity(pid)
-  if (process.platform === "darwin" || process.platform === "freebsd") {
-    const value = await readCommand("/bin/ps", ["-o", "lstart=", "-p", String(pid)])
-    return value === null ? null : `ps-lstart:${value.replace(/\s+/g, " ")}`
-  }
-  return null
+  return await getProcessStartIdentity(pid)
 }

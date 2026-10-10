@@ -1,7 +1,9 @@
+import type { TaskStatus } from "../state"
+
 export type ResidentSummary = {
   readonly task_id: string
   readonly name: string
-  readonly status: string
+  readonly status: TaskStatus
 }
 
 /**

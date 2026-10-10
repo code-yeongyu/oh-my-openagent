@@ -1,6 +1,0 @@
-{
-  "result": "crashed",
-  "error": "RangeError: Maximum call stack size exceeded.",
-  "registerCount": 7954,
-  "totalEvents": 7954
-}

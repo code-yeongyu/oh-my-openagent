@@ -1,3 +1,0 @@
-No stale self-package test copies found.
-
-exit_code=0

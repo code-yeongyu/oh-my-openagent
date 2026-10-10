@@ -1,1 +1,0 @@
-GREEN confirmed: repeated remote validation observes the deletion.

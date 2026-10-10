@@ -15,12 +15,12 @@ The public API is the barrel at `src/index.ts`.
 | `src/identity/` | Memory identity resolution and the `OMO_MEMORY_HOME` directory layout. |
 | `src/locks/` | Cross-process locks for memory writes, reflection scheduling, and transcript state, plus the machine-wide `recall-wake` counting lease (`recall-wake.slot-<n>.lock` per slot, FIFO `recall-wake.tickets/`, default 2 slots, proof-based stale recovery for slots and tickets alike, bounded wait ending in `RecallWakeBusyError`). |
 | `src/memfs/` | Memory-path validation, markdown frontmatter parsing, and hook-script installation. |
-| `src/tools/` | `memory` and `memory_apply_patch` operations, patch parsing, typed tool errors, and auto-commit behavior. |
+| `src/tools/` | `memory` and `memory_apply_patch` operations, patch parsing, typed tool errors, and auto-commit behavior. `leaked-arguments.ts` splits an argument that leaked into its sibling (`summary</description>\n<parameter name="file_text">body`) back apart before `runMemoryTool` validates. |
 | `src/journal/` | Per-conversation transcript cursors, reflection snapshots, and durable journal state. |
 | `src/facts/` | Durable fact pipeline: queue + cursor watermarks, failure backoff/store, payload capping, person routing, recovery, mutation planning. |
 | `src/people/` | People-card grammar: parse/serialize, slug rules, reserved slugs, observations. |
 | `src/soul/` | Soul-file paths and identity-scoped soul-notice watermark consumption. |
-| `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, and merge outcomes. |
+| `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, merge outcomes, the orphan sweep that reclaims worktrees/branches no live run owns, and the park policy that stops automatic reflection after repeated failures (one half-open probe per interval). |
 | `src/compile/` | Compile committed memory revisions into marked system-prompt blocks and cache them by template hash. |
 | `src/search/` | Query parsing, transcript providers, and ranked memory/session search. |
 | `src/sync/` | Remote mirror synchronization and secret redaction. |
@@ -43,6 +43,15 @@ The public API is the barrel at `src/index.ts`.
 - **Preserve markdown contracts.** Memory files require YAML frontmatter with a
   non-empty `description`; `read_only: "true"` blocks mutation. Keep UTF-8,
   normalized repository-relative paths, and LF output.
+- **Frontmatter is strict YAML, one grammar everywhere.** `renderMemoryFile`
+  is the only writer: it quotes any scalar that the `yaml` package would not
+  read back verbatim and re-parses its own header. The reader decodes quoted
+  scalars, keeps non-contract keys (`extra`) so SKILL.md `name`/`version`
+  survive edits, and only falls back to the legacy first-colon grammar for
+  pre-existing files. `describeFrontmatterViolation` is the shared gate for
+  the pre-commit hook rules, `validateCompletion`, and
+  `normalizeMemoryFrontmatter` (one-time legacy repair keyed by a marker in
+  the common git dir). Never emit an unquoted `description:` by hand.
 - **Keep reflection transitions deterministic.** Manual triggers outrank
   compaction, which outranks step-count triggers. Only one active run and one
   merged pending reservation may exist.

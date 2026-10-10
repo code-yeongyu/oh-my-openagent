@@ -150,9 +150,26 @@ class FakeTaskManager implements TaskManager {
   readonly #childListeners = new Map<string, Set<ManagedChildListener>>()
   #residents = 0
   #taskCounter = 0
+  readonly #residencyWaiters = new Map<string, ReturnType<typeof deferred<void>>>()
 
   constructor(options: FakeOptions = {}) {
     this.#options = options
+  }
+
+  residencyChanged(session: string): Promise<void> {
+    let waiter = this.#residencyWaiters.get(session)
+    if (waiter === undefined) {
+      waiter = deferred<void>()
+      this.#residencyWaiters.set(session, waiter)
+    }
+    return waiter.promise
+  }
+
+  #notifyResidency(session: string): void {
+    const waiter = this.#residencyWaiters.get(session)
+    if (waiter === undefined) return
+    this.#residencyWaiters.delete(session)
+    waiter.resolve()
   }
 
   whenStarted(nodeId: string): Promise<void> {
@@ -181,6 +198,7 @@ class FakeTaskManager implements TaskManager {
         : { error_message: `${status} ${nodeId}` }),
     }
     task.completion.resolve(task.record)
+    this.#notifyResidency(task.record.parent_session_id)
   }
 
   async startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
@@ -228,7 +246,15 @@ class FakeTaskManager implements TaskManager {
     const limit = this.#options.residencyLimit ?? Number.POSITIVE_INFINITY
     if (this.#residents >= limit) {
       this.residencyDenials.push(nodeId)
-      return { kind: "residency_denied", reason: "resident child cap reached" }
+      return {
+        kind: "residency_denied",
+        reason: "resident child cap reached",
+        cause: "residents",
+        max_children: limit,
+        residents: [...this.#tasks.values()]
+          .filter((entry) => entry.record.status === "pending" || entry.record.status === "running")
+          .map((entry) => ({ task_id: entry.record.task_id, name: entry.record.name ?? entry.record.task_id, status: entry.record.status })),
+      }
     }
 
     this.#taskCounter += 1
@@ -673,6 +699,27 @@ describe("DAG scheduler failure semantics", () => {
 
     // then
     expect(Object.fromEntries(result.nodes.map((entry) => [entry.id, entry.error?.code]))).toEqual(expected)
+  })
+
+  test("#given every leaf fails at admission with nothing attached #when the pass ends #then dependents are skipped and the run settles failed instead of parking (#8396)", async () => {
+    // given - both leaves refuse to start; the aggregator's only dependencies are those leaves.
+    const manager = new FakeTaskManager({ startFailureNodeIds: ["leaf-a", "leaf-b"] })
+    const { scheduler, events } = schedulerFixture(
+      definition([node("leaf-a"), node("leaf-b"), node("aggregate", ["leaf-a", "leaf-b"])]),
+      manager,
+    )
+
+    // when - nothing was ever attached, so no settlement can drive the loop forward.
+    const result = await scheduler.run()
+
+    // then - the skip cascade still runs and the run reaches a terminal status.
+    expect(result.status).toBe("failed")
+    expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
+      "leaf-a:failed",
+      "leaf-b:failed",
+      "aggregate:skipped",
+    ])
+    expect(events().at(-1)?.type).toBe("dag.run.failed")
   })
 
   test("#given a failed root with a descendant chain #when failure cascades #then every descendant skip is persisted separately", async () => {

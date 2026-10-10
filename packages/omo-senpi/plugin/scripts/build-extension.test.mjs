@@ -1,74 +1,53 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { appendFile, cp, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { appendFile, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
 import {
-  buildExtension,
   checkExtensionCurrent,
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
+import { createBuildFixture } from "./build-extension.test-support.mjs"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
 const repoRoot = join(scriptDir, "..", "..", "..", "..")
-const perTestRoots = []
-let sharedBuildPromise = null
+const fixture = createBuildFixture()
+const { sharedOutputs, mutableOutputs } = fixture
 
 // A focused run builds the six artifacts twice in ~14s, while the package suite shares CPU and disk
 // with other build/staging files. Keep the test bounded, but give the real two-build workload enough
 // headroom under suite contention instead of timing out before the freshness assertion runs.
-setDefaultTimeout(60_000)
+setDefaultTimeout(90_000)
 
-afterEach(async () => {
-  await Promise.all(perTestRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
-})
-
-afterAll(async () => {
-  if (sharedBuildPromise === null) return
-  const shared = await sharedBuildPromise
-  await rm(shared.root, { recursive: true, force: true })
-})
-
-function outputPathsIn(root) {
-  return {
-    outputPath: join(root, "omo.js"),
-    taskOutputPath: join(root, "omo-task.js"),
-    memberOutputPath: join(root, "omo-member.js"),
-    supervisorOutputPath: join(root, "memory-run-supervisor.mjs"),
-    advisorRuntimeOutputPath: join(root, "omo-init-deep-advisor.js"),
-  }
-}
-
-/**
- * The esbuild pass dominates this file, so it runs once and every read-only assertion
- * shares it. Cases that mutate an artifact copy the built tree instead of rebuilding,
- * which keeps them isolated for a fraction of the cost.
- */
-async function sharedOutputs() {
-  sharedBuildPromise ??= (async () => {
-    const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-shared-"))
-    const paths = outputPathsIn(root)
-    const build = await buildExtension(paths)
-    return { root, ...paths, ...build }
-  })()
-  return sharedBuildPromise
-}
-
-async function mutableOutputs() {
-  const shared = await sharedOutputs()
-  const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-"))
-  perTestRoots.push(root)
-  await cp(shared.root, root, { recursive: true })
-  return { root, ...outputPathsIn(root), mainInputs: shared.mainInputs, taskInputs: shared.taskInputs }
-}
+afterEach(fixture.cleanupTest)
+afterAll(fixture.cleanupFile)
 
 describe("checkExtensionCurrent", () => {
+  test("#given the eval SDK build #when inputs and exports are inspected #then the standalone entry has no dependencies", async () => {
+    const outputs = await sharedOutputs()
+    expect(outputs.toolkitSdkInputs.some(input => input.endsWith("src/extension/agent-toolkit-sdk.ts"))).toBe(true)
+    expect(outputs.toolkitSdkInputs.filter(input => input.includes("node_modules/"))).toEqual([])
+    const sdk = await import(outputs.toolkitSdkOutputPath)
+    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "ULW_LOOP_MANIFEST", "ULW_LOOP_OPERATIONS", "agentToolkit", "createAgentToolkit", "toolkitContextFromEnv"].sort())
+  })
+
+  test("#given a missing SDK artifact #when freshness is checked #then it reports that output", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.toolkitSdkOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.toolkitSdkOutputPath })
+  })
+
+  test("#given the rollback migration runtime #when built #then its store entry and migration event are present", async () => {
+    const outputs = await sharedOutputs()
+    expect(outputs.rollbackRuntimeInputs.some(input => input.endsWith("src/extension/rollback-migrate-runtime.ts"))).toBe(true)
+    expect(await readFile(outputs.rollbackRuntimeOutputPath, "utf8")).toContain("host_session_migrated")
+  })
+
   test("#given the host platform #when resolving the Bun executable #then Windows bypasses the command shell", () => {
     expect(resolveBunExecutable("win32")).toBe("bun.exe")
     expect(resolveBunExecutable("darwin")).toBe("bun")
@@ -228,6 +207,48 @@ describe("checkExtensionCurrent", () => {
       .toBe(true)
   })
 
+  test("#given the split extension build #when metafile inputs are inspected #then the computer-use implementation lives only in its lazy entry", async () => {
+    // given / when
+    const { mainInputs, computerUseInputs } = await sharedOutputs()
+    const inMain = (suffix) => mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))
+    const inRuntime = (suffix) => computerUseInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))
+
+    // then
+    for (const implementation of [
+      "packages/senpi-desktop-service/src/index.ts",
+      "packages/senpi-desktop-engine/src/index.ts",
+      "packages/senpi-desktop-tool/src/activation.ts",
+      "packages/omo-senpi/src/components/computer-use/engine-status.ts",
+    ]) {
+      expect(inMain(implementation), implementation).toBe(false)
+      expect(inRuntime(implementation), implementation).toBe(true)
+    }
+    expect(inMain("packages/senpi-desktop-tool/src/registration.ts")).toBe(true)
+  })
+
+  test("#given the split extension build #when doctor inputs are inspected #then health checks load only from the lazy entry", async () => {
+    const { mainInputs, memoryDoctorInputs } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/commands/doctor-runtime.ts",
+      "packages/omo-senpi/src/components/memory/commands/doctor-checks.ts",
+      "packages/omo-senpi/src/components/memory/commands/doctor-reservation.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(memoryDoctorInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+  })
+
+  test("#given the split extension build #when memfs inputs are inspected #then maintenance handlers load only from the lazy entry", async () => {
+    const { mainInputs, memoryMemfsInputs } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/commands/memfs-runtime.ts",
+      "packages/omo-senpi/src/components/memory/commands/memfs-extra.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(memoryMemfsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+  })
+
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
@@ -235,11 +256,16 @@ describe("checkExtensionCurrent", () => {
     const manifest = JSON.parse(await readFile(join(pluginRoot, "package.json"), "utf8"))
 
     expect(main).toContain('import("#omo-task-runtime")')
+    expect(main).toContain('import("#omo-memory-memfs-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
-    expect(main).toContain('import("#omo-agent-toolkit-runtime")')
+    expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
+    expect(manifest.imports).not.toHaveProperty("#omo-agent-toolkit-runtime")
     expect(manifest.imports).toEqual({
       "#omo-task-runtime": "./extensions/omo-task.js",
-      "#omo-agent-toolkit-runtime": "./extensions/omo-agent-toolkit.js",
+      "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
+      "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
+      "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
+      "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })
   })
 })

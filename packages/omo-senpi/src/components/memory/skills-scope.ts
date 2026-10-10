@@ -8,9 +8,19 @@ import type { MemoryIdentityContext } from "./context"
  * Structural match of senpi's ResourcesDiscoverResult (core/extensions/types.ts). Declared
  * locally because the senpi package root does not re-export the event result types; the
  * handler is registered through SenpiExtensionAPI.on, which is payload-agnostic.
+ *
+ * An entry is a plain path or, on hosts that advertise `scopedEntries` on the event, a
+ * `{ path, scope }` object that pins the resource's provenance scope.
  */
+export interface MemorySkillsScopedEntry {
+  readonly path: string
+  readonly scope: "user"
+}
+
+export type MemorySkillsDiscoverEntry = string | MemorySkillsScopedEntry
+
 export interface MemorySkillsDiscoverResult {
-  readonly skillPaths?: string[]
+  readonly skillPaths?: readonly MemorySkillsDiscoverEntry[]
 }
 
 /**
@@ -29,6 +39,12 @@ export interface MemorySkillsDiscoverResult {
  * extension-provided paths are appended AFTER the pre-existing CLI/project/user/builtin
  * discovery set. Memory skills therefore load additively and yield on name collision rather
  * than displacing any existing skill.
+ *
+ * Scope note: the plugin is a system package (pi.system), so a bare contributed path outside
+ * the plugin root lands in the temporary `path` group. Memory-repo skills are user-owned data,
+ * so on a host whose event carries `scopedEntries: true` the handler pins `scope: "user"`;
+ * a host without the flag would treat the object as a path string and abort session start,
+ * so the plain path is returned there.
  *
  * Missing dirs contribute nothing, avoiding a startup diagnostic for first-run identities.
  * Reflection-authored skills committed under skills/<name>/SKILL.md are picked up on the next
@@ -61,7 +77,9 @@ export function createMemorySkillsScopeHandler(
     const context = options.resolveContext(sessionId)
     if (context === undefined) return undefined
     const skillsDir = memorySkillsDir(context)
-    return existsSync(skillsDir) ? { skillPaths: [skillsDir] } : undefined
+    if (!existsSync(skillsDir)) return undefined
+    const entry: MemorySkillsDiscoverEntry = acceptsScopedEntries(payload) ? { path: skillsDir, scope: "user" } : skillsDir
+    return { skillPaths: [entry] }
   }
 }
 
@@ -69,8 +87,12 @@ export function registerMemorySkillsScope(pi: SenpiExtensionAPI, options: Memory
   pi.on("resources_discover", createMemorySkillsScopeHandler(options))
 }
 
-function isResourcesDiscoverPayload(payload: unknown): boolean {
+function isResourcesDiscoverPayload(payload: unknown): payload is Record<string, unknown> {
   return isRecord(payload) && payload.type === "resources_discover"
+}
+
+function acceptsScopedEntries(payload: Record<string, unknown>): boolean {
+  return payload.scopedEntries === true
 }
 
 function readSessionId(eventCtx: unknown): string | undefined {

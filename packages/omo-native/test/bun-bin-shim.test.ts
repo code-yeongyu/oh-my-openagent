@@ -5,95 +5,17 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { bunBinShimScript, ensureBunBinShim } from "../bin/lib/bun-bin-shim.js"
+import {
+  baseInput,
+  bunTreePackage,
+  NON_POSIX_HOST,
+  POSIX_HOME,
+  recorder,
+  stockLinkTarget,
+} from "./bun-bin-shim.test-support"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
-const POSIX_HOME = "/home/dev"
 const roots: string[] = []
-
-type Options = {
-  scriptPath?: string
-  env?: Record<string, string | undefined>
-  homedir?: () => string
-  platform?: string
-  versions?: Record<string, string | undefined>
-  exists?: (path: string) => boolean
-  realpath?: (path: string) => string
-  lstat?: (path: string) => { isSymbolicLink(): boolean; isFile(): boolean }
-  readFile?: (path: string, encoding: "utf8") => string
-  write?: (path: string, content: string, options: { mode: number }) => void
-  rename?: (from: string, to: string) => void
-  chmod?: (path: string, mode: number) => void
-  pid?: number
-  warn?: (message: string) => void
-}
-
-const identityRealpath = (path: string): string => path
-
-function existsOnly(...present: string[]): (path: string) => boolean {
-  const set = new Set(present)
-  return (path) => set.has(path)
-}
-
-function bunTreePackage(bunRoot: string): string {
-  return join(bunRoot, "install", "global", "node_modules", "omo-ai", "bin", "omo.js")
-}
-
-/** The stock shape bun links: a relative symlink from <root>/bin/omo into the global tree. */
-function stockLinkTarget(): string {
-  return join("..", "install", "global", "node_modules", "omo-ai", "bin", "omo.js")
-}
-
-/** Drives the unit surface with recorded filesystem operations, so no assertion touches the host. */
-function recorder(files: Record<string, string> = {}) {
-  const written: Array<{ path: string; content: string; mode: number }> = []
-  const renamed: Array<{ from: string; to: string }> = []
-  const chmodded: Array<{ path: string; mode: number }> = []
-  const links = new Set<string>()
-  return {
-    written,
-    renamed,
-    chmodded,
-    markLink: (path: string) => links.add(path),
-    lstat: (path: string): { isSymbolicLink(): boolean; isFile(): boolean } => {
-      if (!links.has(path) && !(path in files)) throw new Error(`ENOENT: ${path}`)
-      return {
-        isSymbolicLink: () => links.has(path),
-        isFile: () => !links.has(path) && path in files,
-      }
-    },
-    readFile: (path: string): string => {
-      if (!(path in files)) throw new Error(`ENOENT: ${path}`)
-      return files[path] ?? ""
-    },
-    write: (path: string, content: string, options: { mode: number }) => {
-      written.push({ path, content, mode: options.mode })
-      files[path] = content
-    },
-    rename: (from: string, to: string) => {
-      renamed.push({ from, to })
-      files[to] = files[from] ?? ""
-      delete files[from]
-    },
-    chmod: (path: string, mode: number) => chmodded.push({ path, mode }),
-  }
-}
-
-function baseInput(scriptPath: string, overrides: Partial<Options> = {}) {
-  const bunRootDir = join(POSIX_HOME, ".bun")
-  const bunPath = join(bunRootDir, "bin", "bun")
-  const options: Required<Pick<Options, "scriptPath" | "env" | "homedir" | "platform" | "versions" | "exists" | "realpath">> = {
-    scriptPath,
-    env: {},
-    homedir: () => POSIX_HOME,
-    platform: "linux",
-    versions: {},
-    exists: existsOnly(bunPath),
-    realpath: identityRealpath,
-    pid: 4242,
-    ...overrides,
-  }
-  return { options, bunRootDir, bunPath }
-}
 
 /** bun test runs on bun; node ships as its sibling on CI and dev machines, and its absence skips. */
 function nodeInterpreter(): string | undefined {
@@ -106,12 +28,13 @@ function nodeInterpreter(): string | undefined {
 
 const NODE = nodeInterpreter()
 const POSIX_ONLY = process.platform === "win32" || !NODE
-// The unit surface drives the module with `platform: "linux"`, so the module spells its paths with
-// posix.join while the fixtures below spell theirs with the HOST's path.join. On Windows those two
-// spellings never meet - `/home/dev/.bun/bin/bun` against `\home\dev\.bun\bin\bun` - and every
-// lookup misses. Mirroring the module's own darwin/linux gate is the honest fix: the repair itself
-// returns `skipped-platform` on Windows, so there is no Windows behaviour here left to cover.
-const NON_POSIX_HOST = process.platform === "win32"
+
+// The system dirs a node-less PATH keeps (`sh` lives there). A host that ships node in them cannot
+// stage a machine without node, so that case skips instead of passing on the wrong runtime.
+const NODELESS_SYSTEM_DIRS = "/bin"
+const NODELESS_UNAVAILABLE = process.platform === "win32"
+  || !process.versions.bun
+  || spawnSync("/usr/bin/env", ["node", "--version"], { env: { PATH: NODELESS_SYSTEM_DIRS } }).status === 0
 
 type Fixture = {
   root: string
@@ -173,10 +96,12 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   mkdirSync(join(senpiRoot, "dist", "core"), { recursive: true })
   writeFileSync(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   // A stand-in bun that proves it ran; the real bun end to end is QA's job against the real install.
+  // It answers `--version` like a real bun at the engine's floor, because the launcher probes the
+  // bun a bun-global install chose before trusting it (#9563).
   const markerFile = join(root, "fake-bun.marker")
   const bunBinary = join(bunInstall, "bin", "bun")
   mkdirSync(join(bunInstall, "bin"), { recursive: true })
-  writeFileSync(bunBinary, `#!/bin/sh\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
+  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
   symlinkSync(stockLinkTarget(), join(bunInstall, "bin", "omo"))
   mkdirSync(join(root, "home"), { recursive: true })
   return {
@@ -212,6 +137,34 @@ function launchEntry(fixture: Fixture, args: string[], env: Record<string, strin
   })
 }
 
+/**
+ * Turns the fixture into what `bun add -g` leaves behind before it runs the package's own scripts:
+ * the real postinstall line, and an engine tree that postinstall can prepare (the RPC serializer it
+ * patches comes from the installed engine and the pi-ai file it floors is bundled, as in
+ * senpi-patch.test.ts).
+ */
+function stageInstalledPackage(fixture: Fixture): void {
+  const manifestPath = join(fixture.packageRoot, "package.json")
+  const shipped = JSON.parse(readFileSync(join(SOURCE_ROOT, "package.json"), "utf8"))
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
+  writeFileSync(manifestPath, JSON.stringify({ ...manifest, scripts: { postinstall: shipped.scripts.postinstall } }))
+  const senpiRoot = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi")
+  const rpcMode = join(senpiRoot, "dist", "modes", "rpc", "rpc-mode.js")
+  mkdirSync(dirname(rpcMode), { recursive: true })
+  writeFileSync(rpcMode, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
+  const anthropicMessages = join(senpiRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js")
+  mkdirSync(dirname(anthropicMessages), { recursive: true })
+  writeFileSync(anthropicMessages, 'const claudeCodeVersion = "2.1.75";\nexport { claudeCodeVersion }\n')
+}
+
+/** A PATH that reaches bun and the system shell but no node, like a launchd job or a bun-only box. */
+function nodelessEnv(fixture: Fixture): NodeJS.ProcessEnv {
+  const pathDir = join(fixture.root, "nodeless-path")
+  mkdirSync(pathDir, { recursive: true })
+  symlinkSync(process.execPath, join(pathDir, "bun"))
+  return fixtureEnv(fixture, { PATH: `${pathDir}:${NODELESS_SYSTEM_DIRS}` })
+}
+
 function capture(fixture: Fixture): { argv: string[]; env: NodeJS.ProcessEnv; versions: Record<string, string | undefined> } {
   return JSON.parse(readFileSync(fixture.captureFile, "utf8"))
 }
@@ -243,6 +196,24 @@ describe("bun launcher bin shim", () => {
   })
 
   describe.skipIf(NON_POSIX_HOST)("#given a stock bun bin symlink pointing at this install", () => {
+    test("#then a launch running on bun repairs it too (#9293)", () => {
+      // given: bun is the runtime - bun's postinstall on a machine without node, or `bun omo.js`
+      const scriptPath = bunTreePackage(join(POSIX_HOME, ".bun"))
+      const { options, bunRootDir, bunPath } = baseInput(scriptPath, { versions: { bun: "1.4.2" } })
+      const binPath = join(bunRootDir, "bin", "omo")
+      const fs = recorder()
+      fs.markLink(binPath)
+      // when
+      const result = ensureBunBinShim({
+        ...options,
+        realpath: (path: string) => (path === binPath ? scriptPath : path),
+        ...fs,
+      })
+      // then
+      expect(result.action).toBe("repaired")
+      expect(fs.written[0]?.content).toBe(bunBinShimScript(scriptPath, bunPath))
+    })
+
     test("#then it is replaced by an executable shim through an atomic rename", () => {
       // given
       const scriptPath = bunTreePackage(join(POSIX_HOME, ".bun"))
@@ -257,7 +228,7 @@ describe("bun launcher bin shim", () => {
         ...fs,
       })
       // then
-      expect(result).toEqual({ action: "repaired" })
+      expect(result.action).toBe("repaired")
       expect(fs.written).toEqual([
         { path: `${binPath}.4242.tmp`, content: bunBinShimScript(scriptPath, bunPath), mode: 0o755 },
       ])
@@ -274,7 +245,7 @@ describe("bun launcher bin shim", () => {
       // when
       const result = ensureBunBinShim({ ...options, ...fs })
       // then
-      expect(result).toEqual({ action: "current" })
+      expect(result.action).toBe("current")
       expect(fs.written).toHaveLength(0)
       expect(fs.renamed).toHaveLength(0)
     })
@@ -290,7 +261,7 @@ describe("bun launcher bin shim", () => {
       // when
       const result = ensureBunBinShim({ ...options, ...fs })
       // then
-      expect(result).toEqual({ action: "repaired" })
+      expect(result.action).toBe("repaired")
       expect(fs.written[0]?.content).toBe(bunBinShimScript(scriptPath, bunPath))
     })
   })
@@ -310,7 +281,7 @@ describe("bun launcher bin shim", () => {
         ...fs,
       })
       // then
-      expect(result).toEqual({ action: "foreign-link" })
+      expect(result.action).toBe("foreign-link")
       expect(fs.written).toHaveLength(0)
     })
 
@@ -322,7 +293,7 @@ describe("bun launcher bin shim", () => {
       // when
       const result = ensureBunBinShim({ ...options, ...fs })
       // then
-      expect(result).toEqual({ action: "foreign-file" })
+      expect(result.action).toBe("foreign-file")
       expect(fs.written).toHaveLength(0)
     })
 
@@ -334,7 +305,7 @@ describe("bun launcher bin shim", () => {
       // when
       const result = ensureBunBinShim({ ...options, ...fs })
       // then
-      expect(result).toEqual({ action: "absent-bin" })
+      expect(result.action).toBe("absent-bin")
       expect(fs.written).toHaveLength(0)
     })
   })
@@ -350,18 +321,8 @@ describe("bun launcher bin shim", () => {
       const result = ensureBunBinShim({ ...options, ...fs })
       // then - npm's .cmd/.ps1 shims exec the bin file through its shebang, so on Windows the file
       // must stay exactly what bun/npm linked
-      expect(result).toEqual({ action: "skipped-platform" })
+      expect(result.action).toBe("skipped-platform")
       expect(fs.written).toHaveLength(0)
-    })
-
-    test("#then a launcher already running on bun skips the check entirely", () => {
-      // given
-      const { options } = baseInput(scriptPath, { versions: { bun: "1.4.0" } })
-      const fs = recorder()
-      // when
-      const result = ensureBunBinShim({ ...options, ...fs })
-      // then - bun arrived through the shim already; the hot path pays nothing
-      expect(result).toEqual({ action: "skipped-runtime" })
     })
 
     test("#then an npm-layout install skips the check entirely", () => {
@@ -371,7 +332,7 @@ describe("bun launcher bin shim", () => {
       // when
       const result = ensureBunBinShim({ ...options, ...fs })
       // then
-      expect(result).toEqual({ action: "skipped-install" })
+      expect(result.action).toBe("skipped-install")
     })
 
     test("#then a machine without bun has nothing to optimize with", () => {
@@ -381,7 +342,7 @@ describe("bun launcher bin shim", () => {
       // when
       const result = ensureBunBinShim({ ...options, ...fs })
       // then
-      expect(result).toEqual({ action: "skipped-no-bun" })
+      expect(result.action).toBe("skipped-no-bun")
       expect(fs.written).toHaveLength(0)
     })
   })
@@ -404,7 +365,8 @@ describe("bun launcher bin shim", () => {
       // when
       const result = ensureBunBinShim({ ...options, ...failing })
       // then
-      expect(result).toEqual({ action: "failed", error: "EACCES: permission denied" })
+      expect(result.action).toBe("failed")
+      expect(result.error).toBe("EACCES: permission denied")
     })
 
     test("#then OMO_DEBUG narrates the swallowed failure", () => {
@@ -520,6 +482,34 @@ describe("bun launcher bin shim", () => {
       } finally {
         chmodSync(join(fixture.bunInstall, "bin"), 0o755)
       }
+    })
+  })
+
+  describe("#given a bun add -g update on a machine without node (#9293)", () => {
+    test.skipIf(NODELESS_UNAVAILABLE)("#then bun's postinstall leaves an omo that starts without node", () => {
+      // given: the tree `bun add -g` just linked - its bin is the stock symlink to the entrypoint,
+      // whose `#!/usr/bin/env node` cannot start where node is not on PATH
+      const fixture = createFixture()
+      stageInstalledPackage(fixture)
+      const env = nodelessEnv(fixture)
+      const stock = spawnSync(fixture.binPath, ["--version"], { encoding: "utf8", env })
+      expect(stock.status).toBe(127)
+
+      // when: bun runs the package's postinstall right after linking; with no node on PATH, bun
+      // runs the script's `node` itself
+      const postinstall = spawnSync(process.execPath, ["run", "postinstall"], {
+        cwd: fixture.packageRoot,
+        encoding: "utf8",
+        env,
+      })
+
+      // then: the bin is the shim again, and `omo` starts on bun with the same node-less PATH
+      expect(postinstall.status).toBe(0)
+      expect(lstatSync(fixture.binPath).isSymbolicLink()).toBe(false)
+      expect(readFileSync(fixture.binPath, "utf8")).toBe(bunBinShimScript(fixture.launcher, fixture.bunBinary))
+      const launched = spawnSync(fixture.binPath, ["--version"], { encoding: "utf8", env })
+      expect(launched.status).toBe(42)
+      expect(readFileSync(fixture.markerFile, "utf8")).toBe("fake-bun-ran")
     })
   })
 })

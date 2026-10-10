@@ -14,6 +14,8 @@ on:
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -24,14 +26,34 @@ permissions:
 jobs:
   gate:
     name: Review claim gate
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request_target' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     concurrency:
-      group: review-claim-gate-${{ github.event.pull_request.number }}
+      group: review-claim-gate-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
     steps:
+      - name: Check out the merge-group gate helper
+        if: github.event_name == 'merge_group'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: script/review-claim-gate.mjs
+          sparse-checkout-cone-mode: false
+      - name: Recheck current review claims for the queued pull request
+        id: queue-claims
+        if: github.event_name == 'merge_group'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const { checkMergeGroupReviewClaims } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/review-claim-gate.mjs`).href);
+            await checkMergeGroupReviewClaims({ github, context, core });
       - name: Fail while a review claim label is present
+        if: github.event_name == 'pull_request_target'
         uses: actions/github-script@v9
         with:
           script: |
@@ -52,7 +74,7 @@ jobs:
             echo "| Field | Value |"
             echo "| --- | --- |"
             echo "| Job status | ${{ job.status }} |"
-            echo "| PR | #${{ github.event.pull_request.number }} |"
+            echo "| PR | #${{ github.event.pull_request.number || steps.queue-claims.outputs.pr_number || 'unknown' }} |"
             echo "| Event | ${{ github.event.action }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 

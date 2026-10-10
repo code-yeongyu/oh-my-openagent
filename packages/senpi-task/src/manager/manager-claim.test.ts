@@ -73,7 +73,7 @@ function managerWithStore(
 const seedFloorChildFixturePath = resolve(import.meta.dir, "__fixtures__", "seed-floor-child.ts")
 
 async function expectSeedFloorChildModeToSucceed(mode: string): Promise<void> {
-  const child = Bun.spawn([process.execPath, seedFloorChildFixturePath, mode], { stdout: "pipe", stderr: "pipe" })
+  const child = Bun.spawn([process.execPath, seedFloorChildFixturePath, mode], { stdout: "pipe", stderr: "pipe", env: { ...process.env } })
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),

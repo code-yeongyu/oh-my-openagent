@@ -16,13 +16,13 @@ describe("Senpi category routing policy", () => {
     // then
     expect(routing).toEqual({
       visualEngineering: { model: "anthropic/claude-fable-5-1", variant: "max" },
-      quick: { model: "kimi-coding/kimi-for-coding-highspeed" },
-      unspecifiedHigh: { model: "openai/gpt-6-astra", variant: "high" },
-      unspecifiedLow: { model: "xai/grok-4.6", variant: "xhigh" },
+      quick: { model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" },
+      unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "medium" },
+      unspecifiedLow: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
     })
   })
 
-  test("unspecified-low fallback chain is grok-4.6 xhigh first and excludes luna", () => {
+  test("unspecified-low fallback chain is claude-sonnet-5-5 medium first and excludes luna", () => {
     // given / when
     const chain = CATEGORY_FALLBACK_CHAINS["unspecified-low"]
 
@@ -30,24 +30,39 @@ describe("Senpi category routing policy", () => {
     expect(chain.map((entry) => entry.model)).not.toContain("gpt-5.6-luna")
     expect(chain).toEqual([
       {
-        providers: ["xai", "github-copilot", "opencode"],
-        model: "grok-4.6",
-        variant: "xhigh",
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-sonnet-5-5",
+        variant: "medium",
       },
       {
-        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
-        model: "gpt-5.6-terra",
+        providers: ["xiaomi", "opencode-go"],
+        model: "mimo-v2.6-pro",
         variant: "high",
       },
       {
-        providers: ["claude-sdk-oauth", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["xai", "github-copilot", "opencode-go"],
+        model: "grok-4.7",
+        variant: "xhigh",
+      },
+      {
+        providers: ["chatgpt-subscription", "openai"],
+        model: "gpt-6.1-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5",
         variant: "low",
       },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
         model: "qwen3.8-max-preview",
-        variant: "max",
+        variant: "high",
       },
       {
         providers: ["deepseek", "opencode-go"],
@@ -57,7 +72,7 @@ describe("Senpi category routing policy", () => {
       {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
-        variant: "max",
+        variant: "high",
       }
     ])
   })

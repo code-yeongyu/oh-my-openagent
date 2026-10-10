@@ -39,17 +39,6 @@ function acquired(admission: KibitzerWakeAdmission): KibitzerWakeLease {
   return admission.lease
 }
 
-/**
- * True when the promise has already settled. Both racers sit one microtask hop deep and the settled
- * branch is subscribed first, so an already-settled promise always beats the sentinel; a pending one
- * never does.
- */
-async function settledAlready(promise: Promise<unknown>): Promise<boolean> {
-  const sentinel = Symbol("pending")
-  const winner = await Promise.race([promise.then(() => "settled", () => "settled"), Promise.resolve().then(() => sentinel)])
-  return winner !== sentinel
-}
-
 describe("createKibitzerWakeSlot", () => {
   test("#given the production defaults #when a slot is built from config #then the wait is bounded and the poll is a delay, never a spin", async () => {
     const slot = createKibitzerWakeSlot({ locksDirectory: await locksDirectory(), maxConcurrent: 2 })
@@ -62,38 +51,44 @@ describe("createKibitzerWakeSlot", () => {
   test("#given ten sessions contending for two slots #when leases are released one at a time #then admission is FIFO and never more than two wakes are live", async () => {
     const dir = await locksDirectory()
     const slot = createKibitzerWakeSlot({ locksDirectory: dir, maxConcurrent: 2, waitTimeoutMs: 10_000, pollMs: 10 })
+    const controller = new AbortController()
     const order: number[] = []
     const leases: Array<KibitzerWakeLease | undefined> = []
     let live = 0
     let peak = 0
     const waits = Array.from({ length: 10 }, (_, session) =>
-      slot.acquire().then((admission) => {
+      slot.acquire(controller.signal).then((admission) => {
+        const lease = acquired(admission)
         order.push(session)
-        leases[session] = acquired(admission)
+        leases[session] = lease
         live += 1
         peak = Math.max(peak, live)
         return admission
       }),
     )
 
-    await withinMs(Promise.all([waits[0], waits[1]]), "the first two admissions", 5_000)
-    expect(order).toEqual([0, 1])
-    expect(await settledAlready(waits[2] ?? Promise.resolve())).toBe(false)
+    try {
+      await withinMs(Promise.all([waits[0], waits[1]]), "the first two admissions", 5_000)
+      expect(order).toEqual([0, 1])
 
-    for (let next = 2; next < 10; next += 1) {
-      const releasing = leases[next - 2]
-      if (releasing === undefined) throw new Error(`session ${next - 2} never acquired`)
-      live -= 1
-      expect(await releasing.release()).toBe(true)
-      await withinMs(waits[next] ?? Promise.resolve(), `admission ${next}`, 5_000)
-      expect(order[next]).toBe(next)
-      if (next + 1 < 10) expect(await settledAlready(waits[next + 1] ?? Promise.resolve())).toBe(false)
+      for (let next = 2; next < 10; next += 1) {
+        const releasing = leases[next - 2]
+        if (releasing === undefined) throw new Error(`session ${next - 2} never acquired`)
+        live -= 1
+        expect(await releasing.release()).toBe(true)
+        await withinMs(waits[next] ?? Promise.resolve(), `admission ${next}`, 5_000)
+        expect(order).toEqual(Array.from({ length: next + 1 }, (_, index) => index))
+        expect(live).toBe(2)
+      }
+
+      expect(peak).toBe(2)
+      expect(await tickets(dir)).toEqual([])
+      for (const lease of leases.slice(8)) expect(await lease?.release()).toBe(true)
+    } finally {
+      controller.abort()
+      await Promise.allSettled(waits)
+      await Promise.all(leases.map(async (lease) => { await lease?.release() }))
     }
-
-    expect(order).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    expect(peak).toBe(2)
-    expect(await tickets(dir)).toEqual([])
-    for (const lease of leases.slice(8)) expect(await lease?.release()).toBe(true)
   })
 
   test("#given both slots held #when a wake waits its whole budget #then it is reported busy with the time it waited, leaves no ticket, and a released slot admits it", async () => {

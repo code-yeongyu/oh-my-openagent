@@ -1,6 +1,6 @@
 # omob — dev binary from the latest commits
 
-`omob` builds a single-file Bun-compiled binary from senpi `origin/main` and
+`omob` builds a single-file Bun-compiled binary from the senpi engine `origin/main` and
 omo `origin/dev`. On macOS and Linux, the ordinary install places an auto-update
 launcher at `~/.local/bin/omob` and its executable at `~/.cache/omob/bin/omob`.
 It tests the current mainline commit pair end-to-end without cutting a release.
@@ -40,3 +40,8 @@ Behavior:
   executable instead of a launcher; the launcher uses this internally to refresh
   its cached executable. Windows retains the bare-binary installation path.
   `--launcher` explicitly requests the managed POSIX installation.
+
+A dev binary participates in the shared engine host like any other build: its
+build epoch gives it an ordinal, so `omo daemon run` from a newer `omob` hands off
+from an older release and vice versa never happens on an uncomparable pair. See
+[omo daemon](./omo-daemon.md).

@@ -7,6 +7,10 @@ on:
         description: "Wrangler environment (leave blank for default)"
         required: false
         default: ""
+      missing_history_reason:
+        description: "Only for the first deploy after a deployment made outside this pipeline: why /__asset-history.json is missing (leave blank otherwise)"
+        required: false
+        default: ""
   push:
     branches: [master, dev]
     paths:
@@ -15,15 +19,18 @@ on:
       - ".github/workflows/web-deploy.yml"
 
 concurrency:
-  group: web-deploy-${{ github.ref }}
+  group: omo-web-worker-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The Sisyphus Labs account (moved 2026-10-09). wrangler.toml names the account and the zone routes; the
+    # token in this environment can edit Workers scripts and the omo.dev zone's routes, nothing else.
     environment:
-      name: web-production
+      name: omo-production
       url: https://omo.dev
     defaults:
       run:
@@ -48,11 +55,17 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
+      - name: Retain predecessor static assets
+        env:
+          # A push has no inputs, so this is always empty there: a lost history on a normal deploy still fails closed.
+          ACCEPT_MISSING_ASSET_HISTORY: ${{ github.event_name == 'workflow_dispatch' && inputs.missing_history_reason || '' }}
+        run: bun scripts/retain-static-assets.mjs .open-next/assets https://omo.dev 1800 --bootstrap-current
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: 6511ce566bfe27228f536a8fb9448be5
           workingDirectory: packages/web
           command: ${{ inputs.environment && format('deploy --env {0}', inputs.environment) || 'deploy' }}
 
@@ -63,9 +76,14 @@ jobs:
         env:
           JOB_SUMMARY_TITLE: Web deploy
           JOB_SUMMARY_STATUS: ${{ job.status }}
+          MISSING_HISTORY_REASON: ${{ github.event_name == 'workflow_dispatch' && inputs.missing_history_reason || '' }}
           JOB_SUMMARY_DETAILS: |
             - Builds the web app with OpenNext for Cloudflare.
             - Deploys the Worker through Wrangler.
             - Uses the requested Wrangler environment when provided.
           JOB_SUMMARY_NEXT: Check build output first, then Wrangler authentication, account, or environment errors.
-        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+          if [ -n "$MISSING_HISTORY_REASON" ]; then
+            printf '\n**Missing asset history accepted for this run.** Reason: %s\n' "$MISSING_HISTORY_REASON" >> "$GITHUB_STEP_SUMMARY"
+          fi

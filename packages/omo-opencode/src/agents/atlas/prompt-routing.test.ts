@@ -30,6 +30,13 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
     expect(getAtlasPromptSource("kimi-for-coding/k2p7")).toBe("kimi-k2-7")
   })
 
+  test("Kimi K2.8 and the Kimi Code rolling ids share the K2.7 variant", () => {
+    expect(getAtlasPromptSource("moonshotai/kimi-k2.8")).toBe("kimi-k2-7")
+    expect(getAtlasPromptSource("kimi-for-coding/k2p8")).toBe("kimi-k2-7")
+    expect(getAtlasPromptSource("kimi-for-coding/kimi-for-coding")).toBe("kimi-k2-7")
+    expect(getAtlasPromptSource("kimi-for-coding/kimi-for-coding-highspeed")).toBe("kimi-k2-7")
+  })
+
   test("Claude Opus 4.7 routes to opus-4-7", () => {
     expect(getAtlasPromptSource("anthropic/claude-opus-4-7")).toBe("opus-4-7")
     expect(getAtlasPromptSource("github-copilot/claude-opus-4.7")).toBe("opus-4-7")

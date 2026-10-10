@@ -52,7 +52,7 @@ const defaultScheduler: DreamTriggerScheduler = {
   },
 }
 
-export type DreamFireRejection = DreamGateRejection | "no_unreflected_content" | "no_session" | "aborted"
+export type DreamFireRejection = DreamGateRejection | "no_unreflected_content" | "no_session" | "aborted" | "parked"
 
 export type DreamFireOutcome =
   | { readonly fired: true; readonly runId: string; readonly status: "active" | "pending" }

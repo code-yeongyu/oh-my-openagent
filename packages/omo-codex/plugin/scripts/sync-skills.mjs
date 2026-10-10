@@ -51,13 +51,13 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 | \`call_omo_agent(subagent_type="librarian", ...)\` | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a librarian. ...","agent_type":"librarian","fork_context":false})\` |
 | \`task(subagent_type="plan", ...)\` | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a planning agent. ...","agent_type":"plan","fork_context":false})\` |
 | \`task(subagent_type="oracle", ...)\` for final verification | By default, record a self-review in the notepad: re-read the diff, run diagnostics, and capture evidence for every acceptance criterion. Only when the user demanded strict, rigorous, or high-accuracy review, use \`multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})\`; include \`fork_context: false\`. |
-| \`task(category="...", ...)\` for implementation or QA | \`multi_agent_v1.spawn_agent({"message":"TASK: act as an implementation or QA worker. ...","fork_context":false})\` |
+| \`task(category="...", ...)\` for implementation or QA | \`multi_agent_v1.spawn_agent({"message":"TASK: act as an implementation or QA worker. ...","agent_type":"lazycodex-worker-medium","fork_context":false})\` |
 | \`background_output(task_id="...")\` | \`multi_agent_v1.wait_agent(...)\` for mailbox signals |
 | \`team_*(...)\` | Use Codex native subagents via \`multi_agent_v1.spawn_agent\` and \`multi_agent_v1.wait_agent\`; use \`multi_agent_v1.send_input\` and \`multi_agent_v1.close_agent\` only when exposed in the active tools list |
 
-Role-specific behavior must be described in a self-contained \`message\`. Use \`fork_context: false\` to start the child with only the initial prompt (no parent history); use \`fork_context: true\` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. OMO installs these selectable agent roles into \`~/.codex/agents/\`: \`explorer\`, \`librarian\`, \`plan\`, \`momus\`, \`metis\`, \`lazycodex-code-reviewer\`, \`lazycodex-qa-executor\`, and \`lazycodex-gate-reviewer\` - pass the matching name as \`agent_type\` so the child gets that role's model and instructions. If the spawn tool exposes no \`agent_type\` parameter, omit it and describe the role inside \`message\`. If a code block below conflicts with this section, this section wins.
+Role-specific behavior must be described in a self-contained \`message\`. Use \`fork_context: false\` to start the child with only the initial prompt (no parent history); use \`fork_context: true\` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. OMO installs these selectable agent roles into \`~/.codex/agents/\`: \`explorer\`, \`librarian\`, \`plan\`, \`momus\`, \`metis\`, \`lazycodex-code-reviewer\`, \`lazycodex-qa-executor\`, and \`lazycodex-gate-reviewer\` - pass the matching name as \`agent_type\` so the child gets that role's model and instructions. Inspect the actual spawn schema: whenever \`agent_type\` is exposed, EVERY spawn MUST select an exact LazyCodex role, on V1 or V2. Implementation difficulty selects \`lazycodex-worker-low\`, \`lazycodex-worker-medium\`, or \`lazycodex-worker-high\`; clone QA can select \`lazycodex-clone-fidelity-reviewer\`. Never select generic \`worker\` or \`default\`. If a code block below conflicts with this section, this section wins.
 
-Codex exposes ONE of two subagent tool surfaces per session; check your own tool list and route accordingly. If \`multi_agent_v1.*\` tools exist, use the table above as written. If instead a flat \`spawn_agent\` with a required \`task_name\` exists (\`multi_agent_v2\`), rewrite every \`multi_agent_v1.*\` example: \`multi_agent_v1.spawn_agent({...,"fork_context":false})\` becomes \`spawn_agent({"task_name":"<lowercase_digits_underscores>","message":...,"agent_type":...,"fork_turns":"none"})\` (\`"all"\` only when full parent history is truly required); \`send_input\` becomes \`send_message\`; do not call \`close_agent\`/\`resume_agent\` (finished agents end on their own; \`followup_task\` re-tasks one, \`interrupt_agent\` stops one); \`wait_agent\` takes only \`timeout_ms\` and returns on any child mailbox activity. On the v2 surface \`agent_type\` may be ABSENT from the spawn schema (verified 2026-07-11: only \`fork_turns\`/\`message\`/\`task_name\`) — when absent, omit it and describe the role inside \`message\`; installed role TOMLs cannot be selected on that surface. If a code block below conflicts with this section, this section wins. \`fork_context\` is rejected on \`multi_agent_v2\` (\`fork_context is not supported in MultiAgentV2; use fork_turns instead\`).
+Codex exposes ONE of two subagent tool surfaces per session; check your own tool list and route accordingly. If \`multi_agent_v1.*\` tools exist, use the table above as written. If instead a flat \`spawn_agent\` with a required \`task_name\` exists (\`multi_agent_v2\`), rewrite every \`multi_agent_v1.*\` example: \`multi_agent_v1.spawn_agent({...,"fork_context":false})\` becomes \`spawn_agent({"task_name":"<lowercase_digits_underscores>","message":...,"agent_type":...,"fork_turns":"none"})\` (\`"all"\` only when full parent history is truly required); \`send_input\` becomes \`send_message\`; do not call \`close_agent\`/\`resume_agent\` (finished agents end on their own; \`followup_task\` re-tasks one, \`interrupt_agent\` stops one); \`wait_agent\` takes only \`timeout_ms\` and returns on any child mailbox activity. Do not infer role support from V1/V2 or a model version. Legacy-schema exception: only if the actual schema lacks \`agent_type\`, omit that unsupported field and carry the complete role instructions in \`message\`, with history explicitly disabled. This cannot select a specialized TOML; an installed managed default supplies the medium worker for unnamed non-forks. The guard has no schema metadata and rejects unnamed calls, so report incompatible routing instead of retrying generically. Every deliberate full-history fork must still name its role: Codex skips role application on unnamed full-history forks, an upstream gap no LazyCodex default can repair. If a code block below conflicts with this section, this section wins. \`fork_context\` is rejected on \`multi_agent_v2\` (\`fork_context is not supported in MultiAgentV2; use fork_turns instead\`).
 
 When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
 
@@ -171,8 +171,8 @@ private logs, or PII; summarize with lengths, hashes, and short non-sensitive
 prefixes when identity is needed.
 `;
 
-const ulwResearchOriginalDeliveryGates = "### The delivery gates \u2014 every gate must PASS, in order\n\nNothing reaches the user until the gates pass:\n\n1. **Visual QA (always).** Render the produced artifact back to images \u2014 PDF pages to PNG, the HTML in a real browser \u2014 and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.\n2. **Proofread gate \u2014 `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass \u2014 this gate runs BEFORE the first delivery, not after the user finds the typo.";
-const ulwResearchCodexDeliveryGate = "### The delivery gate \u2014 visual QA must PASS\n\nNothing reaches the user until the gate passes:\n\n**Visual QA (always).** Render the produced artifact back to images \u2014 PDF pages to PNG, the HTML in a real browser \u2014 and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.";
+const ulwResearchOriginalDeliveryGates = "Reading the source markup is not visual QA; inspect the pixels.\n4. **Proofread gate \u2014 `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass \u2014 this gate runs BEFORE the first delivery, not after the user finds the typo.";
+const ulwResearchCodexDeliveryGate = "Reading the source markup is not visual QA; inspect the pixels.";
 
 export const ulwExecuteOriginalCompletion = [
 	"When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:",
@@ -183,7 +183,7 @@ export const ulwExecuteOriginalCompletion = [
 	"4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
 ].join("\n");
 export const ulwExecuteOriginalHardRule = [
-	"- No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.",
+	"- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.",
 	"- No `--dry-run` as completion evidence.",
 	"- No tests-only completion claim. A Manual-QA artifact is required.",
 	"- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.",
@@ -203,7 +203,7 @@ const ulwExecuteCodexCompletion = [
 	"6. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
 ].join("\n");
 const ulwExecuteCodexHardRule = [
-	"- No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.",
+	"- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.",
 	"- No `--dry-run` as completion evidence.",
 	"- No tests-only completion claim. A Manual-QA artifact is required.",
 	"- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.",
@@ -274,6 +274,19 @@ async function adaptSkillForCodex(skillName) {
 	await writeCodexSkillDisplayMetadata(skillName);
 }
 
+// Read-only inventory shared by generation and shipped-payload validation.
+export async function getSkillOutputManifest() {
+	const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true });
+	const sharedSkillNames = sharedSkillEntries
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => entry.name)
+		.sort();
+	return {
+		root: skillsRoot,
+		names: [...new Set([...componentSkillNames, ...sharedSkillNames])],
+	};
+}
+
 async function syncSkills() {
 	await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	await mkdir(skillsRoot, { recursive: true });
@@ -292,13 +305,8 @@ async function syncSkills() {
 	);
 	await adaptSkillForCodex("ultrawork");
 
-	const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true });
-	const sharedSkillNames = sharedSkillEntries
-		.filter((entry) => entry.isDirectory())
-		.map((entry) => entry.name)
-		.sort();
-
-	for (const skillName of sharedSkillNames) {
+	const { names } = await getSkillOutputManifest();
+	for (const skillName of names) {
 		if (componentSkillNames.has(skillName)) continue;
 		const sharedSkillSource = join(sharedSkillsRoot, skillName);
 		await cp(sharedSkillSource, join(skillsRoot, skillName), {

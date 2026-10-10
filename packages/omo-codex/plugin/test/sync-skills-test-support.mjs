@@ -6,6 +6,7 @@ export const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
 
 export const expectedSkills = [
 	"ast-grep",
+	"browser",
 	"coding-agent-sessions",
 	"comment-checker",
 	"data-scientist",
@@ -97,7 +98,7 @@ const ulwExecuteCodexCompletion = `When all top-level checkboxes in \`## TODOs\`
 5. Remove or mark the Boulder work as completed.
 6. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`;
 
-const ulwExecuteOriginalHardRule = `- No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.
+const ulwExecuteOriginalHardRule = `- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.
 - No \`--dry-run\` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
 - **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
@@ -106,7 +107,7 @@ const ulwExecuteOriginalHardRule = `- No production change before a failing-firs
 - No unprefixed session ids in Boulder state. Sessions are always recorded as \`codex:<session_id>\`.
 - No stale-memory execution. The plan and ledger are the durable source of truth.`;
 
-const ulwExecuteCodexHardRule = `- No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.
+const ulwExecuteCodexHardRule = `- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.
 - No \`--dry-run\` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
 - **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
@@ -157,8 +158,8 @@ prefixes when identity is needed.
 `;
 const reviewWorkCodexGatePattern = new RegExp(reviewWorkCodexGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
-const ulwResearchOriginalDeliveryGates = "### The delivery gates \u2014 every gate must PASS, in order\n\nNothing reaches the user until the gates pass:\n\n1. **Visual QA (always).** Render the produced artifact back to images \u2014 PDF pages to PNG, the HTML in a real browser \u2014 and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.\n2. **Proofread gate \u2014 `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass \u2014 this gate runs BEFORE the first delivery, not after the user finds the typo.";
-const ulwResearchCodexDeliveryGate = "### The delivery gate \u2014 visual QA must PASS\n\nNothing reaches the user until the gate passes:\n\n**Visual QA (always).** Render the produced artifact back to images \u2014 PDF pages to PNG, the HTML in a real browser \u2014 and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.";
+const ulwResearchOriginalDeliveryGates = "Reading the source markup is not visual QA; inspect the pixels.\n4. **Proofread gate \u2014 `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass \u2014 this gate runs BEFORE the first delivery, not after the user finds the typo.";
+const ulwResearchCodexDeliveryGate = "Reading the source markup is not visual QA; inspect the pixels.";
 
 export function removeCodexSkillOverlays(skillName, content) {
 	if (skillName === "ulw-research") {

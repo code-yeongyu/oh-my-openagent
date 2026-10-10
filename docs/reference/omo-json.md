@@ -2,7 +2,7 @@
 
 `omo.json` (or `omo.jsonc`) is the single harness-spanning configuration surface owned by [`@oh-my-opencode/omo-config-core`](../../packages/omo-config-core/AGENTS.md). It is the only config file read by the OpenCode plugin, by the Senpi adapter (task, config-watch), and by Codex. The legacy OpenCode-family files (`oh-my-openagent.json[c]` / `oh-my-opencode.json[c]`) and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration from legacy files](#migration-from-legacy-files)).
 
-Files may be JSONC: `//` comments and trailing commas are allowed. Strict typed blocks reject malformed values and report a diagnostic rather than silently accepting them; unknown keys are ignored with an `unknown-keys` diagnostic (see [Safety and failure handling](#file-locations-and-precedence)) so a retired or mistyped key never costs you the rest of the layer. The `[opencode]` block is intentionally a freeform record so it can carry the full plugin configuration.
+Files may be JSONC: `//` comments and trailing commas are allowed. Strict typed blocks never silently accept a malformed value: the value is ignored and reported, and every valid key beside it keeps working. Unknown keys are ignored the same way with an `unknown-keys` diagnostic (see [Safety and failure handling](#file-locations-and-precedence)), so neither a retired or mistyped key nor one wrong value costs you the rest of the file. The `[opencode]` block is intentionally a freeform record so it can carry the full plugin configuration.
 
 ## File locations and precedence
 
@@ -20,9 +20,11 @@ Merge rules (`loader/merge.ts`):
 Safety and failure handling:
 
 - A symlinked project `.omo` directory or a symlinked project config file is skipped as a load source (`loader/paths.ts`).
-- A missing, unreadable, or invalid layer becomes an entry in the result's `diagnostics` and is skipped; loading continues.
-- Unrecognized keys anywhere in a layer are ignored and reported through an `unknown-keys` diagnostic that names each dotted key path (for example `profiles.opus.retired_key`), while malformed values still reject that layer.
-- If the merged config fails final validation, the loader returns the all-default config plus one `validation` diagnostic instead of throwing (`loader/loader.ts`).
+- A missing or unreadable file, a file that is not valid JSONC, or a file whose root is not an object becomes an entry in the result's `diagnostics` and is skipped; loading continues.
+- Unrecognized keys anywhere in a layer are ignored and reported through an `unknown-keys` diagnostic that names each dotted key path (for example `profiles.opus.retired_key`).
+- A malformed value in any section (the shared top level, `task`, `agents`, `categories`, `teams`, the `[native]` / `[senpi]` / `[codex]` blocks, `profiles`) is dropped on its own: the loader removes only the smallest failing subtree (the wrong value itself, or the object that lacks a required key), keeps every valid sibling at every depth, and reports each dropped key as its own `invalid-value` diagnostic (for example `task.host_engine_policy` or `teams.alpha.members.0.color`). `omo doctor` prints one line per dropped key, for example `WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)`; the OpenCode edition's doctor lists the same line as a warning. The OpenCode plugin applies the same rule to the `[opencode]` block against its own schema.
+- A file with nothing valid left after pruning contributes nothing and keeps its `validation` diagnostic, as does a file carrying a `__proto__`, `prototype`, or `constructor` key at any depth (checked before anything is pruned).
+- If the merged config fails final validation (a partial team spec that no layer completes, for example), the failing merged values are dropped the same way with an `invalid-value` diagnostic whose path is `(merged omo config)`; only when that cannot settle does the loader return the all-default config plus one `validation` diagnostic instead of throwing (`loader/loader.ts`).
 
 ## `$schema`
 
@@ -39,11 +41,11 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.sc
 After the file layers merge, each harness resolves its own view out of the merged document (`packages/omo-config-core/src/loader/resolution.ts`). Later layers win:
 
 1. **Shared base keys** (every top-level key except `profiles` and the bracketed harness blocks).
-2. **The `[harness]` block** for the current harness: `[opencode]`, `[senpi]`, or `[codex]`.
+2. **The `[harness]` block** for the current harness: `[opencode]`, `[native]`, or `[codex]`.
 3. **`profiles.<name>`** for the active profile.
 4. **`profiles.<name>.[harness]`** for the active profile.
 
-Schema defaults apply once at the very end, after all four layers fold. Control keys (`profiles`, `[opencode]`, `[senpi]`, `[codex]`) never leak into the resolved view. Activating a profile that does not exist yields a `profile` diagnostic and the base configuration.
+Schema defaults apply once at the very end, after all four layers fold. Control keys (`profiles`, `[opencode]`, `[native]`, `[codex]`, and the legacy `[senpi]` spelling) never leak into the resolved view. Activating a profile that does not exist yields a `profile` diagnostic and the base configuration.
 
 ### Profile activation
 
@@ -62,7 +64,7 @@ No default profiles ship. A profile exists only when you write one under `profil
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
   "categories": {
-    "deep": {
+    "deep-low": {
       "description": "Deep analysis",
       "model": "anthropic/claude",
       "reasoning": "high"
@@ -76,7 +78,7 @@ No default profiles ship. A profile exists only when you write one under `profil
     }
   },
   "task": {
-    "default_execution_mode": "in-process",
+    "default_execution_mode": "auto",
     "default_concurrency": 5
   },
   "teams": {
@@ -100,13 +102,14 @@ No default profiles ship. A profile exists only when you write one under `profil
   "task": {},           // task engine settings
   "teams": {},          // record<string, TeamSpec>
   "models": {},         // record<string, ModelCatalogEntry>, shared model catalog
-  "model_profiles": {}, // record<string, ModelProfile>, named model chains picked by intent (Senpi harness)
-  "model_profile": "",  // active profile id or a literal provider/model pin (Senpi harness)
-  "memory": {},         // MemorySettings, Senpi memory subsystem
-  "git_master": { "commit_footer": true, "include_co_authored_by": true }, // commit attribution (Senpi harness)
-  "telemetry": { "enabled": true }, // Senpi telemetry, enabled by default
+  "model_profiles": {}, // record<string, ModelProfile>, named model chains picked by intent (Native harness)
+  "model_profile": "",  // active profile id or a literal provider/model pin (Native harness)
+  "memory": {},         // MemorySettings (Native harness)
+  "git_master": { "commit_footer": false }, // opt-in commit footer (Native harness); no Co-authored-by trailer is ever emitted
+  "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
+  "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
-  "[senpi]": {},        // Senpi-only overrides, typed base keys
+  "[native]": {},       // OmO Native-only overrides, typed base keys
   "[codex]": {},        // Codex-only overrides, typed base keys
   "profiles": {},       // record<string, Profile>, opt-in named profiles
   "_migrations": [],    // applied migration ids, written by the migration engine
@@ -118,17 +121,30 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[senpi]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`), so a harness-specific override stays schema-checked.
+
+`[senpi]` is the legacy spelling of `[native]`, kept working for one release line. It is canonicalized to `[native]` when the config is read, so a config that cannot be rewritten still applies every value it sets, and the startup migration rewrites the key in the file once, naming it in a notice. When a file carries both blocks, `[native]` wins and the ignored `[senpi]` block is reported as a deprecation diagnostic.
+
+### `disabled_skills` (every harness)
+
+The one supported way to turn a skill off. A name listed here is absent from the run: on OmO Native / Senpi it never enters the `<available_skills>` index, the `/skill:` commands, or `get_commands`; on the OpenCode plugin it is dropped from the builtin set and the skill tool. On OmO Native it also covers the skills a feature contributes on its own, `computer-use` and `x-search`: the skill is gone and its tool stays. Unlike other arrays, layers are unioned: the shared base, the `[harness]` block, the user file, the project file, and the active profile all add names, and a project cannot re-enable a skill the user file disabled by omitting it.
+
+```jsonc
+// ~/.omo/omo.jsonc
+{
+  "disabled_skills": ["frontend", "visual-qa"]
+}
+```
 
 Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
 
-### `telemetry` (Senpi harness)
+### `telemetry` (Native harness)
 
-The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to Senpi.
+The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to OmO Native.
 
 ```jsonc
 {
-  "[senpi]": {
+  "[native]": {
     "telemetry": {
       "enabled": false
     }
@@ -138,30 +154,136 @@ The optional `telemetry` block controls OmO Native product telemetry in Senpi. `
 
 The block may also appear at the shared top level or in profile layers and follows the normal resolution order. Because typed config objects are strict, an older `@oh-my-opencode/omo-config-core` version that predates this key rejects a file containing `telemetry` instead of ignoring it. See [Mixed-version compatibility](#mixed-version-compatibility) before sharing one config across versions.
 
-### `memory` (Senpi harness)
+### `memory` (Native harness)
 
-The optional `memory` block configures the Senpi memory subsystem (`schema/memory.ts` `OmoMemorySettingsSchema`). Keys: `enabled` (default `true`), `agent` (default `"auto"`), the sub-blocks `reflection`, `nudge`, `recall` (the resident, read-only Kibitzer sidecar behind `recalled memory:` notices - one per main session, prompt and tool-call triggered, nudge-only output, no memory writes: `enabled` as the only off switch, `max_items` per wake, `category` defaulting to `quick`, `event_caps` defaulting to `{ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }` for its redacted event feed, `sidecar_max_tokens` defaulting to `48000` with a proactive reseed at 60%, `max_concurrent_wakes` defaulting to `2` as the machine-wide wake lease, and `tool_budget` defaulting to `8` read-only tool calls per wake), `facts`, `dream`, `people`, `soul`, `write_notice`, `sync`, `search`, plus `compile_warn_tokens` and per-agent overrides under `agents`. These recall keys can be set at the shared root, harness/profile layer, or per-agent override; layer values are deep-partial and later layers win.
+The optional `memory` block configures the Senpi memory subsystem (`schema/memory.ts` `OmoMemorySettingsSchema`). Keys: `enabled` (default `true`), `agent` (default `"auto"`), the sub-blocks `reflection`, `nudge`, `recall` (the resident, read-only Kibitzer sidecar behind `recalled memory:` notices - one per main session, prompt and tool-call triggered, nudge-only output, no memory writes: `enabled` as the only off switch, `max_items` per wake, `category` defaulting to `quick`, `event_caps` defaulting to `{ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }` for its redacted event feed, `sidecar_max_tokens` defaulting to `48000` with a proactive reseed at 60%, `max_concurrent_wakes` defaulting to `2` as the machine-wide wake lease, `tool_budget` defaulting to `8` read-only tool calls per wake, and `query_expansion` defaulting to `false` for letting the sidecar add discounted synonyms, keywords and related terms to its own memory searches), `facts`, `dream`, `people`, `soul`, `write_notice`, `sync`, `search`, plus `compile_warn_tokens` and per-agent overrides under `agents`. These recall keys can be set at the shared root, harness/profile layer, or per-agent override; layer values are deep-partial and later layers win.
 
-### `git_master` (Senpi harness)
+Reflection children start without extensions so they stay fast. When the reflection model belongs to a provider that only an extension registers (a custom gateway declared under `packages` in `settings.json`, for example), omo detects that the model is missing from the extension-free model list and starts that child with extensions loaded instead; the child still keeps its own memory component off. If no child can see the model even with extensions loaded, automatic reflection pauses after that first failure and shows one notice. To fix it, point `categories.<category>.model` (or `memory.reflection.category`) at a model from a core provider, or set `memory.reflection.enabled` to `false`. `/reflect` retries at once, and the paused state is probed again every six hours.
 
-The optional `git_master` block controls commit attribution in Senpi (`schema/git-master.ts`). When the agent works with the `git-master` skill — reading it in the main session or loading it into a task child via `load_skills` — omo appends a commit-attribution directive to the skill content based on these settings.
+### `git_master` (Native harness)
+
+The optional `git_master` block controls commit attribution in Senpi (`schema/git-master.ts`). When the agent works with the `git-master` skill — reading it in the main session or loading it into a task child via `load_skills` — omo appends a commit-footer directive to the skill content only when you opt in.
+
+Commit-identity contract: commits omo causes in your repository carry your own git `user.name` / `user.email` as author and committer, and omo never adds a `Co-authored-by` trailer or any other GitHub-resolvable automation identity. A default install appends nothing.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `commit_footer` | boolean \| string | `true` | Adds the "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)" footer to commit messages. A string replaces the builtin footer text; `false` disables the footer. |
-| `include_co_authored_by` | boolean | `true` | Adds the `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` trailer ([sisyphus-dev-ai](https://github.com/sisyphus-dev-ai)) to commit messages. |
+| `commit_footer` | boolean \| string | `false` | Opt in to the "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)" footer in the commit body. A string replaces the builtin footer text. |
+| `include_co_authored_by` | boolean | `false` | Deprecated no-op, accepted so existing configs keep validating. omo does not emit a `Co-authored-by` trailer regardless of this value. |
 
-Both attributions ship enabled by default. To opt out of the co-author trailer:
+To opt in to the body footer:
 
 ```jsonc
 {
   "git_master": {
-    "include_co_authored_by": false
+    "commit_footer": true
   }
 }
 ```
 
-The block may live at the shared top level, in `[senpi]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Senpi harness.
+The block may live at the shared top level, in `[native]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Native harness.
+
+### `side_panel` (Senpi harness)
+
+The optional `side_panel` block controls the omo side panel (`schema/side-panel.ts`): a right-hand
+column in the Senpi TUI carrying session, goal, context, usage, subagent, tool, git and memory
+state. The transcript reflows into the remaining width instead of being covered. The panel is **off by
+default** because it rearranges the whole screen.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `enabled` | boolean | `false` | Render the panel. |
+| `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
+| `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
+| `clickable` | boolean | `true` | Paint file and subagent rows as OSC 8 links, so a mouse click opens the same viewer a command would. Set it to `false` on a terminal that mangles hyperlinks. |
+| `usage_poll_seconds` | integer | `150` | Subscription usage refresh interval, and a floor rather than a ceiling: each provider keeps its own freshness window (five minutes for Anthropic, two and a half for Codex), so a smaller value does not poll faster than that. The cache is shared across sessions on one machine, so this is per machine, not per session. Minimum `60`. |
+| `sections` | object | all `true` except `usage` | Per-section switches: `session`, `goal`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. `usage` is `false` by default: it is the one section that reads credentials and contacts a vendor, so it is its own opt-in (see below). |
+
+Rows are clickable because the fullscreen renderer already captures the mouse and activates OSC 8
+hyperlinks; the panel paints its rows as links to a private scheme and claims the renderer's URL
+callback while it is mounted, handing every other URL straight back. Clicking a file opens its diff;
+clicking a subagent opens its card followed by everything that child recorded, rendered by the task
+engine itself - the same text `task_output` would give you. `/side-panel-diff` reaches the file
+viewer by name; it is registered only when the panel is enabled for the run.
+
+A child the engine is holding rather than running - a host session whose daemon went away, one
+caught by a draining host, or simply one the engine detached when its session ended - is counted
+and drawn as `parked` rather than as running or done, and its card names the reason, because a
+dead daemon and a draining host ask different things of you. The ordinary detach names no reason
+at all and shows up only as a residency that is no longer resident, so the column reads both: a
+child whose record still says `running` while nothing holds it would otherwise sit there with its
+timer climbing. The card also names the lane a child runs in - a session of the shared daemon, a
+child process, or the parent's own process - because those three fail in different ways.
+
+The viewer scrolls with the wheel as well as with the arrow keys, and while it is open the wheel
+belongs to it: the host routes a wheel event to whatever sits under the pointer in its layout, and
+an overlay is not part of that layout, so without this the wheel would scroll the transcript behind
+the popup instead. Text selection is untouched either way, because the renderer activates a link
+only on a press and release inside one cell with no drag - dragging still selects, and double or
+triple clicks still take a word or a line.
+
+The `goal` section is drawn only while a goal is registered, so an ordinary session loses no rows
+to it. It carries the objective, the goal's status, the time and tokens it has spent, how much of a
+token budget is gone when one is set, and the continuation count once the loop has run unattended.
+Clicking the objective opens the whole text, which is the point of that row: the column has space
+for one cut line of it. The block follows the panel's ordinary refresh instead of subscribing,
+because a goal publishes no event an extension can listen for; an unchanged store costs one `stat`
+and no parse at all.
+
+The `memory` section names the memory identity this session writes to - one machine carries many,
+and the wrong one is invisible otherwise - and then reports only what is wrong or waiting. It warns
+when automatic reflection is **parked**: repeated failures trip a circuit breaker that stops
+reflection until a half-open probe, so the row says when that probe is due, and clicking it opens
+the whole failure - reason, fingerprint and the host's own detail - which is what tells you whether
+to run `/reflect` or fix a sandbox. It also carries the resident kibitzer, the sidecar that decides what memory to surface: how many
+wakes it has settled for this session, how long ago the last one was, and a warning when that last
+wake failed - a kibitzer failing every wake is memory that quietly stopped being updated. Whether
+it is awake *right now* is deliberately not shown: that state lives in the sidecar process and is
+never written down, so the column reports what it did rather than guessing at what it is doing.
+Below that it counts the facts batches queued but not yet
+applied, and what recall is holding for this session: nudges waiting for the next prompt, and
+memory paths already surfaced in it. Healthy memory with an empty backlog is a single line. The
+block is read on a five-second floor rather than a watcher, because a park takes three failed
+reflection runs and the queue drains per reflection - nothing here can change between two tool
+calls of one turn.
+
+The `usage` section is **off by default** and is the only part of the panel that reaches the
+network. Turning it on (`"sections": { "usage": true }`) makes the panel read, from the agent
+directory, `auth.json` (the OAuth access token of the subscription the session is serving from) and
+`credential-pool-state.json` (which pooled account is pinned or rotated in), and send that token as a
+bearer to the vendor's own usage endpoint: `api.anthropic.com/api/oauth/usage` for a Claude
+subscription, `chatgpt.com/backend-api/wham/usage` for Codex. Nothing else is read or sent, and no
+API key is ever used. While it is off the poller is never created: no credential read, no timer,
+no request. The answers land in one cache file
+per machine (`$XDG_CACHE_HOME/omo-senpi/side-panel-usage.json`), so parallel sessions share both
+the numbers and the backoff instead of each asking on its own.
+
+```jsonc
+{
+  "side_panel": {
+    "enabled": true,
+    "width": "24%",
+    "sections": { "usage": true }
+  }
+}
+```
+
+`--omo-side-panel` forces the panel on for one run. It cannot force it off: senpi sets a boolean
+extension flag to `true` whatever value follows it (`--omo-side-panel=false` still turns it on) and
+rejects a `--no-` form as an unknown option, so `enabled` in `omo.json` is the switch that can say no.
+
+The reflowing column needs the fullscreen TUI (`--tui-mode fullscreen`, or `tuiMode: "fullscreen"` in
+senpi's settings): only that renderer owns a layout root to wrap. In the default regular mode - and on
+any host that does not expose the layout seam - the same rows render as a block above the editor
+instead, and a headless run renders nothing.
+
+The `files` section lists the working copy as `git status` sees it, both status columns included.
+Clicking a row opens that file's diff in a scrollable read-only viewer, and `/side-panel-diff`
+reaches the same viewer by name - for keyboards, and for a host that hands out no URL hook. No
+keyboard chord is registered by default.
+
+The block may live at the shared top level, in `[native]`, or in profile layers, and follows the
+normal resolution order.
 
 ### `models` (shared catalog)
 
@@ -170,11 +292,11 @@ A record of short name to catalog entry (`schema/model-catalog.ts`). The canonic
 ```jsonc
 {
   "models": {
-    "opus": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
-    "fast": { "model": "anthropic/claude-haiku-4-5" }
+    "opus": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
+    "fast": { "model": "anthropic/claude-haiku-5-5" }
   },
   "categories": {
-    "deep": { "model": "opus" },              // resolves to anthropic/claude-opus-5 at reasoning max
+    "deep-low": { "model": "opus" },          // resolves to anthropic/claude-opus-5-5 at reasoning max
     "quick": { "model": "fast", "reasoning": "high" } // site tuning wins over the entry
   }
 }
@@ -182,41 +304,50 @@ A record of short name to catalog entry (`schema/model-catalog.ts`). The canonic
 
 When an agent or category `model` string matches a catalog key, resolution (`models/model-reference-resolution.ts`) swaps in the entry's model id and fills any unset `reasoning` from the entry. Tuning written at the use site always wins. A `[harness]` block (or a profile) can override individual catalog entries for its own view. Catalog cycles are detected and reported as `model_catalog_cycle` diagnostics instead of looping.
 
-### Model profiles (Senpi harness)
+### Model profiles (Native harness)
 
-A model profile is a named, ordered model chain you pick by intent ("Capable", "Deep work") instead of by model id. Two keys drive it (`schema/model-profile.ts`, `schema/config.ts`):
+A model profile is a named, ordered model chain you pick by lane (Daily / Geeky × Normal / Heavy) instead of by model id. Two keys drive it (`schema/model-profile.ts`, `schema/config.ts`):
 
 | Key | Type | Notes |
 |-----|------|-------|
-| `model_profiles` | record<string, `{ display_name?: string; models?: model entries }`> | Named chains. `models` entries are the same shape as a category chain: a bare string (`provider/model`, a bare model id, either with an optional `:level` reasoning suffix) or `{ model, reasoning?, ... }`. Both fields are optional; the object is strict. |
-| `model_profile` | string | Which chain drives the main session model. Either a profile id (`capable`) or a literal `provider/model` (`anthropic/claude-opus-5`). A value containing `/` is a pin, so the pin and the profile share one key. |
+| `model_profiles` | record<string, `{ display_name?: string; family?: "daily" \| "geeky"; tier?: "normal" \| "heavy"; models?: model entries }`> | Named chains. `models` entries are the same shape as a category chain: a bare string (`provider/model`, a bare model id, either with an optional `:level` reasoning suffix) or `{ model, reasoning?, ... }`. Fields are optional; the object is strict. `family` / `tier` are metadata only. |
+| `model_profile` | string | Which chain drives the main session model. Either a lane id (`daily-normal`) or a literal `provider/model` (`anthropic/claude-opus-5-5`). A value containing `/` is a pin, so the pin and the profile share one key. |
 
 This is not the `profiles` key. `profiles.<name>` is a config-layer overlay activated by `OMO_PROFILE` (see [Profile activation](#profile-activation)): it changes which configuration is loaded. `model_profiles` and `model_profile` are ordinary base keys inside that configuration: they change which model the main session starts on. A `profiles.<name>` layer may set `model_profile` like any other key, which is the one way the two meet.
 
-Three builtin profiles ship (`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`). Each rung lists every provider that serves the model, so a Copilot-only or gateway-only setup still resolves:
+Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`). Each rung lists every provider that serves the model, so a Copilot-only or gateway-only setup still resolves:
 
 | Id | Display name | Chain |
 |----|--------------|-------|
-| `capable` | Capable | `claude-fable-5-1` (max) -> `claude-opus-5` (max) -> `kimi-k3` (max) -> `glm-5.3` (max) |
-| `simple-work` | Simple work | `gpt-5.6-luna-fast` (low) -> `deepseek-v4-flash` -> `claude-haiku-4-5` |
-| `deep-work` | Deep work | `gpt-6-astra` (high) -> `gpt-5.6-sol` (medium), the `deep` category chain verbatim |
+| `recommended` | Recommended (the unset default, not a lane) | `claude-opus-5-5` (medium) -> `claude-fable-5-1` (xhigh) -> `kimi-k3` (max) -> `gpt-6-astra` (xhigh) -> `gpt-6.1-sol` (medium, ChatGPT subscription/API) -> `gpt-6-sol` (medium) -> `glm-5.3` (max); ranked providers only, never a gateway aggregator |
+| `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3` (max) -> `glm-5.3` (max) |
+| `daily-heavy` | Daily · Heavy | `claude-fable-5-1` (xhigh) |
+| `geeky-normal` | Geeky · Normal | `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
+| `geeky-heavy` | Geeky · Heavy | `gpt-6-astra` (high) |
 
-What happens at session start (`packages/omo-senpi/src/components/model-profile/index.ts`, `resolve.ts`):
+GPT profiles use the same provider coverage as the corresponding task lanes:
+ChatGPT subscription takes priority over the `openai` API/proxy lane. A user
+profile can replace the candidate order and reasoning. Provider-qualified user
+candidates stay on the named provider; an unavailable one advances only to the
+next user-listed candidate, while a bare model id may match any provider.
 
-- `model_profile` unset: nothing. Senpi's own default resolution, including its `recommended-models` builtin, runs untouched.
+What happens at session start (`packages/omo-senpi/src/components/model-profile/index.ts`, `resolve.ts`) in OmO Desktop and headless sessions. The interactive TUI does not apply `model_profile` yet; it keeps the model it started with.
+
+- `model_profile` unset: Recommended is applied on a fresh session. The apply is not written back to config. Its rungs are served only by their ranked providers, so a gateway aggregator's copy of a model (for example OpenGateway's `anthropic/claude-opus-5-5`) is never picked; the lanes keep their cross-provider fallback.
 - A literal `provider/model`: that exact model is looked up in the live registry and applied.
-- A profile id: the builtin table is overlaid with `model_profiles`, and the first rung the live registry can serve is applied. The notice names the pick and the skipped rungs, for example `omo-senpi: model profile "capable" selected anthropic/claude-opus-5 (skipped: anthropic/claude-fable-5-1); mid-session fallback follows senpi's retry chains`.
-- No rung resolves: a notice lists the chain and Senpi's default model stays.
-- Unknown id: `model_profile "<name>" is not defined; known profiles: ...`.
+- A profile id: the builtin table is overlaid with `model_profiles`, and the first rung the live registry can serve is applied. The notice names the lane, the pick, and the thinking level, for example `OmO Native: model profile "daily-normal" (Daily · Normal) selected anthropic-subscription/claude-opus-5-5 medium; mid-session fallback follows senpi's retry chains`.
+- A rung counts for Recommended or a profile id only when its first turn could use it, which is resolved at session start: the provider's stored credential (per account when the provider holds several and the engine may rotate them - a pinned account is the only one that counts; with `providers.<id>.credentials.rotation: false` in `models.json` or a runtime API key only the default credential counts) and then the model's own request configuration. A saved login that can no longer be refreshed is skipped with the whole provider; a model whose configured headers do not resolve is skipped alone, and its siblings stay eligible. The notice names each skipped provider or model and the recovery for the current surface (`re-authenticate <provider> in Provider authentication settings` on the desktop, `/login <provider>` in an interactive session for a headless run); the raw error is never shown, `details.authFailed` carries `{ provider, model, reason }` with `reason` one of `refresh`, `credentials`, `request`. Each attempted account costs one credential resolution, sequentially (a rejected refresh waits for the provider's exchange timeout). A literal `provider/model` is applied without this check.
+- No rung resolves: a notice lists the chain against this session's model registry and Senpi's default model stays. Absence from the registry is not reported as disconnected auth.
+- Unknown id: `model_profile "<name>" is not defined; known profiles: ...`. Retired ids (`capable`, `deep-work`, `simple-work`) take this path; there is no alias.
 
 The profile is applied only to a fresh session (`reason` is `startup` or `new`) whose model wasn't set explicitly: a `--model` flag, a scoped model, a resumed session, and a fork all keep their own model. Apply is session-scoped; it never writes `settings.json` or `omo.json`. Mid-session model failures follow Senpi's own `retry.fallbackChains`, not the profile chain.
 
-Override semantics: a `model_profiles.<name>` entry that matches a builtin replaces it wholesale, with no per-field merge. `"capable": { "display_name": "Best" }` therefore yields a profile with no models, reported at runtime as `defines no models`, rather than the builtin chain under a new label. Any other name adds a profile. Chain entries may name a `models.<catalog>` entry and expand through the same `resolveModelReferences` path as category chains; a profile named like a catalog entry gets a `shadows a model catalog entry` diagnostic. A bare string in `categories.*.models` or `agents.*.models` that equals a profile id gets a `splicing a profile into a category chain is not supported yet` diagnostic: profiles pick the main session model and never enter a delegated child's chain.
+Override semantics: a `model_profiles.<name>` entry that matches a builtin replaces it wholesale, with no per-field merge. `"daily-normal": { "display_name": "Best" }` therefore yields a profile with no models, reported at runtime as `defines no models`, rather than the builtin chain under a new label. Any other name adds a profile. Chain entries may name a `models.<catalog>` entry and expand through the same `resolveModelReferences` path as category chains; a profile named like a catalog entry gets a `shadows a model catalog entry` diagnostic. A bare string in `categories.*.models` or `agents.*.models` that equals a profile id gets a `splicing a profile into a category chain is not supported yet` diagnostic: profiles pick the main session model and never enter a delegated child's chain.
 
 ```jsonc
 {
   "models": {
-    "opus": { "model": "anthropic/claude-opus-5", "reasoning": "max" }
+    "opus": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" }
   },
   "model_profiles": {
     "office": {
@@ -224,7 +355,7 @@ Override semantics: a `model_profiles.<name>` entry that matches a builtin repla
       "models": ["opus", "openai/gpt-5.6-sol:medium"] // catalog alias, then a literal with a reasoning suffix
     }
   },
-  "model_profile": "office" // or "capable", or a pin such as "anthropic/claude-opus-5"
+  "model_profile": "office" // or "daily-normal", or a pin such as "anthropic/claude-opus-5-5"
 }
 ```
 
@@ -257,6 +388,21 @@ Deprecated keys accepted for back-compat and rewritten by migration:
 | `reasoningEffort` | `reasoning` | `none` normalizes to `off`. |
 
 These are the only deprecated keys the strict agent schema accepts. `textVerbosity`, `fallback_models`, `thinking`, and `maxTokens` are category / model-entry keys, not agent keys (see [Model references and model strings](#model-references-and-model-strings)).
+
+#### Codex managed agent roles
+
+In the Codex edition, `[codex].agents.<role>` (and `profiles.<P>.[codex].agents.<role>`) sets the model of a LazyCodex-managed agent role such as `explorer`, `librarian`, `plan`, `metis`, `momus`, or `lazycodex-worker-medium`. Every install and marketplace bootstrap writes `model` and `reasoning` into `$CODEX_HOME/agents/<role>.toml` (`reasoning` becomes `model_reasoning_effort`; `off` becomes `none`, `auto` keeps the bundled effort; a `gpt-6-luna:low` suffix is split the same way). Only the `[codex]` block counts: shared base `agents` hold OpenCode model ids and never reach Codex. Removing an entry returns the role to the bundled default on the next sync, and a role name LazyCodex does not manage produces a warning.
+
+```jsonc
+{
+  "[codex]": {
+    "agents": {
+      "explorer": { "model": "gpt-6-luna", "reasoning": "low" },
+      "librarian": { "model": "gpt-6-luna" }
+    }
+  }
+}
+```
 
 #### Builtin agents
 
@@ -305,19 +451,26 @@ Team members always spawn in `process` mode, which cannot carry the curated pers
 
 ### `task`
 
-Task engine settings. The whole object is optional, but `provider_concurrency`, `model_concurrency`, `state_dir`, and `reattach_on_reconcile` are optional and remain unset when omitted (`schema/task.ts`).
+Task engine settings. The whole object is optional, but `provider_concurrency`, `model_concurrency`, `state_dir`, `host_idle_exit_ms`, and `reattach_on_reconcile` are optional and remain unset when omitted (`schema/task.ts`).
+
+OpenGateway has a built-in unlimited provider concurrency default, so it does not inherit `default_concurrency`. Explicit `model_concurrency` and `provider_concurrency` settings still take precedence. OpenGateway tasks still consume slots under `global_concurrency`.
+
+`default_execution_mode: "auto"` (the default) defers the in-process/process choice to the session's own engine host: children run as sessions of that host when the platform is not Windows, `process_runner` is `host`, and the ensured host advertises `session_context` + `generation_handoff`; otherwise they run in-process. The decision is made ONCE per parent session, so a child's mode never changes because the host died later, and an explicit `in-process`/`process` always wins over it. Curated read-only agents (`explore`, `librarian`, `plan-consultant`, `plan-reviewer`) stay in-process regardless. `process_runner: "child-process"` keeps every process child in its own OS process (the only behaviour on Windows), `host_engine_policy` decides whether a daemon running a different engine build is handed over (`upgrade`) or left alone while children run as their own processes (`fallback`), and `host_idle_exit_ms` overrides the idle lifetime of a daemon this client starts. There is no socket key: each session's host socket is derived from the session (`<agentDir>/rpc/shards/p-<key>.sock`, or under `OMO_RPC_SHARD_ROOT`), and `rpc.sock` stays the operator endpoint; see [omo daemon](./omo-daemon.md).
 
 | Field | Type | Default |
 |-------|------|---------|
-| `default_execution_mode` | `in-process \| process` | `in-process` |
+| `default_execution_mode` | `auto \| in-process \| process` | `auto` |
+| `process_runner` | `host \| child-process` | `host` |
+| `host_engine_policy` | `upgrade \| fallback` | `upgrade` |
+| `host_idle_exit_ms` | positive int | unset (the launch profile's tunable) |
 | `default_concurrency` | non-negative int (0 = unlimited) | `5` |
 | `provider_concurrency` | record<string, non-negative int (0 = unlimited)> | unset |
 | `model_concurrency` | record<string, non-negative int (0 = unlimited)> | unset |
 | `global_concurrency` | non-negative int (0 = unlimited) | effective default `max(8, availableParallelism() * 2)` |
 | `max_depth` | int >= 0 | `1` |
-| `residency_max_children` | non-negative int or `"unlimited"` (0 = unlimited) | effective default `max(8, availableParallelism() * 3)` |
+| `residency_max_children` | non-negative int or `"unlimited"` (0 = unlimited) | `"unlimited"`: a parent keeps every child it started. Set a number to cap how many children one parent session keeps resident; at the cap the oldest finished idle child is evicted, and a spawn is refused only when every resident is still running. |
 | `ttl_ms` | positive int | `86400000` (24h) |
-| `state_dir` | string | unset (runtime uses `<project>/.omo/senpi-task`) |
+| `state_dir` | string | unset (runtime uses `<agent dir>/projects/<folder>-<path hash>/senpi-task`) |
 | `reattach_on_reconcile` | boolean | unset |
 | `resume_children` | boolean | `true` |
 | `warnings.unavailable_categories` | boolean | `true` |
@@ -329,11 +482,11 @@ Task engine settings. The whole object is optional, but `provider_concurrency`, 
 | `team.max_wall_clock_minutes` | positive int | `120` |
 | `dag` | object | unset |
 
-`task.dag` is an optional block bounding the DAG orchestration subsystem (`schema/task.ts`): `max_nodes_per_run` (`64`), `max_runs_per_session` (`16`), `subscriber_ring` (`1000`), `heartbeat_ms` (`15000`), `history_default_limit` (`256`), `history_max_limit` (`1000`), `retention_days` (`7`), `max_prompt_bytes` (`262144`).
+`task.dag` is an optional block bounding the DAG orchestration subsystem (`schema/task.ts`): `max_nodes_per_run` (`64`), `max_runs_per_session` (`16`, counting only runs that are still active: finished, failed and cancelled runs free their slot), `subscriber_ring` (`1000`), `heartbeat_ms` (`15000`), `history_default_limit` (`256`), `history_max_limit` (`1000`), `retention_days` (`7`), `max_prompt_bytes` (`262144`).
 
-`global_concurrency` caps how many tasks run at once per senpi process, across all model and provider lanes combined. It applies only to senpi; OpenCode `background_task` is unaffected (parity is a follow-up). The cap is per process, not cross-process or machine-wide: two senpi processes each get their own budget. A task spills to a later entry in its fallback chain whenever admission cannot seat it in the preferred model's lane — the per-model/provider/default lane limit is reached or its queue is occupied (the common case), or this global cap is full — even though the preferred model never failed. That later entry can be a DIFFERENT provider, with different pricing and different data handling. If that matters to you, remove cross-provider entries from your fallback chains or use single-model chains. No new storage or telemetry is introduced by this setting.
+`global_concurrency` caps how many tasks run at once per senpi process, across all model and provider lanes combined. It applies only to the senpi engine; OpenCode `background_task` is unaffected (parity is a follow-up). The cap is per process, not cross-process or machine-wide: two senpi processes each get their own budget. A task spills to a later entry in its fallback chain whenever admission cannot seat it in the preferred model's lane — the per-model/provider/default lane limit is reached or its queue is occupied (the common case), or this global cap is full — even though the preferred model never failed. That later entry can be a DIFFERENT provider, with different pricing and different data handling. If that matters to you, remove cross-provider entries from your fallback chains or use single-model chains. No new storage or telemetry is introduced by this setting.
 
-`state_dir` defaults to `<project_dir>/.omo/senpi-task` when unset (`packages/senpi-task/src/store/state-dir.ts`). Completion delivery is not configurable: every child completion is batched with any other ready notifications and steered into the parent's running turn at the next tool-call boundary; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
+`state_dir` defaults to `<agent dir>/projects/<folder>-<path hash>/senpi-task` when unset, so task state never lands in the project's `git status`; a project that already has a `.omo/senpi-task` directory from an earlier release keeps using it (`packages/senpi-task/src/store/project-state-directory.ts`). Completion delivery is not configurable: every child completion is batched with any other ready notifications and steered into the parent's running turn at the next tool-call boundary; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
 
 ### `teams`
 
@@ -357,16 +510,16 @@ Each member shares a base (`name` matching `^[a-z0-9-]+$`, optional `cwd`, `work
 
 ### `profiles`
 
-A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfileSchema`). Each profile accepts the shared base keys (`categories`, `agents`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`) plus `[opencode]`, `[senpi]`, and `[codex]` blocks of its own:
+A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfileSchema`). Each profile accepts the shared base keys (`categories`, `agents`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`) plus `[opencode]`, `[native]`, and `[codex]` blocks of its own:
 
 ```jsonc
 {
   "profiles": {
     "kimi": {
       "categories": {
-        "deep": { "model": "kimi-for-coding/kimi-k3" }
+        "deep-low": { "model": "kimi-for-coding/kimi-k3" }
       },
-      "[senpi]": {
+      "[native]": {
         "agents": {
           "plan-reviewer": { "model": "kimi-for-coding/kimi-k3" }
         }
@@ -376,7 +529,7 @@ A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfile
 }
 ```
 
-Profiles are inert until activated (see [Profile activation](#profile-activation)). When active, the profile's base keys fold over the shared base, and the profile's harness block folds over the top-level harness block. A config profile is a different thing from a model profile: see [Model profiles](#model-profiles-senpi-harness).
+Profiles are inert until activated (see [Profile activation](#profile-activation)). When active, the profile's base keys fold over the shared base, and the profile's harness block folds over the top-level harness block. A config profile is a different thing from a model profile: see [Model profiles](#model-profiles-native-harness).
 
 ### Model references and model strings
 
@@ -403,14 +556,14 @@ The migration engine rewrites the persisted config in place, and doctor reports 
 // .omo/omo.jsonc
 {
   "task": {
-    "default_execution_mode": "in-process",
+    "default_execution_mode": "auto",
     "default_concurrency": 4,
     "wait": { "default_ms": 90000 }
   },
   "categories": {
-    "deep": {
+    "deep-low": {
       "models": [
-        { "model": "anthropic/claude-opus-5", "reasoning": "high" },
+        { "model": "anthropic/claude-opus-5-5", "reasoning": "high" },
         "anthropic/claude-sonnet-4-5"
       ]
     }
@@ -426,7 +579,7 @@ The migration engine rewrites the persisted config in place, and doctor reports 
     "reviewers": {
       "leadAgentId": "lead",
       "members": [
-        { "kind": "category", "name": "quick", "category": "deep", "prompt": "Review the diff." }
+        { "kind": "category", "name": "quick", "category": "deep-low", "prompt": "Review the diff." }
       ]
     }
   }
@@ -438,7 +591,7 @@ The migration engine rewrites the persisted config in place, and doctor reports 
 Before the unification, the OpenCode plugin read a walked `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` chain and the Codex/Senpi harnesses read `~/.omo/config.jsonc`. Those files are history: a lock-and-journal migration engine imports them into `omo.jsonc` once, and nothing reads them at runtime afterward.
 
 - The legacy OpenCode user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy `profiles/<name>/` directory becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; project `.opencode/` files import into that project's `.omo/omo.jsonc`.
-- `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks; a legacy `[omo]` block maps to `[senpi]`.
+- `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks; a legacy `[omo]` block maps to `[native]`.
 - No-clobber: a value already present in the target wins, and skipped legacy values surface as diagnostics. Legacy migration history is preserved under `legacy_migrations`, and applied migrations are marked in the target's `_migrations` array (`2026-07-opencode-config-unification` for the `oh-my-*` files, `2026-07-codex-config-jsonc` for `~/.omo/config.jsonc`, and `2026-08-reasoning-unification` for persisted model and reasoning fields).
 - Sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`).
 - Triggers: OpenCode plugin startup, Senpi startup, and install run both migration groups; Codex startup runs only the `config.jsonc` group; `oh-my-openagent config migrate` runs both on demand (`--dry-run`, `--json`).
@@ -449,7 +602,7 @@ Full user-facing detail: [`docs/reference/configuration.md`](./configuration.md#
 
 The unified file is read starting with oh-my-openagent 5.0.0 (current `5.0.0-beta.13`): the OpenCode plugin, the Senpi adapter, and the Codex plugin at 5.0.0 or later all load `~/.omo/omo.jsonc` plus walked project `.omo/omo.jsonc` and nothing else. Harnesses from 4.x still read the legacy files, which the migration has moved into the backup directory.
 
-One sharp edge when mixing versions: every schema object is `.strict()`. A pre-unification copy of `@oh-my-opencode/omo-config-core` rejects an `omo.jsonc` that contains keys it does not know, which includes `models`, `profiles`, and the `[opencode]` / `[senpi]` / `[codex]` harness blocks. An older strict core handed a newer unified file fails validation on those keys instead of ignoring them.
+One sharp edge when mixing versions: every schema object is `.strict()`. A pre-unification copy of `@oh-my-opencode/omo-config-core` rejects an `omo.jsonc` that contains keys it does not know, which includes `models`, `profiles`, and the `[opencode]` / `[native]` / `[codex]` harness blocks. An older strict core handed a newer unified file fails validation on those keys instead of ignoring them.
 
 To downgrade:
 

@@ -1,17 +1,18 @@
 import type { Metadata } from "next"
 import type { JSX } from "react"
 
-import { AgentsSection } from "@/components/landing/sections/agents"
+import { CraftedSection } from "@/components/landing/sections/crafted"
 import { CtaSection } from "@/components/landing/sections/cta"
-import { EditionsSection } from "@/components/landing/sections/editions"
 import { HeroSection } from "@/components/landing/sections/hero"
+import { KibitzerSection } from "@/components/landing/sections/kibitzer"
 import { MassUlwSection } from "@/components/landing/sections/mass-ulw"
-import { OrchestrationSection } from "@/components/landing/sections/orchestration"
-import { PrinciplesSection } from "@/components/landing/sections/principles"
-import { ProfilesSection } from "@/components/landing/sections/profiles"
+import { MultiModelSection } from "@/components/landing/sections/multi-model"
+import { PlatformsSection } from "@/components/landing/sections/platforms"
 import { ProofStripSection } from "@/components/landing/sections/proof-strip"
 import { ReviewsSection } from "@/components/landing/sections/reviews"
-import { TeamModeSection } from "@/components/landing/sections/team-mode"
+import { SecretSection } from "@/components/landing/sections/secret"
+import { SkillsSection } from "@/components/landing/sections/skills"
+import { UltraworkSection } from "@/components/landing/sections/ultrawork"
 import { getStats, FALLBACK_DESCRIPTION } from "@/lib/stats"
 
 export async function generateLandingMetadata(): Promise<Metadata> {
@@ -23,7 +24,7 @@ export async function generateLandingMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: "Oh My OpenAgent — The Agent Harness",
+    title: "OmO — Your tool for real work. But it's an agent.",
     description,
   }
 }
@@ -33,13 +34,14 @@ export async function LandingPage(): Promise<JSX.Element> {
     <div className="flex min-h-screen flex-col overflow-x-clip">
       <HeroSection />
       <ProofStripSection />
+      <SecretSection />
+      <UltraworkSection />
+      <MultiModelSection />
       <MassUlwSection />
-      <EditionsSection />
-      <AgentsSection />
-      <ProfilesSection />
-      <OrchestrationSection />
-      <TeamModeSection />
-      <PrinciplesSection />
+      <KibitzerSection />
+      <SkillsSection />
+      <CraftedSection />
+      <PlatformsSection />
       <ReviewsSection />
       <CtaSection />
     </div>

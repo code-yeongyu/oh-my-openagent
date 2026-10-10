@@ -125,8 +125,8 @@ describe("legacy config migration plans", () => {
       const migrated = executeLegacyConfigMigrationPlan(plan, { env: { HOME: homeDir } })
 
       // then
-      expect(dryRun.diagnostics).toContain("conflict: [senpi] legacy [omo] kept [senpi]")
-      expect(migrated.diagnostics).toContain("conflict: [senpi] legacy [omo] kept [senpi]")
+      expect(dryRun.diagnostics).toContain("conflict: [native] legacy [omo] kept [native]")
+      expect(migrated.diagnostics).toContain("conflict: [native] legacy [omo] kept [native]")
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true })
     }

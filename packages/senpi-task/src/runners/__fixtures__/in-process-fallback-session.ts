@@ -75,6 +75,7 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
   const primary = modelRegistry.find("runtime-fallback-test", "dead-primary")
   if (primary === undefined) throw new Error("primary model missing")
   const settingsManager = createRuntimeFallbackSettings(
+    { cwd: root, agentDir: join(root, "agent"), projectTrusted: false },
     "runtime-fallback-test/dead-primary",
     [{
       source: "category",
@@ -126,7 +127,7 @@ function testModel(id: string) {
   }
 }
 
-function assistant(
+export function assistant(
   model: string,
   stopReason: StopReason,
   text: string,
@@ -152,7 +153,7 @@ function assistant(
   }
 }
 
-function streamMessage(message: AssistantMessage): EventStream {
+export function streamMessage(message: AssistantMessage): EventStream {
   const queue: unknown[] = []
   const waiters: Array<(value: IteratorResult<unknown>) => void> = []
   let done = false

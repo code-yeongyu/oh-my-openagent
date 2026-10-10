@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { readFile, rm, writeFile, mkdtemp } from "node:fs/promises"
+import { readFile, writeFile, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
 import { validateDreamTokenBudget } from "./completion-validation"
 import { createReflectionWorktree, finalizeReflectionWorktree } from "./worktree"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
 
@@ -20,7 +21,7 @@ async function fixture(runId: string) {
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)

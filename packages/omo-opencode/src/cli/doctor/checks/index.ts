@@ -2,6 +2,7 @@ import type { CheckDefinition } from "../framework/types"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import { checkSystem, gatherSystemInfo } from "./system"
 import { checkConfig } from "./config"
+import { checkBrowserProvider } from "./browser-provider"
 import { checkDeprecatedReasoningKeys } from "./deprecated-reasoning-keys"
 import { checkTools, gatherToolsSummary } from "./tools"
 import { checkModels } from "./model-resolution"
@@ -21,6 +22,7 @@ export { gatherEditionDistTags, resolveLatestVersion }
 
 export function getAllCheckDefinitions(): CheckDefinition[] {
   return [
+    { id: "browser-provider", name: "Browser Provider", check: checkBrowserProvider },
     {
       id: CHECK_IDS.SYSTEM,
       name: CHECK_NAMES[CHECK_IDS.SYSTEM],

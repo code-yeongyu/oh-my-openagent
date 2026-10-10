@@ -4,6 +4,7 @@ import type { ToolExecutionResult } from "./tool-result"
 
 import type { TaskManager } from "../../manager"
 import type { TaskStatus } from "../../state"
+import type { ColdRevivalFailureCode } from "../../lifecycle/port"
 import type { SenpiShutdownErrorCode } from "../../team"
 import type { TeamSendDetails } from "../team/messaging"
 
@@ -22,6 +23,7 @@ export type SendManager = Pick<TaskManager, "sendToTask" | "list">
 export type CancelManager = Pick<TaskManager, "cancelTask" | "get">
 
 export type SendResultDetails =
+  | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: "steer" }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
   | {
@@ -52,7 +54,9 @@ export type SendResultDetails =
 
 export type CancelResultDetails =
   | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly status: TaskStatus }
+  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
+  | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus }
   | { readonly kind: "not_found"; readonly reason: string }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
 

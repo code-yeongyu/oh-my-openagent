@@ -1,3 +1,4 @@
+import { isolationDetails } from "../../isolation/details"
 import type { TaskRecord } from "../../state"
 import { childSessionDir } from "./transcript"
 import type { LostBreadcrumbs, SuspendedDetails, TaskSnapshot } from "./types"
@@ -7,20 +8,36 @@ const LOST_EXPLANATION =
 
 const SUSPENDED_EXPLANATION = "suspended (resumes with session)"
 
+// A daemon-hosted child that could not be reattached carries WHY on the record, so task_output tells
+// the operator the difference between "waiting for its session" and "its engine daemon is gone".
+const SUSPENSION_REASON_EXPLANATIONS: Readonly<Record<NonNullable<TaskRecord["suspension_reason"]>, string>> = {
+  daemon_unavailable: "suspended (daemon unavailable)",
+  handoff_parked: "suspended (its host handed off to a newer generation; reopens there)",
+  host_draining: "suspended (host draining)",
+  host_incompatible: "suspended (its host is incompatible; never reopened elsewhere)",
+  idle_evicted: "suspended (its host parked the idle session; reopens on the next message)",
+  own_host_unreachable: "suspended (the host this session runs behind is unreachable)",
+  revival_deferred: "suspended (its session was resumed, but reviving it was deferred)",
+  store_index_unavailable: "suspended (task store index unavailable)",
+}
+
 const SUSPENDED_RESIDENCIES: ReadonlySet<TaskRecord["residency_state"]> = new Set(["persisted_only", "rpc_detached"])
 
 // Record snapshot for task_output status view (pi-task task-status result fields). For a `lost` task
 // it attaches read-only breadcrumbs (pid + the child's session dir) so the caller can investigate
 // without task_output ever reviving or touching child state.
 export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: number): TaskSnapshot {
+  const isolation = isolationDetails(record)
   return {
     task_id: record.task_id,
     status: record.status,
     residency_state: record.residency_state,
-    ...(isSuspended(record) ? { suspended: { explanation: SUSPENDED_EXPLANATION } } : {}),
+    ...(isSuspended(record) ? { suspended: { explanation: suspendedExplanation(record) } } : {}),
+    ...(record.status === "running" && record.start_queued !== undefined ? { start_queued: record.start_queued } : {}),
     execution_mode: record.execution_mode,
     model: record.model,
     ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
+    ...(record.effective_model !== undefined ? { effective_model: record.effective_model } : {}),
     parent_session_id: record.parent_session_id,
     root_session_id: record.root_session_id,
     age_ms: ageMs(record, now),
@@ -34,12 +51,21 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     ...(record.final_response !== undefined ? { final_response: record.final_response } : {}),
     ...(record.error_message !== undefined ? { error_message: record.error_message } : {}),
     ...(record.run_stats !== undefined ? { run_stats: record.run_stats } : {}),
+    ...(isolation === undefined ? {} : { isolation }),
     ...(record.status === "lost" ? { lost: lostBreadcrumbs(record, stateDir) } : {}),
   }
 }
 
 function isSuspended(record: TaskRecord): boolean {
   return SUSPENDED_RESIDENCIES.has(record.residency_state)
+}
+
+function suspendedExplanation(record: TaskRecord): string {
+  const reason = record.suspension_reason
+  if (reason === "revival_deferred" && record.revival_deferred_reason !== undefined) {
+    return `suspended (its session was resumed, but reviving it was deferred: ${record.revival_deferred_reason})`
+  }
+  return reason === undefined ? SUSPENDED_EXPLANATION : SUSPENSION_REASON_EXPLANATIONS[reason]
 }
 
 function lostBreadcrumbs(record: TaskRecord, stateDir: string): LostBreadcrumbs {

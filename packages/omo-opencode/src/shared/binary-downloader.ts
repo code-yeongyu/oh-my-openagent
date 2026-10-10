@@ -74,23 +74,37 @@ export function ensureExecutable(binaryPath: string): void {
   }
 }
 
+// bsdtar: "mode links owner group size date path", with the month in the system locale, before the day
+// on Windows and in locale order on macOS, sometimes as two words ("10-р сар", "تشرين الأول"). The day-first
+// form is tried first and the second month word only when needed, so a path that starts with a year or a
+// time stays whole.
+const BSDTAR_LISTING_LINE = /^([^\s])\S*\s+\d+\s+\S+\s+\S+\s+\d+\s+(?:\d+\s+\S+(?:\s+\S+)??|\S+(?:\s+\S+)??\s+\d+)\s+(?:\d{2}:\d{2}|\d{4})\s+(.*)$/
+// GNU tar: "mode owner/group size YYYY-MM-DD HH:MM path".
+const GNU_TAR_LISTING_LINE = /^([^\s])\S*\s+\S+\/\S+\s+\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\s+(.*)$/
+
 function parseTarEntry(line: string): ArchiveEntry | null {
-  const match = line.match(/^([^\s])\S*\s+\d+\s+\S+\s+\S+\s+\d+\s+\w+\s+\d+\s+(?:\d{2}:\d{2}|\d{4})\s+(.*)$/)
+  const match = line.match(BSDTAR_LISTING_LINE) ?? line.match(GNU_TAR_LISTING_LINE)
   if (!match) {
     return null
   }
 
   const [, rawType, rawEntryPath] = match
   if (rawType === "l" || rawType === "h") {
-    const arrowIndex = rawEntryPath.lastIndexOf(" -> ")
-    if (arrowIndex === -1) {
+    // Both tars list a hard link as "path link to target".
+    const separator = rawType === "h" && rawEntryPath.includes(" link to ") ? " link to " : " -> "
+    const separatorIndex = rawEntryPath.lastIndexOf(separator)
+    if (separatorIndex === -1) {
       return { path: rawEntryPath, type: rawType === "l" ? "symlink" : "hardlink" }
+    }
+    // A path or target that contains the separator makes the split ambiguous, so the line stays unparsed.
+    if (rawEntryPath.indexOf(separator) !== separatorIndex) {
+      return null
     }
 
     return {
-      path: rawEntryPath.slice(0, arrowIndex),
+      path: rawEntryPath.slice(0, separatorIndex),
       type: rawType === "l" ? "symlink" : "hardlink",
-      linkPath: rawEntryPath.slice(arrowIndex + 4),
+      linkPath: rawEntryPath.slice(separatorIndex + separator.length),
     }
   }
 
@@ -101,8 +115,15 @@ function parseTarEntry(line: string): ArchiveEntry | null {
 }
 
 async function listTarEntries(archivePath: string, cwd?: string): Promise<ArchiveEntry[]> {
-  const proc = spawn(["tar", "-tvzf", archivePath], {
+  // GNU tar reads extra options from TAR_OPTIONS (--block-number prefixes every line) and translates
+  // " link to " in the message locale, so the listing runs in the C locale without them. bsdtar ignores
+  // both; Windows bsdtar keeps the system locale regardless, hence the localized date forms above.
+  const env: NodeJS.ProcessEnv = { ...process.env, LC_ALL: "C" }
+  delete env.TAR_OPTIONS
+  // Owner and group names are stored as-is and can contain spaces, so both tars list them as numbers.
+  const proc = spawn(["tar", "--numeric-owner", "-tvzf", archivePath], {
     cwd,
+    env,
     stdout: "pipe",
     stderr: "pipe",
   })
@@ -122,10 +143,27 @@ async function listTarEntries(archivePath: string, cwd?: string): Promise<Archiv
     throw new Error(`tar entry listing failed (exit ${exitCode}): ${stderr}`)
   }
 
-  return stdout
+  const listingLines = stdout
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(Boolean)
-    .map(line => parseTarEntry(line))
-    .filter((entry): entry is ArchiveEntry => entry !== null)
+  const entries: ArchiveEntry[] = []
+  let unparsedLineCount = 0
+  for (const listingLine of listingLines) {
+    const entry = parseTarEntry(listingLine)
+    if (entry === null) {
+      unparsedLineCount += 1
+    } else {
+      entries.push(entry)
+    }
+  }
+
+  // An unparsed line would reach extraction without validation, so fail closed like the ZIP listing path.
+  if (unparsedLineCount > 0) {
+    throw new Error(
+      `tar entry listing failed: ${unparsedLineCount}/${listingLines.length} tar listing lines could not be parsed (fail-closed)`
+    )
+  }
+
+  return entries
 }

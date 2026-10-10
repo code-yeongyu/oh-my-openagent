@@ -1,0 +1,3 @@
+# Present so npm ignores the sibling .gitignore when packing: runtime/omowright/ is
+# gitignored (staged at build time) but MUST ship in the package.
+.DS_Store

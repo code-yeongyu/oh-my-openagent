@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import * as fs from "node:fs"
 import { relative } from "node:path"
 
-import type { ManagerStartSpec, TaskManager } from "../manager/types"
+import type { ExecutionMode, ManagerStartSpec, ResidencyDenied, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import { resolveDagNodeExecutionMode, type DagExecutionModeSources } from "./execution-mode"
 import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
@@ -24,6 +24,7 @@ import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { OwnedStartResult } from "./owner"
 import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
 import type { DagFileStore } from "./store"
+import { DAG_NODE_OUTPUT_PREVIEW_CHARS } from "./types"
 import type {
   DagNode,
   DagNodeCounts,
@@ -34,6 +35,7 @@ import type {
   DagNodeTransitionReason,
   DagRunEvent,
   DagRunId,
+  DagRoute,
 } from "./types"
 
 // The per-node control verbs live beside the scheduler but keep one public entry point: callers
@@ -175,6 +177,9 @@ type SchedulerContext = {
   // Residency-denied nodes waiting for a free slot, in first-denied order: a slot freed by a
   // settlement is offered to the OLDEST denied admission before any newly ready node.
   pendingAdmission: DagNodeId[]
+  // Nodes whose first residency denial has already been journaled as residency_queued: the wait
+  // can re-deny a node many times, the explanation is written once (#8396).
+  readonly residencyQueued: Set<DagNodeId>
   // Wave events are informational groupings over frontier admission, never barriers: admission
   // remembers which wave indexes this instance reported so each index completes at most once.
   readonly emittedWaveAdmissions: Set<number>
@@ -230,6 +235,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
     pendingAdmission: [],
+    residencyQueued: new Set<DagNodeId>(),
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
     promotionWatches: new Map<DagNodeId, () => void>(),
@@ -333,6 +339,11 @@ export function applyDagSchedulerEvent(
             now: terminalResults.now,
           })
       terminalResults?.pendingTerminalResults.delete(event.nodeId)
+      // The durable copy is written here anyway; carrying a bounded preview of it onto the node
+      // costs no extra IO and is what lets a midpoint snapshot audit the child's claim (#8674).
+      const outputText = terminalResult === undefined
+        ? replayedResult?.output
+        : terminalResult.record.final_response ?? ""
       return {
         ...record,
         nodes: record.nodes.map((node) => {
@@ -347,6 +358,12 @@ export function applyDagSchedulerEvent(
           return {
             ...transitioned,
             resultArtifact: persisted.artifact,
+            ...(outputText === undefined
+              ? {}
+              : {
+                  output: outputText.slice(0, DAG_NODE_OUTPUT_PREVIEW_CHARS),
+                  outputBytes: persisted.artifact.bytes,
+                }),
             ...(terminalResult?.record.run_stats === undefined && replayedResult?.runStats === undefined
               ? {}
               : { runStats: terminalResult?.record.run_stats ?? replayedResult?.runStats }),
@@ -404,7 +421,11 @@ function replayDagNodeResult(
   store: DagFileStore,
   runId: DagRunId,
   nodeId: DagNodeId,
-): { readonly artifact: DagNodeResultArtifact; readonly runStats?: TaskRecord["run_stats"] } | undefined {
+): {
+  readonly artifact: DagNodeResultArtifact
+  readonly output: string
+  readonly runStats?: TaskRecord["run_stats"]
+} | undefined {
   const result = readDagNodeResult({ store, runId, nodeId })
   if (result === null) return undefined
   const outputPath = store.paths.result(runId, nodeId)
@@ -412,6 +433,7 @@ function replayDagNodeResult(
   const statsPath = outputPath.replace(/\.txt$/, ".stats.json")
   const stats = readOptionalArtifact(store, statsPath)
   return {
+    output,
     artifact: {
       ...artifactRef(store, outputPath, output),
       ...(stats === undefined ? {} : { stats }),
@@ -525,6 +547,11 @@ async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
     const current = context.journal.snapshot()
     if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
     if (context.attachedTasks.size === 0) {
+      // #8396 (second symptom): every admission of this pass failed at start, so nothing is
+      // attached while the dependents still sit pending. Their skip cascade runs at the top of the
+      // loop; throwing here instead left the run `running` forever (28 leaves failed at admission,
+      // 2 aggregators pending, retry refused with run_still_active).
+      if (hasCascadableDependent(current)) continue
       throw new Error(`DAG run "${current.runId}" cannot terminalize while nodes are active`)
     }
     if (!await settleOne(context)) return cancelledSnapshot(context)
@@ -543,8 +570,10 @@ async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
 
 // One admission pass over the frontier: the ordered residency-denied queue first (oldest denial
 // gets the first freed slot), then every newly ready node. startOwned runs as one batch; denials
-// park in the queue and retry after a settlement frees a slot, failing with residency_denied only
-// when no attached task can ever free one. Cancellation aborts the pass without admitting more.
+// park in the queue and retry after ANY slot-freeing event in the parent session - one of this
+// run's own children settling, or a resident child of another owner (a sibling run, a team, a task
+// spawn) settling or being evicted (#8396). A denial that names no resident can never be helped by
+// waiting and fails the node. Cancellation aborts the pass without admitting more.
 async function admitFrontier(context: SchedulerContext): Promise<boolean> {
   for (;;) {
     if (context.suspended || context.cancellationStarted) return false
@@ -562,6 +591,10 @@ async function admitFrontier(context: SchedulerContext): Promise<boolean> {
     for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
     emitWaveAdmissions(context, runnable)
 
+    // Armed BEFORE the probe: the wake is edge-triggered, and a sibling child that settles while
+    // this batch is in flight must still be seen, or a run whose last chance passed in that gap
+    // parks until an unrelated resident settles.
+    const residencyReleased = context.taskManager.residencyChanged(snapshot.parentSessionId)
     const awaitingAdmission = [...denied, ...runnable]
     context.admissionInProgress = true
     let results: PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>[]
@@ -578,6 +611,7 @@ async function admitFrontier(context: SchedulerContext): Promise<boolean> {
     // resolves it by owner; this retired controller must not attach, fail, or promote the node.
     if (context.suspended && !context.cancellationStarted) return false
     const nextDenied: DagNodeId[] = []
+    let leaseDenied = false
     for (let index = 0; index < results.length; index += 1) {
       const settled = results[index]
       const nodeId = awaitingAdmission[index]
@@ -590,23 +624,72 @@ async function admitFrontier(context: SchedulerContext): Promise<boolean> {
       if (context.cancellationStarted) {
         if (result.kind === "started") attachStarted(context, nodeId, result)
       } else if (result.kind === "residency_denied") {
-        nextDenied.push(nodeId)
+        const parked = parkResidencyDenied(context, nodeId, result)
+        if (parked === "queued") nextDenied.push(nodeId)
+        if (parked === "lease") {
+          nextDenied.push(nodeId)
+          leaseDenied = true
+        }
       } else {
+        context.residencyQueued.delete(nodeId)
         attachOrFail(context, nodeId, result)
       }
     }
     if (context.cancellationStarted) return false
     context.pendingAdmission.push(...nextDenied)
     if (nextDenied.length === 0) return true
-    if (context.attachedTasks.size === 0) {
-      for (const nodeId of nextDenied) {
-        failNode(context, nodeId, "residency_denied", "resident child cap reached and no task can free a slot")
-      }
-      context.pendingAdmission.length = 0
-      return true
-    }
-    if (!await settleOne(context)) return false
+    // A contended or displaced admission lease is a bounded wait inside acquisition itself, so the
+    // next probe is already paced; only a cap denial has to wait for a slot to free.
+    if (leaseDenied) continue
+    if (!await settleOne(context, residencyReleased)) return false
   }
+}
+
+type ResidencyPark = "queued" | "lease" | "failed"
+
+// Decide what a residency denial means for this node. Residents holding the cap will free their
+// slots (a live child settles; a terminal one is evicted once its pending sends drain), so the node
+// parks and its first parking is journaled with the counts the /dag view needs to explain a quiet
+// run. A denial naming no resident cannot be waited out and fails the node outright.
+function parkResidencyDenied(context: SchedulerContext, nodeId: DagNodeId, denial: ResidencyDenied): ResidencyPark {
+  switch (denial.cause) {
+    case "lease":
+      return "lease"
+    case "residents": {
+      if (denial.residents.length === 0) {
+        context.residencyQueued.delete(nodeId)
+        failNode(
+          context,
+          nodeId,
+          "residency_denied",
+          `resident child cap reached and the denial names no resident child that could free a slot: ${denial.reason}`,
+        )
+        return "failed"
+      }
+      if (!context.residencyQueued.has(nodeId)) {
+        context.residencyQueued.add(nodeId)
+        const ownTaskIds = new Set(context.attachedTaskIds.values())
+        context.journal.append({
+          type: "dag.node.transitioned",
+          nodeId,
+          from: "scheduled",
+          to: "scheduled",
+          reason: {
+            kind: "residency_queued",
+            residents: denial.residents.length,
+            heldByOtherOwners: denial.residents.filter((resident) => !ownTaskIds.has(resident.task_id)).length,
+          },
+        })
+      }
+      return "queued"
+    }
+    default:
+      return assertNever(denial)
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`unexpected residency denial ${JSON.stringify(value)}`)
 }
 
 // dag.wave.started is informational: one event per wave index touched by this admission pass,
@@ -767,7 +850,11 @@ async function watchRevivedInScheduler(
   await task.folded
 }
 
-async function settleOne(context: SchedulerContext): Promise<boolean> {
+// Waits for the next settle-loop wake: one of this run's own children settling (folded here), a
+// foreign journal commit, cancellation, or - when admission parked a residency denial - the
+// session-wide residency release the caller armed before its probe (#8396). Returns true when the
+// caller should run another admission pass, false when the run is cancelled or suspended.
+async function settleOne(context: SchedulerContext, residencyReleased?: Promise<void>): Promise<boolean> {
   // #7412: a foreign commit can land while no settle race is armed (repeatableSignal wake-ups are
   // edge-triggered); consuming the flag first keeps that wake level-triggered.
   if (context.foreignSettlement) {
@@ -776,6 +863,7 @@ async function settleOne(context: SchedulerContext): Promise<boolean> {
   }
   const settled = await Promise.race([
     ...[...context.attachedTasks.values()].map((entry) => entry.settled),
+    ...(residencyReleased === undefined ? [] : [residencyReleased.then(() => null)]),
     context.settlementChanged().then(() => null),
     context.cancellationRequested.then(() => undefined),
   ])
@@ -816,14 +904,24 @@ function applyDependentSkipCascade(context: SchedulerContext): void {
     changed = false
     const snapshot = context.journal.snapshot()
     for (const node of snapshot.nodes) {
-      if (node.state !== "pending" && node.state !== "blocked") continue
-      const dependencies = node.dependsOn.map((nodeId) => nodeById(snapshot, nodeId))
-      if (dependencies.some((dependency) => TERMINAL_NODE_STATES.has(dependency.state) && dependency.state !== "completed")) {
-        transition(context, node.id, "skipped", { kind: "skipped" })
-        changed = true
-      }
+      if (!isCascadableDependent(snapshot, node)) continue
+      transition(context, node.id, "skipped", { kind: "skipped" })
+      changed = true
     }
   }
+}
+
+function hasCascadableDependent(record: DagRunRecordV1): boolean {
+  return record.nodes.some((node) => isCascadableDependent(record, node))
+}
+
+// A waiting node whose dependency ended in any terminal state other than completed can never run.
+function isCascadableDependent(record: DagRunRecordV1, node: DagNode): boolean {
+  if (node.state !== "pending" && node.state !== "blocked") return false
+  return node.dependsOn.some((dependencyId) => {
+    const dependency = nodeById(record, dependencyId)
+    return TERMINAL_NODE_STATES.has(dependency.state) && dependency.state !== "completed"
+  })
 }
 
 function isRunnable(record: DagRunRecordV1, nodeId: DagNodeId): boolean {
@@ -848,6 +946,18 @@ function failNode(context: SchedulerContext, nodeId: DagNodeId, code: DagNodeErr
   context.pendingErrors.delete(nodeId)
 }
 
+// A node names its execution mode only when something already decides it: no mode configuration at
+// all, or an `auto` config the parent session has not resolved yet, both leave the choice to the
+// manager (which awaits that one resolution before it writes the record).
+function dagNodeExecutionMode(
+  context: SchedulerContext,
+  route: DagRoute,
+): { readonly execution_mode?: ExecutionMode } {
+  if (context.executionMode === undefined) return {}
+  const mode = resolveDagNodeExecutionMode({ ...context.executionMode, route })
+  return mode === undefined ? {} : { execution_mode: mode }
+}
+
 function startSpec(context: SchedulerContext, nodeId: DagNodeId): ManagerStartSpec {
   const record = context.journal.snapshot()
   const node = nodeById(record, nodeId)
@@ -859,15 +969,7 @@ function startSpec(context: SchedulerContext, nodeId: DagNodeId): ManagerStartSp
     parent_session_id: record.parentSessionId,
     root_session_id: record.rootSessionId,
     depth: (context.ancestry?.depth ?? 0) + 1,
-    ...(context.executionMode === undefined
-      ? {}
-      : {
-          execution_mode: resolveDagNodeExecutionMode({
-            route: node.route,
-            agents: context.executionMode.agents,
-            config: context.executionMode.config,
-          }),
-        }),
+    ...dagNodeExecutionMode(context, node.route),
     ...(node.route.kind === "category"
       ? { category: node.route.category }
       : { subagent_type: node.route.agent, ...(node.route.model === undefined ? {} : { model: node.route.model }) }),
@@ -961,6 +1063,8 @@ function clearedTerminalOutcome(node: DagNode): DagNode {
     completedAt: _completedAt,
     runStats: _runStats,
     resultArtifact: _resultArtifact,
+    output: _output,
+    outputBytes: _outputBytes,
     ...cleared
   } = node as DagNodeWithResult
   return cleared

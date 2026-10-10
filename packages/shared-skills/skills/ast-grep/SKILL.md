@@ -11,6 +11,18 @@ This skill ships a Python wrapper at `scripts/ast_grep_helper.py` and platform i
 
 ---
 
+## OmO native: the ast-grep MCP tools (fastest path, no CLI needed)
+
+OmO native also registers a bundled ast-grep MCP server. Its three tools are **deferred**: they are absent from the resident tool list and activate automatically the first time you call them by name — no `tool_search` round trip needed.
+
+- `mcp__ast_grep_search({ pattern, language, paths })` — AST-shape search, the MCP equivalent of `sg run -p`. Prefer this over shelling out to `sg` for one-off lookups: no install, no PATH issues.
+- `mcp__ast_grep_rewrite({ pattern, rewrite, language, paths, apply })` — preview matches (`apply: false`, the default) or apply the rewrite (`apply: true`). Same two-pass discipline as `sg run -r`: preview first, then apply.
+- `mcp__ast_grep_scan({ paths })` — run project YAML rules (`sgconfig.yml`, `rules/`), the MCP equivalent of `sg scan`.
+
+Same pattern language as the CLI: `$VAR` matches one AST node, `$$$VAR` matches zero or more, and the pattern is code, not regex. `paths` accepts a file or directory list; `language` is required for patterns that are ambiguous across languages.
+
+---
+
 ## When to use this skill
 
 Use it whenever the user's question is about **code structure**, not bytes:

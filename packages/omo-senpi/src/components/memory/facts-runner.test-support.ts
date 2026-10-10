@@ -1,4 +1,4 @@
-import { afterEach, expect } from "bun:test"
+import { expect, onTestFinished } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { appendFile, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
@@ -22,21 +22,15 @@ import { createFactsRecordTool } from "./facts-record-tool"
 import type { FactsRunLedger } from "./facts-runner-types"
 
 export const AVAILABLE_MODEL: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
-const tempDirs: string[] = []
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
-})
-
-export async function fixture() {
+export async function fixture(now?: () => Date) {
   const root = await mkdtemp(join(tmpdir(), "omo-facts-runner-"))
-  tempDirs.push(root)
+  onTestFinished(() => rm(root, { recursive: true, force: true }))
   const identity: MemoryIdentity = {
     id: "facts-agent",
     safeSlug: "facts-agent",
     paths: buildIdentityPaths(root, "facts-agent"),
   }
-  const queue = new FactsQueue({ identityPaths: identity.paths })
+  const queue = new FactsQueue({ identityPaths: identity.paths, ...(now === undefined ? {} : { now }) })
   await enqueue(queue, identity, "session-1", "m1", "The project uses Bun.")
   return { root, identity, queue }
 }
@@ -47,7 +41,7 @@ export async function fixture() {
  * exist - the shipped catalog would otherwise satisfy the quick chain on its own. An in-process
  * child shares this exact instance, so the facts child cannot drift onto another engine's model set.
  */
-export function registrySnapshot(models: readonly { readonly id: string }[] = [{ id: "mock-1" }]): ChildModelRegistry {
+export function registrySnapshot(models: readonly { readonly id: string; readonly contextWindow?: number; readonly maxTokens?: number }[] = [{ id: "mock-1" }]): ChildModelRegistry {
   const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
   registry.registerProvider("omo-mock", {
     api: "openai-completions",
@@ -59,8 +53,8 @@ export function registrySnapshot(models: readonly { readonly id: string }[] = [{
       reasoning: false,
       input: ["text"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 1,
-      maxTokens: 1,
+      contextWindow: model.contextWindow ?? 1,
+      maxTokens: model.maxTokens ?? 1,
     })),
   })
   return registry
@@ -147,6 +141,7 @@ export function runnerOptions(
         return {
           task_id: spec.taskId,
           sessionId: `session-${spec.taskId}`,
+          effectiveModel: () => undefined,
           steer: async () => undefined,
           followUp: async () => undefined,
           abort: async () => undefined,

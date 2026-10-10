@@ -235,6 +235,11 @@ export class WorkspaceDocumentState {
 	waitForDiagnosticsActivity(snapshot: DiagnosticSnapshot, timeoutMs: number): Promise<void> {
 		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
 		if (!state || timeoutMs <= 0) return Promise.resolve();
+		// A publish that landed between the caller's snapshot and this registration already IS the
+		// activity being waited for, and its notifyWaiters ran before this waiter existed. Without
+		// this check that wake-up is lost and the wait can only end at the freshness deadline, which
+		// turns the deadline from a fallback into the poll interval the result depends on (#8323).
+		if (state.publishGeneration !== snapshot.publishGeneration) return Promise.resolve();
 		return new Promise((resolveActivity) => {
 			let settled = false;
 			const finish = () => {

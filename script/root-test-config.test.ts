@@ -57,4 +57,22 @@ describe("root test Bun config", () => {
     ])
     expect(output).toContain("filters did not match any test files")
   })
+
+  test("#given the Windows shard-2 remainder config #when bun discovers an rpc-host test #then it is left to the rpc-host invocation", () => {
+    const output = spawnBun([
+      "--config=bunfig.win2.parallel.windows.toml",
+      "test",
+      "./packages/senpi-task/src/runners/rpc-host/close.test.ts",
+    ])
+    expect(output).toContain("filters did not match any test files")
+  })
+
+  test("#given the Windows rpc-host invocation config #when bun discovers the quarantined durable-json test #then it is left to the serial quarantine", () => {
+    const output = spawnBun([
+      "--config=bunfig.win2.parallel.toml",
+      "test",
+      "./packages/senpi-task/src/runners/rpc-host/durable-json.test.ts",
+    ])
+    expect(output).toContain("filters did not match any test files")
+  })
 })

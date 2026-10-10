@@ -7,6 +7,11 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import { omoSenpiComponents } from "../../extension/index"
 import { createTaskTerminalObservers } from "../task/terminal-observers"
+import { sharedKibitzerTelemetryObservers } from "../memory/kibitzer/wake-observers"
+import type {
+  ComputerUseTelemetryObservation,
+  ComputerUseTelemetryObservers,
+} from "./omo-native-computer-use"
 import { createOmoNativeTelemetryComponent } from "./omo-native-component"
 import { OMO_NATIVE_PROPERTY_ALLOWLISTS, OMO_NATIVE_SCHEMA_VERSION } from "./product-identity"
 import {
@@ -87,6 +92,25 @@ function nativeMessages(messages: readonly TelemetryCaptureMessage[]): Telemetry
   return messages.filter(({ event }) => event !== "omo_senpi_daily_active")
 }
 
+function computerObservers(): {
+  readonly registry: ComputerUseTelemetryObservers
+  publish(observation: ComputerUseTelemetryObservation): void
+} {
+  let observer: ((observation: ComputerUseTelemetryObservation) => void) | undefined
+  return {
+    registry: {
+      publish: (observation) => observer?.(observation),
+      subscribe: (next) => {
+        observer = next
+        return () => {
+          if (observer === next) observer = undefined
+        }
+      },
+    },
+    publish: (observation) => observer?.(observation),
+  }
+}
+
 // Token totals and `cost_usd` are omitted by design when the provider never reported them, so a
 // delegation row is checked for CONTAINMENT in its allowlist; every other event ships a fixed set.
 function assertAllowlistedPayloadKeys(messages: readonly TelemetryCaptureMessage[]): void {
@@ -162,6 +186,53 @@ describe("OmO Native telemetry component integration", () => {
       ])
       assertAllowlistedPayloadKeys(recorder.messages)
       expect(existsSync(join(stateDir, "last-payloads.json"))).toBe(false)
+    })
+  })
+
+  // Registration order is the whole contract here: the session component's `session_shutdown` handler
+  // shuts the client down and clears `state.capture`, so a `kibitzer_summary` registered after it would
+  // capture into a dead client and vanish with every test still green. Driving the REAL component is the
+  // only way that failure is visible, which is why the parallelism summary is pinned the same way.
+  test("#given a settled kibitzer wake #when the real component shuts the session down #then kibitzer_summary still reaches the transport", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      writeInventory(agentDir)
+      const recorder = createTransportRecorder()
+      const pi = new FakeExtensionAPI()
+      const session = context("kibitzer-order-session")
+      const component = createOmoNativeTelemetryComponent({
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => true,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("integration-host"),
+        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        transportFactory: recorder.factory,
+      })
+      component.register(pi, { config: pi, logger: createSilentLogger() })
+
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, session)
+      sharedKibitzerTelemetryObservers().notify({
+        kind: "wake",
+        sessionId: "kibitzer-order-session",
+        wake: 1,
+        generation: 1,
+        status: "completed",
+        nudges: 2,
+        candidateCount: 3,
+        toolCalls: 1,
+        durationMs: 4_000,
+        slotWaitMs: 50,
+        usage: { input: 11, output: 22, cacheRead: 33, cacheWrite: 44 },
+      })
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, session)
+
+      const summary = recorder.messages.find(({ event }) => event === "kibitzer_summary")
+      expect(summary?.properties?.["nudges_delivered"]).toBe(2)
+      expect(summary?.properties?.["$session_id"]).toBe("hashed:kibitzer-order-session")
+      expect(Object.keys(summary?.properties ?? {}).sort()).toEqual(
+        [...OMO_NATIVE_PROPERTY_ALLOWLISTS.kibitzer_summary, ...SHARED_KEYS].sort(),
+      )
+      assertAllowlistedPayloadKeys(recorder.messages)
     })
   })
 
@@ -283,6 +354,40 @@ describe("OmO Native telemetry component integration", () => {
       ], { logger: createSilentLogger() })(pi)
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context("disabled"))
 
+      expect(recorder.messages).toEqual([])
+    })
+  })
+
+  test("#given config telemetry opt-out #when computer use publishes #then its event also captures nothing", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createTransportRecorder()
+      const pi = new FakeExtensionAPI()
+      const computer = computerObservers()
+      createOmoNativeTelemetryComponent({
+        computerUseTelemetryObservers: computer.registry,
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => false,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("disabled-host"),
+        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        transportFactory: recorder.factory,
+      }).register(pi, { config: pi, logger: createSilentLogger() })
+
+      // when
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context("disabled"))
+      computer.publish({
+        kind: "activation",
+        sessionId: "disabled",
+        active: true,
+        source: "tool_call",
+        platform: "linux",
+        backend: "x11",
+      })
+
+      // then
       expect(recorder.messages).toEqual([])
     })
   })

@@ -58,12 +58,12 @@ describe("star-request", () => {
     expect(results).toEqual(STAR_REPOSITORIES.map((repository) => ({ repository, ok: true })))
   })
 
-  test("stars the default repositories for senpi platform without adding a new repo", async () => {
+  test("stars the default repositories for the native-dev platform without adding a new repo", async () => {
     // given
     const starred: string[] = []
 
     // when
-    const results = await starGitHubRepositories("senpi", async (repository) => {
+    const results = await starGitHubRepositories("native-dev", async (repository) => {
       starred.push(repository)
     })
 

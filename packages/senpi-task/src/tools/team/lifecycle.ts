@@ -185,12 +185,24 @@ function formatCreatedMemberLine(member: CreatedMemberInfo): string {
   return `- ${member.name} [${member.status}] ${target ?? formatMemberRole(member.role)} task:${member.taskId}`
 }
 
+// team_create/team_delete only matter when a multi-agent team is actually started, and they are
+// named across the ulw/hyperplan/review skills, so they ride the tool-search catalog instead of the
+// resident tool list: a by-name call activates the tool on first use.
+const TEAM_SEARCH_GROUP = "team" as const
+
+type TeamSearchMeta = Pick<ToolDefinition, "exposure" | "searchText" | "searchKeywords" | "searchGroup" | "allowLazyActivation">
+
+function teamSearchMeta(searchText: string, searchKeywords: readonly string[]): TeamSearchMeta {
+  return { exposure: "search", searchText, searchKeywords, searchGroup: TEAM_SEARCH_GROUP, allowLazyActivation: true }
+}
+
 export function createTeamCreateTool(deps: TeamToolDeps): ToolDefinition<typeof TeamCreateParams, TeamCreateDetails> {
   return {
     name: "team_create",
     label: "Team Create",
     description: CREATE_DESCRIPTION,
     parameters: TeamCreateParams,
+    ...teamSearchMeta("create a named team of cooperating agents from an inline spec, run several agents in parallel as a team", ["create team", "team run", "start a team", "cooperating agents", "inline team spec"]),
     execute: (_toolCallId: string, params: TeamCreateInput) => runTeamCreate(deps.service, params),
     renderCall: (args, theme) => renderTeamCreateCall(args, theme),
     renderResult: (result, options, theme) => renderTeamCreateResult(result, options, theme),
@@ -203,6 +215,7 @@ export function createTeamDeleteTool(deps: TeamToolDeps): ToolDefinition<typeof 
     label: "Team Delete",
     description: DELETE_DESCRIPTION,
     parameters: TeamDeleteParams,
+    ...teamSearchMeta("tear down a finished team run and cancel its members", ["delete team", "end the team run", "teardown team"]),
     execute: (_toolCallId: string, params: TeamDeleteInput) => runTeamDelete(deps.service, params),
     renderCall: (args, theme) => renderTeamDeleteCall(args, theme),
     renderResult: (result, options, theme) => renderTeamDeleteResult(result, options, theme),

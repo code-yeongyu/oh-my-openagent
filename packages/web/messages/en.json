@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "title": "Oh My OpenAgent",
-    "description": "The Best Agent Harness. Meet OmO: the batteries-included agent harness that codes like you."
+    "title": "OmO",
+    "description": "Your tool for real work. But it's an agent. OmO turns your tokens into results that matter."
   },
   "nav": {
-    "brand": "Oh My OpenAgent",
-    "agents": "Agents",
+    "brand": "OmO",
+    "features": "Features",
     "docs": "Docs",
     "manifesto": "Manifesto",
     "install": "Install",
@@ -15,7 +15,7 @@
     "primary": "Primary"
   },
   "footer": {
-    "brand": "Oh My OpenAgent",
+    "brand": "OmO",
     "copyright": "© {year} Sisyphus Labs · Source-available under SUL-1.0",
     "product": "Product",
     "community": "Community",
@@ -31,275 +31,133 @@
   },
   "landing": {
     "hero": {
-      "eyebrow": "The agent harness",
-      "title": "Type mass ulw.",
-      "titleHighlight": "Own the graph.",
+      "title": "Your tool for real work.",
+      "titleHighlight": "But it's an agent.",
+      "subcopy": "Turn your tokens into results that matter.\nResearch across ten thousand sources. A deck people actually get.\nCompany work, experiments, backends, frontends, code.\nWhatever you need done.",
       "getStarted": "Get started",
       "readManifesto": "Read the manifesto",
-      "rail": {
-        "wave1": {
-          "index": "01",
-          "label": "The orchestrator leads"
-        },
-        "wave2": {
-          "index": "02",
-          "label": "Planners and gates"
-        },
-        "wave3": {
-          "index": "03",
-          "label": "Workers execute"
-        }
-      },
-      "modelsLabel": "Every model at once",
-      "modelsHint": "Any job, however complex. Feed it tokens; the graph routes each node to the model that fits."
-    },
-    "installTabs": {
-      "opencode": "OpenCode",
-      "opencodeCommand": "bunx oh-my-openagent install",
-      "codex": "Codex",
-      "codexCommand": "npx lazycodex-ai install",
-      "senpi": "Senpi",
-      "senpiCommand": "npm i -g omo-ai@beta"
+      "installLabel": "One command, one tool"
     },
     "command": {
-      "tabsLabel": "Install target",
       "copy": "Copy",
       "copied": "Copied",
-      "copyAria": "Copy install command"
+      "copyAria": "Copy install command",
+      "copiedStatus": "Install command copied"
+    },
+    "install": {
+      "tabsLabel": "Install command for your system",
+      "windows": "Windows",
+      "tabs": {
+        "unix": "macOS, Linux, WSL",
+        "powershell": "PowerShell",
+        "cmd": "CMD"
+      },
+      "next": "Then open a new terminal and run omo.",
+      "onComputer": "Run this on your Mac, Linux or Windows computer."
     },
     "proof": {
       "label": "Live numbers",
       "githubStars": "GitHub Stars",
       "totalDownloads": "Total Downloads",
-      "monthlyDownloads": "Monthly Downloads",
-      "agents": "agents",
-      "agentCount": "11"
+      "monthlyDownloads": "Monthly Downloads"
+    },
+    "secret": {
+      "lead": "We'd rather you never had to read what's below.",
+      "body": "Focus on your work.\nOmO takes care of the tech.\nThe more you use it, the better it fits you.",
+      "reveal": "Still curious? This is for you."
+    },
+    "ultrawork": {
+      "title": "ultrawork",
+      "body": "Skip the study. If a task feels hard, add the word ultrawork to your prompt. The agent decides how to attack it and drives to the best result on its own.",
+      "promptPrefix": "make the quarterly report actually readable",
+      "keyword": "ultrawork",
+      "step1": "reads the whole codebase before touching a line",
+      "step2": "plans, then proves each step before moving on",
+      "step3": "verifies the result on the real surface, then stops"
+    },
+    "multiModel": {
+      "title": "Mix models without thinking about it.",
+      "body": "Use the frontier models you love together with the cheap ones. Just sign in. Every model ships with a system prompt tuned for it, so you never pick the wrong one.",
+      "caption": "Tuned profiles shipped with OmO"
     },
     "ulw": {
-      "eyebrow": "The magic word",
-      "title": "Any job. Every model. One graph.",
-      "description": "Feed it tokens. mass ulw turns the whole job into a dependency graph, runs every wave with the right model for each node — Claude, GPT, Kimi, Grok, GLM side by side — and verifies the result before it stops."
+      "title": "Hundreds of agents working for you. One keyword.",
+      "body": "Type mass ulw and the whole job becomes a graph of agents: deep research over thousands of sources, a full machine-learning pipeline, a migration nobody wants to do. Each part runs on the model that fits it, in parallel, and gets checked before anything is called done."
     },
-    "editions": {
-      "eyebrow": "Three editions",
-      "title": "Three editions, one brain.",
-      "subtitle": "Same orchestration engine. Pick the host you already use.",
-      "ultimate": {
-        "name": "Ultimate",
-        "platform": "OpenCode",
-        "description": "Full plugin with 11 agents, Team Mode, background tasks, 3-tier MCP, and 55 lifecycle hooks.",
-        "install": "bunx oh-my-openagent install"
-      },
-      "light": {
-        "name": "Light",
-        "platform": "Codex CLI",
-        "description": "11 components — bootstrap, comment-checker, git-bash, lazycodex-executor-verify, LSP, rules, teammode, telemetry, ultrawork, ulw-execute-continuation, ulw-loop — wired to Codex events.",
-        "install": "npx lazycodex-ai install"
-      },
-      "senpi": {
-        "name": "Senpi",
-        "platform": "Standalone beta",
-        "description": "Native omo command with the OMO extension built in. Standalone — no OpenCode or Codex host. Beta channel only.",
-        "install": "npm i -g omo-ai@beta"
-      },
-      "tagAgents": "11 roles",
-      "tagHooks": "55 lifecycle hooks",
-      "tagComponents": "Light: 11 components",
-      "tagBeta": "Senpi: beta channel"
+    "kibitzer": {
+      "title": "Kibitzer. Your agent doesn't forget you, or your work.",
+      "body": "A small, cheap model sits beside the expensive main agent, reads what you've done before, and nudges the main agent before it repeats a mistake. The expensive model stays sharp; you stop re-explaining yourself.",
+      "sidecar": "Kibitzer · small model",
+      "main": "Main agent · frontier model",
+      "memory": "memory",
+      "nudge": "nudge",
+      "scene": "A small, cheap Kibitzer loops through watching and reading memory beside the expensive main agent's independent loop, inserting a reminder to run the migration test before shipping.",
+      "cheapLoop": "Small, cheap model · independent loop",
+      "expensiveLoop": "Expensive frontier model · main loop",
+      "watch": "Watch",
+      "read": "Read memory",
+      "judge": "Judge",
+      "memoryNote": "Previous migration: production broke when the test was skipped.",
+      "watchAgain": "Keep watching",
+      "turn": "turn {turn}",
+      "plan": "Plan the schema change",
+      "act": "Act · write the migration",
+      "skip": "Verify · skip the migration test",
+      "testFirst": "Verify · run the migration test first",
+      "ship": "Ship the change",
+      "nextTurn": "Back to plan · next turn",
+      "reason": "Last time this broke production. Run the migration test first."
     },
-    "agents": {
-      "eyebrow": "The roster",
-      "title": "Eleven roles, one graph.",
-      "subtitle": "A directed graph of 11 roles scheduled in waves: the orchestrator leads, the planner, gap analysis and plan review gate the work, categories and curated agents execute. Click a node in the graph to find its cell here.",
-      "orchestrator": {
-        "name": "Orchestrator",
-        "role": "The main agent",
-        "model": "Profiles: Capable · Simple work · Deep work",
-        "description": "Runs in your session, on your model. Parses what you meant, maps the codebase before touching a line, delegates by category and verifies every result independently. Interrupted runs resume from boulder.json exactly where they stopped."
-      },
-      "planner": {
-        "name": "Ultrawork Planner",
-        "role": "/ulw-plan planning interview",
-        "model": "Runs in the main session"
-      },
-      "planConsultant": {
-        "name": "Plan Consultant",
-        "role": "Gap analysis",
-        "model": "Claude Sonnet 4.6"
-      },
-      "planReviewer": {
-        "name": "Plan Reviewer",
-        "role": "Plan review gate",
-        "model": "GPT 6 Astra xHigh"
-      },
-      "kibitzer": {
-        "name": "Kibitzer",
-        "role": "Post-turn memory advisor",
-        "model": "Quick category"
-      },
-      "architect": {
-        "name": "Architect",
-        "role": "Architecture consult lane",
-        "model": "Claude Fable 5.1 Max"
-      },
-      "deep": {
-        "name": "Deep",
-        "role": "Deep autonomous problem-solving",
-        "model": "GPT 6 Astra High"
-      },
-      "quick": {
-        "name": "Quick",
-        "role": "Small, single-file changes",
-        "model": "Kimi For Coding Highspeed"
-      },
-      "visualEngineering": {
-        "name": "Visual Engineering",
-        "role": "UI, styling and design systems",
-        "model": "Claude Fable 5.1 Max"
-      },
-      "explore": {
-        "name": "Explore",
-        "role": "Codebase grep",
-        "model": "GPT 5.6 Luna Fast"
-      },
-      "librarian": {
-        "name": "Librarian",
-        "role": "Docs and code search",
-        "model": "GPT 5.6 Luna Fast"
-      },
-      "dynamic": {
-        "name": "Dynamic Agent",
-        "role": "Assembled for the task at hand",
-        "model": "Per-category"
+    "skills": {
+      "title": "High-quality skills. Only the ones you need.",
+      "body": "Your model is smart, but it still doesn't know a lot about solving real-world problems. OmO ships the missing knowledge as skills and loads only what the task needs."
+    },
+    "crafted": {
+      "title": "And everything else you'll touch is crafted.",
+      "body": "You won't see most of this. That's the point.",
+      "docs": "Read the details in the docs",
+      "item1Name": "Code-mode tool calls",
+      "item1Desc": "Independent tool calls run together in one small program instead of one slow round trip each.",
+      "item2Name": "Tool-call absorption",
+      "item2Desc": "Dozens of read, search and lookup calls collapse into a single step. Fewer turns, less waiting, fewer tokens.",
+      "item3Name": "Tool-call correction",
+      "item3Desc": "Malformed arguments are repaired before they execute, so a typo never becomes a wasted turn.",
+      "item4Name": "Team mode",
+      "item4Desc": "A lead agent runs a team of specialists in parallel when a job is big enough to split.",
+      "item5Name": "Monitors, not polling",
+      "item5Desc": "Waiting on a build, a deploy or a file is a subscription. The agent keeps working and wakes when it lands.",
+      "item6Name": "Goals that survive",
+      "item6Desc": "Long work is checkpointed with evidence, so a session restart resumes where it stopped.",
+      "item7Name": "Hot-reloading everything",
+      "item7Desc": "Config, skills and prompts reload live. No restarts to try a change.",
+      "item8Name": "Computer use",
+      "item8Desc": "The agent reads the screen and accessibility tree of native apps on macOS, Linux and Windows, then clicks and types in the background, so your focus and cursor stay put. A stop chord suspends it; only you resume.",
+      "stage": {
+        "roundTrip": "one round trip",
+        "oneStep": "1 step",
+        "repaired": "repaired before it ran",
+        "splits": "splits the job",
+        "parallel": "working in parallel",
+        "waiting": "waiting · 0 polls",
+        "woke": "woke up",
+        "goalProgress": "goal · 3 of 4 checked",
+        "resumes": "restart → resumes at step 4",
+        "saved": "saved",
+        "reloaded": "reloaded · no restart",
+        "background": "in the background",
+        "focusKept": "clicked · your focus never moved",
+        "stageLabel": "A single cell acting out the selected detail"
       }
     },
-    "profiles": {
-      "eyebrow": "Profiles",
-      "title": "Pick the intent, not the model.",
-      "subtitle": "A profile is an ordered chain of models. Set model_profile once and omo starts your session on the first model your providers serve; a literal provider/model in the same key pins it instead.",
-      "capable": {
-        "name": "Capable",
-        "role": "The strongest generalist available — the default when you do not want to think about models.",
-        "models": ["Claude Fable 5.1", "Claude Opus 5", "Kimi K3", "GLM 5.3"]
-      },
-      "simpleWork": {
-        "name": "Simple work",
-        "role": "Fast and cheap for small, well-specified edits.",
-        "models": ["GPT-5.6 Luna Fast", "DeepSeek V4 Flash", "Claude Haiku 4.5"]
-      },
-      "deepWork": {
-        "name": "Deep work",
-        "role": "Maximum reasoning for hard problems — the same chain the deep category runs.",
-        "models": ["GPT-6 Astra", "GPT-5.6 Sol"]
-      }
-    },
-    "orchestration": {
-      "eyebrow": "Orchestration",
-      "title": "Think, then act.",
-      "subtitle": "Planning and execution are different jobs. The planner never writes code; the executor follows a plan two reviewers already passed.",
-      "planner": {
-        "name": "Ultrawork Planner",
-        "role": "/ulw-plan",
-        "model": "Runs in the main session",
-        "description": "Interviews you, explores the codebase, writes the plan. Never writes code.",
-        "features": ["Interview mode", "Multi-agent codebase exploration"]
-      },
-      "planConsultant": {
-        "name": "Plan Consultant",
-        "role": "Gap analysis",
-        "model": "Claude Sonnet 4.6",
-        "description": "Reads the plan for ambiguities before they become bugs.",
-        "features": ["Missing requirements", "Unstated assumptions"]
-      },
-      "planReviewer": {
-        "name": "Plan Reviewer",
-        "role": "Plan review",
-        "model": "GPT 6 Astra xHigh",
-        "description": "Approves only when the plan holds up. Otherwise it goes back.",
-        "features": ["Hostile review", "OKAY or a list of reasons"]
-      },
-      "executor": {
-        "name": "Executor",
-        "role": "/ulw-execute",
-        "model": "Runs in the main session",
-        "description": "Executes the approved plan in the same session, delegates by category and skills, verifies every result itself.",
-        "features": ["Boulder state", "Independent verification"]
-      }
-    },
-    "teamMode": {
-      "eyebrow": "Team Mode · opt-in",
-      "title": "Multiple agents, side by side.",
-      "description": "A lead agent runs a team of category-specialised members in parallel. They talk through dedicated tools and you watch every member work in tmux.",
-      "features": {
-        "lead": {
-          "title": "Lead orchestration",
-          "description": "One coordinator, many specialists. Messaging via team_send_message and team_task_create."
-        },
-        "parallel": {
-          "title": "True parallelism",
-          "description": "Up to 8 members work at the same time. No queue."
-        },
-        "tmux": {
-          "title": "tmux visualisation",
-          "description": "Focus and grid windows: zoom into one teammate without losing the whole board."
-        },
-        "tools": {
-          "title": "team_* tool family",
-          "description": "12 dedicated tools (team_create, team_status, team_send_message, ...) gated behind team_mode.enabled."
-        }
-      },
-      "optIn": "team_mode.enabled = true → restart opencode",
-      "mockup": {
-        "title": "tmux — team · grid",
-        "status": "3 running",
-        "paneLead": "lead",
-        "statusLead": "team_status: 3 members busy",
-        "lineLead": "> team_task_create dashboard-ui",
-        "paneImpl": "member · visual-engineering",
-        "statusImpl": "editing app/dashboard/page.tsx",
-        "lineImpl": "> team_send_message lead \"layout done\"",
-        "paneReview": "member · ultrabrain",
-        "statusReview": "reviewing plan.md",
-        "lineReview": "> reading 14 files",
-        "paneTest": "member · quick",
-        "statusTest": "running e2e",
-        "lineTest": "> 42 passed",
-        "caption": "Off by default. Enable it when the work splits cleanly across people."
-      }
-    },
-    "principles": {
-      "eyebrow": "Design decisions",
-      "title": "Built different.",
-      "subtitle": "Six decisions that decide how the harness behaves.",
-      "specialization": {
-        "title": "Specialization",
-        "description": "Each agent does one thing well. Skills are injected per task instead of one agent knowing everything."
-      },
-      "trustVerify": {
-        "title": "Trust, but verify",
-        "description": "The orchestrator runs independent verification on everything. Subagent claims are not results."
-      },
-      "wisdom": {
-        "title": "Wisdom accumulation",
-        "description": "Learnings from each task are passed to all subsequent tasks in the run."
-      },
-      "modelOptimization": {
-        "title": "Model optimization",
-        "description": "Expensive models for planning and hard decisions. Cheap models for routine work."
-      },
-      "categories": {
-        "title": "Category system",
-        "description": "Intent-based routing. Say what you need — ultrabrain, visual-engineering, quick — and the matching model handles it."
-      },
-      "continuity": {
-        "title": "Session continuity",
-        "description": "Interrupted work resumes exactly where it stopped. Nothing is lost between sessions."
-      },
-      "boulderEvidence": "$ cat boulder.json\n{ \"plan\": \"dashboard\", \"wave\": 3, \"status\": \"resuming\" }"
+    "platforms": {
+      "titlePrefix": "And from your",
+      "body": "Talk to your agent where you already are. It messages as you, not as a bot, on every platform you use.",
+      "footnote": "Coming soon. Messaging platforms are being wired in one by one.",
+      "titleSuffix": ""
     },
     "reviews": {
       "eyebrow": "From users",
-      "title": "What developers say.",
+      "title": "What people say.",
       "review1": {
         "text": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
         "author": "Arthur Guiot"
@@ -309,37 +167,24 @@
         "author": "B, Quant Researcher"
       },
       "review3": {
-        "text": "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day.",
-        "author": "Jacob Ferrari"
-      },
-      "review4": {
-        "text": "use oh-my-openagent, you will never go back",
-        "author": "d0t3ch"
-      },
-      "review5": {
         "text": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
         "author": "Henning Kilset"
-      },
-      "review6": {
-        "text": "Oh My OpenCode Is Actually Insane",
-        "author": "Darren Builds AI (YouTube)"
       }
     },
     "cta": {
       "eyebrow": "Install",
-      "title": "Stop writing boilerplate.",
-      "subtitle": "Install Oh My OpenAgent, open your project, type mass ulw. Any job, however complex — every model at once, as a graph.",
-      "installCommand": "bunx oh-my-openagent install",
+      "title": "One command. Then get back to work.",
+      "subtitle": "Install OmO, open your project, describe the job. That's the whole setup.",
       "installNow": "Install now",
       "readTheDocs": "Read the docs"
     },
     "dag": {
       "region": "OmO desktop with the workflow graph open",
-      "windowTitle": "OmO — ship the dashboard",
+      "windowTitle": "OmO — market research, 12k sources",
       "threads": "Threads",
-      "thread1": "ship the dashboard",
-      "thread2": "fix flaky e2e",
-      "thread3": "migrate auth",
+      "thread1": "market research, 12k sources",
+      "thread2": "train the ranking model",
+      "thread3": "ship the investor deck",
       "workflow": "Workflow",
       "status": {
         "pending": "queued",
@@ -357,37 +202,93 @@
     }
   },
   "docs": {
-    "mobileHeader": "Oh My OpenAgent Docs",
-    "searchPlaceholder": "Search docs..."
+    "mobileHeader": "OmO Docs",
+    "searchPlaceholder": "Search docs...",
+    "install": {
+      "title": "Install OmO",
+      "description": "Install OmO with one command on macOS, Linux, WSL and Windows."
+    }
   },
   "manifesto": {
+    "badge": "Manifesto",
+    "meta": {
+      "author": "Q Kim",
+      "date": "Sep 14, 2026",
+      "series": "This series gets updated as the world changes."
+    },
+    "hero": {
+      "title": "Ultrawork Manifesto",
+      "subtitle": "We build today's tools, and tomorrow's,\nso you can keep your head in your work."
+    },
+    "chapters": {
+      "yourWork": {
+        "title": "Your work",
+        "p1": "You boot up your laptop. You open Slack.\nEvery day we sit at a keyboard and a mouse and do the same work as everyone else.\nExcept it isn't the same.\nEvery day, we mix in a little of our own wisdom and experience.",
+        "p2": "Nobody else has your wisdom and experience.\nThat's what makes your work worth something.",
+        "p3": "Your work matters.\nNot because you dug up piles of material, set up an experiment, and wrote the code.\nBecause your wisdom and experience went into it.\nThe rest was just your hands moving."
+      },
+      "ourTool": {
+        "title": "The tool we build",
+        "p1": "Agents today can act on your behalf.",
+        "p2": "They read dozens of times more than you ever could,\nthrow all of human knowledge at the question of how to build it,\nand they work 24 hours a day.",
+        "p3": "So it ought to be simple.\nYou put in quality tokens and compute,\nand great work comes out.",
+        "p4": "That's what today's tool has to be.",
+        "p5": "Which harness, which model's quirks, which skills...\nnone of that should be your problem.",
+        "p6": "When your wisdom meets quality tokens, it should compile straight into good work.",
+        "p7": "That's the tool we're building.\nIt takes your quality tokens and turns them into great work."
+      },
+      "ourThinking": {
+        "title": "What we think",
+        "p1": "Agents today can act on your behalf,\nbut they don't have your wisdom or your experience.",
+        "p2": "Give them everything you know, and then some.\nWhat you picked up by living as a human\nstill won't come out of the few characters an agent uses to make sense of the world.",
+        "p3Link": "We already live in a world where AI cracks a Millennium Prize problem,",
+        "p3Rest": "\nand even that proof grew from one seed, a single line of human wisdom.",
+        "p4": "We value your wisdom and experience.\nAnd everyone else's, just as much.",
+        "p5": "Our tool takes someone's wisdom and experience, and how they got there,\nand hands it to you, still alive.",
+        "p6": "Our own thinking reaches you as living wisdom.\nUnder the name of an agent. Under the name of a tool.",
+        "p7": "Your thinking can reach someone else the same way.\nThen everyone gets to spend their time on the problems that actually matter to them,\nand solve those.\nWe think we can build that world."
+      },
+      "tomorrow": {
+        "title": "Tomorrow's tool",
+        "p1": "When everyone shares what they know,\nwhen people think up the countless problems that matter to them and toss them out,\nand computers just come back with the answers,",
+        "p2": "we'll show up again, with tomorrow's tool,\nso you can focus one more time."
+      }
+    },
+    "closing": {
+      "lead": "So don't overthink it,",
+      "title": "just ulw ulw",
+      "button": "Get OmO"
+    },
+    "legacyNote": "Back on <date>January 19, 2026</date> we said an agent that makes you read its code is a badly built tool. <link>Read the old version</link>"
+  },
+  "manifestoLegacy": {
     "badge": "Manifesto",
     "hero": {
       "title": "Ultrawork Manifesto",
       "subtitle": "The Philosophy of High-Output Engineering"
     },
     "bottleneck": "> HUMAN IN THE LOOP = BOTTLENECK",
-    "autonomousCar": "Imagine an autonomous car that requires you to grab the steering wheel every 30 seconds. Would you call that \"autonomous\"? No. You'd call it driver assist — barely better than cruise control.",
+    "autonomousCar": "Imagine an autonomous car that makes you grab the wheel every 30 seconds. Would you call that \"autonomous\"? No. You'd call it driver assist. Barely better than cruise control.",
     "whyDifferent": "Why is coding any different?",
-    "micromanagement": "We've accepted a paradigm where \"AI coding\" means a chatbot that writes 20 lines, then waits for you to fix it. That's not automation — that's micromanagement.",
+    "micromanagement": "We've accepted a version of \"AI coding\" where a chatbot writes 20 lines, then waits for you to fix them. Nobody would call that automation. It's micromanagement.",
     "painPoints": {
-      "fixing": "Fixing AI's half-finished code",
+      "fixing": "Fixing the AI's half-finished code",
       "syntax": "Manually correcting syntax errors",
       "copyPasting": "Copy-pasting context back and forth",
       "reviewing": "Reviewing every single line for hallucinations"
     },
-    "notCollaboration": "That's not \"human-AI collaboration\" — that's the AI failing to do its job.",
+    "notCollaboration": "That's not \"human-AI collaboration.\" That's the AI failing to do its job.",
     "premise": "{linkText} is built on the premise that the human should be the architect, not the spell-checker.",
-    "premiseLinkText": "Oh My OpenAgent",
+    "premiseLinkText": "OmO",
     "indistinguishable": {
       "title": "Indistinguishable Code",
       "subtitle": "Agent-written code should be indistinguishable from code written by a senior engineer.",
       "items": {
         "patterns": "Follows existing codebase patterns and architecture",
-        "errorHandling": "Implements proper error handling and edge cases",
+        "errorHandling": "Handles errors and edge cases without being asked",
         "tests": "Writes tests that actually test behavior, not just coverage",
-        "noSlop": "No 'AI slop' — clean, concise, maintainable code",
-        "comments": "Comments only when they add value — never stating the obvious"
+        "noSlop": "No AI slop, meaning no over-engineering and no abstractions nobody asked for",
+        "comments": "Comments only when they add value, never to restate the obvious"
       },
       "quote": "\"If you can tell whether a commit was made by a human or an agent, the agent has failed.\""
     },
@@ -396,13 +297,13 @@
       "description": "We don't care about token usage. We care about output. If spending $5 on tokens saves an hour of engineering time, that's a 20x ROI.",
       "parallelAgents": "Parallel agents exploring multiple solutions",
       "completeWork": "Complete work without human intervention",
-      "selfVerification": "Thorough self-verification loops",
+      "selfVerification": "Verifies its own work before calling it done",
       "however": "However...",
       "optimizeDescription": "We optimize for efficiency where it counts. Not by crippling the model, but by:",
       "cheaperModels": "Using cheaper models for routine tasks",
-      "avoidingRedundant": "Avoiding redundant exploration",
-      "intelligentCaching": "Intelligent caching of context",
-      "stoppingExactly": "Stopping exactly when sufficient"
+      "avoidingRedundant": "Not exploring the same ground twice",
+      "intelligentCaching": "Caching what it learned across sessions",
+      "stoppingExactly": "Stopping once there's enough context"
     },
     "cognitiveLoad": {
       "title": "Minimize Human Cognitive Load",
@@ -412,37 +313,37 @@
         "title": "Ultrawork",
         "subtitle": "Just say \"ulw\" and walk away.",
         "steps": {
-          "analyze": "Analyzes codebase context",
-          "breakdown": "Breaks down task into atomic steps",
-          "execute": "Executes implementation",
+          "analyze": "Reads the codebase for context",
+          "breakdown": "Breaks the task into atomic steps",
+          "execute": "Implements it",
           "verify": "Verifies against requirements",
-          "commit": "Commits changes"
+          "commit": "Commits the changes"
         },
-        "footer": "Zero intervention. Full autonomy. Just results."
+        "footer": "Zero intervention. Just results."
       },
       "plannerExecutor": {
         "badge": "Approach 2",
         "title": "Planner + Executor",
         "subtitle": "When you want strategic control.",
         "plannerTitle": "Ultrawork Planner",
-        "plannerDescription": "Runs the interview, researches context, and writes a detailed work plan.",
+        "plannerDescription": "Interviews you and researches the codebase, then writes a detailed work plan.",
         "executorTitle": "/ulw-execute",
-        "executorDescription": "Executes the approved plan in the same session, delegates by category, manages waves, and tracks progress.",
-        "footer": "You architect. Agents execute. Full transparency."
+        "executorDescription": "Executes the approved plan in the same session, delegating by category and tracking progress wave by wave.",
+        "footer": "You architect. Agents execute. Nothing happens out of sight."
       }
     },
     "principles": {
       "predictable": {
         "title": "Predictable",
-        "description": "Same inputs = consistent output. No random deviations or creative liberties unless requested."
+        "description": "Same inputs, same output. No surprises and no creative liberties you didn't ask for."
       },
       "continuous": {
         "title": "Continuous",
-        "description": "Survives interruptions. Tracks progress in real-time. Preserves context across sessions."
+        "description": "Work survives a crashed session or a week away, because the agent keeps the state and you don't have to."
       },
       "delegatable": {
         "title": "Delegatable",
-        "description": "Clear acceptance criteria. Self-correcting mechanisms. Escalation only when absolutely needed."
+        "description": "Hand it a task with clear acceptance criteria, the way you'd hand one to a capable teammate. It corrects itself when something goes wrong and escalates only when it has to."
       }
     },
     "coreLoop": {
@@ -450,7 +351,7 @@
       "features": {
         "planner": {
           "feature": "Planning interview",
-          "purpose": "Extract intent through intelligent interview"
+          "purpose": "Draw out what you actually want before anything gets built"
         },
         "planConsultant": {
           "feature": "Plan consultant",
@@ -458,11 +359,11 @@
         },
         "planReviewer": {
           "feature": "Plan review gate",
-          "purpose": "Verify plans are complete before execution"
+          "purpose": "Verify the plan is complete before execution"
         },
         "orchestrator": {
           "feature": "Orchestrator",
-          "purpose": "Coordinate work without human micromanagement"
+          "purpose": "Coordinate the work so you don't have to micromanage it"
         },
         "todoContinuation": {
           "feature": "Todo Continuation",
@@ -470,11 +371,11 @@
         },
         "categorySystem": {
           "feature": "Category System",
-          "purpose": "Route to optimal model without human decision"
+          "purpose": "Route each task to the right model so you never have to pick one"
         },
         "backgroundAgents": {
           "feature": "Background Agents",
-          "purpose": "Parallel research without blocking user"
+          "purpose": "Research in parallel without blocking you"
         },
         "wisdomAccumulation": {
           "feature": "Wisdom Accumulation",
@@ -485,8 +386,8 @@
     "future": {
       "title": "The Future We're Building",
       "items": {
-        "focus": "Human developers focus on WHAT to build, not HOW to get AI to build it",
-        "quality": "Code quality independent of who wrote it",
+        "focus": "Developers think about what to build, not how to get an AI to build it",
+        "quality": "Code quality that doesn't depend on who wrote it",
         "complexity": "Complex projects as easy as simple ones",
         "promptEngineering": "\"Prompt engineering\" becomes obsolete"
       },
@@ -495,7 +396,12 @@
     },
     "finalCta": {
       "title": "just ulw ulw",
-      "button": "Get Oh My OpenAgent"
+      "button": "Get OmO"
+    },
+    "archive": {
+      "eyebrow": "Old version · Jan 19, 2026",
+      "note": "Written when not reading the code was still called crazy, and everyone sat in front of the agent.",
+      "back": "Read the current version"
     }
   }
 }

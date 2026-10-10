@@ -152,6 +152,41 @@ describe("reconcileCodexGoalSnapshot", () => {
 		expect(reconciliation.ok).toBe(true);
 		expect(reconciliation.errors).toHaveLength(0);
 		expect(reconciliation.warnings.join(" ")).toContain("driver_objective_differs");
+		expect(reconciliation.nextActions).toEqual([]);
+		expect(reconciliation.unacknowledgedObjective).toBe("X");
+	});
+
+	it("#given the differing objective was acknowledged #when reconciled again #then it is silent", () => {
+		const reconciliation = reconcileCodexGoalSnapshot(
+			{ available: true, objective: " X  \n", status: "active", raw: null },
+			{ expectedObjective: "Y", acknowledgedObjectives: ["X"] },
+		);
+
+		expect(reconciliation.warnings).toEqual([]);
+		expect(reconciliation.nextActions).toEqual([]);
+		expect(reconciliation.unacknowledgedObjective).toBeUndefined();
+	});
+
+	it("#given no driver snapshot #when reconciled #then create_goal is a next action, not a warning", () => {
+		const reconciliation = reconcileCodexGoalSnapshot(null, { expectedObjective: "Y" });
+
+		expect(reconciliation.nextActions.join(" ")).toContain("create_goal");
+		expect(reconciliation.warnings).toEqual([]);
+	});
+
+	it("#given a completed or limited driver #when reconciled #then the advice is a next action", () => {
+		const completed = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "Y", status: "complete", raw: null },
+			{ expectedObjective: "Y" },
+		);
+		const limited = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "Y", status: "usage_limited", raw: null },
+			{ expectedObjective: "Y" },
+		);
+
+		expect(completed.nextActions.join(" ")).toContain("create_goal");
+		expect(limited.nextActions.join(" ")).toContain("/goal resume");
+		expect([...completed.warnings, ...limited.warnings]).toEqual([]);
 	});
 
 	it("accepts a parsable snapshot without objective as advisory", () => {
@@ -176,7 +211,8 @@ describe("reconcileCodexGoalSnapshot", () => {
 		// then
 		expect(reconciliation.ok).toBe(true);
 		expect(reconciliation.errors).toHaveLength(0);
-		expect(reconciliation.warnings.join(" ")).toContain("/goal resume");
+		expect(reconciliation.nextActions.join(" ")).toContain("/goal resume");
+		expect(reconciliation.warnings).toEqual([]);
 	});
 });
 

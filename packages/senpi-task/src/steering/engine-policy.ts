@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto"
 
 import { interactionPolicyForAgent } from "../agents"
-import type { TaskRecord } from "../state"
+import { type DeferralOutlook, deferralOutlookFor } from "../lifecycle/deferred-revival-reasons"
+import { isHostSessionRecord } from "../lifecycle/host-session"
+import { nextRunEpoch, type TaskRecord } from "../state"
 import type { SendInput, SendOutcome } from "./types"
 
 export function oneShotPolicyDenial(record: TaskRecord): SendOutcome | undefined {
@@ -24,10 +26,27 @@ export function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome |
   }
 }
 
+const DEFERRAL_OUTLOOK_TEXT: Readonly<Record<DeferralOutlook, string>> = {
+  waits_for_capacity: "it is retried while a running child finishes or is reclaimed, and otherwise at the session's next start.",
+  may_stay_with_live_owner: "another live session holds it; it is revived here only if that session lets it go.",
+  retried_then_lost: "it is retried a few times, then marked lost if it still cannot be revived.",
+  retried_not_lost: "it is retried a few times and otherwise waits for its host; it is never marked lost for this.",
+  not_retried: "it is not retried; it stays suspended until its session starts again.",
+}
+
+/** The sentence a deferral outlook is shown as; tests compare against it rather than restating the prose. */
+export function deferralOutlookText(outlook: DeferralOutlook): string {
+  return DEFERRAL_OUTLOOK_TEXT[outlook]
+}
+
 export function notContinuableReason(record: TaskRecord): string {
   // Persisted-only and non-terminal RPC children resume only with their session. Terminal RPC
   // children with a transcript are the sole suspended records eligible for lazy task_send revival.
   if (record.residency_state === "persisted_only" || record.residency_state === "rpc_detached") {
+    if (record.suspension_reason === "revival_deferred") {
+      const reason = record.revival_deferred_reason ?? "unknown"
+      return `Task ${record.task_id} is suspended: its session was resumed, but reviving it was deferred (${reason}); ${DEFERRAL_OUTLOOK_TEXT[deferralOutlookFor(reason, isHostSessionRecord(record))]} task_output shows its state and task_cancel ends it.`
+    }
     return `Task ${record.task_id} is suspended - resumes when its session is resumed.`
   }
   if (record.residency_state === "disposed") return `Task ${record.task_id} was disposed and can no longer be continued.`
@@ -44,9 +63,21 @@ export function deliveryUncertain(record: TaskRecord, runEpoch: number): SendOut
     kind: "delivery_uncertain",
     task_id: record.task_id,
     run_epoch: runEpoch,
-    reason: "child exited before acknowledging the message; inspect task_output before resending",
-    suggestion: "Do not resend automatically; inspect task_output first.",
+    reason: "Message delivery could not be confirmed durably; inspect task_output before continuing.",
+    suggestion: "Do not resend automatically; inspect task_output and explicitly resolve the recorded delivery first.",
   }
+}
+
+export function uncertainDeliveryDenial(record: TaskRecord, message: string): SendOutcome | undefined {
+  const uncertain = record.revive_delivery_uncertain
+  if (uncertain === undefined) return undefined
+  // Retained batches cannot be retried implicitly, even by a distinct message. An ordinary
+  // running turn without a retained batch still accepts distinct steering as before.
+  if (record.status !== "running" || (record.pending_steering?.length ?? 0) > 0 ||
+    (uncertain.run_epoch === record.notification.run_epoch && uncertain.message_sha256 === messageSha256(message))) {
+    return deliveryUncertain(record, uncertain.run_epoch)
+  }
+  return undefined
 }
 
 export function lazyRevivalFailure(record: TaskRecord, reason: string): SendOutcome {
@@ -59,14 +90,15 @@ export function lazyRevivalFailure(record: TaskRecord, reason: string): SendOutc
 }
 
 export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord {
-  // run_stats, terminal_at, and any unacknowledged-delivery marker describe the FINISHED run; none
-  // may cross into the new run (a stale marker would otherwise ride every later epoch).
+  // Finished-run output and timing reset; unresolved delivery is durable evidence, not run
+  // bookkeeping. Only explicit resolution or acknowledgment may remove its marker.
   const {
     final_response: _final,
     error_message: _error,
+    failure_kind: _failureKind,
+    failure_reason: _failureReason,
     run_stats: _stats,
     terminal_at: _terminalAt,
-    revive_delivery_uncertain: _uncertain,
     ...rest
   } = record
   return {
@@ -74,6 +106,17 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
     status: "running",
     residency_state: "resident",
     updated_at: timestamp,
-    notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
+    notification: { ...record.notification, run_epoch: nextRunEpoch(record) },
+    // A revive is a new user-visible run: handles minted before it no longer name the current run.
+    run_start_epoch: nextRunEpoch(record),
+  }
+}
+
+export function evictionRefusal(taskId: string): SendOutcome {
+  return {
+    kind: "not_continuable",
+    task_id: taskId,
+    reason: `Task ${taskId} is being evicted; send was not started.`,
+    suggestion: "Use task_output to read the final result.",
   }
 }

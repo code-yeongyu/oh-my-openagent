@@ -7,6 +7,7 @@ import {
   TaskRecordCollisionError,
   createTaskRecord,
   createTaskRecordStore,
+  projectStateKey,
   resolveStateDir,
   transitionTaskRecord,
 } from "../index"
@@ -27,7 +28,7 @@ function tempProject(): string {
 }
 
 describe("resolveStateDir", () => {
-  test("#given no task state override #when resolved #then project omo senpi-task directory is used", () => {
+  test("#given no task state override #when resolved #then the per-project directory under the omo home is used", () => {
     // given
     const project = "/tmp/project-a"
 
@@ -35,7 +36,7 @@ describe("resolveStateDir", () => {
     const stateDir = resolveStateDir({ project_dir: project })
 
     // then
-    expect(stateDir).toBe(join(project, ".omo", "senpi-task"))
+    expect(stateDir).toBe(join(process.env.HOME ?? "", ".omo", "agent", "projects", projectStateKey(project), "senpi-task"))
   })
 
   test("#given task state override #when resolved #then override directory wins", () => {

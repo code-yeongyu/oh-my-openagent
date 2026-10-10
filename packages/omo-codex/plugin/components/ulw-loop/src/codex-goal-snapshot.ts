@@ -22,13 +22,19 @@ export interface CodexGoalSnapshot {
 export interface CodexGoalReconciliation {
 	ok: boolean;
 	snapshot: CodexGoalSnapshot;
+	/** Facts to know (a differing driver objective); never something to do. */
 	warnings: string[];
+	/** Things to do next (create, re-create, or resume the driver goal). */
+	nextActions: string[];
 	errors: string[];
+	/** The differing objective this reconciliation reported for the first time, for the caller to acknowledge. */
+	unacknowledgedObjective?: string;
 }
 
 export interface ReconcileCodexGoalOptions {
 	expectedObjective: string;
 	readonly acceptedObjectives?: readonly string[];
+	readonly acknowledgedObjectives?: readonly string[];
 }
 
 export class CodexGoalSnapshotError extends Error {}
@@ -111,35 +117,41 @@ export function reconcileCodexGoalSnapshot(
 	const effectiveSnapshot = snapshot ?? { available: false, raw: null };
 	const errors: string[] = [];
 	const warnings: string[] = [];
+	const nextActions: string[] = [];
 
 	const expected = options.expectedObjective;
-	const normalizedExpected = normalizeObjective(expected);
 	if (!effectiveSnapshot.available) {
-		warnings.push(`call get_goal; if none, create_goal with codexObjective "${expected}" verbatim`);
-		return { ok: errors.length === 0, snapshot: effectiveSnapshot, warnings, errors };
+		nextActions.push(`call get_goal; if none, create_goal with codexObjective "${expected}" verbatim`);
+		return { ok: errors.length === 0, snapshot: effectiveSnapshot, warnings, nextActions, errors };
 	}
 
-	const accepted = new Set(
-		[
-			normalizedExpected,
-			...(options.acceptedObjectives ?? []).map((objective) => normalizeObjective(objective)),
-		].filter(Boolean),
-	);
+	const normalized = (objectives: readonly string[]) => new Set(objectives.map(normalizeObjective).filter(Boolean));
+	const accepted = normalized([expected, ...(options.acceptedObjectives ?? [])]);
+	const acknowledged = normalized(options.acknowledgedObjectives ?? []);
 	const actual = normalizeObjective(effectiveSnapshot.objective ?? "");
-	if (actual && !accepted.has(normalizeObjective(actual))) {
+	let unacknowledgedObjective: string | undefined;
+	if (actual && !accepted.has(actual) && !acknowledged.has(actual)) {
 		warnings.push(`driver_objective_differs: expected "${expected}", got "${actual}".`);
+		unacknowledgedObjective = actual;
 	}
 
 	const actualStatus = effectiveSnapshot.status ?? "unknown";
 	if (actualStatus === "paused" || actualStatus === "usage_limited" || actualStatus === "budget_limited") {
-		warnings.push("/goal resume or raise the budget");
+		nextActions.push("/goal resume or raise the budget");
 	}
 	if (actualStatus === "complete")
-		warnings.push(`driver closed early: call create_goal with codexObjective "${expected}" verbatim`);
-	return { ok: errors.length === 0, snapshot: effectiveSnapshot, warnings, errors };
+		nextActions.push(`driver closed early: call create_goal with codexObjective "${expected}" verbatim`);
+	return {
+		ok: errors.length === 0,
+		snapshot: effectiveSnapshot,
+		warnings,
+		nextActions,
+		errors,
+		...(unacknowledgedObjective === undefined ? {} : { unacknowledgedObjective }),
+	};
 }
 
 export function formatCodexGoalReconciliation(reconciliation: CodexGoalReconciliation): string {
-	const parts = [...reconciliation.errors, ...reconciliation.warnings];
+	const parts = [...reconciliation.errors, ...reconciliation.nextActions, ...reconciliation.warnings];
 	return parts.join(" ");
 }

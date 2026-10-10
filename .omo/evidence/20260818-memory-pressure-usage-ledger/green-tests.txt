@@ -1,1 +1,0 @@
-GREEN: 24 pass, 0 fail across 5 test files (ledger, wiring, assets, domains, spawn)

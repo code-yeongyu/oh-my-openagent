@@ -1,6 +1,6 @@
 import type { BoulderSessionOrigin, BoulderState, BoulderWorkState } from "../types"
 import { getBoulderWorks, readBoulderState } from "./read-state"
-import { normalizeSessionId, nowIsoString, projectWorkToMirror } from "./shared"
+import { normalizeSessionId, nowIsoString, projectWorkToMirror, restoreDemotedWork } from "./shared"
 import { writeBoulderState } from "./write-state"
 
 export function appendSessionId(
@@ -70,7 +70,7 @@ export function appendSessionIdForWork(
   }
 
   const updatedWork: BoulderWorkState = {
-    ...targetWork,
+    ...restoreDemotedWork(targetWork),
     session_ids: targetWork.session_ids.includes(normalizedSessionId)
       ? [...targetWork.session_ids]
       : [...targetWork.session_ids, normalizedSessionId],

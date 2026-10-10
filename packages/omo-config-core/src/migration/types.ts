@@ -55,6 +55,12 @@ export type MigrationPlan = {
   readonly id: string
   /** Rewrites the current target document instead of no-clobber merging separate legacy sources. */
   readonly mode?: "merge" | "replace-target"
+  /**
+   * Content gate evaluated against the current target before anything is written. A plan that
+   * returns false is skipped whole: no journal, no backup, no target write, and no `_migrations`
+   * marker, so a config the migration has nothing to do to is left byte-identical.
+   */
+  readonly shouldRun?: (target: Readonly<Record<string, unknown>>) => boolean
   readonly sources: readonly MigrationSourceDescriptor[]
   readonly targetPath: string
   readonly transform: MigrationTransform

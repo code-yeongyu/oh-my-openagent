@@ -22,13 +22,20 @@ async function makePackagedPlugin(): Promise<string> {
   await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
   await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-agent-toolkit.js"), "export const createAgentToolkitTool = () => ({})\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-computer-use.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-doctor.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-memfs.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
+  await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "gateway-store-worker.mjs"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "kibitzer-persona.md"), "# kibitzer persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "daemon-launch-spec.json"), '{"spec_version":1,"core":{"session_runtime":"in-process","multi_session":true,"extensions":["."]},"tunables":{},"env":{}}\n')
   const requiredSkillNames = [
     "ast-grep",
     "coding-agent-sessions",
@@ -36,6 +43,7 @@ async function makePackagedPlugin(): Promise<string> {
     "frontend",
     "git-master",
     "init-deep",
+    "browser",
     "lsp-setup",
     "programming",
     "refactor",
@@ -52,6 +60,10 @@ async function makePackagedPlugin(): Promise<string> {
   for (const skillName of requiredSkillNames) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }
+  // The browser skill's bundled omowright runtime is a required payload artifact (issue #9661);
+  // the fixture mirrors the required set so the installer's integrity check passes.
+  await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "index.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "page-bundle.js"), "\n")
   // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
   await writeFixtureFile(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
   const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import type { ExtensionContext } from "@code-yeongyu/senpi"
+import type { ExtensionToolContext } from "@code-yeongyu/senpi"
 
 import { collisionStore } from "../../manager/__fixtures__/collision-store"
 import { FakeRunner, categoryPlanner, cleanupProjects, settings, tempProject } from "../../manager/__fixtures__/manager-fakes"
@@ -41,7 +41,7 @@ describe("team_create collision handling", () => {
       },
     })
     const tool = createTeamCreateTool({ service })
-    const context = {} as unknown as ExtensionContext
+    const context = {} as unknown as ExtensionToolContext
 
     // when
     const result = await tool.execute(

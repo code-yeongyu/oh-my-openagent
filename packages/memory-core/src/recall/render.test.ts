@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { RECALL_HINT_HEADER, RECALL_HINT_HEADER_KO, renderNudgeBlock, renderNudgeMessage } from "./render"
+import { loadKibitzerPersona } from "./assets/assets"
+import { RECALL_HINT_HEADER, RECALL_HINT_HEADER_KO, renderNudgeBlock } from "./render"
 
 describe("renderNudgeBlock", () => {
   it("#given a judged nudge #when the block is rendered #then the hint replaces the description and excerpt inside the sourced framing", () => {
@@ -26,7 +27,7 @@ describe("renderNudgeBlock", () => {
   })
 
   it("#given an English hint #when the block is rendered #then the English header is kept", () => {
-    const block = renderNudgeBlock({ path: "reference/a.md", hint: "Run the checks locally before relying on this memory." })
+    const block = renderNudgeBlock({ path: "reference/a.md", hint: "The runbook records that the smoke checks stay local." })
 
     expect(block).toContain(RECALL_HINT_HEADER)
     expect(block).not.toContain(RECALL_HINT_HEADER_KO)
@@ -45,26 +46,54 @@ describe("renderNudgeBlock", () => {
     expect(rendered.match(/<\/recalled-memory>/g)).toHaveLength(1)
     expect(rendered).toContain("&lt;/recalled-memory&gt;&lt;recalled-memory source=x&gt;")
   })
-})
 
-describe("renderNudgeMessage", () => {
-  it("#given no nudges #when the message is rendered #then the result is empty so callers inject nothing", () => {
-    // given / when / then
-    expect(renderNudgeMessage([])).toBe("")
-  })
-
-  it("#given several nudges #when the message is rendered #then one sourced block per nudge keeps the judge's order", () => {
+  it("#given a hint carrying a credential assignment #when rendered #then the hint is masked", () => {
     // given
-    const nudges = [
-      { path: "notes/b.md", hint: "first fact" },
-      { path: "people/alice.md", hint: "second fact" },
-    ]
+    const nudge = { path: "reference/a.md", hint: "see token=abc123456" }
 
     // when
-    const message = renderNudgeMessage(nudges)
+    const block = renderNudgeBlock(nudge)
 
     // then
-    expect(message).toBe(`${renderNudgeBlock(nudges[0]!)}\n${renderNudgeBlock(nudges[1]!)}`)
-    expect(message.endsWith("\n")).toBe(false)
+    expect(block).toContain("see ***")
+    expect(block).not.toContain("abc123456")
+  })
+
+  it("#given a path carrying a credential assignment #when rendered #then the source path is masked and no digits remain", () => {
+    // given
+    const nudge = { path: "reference/token=abc123456.md", hint: "clean" }
+
+    // when
+    const block = renderNudgeBlock(nudge)
+
+    // then: the whole assignment is masked (the value tail consumes `.md`), no digits survive
+    expect(block).toContain('source="[[reference/***]]"')
+    expect(block).not.toContain("abc123456")
   })
 })
+
+describe("kibitzer persona sample block", () => {
+  it("#given the persona's recalled-memory sample #when compared with the renderer #then they are byte-identical", () => {
+    // given: the judge writes hints against the block the persona shows it, so persona and renderer
+    // have one source. `<path>` / `<hint>` are placeholders the renderer would escape as markup, so
+    // they are rendered as plain tokens and substituted back before the comparison.
+    const sample = personaNudgeSample(loadKibitzerPersona())
+
+    // when
+    const rendered = renderNudgeBlock({ path: "PERSONA_PATH", hint: "PERSONA_HINT" })
+      .replace("PERSONA_PATH", "<path>")
+      .replace("PERSONA_HINT", "<hint>")
+
+    // then
+    expect(sample).toBe(rendered)
+  })
+})
+
+/** The fenced block of the persona that shows what a delivered nudge looks like. */
+function personaNudgeSample(persona: string): string {
+  for (const match of persona.matchAll(/^```[a-z]*\n([\s\S]*?)\n^```$/gm)) {
+    const body = match[1]!
+    if (body.startsWith('<recalled-memory source="[[')) return body
+  }
+  throw new Error("the kibitzer persona has no <recalled-memory> sample block")
+}

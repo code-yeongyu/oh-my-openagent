@@ -3,14 +3,13 @@ import { join } from "node:path"
 
 import { dispatchRunEnd, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
-import { normalizeUlwLoopSessionId, ulwLoopScopedGoalsPath, ulwLoopStatusArgs } from "./session-scope"
+import { normalizeUlwLoopSessionId, ulwLoopScopedGoalsPath } from "./session-scope"
 import { activeStatus, createLogger, type RecordedLog } from "./ulw-loop.test-support"
 import type { ComponentLogger } from "../../extension/types"
 
 interface RunnerCall {
-  bin: string
-  args: readonly string[]
   cwd: string
+  sessionId: string
 }
 
 async function registerScoped(
@@ -24,10 +23,9 @@ async function registerScoped(
   const calls: RunnerCall[] = []
   const logger = createLogger()
   await createUlwLoopComponent({
-    resolveOmoBin: () => "/tmp/omo",
     planExists: options.planExists ?? (() => true),
-    runCommand: async (bin, args, runOptions) => {
-      calls.push({ bin, args, cwd: runOptions.cwd })
+    readStatus: async (cwd, sessionId) => {
+      calls.push({ cwd, sessionId })
       return { code: 0, stdout: options.stdout ?? activeStatus() }
     },
   }).register(pi, { logger, config: { getFlag: () => false } })
@@ -39,10 +37,10 @@ function sessionCtx(cwd: string, sessionId: string): Record<string, unknown> {
 }
 
 describe("omo-senpi ulw-loop status probe session scope", () => {
-  it("#given a session id on the host #when the status probe runs #then every invocation carries --session-id", async () => {
+  it("#given a session id on the host #when the status probe runs #then every read carries the normalized session id", async () => {
     const { pi, calls } = await registerScoped()
     const ctx = sessionCtx("/repo", "sess A/../weird")
-    const expected = ["ulw-loop", "status", "--json", "--session-id", "sess-A-weird"]
+    const expected = { cwd: "/repo", sessionId: "sess-A-weird" }
 
     await pi.dispatch("session_start", { type: "session_start" }, ctx)
     await pi.dispatch(
@@ -54,7 +52,7 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
     await pi.dispatch("tool_result", { toolName: "bash" }, ctx)
 
     expect(calls).toHaveLength(4)
-    for (const call of calls) expect(call.args).toEqual(expected)
+    for (const call of calls) expect(call).toEqual(expected)
   })
 
   it("#given NO session id available #when agent_end fires on an active unscoped run #then no continuation is delivered", async () => {
@@ -85,7 +83,7 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
     expect(calls).toEqual([])
   })
 
-  it("#given a session id but no .omo/ulw-loop directory #when agent_end fires #then the perf guard short-circuits with no spawn", async () => {
+  it("#given a session id but no .omo/ulw-loop directory #when agent_end fires #then the perf guard short-circuits with no status read", async () => {
     const { pi, calls } = await registerScoped({ planExists: () => false })
 
     await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionCtx("/repo", "sess-guard"))
@@ -148,10 +146,6 @@ describe("omo-senpi ulw-loop session id normalization parity", () => {
       expect([input, normalizeUlwLoopSessionId(input)]).toEqual([input, expected])
       expect([input, toolkitNormalize(input)]).toEqual([input, expected])
     }
-  })
-
-  it("#given a normalized session id #when building status args #then the toolkit flag order is stable", () => {
-    expect(ulwLoopStatusArgs("sess-A")).toEqual(["ulw-loop", "status", "--json", "--session-id", "sess-A"])
   })
 
   it("#given a cwd and normalized session id #when resolving the scoped goals.json path #then it matches the toolkit session-scoped goals path", () => {

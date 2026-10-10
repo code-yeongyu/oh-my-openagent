@@ -84,7 +84,7 @@ sync_latest_source() {
   git -C "$DEST" checkout -B "$DEFAULT_BRANCH" FETCH_HEAD
 }
 sync_latest_source code-yeongyu/lazycodex "$LAZYCODEX_SOURCE_ROOT/lazycodex-source"
-sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/openai-codex-source"
+sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source"
 ```
 4. Create a fresh temporary clone and branch under `${TMPDIR:-/tmp}`. Do not modify the user's current repository for the target fix unless the current repository is itself the requested target and the user explicitly asked for local edits.
 

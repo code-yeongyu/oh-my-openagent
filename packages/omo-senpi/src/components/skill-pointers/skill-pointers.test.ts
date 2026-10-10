@@ -3,75 +3,15 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import {
-  createSkillPointersComponent,
   MASS_ULW_CUSTOM_TYPE,
   matchedSkillPointerNames,
-  SKILL_POINTERS_DISABLED_FLAG,
+  ULTIMATE_BROWSING_CUSTOM_TYPE,
   ULW_LOOP_CUSTOM_TYPE,
   ULW_PLAN_CUSTOM_TYPE,
   ULW_RESEARCH_CUSTOM_TYPE,
 } from "./index"
-
-type InputDispatchResult = { action: "continue" } | { action: "transform"; text: string }
-
-function createTestContext(pi: FakeExtensionAPI): ComponentContext {
-  const logger: ComponentLogger = {
-    info() {},
-    warn() {},
-    error() {},
-  }
-  return {
-    logger,
-    config: {
-      getFlag(name) {
-        return pi.getFlag(name)
-      },
-    },
-  }
-}
-
-async function registerSkillPointers(pi: FakeExtensionAPI): Promise<void> {
-  await createSkillPointersComponent().register(pi, createTestContext(pi))
-}
-
-async function dispatchInput(
-  pi: FakeExtensionAPI,
-  text: unknown,
-  source: unknown = "interactive",
-  streamingBehavior?: unknown,
-  eventCtx?: unknown,
-): Promise<InputDispatchResult> {
-  const [result] = await pi.dispatch("input", {
-    type: "input",
-    text,
-    source,
-    ...(streamingBehavior === undefined ? {} : { streamingBehavior }),
-  }, eventCtx)
-  return result as InputDispatchResult
-}
-
-function expectPointerInjections(pi: FakeExtensionAPI, result: unknown, expected: readonly { customType: string; skillName: string }[]): void {
-  expect(result).toEqual({ action: "continue" })
-  expect(pi.messages).toHaveLength(expected.length)
-  expect(pi.messages.map((call) => call.message["customType"])).toEqual(expected.map((entry) => entry.customType))
-  for (const [index, entry] of expected.entries()) {
-    const call = pi.messages[index]
-    expect(call?.message["display"]).toBe(false)
-    const content = call?.message["content"]
-    if (typeof content !== "string") {
-      throw new Error("expected a string skill-pointer message")
-    }
-    expect(content).toContain(`<omo-${entry.skillName}-pointer>`)
-    expect(content).toContain(`${entry.skillName}/SKILL.md`)
-  }
-}
-
-function expectNoInjection(pi: FakeExtensionAPI, result: unknown): void {
-  expect(result).toEqual({ action: "continue" })
-  expect(pi.messages).toHaveLength(0)
-}
+import { dispatchInput, expectPointerInjections, registerSkillPointers } from "./test-support"
 
 describe("omo-senpi skill-pointers component", () => {
   describe("#given the keyword table", () => {
@@ -194,7 +134,7 @@ describe("omo-senpi skill-pointers component", () => {
       expect(content).toEndWith("</omo-mass-ulw-pointer>")
     })
 
-    it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop points at the registered toolkit tool", async () => {
+    it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop teaches the eval SDK import", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -208,9 +148,10 @@ describe("omo-senpi skill-pointers component", () => {
       if (typeof massContent !== "string" || typeof loopContent !== "string") {
         throw new Error("expected string skill-pointer messages")
       }
-      expect(loopContent).toContain("tool.omo_agent_toolkit")
+      expect(loopContent).toContain('await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`)')
+      expect(loopContent).not.toMatch(/tool\.omo_agent_toolkit/)
       expect(loopContent).not.toContain("runtime/agent-toolkit")
-      expect(massContent).not.toContain("tool.omo_agent_toolkit")
+      expect(massContent).not.toContain("OMO_AGENT_TOOLKIT_SDK_ROOT")
     })
 
     it("#when overlapping keywords are mentioned #then one pointer per skill is injected in table order", async () => {
@@ -240,7 +181,7 @@ describe("omo-senpi skill-pointers component", () => {
       expectPointerInjections(pi, result, [{ customType: ULW_PLAN_CUSTOM_TYPE, skillName: "ulw-plan" }])
     })
 
-    it("#when research is mentioned #then the research pointer is injected", async () => {
+    it("#when research is mentioned #then the research pointer and its browsing companion are injected", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -252,216 +193,8 @@ describe("omo-senpi skill-pointers component", () => {
       expectPointerInjections(pi, result, [
         { customType: MASS_ULW_CUSTOM_TYPE, skillName: "mass-ulw" },
         { customType: ULW_RESEARCH_CUSTOM_TYPE, skillName: "ulw-research" },
+        { customType: ULTIMATE_BROWSING_CUSTOM_TYPE, skillName: "ultimate-browsing" },
       ])
-    })
-  })
-
-  describe("#given quoted and relayed mentions", () => {
-    it("#when a mention is inside inline code #then no pointer is injected", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      for (const text of ["explain `ulw-loop` without running it", "explain ``ulw-loop `status` ``"]) {
-        expect(matchedSkillPointerNames(text)).toEqual([])
-        expectNoInjection(pi, await dispatchInput(pi, text))
-      }
-    })
-
-    it("#when a mention is inside a fenced code block #then no pointer is injected", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      for (const text of [
-        "review this log:\n```text\nulw-loop\n```",
-        "~~~text\nulw-loop\n~~~",
-        "````text\n```\nulw-loop\n````",
-        "```text\nulw-loop",
-      ]) {
-        expect(matchedSkillPointerNames(text)).toEqual([])
-        expectNoInjection(pi, await dispatchInput(pi, text))
-      }
-    })
-
-    it("#when a mention is inside a relayed pointer block #then no pointer is injected", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      for (const tag of ["omo-ulw-loop-pointer", "omo-mass-ulw-pointer", "ultrawork-mode", "omo-ultrawork-reminder"]) {
-        const text = `<${tag}>ulw-loop</${tag}>`
-        expect(matchedSkillPointerNames(text)).toEqual([])
-        expectNoInjection(pi, await dispatchInput(pi, text))
-      }
-    })
-
-    it("#when code separates skill-name fragments #then removing it does not fabricate a match", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      expectNoInjection(pi, await dispatchInput(pi, "ulw `not a request` loop"))
-    })
-
-    it("#when a request follows a quoted mention #then only the requested skill matches", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      const result = await dispatchInput(pi, "explain `ulw-plan`, then run ulw-loop")
-
-      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
-    })
-
-    it("#when plain prose mentions a skill #then the pointer remains harmlessly conditional", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      const result = await dispatchInput(pi, "the status report mentions ulw-loop")
-
-      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
-      expect(pi.messages[0]?.message["content"]).toEndWith("</omo-ulw-loop-pointer>")
-    })
-  })
-
-  describe("#given a queued prompt", () => {
-    it("#when streamingBehavior is set #then all pointers ride inside the same message", async () => {
-      // given
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      // when
-      const result = await dispatchInput(pi, "mass ulw loop queued work", "interactive", "steer")
-
-      // then
-      expect(result.action).toBe("transform")
-      if (result.action !== "transform") throw new Error("expected transform")
-      expect(result.text).toMatch(/^mass ulw loop queued work\n/)
-      expect(result.text).toContain("mass-ulw/SKILL.md")
-      expect(result.text).toContain("ulw-loop/SKILL.md")
-      expect(pi.messages).toHaveLength(0)
-    })
-  })
-
-  describe("#given ulw-loop session scope", () => {
-    it("#when the input session id is known #then the pointer carries its normalized scope", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      const result = await dispatchInput(pi, "run ulw-loop", "interactive", undefined, {
-        sessionManager: { getSessionId: () => "session/a weird" },
-      })
-
-      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
-      const content = pi.messages[0]?.message["content"]
-      expect(content).toContain("tool.omo_agent_toolkit")
-      expect(content).toContain(".omo/ulw-loop/session-a-weird/")
-    })
-
-    it("#when a queued RPC input changes sessions #then the pointer uses that event's scope", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-      await dispatchInput(pi, "run ulw-loop", "interactive", undefined, {
-        sessionManager: { getSessionId: () => "previous-session" },
-      })
-
-      const prompt = "/skill:mass-ulw then ulw-loop"
-      const result = await dispatchInput(pi, prompt, "rpc", "steer", {
-        sessionManager: { getSessionId: () => "new/session" },
-      })
-
-      expect(result.action).toBe("transform")
-      if (result.action !== "transform") throw new Error("expected transform")
-      expect(result.text).toStartWith(`${prompt}\n<omo-ulw-loop-pointer>`)
-      expect(result.text).toContain(".omo/ulw-loop/new-session/")
-      expect(result.text).not.toContain(".omo/ulw-loop/previous-session/")
-      expect(pi.messages).toHaveLength(1)
-    })
-
-    it("#when the input session id is unknown #then the pointer omits the session flag", async () => {
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      const result = await dispatchInput(pi, "run ulw-loop")
-
-      expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
-      const content = pi.messages[0]?.message["content"]
-      expect(content).not.toContain("--session-id")
-      expect(content).not.toContain(".omo/ulw-loop/")
-    })
-  })
-
-  describe("#given suppression conditions", () => {
-    it("#when the source is extension #then nothing is injected", async () => {
-      // given
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      // when
-      const result = await dispatchInput(pi, "mass ulw loop from extension", "extension")
-
-      // then
-      expectNoInjection(pi, result)
-    })
-
-    it("#when the prompt is a raw /skill: command for the only matched skill #then nothing is injected", async () => {
-      // given
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      // when
-      const result = await dispatchInput(pi, "/skill:mass-ulw run the graph")
-
-      // then
-      expectNoInjection(pi, result)
-    })
-
-    it("#when /skill:ulw-loop args mention ulw research #then only the research pointer is injected", async () => {
-      // given
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      // when
-      const result = await dispatchInput(pi, "/skill:ulw-loop then ulw research the fallout")
-
-      // then
-      expectPointerInjections(pi, result, [{ customType: ULW_RESEARCH_CUSTOM_TYPE, skillName: "ulw-research" }])
-    })
-
-    it("#when the prompt carries an expanded skill block #then that skill is not re-injected", async () => {
-      // given
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      // when
-      const result = await dispatchInput(
-        pi,
-        '<skill name="mass-ulw" path="skills/mass-ulw/SKILL.md">skill body mentioning mass ulw</skill> now run it',
-      )
-
-      // then
-      expectNoInjection(pi, result)
-    })
-
-    it("#when the component flag is disabled #then nothing is injected", async () => {
-      // given
-      const pi = new FakeExtensionAPI()
-      pi.setFlag(SKILL_POINTERS_DISABLED_FLAG, true)
-      await registerSkillPointers(pi)
-
-      // when
-      const result = await dispatchInput(pi, "mass ulw loop ship it")
-
-      // then
-      expectNoInjection(pi, result)
-    })
-
-    it("#when the text has no keyword #then nothing is injected", async () => {
-      // given
-      const pi = new FakeExtensionAPI()
-      await registerSkillPointers(pi)
-
-      // when
-      const result = await dispatchInput(pi, "ordinary follow-up")
-
-      // then
-      expectNoInjection(pi, result)
     })
   })
 })
