@@ -23,6 +23,7 @@ import {
   resolveSessionPromptConfig,
 } from "./session-prompt-config-resolver"
 import { AGENT_RECOVERY_PROMPT, NO_TEXT_TAIL_THRESHOLD, RECOVERY_COOLDOWN_MS, RECENT_COMPACTION_WINDOW_MS } from "./constants"
+import { formatCheckpointedSkillsText } from "./skill-reinjection"
 import type { CompactionContextClient } from "./types"
 import type { TailMonitorState } from "./tail-monitor"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
@@ -77,8 +78,12 @@ export function createRecoveryLogic(
     const launchAgent = resolveRegisteredAgentName(expectedPromptConfig.agent)
     const model = expectedPromptConfig.model
     const tools = expectedPromptConfig.tools
+    const checkpointedSkillsText = formatCheckpointedSkillsText(checkpoint.skills)
 
-    if (reason === "compaction.autocontinue" || reason === "session.compacted") {
+    if (
+      (reason === "compaction.autocontinue" || reason === "session.compacted") &&
+      !checkpointedSkillsText
+    ) {
       const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
         return false
@@ -99,7 +104,15 @@ export function createRecoveryLogic(
             agent: launchAgent ?? expectedPromptConfig.agent,
             ...(model ? { model } : {}),
             ...(tools ? { tools } : {}),
-            parts: [withInternalNoReplyMarker(createInternalAgentContinuationTextPart(AGENT_RECOVERY_PROMPT))],
+            parts: [
+              withInternalNoReplyMarker(
+                createInternalAgentContinuationTextPart(
+                  checkpointedSkillsText
+                    ? `${AGENT_RECOVERY_PROMPT}\n\n${checkpointedSkillsText}`
+                    : AGENT_RECOVERY_PROMPT,
+                ),
+              ),
+            ],
           },
           query: { directory: ctx.directory },
         },

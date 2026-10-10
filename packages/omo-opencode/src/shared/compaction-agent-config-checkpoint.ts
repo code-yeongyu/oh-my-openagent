@@ -1,7 +1,13 @@
+export type CompactionSkillSnapshot = {
+  name: string
+  body: string
+}
+
 export type CompactionAgentConfigCheckpoint = {
   agent?: string
   model?: { providerID: string; modelID: string; variant?: string }
   tools?: Record<string, boolean>
+  skills?: CompactionSkillSnapshot[]
 }
 
 const checkpoints = new Map<string, CompactionAgentConfigCheckpoint>()
@@ -21,6 +27,14 @@ function cloneCheckpoint(
         }
       : {}),
     ...(checkpoint.tools ? { tools: { ...checkpoint.tools } } : {}),
+    ...(checkpoint.skills
+      ? {
+          skills: checkpoint.skills.map((skill) => ({
+            name: skill.name,
+            body: skill.body,
+          })),
+        }
+      : {}),
   }
 }
 

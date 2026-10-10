@@ -18,6 +18,7 @@ import {
   matchSkillByName,
 } from "./skill-matcher"
 import { extractSkillBody } from "./skill-body"
+import { recordLoadedSkill } from "../../shared/session-loaded-skills"
 import {
   isPromiseLike,
   loadedSkillToInfo,
@@ -167,6 +168,10 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
         if (matchedSkill.name === "git-master") {
           body = injectGitMasterConfig(body, options.gitMasterConfig)
+        }
+
+        if (ctx?.sessionID) {
+          recordLoadedSkill(ctx.sessionID, matchedSkill.name, body)
         }
 
         const dir = matchedSkill.path ? dirname(matchedSkill.path) : matchedSkill.resolvedPath || process.cwd()
