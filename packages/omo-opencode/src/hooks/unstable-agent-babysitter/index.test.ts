@@ -301,6 +301,34 @@ describe("unstable-agent-babysitter hook", () => {
     Date.now = originalNow
   })
 
+  test("does not inject a reminder when the main session is cancelled during idle settle", async () => {
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
+        ],
+      },
+      promptCalls,
+    })
+    const backgroundManager = createBackgroundManager([createTask()])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { timeout_ms: 120000 },
+      idleSettleMs: 10,
+    })
+
+    const idleEvent = hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+    await hook.event({ event: { type: "session.stop", properties: { sessionID: "main-1" } } })
+    await idleEvent
+
+    expect(promptCalls.length).toBe(0)
+  })
+
   test("#given the main session model includes variant #when injecting a babysitter reminder #then promptAsync receives variant as a top-level field", async () => {
     // given
     setMainSession("main-1")
