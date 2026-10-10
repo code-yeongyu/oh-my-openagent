@@ -36,12 +36,14 @@ export async function extractTarGz(
   destDir: string,
   options?: { args?: string[]; cwd?: string }
 ): Promise<void> {
-  const entries = await listTarEntries(archivePath, options?.cwd)
+  const env = tarEnvironment()
+  const entries = await listTarEntries(archivePath, env, options?.cwd)
   validateArchiveEntries(entries, destDir)
 
   const args = options?.args ?? ["tar", "-xzf", archivePath, "-C", destDir];
   const proc = spawn(args, {
     cwd: options?.cwd,
+    env,
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -114,12 +116,21 @@ function parseTarEntry(line: string): ArchiveEntry | null {
   }
 }
 
-async function listTarEntries(archivePath: string, cwd?: string): Promise<ArchiveEntry[]> {
-  // GNU tar reads extra options from TAR_OPTIONS (--block-number prefixes every line) and translates
-  // " link to " in the message locale, so the listing runs in the C locale without them. bsdtar ignores
-  // both; Windows bsdtar keeps the system locale regardless, hence the localized date forms above.
-  const env: NodeJS.ProcessEnv = { ...process.env, LC_ALL: "C" }
+// The validated listing and the extraction run with this one environment. GNU tar reads extra options
+// from TAR_OPTIONS (--block-number prefixes every line) and translates " link to " in the message locale,
+// so neither run sees TAR_OPTIONS and both use the C locale for messages and dates. LC_ALL would override
+// those categories, so its value moves to LC_CTYPE: in a C character locale bsdtar prints non-ASCII names
+// as backslash escapes. bsdtar ignores TAR_OPTIONS; Windows bsdtar keeps the system locale regardless,
+// hence the localized date forms above.
+function tarEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, LC_MESSAGES: "C", LC_TIME: "C" }
+  if (env.LC_ALL && !env.LC_CTYPE) env.LC_CTYPE = env.LC_ALL
+  delete env.LC_ALL
   delete env.TAR_OPTIONS
+  return env
+}
+
+async function listTarEntries(archivePath: string, env: NodeJS.ProcessEnv, cwd?: string): Promise<ArchiveEntry[]> {
   // Owner and group names are stored as-is and can contain spaces, so both tars list them as numbers.
   const proc = spawn(["tar", "--numeric-owner", "-tvzf", archivePath], {
     cwd,
