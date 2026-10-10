@@ -126,8 +126,38 @@ describe("resolveCategoryExecution", () => {
 		])
 	})
 
-	test("prefers the canonical models chain over legacy model fields and carries entry reasoning", async () => {
+	test("uses the tail of a canonical models chain as the runtime fallback chain (issue #6868)", async () => {
 		//#given
+		const args = {
+			category: "deep",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: {
+				models: ["quotio/claude-opus-4-7", "quotio/kimi-k2.5", "openai/gpt-5.5(high)"],
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then - the chain head is the primary; the tail drives retries
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("quotio/claude-opus-4-7")
+		expect(result.fallbackChain).toEqual([
+			{ providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
+			{ providers: ["openai"], model: "gpt-5.5", variant: "high" },
+		])
+	})
+
+	test("merges the legacy model into the canonical chain head and preserves per-entry reasoning (issue #6868)", async () => {
+		//#given - model + models on one category used to silently drop model
 		const args = {
 			category: "canonical-chain",
 			prompt: PROMPT_INPUT_SENTINEL,
@@ -141,9 +171,61 @@ describe("resolveCategoryExecution", () => {
 		executorCtx.userCategories = {
 			"canonical-chain": {
 				model: "legacy/primary",
-				fallback_models: ["legacy/fallback"],
 				reasoning: "medium",
 				reasoningEffort: "low",
+				models: [
+					{ model: "openai/gpt-5.4", reasoning: "high", reasoningEffort: "minimal" },
+					{ model: "test-provider/plain-model", reasoning: "low" },
+				],
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined)
+
+		//#then - the explicitly written model leads; the chain shifts into the fallbacks
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("legacy/primary")
+		expect(result.fallbackChain).toEqual([
+			{
+				providers: ["openai"],
+				model: "gpt-5.4",
+				variant: undefined,
+				reasoning: "high",
+				reasoningEffort: "minimal",
+				temperature: undefined,
+				top_p: undefined,
+				maxTokens: undefined,
+				thinking: undefined,
+			},
+			{
+				providers: ["test-provider"],
+				model: "plain-model",
+				variant: undefined,
+				reasoning: "low",
+				reasoningEffort: undefined,
+				temperature: undefined,
+				top_p: undefined,
+				maxTokens: undefined,
+				thinking: undefined,
+			},
+		])
+	})
+
+	test("keeps per-entry settings when a canonical chain is consumed without a legacy model", async () => {
+		//#given
+		const args = {
+			category: "canonical-chain",
+			prompt: PROMPT_INPUT_SENTINEL,
+			description: DESCRIPTION_INPUT_SENTINEL,
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			"canonical-chain": {
 				models: [
 					{ model: "openai/gpt-5.4", reasoning: "high", reasoningEffort: "minimal" },
 					{ model: "test-provider/plain-model", reasoning: "low" },
