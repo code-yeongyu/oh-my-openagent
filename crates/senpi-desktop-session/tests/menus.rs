@@ -132,7 +132,7 @@ async fn items_lists_children_without_a_mutation_transaction() {
         ["Save", "Export…"]
     );
     assert!(audits.lock().is_empty(), "{:?}", audits.lock());
-    assert_eq!(recorded(&sinks), [], "{:?}", recorded(&sinks));
+    assert_eq!(recorded(sinks), [], "{:?}", recorded(sinks));
 }
 
 #[tokio::test]
@@ -154,7 +154,7 @@ async fn select_records_the_path_and_emits_exactly_one_audit_event() {
     // Then
     assert_eq!(selected, Response::Unit);
     assert_eq!(
-        recorded(&sinks),
+        recorded(sinks),
         [SinkOp::MenuSelect {
             window: "101".to_owned(),
             path: vec!["File".to_owned(), "Save".to_owned()],
@@ -183,7 +183,7 @@ async fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
     let refused = session.submit(select("101", &["Edit", "Undo"])).wait().await;
     // Then: the failure is still audited, but nothing was dispatched
     assert_eq!(code(refused), Some(ErrorCode::AxFailed));
-    assert_eq!(recorded(&sinks), [], "{:?}", recorded(&sinks));
+    assert_eq!(recorded(sinks), [], "{:?}", recorded(sinks));
     assert_eq!(audits.lock().len(), 1, "{:?}", audits.lock());
 }
 
@@ -203,7 +203,7 @@ async fn an_invalid_path_is_refused_before_the_backend() {
     // Then
     assert_eq!(code(empty), Some(ErrorCode::InvalidTarget));
     assert_eq!(code(blank), Some(ErrorCode::InvalidTarget));
-    assert_eq!(recorded(&sinks), [], "{:?}", recorded(&sinks));
+    assert_eq!(recorded(sinks), [], "{:?}", recorded(sinks));
 }
 
 #[tokio::test]
@@ -221,7 +221,7 @@ async fn select_is_refused_while_suspended() {
     let refused = session.submit(select("101", &["File", "Save"])).wait().await;
     // Then: the gate applies and nothing was dispatched
     assert_eq!(code(refused), Some(ErrorCode::Suspended));
-    assert_eq!(recorded(&sinks), [], "{:?}", recorded(&sinks));
+    assert_eq!(recorded(sinks), [], "{:?}", recorded(sinks));
 }
 
 #[tokio::test]
