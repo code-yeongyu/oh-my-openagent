@@ -166,6 +166,97 @@ describe("resolveActiveBoulderSession", () => {
     expect(result).toBeNull()
   })
 
+  test("returns null for tracked work session when resolved work is completed and ended", async () => {
+    // given
+    const activePlanPath = join(testDirectory, "active-work-plan.md")
+    const completedPlanPath = join(testDirectory, "completed-work-plan.md")
+    writeFileSync(activePlanPath, "# Plan\n- [ ] Active task\n", "utf-8")
+    writeFileSync(completedPlanPath, "# Plan\n- [x] Completed task\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-active",
+      active_plan: activePlanPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: ["ses_active"],
+      plan_name: "active-work-plan",
+      works: {
+        "work-active": {
+          work_id: "work-active",
+          active_plan: activePlanPath,
+          plan_name: "active-work-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_active"],
+          status: "active",
+        },
+        "work-completed": {
+          work_id: "work-completed",
+          active_plan: completedPlanPath,
+          plan_name: "completed-work-plan",
+          started_at: "2026-01-02T10:05:00Z",
+          ended_at: "2026-01-02T10:10:00Z",
+          session_ids: ["ses_completed"],
+          status: "completed",
+        },
+      },
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_completed",
+    })
+
+    // then
+    expect(result).toBeNull()
+  })
+
+  test("returns complete progress when work is active even if plan is fully checked", async () => {
+    // given
+    const activePlanPath = join(testDirectory, "active-work-plan.md")
+    const completedPlanPath = join(testDirectory, "completed-work-plan.md")
+    writeFileSync(activePlanPath, "# Plan\n- [ ] Active task\n", "utf-8")
+    writeFileSync(completedPlanPath, "# Plan\n- [x] Completed task\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-active",
+      active_plan: activePlanPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: ["ses_active"],
+      plan_name: "active-work-plan",
+      works: {
+        "work-active": {
+          work_id: "work-active",
+          active_plan: activePlanPath,
+          plan_name: "active-work-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_active"],
+          status: "active",
+        },
+        "work-completed": {
+          work_id: "work-completed",
+          active_plan: completedPlanPath,
+          plan_name: "completed-work-plan",
+          started_at: "2026-01-02T10:05:00Z",
+          ended_at: "2026-01-02T10:10:00Z",
+          session_ids: ["ses_completed"],
+          status: "completed",
+        },
+      },
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_active",
+    })
+
+    // then
+    expect(result).not.toBeNull()
+    expect(result?.progress.isComplete).toBe(false)
+  })
+
   test("returns complete progress when a mirrored worktree plan is complete", async () => {
     // given
     const mainPlanPath = join(testDirectory, ".omo", "plans", "worktree-plan.md")
