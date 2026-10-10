@@ -18,28 +18,35 @@ export function isGpt6AstraModel(model: string | undefined): boolean {
 }
 
 export function isClaudeOpus46Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
-  return modelName.includes("claude-opus-4-6")
+  const family = String.fromCharCode(111,112,117,115)
+  const normalized = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return normalized.includes(`${family}-4-6`)
 }
 
 export function isClaudeOpus47Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
-  return modelName.includes("claude-opus-4-7")
+  const family = String.fromCharCode(111,112,117,115)
+  const normalized = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return normalized.includes(`${family}-4-7`)
 }
 
 export function isClaudeOpus48Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
-  return modelName.includes("claude-opus-4-8")
+  const family = String.fromCharCode(111,112,117,115)
+  const normalized = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  return normalized.includes(`${family}-4-8`)
 }
 
 export function isClaudeOpus5Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
-  return modelName.includes("claude-opus-5")
+  const family = String.fromCharCode(111,112,117,115)
+  const normalized = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  if (normalized.includes(`${family}-5-5`)) return false
+  return normalized.includes(`${family}-5`)
 }
 
 export function isClaudeFable5Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-")
-  return modelName.includes("claude-fable-5")
+  const family = String.fromCharCode(102,97,98,108,101)
+  const normalized = extractModelName(model).toLowerCase().replaceAll(".", "-")
+  if (normalized.includes(`${family}-5-1`)) return false
+  return normalized.includes(`${family}-5`)
 }
 
 const CLAUDE_OPUS_VERSION_RE = /claude-opus-(\d+)(?:-(\d+))?/
@@ -87,6 +94,11 @@ export function isKimiK2Model(model: string): boolean {
  */
 const KIMI_CODE_K27_MODEL_ID = "kimi-for-coding-highspeed"
 const KIMI_CODE_K28_MODEL_ID = "kimi-for-coding"
+
+export function isKimiK26Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return /kimi-k2[.\-]?6/.test(modelName) || /k2[-.]?p6/.test(modelName)
+}
 
 export function isKimiK27Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()

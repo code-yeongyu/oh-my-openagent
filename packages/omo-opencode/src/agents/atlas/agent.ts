@@ -37,7 +37,7 @@ import {
 
 const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k3" | "kimi-k2-7" | "opus-4-7" | "glm"
+export type AtlasPromptSource = Extract<keyof typeof atlasPromptVariants, string>
 
 class AtlasPromptVariantError extends Error {
   readonly name = "AtlasPromptVariantError"
