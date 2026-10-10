@@ -1,0 +1,311 @@
+$ bun run script/build.ts
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] wrote 148 frontend reference files from submodules
+build:git-bash-mcp
+$ bun run --cwd packages/git-bash-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 15 modules in 108ms
+
+  cli.js  22.68 KB  (entry point)
+
+build:ast-grep-mcp
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 103 modules in 89ms
+
+  cli.js  85.14 KB  (entry point)
+
+build:cli-node
+$ bun run script/build-cli-node.ts
+built dist/cli-node (1 output)
+build:tui
+Bundled 556 modules in 375ms
+
+  tui.js  1.75 MB  (entry point)
+
+build:index
+Bundled 2002 modules in 372ms
+
+  index.js  5.85 MB  (entry point)
+
+build:cli
+Bundled 931 modules in 429ms
+
+  index.js  2.94 MB  (entry point)
+
+build:codex-install
+$ bun run script/build-codex-install.ts
+build:node-require-shim
+$ bun run script/patch-node-require-shim.ts
+Patched Node/Electron require shim in dist/index.js
+build:omo-schema
+$ bun run script/build-omo-schema.ts
+Generating omo JSON Schema...
+Γ£ô omo JSON Schema generated: assets/omo.schema.json
+build:schema
+$ bun run script/build-schema.ts
+Generating JSON Schemas...
+Γ£ô JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+build:shared-skills-assets
+$ bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+build:declarations
+build:lsp-tools-mcp
+$ npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build
+
+added 51 packages, and audited 54 packages in 4s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 build
+> node scripts/ensure-core-links.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm
+
+Bundled 70 modules in 22ms
+
+  cli.js               195.25 KB  (entry point)
+  mcp.js               194.74 KB  (entry point)
+  tools.js             182.94 KB  (entry point)
+  request-context.js   7.47 KB    (entry point)
+  lsp/manager.js       109.54 KB  (entry point)
+
+build:lsp-daemon
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 51 packages, and audited 54 packages in 5s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 18ms
+
+  cli.js     250.23 KB  (entry point)
+  index.js   231.23 KB  (entry point)
+  client.js  228.84 KB  (entry point)
+
+(node:12716) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+build:codex-plugin
+$ npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build
+
+added 70 packages, and audited 88 packages in 4s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 5.0.0-beta.78 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+(node:4284) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.78 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 29ms
+
+  cli.js  156.17 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.78 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 15ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.78 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 19ms
+
+  cli.js  19.25 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 22ms
+
+  cli.js  156.38 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 14ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 20ms
+
+  cli.js  19.43 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.78 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 36ms
+
+  cli.js  0.26 MB  (entry point)
+
+Bundled 92 modules in 30ms
+
+  posthog.js  261.83 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.78 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 21ms
+
+  cli.js  14.52 KB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 16ms
+
+  cli.js  14.77 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 32ms
+
+  cli.js  0.26 MB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.78 build
+> tsc -p tsconfig.build.json
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.78 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 12ms
+
+  cli.js  6.1 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 16ms
+
+  cli.js  8.79 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.78 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 17ms
+
+  cli.js  35.97 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.78 build
+> node scripts/build.mjs
+
+
+  dist\cli.js  377.2kb
+
+ΓÜí Done in 99ms
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 13ms
+
+  cli.js  36.14 KB  (entry point)
+
+Bundling components/bootstrap/dist/cli.js
+Bundled 180 modules in 32ms
+
+  cli.js  0.37 MB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.78 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 56 modules in 20ms
+
+  cli.js  210.78 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.78 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.78 build
+> node scripts/build-runtime.mjs
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 56 modules in 17ms
+
+  cli.js  211.96 KB  (entry point)
+
+build:senpi-plugin
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Staged Senpi LSP runtime: <repo>\packages\omo-senpi\plugin\runtime\lsp-daemon\dist
+Staged Senpi ast-grep MCP runtime: <repo>\packages\omo-senpi\plugin\runtime\ast-grep-mcp\cli.js
+Staged x-search conditional skill: <repo>\packages\omo-senpi\plugin\skills-conditional\x-search\SKILL.md
+Bundled 47 modules in 16ms
+
+  sdk.js  112.97 KB  (entry point)
+
+Bundled 1009 modules in 104ms
+
+  omo.js  1.78 MB  (entry point)
+
+Bundled 768 modules in 89ms
+
+  omo-task.js  1.21 MB  (entry point)
+
+Bundled 151 modules in 26ms
+
+  omo-member.js  204.95 KB  (entry point)
+
+Bundled 151 modules in 33ms
+
+  memory-run-supervisor.mjs  42.39 KB  (entry point)
+
+Bundled 161 modules in 26ms
+
+  omo-init-deep-advisor.js  86.65 KB  (entry point)
+
+Built omo-senpi extensions: <repo>\packages\omo-senpi\plugin\extensions\omo.js, <repo>\packages\omo-senpi\plugin\extensions\omo-task.js, <repo>\packages\omo-senpi\plugin\extensions\omo-member.js, <repo>\packages\omo-senpi\plugin\extensions\memory-run-supervisor.mjs, <repo>\packages\omo-senpi\plugin\extensions\omo-init-deep-advisor.js
+Built omo-senpi daemon launch spec: <repo>\packages\omo-senpi\plugin\daemon-launch-spec.json
+synced omo-senpi skills to <repo>\packages\omo-senpi\plugin\skills
+generated directive is current: <repo>\packages\omo-senpi\src\components\ultrawork\generated-directive.ts
+Bundled 7 modules in 11ms
+
+  install.mjs  20.69 KB  (entry point)
+
+Built omo-senpi installer: <repo>\packages\omo-senpi\plugin\scripts\install.mjs
+(node:20760) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+build: all steps completed
