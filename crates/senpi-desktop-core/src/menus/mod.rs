@@ -1,6 +1,9 @@
 //! Menu-path matching shared by every platform's menu backend: which item a
 //! requested label names, and whether it may be invoked as a command.
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::error::{CoreResult, DesktopError};
 
 /// Longest menu path any backend accepts.
@@ -8,7 +11,8 @@ const MAX_PATH_LABELS: usize = 32;
 
 /// One immediate child of a native application menu. `path` holds the native
 /// labels, ellipses included; selection accepts normalized labels.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MenuItem {
     pub title: String,
     pub path: Vec<String>,

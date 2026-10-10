@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::protocol_params::{
     AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
     AxSetValueParams, AxSnapshotParams, CancelParams, CaptureParams, ClipboardText, DragParams, EmptyParams,
-    KeyChordParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams, StopPathStartParams,
+    KeyChordParams, MenuPathParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams, StopPathStartParams,
     StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{AuditEvent, EngineLog, HelloResult, SessionOpenResult, StopPathStatus};
@@ -20,6 +20,7 @@ use crate::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions,
     DesktopWindow,
 };
+use crate::menus::MenuItem;
 
 /// What a method may do to the desktop or to the engine's input gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -97,6 +98,8 @@ method_table! {
     TypeText = "typeText", Exec, Public, TypeTextParams => ();
     KeyChord = "keyChord", Exec, Public, KeyChordParams => ();
     RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => ();
+    MenusItems = "menus.items", Read, Public, MenuPathParams => Vec<MenuItem>;
+    MenusSelect = "menus.select", Exec, Public, MenuPathParams => ();
     ClipboardRead = "clipboard.read", Read, Public, EmptyParams => ClipboardText;
     ClipboardWrite = "clipboard.write", Exec, Public, ClipboardText => ();
     AxSnapshot = "ax.snapshot", Read, Public, AxSnapshotParams => AxSnapshot;
