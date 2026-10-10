@@ -100,8 +100,10 @@ describe("parked recovery contract (#9861)", () => {
     expect(deadline).toBeDefined()
     await f.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
     f.restart()
+    const ended = f.wait("suspended_unresumable")
     f.advance(300_000)
     await f.lifecycle.reconcileOnSessionStart("parent-1")
+    await ended
     expect(f.store.load(id)?.status).toBe("error")
     expect(f.store.load(id)?.recovery_deadline_at).toBe(deadline)
     expect(f.manager.getResidentHandle(id)).toBeUndefined()

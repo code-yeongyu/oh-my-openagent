@@ -1,3 +1,4 @@
+import { TERMINAL_STATUSES } from "../lifecycle/context"
 import { PERMANENT_REVIVAL_REASONS } from "../lifecycle/deferred-revival-reasons"
 
 const CAUSES: Readonly<Record<string, string>> = {
@@ -19,7 +20,7 @@ export function recoveryPresentation(record: {
   readonly failure_kind?: string
   readonly error_message?: string
 }): { readonly state: "resuming" | "ending"; readonly cause: string; readonly text: string } | undefined {
-  if (["completed", "error", "cancelled", "lost"].includes(record.status)) return undefined
+  if (TERMINAL_STATUSES.has(record.status)) return undefined
   const expiring = record.failure_kind === "suspended_unresumable"
     || record.error_message?.startsWith("suspended_unresumable:") === true
   if (!expiring && record.suspension_reason === undefined

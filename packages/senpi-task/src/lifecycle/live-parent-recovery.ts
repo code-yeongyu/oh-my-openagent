@@ -229,7 +229,7 @@ export function startLiveParentRecovery(
             const episode = episodes.get(record.task_id)
             if (episode !== undefined && !episode.busy) {
               episode.busy = true
-              await attempt(record, episode)
+              void attempt(record, episode)
             }
           }
         }

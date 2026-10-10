@@ -5,7 +5,7 @@ import { renderTaskOutputResult } from "../../../../senpi-task/src/tools/output/
 import { panelChildFromRecord } from "../side-panel/data/task-records"
 import { buildAgentCardRows, buildAgentRows } from "../side-panel/sections/agents"
 import type { PanelChild } from "../side-panel/store"
-import { backgroundWidgetRows, buildWidgetRows, formatTaskRow } from "./status-row-format"
+import { backgroundWidgetRows, buildWidgetRows, formatTaskRow, isSuspended } from "./status-row-format"
 
 const shapes: readonly [string, Partial<TaskRecord>, "resuming" | "ending"][] = [
   ["parent restart", { residency_state: "persisted_only" }, "resuming"],
@@ -52,4 +52,40 @@ for (const [name, overrides, expected] of shapes) {
     }
     expect(buildAgentRows([child], 100, 80).some((row) => row.color === "warning")).toBe(false)
   })
+}
+
+for (const [status, panelStatus] of [
+  ["completed", "finished"], ["error", "failed"], ["cancelled", "cancelled"],
+  ["interrupted", "cancelled"], ["lost", "failed"],
+] as const) {
+  for (const residency_state of ["disposed", "evicted", "persisted_only", "rpc_detached"] as const) {
+    test(`${status} with ${residency_state} stays terminal on every recovery surface`, () => {
+      const record: TaskRecord = {
+        ...createTaskRecord({
+          parent_session_id: "parent", root_session_id: "parent", depth: 1,
+          execution_mode: "process", model: "provider/model", notify_on_terminal: true,
+        }),
+        status, residency_state, name: "child",
+      }
+      expect(recoveryPresentation(record)).toBeUndefined()
+      expect(isSuspended(record)).toBe(false)
+      const snapshot = buildTaskSnapshot(record, "/tmp/task-recovery-surface", 0)
+      expect(snapshot.suspended).toBeUndefined()
+      expect(snapshot.status).toBe(status)
+      const output = renderTaskOutputResult(
+        { content: [], details: { kind: "status", snapshot } },
+        { expanded: false, isPartial: false },
+        { fg: (_color, text) => text },
+      ).render(220)
+      expect(output.join("\n")).toContain(status)
+      expect(formatTaskRow(record)).toContain(`status:${status}`)
+      expect(buildWidgetRows([record])).toEqual([])
+      expect(backgroundWidgetRows([record], new Map(), 0, undefined, 220)).toEqual([])
+      const update = panelChildFromRecord(record)
+      expect(update.status).toBe(panelStatus)
+      expect(update.parkedReason).toBeUndefined()
+      const child: PanelChild = { id: record.task_id, name: "child", status: panelStatus, startedAt: 0 }
+      expect(buildAgentCardRows(child, 100)[0]?.text).toContain(panelStatus)
+    })
+  }
 }

@@ -38,7 +38,7 @@ export async function expireSuspendedChild(
   const retry = previous?.token === observed.residency_claim ? previous : undefined
   if (retry !== undefined && context.now() < retry.retryAt) return
   const token = retry?.token ?? randomUUID()
-  const cause = observed.revival_deferred_reason ?? observed.suspension_reason ?? "suspended"
+  const cause = observed.revival_deferred_reason ?? observed.suspension_reason ?? "parent session restarted"
   const reason = observed.error_message?.startsWith("suspended_unresumable:")
     ? observed.error_message
     : `suspended_unresumable:${cause}`

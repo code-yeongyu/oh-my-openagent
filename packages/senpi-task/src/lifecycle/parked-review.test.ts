@@ -1,7 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
 import { cleanupProjects as cleanupManagers } from "../manager/__fixtures__/manager-fakes"
 import { cleanupProjects } from "./__fixtures__/lifecycle-fakes"
-import { liveParentFixture } from "./__fixtures__/live-parent-fakes"
+import { bounded, liveParentFixture } from "./__fixtures__/live-parent-fakes"
 
 const fixtures: ReturnType<typeof liveParentFixture>[] = []
 function fixture(mode?: Parameters<typeof liveParentFixture>[0]) {
@@ -138,4 +138,52 @@ test("recoverable daemon refusal detaches without aborting or closing its sessio
   expect(f.manager.getResidentHandle(id)).toBeUndefined()
   expect(f.store.load(id)?.status).toBe("running")
   expect(f.store.load(id)?.residency_state).toBe("rpc_detached")
+})
+
+test("restart reconciliation returns while its expired final revival is held", async () => {
+  const f = fixture()
+  const id = await f.start()
+  const attempted = f.wait("live_parent_recovery_attempt")
+  f.park(id)
+  await attempted
+  await f.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
+  f.restart()
+  f.advance(600_000)
+  f.state.revivable = true
+  const before = f.state.respawns
+  const gate = f.holdRevival()
+  const reconciled = f.lifecycle.reconcileOnSessionStart("parent-1")
+  try {
+    await gate.started
+    await bounded(reconciled)
+    expect(f.state.respawns).toBe(before + 1)
+    const ended = f.wait("suspended_unresumable")
+    f.advance(5_000)
+    await ended
+    expect(f.store.load(id)?.status).toBe("error")
+    expect(f.messages).toHaveLength(1)
+  } finally {
+    const settled = f.wait("live_parent_recovery_attempt")
+    gate.resolve()
+    await settled
+    await reconciled
+  }
+  expect(f.store.load(id)?.status).toBe("error")
+  expect(f.manager.getResidentHandle(id)).toBeUndefined()
+  expect(f.messages).toHaveLength(1)
+})
+
+test("recovery detach forgets a handle even when its disposal rejects", async () => {
+  const f = fixture("host-session")
+  const id = await f.start()
+  const handle = f.manager.getResidentHandle(id)
+  if (handle === undefined) throw new Error("fixture has no child")
+  const failure = new Error("detach rejected")
+  spyOn(handle, "dispose").mockRejectedValueOnce(failure)
+  f.store.mutate(id, (record) => ({ ...record, residency_state: "rpc_detached" }))
+  await expect(f.lifecycle.destroyResidentTask(id, "recovery_detach")).rejects.toBe(failure)
+  expect(f.manager.getResidentHandle(id)).toBeUndefined()
+  expect(f.store.load(id)?.status).toBe("running")
+  expect(f.store.load(id)?.residency_state).toBe("rpc_detached")
+  expect(f.state.closes).toBe(0)
 })

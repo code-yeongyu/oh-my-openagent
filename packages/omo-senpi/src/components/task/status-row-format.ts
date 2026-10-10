@@ -41,7 +41,7 @@ export function isTerminal(status: TaskStatus): boolean {
  * finished can be parked; a finished child is `evicted` or `disposed` and keeps its own status.
  */
 export function isSuspended(record: TaskRecord): boolean {
-  return recoveryPresentation(record) !== undefined
+  return !isTerminal(record.status) && recoveryPresentation(record) !== undefined
 }
 
 function statusLabel(record: TaskRecord): string {
