@@ -1,18 +1,23 @@
 import { describe, expect, test } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message-handler"
+import {
+  applyGitHubCopilotRateLimit,
+  getGitHubCopilotRateLimitState,
+} from "./copilot-rate-limit"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps } from "./types"
+import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 function createDeps(): HookDeps {
   return {
-    ctx: {
+    ctx: unsafeTestValue<HookDeps["ctx"]>({
       client: {
         session: {},
         tui: {},
       },
       directory: "/test/dir",
-    },
+    }),
     config: {
       enabled: true,
       retry_on_errors: [429, 503, 529],
@@ -212,13 +217,13 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     // given
     const deps = createDeps()
     deps.config.restore_primary_after_cooldown = true
-    deps.pluginConfig = {
+    deps.pluginConfig = unsafeTestValue<NonNullable<HookDeps["pluginConfig"]>>({
       agents: {
         sisyphus: {
           variant: "high",
         },
       },
-    }
+    })
     const sessionID = "session-restore-inherited-primary-variant"
     const state = createFallbackState("openai/gpt-5.4")
     state.currentModel = "anthropic/claude-opus-4-7(high)"
@@ -253,5 +258,45 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       },
       variant: "high",
     })
+  })
+
+  test("#given GitHub Copilot has exhausted its 429 retry budget #when primary restoration is considered #then the provider cooldown keeps the active non-Copilot fallback", async () => {
+    // given
+    const deps = createDeps()
+    deps.config.restore_primary_after_cooldown = true
+    const sessionID = "session-copilot-provider-cooldown"
+    const state = createFallbackState("github-copilot/gpt-5.6")
+    state.currentModel = "openai/gpt-5.6"
+    state.fallbackIndex = 0
+    deps.sessionStates.set(sessionID, state)
+    const copilotRateLimit = getGitHubCopilotRateLimitState(deps)
+    const startedAt = Date.now()
+    for (let retryCount = 0; retryCount < 5; retryCount += 1) {
+      applyGitHubCopilotRateLimit(copilotRateLimit, {
+        error: { statusCode: 429 },
+        model: "github-copilot/gpt-5.6",
+        now: startedAt + retryCount * 1_000,
+        random: () => 0,
+      })
+    }
+    expect(copilotRateLimit.cooldownUntil).toBeGreaterThan(startedAt + 4_000)
+    const handler = createChatMessageHandler(deps)
+    const output: { message: { model?: { providerID: string; modelID: string } } } = { message: {} }
+
+    // when
+    await handler(
+      {
+        sessionID,
+        model: {
+          providerID: "openai",
+          modelID: "gpt-5.6",
+        },
+      },
+      output,
+    )
+
+    // then
+    expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.6" })
+    expect(deps.sessionStates.get(sessionID)?.currentModel).toBe("openai/gpt-5.6")
   })
 })
