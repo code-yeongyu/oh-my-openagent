@@ -13,10 +13,12 @@ import {
 } from "./sisyphus-agent-config";
 import { buildFallbackSisyphusPrompt } from "./sisyphus-dynamic-prompt";
 import { buildClaudeFable51SisyphusPrompt } from "./sisyphus/fable-5-1";
+import { buildClaudeHaiku55SisyphusPrompt } from "./sisyphus/haiku-5-5";
 import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildClaudeOpus48SisyphusPrompt } from "./sisyphus/claude-opus-4-8";
 import { buildClaudeOpus5SisyphusPrompt } from "./sisyphus/claude-opus-5";
+import { buildClaudeSonnet55SisyphusPrompt } from "./sisyphus/sonnet-5-5";
 import { buildGlm52SisyphusPrompt } from "./sisyphus/glm-5-2";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
@@ -28,20 +30,31 @@ import type { AgentMode } from "./types";
 import {
   isClaudeFable51Model,
   isClaudeFable5Model,
+  isClaudeHaiku55Model,
   isClaudeOpus47Model,
   isClaudeOpus48Model,
   isClaudeOpus5Model,
   isClaudeOpus55Model,
+  isClaudeSonnet55Model,
+  isDeepseekV4Flash0731Model,
+  isDeepseekV4FlashModel,
+  isDeepseekV4ProModel,
+  isDeepseekV41FlashModel,
+  isGlm52Model,
+  isGlm53Model,
   isGlmModel,
   isGpt5_5Model,
   isGpt5_6Model,
+  isGpt52Model,
   isGpt6Model,
   isGptModel,
   isGptNativeSisyphusModel,
   isGrok45Model,
   isGrok46Model,
+  isGrok47Model,
   isKimiK2CodeModel,
   isKimiK2Model,
+  isKimiK28Model,
   isKimiK3Model,
 } from "./types";
 
@@ -56,25 +69,36 @@ const MODE: AgentMode = "primary";
  */
 export type SisyphusPromptFamily =
   | "kimi-k3"
+  | "kimi-k2-8"
   | "kimi-k2-7"
   | "kimi-k2-6"
   | "gpt-5-5"
   | "gpt-5-4"
+  | "gpt-5-2"
   | "fable-5-1"
   | "fable-5"
   | "opus-5-5"
   | "opus-5"
   | "opus-4-8"
   | "opus-4-7"
+  | "sonnet-5-5"
+  | "haiku-5-5"
+  | "glm-5-3"
   | "glm-5-2"
+  | "deepseek-v4-flash-0731"
+  | "deepseek-v4-1-flash"
+  | "deepseek-v4-flash"
+  | "deepseek-v4-pro"
   | "grok-4"
   | "fallback";
 
 export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily {
   if (isKimiK3Model(model)) return "kimi-k3";
+  if (isKimiK28Model(model)) return "kimi-k2-8";
   if (isKimiK2CodeModel(model)) return "kimi-k2-7";
   if (isKimiK2Model(model)) return "kimi-k2-6";
   if (isGpt5_5Model(model) || isGpt5_6Model(model) || isGpt6Model(model)) return "gpt-5-5";
+  if (isGpt52Model(model)) return "gpt-5-2";
   if (isGptNativeSisyphusModel(model)) return "gpt-5-4";
   if (isClaudeFable51Model(model)) return "fable-5-1";
   if (isClaudeFable5Model(model)) return "fable-5";
@@ -82,8 +106,15 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isClaudeOpus5Model(model)) return "opus-5";
   if (isClaudeOpus48Model(model)) return "opus-4-8";
   if (isClaudeOpus47Model(model)) return "opus-4-7";
+  if (isClaudeSonnet55Model(model)) return "sonnet-5-5";
+  if (isClaudeHaiku55Model(model)) return "haiku-5-5";
+  if (isGlm53Model(model)) return "glm-5-3";
   if (isGlmModel(model)) return "glm-5-2";
-  if (isGrok45Model(model) || isGrok46Model(model)) return "grok-4";
+  if (isDeepseekV4Flash0731Model(model)) return "deepseek-v4-flash-0731";
+  if (isDeepseekV41FlashModel(model) || model.startsWith("deepseek/deepseek-v4-flash")) return "deepseek-v4-1-flash";
+  if (isDeepseekV4FlashModel(model)) return "deepseek-v4-flash";
+  if (isDeepseekV4ProModel(model)) return "deepseek-v4-pro";
+  if (isGrok47Model(model) || isGrok45Model(model) || isGrok46Model(model)) return "grok-4";
   return "fallback";
 }
 
@@ -167,6 +198,50 @@ export function createSisyphusAgent(
         model,
         buildClaudeOpus47SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
+    case "gpt-5-2":
+      return buildGptSisyphusAgentConfig(
+        MODE,
+        model,
+        buildGpt54SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "sonnet-5-5":
+      return buildClaudeSisyphusAgentConfig(
+        MODE,
+        model,
+        buildClaudeSonnet55SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "haiku-5-5":
+      return buildClaudeSisyphusAgentConfig(
+        MODE,
+        model,
+        buildClaudeHaiku55SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "glm-5-3":
+      return buildGlmSisyphusAgentConfig(
+        MODE,
+        model,
+        buildGlm52SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "kimi-k2-8":
+      return buildGptSisyphusAgentConfig(
+        MODE,
+        model,
+        buildKimiK27SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "deepseek-v4-flash-0731":
+    case "deepseek-v4-1-flash":
+    case "deepseek-v4-flash":
+    case "deepseek-v4-pro": {
+      const prompt = buildFallbackSisyphusPrompt(
+        model,
+        agents,
+        tools,
+        skills,
+        categories,
+        useTaskSystem,
+      );
+      return buildClaudeSisyphusAgentConfig(MODE, model, prompt);
+    }
     case "glm-5-2":
       return buildGlmSisyphusAgentConfig(
         MODE,

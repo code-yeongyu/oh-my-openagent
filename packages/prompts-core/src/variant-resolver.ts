@@ -104,7 +104,10 @@ function isGpt5ExactModel(model: string): boolean {
 // alias match is gated on the provider namespace.
 function isDeepseekV41FlashOrRetiredAlias(modelID: string, providerID?: string): boolean {
   if (isDeepseekV41FlashModel(modelID)) return true
-  return providerID === "deepseek" && modelID === "deepseek-v4-flash"
+  const slash = modelID.indexOf("/")
+  const bareModelID = slash === -1 ? modelID : modelID.slice(slash + 1)
+  const resolvedProviderID = providerID ?? (slash === -1 ? undefined : modelID.slice(0, slash))
+  return resolvedProviderID === "deepseek" && bareModelID === "deepseek-v4-flash"
 }
 
 export function resolveVariant(input: ResolveVariantInput): string {

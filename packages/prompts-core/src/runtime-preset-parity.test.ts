@@ -15,8 +15,7 @@ describe("runtime preset parity (#9851)", () => {
   test("every fixture case resolves to its Atlas variant", () => {
     for (const testCase of RUNTIME_PRESET_MODEL_CASES) {
       const variant = resolveVariant({
-        providerID: testCase.providerID,
-        modelID: testCase.modelID,
+        modelID: `${testCase.providerID}/${testCase.modelID}`,
         variants: atlasPromptVariants,
       })
       expect(variant, `${testCase.providerID}/${testCase.modelID}`).toBe(testCase.preset)
@@ -32,8 +31,7 @@ describe("runtime preset parity (#9851)", () => {
   test("no fixture case falls through to default", () => {
     for (const testCase of RUNTIME_PRESET_MODEL_CASES) {
       const variant = resolveVariant({
-        providerID: testCase.providerID,
-        modelID: testCase.modelID,
+        modelID: `${testCase.providerID}/${testCase.modelID}`,
         variants: atlasPromptVariants,
       })
       expect(variant, `${testCase.providerID}/${testCase.modelID}`).not.toBe("default")

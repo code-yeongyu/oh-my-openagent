@@ -96,11 +96,14 @@ export function isClaudeHaiku55Model(model: string): boolean {
 }
 
 export function isGlm52Model(model: string): boolean {
-  return hasSegmentSignal(model, "glm", "5-2")
+  if (hasSegmentSignal(model, "glm", "5-2")) return true
+  return /(?:^|[/@._-])glm[._-]?5p2(?:$|[/@._:-])/.test(extractModelName(model).toLowerCase().replaceAll(".", "-"))
 }
 
 export function isGlm53Model(model: string): boolean {
-  return hasSegmentSignal(model, "glm", "5-3")
+  if (hasSegmentSignal(model, "glm", "5-3")) return true
+  // Fireworks spells the point release with a p infix: glm-5p3, glm-5p3-flash, glm-5p3-fast.
+  return /(?:^|[/@._-])glm[._-]?5p3(?:$|[/@._:-])/.test(extractModelName(model).toLowerCase().replaceAll(".", "-"))
 }
 
 // DeepSeek V4 id shapes mirror the runtime: v4-1-flash / v4p1-flash / the official `deepseek-flash`
