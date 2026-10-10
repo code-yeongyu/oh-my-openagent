@@ -28,7 +28,9 @@ export function captureChild(child, onOutput = () => {}) {
 }
 
 export function stageRecorder(onStage = (entry) => {
-  process.stderr.write(`OMO_RECONCILE_STAGE ${JSON.stringify(entry)}\n`)
+  if (process.env.OMO_RECONCILE_STAGES === "1") {
+    process.stderr.write(`OMO_RECONCILE_STAGE ${JSON.stringify(entry)}\n`)
+  }
 }) {
   const started = performance.now()
   const stages = []

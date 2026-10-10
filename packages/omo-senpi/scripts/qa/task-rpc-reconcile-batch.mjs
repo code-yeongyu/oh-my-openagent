@@ -11,7 +11,7 @@ import {
 
 const script = fileURLToPath(import.meta.url)
 
-async function runOne(repo, label, outDir, bun) {
+export async function runOne(repo, label, outDir, bun) {
   const root = mkdtempSync(join(tmpdir(), "omo9715-ab-"))
   const logPath = join(outDir, `${label}.log`)
   const receipt = { label, repo, root, bun, watchdogMs: RECONCILE_WATCHDOG_MS, cpu: [], stages: [], verdict: "FAIL" }
@@ -28,6 +28,7 @@ async function runOne(repo, label, outDir, bun) {
     cwd: repo, detached: true, stdio: ["ignore", "pipe", "pipe"],
     env: {
       ...process.env, TMPDIR: root, PI_OFFLINE: "1", OMO_SENPI_QA: "1", OMO_QA_BUN_BIN: bun.path,
+      OMO_RECONCILE_STAGES: "1",
       BUN_INSTALL_CACHE_DIR: join(root, "bun-cache"),
       BUN_RUNTIME_TRANSPILER_CACHE_PATH: join(root, "transpiler-cache"),
       NODE_COMPILE_CACHE: join(root, "node-cache"), XDG_CACHE_HOME: join(root, "cache"),
