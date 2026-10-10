@@ -1,7 +1,11 @@
-import type { ControlConfirmRequest } from "@oh-my-opencode/senpi-desktop-tool"
+import { type ControlConfirmRequest, DEFAULT_TIMEOUT_SECONDS } from "@oh-my-opencode/senpi-desktop-tool"
 
-/** Bounds the `control.acquire` human confirm; an RPC/desktop client that never answers stays ungranted. */
-export const CONTROL_CONFIRM_TIMEOUT_MS = 60_000
+/**
+ * Bounds the `control.acquire` human confirm; an RPC/desktop client that never answers stays ungranted.
+ * It ends 15 s before the default run budget, so an unanswered confirm reports `{ active: false }` to the
+ * model instead of the run timing out first.
+ */
+export const CONTROL_CONFIRM_TIMEOUT_MS = (DEFAULT_TIMEOUT_SECONDS - 15) * 1000
 
 /** Title of the foreground-control confirm, upstream oh-my-pi's wording. */
 export const CONTROL_CONFIRM_TITLE = "Allow foreground computer control?"

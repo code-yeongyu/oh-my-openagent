@@ -122,6 +122,10 @@ export class DesktopService {
 		const connection = this.#connection;
 		if (connection === undefined || !connection.rpc.alive) return;
 		try {
+			// Read first (unaudited): every run end and turn end comes here, and a revoke with no grant
+			// would only add a no-op event to the engine's audit log.
+			const state = await connection.rpc.request("control.state", {}, { timeoutMs: REVOKE_TIMEOUT_MS });
+			if (typeof state !== "object" || state === null || !("active" in state) || state.active !== true) return;
 			await connection.rpc.request("control.revoke", {}, { timeoutMs: REVOKE_TIMEOUT_MS });
 		} catch (error) {
 			if (error instanceof DesktopServiceError || error instanceof DesktopEngineRpcError) {

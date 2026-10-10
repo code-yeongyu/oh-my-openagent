@@ -28,7 +28,7 @@ const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const fakeDesktop = join(repoRoot, "crates", "senpi-desktop-backend-fake", "fixtures", "two-displays-one-window.json")
 const CONFIRM_TITLE = "Allow foreground computer control?"
 const REASON = "QA: click Run in the fixture window"
-// The host bounds the confirm at 60 s (CONTROL_CONFIRM_TIMEOUT_MS); the turn gets that plus slack.
+// The host bounds the confirm at 45 s (CONTROL_CONFIRM_TIMEOUT_MS, under the 60 s run budget); the turn gets slack.
 const TURN_TIMEOUT_MS = 150_000
 
 function argValue(name) {

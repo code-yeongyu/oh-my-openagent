@@ -223,6 +223,34 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		expect(methods(log)).not.toContain("control.grant");
 	});
 
+	it("a run that fails while granted revokes the grant before reporting its failure", async () => {
+		// Given: the lead's add (a) for #9651 - a cell error ends the human's grant
+		const { service, log } = await openDesktop();
+
+		// When
+		const error = await rejectionOf(
+			run(service, `await desktop.control.acquire({ reason: "click Run" }); throw new Error("boom");`, {
+				confirmControl: () => Promise.resolve(true),
+			}),
+		);
+
+		// Then
+		expect(error).toMatchObject({ message: "boom" });
+		expect(methods(log)).toContain("control.revoke");
+		expect((await run(service, `return await desktop.control.state();`)).returnValue).toEqual({ active: false });
+	});
+
+	it("a run that fails without a grant sends no control.revoke", async () => {
+		// Given: nothing to revoke, so the engine audit stays free of no-op revocations
+		const { service, log } = await openDesktop();
+
+		// When
+		await rejectionOf(run(service, `throw new Error("boom");`));
+
+		// Then
+		expect(methods(log)).not.toContain("control.revoke");
+	});
+
 	it("never sends control.grant when the run ended while the confirm was pending", async () => {
 		// Given: the confirm outlives its run (an RPC client answering after the task ended); the run
 		// has already been torn down when the late yes arrives, so the fence discards it (#9651 B5b).
