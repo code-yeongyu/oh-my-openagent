@@ -14,6 +14,7 @@ declare function clearTimeout(timeoutID: unknown): void
 interface CompactionTargetState {
   providerID: string
   modelID: string
+  agent?: string
 }
 
 interface ClientLike {
@@ -133,6 +134,7 @@ export function createPostCompactionDegradationMonitor(args: {
         sessionID,
         cached.providerID,
         cached.modelID,
+        cached.agent,
       )
 
       await client.tui
