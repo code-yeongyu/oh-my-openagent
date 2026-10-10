@@ -209,7 +209,7 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="...task 
 </parallel_by_default>
 
 <opus_specific_parallel_addendum>
-**5-specific calibration:** hold the parallel mandate — N independent tasks, N task() calls in one message.
+**Opus 5-specific calibration:** hold the parallel mandate — N independent tasks, N task() calls in one message.
 </opus_specific_parallel_addendum>
 
 <workflow>

@@ -427,7 +427,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     const source = getSisyphusJuniorPromptSource(model)
 
     // then
-    expect(source).toBe("kimi-k2")
+    expect(source).toBe("kimi-k2-6")
   })
 
   test("returns 'kimi-k2' for kimi-k2-5 model", () => {
@@ -449,7 +449,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     const source = getSisyphusJuniorPromptSource(model)
 
     // then
-    expect(source).toBe("kimi-k2")
+    expect(source).toBe("kimi-k2-6")
   })
 
   test("returns 'kimi-k3' for kimi-k3 model, not 'kimi-k2-7' or 'kimi-k2'", () => {
@@ -509,7 +509,7 @@ describe("getSisyphusJuniorPromptSource", () => {
     const sources = models.map((model) => getSisyphusJuniorPromptSource(model))
 
     // then
-    expect(sources).toEqual(["kimi-k2-7", "kimi-k2-7", "kimi-k2-7", "kimi-k2-7"])
+    expect(sources).toEqual(["kimi-k2-8", "kimi-k2-8", "kimi-k2-8", "kimi-k2-7"])
   })
 
   test("returns 'gpt-5-4' for GPT 5.4 models", () => {
@@ -654,7 +654,7 @@ describe("buildSisyphusJuniorPrompt", () => {
     const cases = [
       ["opencode-go/kimi-k3", "kimi-k3"],
       ["opencode-go/kimi-k2.7", "kimi-k2-7"],
-      ["opencode-go/kimi-k2.6", "kimi-k2"],
+      ["opencode-go/kimi-k2.6", "kimi-k2-6"],
       ["openai/gpt-5.6-sol", "gpt-5-5"],
       ["openai/gpt-5.5", "gpt-5-5"],
       ["openai/gpt-5.4", "gpt-5-4"],

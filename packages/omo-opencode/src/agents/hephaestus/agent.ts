@@ -23,7 +23,7 @@ const GPT_5_6_RE = /^gpt-5[.-]6(?:$|[.-])/i;
 const GPT_6_RE = /^gpt-6(?:$|[.-])/i;
 const HOSTED_VENDOR_PREFIX_RE = /^(?:[^./]+\.)+(gpt-5[.-].*)$/i;
 
-export type HephaestusPromptSource = "gpt-5-6" | "gpt-5-5" | "gpt-5-4" | "gpt";
+export type HephaestusPromptSource = "gpt-5-6" | "gpt-5-5" | "gpt-5-4" | "gpt-5-3-codex" | "gpt";
 
 export class UnsupportedHephaestusModelError extends Error {
   readonly model: string | undefined;
@@ -72,6 +72,9 @@ export function getHephaestusPromptSource(
   }
   if (model && GPT_5_4_RE.test(extractModelName(model))) {
     return "gpt-5-4";
+  }
+  if (model && GPT_5_3_CODEX_RE.test(extractModelName(model))) {
+    return "gpt-5-3-codex";
   }
   return "gpt";
 }
@@ -124,6 +127,15 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
       break;
     case "gpt-5-4":
       basePrompt = buildGpt54Prompt(
+        agents,
+        tools,
+        skills,
+        categories,
+        useTaskSystem,
+      );
+      break;
+    case "gpt-5-3-codex":
+      basePrompt = buildGptPrompt(
         agents,
         tools,
         skills,
