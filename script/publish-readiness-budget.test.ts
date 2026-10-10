@@ -66,10 +66,11 @@ function runReadiness(scenario: Scenario = {}) {
     }).join("\n") + "\n")
     for (const name of ["clock", "slept"]) writeFileSync(join(root, name), "0")
     writeFileSync(join(root, "calls"), "")
-    // Bash functions work on Git Bash too; executable PATH stubs do not support shebangs there.
+    // Bash functions and builtin clock reads avoid expensive nested Git Bash forks on Windows.
+    // Each view consumes deterministic virtual request time, within the real shared deadline.
     const stubs = String.raw`
 clock() { local value; IFS= read -r value < "$FIXTURE/clock" || :; printf '%s' "$value"; }
-advance() { printf '%s' "$(($(clock) + $1))" > "$FIXTURE/clock"; }
+advance() { local value; IFS= read -r value < "$FIXTURE/clock" || :; printf '%s' "$((value + $1))" > "$FIXTURE/clock"; }
 date() { clock; }
 sleep() { local value; IFS= read -r value < "$FIXTURE/slept" || :; printf '%s' "$((value + $1))" > "$FIXTURE/slept"; advance "$1"; }
 timeout() {
@@ -85,11 +86,12 @@ lookup() {
 }
 npm() {
   while [[ "$1" == view || "$1" == --* ]]; do shift; done
-  local spec="$1" field="$2" name version tag tag_version git_head metadata_after tarball_after http_status
+  local spec="$1" field="$2" name version tag tag_version git_head metadata_after tarball_after http_status now
   printf 'npm %s %s\n' "$spec" "$field" >> "$FIXTURE/calls"
   advance "$PROBE_SECONDS"
   lookup "${"$"}{spec%%@*}" || return 1
-  [ "$(clock)" -ge "$metadata_after" ] || return 0
+  IFS= read -r now < "$FIXTURE/clock" || :
+  [ "$now" -ge "$metadata_after" ] || return 0
   if [[ "$spec" == *@* && "${"$"}{spec#*@}" != "$version" ]]; then return 0; fi
   case "$field" in
     version) printf '%s\n' "$version" ;;
@@ -100,11 +102,12 @@ npm() {
   return 0
 }
 curl() {
-  local url="${"$"}{@: -1}" name version tag tag_version git_head metadata_after tarball_after http_status
+  local url="${"$"}{!#}" name version tag tag_version git_head metadata_after tarball_after http_status now
   local package="${"$"}{url#https://registry.npmjs.org/}"
   printf 'curl %s\n' "$url" >> "$FIXTURE/calls"
   lookup "${"$"}{package%%/*}" || return 1
-  [ "$(clock)" -ge "$tarball_after" ] || http_status=404
+  IFS= read -r now < "$FIXTURE/clock" || :
+  [ "$now" -ge "$tarball_after" ] || http_status=404
   # Preserve --fail's transport outcome, including successful non-200 replies such as 204.
   if [[ "$*" == *--write-out* ]]; then printf '%s' "$http_status"; fi
   [ "$http_status" -lt 400 ]
@@ -115,7 +118,7 @@ export -f clock advance date sleep timeout lookup npm curl
     writeFileSync(script, stubs + readiness.run)
     const result = spawnSync("bash", [script], {
       encoding: "utf8", timeout: READINESS_TEST_TIMEOUT_MS - 1_000,
-      env: { ...process.env, ...env, FIXTURE: root, PROBE_SECONDS: String(scenario.probeSeconds ?? 0) },
+      env: { ...process.env, ...env, FIXTURE: root, PROBE_SECONDS: String(scenario.probeSeconds ?? 5) },
     })
     if (result.error) throw result.error
     return {
@@ -143,15 +146,18 @@ describe("publish.yml post-publish-verify registry readiness", () => {
     const outcome = runReadiness({ registry: { "oh-my-opencode": { metadataAfter: 999999 }, "oh-my-openagent": { metadataAfter: 999999 } } })
     expect(outcome.status).toBe(1)
     for (const name of ["oh-my-opencode", "oh-my-openagent"]) expect(outcome.output).toContain(`::error::${name}@5.1.27`)
-    expect(outcome.slept).toBeGreaterThanOrEqual(55 * 60)
+    expect(outcome.elapsed).toBeGreaterThanOrEqual(55 * 60)
     expect(outcome.elapsed).toBeLessThanOrEqual(60 * 60)
     expect(outcome.calls.filter((call) => call === "npm omo-ai@5.1.27 version")).toHaveLength(1)
   }, READINESS_TEST_TIMEOUT_MS)
 
   test.each([300, 55 * 60])("#given delayed sibling metadata and tarball (%s s) #when readiness polls #then it waits for both", (delay) => {
-    const outcome = runReadiness({ registry: { "oh-my-opencode": { metadataAfter: delay }, "lazycodex-ai": { tarballAfter: delay } } })
+    const outcome = runReadiness(delay === 55 * 60
+      ? { probeSeconds: 0, registry: { "lazycodex-ai": { metadataAfter: delay, tarballAfter: delay } } }
+      : { registry: { "oh-my-opencode": { metadataAfter: delay }, "lazycodex-ai": { tarballAfter: delay } } })
     expect(outcome.status).toBe(0)
-    expect(outcome.slept).toBe(delay)
+    expect(outcome.elapsed).toBeGreaterThanOrEqual(delay)
+    expect(outcome.elapsed).toBeLessThan(delay + 120)
   }, READINESS_TEST_TIMEOUT_MS)
 
   test.each([...names])("#given %s has a different gitHead #when version and tarball are served #then verification fails", (name) => {

@@ -1520,7 +1520,7 @@ jobs:
             # A final sleep can consume the deadline; retain the last observed failures.
             [ "$(date +%s)" -lt "$DEADLINE" ] || break
             STILL_PENDING=()
-            LAST_FAILURES=("${FAILURES[@]}")
+            LAST_FAILURES=("${FAILURES[@]-}")
             FAILURES=()
             for index in "${!PENDING[@]}"; do
               target="${PENDING[$index]}"
