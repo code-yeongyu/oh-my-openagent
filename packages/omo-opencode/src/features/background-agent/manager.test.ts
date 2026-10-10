@@ -7259,6 +7259,64 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
   })
 })
 
+describe("BackgroundManager.pruneStaleTasksAndNotifications - stuck concurrency waiter recovery", () => {
+  test("rejects the acquire waiter of a pruned pending task so processKey is not blocked forever", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+    const concurrency = getConcurrencyManager(manager)
+    const key = "test-agent"
+    const limit = concurrency.getConcurrencyLimit(key)
+
+    const slotAcquires: Array<Promise<void>> = []
+    for (let i = 0; i < limit; i++) {
+      slotAcquires.push(concurrency.acquire(key))
+    }
+    await Promise.all(slotAcquires)
+
+    const queuedAt = new Date(Date.now() - 31 * 60 * 1000)
+    const task = createMockTask({
+      id: "task-stale-waiter",
+      parentSessionId: "parent-session",
+      status: "pending",
+      queuedAt,
+      startedAt: undefined,
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+    }
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+
+    // processKey shifts the item out of queuesByKey and parks on acquire() while slots are full.
+    // processKey already shifted the item out of queuesByKey; acquire() is parked
+    // in the concurrency waiter queue until a slot frees or the waiter is cancelled.
+    const processKeyPromise = processKeyForTest(manager, key)
+    await flushBackgroundNotifications()
+    expect(concurrency.getQueueLength(key)).toBe(1)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+    expect(task.status).toBe("error")
+
+    const timedOut = await Promise.race([
+      processKeyPromise.then(() => false),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 500)),
+    ])
+
+    //#then
+    expect(timedOut).toBe(false)
+    expect(concurrency.getQueueLength(key)).toBe(0)
+    expect(getQueuesByKey(manager).get(key) ?? []).toHaveLength(0)
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
   function setCompletionTimer(manager: BackgroundManager, taskId: string): void {
     const completionTimers = getCompletionTimers(manager)
