@@ -1,4 +1,6 @@
 import { tmpdir } from "node:os"
+import { mkdtempSync, rmSync } from "node:fs"
+import { join } from "node:path"
 import { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import * as sharedModule from "../../shared"
@@ -25,9 +27,20 @@ import type { BackgroundTask, ResumeInput } from "./types"
 
 afterAll(() => { mock.restore() })
 
+let recoveryDataRoot: string
+let previousDataHome: string | undefined
+beforeEach(() => {
+  previousDataHome = process.env.XDG_DATA_HOME
+  recoveryDataRoot = mkdtempSync(join(tmpdir(), "omo-background-owner-test-"))
+  process.env.XDG_DATA_HOME = recoveryDataRoot
+})
+
 afterEach(() => {
   clearBackgroundTaskRegistryForTesting()
   releaseAllPromptAsyncReservationsForTesting()
+  if (previousDataHome === undefined) delete process.env.XDG_DATA_HOME
+  else process.env.XDG_DATA_HOME = previousDataHome
+  rmSync(recoveryDataRoot, { recursive: true, force: true })
 })
 
 const TASK_TTL_MS = 30 * 60 * 1000
@@ -641,12 +654,14 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       rollback: () => {},
     })
     const retried: Array<{ taskId: string; errorInfo: { name?: string; message?: string }; source: string }> = []
+    const retryObserved = Promise.withResolvers<void>()
     ;(cast<{
       tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
     }>(manager)).tryFallbackRetry = async (task, errorInfo, source) => {
       retried.push({ taskId: task.id, errorInfo, source })
       task.status = "pending"
       task.error = undefined
+      retryObserved.resolve()
       return true
     }
 
@@ -660,7 +675,7 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       model: { providerID: "genai-proxy-openai", modelID: "gpt-5.6-luna-fast" },
       fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
     })
-    await flushBackgroundNotifications()
+    await retryObserved.promise
 
     //#then
     const storedTask = getTaskMap(manager).get(launchedTask.id)
@@ -3178,6 +3193,137 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
   })
 })
 
+describe("BackgroundManager restart recovery", () => {
+  const managers = new Set<BackgroundManager>()
+  const completions = new Set<() => void>()
+  afterEach(async () => {
+    for (const complete of completions) complete()
+    completions.clear()
+    await Promise.all(Array.from(managers, (manager) => manager.shutdown()))
+    managers.clear()
+  })
+
+  async function launchRecoveryChild(agent = "explore") {
+    const sessionId = `ses_recovery_${crypto.randomUUID()}`
+    const dispatched = Promise.withResolvers<void>()
+    const continued = Promise.withResolvers<void>()
+    const completion = Promise.withResolvers<void>()
+    completions.add(() => completion.resolve())
+    const calls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const model = { providerID: "openai", modelID: "recovery-model", variant: "medium", temperature: 0.27, reasoningEffort: "high" }
+    const child: { id: string; parentID?: string; directory: string; time: { archived?: number } } = {
+      id: sessionId, parentID: "parent-original", directory: tmpdir(), time: {},
+    }
+    let aborts = 0
+    let acceptedPrompts = 0
+    const client = {
+      session: {
+        get: async ({ path }: { path: { id: string } }) => ({ data: path.id === sessionId ? child : { id: path.id, directory: tmpdir(), time: {} } }),
+        create: async () => ({ data: { id: sessionId } }),
+        status: async () => ({ data: {} }),
+        messages: async () => ({ data: acceptedPrompts === 0 ? [] : [{ info: { role: "assistant", agent: calls.at(-1)?.body.agent, model, variant: null }, parts: [{ type: "tool", state: { status: "running" } }] }] }),
+        promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          calls.push(input)
+          if (input.body.agent === "missing-agent") throw new Error("Agent not found: missing-agent")
+          acceptedPrompts++
+          dispatched.resolve()
+          if (acceptedPrompts === 2) { continued.resolve(); await completion.promise }
+          return {}
+        },
+        abort: async () => { aborts++; return {} },
+      },
+    }
+    const first = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const second = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    managers.add(first)
+    managers.add(second)
+    stubNotifyParentSession(first)
+    stubNotifyParentSession(second)
+    const launched = await first.launch({ agent, description: "recovery", prompt: "initial", model, category: "quick", teamRunId: "team-recovery",
+      userPermission: { webfetch: "deny" }, parentSessionId: "parent-original", parentMessageId: "msg-original" })
+    await dispatched.promise
+    return { first, second, launched, model, sessionId, calls, child, continued, client, aborts: () => aborts }
+  }
+
+  test("recovers original child, tuning and restrictions without waiting for child completion", async () => {
+      const { first, second, launched, model, sessionId, calls, continued } = await launchRecoveryChild()
+      await first.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+      const resumed = await second.resume({ sessionId, prompt: "continue", parentSessionId: "parent-new", parentMessageId: "msg-new" })
+      expect(resumed.id).toBe(launched.id)
+      expect(resumed.sessionId).toBe(sessionId)
+      expect(resumed.model).toEqual(model)
+      expect(resumed.parentSessionId).toBe("parent-new")
+      expect(resumed.category).toBe("quick")
+      expect(resumed.teamRunId).toBe("team-recovery")
+      expect(second.getTask(resumed.id)).toBe(resumed)
+      await continued.promise
+      expect(calls).toHaveLength(2)
+      expect(calls[1]?.body.variant).toBe("medium")
+      expect(calls[1]?.body.agent).toBe("explore")
+      expect(calls[1]?.body.tools).toMatchObject({ webfetch: false, task: false, question: false })
+      expect(getSessionPromptParams(sessionId)).toMatchObject({ temperature: 0.27, options: { reasoningEffort: "high" } })
+  })
+
+  test("does not prompt or abort a child still owned by another live worker", async () => {
+    const { second, sessionId, calls, aborts } = await launchRecoveryChild()
+    const before = aborts()
+    await expect(second.resume({ sessionId, prompt: "continue", parentSessionId: "parent-new", parentMessageId: "msg-new" })).rejects.toThrow("owner is live")
+    expect(calls).toHaveLength(1)
+    expect(aborts()).toBe(before)
+  })
+
+  test("preserves the effective fallback agent and tools across worker restart", async () => {
+    const { first, second, sessionId, calls, continued } = await launchRecoveryChild("missing-agent")
+    expect(calls[1]?.body.agent).toBe("general")
+    await first.shutdown()
+    releaseAllPromptAsyncReservationsForTesting()
+    const resumed = await second.resume({ sessionId, prompt: "continue", parentSessionId: "parent-new", parentMessageId: "msg-new" })
+    expect(resumed.agent).toBe("general")
+    await continued.promise
+    expect(calls).toHaveLength(3)
+    expect(calls[2]?.body.agent).toBe("general")
+    expect(calls[2]?.body.tools).toEqual(calls[1]?.body.tools)
+  })
+
+  test("two recovering managers claim one orphan and dispatch one continuation", async () => {
+    const { first, second, sessionId, client, calls, continued } = await launchRecoveryChild()
+    const third = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    managers.add(third)
+    stubNotifyParentSession(third)
+    await first.shutdown()
+    releaseAllPromptAsyncReservationsForTesting()
+    const input = { sessionId, prompt: "continue", parentSessionId: "parent-new", parentMessageId: "msg-new" }
+    const results = await Promise.allSettled([second.resume(input), third.resume(input)])
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1)
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1)
+    await continued.promise
+    expect(calls).toHaveLength(2)
+  })
+
+  for (const invalid of ["root", "archived", "wrong-directory"] as const) {
+    test(`refuses ${invalid} child metadata without prompting or aborting`, async () => {
+      const { first, second, sessionId, child, calls, aborts } = await launchRecoveryChild()
+      await first.shutdown()
+      if (invalid === "root") delete child.parentID
+      if (invalid === "archived") child.time.archived = 1
+      if (invalid === "wrong-directory") child.directory = "/unrelated"
+      const before = aborts()
+      await expect(second.resume({ sessionId, prompt: "continue", parentSessionId: "parent-new", parentMessageId: "msg-new" })).rejects.toThrow("mismatched")
+      expect(calls).toHaveLength(1)
+      expect(aborts()).toBe(before)
+    })
+  }
+
+  test("legacy children without ownership metadata fail closed", async () => {
+    const { second, calls, aborts } = await launchRecoveryChild()
+    const before = aborts()
+    await expect(second.resume({ sessionId: "legacy-child", prompt: "continue", parentSessionId: "parent-new", parentMessageId: "msg-new" })).rejects.toThrow("no provable native owner")
+    expect(calls).toHaveLength(1)
+    expect(aborts()).toBe(before)
+  })
+})
+
 describe("BackgroundManager.resume model persistence", () => {
    let manager: BackgroundManager
    let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
@@ -4791,6 +4937,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
       manager.shutdown()
       manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config })
+      const concurrencyManager = getConcurrencyManager(manager)
+      const queued = Promise.withResolvers<void>()
+      const acquire = concurrencyManager.acquire.bind(concurrencyManager)
+      const acquireSpy = spyOn(concurrencyManager, "acquire").mockImplementation((model, taskId) => {
+        const result = acquire(model, taskId)
+        if (concurrencyManager.getQueueLength("anthropic") === 1) queued.resolve()
+        return result
+      })
 
       const input1 = {
         description: "Task 1",
@@ -4813,12 +4967,12 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
-      await waitUntil(() => manager.getTask(task1.id)?.status === "running", 600)
+      await queued.promise
+      acquireSpy.mockRestore()
 
       // then
       const updatedTask1 = manager.getTask(task1.id)
       const updatedTask2 = manager.getTask(task2.id)
-      const concurrencyManager = getConcurrencyManager(manager)
 
       expect(updatedTask1?.status).toBe("running")
       expect(updatedTask2?.status).toBe("pending")

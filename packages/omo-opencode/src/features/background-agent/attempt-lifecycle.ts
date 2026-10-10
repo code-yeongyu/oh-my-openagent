@@ -11,12 +11,13 @@ function toAttemptModel(model: DelegatedModelConfig | undefined): Pick<Backgroun
   }
 }
 
-function toTaskModel(attempt: BackgroundTaskAttempt): DelegatedModelConfig | undefined {
+function toTaskModel(attempt: BackgroundTaskAttempt, model: DelegatedModelConfig | undefined): DelegatedModelConfig | undefined {
   if (!attempt.providerId || !attempt.modelId) {
     return undefined
   }
 
   return {
+    ...(model?.providerID === attempt.providerId && model.modelID === attempt.modelId ? model : {}),
     providerID: attempt.providerId,
     modelID: attempt.modelId,
     ...(attempt.variant ? { variant: attempt.variant } : {}),
@@ -80,7 +81,7 @@ export function projectTaskFromCurrentAttempt(task: BackgroundTask): BackgroundT
   task.startedAt = currentAttempt.startedAt
   task.completedAt = currentAttempt.completedAt
   task.error = currentAttempt.error
-  task.model = toTaskModel(currentAttempt)
+  task.model = toTaskModel(currentAttempt, task.model)
 
   return task
 }

@@ -23,10 +23,22 @@ export function getRegisteredProcessCleanupSignalListener(
 export function getNewListener(
   signal: ProcessCleanupEvent,
   existingListeners: Function[],
-): () => void {
-  const listener = process
-    .listeners(signal)
-    .find((registeredListener) => !existingListeners.includes(registeredListener))
+) {
+  const listeners = (() => {
+    switch (signal) {
+      case "beforeExit":
+        return process.listeners(signal)
+      case "exit":
+        return process.listeners(signal)
+      case "uncaughtException":
+        return process.listeners(signal)
+      case "unhandledRejection":
+        return process.listeners(signal)
+      default:
+        return process.listeners(signal)
+    }
+  })()
+  const listener = listeners.find((registeredListener) => !existingListeners.includes(registeredListener))
 
   if (typeof listener !== "function") {
     throw new Error(`Expected a ${signal} listener to be registered`)

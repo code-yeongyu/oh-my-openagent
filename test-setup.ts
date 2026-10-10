@@ -7,7 +7,7 @@ import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./pac
 import { _resetForTesting as resetModelFallbackState } from "./packages/omo-opencode/src/hooks/model-fallback/hook"
 import { RULES_INJECTOR_STORAGE } from "./packages/omo-opencode/src/hooks/rules-injector/constants"
 import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./packages/omo-opencode/src/shared/connected-providers-cache"
-import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-path"
+import { getDataDir, getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-path"
 import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
 import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
@@ -39,7 +39,8 @@ setDefaultTimeout(process.platform === "win32" ? 30_000 : 20_000)
 
 // Skill/agent/command discovery reads the developer's real HOME, and the engine's agent dir falls
 // back to os.homedir(). Both point at one per-process temp home; see test-hermetic-home.ts.
-installHermeticHome()
+const hermeticHome = installHermeticHome()
+process.env.XDG_DATA_HOME = join(hermeticHome.home, ".local", "share")
 delete process.env.OPENCODE_SERVER_PASSWORD
 
 let isGlobalMockCleanup = false
@@ -70,6 +71,7 @@ beforeEach(() => {
   process.env.OMO_DISABLE_POSTHOG = "true"
   cleanupOmoCacheDir(getOmoOpenCodeCacheDir())
   cleanupRulesInjectorStorage()
+  rmSync(join(getDataDir(), "omo", "background-owners"), { recursive: true, force: true })
   resetClaudeSessionState()
   resetTaskToastManager()
   resetModelFallbackState()

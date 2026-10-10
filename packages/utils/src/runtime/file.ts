@@ -35,7 +35,7 @@ function createNodeFile(path: string): BunFileLike {
     async arrayBuffer() {
       const buffer = await readFile(path)
 
-      return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+      return new Uint8Array(buffer).buffer
     },
     exists() {
       return access(path).then(

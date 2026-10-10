@@ -58,12 +58,14 @@ function createAtlasHarness(): {
   readonly manager: BackgroundManager
   readonly createdSessions: Array<{ readonly id: string; readonly body: SessionCreateArgs["body"] }>
   readonly promptCalls: PromptCall[]
+  readonly whenPrompted: (count: number) => Promise<void>
   readonly markSessionMissing: (sessionID: string) => void
 } {
   const directory = testDirectory
   const sessionAlive = new Map<string, boolean>([["atlas-parent", true]])
   const createdSessions: Array<{ readonly id: string; readonly body: SessionCreateArgs["body"] }> = []
   const promptCalls: PromptCall[] = []
+  const promptWaiters = new Map<number, Array<() => void>>()
   const sessionIDs = ["ses_primary", "ses_fallback"]
 
   const client = {
@@ -85,6 +87,8 @@ function createAtlasHarness(): {
       },
       promptAsync: async (args: PromptCall) => {
         promptCalls.push(args)
+        for (const resolve of promptWaiters.get(promptCalls.length) ?? []) resolve()
+        promptWaiters.delete(promptCalls.length)
         return {}
       },
       abort: async ({ path }: SessionGetArgs) => {
@@ -99,11 +103,19 @@ function createAtlasHarness(): {
     manager,
     createdSessions,
     promptCalls,
+    whenPrompted: (count) => {
+      if (promptCalls.length >= count) return Promise.resolve()
+      return new Promise((resolve) => {
+        const waiters = promptWaiters.get(count) ?? []
+        waiters.push(resolve)
+        promptWaiters.set(count, waiters)
+      })
+    },
     markSessionMissing: (sessionID: string) => sessionAlive.set(sessionID, false),
   }
 }
 
-async function launchAtlasOracleSubagent(manager: BackgroundManager): Promise<string> {
+async function launchAtlasOracleSubagent(manager: BackgroundManager, whenPrompted: (count: number) => Promise<void>): Promise<string> {
   const task = await manager.launch({
     description: "Atlas oracle subagent",
     prompt: "Investigate fallback behavior",
@@ -116,7 +128,7 @@ async function launchAtlasOracleSubagent(manager: BackgroundManager): Promise<st
       { providers: ["github-copilot"], model: "claude-sonnet-4.6", variant: "high" },
     ],
   })
-  await flushAsyncWork()
+  await whenPrompted(1)
   return task.id
 }
 
@@ -141,11 +153,12 @@ function emitUsageLimitError(manager: BackgroundManager, sessionID: string): voi
 describe("Atlas-spawned subagent runtime fallback", () => {
   test("retries oracle subagent on OpenAI usage_limit_reached and registers the fallback session", async () => {
     //#given
-    const { manager, createdSessions, promptCalls } = createAtlasHarness()
-    const taskID = await launchAtlasOracleSubagent(manager)
+    const { manager, createdSessions, promptCalls, whenPrompted } = createAtlasHarness()
+    const taskID = await launchAtlasOracleSubagent(manager, whenPrompted)
 
     //#when
     emitUsageLimitError(manager, "ses_primary")
+    await whenPrompted(2)
     await flushAsyncWork(60)
 
     //#then
@@ -166,8 +179,8 @@ describe("Atlas-spawned subagent runtime fallback", () => {
 
   test("surfaces non-retryable oracle subagent errors without creating a fallback session", async () => {
     //#given
-    const { manager, createdSessions, markSessionMissing } = createAtlasHarness()
-    const taskID = await launchAtlasOracleSubagent(manager)
+    const { manager, createdSessions, markSessionMissing, whenPrompted } = createAtlasHarness()
+    const taskID = await launchAtlasOracleSubagent(manager, whenPrompted)
     markSessionMissing("ses_primary")
 
     //#when
@@ -191,9 +204,10 @@ describe("Atlas-spawned subagent runtime fallback", () => {
 
   test("marks oracle subagent errored when usage_limit_reached exhausts all fallbacks", async () => {
     //#given
-    const { manager, createdSessions, markSessionMissing } = createAtlasHarness()
-    const taskID = await launchAtlasOracleSubagent(manager)
+    const { manager, createdSessions, markSessionMissing, whenPrompted } = createAtlasHarness()
+    const taskID = await launchAtlasOracleSubagent(manager, whenPrompted)
     emitUsageLimitError(manager, "ses_primary")
+    await whenPrompted(2)
     await flushAsyncWork(60)
     markSessionMissing("ses_fallback")
 
