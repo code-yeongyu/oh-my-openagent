@@ -69,9 +69,7 @@ fn items_at_a_nested_path_lists_that_submenus_children() {
     let mut backend = backend("{}");
     let window = window(&mut backend);
     // When
-    let items = backend
-        .menu_items(&window, &labels(&["File"]))
-        .expect("File children");
+    let items = backend.menu_items(&window, &labels(&["File"])).expect("File children");
     // Then
     assert_eq!(titles(&items), ["Save", "Export…"]);
     assert_eq!(items[0].shortcut.as_deref(), Some("Cmd+S"));
@@ -122,16 +120,22 @@ fn selecting_with_an_ellipsis_normalized_title_matches_the_native_label() {
 
 #[test]
 fn an_ambiguous_label_is_refused_and_dispatches_nothing() {
-    // Given
-    let mut backend = backend("{}");
+    // Given: two titles that fold to the same lowercase; core's exact tier is
+    // case-insensitive, so neither wins and the label is ambiguous
+    let mut backend = backend(
+        r#"{"menus": {"101": [
+        { "title": "File", "children": [{ "title": "Save" }, { "title": "SAVE" }] }
+    ]}}"#,
+    );
     let sink = backend.sink();
     let window = window(&mut backend);
     // When
     let refused = backend
-        .menu_select(&window, &labels(&["file", "save"]))
-        .expect_err("lowercase file is not an exact title");
+        .menu_select(&window, &labels(&["File", "save"]))
+        .expect_err("save names both Save and SAVE");
     // Then
     assert_eq!(refused.code, ErrorCode::AxFailed, "{refused}");
+    assert!(refused.message.contains("ambiguous"), "{refused}");
     assert!(sink.ops().is_empty(), "{:?}", sink.ops());
 }
 
@@ -154,9 +158,11 @@ fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
 #[test]
 fn a_disabled_submenu_in_the_path_is_refused_before_the_leaf() {
     // Given: File is disabled, so even the enabled Save under it is unreachable
-    let mut backend = backend(r#"{"menus": {"101": [
+    let mut backend = backend(
+        r#"{"menus": {"101": [
         { "title": "File", "enabled": false, "children": [{ "title": "Save" }] }
-    ]}}"#);
+    ]}}"#,
+    );
     let sink = backend.sink();
     let window = window(&mut backend);
     // When
@@ -214,21 +220,9 @@ fn selecting_with_an_empty_path_is_invalid_but_listing_is_not() {
 
 #[test]
 fn a_backend_without_menus_reports_ax_unsupported() {
-    // Given: the plain two-window scenario carries no menu tree
-    let scenario = FakeScenario::default();
-    let mut backend = FakeBackend::new(scenario);
-    let window = senpi_desktop_core::types::DesktopWindow {
-        id: "101".to_owned(),
-        title: "Editor".to_owned(),
-        app: "Code".to_owned(),
-        pid: None,
-        x: 0,
-        y: 0,
-        width: 800,
-        height: 600,
-        focused: true,
-        elevated: None,
-    };
+    // Given: the scenario has the window but carries no menu tree for it
+    let mut backend = backend(r#"{"menus": {}}"#);
+    let window = window(&mut backend);
     // When / Then
     let items = backend.menu_items(&window, &[]).expect_err("no menus");
     assert_eq!(items.code, ErrorCode::AxUnsupported, "{items}");

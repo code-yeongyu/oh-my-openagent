@@ -13,9 +13,7 @@ use senpi_desktop_core::protocol_params::MenuPathParams;
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::types::DesktopSessionOptions;
 use senpi_desktop_safety::{FakeClock, StopPathId, StopSource, Supervisor};
-use senpi_desktop_session::{
-    BackendFactory, Op, Response, Session, SessionSafety, SessionTimeouts,
-};
+use senpi_desktop_session::{BackendFactory, Op, Response, Session, SessionSafety, SessionTimeouts};
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -46,9 +44,17 @@ impl BackendFactory for MenusFactory {
     }
 }
 
-/// A supervised session over the menus fixture, with its supervisor, the
-/// backend's op log, and every audit event the session emitted.
-fn start(overlay: &str) -> (Session, Arc<Supervisor>, Arc<Mutex<Vec<RecordingSink>>>, Arc<Mutex<Vec<AuditEvent>>>) {
+/// A supervised session over the menus fixture, with the pieces a menu test
+/// asserts against: the supervisor behind the gate, the backend's op log,
+/// and every audit event the session emitted.
+struct MenusSession {
+    session: Session,
+    supervisor: Arc<Supervisor>,
+    sinks: Arc<Mutex<Vec<RecordingSink>>>,
+    audits: Arc<Mutex<Vec<AuditEvent>>>,
+}
+
+fn start(overlay: &str) -> MenusSession {
     let supervisor = Arc::new(Supervisor::new(Arc::new(FakeClock::new(0))));
     supervisor.set_live(StopPathId::Global, true);
     let factory = MenusFactory {
@@ -62,9 +68,13 @@ fn start(overlay: &str) -> (Session, Arc<Supervisor>, Arc<Mutex<Vec<RecordingSin
         supervisor: Arc::clone(&supervisor),
         audit: Box::new(move |event| sink.lock().push(event.clone())),
     };
-    let session =
-        Session::start_supervised(factory, SessionTimeouts::default(), safety).expect("session starts");
-    (session, supervisor, sinks, audits)
+    let session = Session::start_supervised(factory, SessionTimeouts::default(), safety).expect("session starts");
+    MenusSession {
+        session,
+        supervisor,
+        sinks,
+        audits,
+    }
 }
 
 fn select(window: &str, path: &[&str]) -> Op {
@@ -92,7 +102,8 @@ fn recorded(sinks: &Mutex<Vec<RecordingSink>>) -> Vec<SinkOp> {
 #[tokio::test]
 async fn items_lists_children_without_a_mutation_transaction() {
     // Given
-    let (session, _supervisor, sinks, audits) = start("{}");
+    let started = start("{}");
+    let (session, sinks, audits) = (&started.session, &started.sinks, &started.audits);
     session
         .open(DesktopSessionOptions::default())
         .wait()
@@ -127,7 +138,8 @@ async fn items_lists_children_without_a_mutation_transaction() {
 #[tokio::test]
 async fn select_records_the_path_and_emits_exactly_one_audit_event() {
     // Given
-    let (session, _supervisor, sinks, audits) = start("{}");
+    let started = start("{}");
+    let (session, sinks, audits) = (&started.session, &started.sinks, &started.audits);
     session
         .open(DesktopSessionOptions::default())
         .wait()
@@ -160,7 +172,8 @@ async fn select_records_the_path_and_emits_exactly_one_audit_event() {
 #[tokio::test]
 async fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
     // Given
-    let (session, _supervisor, sinks, audits) = start("{}");
+    let started = start("{}");
+    let (session, sinks, audits) = (&started.session, &started.sinks, &started.audits);
     session
         .open(DesktopSessionOptions::default())
         .wait()
@@ -177,7 +190,8 @@ async fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
 #[tokio::test]
 async fn an_invalid_path_is_refused_before_the_backend() {
     // Given
-    let (session, _supervisor, sinks, _audits) = start("{}");
+    let started = start("{}");
+    let (session, sinks) = (&started.session, &started.sinks);
     session
         .open(DesktopSessionOptions::default())
         .wait()
@@ -195,7 +209,8 @@ async fn an_invalid_path_is_refused_before_the_backend() {
 #[tokio::test]
 async fn select_is_refused_while_suspended() {
     // Given
-    let (session, supervisor, sinks, _audits) = start("{}");
+    let started = start("{}");
+    let (session, supervisor, sinks) = (&started.session, &started.supervisor, &started.sinks);
     session
         .open(DesktopSessionOptions::default())
         .wait()
@@ -212,7 +227,8 @@ async fn select_is_refused_while_suspended() {
 #[tokio::test]
 async fn a_backend_without_menus_reports_ax_unsupported() {
     // Given: the scenario carries no menu tree at all
-    let (session, _supervisor, _sinks, _audits) = start(r#"{"menus": {}}"#);
+    let started = start(r#"{"menus": {}}"#);
+    let session = &started.session;
     session
         .open(DesktopSessionOptions::default())
         .wait()
