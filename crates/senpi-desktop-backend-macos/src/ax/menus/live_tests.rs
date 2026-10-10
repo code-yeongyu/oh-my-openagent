@@ -13,6 +13,7 @@ use crate::responsible;
 
 const FIXTURE_SOURCE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/menu_fixture.swift");
 const WINDOW_DEADLINE: Duration = Duration::from_secs(30);
+const RECORD_DEADLINE: Duration = Duration::from_secs(5);
 
 struct Fixture(Child);
 
@@ -44,8 +45,17 @@ fn find_window(title: &str) -> Option<senpi_desktop_core::types::DesktopWindow> 
     capture.windows().ok()?.into_iter().find(|window| window.title == title)
 }
 
-fn read_record(path: &Path) -> String {
-    std::fs::read_to_string(path).unwrap_or_default()
+/// AXPress posts the menu action; the fixture runs it on its own run loop
+/// afterwards, so wait (bounded) for the record it writes.
+fn wait_for_record(path: &Path) -> String {
+    let started = Instant::now();
+    loop {
+        let recorded = std::fs::read_to_string(path).unwrap_or_default();
+        if !recorded.is_empty() || started.elapsed() >= RECORD_DEADLINE {
+            return recorded;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }
 
 #[test]
@@ -103,7 +113,7 @@ fn menu_listing_and_select_against_a_real_nsmenu() {
     let chosen = select(&window, &["File".into(), "Save".into()], &|| Ok(())).map_err(|e| e.message);
     println!("select_save_ok={}", chosen.is_ok());
     assert_eq!(chosen, Ok(()));
-    let recorded = read_record(&record);
+    let recorded = wait_for_record(&record);
     println!("recorded={recorded:?}");
     assert!(recorded.contains("Save"), "the fixture recorded {recorded:?}");
 
