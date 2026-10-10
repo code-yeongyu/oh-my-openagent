@@ -31,11 +31,17 @@ export async function getSessionActivityFromClient(
   sessionID: string,
   directory?: string,
 ): Promise<SessionActivityLookup> {
-  const sessionGet = client.session.get
-  if (typeof sessionGet !== "function") return { type: "missing" }
+  const session = client.session
+  const sessionGet = session?.get
+  if (!session || typeof sessionGet !== "function") return { type: "missing" }
+  // The SDK client methods read `this._client`, so they must be invoked with their
+  // receiver. Detaching the method (const sessionGet = client.session.get) throws
+  // "undefined is not an object (evaluating 'this._client')" and silently downgrades
+  // every activity read to `unavailable`, which strands background tasks.
+  const readSession = sessionGet.bind(session)
 
   try {
-    const response = await sessionGet({
+    const response = await readSession({
       path: { id: sessionID },
       ...(directory ? { query: { directory } } : {}),
     })

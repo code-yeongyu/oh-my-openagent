@@ -91,7 +91,10 @@ type LoopStateController = {
 }
 
 function showCompletionToastBestEffort(ctx: PluginInput, state: RalphLoopState): void {
-	const showToast = ctx.client.tui?.showToast
+  const tui = ctx.client.tui
+  // SDK methods read `this._client`, so they must be invoked with their receiver.
+  // Bind it here; a detached call throws and the toast is silently lost.
+  const showToast = tui ? tui.showToast?.bind(tui) : undefined
 	if (!showToast) {
 		return
 	}
