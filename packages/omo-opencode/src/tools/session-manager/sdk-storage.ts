@@ -20,7 +20,6 @@ function throwOnNonFallbackableSdkError(response: unknown): void {
 
 const SDK_TRANSIENT_RETRY_ATTEMPTS = 3
 const GLOBAL_SESSION_PAGE_SIZE = 100
-const MAX_DIRECTORY_FILTERED_GLOBAL_PAGES = 5
 
 type ExperimentalSessionList = (input: { roots?: boolean; cursor?: number; limit: number }) => Promise<unknown>
 
@@ -52,14 +51,11 @@ async function getSdkGlobalSessions(
   if (!client) return undefined
 
   try {
-    const desired = options.limit ?? GLOBAL_SESSION_PAGE_SIZE
-    const maxPages = options.sessionMatches
-      ? MAX_DIRECTORY_FILTERED_GLOBAL_PAGES
-      : Math.ceil(desired / GLOBAL_SESSION_PAGE_SIZE)
+    const desired = options.limit ?? Number.POSITIVE_INFINITY
     const sessions: SessionMetadata[] = []
     let matched = 0
     let cursor: number | undefined
-    for (let page = 0; page < maxPages && matched < desired; page++) {
+    while (matched < desired) {
       const limit = options.sessionMatches
         ? GLOBAL_SESSION_PAGE_SIZE
         : Math.min(GLOBAL_SESSION_PAGE_SIZE, desired - matched)
@@ -72,7 +68,6 @@ async function getSdkGlobalSessions(
       const pageSessions = normalizeSDKResponse(response, [] as SessionMetadata[])
       sessions.push(...pageSessions)
       matched += options.sessionMatches ? pageSessions.filter(options.sessionMatches).length : pageSessions.length
-      if (matched >= desired) return sessions
 
       const nextCursor = getNextCursor(response)
       if (nextCursor === undefined || nextCursor === cursor) return sessions

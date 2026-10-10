@@ -222,6 +222,33 @@ describe("session-manager storage fallback", () => {
     expect(globalList).toHaveBeenNthCalledWith(3, { limit: 50 })
   })
 
+  test("#given a project whose root sessions sit behind 600 newer ones #when getMainSessions filters by directory #then it pages until the cursor is exhausted", async () => {
+    const rootSessions = [
+      ...Array.from({ length: 600 }, (_, index) => ({
+        id: `ses_other_${index}`, projectID: "other", directory: "/workspace/other",
+        time: { created: 10_000 - index, updated: 10_000 - index },
+      })),
+      ...["ses_target_new", "ses_target_old"].map((id, index) => ({
+        id, projectID: "target", directory: "/workspace/target",
+        time: { created: 1_000 - index, updated: 1_000 - index },
+      })),
+    ]
+    const globalList = mock((input?: { roots?: boolean; cursor?: number; limit?: number }): Promise<unknown> => {
+      const start = input?.cursor ?? 0
+      const page = rootSessions.slice(start, start + (input?.limit ?? 100))
+      const nextCursor = start + page.length
+      return Promise.resolve({
+        data: page,
+        response: new Response(null, { headers: nextCursor < rootSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers() }),
+      })
+    })
+    storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
+
+    const sessions = await storage.getMainSessions({ directory: "/workspace/target" })
+
+    expect(sessions.map((session) => session.id)).toEqual(["ses_target_new", "ses_target_old"])
+  })
+
   test("#given unreachable SDK messages error #when readSessionMessages runs #then falls back to file messages", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
     mockClient.session.messages.mockImplementation(() => Promise.reject(createSdkUnavailableError("Unable to connect to http://localhost:4096")))

@@ -93,7 +93,7 @@ export function createSessionManagerTools(
     execute: async (args: SessionListArgs, _context) => {
       try {
         const directory = args.project_path ?? ctx.directory
-        const limit = args.limit && args.limit > 0 ? args.limit : undefined
+        const limit = !args.from_date && !args.to_date && args.limit && args.limit > 0 ? args.limit : undefined
         let sessions = await resolvedDeps.getMainSessions({ directory, limit })
         let sessionIDs = sessions.map((s) => s.id)
 
