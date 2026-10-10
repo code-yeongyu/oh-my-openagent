@@ -2,6 +2,7 @@ import { OpencodeClient as V2OpencodeClient } from "@opencode-ai/sdk/v2"
 import type { Client as V2GeneratedClient } from "@opencode-ai/sdk/v2/gen/client"
 import { z } from "zod"
 import { log } from "../shared"
+import type { OhMyOpenCodeConfig } from "../config"
 import type { SkillLoadOptions } from "../tools/skill/types"
 import type { PluginContext } from "./types"
 
@@ -39,6 +40,31 @@ function getGeneratedClientFromPluginClient(client: PluginContext["client"]): un
 export function getPluginInputNativeSkills(ctx: PluginContext): NativeSkills | undefined {
   const value = getObjectProperty(ctx, "skills")
   return isNativeSkills(value) ? value : undefined
+}
+
+export function applySkillsEnableToNativeSkills(
+  nativeSkills: NativeSkills,
+  skillsConfig: OhMyOpenCodeConfig["skills"],
+): NativeSkills {
+  const enabledSkillNames = Array.isArray(skillsConfig) ? skillsConfig : skillsConfig?.enable ?? []
+  if (enabledSkillNames.length === 0) return nativeSkills
+
+  const enabledSkills = new Set(enabledSkillNames)
+  const filterSkills = (skills: Awaited<ReturnType<NativeSkills["all"]>>) =>
+    skills.filter((skill) => enabledSkills.has(skill.name))
+
+  return {
+    all() {
+      const skills = nativeSkills.all()
+      return skills instanceof Promise ? skills.then(filterSkills) : filterSkills(skills)
+    },
+    get(name) {
+      return enabledSkills.has(name) ? nativeSkills.get(name) : undefined
+    },
+    dirs() {
+      return nativeSkills.dirs()
+    },
+  }
 }
 
 export function createNativeSkills(input: { readonly client: PluginContext["client"]; readonly directory: string }): NativeSkills {

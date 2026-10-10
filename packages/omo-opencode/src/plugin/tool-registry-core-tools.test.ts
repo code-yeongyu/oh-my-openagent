@@ -82,6 +82,66 @@ describe("#given disabled native skills in the registry skill context", () => {
   })
 })
 
+describe("#given skills.enable allows one native plugin skill", () => {
+  test("#when core tools register skill and task #then both receive only the allowed native skill", async () => {
+    // given
+    const nativeSkills = [{
+      name: "allowed-native-skill",
+      description: "Allowed native skill",
+      location: "/native/allowed/SKILL.md",
+      content: "Allowed native skill content",
+    }, {
+      name: "blocked-native-skill",
+      description: "Blocked native skill",
+      location: "/native/blocked/SKILL.md",
+      content: "Blocked native skill content",
+    }]
+    const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)
+    const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
+    const factories = {
+      ...createFactories(createSkillTool),
+      createDelegateTask,
+    }
+
+    // when
+    createCoreTools({
+      ctx: unsafeTestValue({
+        directory: "/tmp/project",
+        skills: {
+          async all() { return nativeSkills },
+          async get(name: string) { return nativeSkills.find((skill) => skill.name === name) },
+          dirs() { return [] },
+        },
+      }),
+      pluginConfig: unsafeTestValue({
+        disabled_agents: ["multimodal-looker"],
+        skills: { enable: ["allowed-native-skill"] },
+      }),
+      managers: unsafeTestValue({
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+        modelFallbackControllerAccessor: {},
+      }),
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      factories,
+    })
+
+    // then
+    const skillNativeSkills = createSkillTool.mock.calls[0]?.[0].nativeSkills
+    const taskNativeSkills = createDelegateTask.mock.calls[0]?.[0].nativeSkills
+    expect(await skillNativeSkills!.all()).toEqual([nativeSkills[0]])
+    expect(await taskNativeSkills!.all()).toEqual([nativeSkills[0]])
+    expect(await skillNativeSkills!.get("blocked-native-skill")).toBeUndefined()
+  })
+})
+
 describe("#given core skill tools are registered", () => {
   test("#when core tools are created #then skill task and skill_mcp share the runtime skill resolver", () => {
     const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)
