@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, jest, test } from "bun:test"
 
 import { createManagerResidencyRegistry } from "../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle } from "../lifecycle/create"
@@ -66,6 +66,14 @@ describe("runtime fallback over a live daemon session", () => {
       if (!acknowledged) host.withholdReply("close_session")
       const settled = acknowledged ? undefined : manager.waitFor(task.task_id, { signal: AbortSignal.timeout(10_000) })
 
+      let timeout: ReturnType<typeof setTimeout> | undefined
+      // Arm a real watchdog before freezing the grace clock: socket I/O still runs in real time.
+      const deadline = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`fallback did not settle within 10s; task status: ${store.load(task.task_id)?.status ?? "missing"}`)), 10_000)
+      })
+      const nextOpened = acknowledged ? host.waitForCommand("prompt") : undefined
+      if (acknowledged) jest.useFakeTimers()
+
       try {
         // when
         host.emitRecord(original.routingId, { type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider failed" } })
@@ -74,17 +82,20 @@ describe("runtime fallback over a live daemon session", () => {
 
         // then
         if (acknowledged) {
-          const nextOpened = host.waitForCommand("prompt")
-          await nextOpened
+          // Keep both 50ms grace timers frozen until the real host confirms the close and the
+          // replacement prompt arrives, independent of the OS scheduler's socket latency.
+          await Promise.race([nextOpened, deadline])
           expect(host.sessions().map((session) => session.sessionPath)).not.toContain(original.sessionPath)
         } else {
           if (settled === undefined) throw new Error("expected a terminal wait for the unconfirmed close")
-          const record = await settled
+          const record = await Promise.race([settled, deadline])
           expect(record.status).toBe("error")
           expect(launched).toHaveLength(1)
           expect(record.fallback_closing_child?.host_session?.session_path ?? record.host_session?.session_path).toBe(original.sessionPath)
         }
       } finally {
+        if (acknowledged) jest.useRealTimers()
+        clearTimeout(timeout)
         for (const handle of launched) await handle.dispose()
         for (const id of manager.residentTaskIds()) manager.forget(id)
         lifecycle.dispose?.()
