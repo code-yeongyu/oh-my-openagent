@@ -6,7 +6,8 @@ import { fakeEngineFactory, rejectionOf, type SpawnLog } from "./harness";
 
 // Every case waits on real child-process I/O; the guard only catches a hang, it never times behavior.
 const HANG_GUARD = { timeout: 30_000 };
-const RUN_TIMEOUT_MS = 5_000;
+// Long enough for a confirm to be asked (the facade keeps 5 s back and needs 3 s more); runs end far sooner.
+const RUN_TIMEOUT_MS = 15_000;
 
 const services: DesktopService[] = [];
 
@@ -14,8 +15,8 @@ afterEach(async () => {
 	await Promise.all(services.splice(0).map((service) => service.close()));
 });
 
-async function openDesktop(): Promise<{ service: DesktopService; log: SpawnLog }> {
-	const log = fakeEngineFactory({ FAKE_ENGINE_DESKTOP: "1" });
+async function openDesktop(env: Record<string, string> = {}): Promise<{ service: DesktopService; log: SpawnLog }> {
+	const log = fakeEngineFactory({ FAKE_ENGINE_DESKTOP: "1", ...env });
 	const service = new DesktopService({ createChild: log.factory });
 	services.push(service);
 	await service.open({});
@@ -257,6 +258,45 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		// The revoke is not awaited by the run (it settles at its own deadline); it is already on the wire.
 		await log.nthRequest("control.revoke", 1);
 		expect((await run(service, `return await desktop.control.state();`)).returnValue).toEqual({ active: false });
+	});
+
+	it("sends the revoke again after one that failed, so the grant is never forgotten as revoked", async () => {
+		// Given: the engine refuses the first revoke (#9651 B5b review round 2, R2-M1)
+		const { service, log } = await openDesktop({ FAKE_ENGINE_REVOKE_ERROR: "Internal" });
+		await rejectionOf(
+			run(service, `await desktop.control.acquire({ reason: "click Run" }); throw new Error("boom");`, {
+				confirmControl: () => Promise.resolve(true),
+			}),
+		);
+		await log.nthRequest("control.revoke", 1);
+
+		// When: the turn ends
+		await service.revokeControl();
+
+		// Then: a second revoke went out, since the first covered nothing
+		await log.nthRequest("control.revoke", 2);
+	});
+
+	it("refuses acquire with a reason when the run has too little time left to ask", async () => {
+		// Given: a run that cannot leave the human 3 s after the 5 s grant margin
+		const { service, log } = await openDesktop();
+		let prompts = 0;
+
+		// When
+		const error = await rejectionOf(
+			run(service, `await desktop.control.acquire({ reason: "click Run" });`, {
+				timeoutMs: 6_000,
+				confirmControl: () => {
+					prompts += 1;
+					return Promise.resolve(true);
+				},
+			}),
+		);
+
+		// Then
+		expect(error).toMatchObject({ message: expect.stringContaining("timeout") });
+		expect(prompts).toBe(0);
+		expect(methods(log)).not.toContain("control.grant");
 	});
 
 	it("a run that fails without a grant sends no control.revoke", async () => {

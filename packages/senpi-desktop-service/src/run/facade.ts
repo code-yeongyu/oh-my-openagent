@@ -108,6 +108,8 @@ export function createDesktopFacade(scope: RunScope) {
 
 /** Run time kept back from a pending confirm for `control.grant` and the action that follows it. */
 const CONFIRM_RUN_MARGIN_MS = 5_000;
+/** Less than this left for the confirm: a human could not read and answer it, so nobody is asked. */
+const MIN_CONFIRM_BUDGET_MS = 3_000;
 
 /** The `control.state` result shape, mirrored from the engine's `ControlStateResult` (#9651 B5). */
 export interface ControlState {
@@ -147,6 +149,12 @@ function createControlFacade(scope: RunScope, method: ReturnType<typeof facadeMe
 				if (confirm === undefined) return { active: false };
 				// The confirm must settle before the run budget ends, leaving time to send the grant and act on it.
 				const budgetMs = Math.max(0, context.deadline - Date.now() - CONFIRM_RUN_MARGIN_MS);
+				if (budgetMs < MIN_CONFIRM_BUDGET_MS) {
+					throw new ComputerRunError(
+						"assertion",
+						"control.acquire needs at least 3 s of run time left to ask the human; call it earlier or give the run a longer timeout",
+					);
+				}
 				const approved = await confirm(reason, context.signal, budgetMs);
 				context.signal.throwIfAborted();
 				if (approved !== true) return { active: false };

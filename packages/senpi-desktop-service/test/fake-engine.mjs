@@ -101,6 +101,9 @@ function handle(request) {
 			control = { active: true, reason: params?.reason ?? null, grantedAt: CONTROL_GRANTED_AT };
 			return reply(id, control);
 		case "control.revoke":
+			if (process.env.FAKE_ENGINE_REVOKE_ERROR !== undefined) {
+				return fail(id, process.env.FAKE_ENGINE_REVOKE_ERROR, `revoke failed: ${process.env.FAKE_ENGINE_REVOKE_ERROR}`);
+			}
 			control = { active: false };
 			return reply(id, null);
 		case "$/cancel":
