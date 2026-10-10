@@ -12,7 +12,7 @@ use serde_json::json;
 use super::TransactionError;
 use crate::request::Op;
 use crate::test_support::{
-    click_window, delivery, foreground_click, foreground_click_mutation, grant_control, harness, op_names, two_windows,
+    click_window, delivery, foreground_click, foreground_click_mutation, harness, op_names, two_windows,
 };
 
 fn chord(mode: &str) -> Op {
@@ -32,7 +32,7 @@ fn keypress_backend_failure_releases_before_restore_and_keeps_primary_error() {
     for (mode, expected) in cases {
         // Given
         let mut harness = harness(&two_windows());
-        harness.process(grant_control("one")).expect("grants");
+        harness.grant("one");
         harness.faults.fail_next(FakeMethod::KeyChord, ErrorCode::InputFailed);
         // When
         let reply = harness.process(chord(mode));
@@ -69,7 +69,7 @@ fn keypress_persistent_release_failure_retains_ownership_until_recovery() {
 fn transaction_captures_once_and_restore_failure_retains_primary() {
     // Given: a foreground drag off the frame, and a cursor that cannot return.
     let mut harness = harness(&two_windows());
-    harness.process(grant_control("one")).expect("grants");
+    harness.grant("one");
     let frame_id = harness.capture("101");
     harness.faults.fail_next(FakeMethod::WarpCursor, ErrorCode::InputFailed);
     let op = Op::Drag(DragParams {
@@ -94,7 +94,7 @@ fn transaction_captures_once_and_restore_failure_retains_primary() {
 fn transaction_capture_failure_runs_no_input_or_restore() {
     // Given
     let mut harness = harness(&two_windows());
-    harness.process(grant_control("one")).expect("grants");
+    harness.grant("one");
     let frame_id = harness.capture("101");
     harness
         .faults
@@ -110,7 +110,7 @@ fn transaction_capture_failure_runs_no_input_or_restore() {
 fn transaction_panic_releases_held_input_and_restores_cursor() {
     // Given
     let mut harness = harness(&two_windows());
-    harness.process(grant_control("one")).expect("grants");
+    harness.grant("one");
     // When: the backend panics right after delivering the click.
     let result = harness
         .worker
@@ -131,7 +131,7 @@ fn transaction_panic_releases_held_input_and_restores_cursor() {
 fn release_panic_still_restores_cursor_once() {
     // Given: the click fails and the release that follows it panics.
     let mut harness = harness(&two_windows());
-    harness.process(grant_control("one")).expect("grants");
+    harness.grant("one");
     let frame_id = harness.capture("101");
     harness.faults.fail_next(FakeMethod::Click, ErrorCode::InputFailed);
     harness.panics.panic_next(FakeMethod::ReleaseAll);
@@ -146,7 +146,7 @@ fn release_panic_still_restores_cursor_once() {
 fn restore_panic_is_mapped_without_escaping_transaction() {
     // Given
     let mut harness = harness(&two_windows());
-    harness.process(grant_control("one")).expect("grants");
+    harness.grant("one");
     harness.panics.panic_next(FakeMethod::RestoreFrontWindow);
     // When
     let (result, focus_restored) =

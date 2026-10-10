@@ -5,7 +5,9 @@ use senpi_desktop_safety::{StopPathId, StopSource};
 use serde_json::json;
 
 use crate::request::{Op, Response};
-use crate::test_support::{grant_control, harness, two_windows, Harness};
+use std::sync::Arc;
+
+use crate::test_support::{grant_control, harness, harness_with_slot, two_windows, Harness};
 
 fn grant(harness: &mut Harness, reason: &str) -> Response {
     harness
@@ -51,9 +53,10 @@ fn grant_reports_the_live_grant_and_revoke_is_idempotent() {
 
 #[test]
 fn a_second_sessions_grant_is_refused_and_the_first_keeps_its_grant() {
-    // Given: two sessions in this process; the first holds the grant.
-    let mut first = harness(&json!({}));
-    let mut second = harness(&json!({}));
+    // Given: two sessions sharing one slot; the first holds the grant.
+    let slot = crate::grant::ControlSlot::new();
+    let mut first = harness_with_slot(&json!({}), Arc::clone(&slot));
+    let mut second = harness_with_slot(&json!({}), slot);
     grant(&mut first, "first");
     // When
     let refused = second.process(grant_control("second"));

@@ -56,6 +56,12 @@ impl BackendFactory for Factory {
 /// An open session over the fixture with `overlay`'s top-level keys
 /// replaced, and a live, fresh global stop path.
 pub(crate) fn harness(overlay: &Value) -> Harness {
+    harness_with_slot(overlay, crate::grant::ControlSlot::new())
+}
+
+/// A harness whose session shares `slot` with other harnesses, as the
+/// engine's sessions share the process-wide slot.
+pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::ControlSlot>) -> Harness {
     let mut json: Value = serde_json::from_str(FIXTURE).expect("fixture is JSON");
     for (key, value) in overlay.as_object().expect("overlay is an object") {
         json[key] = value.clone();
@@ -70,7 +76,7 @@ pub(crate) fn harness(overlay: &Value) -> Harness {
     let safety = SessionSafety {
         supervisor: Arc::clone(&supervisor),
         audit: Box::new(move |event| recorded.lock().push(event.clone())),
-        control_slot: crate::grant::ControlSlot::new(),
+        control_slot: slot,
     };
     let panics = Panics::default();
     let factory = Factory {
@@ -97,6 +103,14 @@ impl Harness {
     /// Serves `op` as a request whose waiter never gives up.
     pub(crate) fn process(&mut self, op: Op) -> CoreResult<Response> {
         self.worker.process(op, &|| false)
+    }
+
+    /// Grants foreground control, then makes the live grant the captured
+    /// generation, as a request dequeued after the grant would capture it.
+    /// Tests that call `transaction` directly skip that capture.
+    pub(crate) fn grant(&mut self, reason: &str) {
+        self.process(grant_control(reason)).expect("grants");
+        self.worker.queued_generation = self.worker.live_generation();
     }
 
     /// Captures `target` and returns the frame id.

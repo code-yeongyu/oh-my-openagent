@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_safety::StopSource;
+use serde_json::json;
 
 use crate::test_support::{
     click_window, delivery, foreground_click, foreground_click_mutation, grant_control, harness, op_names, two_windows,
@@ -106,8 +107,8 @@ fn an_op_queued_before_a_revoke_and_regrant_never_runs_under_the_new_grant() {
 
 #[test]
 fn ax_click_foreground_needs_the_grant() {
-    // Given
-    let mut harness = harness(&two_windows());
+    // Given: the default fixture exposes a focused text area
+    let mut harness = harness(&json!({}));
     let reference = harness.focused_ref();
     let click = crate::request::Op::AxClick(senpi_desktop_core::protocol_params::AxClickParams {
         ref_: reference,
