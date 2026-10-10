@@ -1,24 +1,57 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import {
+  SESSION_INFO_DESCRIPTION,
   SESSION_LIST_DESCRIPTION,
   SESSION_READ_DESCRIPTION,
   SESSION_SEARCH_DESCRIPTION,
-  SESSION_INFO_DESCRIPTION,
 } from "./constants"
-import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
 import {
   filterSessionsByDate,
+  formatSearchResults,
   formatSessionInfo,
   formatSessionList,
   formatSessionMessages,
-  formatSearchResults,
   searchInSession,
 } from "./session-formatter"
-import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
+import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
+import type { SearchResult, SessionInfoArgs, SessionListArgs, SessionReadArgs, SessionSearchArgs } from "./types"
 
 const SEARCH_TIMEOUT_MS = 60_000
 const MAX_SESSIONS_TO_SCAN = 50
+
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error === null || error === undefined) return String(error)
+
+  switch (typeof error) {
+    case "string":
+    case "number":
+    case "boolean":
+    case "bigint":
+    case "symbol":
+      return String(error)
+    case "function":
+      return error.name ? `[function ${error.name}]` : "[function]"
+    case "object":
+      return formatObjectError(error)
+  }
+
+  return String(error)
+}
+
+function formatObjectError(error: object): string {
+  try {
+    return JSON.stringify(error) ?? Object.prototype.toString.call(error)
+  } catch (serializationError) {
+    if (serializationError instanceof TypeError) return Object.prototype.toString.call(error)
+    throw serializationError
+  }
+}
+
+function formatToolError(error: unknown): string {
+  return `Error: ${formatUnknownError(error)}`
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
   return Promise.race([
@@ -81,7 +114,7 @@ export function createSessionManagerTools(
     execute: async (args: SessionListArgs, _context) => {
       try {
         const directory = args.project_path ?? ctx.directory
-        let sessions = await resolvedDeps.getMainSessions({ directory })
+        const sessions = await resolvedDeps.getMainSessions({ directory })
         let sessionIDs = sessions.map((s) => s.id)
 
         if (args.from_date || args.to_date) {
@@ -94,7 +127,7 @@ export function createSessionManagerTools(
 
         return await resolvedDeps.formatSessionList(sessionIDs)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return formatToolError(e)
       }
     },
   })
@@ -130,7 +163,7 @@ export function createSessionManagerTools(
 
         return resolvedDeps.formatSessionMessages(messages, args.include_todos, todos)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return formatToolError(e)
       }
     },
   })
@@ -171,7 +204,7 @@ export function createSessionManagerTools(
 
         return resolvedDeps.formatSearchResults(results)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return formatToolError(e)
       }
     },
   })
@@ -191,7 +224,7 @@ export function createSessionManagerTools(
 
         return resolvedDeps.formatSessionInfo(info)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return formatToolError(e)
       }
     },
   })
