@@ -342,4 +342,70 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       "Every allowlist entry must match the shipped tree: file scanned, reason present.",
     ).toEqual([])
   })
+  describe("allowlist pins exact call sites (in-memory)", () => {
+    const pinnedCallEntry = (): AllowlistEntry => ({
+      file: "pkg/a.ts",
+      call: "http2.connect(baseUrl)",
+      count: 2,
+      reason: "host comes from new URL(...).hostname",
+    })
+
+    test("#given the exact allowlisted calls #when evaluated #then they pass with the exact counts", () => {
+      const entries: AllowlistEntry[] = [
+        pinnedCallEntry(),
+        {
+          file: "pkg/b.mjs",
+          call: 'import { get as httpsGet } from "node:https"',
+          count: 1,
+          reason: "host is the api.example.com literal",
+        },
+      ]
+      const scan: ScanItem[] = [
+        { path: "pkg/a.ts", content: "one();\nhttp2.connect(baseUrl);\ntwo();\nhttp2.connect(baseUrl);\n" },
+        { path: "pkg/b.mjs", content: 'import { get as httpsGet } from "node:https";\n' },
+      ]
+      expect(evaluateShippedSource(scan, entries)).toEqual({ offenders: [], stale: [] })
+    })
+
+    test("#given an allowlisted file with an extra different raw call #when evaluated #then it fails", () => {
+      const scan: ScanItem[] = [
+        {
+          path: "pkg/a.ts",
+          content: 'http2.connect(baseUrl);\nhttp2.connect(baseUrl);\ntls.connect({ host: "x", port: 1 });\n',
+        },
+      ]
+      const verdict = evaluateShippedSource(scan, [pinnedCallEntry()])
+      expect(
+        verdict.offenders.some((line) => line.includes('tls.connect({ host: "x", port: 1 })')),
+        "expected the new tls.connect to be flagged: " + JSON.stringify(verdict),
+      ).toBe(true)
+    })
+
+    test("#given an extra occurrence of the allowlisted call #when evaluated #then the count mismatch fails", () => {
+      const scan: ScanItem[] = [
+        { path: "pkg/a.ts", content: "http2.connect(baseUrl);\nhttp2.connect(baseUrl);\nhttp2.connect(baseUrl);\n" },
+      ]
+      const verdict = evaluateShippedSource(scan, [pinnedCallEntry()])
+      expect(
+        verdict.stale.some((line) => line.includes("expected http2.connect(baseUrl) x2, found x3")),
+        "expected a count mismatch: " + JSON.stringify(verdict),
+      ).toBe(true)
+    })
+
+    test("#given a stale entry whose call is gone #when evaluated #then it fails", () => {
+      const scan: ScanItem[] = [{ path: "pkg/a.ts", content: 'tls.connect({ host: "y", port: 2 });\n' }]
+      const verdict = evaluateShippedSource(scan, [pinnedCallEntry()])
+      expect(
+        verdict.stale.some((line) => line.includes("expected http2.connect(baseUrl) x2, found x0")),
+        "expected the stale entry to fail: " + JSON.stringify(verdict),
+      ).toBe(true)
+    })
+
+    test("#given reformatted calls #when evaluated #then they still match the pinned text", () => {
+      const scan: ScanItem[] = [
+        { path: "pkg/a.ts", content: "http2.connect(\n  baseUrl,\n);\nhttp2.connect( baseUrl );\n" },
+      ]
+      expect(evaluateShippedSource(scan, [pinnedCallEntry()])).toEqual({ offenders: [], stale: [] })
+    })
+  })
 })
