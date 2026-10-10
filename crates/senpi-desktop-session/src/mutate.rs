@@ -149,10 +149,12 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> (Result<T, TransactionError>, Option<bool>) {
-        if let Err(refused) = self.admit_control(mutation) {
+        // The fail-closed gate (stop path, lock, permissions) answers first:
+        // asking the human for a grant is pointless while input cannot run.
+        if let Err(refused) = self.gate(mutation) {
             return (Err(TransactionError::Primary(refused)), None);
         }
-        if let Err(refused) = self.gate(mutation) {
+        if let Err(refused) = self.admit_control(mutation) {
             return (Err(TransactionError::Primary(refused)), None);
         }
         let guard = match Guard::begin(self, mutation.action, mutation.delivery) {

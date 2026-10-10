@@ -104,6 +104,7 @@ impl Worker {
 
     /// `cancelled` reports that the request's waiter gave up; only mutating
     /// requests consult it.
+    #[cfg(test)]
     pub(crate) fn process(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         let queued = crate::grant::generation_for(self.instance);
         self.process_captured(op, cancelled, queued)

@@ -697,42 +697,6 @@
       "description": "`session.open` reply. `resume_token` is the only way to lift a stop latch\n(`stopPath.resume`) and is never forwarded past the host process.",
       "additionalProperties": false
     },
-    "ControlGrantParams": {
-      "type": "object",
-      "properties": {
-        "reason": {
-          "type": "string"
-        },
-        "confirmationId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "reason",
-        "confirmationId"
-      ],
-      "description": "`control.grant`: `confirmationId` is the host's receipt of the human\nconfirmation it showed; the engine never sees the confirm itself.",
-      "additionalProperties": false
-    },
-    "ControlStateResult": {
-      "type": "object",
-      "properties": {
-        "active": {
-          "type": "boolean"
-        },
-        "reason": {
-          "type": "string"
-        },
-        "grantedAt": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "active"
-      ],
-      "description": "`control.grant` and `control.state` reply: this session's live foreground\ncontrol grant. `reason` and `granted_at` are present exactly when\n`active` is true.",
-      "additionalProperties": false
-    },
     "DesktopCapabilities": {
       "type": "object",
       "properties": {
@@ -819,6 +783,49 @@
         "screenLocked"
       ],
       "description": "Runtime truth about what this host's backend can do right now.\n\nFROZEN field set (IS-2): later todos fill values, never add fields.",
+      "additionalProperties": false
+    },
+    "ControlGrantParams": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "confirmationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "confirmationId"
+      ],
+      "description": "`control.grant`: `confirmationId` is the host's receipt of the human\nconfirmation it showed; the engine never sees the confirm itself.",
+      "additionalProperties": false
+    },
+    "ControlStateResult": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grantedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "RFC 3339 UTC with milliseconds, matching the audit timestamps."
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "description": "`control.grant` and `control.state` reply: this session's live foreground\ncontrol grant. `reason` and `granted_at` are present exactly when\n`active` is true.",
       "additionalProperties": false
     },
     "DesktopDisplay": {

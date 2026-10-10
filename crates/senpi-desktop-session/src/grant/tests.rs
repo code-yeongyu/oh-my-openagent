@@ -29,12 +29,12 @@ fn grant_reports_the_live_grant_and_revoke_is_idempotent() {
     // When
     let granted = grant(&mut harness, "click the install button");
     // Then
-    let Response::ControlState(state) = granted else {
+    let Response::ControlState(reply) = granted else {
         panic!("grant answered {granted:?}")
     };
-    assert!(state.active);
-    assert_eq!(state.reason.as_deref(), Some("click the install button"));
-    let granted_at = state.granted_at.expect("a grant carries grantedAt");
+    assert!(reply.active);
+    assert_eq!(reply.reason.as_deref(), Some("click the install button"));
+    let granted_at = reply.granted_at.expect("a grant carries grantedAt");
     assert_eq!(state(&mut harness).granted_at.as_deref(), Some(granted_at.as_str()));
     // When: revoked twice
     assert_eq!(harness.process(Op::ControlRevoke), Ok(Response::Unit));

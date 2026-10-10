@@ -7,18 +7,11 @@ use std::sync::Arc;
 
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_safety::StopSource;
-use serde_json::json;
 
 use crate::grant::test_lock;
 use crate::test_support::{
     click_window, delivery, foreground_click, foreground_click_mutation, grant_control, harness, op_names, two_windows,
-    Harness,
 };
-use crate::worker::Worker;
-
-fn granted_foreground_click(_harness: &Harness) -> fn(&mut Worker) -> senpi_desktop_core::error::CoreResult<()> {
-    foreground_click
-}
 
 #[test]
 fn foreground_without_a_grant_is_refused_without_input_or_capture() {
@@ -184,7 +177,7 @@ fn an_op_admitted_under_the_old_generation_still_finishes_its_transaction() {
         .worker
         .mutate(&foreground_click_mutation(), &|| false, move |worker| {
             supervisor.trigger_stop(StopSource::Hotkey);
-            granted_foreground_click(harness)(worker)
+            foreground_click(worker)
         })
         .map(|((), _audit)| ());
     // Then: suspended, but capture, input, release and restore all happened
