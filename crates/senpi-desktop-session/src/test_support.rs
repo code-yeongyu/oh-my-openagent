@@ -105,12 +105,9 @@ impl Harness {
         self.worker.process(op, &|| false)
     }
 
-    /// Grants foreground control, then makes the live grant the captured
-    /// generation, as a request dequeued after the grant would capture it.
-    /// Tests that call `transaction` directly skip that capture.
+    /// Grants foreground control for this harness's session.
     pub(crate) fn grant(&mut self, reason: &str) {
         self.process(grant_control(reason)).expect("grants");
-        self.worker.queued_generation = self.worker.live_generation();
     }
 
     /// Captures `target` and returns the frame id.
@@ -137,18 +134,9 @@ impl Harness {
         self.audits.lock().clone()
     }
 
-    /// The worker's live grant generation, as a dequeue would capture it.
-    pub(crate) fn queue_generation(&self) -> Option<u64> {
-        self.worker.safety.control_slot.generation_for(self.worker.instance)
-    }
-
-    /// Whether a mutation carrying `queued` would be admitted foreground.
-    pub(crate) fn queued_admits_foreground(&self, queued: Option<u64>) -> bool {
-        crate::grant::admits(
-            DeliveryMode::Foreground,
-            queued,
-            self.worker.live_generation(),
-        )
+    /// This session's live grant generation, `None` without a grant.
+    pub(crate) fn grant_generation(&self) -> Option<u64> {
+        self.worker.control.as_ref().map(|grant| grant.generation)
     }
 }
 

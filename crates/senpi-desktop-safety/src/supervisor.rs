@@ -199,9 +199,10 @@ impl Supervisor {
         self.suspended.load(Ordering::SeqCst)
     }
 
-    /// The only user-only proof a test can make: no resume token exists.
-    /// Hidden: the engine's stop paths redeem a real [`ResumeToken`].
-    #[doc(hidden)]
+    /// Lifts suspension without a [`UserReset`], for tests only: compiled
+    /// solely with the `test-support` feature, which only dev-dependencies
+    /// enable, so no production build can call it.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn reset_for_test(&self) {
         let mut stopped_by = self.stopped_by.lock();
         *stopped_by = None;

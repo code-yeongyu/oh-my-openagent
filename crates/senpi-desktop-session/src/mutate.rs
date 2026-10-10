@@ -130,9 +130,6 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> CoreResult<(T, AuditEvent)> {
-        // A dequeued op keeps the generation captured then; a direct call
-        // (worker_input/ax already set it, tests) takes the live one.
-        self.queued_generation = self.queued_generation.take().or_else(|| self.live_generation());
         let started = Instant::now();
         let (result, focus_restored) = match self.admit(cancelled) {
             Ok(_transaction) => self.transaction(mutation, cancelled, act),

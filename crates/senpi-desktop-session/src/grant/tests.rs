@@ -98,7 +98,7 @@ fn re_grant_by_the_same_session_replaces_the_generation() {
     // Given
     let mut harness = harness(&json!({}));
     grant(&mut harness, "one");
-    let first_generation = harness.queue_generation();
+    let first_generation = harness.grant_generation();
     // When
     let second = grant(&mut harness, "two");
     // Then: a fresh generation (timestamps can share a millisecond)
@@ -106,7 +106,7 @@ fn re_grant_by_the_same_session_replaces_the_generation() {
         unreachable!()
     };
     assert!(first_generation.is_some());
-    assert_ne!(harness.queue_generation(), first_generation);
+    assert_ne!(harness.grant_generation(), first_generation);
     assert_eq!(two.reason.as_deref(), Some("two"));
 }
 
