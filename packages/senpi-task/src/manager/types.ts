@@ -29,6 +29,7 @@ import type { TaskConcurrency } from "./concurrency"
 import type { InheritedExtensions } from "../runners/rpc/parent-extensions"
 import type { WorkpoolEngine } from "../workpool/engine"
 import type { ChildExtensionEvent } from "../runners/child-extension-events"
+import type { ExitConfirmationSchedule } from "./provisional-exit"
 
 export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
@@ -264,6 +265,7 @@ export type TaskManagerOptions = {
   readonly config: OmoTaskSettings
   readonly cwd: string
   readonly now?: () => number
+  readonly scheduleExitConfirmation?: ExitConfirmationSchedule
   // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
   // a no-op so the manager stays usable before lifecycle wiring lands.
   readonly destruction?: DestructionPort

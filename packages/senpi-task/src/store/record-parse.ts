@@ -24,6 +24,7 @@ import {
   readOptionalTaskStartFailureReason,
 } from "./start-failure-parse"
 import { parseRunStats } from "./run-stats-parse"
+import { parseOptionalProvisionalExit } from "./provisional-exit-parse"
 import {
   isRecord,
   readNumber,
@@ -94,6 +95,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const closingChild = parseOptionalClosingChild(value)
   const residencyClaim = readOptionalString(value, "residency_claim")
   const cancelRequested = parseOptionalCancelRequest(value)
+  const provisionalExit = parseOptionalProvisionalExit(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -161,6 +163,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(closingChild === undefined ? {} : { fallback_closing_child: closingChild }),
     ...(residencyClaim === undefined ? {} : { residency_claim: residencyClaim }),
     ...(cancelRequested === undefined ? {} : { cancel_requested: cancelRequested }),
+    ...(provisionalExit === undefined ? {} : { provisional_exit: provisionalExit }),
   }
 }
 

@@ -79,6 +79,7 @@ export async function reattachManagedTask(input: {
       final_response: _final,
       killed: _killed,
       fallback_handoff_epoch: _handoff,
+      provisional_exit: _provisionalExit,
       ...rest
     } = fresh
     const epoch = nextRunEpoch(fresh)

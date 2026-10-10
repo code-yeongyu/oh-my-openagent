@@ -12,7 +12,7 @@ const { killProcessGroup } = await import(pathToFileURL(join(scriptDir, "team-e2
 const mockProviderEntry = join(scriptDir, "task-rpc-e2e-mock-provider.ts")
 const CHILD_FINAL_TEXT = "omo rpc child mock work complete"
 const PROJECT_OMO_CONFIG = {
-  task: { default_execution_mode: "process" },
+  task: { default_execution_mode: "process", process_runner: "child-process" },
   categories: { proc: { description: "Process-mode mock category.", model: "omo-mock/mock-1" } },
 }
 const RECONCILE_PROJECT_OMO_CONFIG = {

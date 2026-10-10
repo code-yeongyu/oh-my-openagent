@@ -175,7 +175,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     try {
       await deliverPrompt(text, streamingBehavior)
     } catch (error) {
-      settleTurn(promptFailureOutcome(error))
+      // A broken pipe can reject the command before close supplies the process-exit facts.
+      // Let close settle that outcome so the manager can confirm it instead of publishing ERROR.
+      if (!client.exited) settleTurn(promptFailureOutcome(error))
       throw error
     }
   }
