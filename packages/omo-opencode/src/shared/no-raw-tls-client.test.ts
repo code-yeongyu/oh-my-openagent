@@ -44,14 +44,38 @@ const EXCLUDED_SEGMENTS = new Set([
   "docs",
 ])
 
-// Reviewed allowlist: repo-relative file path -> one-line reason stating
-// where the host comes from. A reason is only valid if the host is
-// "new URL(...).hostname" or a literal. Adding an entry is a reviewed act:
-// name the call sites and the host provenance, and reference senpi#3078.
-const ALLOWLIST: Record<string, string> = {
-  "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs":
-    "httpsGet(url) at :109; url is the template built at :107 whose host is the fixed api.github.com prefix - repo and version interpolate into the path, not the host - and https.get parses the URL string before TLS (senpi#3078).",
+type AllowlistEntry = {
+  file: string
+  call: string
+  count: number
+  reason: string
 }
+
+type ScanItem = {
+  path: string
+  content: string
+}
+
+type ScanVerdict = {
+  offenders: string[]
+  stale: string[]
+}
+
+// Reviewed allowlist. Each entry pins one exact call: the repo-relative
+// file, the detected call's normalized text (whitespace collapsed, exactly
+// as the failure message prints it), the expected occurrence count, and a
+// one-line reason stating where the host comes from. A reason is only
+// valid if the host is "new URL(...).hostname" or a literal. Adding or
+// editing an entry is a reviewed act: name the host provenance and
+// reference senpi#3078.
+const ALLOWLIST: AllowlistEntry[] = [
+  {
+    file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
+    call: 'import { get as httpsGet } from "node:https"',
+    count: 1,
+    reason: "httpsGet(url) at :109 receives the :107 template whose host is the fixed api.github.com prefix - repo and version interpolate into the path - and https.get parses the URL string before TLS (senpi#3078).",
+  },
+]
 
 const OFFENDER_GUIDANCE = [
   "Shipped source must not gain raw TLS/HTTPS client calls.",
@@ -105,6 +129,36 @@ function httpsImportGrantsRequestGet(clause: string): boolean {
   return names.includes("request") || names.includes("get")
 }
 
+function normalizeCallText(text: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/\(\s+/g, "(")
+    .replace(/,\s*\)/g, ")")
+    .replace(/\s+\)/g, ")")
+}
+
+// The matched call plus its balanced argument list, normalized, so a
+// reformatted call still matches its pinned allowlist text.
+function callText(content: string, match: RegExpMatchArray): string {
+  const open = (match.index ?? 0) + match[0].length - 1
+  let depth = 0
+  let close = -1
+  for (let i = open; i < content.length && i < open + 400; i += 1) {
+    const character = content[i]
+    if (character === "(") {
+      depth += 1
+    } else if (character === ")") {
+      depth -= 1
+      if (depth === 0) {
+        close = i
+        break
+      }
+    }
+  }
+  if (close === -1) close = Math.min(content.length, open + 400) - 1
+  return normalizeCallText(content.slice(match.index ?? 0, close + 1))
+}
+
 function lineNumber(content: string, index: number): number {
   let line = 1
   for (let i = 0; i < index; i += 1) {
@@ -113,11 +167,11 @@ function lineNumber(content: string, index: number): number {
   return line
 }
 
-function findRawTlsClients(content: string): Array<{ line: number; id: string }> {
+function findRawTlsClients(content: string): Array<{ line: number; id: string; text: string }> {
   const hits: Array<{ line: number; id: string }> = []
   for (const [id, pattern] of CALL_PATTERNS) {
     for (const match of content.matchAll(pattern)) {
-      hits.push({ line: lineNumber(content, match.index ?? 0), id })
+      hits.push({ line: lineNumber(content, match.index ?? 0), id, text: callText(content, match) })
     }
   }
   for (const match of content.matchAll(IMPORT_FROM)) {
@@ -126,14 +180,26 @@ function findRawTlsClients(content: string): Array<{ line: number; id: string }>
     const moduleName = match[3]
     if (typeClause) continue
     if (moduleName.endsWith("tls")) {
-      hits.push({ line: lineNumber(content, match.index ?? 0), id: 'import from "' + moduleName + '"' })
+      hits.push({
+        line: lineNumber(content, match.index ?? 0),
+        id: 'import from "' + moduleName + '"',
+        text: normalizeCallText(match[0]),
+      })
     } else if (httpsImportGrantsRequestGet(clause)) {
-      hits.push({ line: lineNumber(content, match.index ?? 0), id: "import granting request/get from node:https" })
+      hits.push({
+        line: lineNumber(content, match.index ?? 0),
+        id: "import granting request/get from node:https",
+        text: normalizeCallText(match[0]),
+      })
     }
   }
   for (const [pattern, label] of MODULE_FORMS) {
     for (const match of content.matchAll(pattern)) {
-      hits.push({ line: lineNumber(content, match.index ?? 0), id: label + '("' + match[1] + '")' })
+      hits.push({
+        line: lineNumber(content, match.index ?? 0),
+        id: label + '("' + match[1] + '")',
+        text: normalizeCallText(match[0]),
+      })
     }
   }
   return hits.sort((a, b) => a.line - b.line || a.id.localeCompare(b.id))
@@ -147,6 +213,33 @@ function isScannedSourceFile(relativePath: string): boolean {
   const segments = relativePath.split("/")
   if (segments.some((segment) => EXCLUDED_SEGMENTS.has(segment))) return false
   return true
+}
+
+function evaluateShippedSource(scan: ScanItem[], allowlist: AllowlistEntry[]): ScanVerdict {
+  const offenders: string[] = []
+  const stale: string[] = []
+  for (const item of scan) {
+    const hits = findRawTlsClients(item.content)
+    if (hits.length === 0) continue
+    if (allowlist.some((entry) => entry.file === item.path)) continue
+    for (const hit of hits) {
+      offenders.push(item.path + ":" + hit.line + "  " + hit.text)
+    }
+  }
+  for (const entry of allowlist) {
+    const item = scan.find((candidate) => candidate.path === entry.file)
+    if (!item) {
+      stale.push(entry.file + ": stale allowlist entry (no longer scanned)")
+      continue
+    }
+    if (findRawTlsClients(item.content).length === 0) {
+      stale.push(entry.file + ": stale allowlist entry (no raw TLS client calls left in file)")
+    }
+    if (!entry.reason || !entry.reason.trim()) {
+      stale.push(entry.file + ": allowlist entry without a reason")
+    }
+  }
+  return { offenders, stale }
 }
 
 function collectShippedSourceFiles(): string[] {
@@ -204,7 +297,7 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       expect(hits.some((hit) => hit.id === id), "sample not caught as " + id + ": " + sample).toBe(true)
     }
     const positioned = findRawTlsClients('const a = 1;\n\nawait tls.connect({ host: "x", port: 1 });')
-    expect(positioned).toEqual([{ line: 3, id: "tls.connect(" }])
+    expect(positioned).toEqual([{ line: 3, id: "tls.connect(", text: 'tls.connect({ host: "x", port: 1 })' }])
   })
 
   test("#given URL-parsed and inbound-server neighbors #when scanned #then nothing is flagged", () => {
@@ -238,24 +331,15 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
   test("#given shipped production source #when scanned #then no raw TLS client call exists outside the reviewed allowlist", () => {
     const files = collectShippedSourceFiles()
     expect(files.length).toBeGreaterThan(1000)
-    const offenders: string[] = []
-    const allowlistedHits = new Map<string, number>(Object.keys(ALLOWLIST).map((entry) => [entry, 0]))
-    for (const relativePath of files) {
-      const hits = findRawTlsClients(readFileSync(path.join(WORKSPACE_ROOT, relativePath), "utf8"))
-      if (hits.length === 0) continue
-      if (Object.hasOwn(ALLOWLIST, relativePath)) {
-        allowlistedHits.set(relativePath, (allowlistedHits.get(relativePath) ?? 0) + hits.length)
-        continue
-      }
-      for (const hit of hits) {
-        offenders.push(relativePath + ":" + hit.line + "  " + hit.id)
-      }
-    }
-    expect(offenders, OFFENDER_GUIDANCE).toEqual([])
-    for (const [entry, hits] of allowlistedHits) {
-      expect(files.includes(entry), "stale allowlist entry (no longer scanned): " + entry).toBe(true)
-      expect(hits > 0, "stale allowlist entry (no raw TLS client calls left in file): " + entry).toBe(true)
-      expect(ALLOWLIST[entry].trim().length > 0, "allowlist entry without a reason: " + entry).toBe(true)
-    }
+    const scan: ScanItem[] = files.map((relativePath) => ({
+      path: relativePath,
+      content: readFileSync(path.join(WORKSPACE_ROOT, relativePath), "utf8"),
+    }))
+    const verdict = evaluateShippedSource(scan, ALLOWLIST)
+    expect(verdict.offenders, OFFENDER_GUIDANCE).toEqual([])
+    expect(
+      verdict.stale,
+      "Every allowlist entry must match the shipped tree: file scanned, reason present.",
+    ).toEqual([])
   })
 })
