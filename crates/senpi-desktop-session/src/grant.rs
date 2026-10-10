@@ -110,34 +110,86 @@ impl Worker {
 }
 
 impl Worker {
-    /// `control.grant` (stub: implemented with the grant slot).
-    pub(crate) fn try_grant(&mut self, _params: &ControlGrantParams) -> CoreResult<ControlStateResult> {
-        Err(DesktopError::internal("control.grant is not implemented"))
+    /// `control.grant`: takes the process-wide slot for this session. A
+    /// second session is refused `InputBusy` and never steals it; the same
+    /// session re-grants with a fresh generation.
+    pub(crate) fn try_grant(&mut self, params: &ControlGrantParams) -> CoreResult<ControlStateResult> {
+        let mut slot = CONTROL_SLOT.lock();
+        if let Some(owner) = slot.as_ref() {
+            if owner.instance != self.instance {
+                return Err(DesktopError::input_busy(
+                    "another session holds the foreground control grant; it is never stolen, so retry \
+                     after that session revokes or closes",
+                ));
+            }
+        }
+        let generation = NEXT_GENERATION.fetch_add(1, Ordering::SeqCst);
+        let grant = ControlGrant {
+            id: ulid::Ulid::generate().to_string(),
+            reason: params.reason.clone(),
+            generation,
+            granted_at: crate::audit::rfc3339_ms(crate::audit::unix_now_ms()),
+            stop_epoch: self.stop_epoch(),
+        };
+        *slot = Some(SlotOwner {
+            instance: self.instance,
+            generation,
+        });
+        let state = ControlStateResult {
+            active: true,
+            reason: Some(grant.reason.clone()),
+            granted_at: Some(grant.granted_at.clone()),
+        };
+        self.control = Some(grant);
+        Ok(state)
     }
 
-    /// `control.revoke` (stub). Idempotent.
+    /// `control.revoke`: idempotent; frees the slot this session owns. Every
+    /// revocation is a generation boundary: nothing queued under the old
+    /// generation runs under the next grant.
     pub(crate) fn try_revoke(&mut self) -> CoreResult<()> {
-        Err(DesktopError::internal("control.revoke is not implemented"))
+        self.release_control();
+        Ok(())
     }
 
-    /// Releases this worker's slot share: `session.close`.
-    pub(crate) fn release_control(&mut self) {}
+    /// Releases this worker's slot share: `session.close` and `Drop`. Not an
+    /// audit event: `session.close` and the stop revocation have their own.
+    pub(crate) fn release_control(&mut self) {
+        let mut slot = CONTROL_SLOT.lock();
+        if slot.as_ref().is_some_and(|owner| owner.instance == self.instance) {
+            *slot = None;
+        }
+        drop(slot);
+        self.control = None;
+    }
 
-    /// Drops the grant when a stop was observed since it was granted.
-    pub(crate) fn reconcile_grant(&mut self) {}
-
-    /// This worker's live grant as the `control.state` reply.
-    pub(crate) fn control_state(&self) -> ControlStateResult {
-        ControlStateResult {
-            active: false,
-            reason: None,
-            granted_at: None,
+    /// Drops the grant when a stop was observed since it was granted. Runs at
+    /// the top of every served request, so a suspension revokes even when no
+    /// mutating op follows, and `stopPath.resume` never restores it.
+    pub(crate) fn reconcile_grant(&mut self) {
+        let revoked = self
+            .control
+            .as_ref()
+            .is_some_and(|grant| grant.stop_epoch != self.stop_epoch());
+        if revoked {
+            self.release_control();
         }
     }
 
-    /// The queued generation this worker admits, if it matches the grant.
-    pub(crate) fn queued_generation(&self) -> Option<u64> {
-        generation_for(self.instance)
+    /// This worker's live grant as the `control.state` reply.
+    pub(crate) fn control_state(&self) -> ControlStateResult {
+        match self.control.as_ref() {
+            Some(grant) => ControlStateResult {
+                active: true,
+                reason: Some(grant.reason.clone()),
+                granted_at: Some(grant.granted_at.clone()),
+            },
+            None => ControlStateResult {
+                active: false,
+                reason: None,
+                granted_at: None,
+            },
+        }
     }
 }
 
