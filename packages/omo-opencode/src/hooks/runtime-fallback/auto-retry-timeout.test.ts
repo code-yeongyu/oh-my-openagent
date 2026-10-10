@@ -6,7 +6,13 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 
-function createContext(): RuntimeFallbackPluginInput {
+type ToastCall = {
+  readonly title: string
+  readonly message: string
+  readonly variant: string
+}
+
+function createContext(toasts: ToastCall[] = [], showToast?: RuntimeFallbackPluginInput["client"]["tui"]["showToast"]): RuntimeFallbackPluginInput {
   return {
     client: {
       session: {
@@ -15,16 +21,23 @@ function createContext(): RuntimeFallbackPluginInput {
         promptAsync: async () => ({}),
       },
       tui: {
-        showToast: async () => ({}),
+        showToast: showToast ?? (async (input) => {
+          toasts.push({
+            title: input.body.title,
+            message: input.body.message,
+            variant: input.body.variant,
+          })
+          return {}
+        }),
       },
     },
     directory: "/test/dir",
   }
 }
 
-function createDeps(): HookDeps {
+function createDeps(toasts: ToastCall[] = [], showToast?: RuntimeFallbackPluginInput["client"]["tui"]["showToast"]): HookDeps {
   return {
-    ctx: createContext(),
+    ctx: createContext(toasts, showToast),
     config: {
       enabled: true,
       retry_on_errors: [429, 503, 529],
@@ -60,7 +73,7 @@ describe("createFallbackTimeoutHelpers", () => {
     restoreRuntimeFallbackTestClock()
   })
 
-  test("#given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored", async () => {
+  test("#given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored with the attempt consumed", async () => {
     // given
     const sessionID = "session-timeout-dispatch-blocked"
     SessionCategoryRegistry.register(sessionID, "test")
@@ -69,40 +82,30 @@ describe("createFallbackTimeoutHelpers", () => {
     deps.sessionStates.set(sessionID, state)
 
     let retryModel: string | undefined
-    let resolveRetry: (() => void) | undefined
-    const retryCalled = new Promise<void>((resolve) => {
-      resolveRetry = resolve
-    })
     const helpers = createFallbackTimeoutHelpers(
       deps,
       async () => {},
       async (_sessionID, model) => {
         retryModel = model
-        resolveRetry?.()
         return { accepted: false, status: "blocked", reason: "test gate blocked dispatch" }
       },
     )
+    const clock = installRuntimeFallbackTestClock()
 
     // when
     helpers.scheduleSessionFallbackTimeout(sessionID)
-    await Promise.race([
-      retryCalled,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("timer did not fire")), 1000)
-      }),
-    ])
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await clock.advanceBy(1)
 
     // then
     expect(retryModel).toBe("litellm/openai.eu.gpt-5.5")
     expect(state.currentModel).toBe("openai/gpt-5.4")
     expect(state.fallbackIndex).toBe(-1)
-    expect(state.attemptCount).toBe(0)
+    expect(state.attemptCount).toBe(1)
     expect(state.pendingFallbackModel).toBe(undefined)
     expect(state.failedModels.size).toBe(0)
   })
 
-  test("#given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed", async () => {
+  test("#given an accepted fallback is awaiting its result #when timeout escalation is blocked below the cap #then the restored awaiting state keeps a timeout armed", async () => {
     // given
     const sessionID = "session-timeout-awaiting-dispatch-blocked"
     SessionCategoryRegistry.register(sessionID, "test")
@@ -116,68 +119,147 @@ describe("createFallbackTimeoutHelpers", () => {
     deps.sessionStates.set(sessionID, state)
     deps.sessionAwaitingFallbackResult.add(sessionID)
 
-    let resolveRetry: (() => void) | undefined
-    const retryCalled = new Promise<void>((resolve) => {
-      resolveRetry = resolve
-    })
+    let dispatchCount = 0
     const helpers = createFallbackTimeoutHelpers(
       deps,
       async () => {},
       async () => {
-        resolveRetry?.()
+        dispatchCount += 1
         return { accepted: false, status: "blocked", reason: "test gate blocked dispatch" }
       },
     )
+    const clock = installRuntimeFallbackTestClock()
 
     // when
     helpers.scheduleSessionFallbackTimeout(sessionID)
-    await Promise.race([
-      retryCalled,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("timer did not fire")), 1000)
-      }),
-    ])
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await clock.advanceBy(1)
 
     // then
+    expect(dispatchCount).toBe(1)
+    expect(state.attemptCount).toBe(1)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(true)
     helpers.clearSessionFallbackTimeout(sessionID)
   })
 
-  test("#given a timeout belongs to an older state generation #when that generation is replaced before its callback runs #then it never aborts the replacement request", async () => {
+  test("#given every timeout dispatch is rejected #when the attempt cap is reached #then retries stop and the caller sees a terminal failure", async () => {
     // given
-    const sessionID = "session-timeout-replaced-before-callback"
+    const sessionID = "session-timeout-rejected-until-cap"
     SessionCategoryRegistry.register(sessionID, "test")
-    const deps = createDeps()
-    deps.options = {
-      session_timeout_ms: 1,
-    }
-    deps.sessionStates.set(sessionID, createFallbackState("openai/gpt-5.4"))
-    let abortCalls = 0
-    let retryCalls = 0
+    const toasts: ToastCall[] = []
+    const deps = createDeps(toasts)
+    deps.config.max_fallback_attempts = 2
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+
+    let dispatchCount = 0
+    const abortSources: string[] = []
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => {
-        abortCalls += 1
+      async (_sessionID, source) => {
+        abortSources.push(source)
       },
       async () => {
-        retryCalls += 1
+        dispatchCount += 1
+        return { accepted: false, status: "blocked", reason: `blocked ${dispatchCount}` }
+      },
+    )
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(10)
+
+    // then
+    expect(dispatchCount).toBe(2)
+    expect(state.attemptCount).toBe(2)
+    expect(state.currentModel).toBe("openai/gpt-5.4")
+    expect(state.fallbackIndex).toBe(-1)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+    expect(abortSources).toEqual([
+      "session.timeout",
+      "session.timeout",
+      "session.timeout.fallback-exhausted",
+    ])
+    expect(toasts).toEqual([
+      {
+        title: "Model Fallback Failed",
+        message: "No fallback model could be reached (max fallback attempts reached)",
+        variant: "error",
+      },
+    ])
+  })
+
+  test("#given no fallback models are configured #when the timeout fires #then the awaiting caller is released terminally", async () => {
+    // given
+    const sessionID = "session-timeout-without-fallback-models"
+    const toasts: ToastCall[] = []
+    const deps = createDeps(toasts)
+    deps.pluginConfig = { categories: {} }
+    deps.sessionStates.set(sessionID, createFallbackState("openai/gpt-5.4"))
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+
+    let dispatchCount = 0
+    const abortSources: string[] = []
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async (_sessionID, source) => {
+        abortSources.push(source)
+      },
+      async () => {
+        dispatchCount += 1
         return { accepted: true, status: "dispatched" }
       },
     )
     const clock = installRuntimeFallbackTestClock()
-    helpers.scheduleSessionFallbackTimeout(sessionID)
 
     // when
-    const replacementState = createFallbackState("google/gemini-2.5-pro")
-    deps.sessionStates.set(sessionID, replacementState)
-    await clock.advanceBy(1)
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(10)
 
     // then
-    expect(abortCalls).toBe(0)
-    expect(retryCalls).toBe(0)
-    expect(replacementState.currentModel).toBe("google/gemini-2.5-pro")
+    expect(dispatchCount).toBe(0)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+    expect(abortSources).toEqual(["session.timeout", "session.timeout.fallback-exhausted"])
+    expect(toasts[0]?.message).toBe("No fallback model could be reached (no fallback models configured)")
+  })
+
+  test("#given no session is awaiting a fallback result #when the fallback budget is exhausted #then no terminal abort is issued", async () => {
+    // given
+    const sessionID = "session-timeout-exhausted-without-awaiting"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const toasts: ToastCall[] = []
+    const deps = createDeps(toasts)
+    deps.config.max_fallback_attempts = 1
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+
+    const abortSources: string[] = []
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async (abortedSessionID, source) => {
+        abortSources.push(source)
+        if (source === "session.timeout") {
+          deps.internallyAbortedSessions.add(abortedSessionID)
+        }
+      },
+      async () => ({ accepted: true, status: "dispatched" }),
+    )
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(10)
+
+    // then
+    expect(abortSources).toEqual(["session.timeout"])
+    expect(toasts).toEqual([])
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
   })
 
   test("#given timeout callback awaits abort #when manual model change replaces state #then the stale generation never dispatches", async () => {
@@ -221,5 +303,110 @@ describe("createFallbackTimeoutHelpers", () => {
     // then
     expect(retryCalls).toBe(0)
     expect(replacementState.currentModel).toBe("google/gemini-2.5-pro")
+  })
+
+  test("#given a superseding retry advances the same state object while a timeout dispatch is in flight #when that dispatch is rejected #then the newer retry is not rolled back", async () => {
+    // given
+    const sessionID = "session-timeout-superseded-in-flight"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+
+    let dispatchCount = 0
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => {},
+      async () => {
+        dispatchCount += 1
+        // A concurrent retry advances the very same FallbackState object without
+        // replacing it, so an identity-only guard would still consider this
+        // rejected dispatch the owner and rewind the newer retry.
+        state.currentModel = "google/gemini-2.5-pro"
+        state.fallbackIndex = 1
+        state.attemptCount = 7
+        return { accepted: false, status: "blocked", reason: "test gate blocked dispatch" }
+      },
+    )
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(10)
+
+    // then
+    expect(dispatchCount).toBe(1)
+    expect(state.currentModel).toBe("google/gemini-2.5-pro")
+    expect(state.fallbackIndex).toBe(1)
+    expect(state.attemptCount).toBe(7)
+  })
+
+  test("#given the notify toast never settles #when the fallback budget is exhausted #then the terminal abort still fires", async () => {
+    // given
+    const sessionID = "session-timeout-toast-never-settles"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps([], () => new Promise(() => {}))
+    deps.config.max_fallback_attempts = 1
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+
+    const abortSources: string[] = []
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async (_sessionID, source) => {
+        abortSources.push(source)
+      },
+      async () => ({ accepted: true, status: "dispatched" }),
+    )
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(10)
+
+    // then
+    expect(abortSources).toContain("session.timeout.fallback-exhausted")
+  })
+
+  test("#given a newer fallback generation replaces the session state during the fire-and-forget toast dispatch #when the terminal abort would fire #then it does not abort the newer generation", async () => {
+    // given
+    // showToast is invoked but not awaited, so its body still runs
+    // synchronously up to its own first await - the same window a
+    // synchronous side effect from a concurrent caller could land in.
+    const sessionID = "session-timeout-terminal-abort-superseded"
+    SessionCategoryRegistry.register(sessionID, "test")
+    let replacementState: ReturnType<typeof createFallbackState> | undefined
+    const deps = createDeps([], () => {
+      replacementState = createFallbackState("google/gemini-2.5-pro")
+      deps.sessionStates.set(sessionID, replacementState)
+      return new Promise(() => {})
+    })
+    deps.config.max_fallback_attempts = 1
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+
+    const abortSources: string[] = []
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async (_sessionID, source) => {
+        abortSources.push(source)
+      },
+      async () => ({ accepted: true, status: "dispatched" }),
+    )
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(10)
+
+    // then
+    expect(replacementState).toBeDefined()
+    expect(abortSources).not.toContain("session.timeout.fallback-exhausted")
+    expect(deps.sessionStates.get(sessionID)).toBe(replacementState)
   })
 })
