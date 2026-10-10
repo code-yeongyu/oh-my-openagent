@@ -1,13 +1,16 @@
 // allow: SIZE_OK - this restart fixture keeps manager, store and notifier replacement in one shared
 // closure so tests observe the same terminal ledger before and after a simulated process restart.
 import { createCompletionNotifier } from "../../completion/notifier"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { resolveChildSessionDir } from "../../runners/rpc/spawn"
 import type { ParentNotifierMessage, ParentState } from "../../completion/types"
 import { baseSpec, FakeRunner, makeHandle, makeManager } from "../../manager/__fixtures__/manager-fakes"
 import type { TaskRecord } from "../../state"
 import type { TaskRecordStore } from "../../store"
 import { createTaskRecordStore } from "../../store"
 import { createTaskLifecycle } from "../create"
-import type { LifecycleDeps, ResidentHandle } from "../port"
+import type { LifecycleDeps, ResidentHandle, RespawnFailureCode } from "../port"
 import { hostLifecycleDeps, hostSession } from "./host-session-fakes"
 import { settings, tempStore } from "./lifecycle-fakes"
 import { bounded, recoveryClock, signal } from "./live-parent-clock"
@@ -23,6 +26,7 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
   const newNotifier = () =>
     createCompletionNotifier({
       store: backing,
+      stateDir: backing.stateDir,
       notifier: { enqueue: (message) => messages.push(message) },
       getCurrentSessionId: () => "parent-1",
     })
@@ -85,8 +89,12 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
     closeRefused: true,
     respawns: 0,
     stopConfirmed: true,
+    failureCode: "model_unavailable" as RespawnFailureCode,
+    permanentFailure: false,
   }
+  const resumedHandles = new Map<string, ReturnType<typeof makeHandle>>()
   let respawnGate: ReturnType<typeof signal<void>> | undefined
+  let respawnStarted = signal<void>()
   let closeGate: ReturnType<typeof signal<void>> | undefined
   let closeStarted = signal<void>()
   const registry = {
@@ -103,7 +111,10 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
             terminate: handle.terminate ?? (async () => undefined),
           }
     },
-    entries: (): readonly ResidentHandle[] => [],
+    entries: (): readonly ResidentHandle[] => manager.residentTaskIds().flatMap((id) => {
+      const handle = registry.get(id)
+      return handle === undefined ? [] : [handle]
+    }),
     forget: (id: string) => manager.forget(id),
     hasPendingSends: () => false,
     ownsRecord: (record: { readonly parent_session_id: string }) =>
@@ -134,13 +145,16 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
     },
     respawn: async (record) => {
       state.respawns += 1
+      respawnStarted.resolve()
       if (respawnGate !== undefined) await respawnGate.promise
+      const resumed = makeHandle(record.task_id)
+      resumedHandles.set(record.task_id, resumed)
       return state.revivable
-        ? { ok: true, handle: makeHandle(record.task_id).handle }
+        ? { ok: true, handle: resumed.handle }
         : {
             ok: false,
-            disposition: "retryable",
-            code: "model_unavailable",
+            disposition: state.permanentFailure ? "unrecoverable" : "retryable",
+            code: state.failureCode,
             reason: "fixture model unavailable",
           }
     },
@@ -176,6 +190,7 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
       return notifier
     },
     runner,
+    resumedHandles,
     state,
     messages,
     terminals,
@@ -201,7 +216,8 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
     },
     holdRevival: () => {
       respawnGate = signal<void>()
-      return respawnGate
+      respawnStarted = signal<void>()
+      return { ...respawnGate, started: bounded(respawnStarted.promise) }
     },
     holdClose: () => {
       closeGate = signal<void>()
@@ -232,6 +248,11 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
         }),
       )
       if (result.kind !== "started") throw new Error(`fixture start failed: ${result.kind}`)
+      if (result.status === "running" && mode !== "host-session") {
+        const sessions = resolveChildSessionDir(join(backing.stateDir, "children", result.task_id), result.task_id)
+        mkdirSync(sessions, { recursive: true })
+        writeFileSync(join(sessions, "child.jsonl"), '{"type":"session","id":"fixture-session"}\n')
+      }
       if (mode === "child-process") alivePids.add(42424)
       if (mode === "host-session") {
         const identity = hostSession(result.task_id)

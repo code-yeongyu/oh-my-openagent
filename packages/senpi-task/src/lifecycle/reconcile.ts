@@ -81,7 +81,11 @@ export async function reconcileOnSessionStart(
   }
 
   outcomes.push(...await reconcileScopedRevival(
-    { ...context, reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival } },
+    {
+      ...context,
+      deferUnresumable: context.registry.ownsRecord?.({ parent_session_id: parentSessionId }) === true || context.deferUnresumable,
+      reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival },
+    },
     parentSessionId,
     candidates.filter((record) => record.parent_session_id === parentSessionId),
     (taskId) => newestSessionPath(context, taskId),

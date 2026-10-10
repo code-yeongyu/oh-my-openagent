@@ -150,16 +150,33 @@ describe("backgroundWidgetRows", () => {
   })
 })
 
-describe("suspended residency labeling", () => {
-  it("#given a persisted_only record #when formatting a full row #then the status shows suspended", () => {
+describe("automatic recovery residency labeling", () => {
+  it("every unfinished parked record shape renders recovery without a cancel hint", () => {
+    for (const status of ["pending", "running"] as const) {
+      for (const residency_state of ["resident", "persisted_only", "rpc_detached", "evicted", "disposed"] as const) {
+        for (const suspension_reason of [undefined, "daemon_unavailable", "handoff_parked", "host_draining", "host_incompatible", "idle_evicted", "own_host_unreachable", "revival_deferred", "store_index_unavailable"] as const) {
+          if (residency_state === "resident" && suspension_reason === undefined) continue
+          const parked = record({ task_id: "st_recovery", status, residency_state, suspension_reason })
+          const rows = [formatTaskRow(parked), ...buildWidgetRows([parked]),
+            ...backgroundWidgetRows([parked], new Map(), 0, undefined, 90),
+            ...backgroundWidgetRows([parked], new Map(), 0, undefined, 220)]
+          for (const row of rows) {
+            expect(row).toContain("resuming")
+            expect(row).not.toMatch(/suspended|\/task-kill/u)
+          }
+        }
+      }
+    }
+  })
+  it("#given a persisted_only record #when formatting a full row #then the status shows resuming", () => {
     const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" }))
-    expect(row).toContain("suspended")
+    expect(row).toContain("resuming")
     expect(row).not.toContain("status:running")
   })
 
-  it("#given an rpc_detached record #when formatting a full row #then the status shows suspended", () => {
+  it("#given an rpc_detached record #when formatting a full row #then the status shows resuming", () => {
     const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" }))
-    expect(row).toContain("suspended")
+    expect(row).toContain("resuming")
     expect(row).not.toContain("status:running")
   })
 
@@ -169,16 +186,16 @@ describe("suspended residency labeling", () => {
     expect(row).not.toContain("suspended")
   })
 
-  it("#given a persisted_only record #when building a widget row #then it contains suspended", () => {
+  it("#given a persisted_only record #when building a widget row #then it contains resuming", () => {
     const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })])
     expect(row.length).toBeGreaterThan(0)
-    expect(row[0]).toContain("suspended")
+    expect(row[0]).toContain("resuming")
   })
 
-  it("#given an rpc_detached record #when building a widget row #then it contains suspended", () => {
+  it("#given an rpc_detached record #when building a widget row #then it contains resuming", () => {
     const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" })])
     expect(row.length).toBeGreaterThan(0)
-    expect(row[0]).toContain("suspended")
+    expect(row[0]).toContain("resuming")
   })
 
   it("#given a suspended background child #when the live row repaints over time #then it neither spins nor counts", () => {
@@ -204,20 +221,21 @@ describe("suspended residency labeling", () => {
     expect(first).toStartWith("‖ ")
     expect(first).not.toMatch(/\d+m \d+s|\b\d+s\b/u)
     expect(first).toContain("parent session restarted")
-    expect(first).toContain("resumes on session restart; /task-kill to cancel")
+    expect(first).toContain("resuming")
+    expect(first).not.toMatch(/suspended|\/task-kill|resumes on session restart/u)
   })
 
-  it("#given a suspended child on a 118-column terminal #when building the live row #then it keeps the cancel action", () => {
+  it("#given a recovering child on a 118-column terminal #when building the live row #then no user action is needed", () => {
     // given a parked child and a common terminal width
     const parked = record({ task_id: "st_narrow", task_summary: "parked child", status: "running", residency_state: "persisted_only" })
 
     // when the live row renders at 118 columns
     const row = backgroundWidgetRows([parked], new Map(), Date.parse("2026-07-07T01:00:00.000Z"), () => undefined, 118)[0] ?? ""
 
-    // then the cause and the user's action both survive the width budget
+    // then the recovery state survives the width budget without a user action
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(118)
-    expect(row).toContain("suspended (parent session restarted)")
-    expect(row).toContain("/task-kill to cancel")
+    expect(row).toContain("resuming (parent session restarted)")
+    expect(row).not.toMatch(/suspended|\/task-kill/u)
   })
 
   it.each([
@@ -246,15 +264,18 @@ describe("suspended residency labeling", () => {
     ["a child on an incompatible host", { residency_state: "rpc_detached", suspension_reason: "host_incompatible" }, "will not resume"],
     ["an in-process child whose deferred revival ends in lost", { residency_state: "persisted_only", suspension_reason: "revival_deferred", revival_deferred_reason: "model_unavailable" }, "retried a few times, then marked lost"],
     ["a child deferred for capacity", { residency_state: "persisted_only", suspension_reason: "revival_deferred", revival_deferred_reason: "capacity" }, "retried when a running child ends, else on session restart"],
-  ] as const)("#given %s #when building the live row #then the resume line says only what the engine does", (_label, overrides, promise) => {
+  ] as const)("#given %s #when building the live row #then recovery needs no manual action", (_label, overrides) => {
     // given a parked child of that kind
     const parked = record({ task_id: "st_promise", status: "running", ...overrides })
 
     // when the live row renders on a wide line
     const row = backgroundWidgetRows([parked], new Map(), Date.parse("2026-07-07T01:00:00.000Z"), () => undefined, 220)[0] ?? ""
 
-    // then it carries that resume line and the cancel action
-    expect(row).toContain(`${promise}; /task-kill to cancel`)
+    // then every public row uses a transient state, never an instruction to the user
+    for (const rendered of [row, formatTaskRow(parked), ...buildWidgetRows([parked])]) {
+      expect(rendered).toContain("resuming")
+      expect(rendered).not.toMatch(/suspended|\/task-kill|resumes on session restart/u)
+    }
   })
 
   it.each([
@@ -291,10 +312,10 @@ describe("suspended residency labeling", () => {
     expect(row).toContain("revival deferred: capacity")
   })
 
-  it("#given a persisted_only record #when building a background widget row #then it contains suspended", () => {
+  it("#given a persisted_only record #when building a background widget row #then it contains resuming", () => {
     const now = Date.parse("2026-07-07T00:01:00.000Z")
     const row = backgroundWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })], new Map([]), now, () => undefined, 220)[0] ?? ""
-    expect(row).toContain("suspended")
+    expect(row).toContain("resuming")
   })
 })
 

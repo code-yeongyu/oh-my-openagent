@@ -1,6 +1,7 @@
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
-import { LOST_ON_EXHAUSTION, SCOPED_RETRY_REASONS } from "./deferred-revival-reasons"
+import { LOST_ON_EXHAUSTION, SCOPED_RETRY_REASONS, PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
+import { expireSuspendedChild } from "./suspended-expiry"
 import { destroyResidentTask } from "./destroy"
 import { isHostSessionRecord } from "./host-session"
 import { reconcileScopedRevival } from "./reconcile-revival"
@@ -77,7 +78,11 @@ export async function retryDeferredScopedChild(
       if (record.task_id !== taskId) excludeTaskIds.add(record.task_id)
     }
     const outcomes = await reconcileScopedRevival(
-      { ...context, reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds } },
+      {
+        ...context,
+        deferUnresumable: context.registry.ownsRecord?.(fresh) === true || context.deferUnresumable,
+        reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds },
+      },
       parentSessionId,
       [fresh],
       (id) => newestSessionPath(context, id),
@@ -93,8 +98,15 @@ export async function retryDeferredScopedChild(
     const outcome = outcomes.find((entry) => entry.task_id === taskId)
     if (outcome?.kind !== "deferred" || outcome.reason === undefined) return
     reason = outcome.reason
-    if (!SCOPED_RETRY_REASONS.has(reason)) return
     expected = context.store.load(taskId)
+    if (expected !== null && context.registry.ownsRecord?.(expected) === true
+      && (outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(reason))) {
+      const permanent = expected
+      await expireSuspendedChild(context, permanent,
+        () => !retriesStopped(context, parentSessionId) && context.registry.ownsRecord?.(permanent) === true)
+      return
+    }
+    if (!SCOPED_RETRY_REASONS.has(reason)) return
   }
   // Any attempt that ran saw a stop in its own post-attempt check; the only other way here is a live
   // foreign owner, which never ends lost below.
@@ -103,6 +115,8 @@ export async function retryDeferredScopedChild(
   if (expected === null || observed.residency_claim !== expected.residency_claim
     || observed.notification.run_epoch !== expected.notification.run_epoch) return
   context.store.appendEvent(taskId, { type: "revival_retry_exhausted", payload: { reason, attempts } })
+  // A live parent owns the deadline and confirmed cleanup, including daemon-hosted children.
+  if (context.registry.ownsRecord?.(observed) === true) return
   // Capacity and a live foreign owner resolve when the other side moves, not when this session
   // retries harder. A daemon session's transcript still belongs to its host and is never lost.
   if (isHostSessionRecord(observed) || !LOST_ON_EXHAUSTION.has(reason) || foreignOwnerAlive(context, observed)) return

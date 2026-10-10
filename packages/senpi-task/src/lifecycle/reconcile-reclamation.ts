@@ -147,6 +147,12 @@ export async function reviveClaimed(
     markSuspensionReason(context, fresh.task_id, parkedReason(reached))
     return outcome
   }
+  if (context.deferUnresumable && !terminalAllowed && fresh.fallback_handoff_epoch !== fresh.notification.run_epoch
+    && ((resumePath === undefined && fresh.started_at !== undefined)
+      || (fresh.execution_mode === "in-process" && !isSpawnSpecV1Record(fresh)))) {
+    const reason = resumePath === undefined ? "transcript_unavailable" : "spawn_spec_unavailable"
+    return { ...rollbackOrDeferred(context, fresh.task_id, rollbackResidency, reason, fresh), permanent: true }
+  }
 
   if (resumePath === undefined && !isSpawnSpecV1Record(fresh)) {
     if (context.deferUnresumable)
@@ -195,7 +201,7 @@ export async function reviveClaimed(
     }
     if (TERMINAL_STATUSES.has(fresh.status)) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code), fresh)
     if (context.deferUnresumable)
-      return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code), fresh)
+      return { ...rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code), fresh), permanent: true }
     await markLost(context, fresh, `reattach failed: ${respawned.reason}`)
     return { task_id: fresh.task_id, kind: "lost", reason: respawned.reason }
   }

@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto"
 import type { TaskRecord } from "../state"
+import { salvageCrashedIsolation } from "../isolation"
 import { type LifecycleContext, nowIso } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { DEFAULT_HOST_SESSION_RETRY_POLICY, isHostSessionRecord } from "./host-session"
-import { isSuspendedResidency } from "./revival-selection"
 import { terminateOldRpc } from "./revive-rollback"
 
 type StopRetry = { token: string; attempt: number; retryAt: number }
@@ -48,7 +48,8 @@ export async function expireSuspendedChild(
       ? context.store.mutate(observed.task_id, (fresh) => {
           if (
             !parentLive() ||
-            (!isSuspendedResidency(fresh.residency_state) && !isSuspensionExpiry(fresh)) ||
+            (fresh.residency_state === "resident" && fresh.suspension_reason === undefined
+              && fresh.recovery_deadline_at === undefined && !isSuspensionExpiry(fresh)) ||
             (fresh.status !== "pending" && fresh.status !== "running") ||
             fresh.notification.run_epoch !== observed.notification.run_epoch ||
             fresh.residency_claim !== observed.residency_claim ||
@@ -106,6 +107,13 @@ export async function expireSuspendedChild(
     pending.attempt += 1
   }
   if (!isHostSessionRecord(record) && !closed) return
+  if (closed && record.isolation !== undefined && record.isolation.merge_result === undefined && context.isolation !== undefined) {
+    await salvageCrashedIsolation({
+      runtime: context.isolation,
+      stateDir: context.store.stateDir,
+      mutate: (taskId, mutation) => context.store.mutate(taskId, mutation),
+    }, record)
+  }
   const fresh = context.store.load(record.task_id)
   if (
     fresh === null ||
