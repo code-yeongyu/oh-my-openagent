@@ -163,6 +163,51 @@ session_id: ses_final_wave_review
     expect(mockInput._promptMock).not.toHaveBeenCalled()
   })
 
+  test("waits for explicit user approval when final-wave rows use the F<n> em-dash grammar", async () => {
+    // given
+    const sessionID = "atlas-final-wave-session"
+
+    writeFinalWavePlanState({
+      directory: env.directory,
+      sessionID,
+      planName: "final-wave-dash-plan",
+      planContent: `# Plan
+
+## TODOs
+- [x] T1.1 Ship the implementation
+
+## Final Verification Wave
+- [x] F1 \u2014 Plan Compliance Audit
+- [x] F2 \u2014 Code Quality Review
+- [x] F3 \u2014 Real Manual QA
+- [ ] F4 \u2014 Scope Fidelity Check
+`,
+    })
+
+    const mockInput = createMockPluginInput()
+    const hook = createAtlasHook(mockInput, {
+      directory: env.directory,
+      isCallerOrchestrator: async () => true,
+    })
+    const toolOutput = {
+      title: "Sisyphus Task",
+      output: `Tasks [4/4 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE
+
+<task_metadata>
+session_id: ses_final_wave_review
+</task_metadata>`,
+      metadata: {},
+    }
+
+    // when
+    await hook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+    mockInput._promptMock.mockClear()
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then - the gate engages exactly as it does for canonical F<n>. rows
+    expect(mockInput._promptMock).not.toHaveBeenCalled()
+  })
+
   test("does not dispatch completed-plan continuation when the plan reads complete while waiting for final-wave approval", async () => {
     // given
     const sessionID = "atlas-final-wave-session"
