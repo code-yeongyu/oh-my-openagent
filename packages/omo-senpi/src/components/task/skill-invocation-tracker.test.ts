@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { createSkillInvocationTracker } from "./skill-invocation-tracker"
+import { createSkillInvocationStore, createSkillInvocationTracker } from "./skill-invocation-tracker"
 
 const CTX_A = { sessionManager: { getSessionId: () => "sess-a" } }
 const CTX_B = { sessionManager: { getSessionId: () => "sess-b" } }
+
+// The production default is the process-lifetime shared store; each case builds its own so state
+// recorded by one test can never arm the gate in another.
+const trackerFor = (pi: FakeExtensionAPI) => createSkillInvocationTracker(pi, createSkillInvocationStore())
 
 function readResult(path: string, isError = false) {
   return { type: "tool_result", toolCallId: "c1", toolName: "read", input: { path }, content: [], isError }
@@ -14,7 +18,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a read of an ulw-plan SKILL.md #when the tool result arrives #then the session has invoked ulw-plan", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", readResult("/repo/packages/omo-senpi/plugin/skills/ulw-plan/SKILL.md"), CTX_A)
@@ -27,7 +31,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a read of a ulw-execute SKILL.md #when the tool result arrives #then the session has invoked ulw-execute", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", readResult("/home/u/.senpi/agent/skills/ulw-execute/SKILL.md"), CTX_A)
@@ -39,7 +43,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a read of a non-skill file #when the tool result arrives #then nothing is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", readResult("/repo/src/skills-notes.md"), CTX_A)
@@ -52,7 +56,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a failed read of a skill file #when the tool result arrives #then nothing is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", readResult("/repo/plugin/skills/ulw-plan/SKILL.md", true), CTX_A)
@@ -64,7 +68,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a non-read tool result naming a skill path #when it arrives #then nothing is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -80,7 +84,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a slash skill input #when the input arrives #then the named skill is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("input", { text: "/skill:ulw-plan plan the auth refactor" }, CTX_A)
@@ -92,7 +96,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a plain input mentioning a skill #when the input arrives #then nothing is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("input", { text: "should we use ulw-plan for this?" }, CTX_A)
@@ -104,7 +108,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given an invocation in session A #when session B is queried #then it stays locked", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", readResult("/repo/plugin/skills/ulw-plan/SKILL.md"), CTX_A)
@@ -117,7 +121,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given an invocation followed by session shutdown #when the session is queried #then the state is dropped", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
     await pi.dispatch("tool_result", readResult("/repo/plugin/skills/ulw-plan/SKILL.md"), CTX_A)
 
     // when
@@ -130,7 +134,7 @@ describe("createSkillInvocationTracker", () => {
   test("#given a windows-style skill path #when the tool result arrives #then the skill is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", readResult("C:\\repo\\plugin\\skills\\ulw-plan\\SKILL.md"), CTX_A)
@@ -144,7 +148,7 @@ describe("createSkillInvocationTracker - user-request channel", () => {
   test("#given a plain user input asking for ulw plan #when it arrives #then it is recorded as a user request but not an invocation", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("input", { text: "ulw plan \uc73c\ub85c \uc791\uc5c5\uacc4\ud68d\uc11c \ub9cc\ub4e4\uc5b4\uc918" }, CTX_A)
@@ -157,7 +161,7 @@ describe("createSkillInvocationTracker - user-request channel", () => {
   test("#given a slash skill input #when it arrives #then it counts as both an invocation and a user request", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("input", { text: "/skill:ulw-plan plan the auth refactor" }, CTX_A)
@@ -170,7 +174,7 @@ describe("createSkillInvocationTracker - user-request channel", () => {
   test("#given an ulw-plan mention only inside an ultrawork-mode block #when the input arrives #then no user request is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -186,7 +190,7 @@ describe("createSkillInvocationTracker - user-request channel", () => {
   test("#given an ulw-plan mention only inside a system-reminder block #when the input arrives #then no user request is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -208,7 +212,7 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
   test("#given a write into a worktree .omo/plans file #when the tool result arrives #then the session has a plan artifact", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("write", { path: "/repo/.local-ignore/worktrees/wt1/.omo/plans/feature.md" }), CTX_A)
@@ -221,7 +225,7 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
   test("#given an edit of a relative .omo/plans path #when the tool result arrives #then the artifact is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("edit", { path: ".omo/plans/refactor.md" }), CTX_A)
@@ -233,7 +237,7 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
   test("#given a read of a plan file written by a planning child #when the tool result arrives #then the artifact is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("read", { path: "/other/checkout/.omo/plans/child-authored.md" }), CTX_A)
@@ -245,7 +249,7 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
   test("#given an apply_patch whose patch body touches .omo/plans #when the tool result arrives #then the artifact is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -261,7 +265,7 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
   test("#given non-plan writes and failed plan writes #when the tool results arrive #then no artifact is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("write", { path: "/repo/docs/plans.md" }), CTX_A)
@@ -275,7 +279,7 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
   test("#given a recorded request and artifact followed by session shutdown #when queried #then all state is dropped", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
     await pi.dispatch("input", { text: "ulw plan please" }, CTX_A)
     await pi.dispatch("tool_result", toolResult("write", { path: ".omo/plans/x.md" }), CTX_A)
 
@@ -304,7 +308,7 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
     test(`#given the user asks in their own words (${text}) #when the input arrives #then it counts as a user request`, async () => {
       // given
       const pi = new FakeExtensionAPI()
-      const tracker = createSkillInvocationTracker(pi)
+      const tracker = trackerFor(pi)
 
       // when
       await pi.dispatch("input", { type: "input", text, source: "interactive" }, CTX_A)
@@ -317,7 +321,7 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
   test("#given an ordinary work instruction with no plan request #when the input arrives #then no user request is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     for (const text of ["fix the login bug", "\ubc84\uadf8 \uace0\uccd0\uc918", "run the tests and report", "what does this function do?"]) {
@@ -334,7 +338,7 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
   test("#given a pasted transcript merely mentioning plan writing #when the input arrives #then no user request is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -354,7 +358,7 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
   test("#given an explicit korean request to write the plan #when the input arrives #then it counts as a user request", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("input", { type: "input", text: "\uacc4\ud68d \uc791\uc131\ud574\uc918", source: "interactive" }, CTX_A)
@@ -366,7 +370,7 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
   test("#given a plan request inside an injected ultrawork block #when the input arrives #then no user request is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -387,7 +391,7 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
   test("#given an expanded ulw-plan skill block #when the input arrives #then it counts as invocation and user request", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -408,7 +412,7 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
   test("#given an expanded block for an unrelated skill whose body mentions ulw-plan #when it arrives #then the gate is not armed", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -433,7 +437,7 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
   test("#given another skill block followed by an own-words plan request #when it arrives #then both are recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -454,7 +458,7 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
   test("#given an unrelated skill block whose body mentions ulw-plan and no trailing request #when it arrives #then the gate stays closed", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -474,7 +478,7 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
   test("#given an expanded ulw-execute skill block #when it arrives #then ulw-execute counts as invoked for the forbids check", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -494,7 +498,7 @@ describe("createSkillInvocationTracker - agent-manufacturable sources stay close
   test("#given an extension-sourced input naming ulw-plan #when it arrives #then no user request is recorded", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("input", { type: "input", text: "ulw-plan please", source: "extension" }, CTX_A)
@@ -506,7 +510,7 @@ describe("createSkillInvocationTracker - agent-manufacturable sources stay close
   test("#given an extension-sourced expanded skill block #when it arrives #then the gate is not armed", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch(
@@ -522,7 +526,7 @@ describe("createSkillInvocationTracker - agent-manufacturable sources stay close
   test("#given an interactive input with no explicit source #when it arrives #then it is treated as user input", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("input", { text: "ulw plan for the refactor" }, CTX_A)
