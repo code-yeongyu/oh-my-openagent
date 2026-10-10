@@ -1,0 +1,10 @@
+opencode_version=1.18.25
+real_session_count_before=0
+xdg_data_isolated=true
+xdg_config_isolated=true
+xdg_state_isolated=true
+xdg_cache_isolated=true
+opencode_config_isolated=true
+real_session_count_after=0
+real_session_count_unchanged=true
+sandbox_removed=true
