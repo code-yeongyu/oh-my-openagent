@@ -33,6 +33,7 @@ import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-start
 import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
 import { sweepOmoFamiliesBestEffort } from "../shared/omo-process-sweep"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
+import { PROCESS_LISTENERS_CAP_DEFAULT, raiseProcessListenersCap } from "../shared/raise-process-listeners-cap"
 import { recordPluginTelemetry } from "../shared/posthog"
 import {
   initLiveServerRoute,
@@ -60,6 +61,7 @@ export type PluginModuleDeps = {
   log: typeof log
   logLegacyPluginStartupWarning: typeof logLegacyPluginStartupWarning
   migrateLegacyWorkspaceDirectory: typeof migrateLegacyWorkspaceDirectory
+  raiseProcessListenersCap: typeof raiseProcessListenersCap
   runOpenCodeStartupMigration: typeof runOpenCodeStartupMigration
   startOmoProcessSweep: () => Promise<void>
   detectDuplicateOmoPlugin: typeof detectDuplicateOmoPlugin
@@ -94,6 +96,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   log,
   logLegacyPluginStartupWarning,
   migrateLegacyWorkspaceDirectory,
+  raiseProcessListenersCap,
   runOpenCodeStartupMigration,
   startOmoProcessSweep: () => sweepOmoFamiliesBestEffort({ log }),
   detectDuplicateOmoPlugin,
@@ -160,6 +163,12 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
   const deps = { ...defaultPluginModuleDeps, ...overrides }
   let startupMigration: ReturnType<PluginModuleDeps["runOpenCodeStartupMigration"]> | undefined
   const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
+    // Raise the process listener cap at the earliest startup point — before any
+    // manager/hook/tmux listener registers — so the MaxListenersExceededWarning
+    // does not fire on legitimate accumulation (#4334). Done here rather than at
+    // module import so merely importing the entry never mutates host-global
+    // `process` state.
+    deps.raiseProcessListenersCap(PROCESS_LISTENERS_CAP_DEFAULT)
     deps.installAgentSortShim()
     deps.initConfigContext("opencode", null)
     deps.log("[oh-my-openagent] ENTRY - plugin loading", {

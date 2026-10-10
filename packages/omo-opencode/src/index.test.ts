@@ -14,6 +14,7 @@ const mockGetSkillPluginConflictWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
+const mockRaiseProcessListenersCap = mock(() => {})
 const mockRunOpenCodeStartupMigration = mock(() => ({
   journalResumed: false,
   migratedFrom: [],
@@ -81,6 +82,7 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
+    raiseProcessListenersCap: mockRaiseProcessListenersCap,
     runOpenCodeStartupMigration: mockRunOpenCodeStartupMigration,
     loadConfigChain: mockLoadConfigChain as never,
     loadPluginConfig: mockLoadPluginConfig as never,
@@ -110,6 +112,7 @@ describe("oh-my-openagent plugin module", () => {
     mockInjectServerAuthIntoClient.mockClear()
     mockLogLegacyPluginStartupWarning.mockClear()
     mockMigrateLegacyWorkspaceDirectory.mockClear()
+    mockRaiseProcessListenersCap.mockClear()
     mockRunOpenCodeStartupMigration.mockClear()
     mockLoadConfigChain.mockClear()
     mockLoadPluginConfig.mockClear()
@@ -191,5 +194,20 @@ describe("oh-my-openagent plugin module", () => {
     expect(typeof pluginModule).toBe("object")
     expect(pluginModule.id).toBe("oh-my-openagent")
     expect(typeof pluginModule.server).toBe("function")
+  })
+})
+
+describe("plugin entry import purity (#4334)", () => {
+  it("#given the plugin entry is imported #when server() never runs #then process.getMaxListeners() is unchanged", async () => {
+    // given - the host-global listener cap before the entry is loaded
+    const capBeforeImport = process.getMaxListeners()
+
+    // when - importing the entry alone, without invoking server()
+    await import(`./index?purity=${Date.now()}-${Math.random()}`)
+
+    // then - import-time evaluation must not mutate host-global process state;
+    // the cap is only raised inside server() at real startup (see
+    // create-plugin-module.ts), never as an import-time side effect.
+    expect(process.getMaxListeners()).toBe(capBeforeImport)
   })
 })
