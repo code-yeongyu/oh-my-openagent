@@ -160,6 +160,17 @@ export interface PostToolUseOutput extends HookCommonOutput {
   }
 }
 
+export interface UserPromptSubmitOutput extends HookCommonOutput {
+  /** Blocks the prompt; `reason` is shown to the user. */
+  decision?: "block"
+  reason?: string
+  hookSpecificOutput?: {
+    hookEventName: "UserPromptSubmit"
+    /** The only field of a control output that reaches the model */
+    additionalContext?: string
+  }
+}
+
 export interface HookResult {
   exitCode: number
   stdout?: string
