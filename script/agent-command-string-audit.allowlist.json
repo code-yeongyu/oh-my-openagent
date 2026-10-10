@@ -87,7 +87,7 @@
     "packages/omo-native/test/launch-spec-mode.test.ts: omo doctor x2",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.ts: omo doctor",
-    "packages/omo-opencode/src/cli/doctor/checks/tools.ts: omo doctor",
+    "packages/omo-opencode/src/cli/doctor/checks/components.ts: omo doctor",
     "packages/omo-senpi/plugin/README.md: omo install",
     "packages/omo-senpi/scripts/qa/thread-tools/lib/gateway.mjs: /bin/omo",
     "packages/omo-senpi/scripts/qa/thread-tools/lib/gateway.mjs: omo install",

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions()` registers **8** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four of the eight are category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
+`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions(components)` registers **9** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four of the eight are category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
 
 ## COMMAND FLAGS
 
@@ -25,7 +25,8 @@ Registered by `getAllCheckDefinitions()` (8):
 | **CONFIG** | `checks/config.ts` | JSONC validity, Zod schema passes, no unknown keys, model override syntax correct |
 | **TUI_PLUGIN** | `checks/tui-plugin-config.ts` | TUI sidebar plugin entry resolvable |
 | `deprecated-reasoning-keys` | `checks/deprecated-reasoning-keys.ts` | Scans `~/.omo/omo.json[c]` for deprecated `variant` / `reasoningEffort` / `thinking` / `textVerbosity` / `fallback_models` keys, reporting file + dotted path and a `config migrate` hint. Skips the `[opencode]` block and passthrough containers (`provider_options`). Registered with a literal id, NOT in `CHECK_IDS`. |
-| **TOOLS** | `checks/tools.ts` | AST-Grep CLI + NAPI, comment-checker binary, LSP servers reachable, GitHub CLI auth, built-in MCP reachability |
+| **TOOLS** | `checks/tools.ts` | Summary flags derived from the Components probes, user MCP config validity |
+| **COMPONENTS** | `checks/components.ts` | Functional probes, run once per process (`gatherComponents`): per-language LSP via `@oh-my-opencode/lsp-core` `checkLspComponents()` (languages the cwd uses plus `--require-lsp`; same config paths as the LSP bridge via `resolveLspConfigPaths()`; bounded `initialize` + `documentSymbol` on a fixture), sg matching a fixture, comment-checker flagging a fixture comment, `gh auth status`. Required languages that are not `ok` fail; everything else warns. `--no-probe` resolves without starting anything. Never installs. Also run warn-only after install (`install-component-check.ts`) |
 | **MODELS** | `checks/model-resolution.ts` | models.json cache exists, per-agent fallback resolution, category overrides valid, provider availability |
 | **TELEMETRY** | `checks/telemetry.ts` | Telemetry configuration state |
 | **TEAM_MODE** | `checks/team-mode.ts` | Team-mode dependencies |
@@ -49,7 +50,8 @@ checks/
 ├── tools.ts                               # Main Tools aggregator
 ├── dependencies.ts                        # AST-Grep CLI/NAPI + comment-checker presence
 ├── tools-gh.ts                            # gh cli install + auth status
-├── tools-lsp.ts                           # LSP server enumeration
+├── tools-lsp.ts                           # LSP tools bridge presence (not server health)
+├── components.ts                          # Functional component probes + Components check
 ├── tools-mcp.ts                           # Built-in + user MCP reachability
 ├── model-resolution.ts                    # Main Models aggregator
 ├── model-resolution-cache.ts              # models.json presence + freshness

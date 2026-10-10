@@ -5,6 +5,7 @@ import * as spawnModule from "../shared/spawn-with-windows-hide"
 import type { SpawnedProcess } from "../shared/spawn-with-windows-hide"
 import { runCliInstaller } from "./cli-installer"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as componentCheck from "./install-component-check"
 import * as installNative from "./install-native"
 import type { NativeInstallOutcome } from "./install-native"
 import * as tuiInstallPrompts from "./tui-install-prompts"
@@ -76,6 +77,7 @@ describe("runTuiInstaller offers omo setup after a native install", () => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true })
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(componentCheck, "reportComponentHealth").mockResolvedValue(undefined)
     spyOn(p, "spinner").mockReturnValue(createMockSpinner())
     spyOn(p, "intro").mockImplementation(() => undefined)
     spyOn(p.log, "info").mockImplementation(() => undefined)

@@ -35,6 +35,15 @@ type DoctorCommandOptions = {
   readonly verbose?: boolean
   readonly json?: boolean
   readonly platform?: DoctorOptions["target"]
+  readonly requireLsp?: string
+  readonly probe?: boolean
+}
+
+export function parseRequiredLanguages(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((language) => language.trim())
+    .filter((language) => language.length > 0)
 }
 
 export { resolveInstallArgs } from "./install-command-options"
@@ -194,6 +203,8 @@ program
   .option("--status", "Show compact system dashboard")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
+  .option("--require-lsp <languages>", "Comma-separated LSP languages that must work (e.g. typescript,bash,yaml); failing ones fail the doctor")
+  .option("--no-probe", "Resolve components without starting language servers or tools")
   .addOption(new Option("--platform <platform>", "Doctor target platform: opencode, codex").choices(["opencode", "codex"]))
   .addHelpText("after", `
 Examples:
@@ -201,6 +212,7 @@ Examples:
   $ bunx oh-my-opencode doctor --status   # Compact dashboard
   $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics
   $ bunx oh-my-opencode doctor --json     # JSON output
+  $ bunx oh-my-opencode doctor --require-lsp typescript,bash,yaml   # Fail unless these servers answer
   $ omo-agent-toolkit doctor --platform=codex   # Codex/LazyCodex diagnostics only
 `)
   .action(async (options: DoctorCommandOptions) => {
@@ -210,6 +222,7 @@ Examples:
     const doctorOptions: DoctorOptions = {
       mode,
       json: options.json ?? false, target: resolveDoctorTarget(process.env.OMO_INVOCATION_NAME, options.platform ?? rootDoctorPlatform),
+      components: { requiredLanguages: parseRequiredLanguages(options.requireLsp), probe: options.probe ?? true },
     }
     const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)

@@ -76,6 +76,46 @@ export const DoctorSummarySchema = z
   })
   .meta({ ref: "DoctorSummary" })
 
+export const LspLanguageReportSchema = z
+  .object({
+    language: z.string().describe("LSP language id"),
+    extension: z.string().describe("Extension the server was resolved for"),
+    required: z.boolean().describe("Whether --require-lsp named this language"),
+    projectFiles: z.number().describe("Files of this language in the scanned project"),
+    status: z
+      .enum(["ok", "unverified", "missing", "unconfigured", "wrong_routing", "startup_failed", "timeout", "request_failed"])
+      .describe("Functional status of the server OMO would use"),
+    serverId: z.string().nullable().describe("Selected or expected server id"),
+    executable: z.string().nullable().describe("Executable that would be spawned"),
+    detail: z.string().describe("Human-readable explanation"),
+    remediation: z.array(z.string()).describe("Suggested fixes; never run automatically"),
+  })
+  .meta({ ref: "LspLanguageReport" })
+
+export const ToolComponentReportSchema = z
+  .object({
+    id: z.enum(["lsp-bridge", "ast-grep", "comment-checker", "gh"]).describe("Component id"),
+    status: z.enum(["ok", "present", "missing", "failed", "unauthenticated", "skipped"]).describe("Functional status"),
+    path: z.string().nullable().describe("Resolved executable"),
+    version: z.string().nullable().describe("Reported version"),
+    detail: z.string().describe("Human-readable explanation"),
+    remediation: z.array(z.string()).describe("Suggested fixes; never run automatically"),
+  })
+  .meta({ ref: "ToolComponentReport" })
+
+export const ComponentsReportSchema = z
+  .object({
+    cwd: z.string().describe("Project directory whose languages were scanned"),
+    probed: z.boolean().describe("Whether components were started, not just resolved"),
+    requiredLanguages: z.array(z.string()).describe("Languages that fail the doctor unless ok"),
+    lsp: z
+      .object({ cwd: z.string(), scannedEntries: z.number(), languages: z.array(LspLanguageReportSchema) })
+      .nullable()
+      .describe("Per-language LSP results; null when the LSP tools are disabled"),
+    tools: z.array(ToolComponentReportSchema).describe("Per-tool results"),
+  })
+  .meta({ ref: "ComponentsReport" })
+
 export const DoctorResultSchema = z
   .object({
     results: z.array(CheckResultSchema).describe("All check results"),
@@ -83,6 +123,7 @@ export const DoctorResultSchema = z
     tools: ToolsSummarySchema.describe("Tool and server availability summary"),
     summary: DoctorSummarySchema.describe("Aggregate check statistics"),
     exitCode: z.number().describe("Process exit code (0 = success)"),
+    components: ComponentsReportSchema.optional().describe("Functional component results"),
   })
   .meta({ ref: "DoctorResult" })
 

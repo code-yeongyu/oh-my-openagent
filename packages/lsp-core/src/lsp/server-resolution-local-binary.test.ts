@@ -97,6 +97,45 @@ describe("findServerForExtension local binary substitution", () => {
 		expect(result.installHint.length).toBeGreaterThan(0);
 	});
 
+	test("#given deno on PATH and no deno.json #when looking up a typescript file #then the built-in deno is not selected", () => {
+		// given
+		const root = makeTempRoot("lsp-resolution-deno-gate-");
+		mkdirSync(join(root, ".git"));
+		writeFileSync(join(root, "package.json"), "{}\n");
+		const pathDir = makeTempRoot("lsp-resolution-deno-path-");
+		writeExecutable(join(pathDir, "deno"));
+		process.env["PATH"] = pathDir;
+
+		// when
+		const result = runWithRequestContext(contextFor(root), () => findServerForExtension(".ts"));
+
+		// then
+		expect(result.status).toBe("not_installed");
+		if (result.status !== "not_installed") throw new Error("expected not_installed");
+		expect(result.server.id).toBe("typescript");
+	});
+
+	test("#given deno on PATH and a deno.json above cwd #when looking up a typescript file #then deno is selected", () => {
+		// given
+		const root = makeTempRoot("lsp-resolution-deno-project-");
+		mkdirSync(join(root, ".git"));
+		writeFileSync(join(root, "deno.jsonc"), "{}\n");
+		const cwd = join(root, "src");
+		mkdirSync(cwd);
+		const pathDir = makeTempRoot("lsp-resolution-deno-project-path-");
+		const deno = writeExecutable(join(pathDir, "deno"));
+		process.env["PATH"] = pathDir;
+
+		// when
+		const result = runWithRequestContext(contextFor(cwd), () => findServerForExtension(".ts"));
+
+		// then
+		expect(result.status).toBe("found");
+		if (result.status !== "found") throw new Error("expected a found server");
+		expect(result.server.id).toBe("deno");
+		expect(result.server.command[0]).toBe(deno);
+	});
+
 	test("#given an unknown extension #when looking up #then the not_configured result is preserved", () => {
 		// given
 		const root = makeTempRoot("lsp-resolution-unknown-");
