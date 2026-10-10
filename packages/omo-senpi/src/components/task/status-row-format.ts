@@ -1,5 +1,6 @@
 import {
   buildLiveStatsTokens,
+  recoveryPresentation,
   excerptRendererText,
   formatStatusTarget,
   formatTargetWithModel,
@@ -40,35 +41,11 @@ export function isTerminal(status: TaskStatus): boolean {
  * finished can be parked; a finished child is `evicted` or `disposed` and keeps its own status.
  */
 export function isSuspended(record: TaskRecord): boolean {
-  if (isTerminal(record.status)) return false
-  return record.suspension_reason !== undefined || record.residency_state !== "resident"
-}
-
-type SuspensionReason = NonNullable<TaskRecord["suspension_reason"]>
-
-// Recovery owns the deadline; the row names the cause without asking the user to intervene.
-const SUSPENSION_CAUSES: Readonly<Record<SuspensionReason, string>> = {
-  daemon_unavailable: "task daemon unavailable",
-  handoff_parked: "handed off",
-  host_draining: "host draining",
-  host_incompatible: "host version mismatch",
-  idle_evicted: "evicted while idle",
-  own_host_unreachable: "host lost",
-  revival_deferred: "revival deferred",
-  store_index_unavailable: "task store unavailable",
-}
-
-const PARENT_RESTARTED_CAUSE = "parent session restarted"
-
-// Why the child is parked, in words: the host's recorded reason, or the parent restarting away.
-function suspensionCause(record: TaskRecord): string {
-  const cause = record.suspension_reason === undefined ? PARENT_RESTARTED_CAUSE : SUSPENSION_CAUSES[record.suspension_reason]
-  const deferred = optionalRendererText(record.revival_deferred_reason)
-  return record.suspension_reason === "revival_deferred" && deferred !== undefined ? `${cause}: ${deferred}` : cause
+  return recoveryPresentation(record) !== undefined
 }
 
 function statusLabel(record: TaskRecord): string {
-  return isSuspended(record) ? "resuming" : normalizeRendererText(record.status)
+  return recoveryPresentation(record)?.state ?? normalizeRendererText(record.status)
 }
 
 function optionalRendererText(value: string | undefined): string | undefined {
@@ -163,7 +140,7 @@ function formatLiveBackgroundRow(
   const fullIdentity = liveTaskIdentity(record)
   const fullTarget = recordStatusTarget(record)
   const fullActivity = suspended
-    ? `resuming (${suspensionCause(record)})`
+    ? normalizeRendererText(recoveryPresentation(record)?.text ?? statusLabel(record))
     : activity === undefined
       ? defaultLiveActivity(stats)
       : normalizeRendererText(activity)

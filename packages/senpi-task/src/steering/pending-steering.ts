@@ -107,14 +107,14 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
               suspension_reason: error instanceof SessionHeldElsewhereError ? "host_draining" : "daemon_unavailable" }
           })
           if (parked && port.liveHandle(taskId) === handle) {
-            await port.destruction.destroyResidentTask(taskId, "revive_failure")
+            await port.destruction.destroyResidentTask(taskId, "recovery_detach")
           }
+          break
         } else {
           // Other failures may have delivered before losing their acknowledgement. Preserve the
           // existing no-replay behavior rather than duplicating side effects on a later revival.
           delivered.add(entry.id)
         }
-        break
       }
     }
     clearPersistedQueue(taskId, delivered)

@@ -217,6 +217,7 @@ export async function reviveClaimed(
   if (!reattached.ok) {
     reservation.release()
     if (reattached.kind === "already_attached") {
+      clearSuspensionReason(context, fresh.task_id)
       return { task_id: fresh.task_id, kind: "resumed", reason: reattached.reason }
     }
     return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)

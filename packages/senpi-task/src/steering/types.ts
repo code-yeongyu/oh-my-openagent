@@ -6,7 +6,7 @@ import type { TaskRecordStore } from "../store"
 
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
-export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure" | "reconcile_lost"
+export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure" | "reconcile_lost" | "recovery_detach"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.

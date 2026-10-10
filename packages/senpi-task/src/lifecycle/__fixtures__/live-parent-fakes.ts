@@ -22,6 +22,7 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
   let backing = tempStore()
   const messages: ParentNotifierMessage[] = []
   const terminals: TaskRecord[] = []
+  const recordedEvents: Array<{ readonly type: string; readonly payload: unknown }> = []
   const parent: { value: ParentState } = { value: { kind: "idle" } }
   const newNotifier = () =>
     createCompletionNotifier({
@@ -48,7 +49,8 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
           runInBackground: true,
         })
       },
-      event: (type) => {
+      event: (type, payload) => {
+        recordedEvents.push({ type, payload })
         for (const resolve of events.get(type)?.splice(0) ?? []) resolve()
       },
       beforeMutate: () => {
@@ -193,6 +195,7 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
     resumedHandles,
     state,
     messages,
+    recordedEvents,
     terminals,
     parent,
     host,

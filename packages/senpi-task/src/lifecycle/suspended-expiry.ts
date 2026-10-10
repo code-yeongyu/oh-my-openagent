@@ -122,9 +122,16 @@ export async function expireSuspendedChild(
     (fresh.status !== "pending" && fresh.status !== "running")
   )
     return
-  const message = closed
+  const undelivered = fresh.pending_steering?.length ?? 0
+  const closureMessage = closed
     ? `${reason}\nThe child could not be resumed (${cause}); its stop is confirmed.`
     : `${reason}\nThe child could not be resumed (${cause}). Its old session may still be running on an unreachable host; closing it is being retried. There is no at-most-once guarantee if you re-dispatch: the work may run twice while the old run is still live. Check side-effecting work before re-running.`
+  const message = undelivered === 0 ? closureMessage
+    : `${closureMessage}\n${undelivered} queued message${undelivered === 1 ? " was" : "s were"} not delivered.`
+  context.store.mutate(record.task_id, (current) => {
+    const { pending_steering: _undelivered, ...rest } = current
+    return rest
+  })
   // Dispose/release before notification. This is NOT a cancellation: externally caused failure
   // must take the normal fail transition so the waiting parent receives one result.
   context.dequeuePending(record.task_id)
@@ -145,7 +152,7 @@ export async function expireSuspendedChild(
   if (result.applied)
     context.store.appendEvent(record.task_id, {
       type: "suspended_unresumable",
-      payload: { cause, confirmed_stop: closed },
+      payload: { cause, confirmed_stop: closed, undelivered_messages: undelivered },
     })
 }
 

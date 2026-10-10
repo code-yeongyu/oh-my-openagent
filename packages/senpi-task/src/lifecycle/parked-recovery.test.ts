@@ -101,7 +101,6 @@ describe("parked recovery contract (#9861)", () => {
     await f.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
     f.restart()
     f.advance(300_000)
-    f.state.revivable = true
     await f.lifecycle.reconcileOnSessionStart("parent-1")
     expect(f.store.load(id)?.status).toBe("error")
     expect(f.store.load(id)?.recovery_deadline_at).toBe(deadline)
@@ -148,7 +147,7 @@ describe("parked recovery contract (#9861)", () => {
       expect(f.store.load(id)?.error_message).toContain(reason)
       expect(f.store.load(id)?.fallback_closing_child?.requires_confirmation).toBe(true)
       expect(f.messages).toHaveLength(1)
-      expect(f.messages[0]?.content).toContain("may still be running")
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ confirmed_stop: false })
     })
   }
 

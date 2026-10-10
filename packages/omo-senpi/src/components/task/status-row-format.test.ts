@@ -161,7 +161,7 @@ describe("automatic recovery residency labeling", () => {
             ...backgroundWidgetRows([parked], new Map(), 0, undefined, 90),
             ...backgroundWidgetRows([parked], new Map(), 0, undefined, 220)]
           for (const row of rows) {
-            expect(row).toContain("resuming")
+            expect(row).toContain(suspension_reason === "host_incompatible" ? "ending" : "resuming")
             expect(row).not.toMatch(/suspended|\/task-kill/u)
           }
         }
@@ -273,7 +273,7 @@ describe("automatic recovery residency labeling", () => {
 
     // then every public row uses a transient state, never an instruction to the user
     for (const rendered of [row, formatTaskRow(parked), ...buildWidgetRows([parked])]) {
-      expect(rendered).toContain("resuming")
+      expect(rendered).toContain(parked.suspension_reason === "host_incompatible" ? "ending" : "resuming")
       expect(rendered).not.toMatch(/suspended|\/task-kill|resumes on session restart/u)
     }
   })

@@ -22,6 +22,7 @@ export type DestroyCause =
   | "reconcile_lost"
   | "fallback_handoff"
   | "revive_failure"
+  | "recovery_detach"
 
 // The teardown surface the destruction port operates against. In production this wraps a live
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle

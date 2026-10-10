@@ -168,7 +168,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
         ? { ...current, residency_state: "rpc_detached", suspension_reason: error instanceof SessionHeldElsewhereError ? "host_draining" : "daemon_unavailable" }
         : current)
       const queued = enqueuePending(fresh, message, deliverAs)
-      await port.destruction.destroyResidentTask(record.task_id, "revive_failure")
+      await port.destruction.destroyResidentTask(record.task_id, "recovery_detach")
       return queued
     } finally {
       endSend(record.task_id)

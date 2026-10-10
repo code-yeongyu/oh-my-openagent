@@ -35,6 +35,16 @@ export async function destroyResidentTask(
   cause: DestroyCause,
   orphan?: OrphanTarget,
 ): Promise<void> {
+  if (cause === "recovery_detach") {
+    // A typed pre-delivery refusal says nothing about the daemon's running turn. dispose drops
+    // only our protocol connection; abort/terminate would close the session we intend to reattach.
+    const handle = context.registry.get(taskId)
+    if (handle !== undefined) {
+      await withinTeardownBudget(context.teardownStepDeadline, { taskId, pid: handle.pid }, "dispose", () => handle.dispose())
+    }
+    context.registry.forget(taskId)
+    return
+  }
   const claimedEviction = cause === "evict" ? (context.registry.tryClaimEviction?.(taskId) ?? true) : false
   if (cause === "evict" && !claimedEviction) return
   // Deliberate teardown drops the child's runtime parent kernel-tool binding: nothing may keep a

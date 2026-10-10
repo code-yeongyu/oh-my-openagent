@@ -5,6 +5,23 @@ import { cleanupSteering, makeFakeHandle, makeHarness } from "./__fixtures__/ste
 afterEach(cleanupSteering)
 
 describe("steering a recovering child (#9861)", () => {
+  test("a plain failure does not prevent delivery of the next queued entry", async () => {
+    const h = makeHarness()
+    const record = h.seedRecord()
+    for (const message of ["first", "second"]) {
+      await h.engine.sendToTask({ idOrName: record.task_id, message, deliverAs: "steer" })
+    }
+    h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
+    const attempted: string[] = []
+    const child = makeFakeHandle(record.task_id, "rpc")
+    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
+      attempted.push(message)
+      if (message === "first") throw new Error("ordinary delivery failure")
+    } })
+    await h.engine.notifyStarted(record.task_id)
+    expect(attempted).toEqual(["first", "second"])
+    expect(h.store.load(record.task_id)?.pending_steering).toBeUndefined()
+  })
   for (const error of [
     new HostSessionDetachedError("steer"),
     new SessionHeldElsewhereError("/tmp/child.jsonl", { owner: "draining-generation" }, "draining"),
@@ -19,7 +36,7 @@ describe("steering a recovering child (#9861)", () => {
       const sent = await h.engine.sendToTask({ idOrName: record.task_id, message: "updated scope", deliverAs: "steer" })
       expect(sent.kind).toBe("queued")
       expect(h.store.load(record.task_id)?.pending_steering?.map((entry) => entry.message)).toEqual(["updated scope"])
-      expect(h.destruction.calls).toEqual([{ taskId: record.task_id, cause: "revive_failure" }])
+      expect(h.destruction.calls).toEqual([{ taskId: record.task_id, cause: "recovery_detach" }])
 
       h.setLive(record.task_id, child.handle)
       h.store.mutate(record.task_id, (fresh) => ({ ...fresh, residency_state: "resident" }))
