@@ -62,6 +62,44 @@ describe("steering a recovering child (#9861)", () => {
     expect(child.steerCalls).toEqual(["first", "second"])
   })
 
+  // Contract: a drain always settles, even when each delivery queues another message. Before the
+  // pass limit and the per-pass yield, notifyStarted never returned and starved every timer (#9861).
+  test("a child whose deliveries keep queueing more messages still settles", async () => {
+    const h = makeHarness()
+    const record = h.seedRecord()
+    await h.engine.sendToTask({ idOrName: record.task_id, message: "seed", deliverAs: "steer" })
+    h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
+    const child = makeFakeHandle(record.task_id, "rpc")
+    let deliveries = 0
+    // A send that lands while a drain is delivering is persisted to the queue (as a revival or a
+    // parked window does), not delivered inline; append one per delivery so the queue never empties.
+    h.setLive(record.task_id, { ...child.handle, steer: async () => {
+      deliveries += 1
+      h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: [...(fresh.pending_steering ?? []),
+        { id: `more-${deliveries}`, message: `more ${deliveries}`, deliver_as: "steer" as const }] }))
+    } })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const settled = await Promise.race([
+      h.engine.notifyStarted(record.task_id).then(() => "settled"),
+      new Promise<string>((resolve) => { timer = setTimeout(() => resolve("drain never settled within 5 s"), 5_000) }),
+    ])
+    clearTimeout(timer)
+    expect(settled).toBe("settled")
+    expect(deliveries).toBeGreaterThan(0)
+  })
+
+  // Contract: queued entries have distinct ids, so clearing one delivered entry never drops another.
+  test("a message queued during delivery is kept after a partial drain", async () => {
+    const h = makeHarness()
+    const record = h.seedRecord()
+    await h.engine.sendToTask({ idOrName: record.task_id, message: "first", deliverAs: "steer" })
+    await h.engine.sendToTask({ idOrName: record.task_id, message: "second", deliverAs: "steer" })
+    h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: fresh.pending_steering?.slice(1) }))
+    await h.engine.sendToTask({ idOrName: record.task_id, message: "third", deliverAs: "steer" })
+    const ids = h.store.load(record.task_id)?.pending_steering?.map((entry) => entry.id) ?? []
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
   test("an ended recovery answers with the terminal result instead of a host refusal", async () => {
     const h = makeHarness()
     const record = h.seedRecord()

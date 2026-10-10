@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { log } from "@oh-my-opencode/utils"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
 import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
@@ -5,6 +6,11 @@ import type { SendDelivery, SendOutcome, SteeringPort } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
+// A drain re-reads the queue after each delivered batch, so a child whose deliveries keep queueing
+// more messages could drain forever. Each pass yields to the event loop (timers and teardown still
+// run), and a drain stops after this many passes; what is left waits for the next start (#9861).
+const MAX_DRAIN_PASSES = 16
+const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
 
 // The durable record is the only message queue. Drain single-flight, retaining refused deliveries.
 export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: string) => TaskRecord | undefined) {
@@ -16,7 +22,9 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
     const updated = port.store.mutate(record.task_id, (fresh) => {
       if ((fresh.status !== "pending" && fresh.status !== "running") || fresh.killed === true || fresh.cancel_requested !== undefined) return fresh
       const entry: PendingSteeringEntry = {
-        id: `ps-${port.now()}-${(fresh.pending_steering ?? []).length + 1}`,
+        // Unique per entry: a clock-plus-length id repeats after a partial drain, and clearing a
+        // delivered id would then also drop the later entry that reused it.
+        id: `ps-${port.now()}-${randomUUID()}`,
         message,
         deliver_as: deliverAs,
       }
@@ -63,9 +71,12 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
     const existing = draining.get(taskId)
     if (existing !== undefined) return existing
     const work = Promise.resolve().then(async () => {
-      while (await drainPending(taskId)) {
-        // Re-read after each delivered batch: sends accepted during delivery retain their order.
+      // Re-read after each delivered batch: sends accepted during delivery retain their order.
+      for (let pass = 0; pass < MAX_DRAIN_PASSES; pass += 1) {
+        if (!(await drainPending(taskId))) return
+        await nextTurn()
       }
+      log("senpi-task steering drain stopped after its pass limit", { taskId, passes: MAX_DRAIN_PASSES })
     }).finally(() => draining.delete(taskId))
     draining.set(taskId, work)
     return work
