@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { DESKTOP_METHODS, type DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol";
 import { isDesktopCapabilities } from "../service/parse";
 import { ComputerRunError, facadeMethod, type RunScope } from "./context";
@@ -101,6 +102,60 @@ export function createDesktopFacade(scope: RunScope) {
 					await call("clipboard.write", { text });
 				}),
 		},
+		control: createControlFacade(scope, method),
+	};
+}
+
+/** The `control.state` result shape, mirrored from the engine's `ControlStateResult` (#9651 B5). */
+export interface ControlState {
+	readonly active: boolean;
+	readonly reason?: string | null;
+	readonly grantedAt?: string | null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isControlState(value: unknown): value is ControlState {
+	return isRecord(value) && typeof value.active === "boolean";
+}
+
+/**
+ * `desktop.control`: the foreground-control grant. `acquire` asks the human through the run's confirm
+ * channel and only then calls the host-only `control.grant`; a "yes" that arrives after the run was
+ * aborted is discarded (the fence oh-my-pi's `#controlEpoch` guards, here the run's own signal).
+ */
+function createControlFacade(scope: RunScope, method: ReturnType<typeof facadeMethod>) {
+	const state = (): Promise<ControlState> =>
+		method("control.state", async ({ call }) =>
+			expectResult("control.state", await call("control.state", {}), isControlState),
+		);
+	return {
+		acquire: (options: { reason: string }): Promise<ControlState> =>
+			method("control.acquire", async ({ context, call }) => {
+				const reason = typeof options?.reason === "string" ? options.reason.trim() : "";
+				if (reason.length === 0) {
+					throw new ComputerRunError("assertion", "control.acquire requires a non-empty reason");
+				}
+				const current = expectResult("control.state", await call("control.state", {}), isControlState);
+				if (current.active) return current;
+				const confirm = scope.confirmControl;
+				if (confirm === undefined) return { active: false };
+				const approved = await confirm(reason, context.signal);
+				context.signal.throwIfAborted();
+				if (approved !== true) return { active: false };
+				return expectResult(
+					"control.grant",
+					await call("control.grant", { reason, confirmationId: randomUUID() }),
+					isControlState,
+				);
+			}),
+		release: (): Promise<void> =>
+			method("control.release", async ({ call }) => {
+				await call("control.revoke", {});
+			}),
+		state,
 	};
 }
 

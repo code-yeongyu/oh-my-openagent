@@ -15,6 +15,7 @@ import {
 	CAPABILITIES_TIMEOUT_MS,
 	CLOSE_TIMEOUT_MS,
 	HEARTBEAT_MS,
+	REVOKE_TIMEOUT_MS,
 	START_TIMEOUT_MESSAGE,
 	START_TIMEOUT_MS,
 } from "./timeouts";
@@ -110,6 +111,25 @@ export class DesktopService {
 	async call(method: EngineMethod, params: unknown, options: CallOptions = {}): Promise<unknown> {
 		const connection = await this.#live();
 		return connection.rpc.request(method, params, options);
+	}
+
+	/**
+	 * `control.revoke`, best effort (#9651 B5b): with no live engine it is a no-op, the call is
+	 * bounded by `REVOKE_TIMEOUT_MS`, and a failure is logged through the error hub rather than
+	 * thrown — `session.close` stays the backstop that always releases the grant.
+	 */
+	async revokeControl(): Promise<void> {
+		const connection = this.#connection;
+		if (connection === undefined || !connection.rpc.alive) return;
+		try {
+			await connection.rpc.request("control.revoke", {}, { timeoutMs: REVOKE_TIMEOUT_MS });
+		} catch (error) {
+			if (error instanceof DesktopServiceError || error instanceof DesktopEngineRpcError) {
+				this.#hub.emitError(error);
+				return;
+			}
+			throw error;
+		}
 	}
 
 	async capabilities(): Promise<DesktopCapabilities> {

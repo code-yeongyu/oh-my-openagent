@@ -19,14 +19,40 @@ export interface ControlConfirmOptions {
   readonly scheduleTimeout?: ControlTimeoutScheduler
 }
 
+const realScheduler: ControlTimeoutScheduler = (onTimeout, timeoutMs) => {
+  const timer = setTimeout(onTimeout, timeoutMs)
+  return () => clearTimeout(timer)
+}
+
 /**
  * The human confirm behind `computer.control.acquire` (#9651 B5b). Headless contexts never prompt;
- * a refusal, a timeout, or an abort means no grant.
+ * a refusal, a timeout, or an abort means no grant. Mirrors senpi's RPC `createDialogPromise`
+ * contract (abort or a client that never answers resolves the default `false`) so the run always
+ * settles instead of hanging on the human.
  */
 export async function confirmComputerControl(
-  _request: ControlConfirmRequest,
-  _options: ControlConfirmOptions = {},
+  request: ControlConfirmRequest,
+  options: ControlConfirmOptions = {},
 ): Promise<boolean> {
-  // RED stub: the real confirm flow lands with the component implementation commit.
-  return false
+  const confirm = request.context.ui?.confirm
+  if (request.context.hasUI === false || confirm === undefined || request.signal.aborted) return false
+  const timeoutMs = options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS
+  const scheduleTimeout = options.scheduleTimeout ?? realScheduler
+  return await new Promise<boolean>((resolve) => {
+    let settled = false
+    const settle = (approved: boolean): void => {
+      if (settled) return
+      settled = true
+      cancelTimeout()
+      request.signal.removeEventListener("abort", onAbort)
+      resolve(approved)
+    }
+    const onAbort = (): void => settle(false)
+    const cancelTimeout = scheduleTimeout(() => settle(false), timeoutMs)
+    request.signal.addEventListener("abort", onAbort, { once: true })
+    Promise.resolve(confirm(CONTROL_CONFIRM_TITLE, controlConfirmBody(request.reason), { signal: request.signal })).then(
+      (approved) => settle(approved === true),
+      () => settle(false),
+    )
+  })
 }

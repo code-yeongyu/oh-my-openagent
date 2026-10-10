@@ -57,11 +57,18 @@ export type EngineCall = (method: EngineMethod, params: object) => Promise<unkno
 /** Returns `promise` after arranging for user code awaiting it to resume once it settles. */
 export type Resume = <T>(promise: Promise<T>) => Promise<T>;
 
+/**
+ * The human confirmation behind `desktop.control.acquire`; absent on a headless run, which then
+ * never grants (#9651 B5b).
+ */
+export type ConfirmControl = (reason: string, signal: AbortSignal) => Promise<boolean>;
+
 /** What every facade method needs: the run it belongs to, its engine channel, and the vm resume hook. */
 export interface RunScope {
 	readonly context: RunContext;
 	readonly call: EngineCall;
 	readonly resume: Resume;
+	readonly confirmControl?: ConfirmControl;
 }
 
 /** Tier table of one facade surface (`DESKTOP_METHODS`, `WINDOW_METHODS`, `ELEMENT_METHODS`). */
