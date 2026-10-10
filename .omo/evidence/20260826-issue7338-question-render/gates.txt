@@ -1,0 +1,19 @@
+=== GATES RUN 2026-08-26T02:53:57Z ===
+
+--- tsgo --noEmit (packages/omo-opencode):
+PASS (exit 0)
+
+--- focused suite 1: question-visibility-watchdog + tool-execute-before (run 1):
+ 30 pass
+ 0 fail
+ 52 expect() calls
+Ran 30 tests across 2 files. [2.43s]
+
+--- focused suite run 2 (clean-streak confirmation):
+ 30 pass
+ 0 fail
+ 52 expect() calls
+Ran 30 tests across 2 files. [2.76s]
+
+--- git diff --check:
+PASS (no whitespace errors)
