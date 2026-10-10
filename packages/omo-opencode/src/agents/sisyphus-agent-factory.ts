@@ -29,6 +29,7 @@ import {
   isClaudeOpus47Model,
   isClaudeOpus48Model,
   isClaudeOpus5Model,
+  isClaudeOpus55Model,
   isGlmModel,
   isGpt5_5Model,
   isGpt5_6Model,
@@ -72,6 +73,7 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isGpt5_5Model(model) || isGpt5_6Model(model) || isGpt6Model(model)) return "gpt-5-5";
   if (isGptNativeSisyphusModel(model)) return "gpt-5-4";
   if (isClaudeFable5Model(model)) return "claude-fable-5";
+  if (isClaudeOpus55Model(model)) return "claude-opus-5";
   if (isClaudeOpus5Model(model)) return "claude-opus-5";
   if (isClaudeOpus48Model(model)) return "claude-opus-4-8";
   if (isClaudeOpus47Model(model)) return "claude-opus-4-7";
