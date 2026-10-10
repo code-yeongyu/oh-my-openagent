@@ -50,6 +50,9 @@ export type ResidencyRegistry = {
   forget(taskId: string): void
   // A terminal resident with a queued send must NOT be evicted (codex is_unloadable parity).
   hasPendingSends(taskId: string): boolean
+  // Only sends being delivered right now (no durable queue). A finished child's durable queue does not
+  // pin its slot: it parks with the queue kept on its record for the next revival (#9861).
+  hasInFlightSends?(taskId: string): boolean
   // Synchronous per-task arbitration held across async teardown. Eviction and sends are mutually
   // exclusive; callers that lose the race must not touch the child handle.
   tryClaimEviction?(taskId: string): boolean

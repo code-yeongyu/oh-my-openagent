@@ -87,7 +87,7 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
     } finally { await h.dispose() }
   })
 
-  it("#given an otherwise eligible old resident #when a durable send is pending #then teardown is blocked until the queue is resolved", async () => {
+  it("#given a finished resident with a durable queue #when idle reclaim runs #then it parks, frees its slot and keeps the queue", async () => {
     let now = 1000
     let disposals = 0
     const h = coldReviveHarness({ now: () => now, idleTimeoutMs: 37,
@@ -101,16 +101,14 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
       await terminal
       h.store.mutate(h.record.task_id, (record) => ({ ...record, pending_steering: pending }))
       now += 37
-      expect(h.store.load(h.record.task_id)?.residency_state).toBe("resident")
+      // The queue is still durable work for the next revival (#9861)...
       expect(h.registry.hasPendingSends(h.record.task_id)).toBe(true)
-      expect(await h.lifecycle.reclaimIdleResidents?.()).toEqual([])
-      expect(disposals).toBe(0)
-      expect(h.registry.get(h.record.task_id)).toBeDefined()
-      expect(h.store.load(h.record.task_id)?.pending_steering).toEqual(pending)
-      h.store.mutate(h.record.task_id, (record) => ({ ...record, pending_steering: [] }))
+      // ...but it no longer pins a finished child's slot: the child parks and its handle is released.
       expect(await h.lifecycle.reclaimIdleResidents?.()).toEqual([h.record.task_id])
       expect(disposals).toBe(1)
+      expect(h.registry.get(h.record.task_id)).toBeUndefined()
       expect(h.store.load(h.record.task_id)?.residency_state).toBe("persisted_only")
+      expect(h.store.load(h.record.task_id)?.pending_steering).toEqual(pending)
     } finally { await h.dispose() }
   })
 

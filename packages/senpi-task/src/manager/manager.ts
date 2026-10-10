@@ -555,6 +555,10 @@ class TaskManagerImpl implements TaskManager {
     return (this.#sendCounts.get(taskId) ?? 0) > 0 || (this.#steering.hasPendingSends(taskId) ?? false)
   }
 
+  hasInFlightSends(taskId: string): boolean {
+    return (this.#sendCounts.get(taskId) ?? 0) > 0 || this.#steering.hasInFlightSends(taskId)
+  }
+
   tryClaimEviction(taskId: string): boolean {
     if ((this.#sendCounts.get(taskId) ?? 0) > 0 || this.#evicting.has(taskId)) return false
     this.#evicting.add(taskId)
@@ -627,8 +631,12 @@ class TaskManagerImpl implements TaskManager {
     this.#background.delete(taskId)
     this.#released.delete(taskId)
     this.#runStats.delete(taskId)
-    const residency = this.#tryLoad(taskId)?.residency_state
-    if (residency !== "persisted_only" && residency !== "rpc_detached") this.#steering.dropPending(taskId)
+    // A parked child keeps its durable queue for the next revival, and so does a finished one whose
+    // handle is being released to park it (the record parks just after this): its queued messages are
+    // delivered first when it is revived (#9861). Only a child that will never run again drops it here.
+    const forgotten = this.#tryLoad(taskId)
+    const parking = forgotten != null && (forgotten.status === "completed" || forgotten.status === "error") && forgotten.killed !== true
+    if (!parking && forgotten?.residency_state !== "persisted_only" && forgotten?.residency_state !== "rpc_detached") this.#steering.dropPending(taskId)
     this.#settleWaiters(taskId)
   }
 

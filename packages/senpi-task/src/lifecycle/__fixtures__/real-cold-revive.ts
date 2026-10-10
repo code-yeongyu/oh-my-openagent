@@ -191,7 +191,10 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     const pending = [{ id: "pending-ttl", message: "PENDING_SENTINEL", deliver_as: "steer" as const }]
     store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: pending }))
     now += 7
-    assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [])
+    // A finished child's durable queue no longer pins its slot (#9861): idle reclaim parks it, and the
+    // queue stays on the record to be delivered first when the revive below brings it back.
+    assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [record.task_id])
+    assert.notEqual(store.load(record.task_id)?.residency_state, "resident")
     assert.deepEqual(store.load(record.task_id)?.pending_steering, pending)
     // A further revive can acquire at cap=1, proving the previous terminal released its lease.
     trace?.mark("lease_probe_requested")

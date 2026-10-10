@@ -305,6 +305,7 @@ export type TaskManager = {
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   hasPendingSends?(taskId: string): boolean
+  hasInFlightSends?(taskId: string): boolean
   tryClaimEviction?(taskId: string): boolean
   releaseEviction?(taskId: string): void
   isEvicting?(taskId: string): boolean

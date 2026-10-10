@@ -2,7 +2,7 @@ import type { ResidencyRegistry, ResidentHandle } from "@oh-my-opencode/senpi-ta
 import type { ManagedChildHandle, TaskManager } from "@oh-my-opencode/senpi-task"
 
 type ResidencyManager = Pick<TaskManager, "forget" | "get" | "getResidentHandle" | "hasPendingSends" | "residentTaskIds"> &
-  Partial<Pick<TaskManager, "isEvicting" | "releaseEviction" | "tryBeginSend" | "tryClaimEviction" | "endSend">>
+  Partial<Pick<TaskManager, "hasInFlightSends" | "isEvicting" | "releaseEviction" | "tryBeginSend" | "tryClaimEviction" | "endSend">>
 
 // W1-V F3/F7: the lifecycle's ResidencyRegistry is a VIEW over the manager's live handles, and its
 // forget() delegates to manager.forget() so the registry and the manager's #live map share one
@@ -18,8 +18,10 @@ export function createManagerResidencyRegistry(getManager: () => ResidencyManage
         .filter((handle): handle is ResidentHandle => handle !== undefined),
     forget: (taskId) => getManager().forget(taskId),
     // The durable steering queue is the steering engine's source of truth. A queued message must
-    // keep its resident alive until it is delivered or explicitly dropped.
+    // keep a RUNNING resident alive until it is delivered or explicitly dropped; a finished one parks
+    // with its queue kept on the record for the next revival (#9861).
     hasPendingSends: (taskId) => getManager().hasPendingSends?.(taskId) ?? false,
+    hasInFlightSends: (taskId) => getManager().hasInFlightSends?.(taskId) ?? false,
     tryClaimEviction: (taskId) => getManager().tryClaimEviction?.(taskId) ?? true,
     releaseEviction: (taskId) => getManager().releaseEviction?.(taskId),
     isEvicting: (taskId) => getManager().isEvicting?.(taskId) ?? false,

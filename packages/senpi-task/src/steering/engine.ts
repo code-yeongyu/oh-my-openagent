@@ -200,6 +200,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     port.endSend?.(taskId)
   }
 
+  function hasInFlightSends(taskId: string): boolean {
+    return (pendingSends.get(taskId) ?? 0) > 0
+  }
+
   function hasPendingSends(taskId: string): boolean {
     return (pendingSends.get(taskId) ?? 0) > 0 || (tryLoad(taskId)?.pending_steering?.length ?? 0) > 0
   }
@@ -208,5 +212,5 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     clearPersistedQueue(taskId, undefined, "task_released")
   }
 
-  return { sendToTask, ...createSteeringControls(port, resolve, clearPersistedQueue), notifyStarted, hasPendingSends, dropPending }
+  return { sendToTask, ...createSteeringControls(port, resolve, clearPersistedQueue), notifyStarted, hasPendingSends, hasInFlightSends, dropPending }
 }

@@ -117,6 +117,7 @@ export type CancelOutcome =
 
 export type SteeringEngine = {
   hasPendingSends(taskId: string): boolean
+  hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.
   sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
