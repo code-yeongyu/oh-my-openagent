@@ -181,9 +181,10 @@ async fn a_disabled_leaf_is_refused_and_dispatches_nothing() {
         .expect("opens");
     // When
     let refused = session.submit(select("101", &["Edit", "Undo"])).wait().await;
-    // Then: the failure is still audited, but nothing was dispatched
+    // Then: the failure is audited and no menu command was dispatched; the
+    // transaction's release after a failed mutation is the only op
     assert_eq!(code(refused), Some(ErrorCode::AxFailed));
-    assert_eq!(recorded(sinks), [], "{:?}", recorded(sinks));
+    assert_eq!(recorded(sinks), [SinkOp::ReleaseAll], "{:?}", recorded(sinks));
     assert_eq!(audits.lock().len(), 1, "{:?}", audits.lock());
 }
 
