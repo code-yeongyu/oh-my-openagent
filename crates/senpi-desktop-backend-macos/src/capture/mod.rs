@@ -35,11 +35,17 @@ pub(crate) fn permission_denied() -> DesktopError {
 pub(crate) struct MacCapture {
     selector: DisplaySelector,
     shooter: Screencapture,
+    overlay: crate::overlay::Overlay,
 }
 
 impl MacCapture {
     pub(crate) fn new(selector: DisplaySelector, shooter: Screencapture) -> Self {
-        Self { selector, shooter }
+        Self { selector, shooter, overlay: crate::overlay::Overlay::default() }
+    }
+
+    pub(crate) fn with_overlay(mut self, overlay: crate::overlay::Overlay) -> Self {
+        self.overlay = overlay;
+        self
     }
 
     pub(crate) fn permission_granted(&self) -> bool {
@@ -53,14 +59,18 @@ impl MacCapture {
 
     pub(crate) fn windows(&self) -> CoreResult<Vec<DesktopWindow>> {
         self.require_permission()?;
-        windows::enumerate()
+        let mut windows = windows::enumerate()?;
+        exclude_overlay_windows(&mut windows, self.overlay.owner_pid());
+        Ok(windows)
     }
 
     pub(crate) fn capture(&self, target: &Target) -> CoreResult<(RgbaImage, FrameGeometry)> {
-        match target {
+        // The guard surrounds the entire dispatch, not just screencapture.
+        // It therefore also covers multi-display batches and CoreGraphics.
+        self.overlay.capture(|| match target {
             Target::Desktop => self.capture_desktop(),
             Target::Window(id) => self.capture_window(id),
-        }
+        })
     }
 
     fn require_permission(&self) -> CoreResult<()> {
@@ -114,6 +124,12 @@ impl MacCapture {
         }
         let geometry = FrameGeometry::for_window(&window, image.width(), image.height());
         Ok((image, geometry))
+    }
+}
+
+fn exclude_overlay_windows(windows: &mut Vec<DesktopWindow>, overlay_pid: Option<u32>) {
+    if let Some(pid) = overlay_pid {
+        windows.retain(|window| window.pid != Some(pid));
     }
 }
 

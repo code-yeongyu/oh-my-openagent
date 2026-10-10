@@ -24,15 +24,39 @@ pub struct MacosBackend {
     capture: MacCapture,
     input: MacInput,
     ax: MacAx,
+    overlay: crate::overlay::Overlay,
 }
 
 impl MacosBackend {
     pub fn new(display: DisplaySelector) -> CoreResult<Self> {
+        let overlay = crate::overlay::Overlay::default();
         Ok(Self {
-            capture: MacCapture::new(display, Screencapture::system()),
+            capture: MacCapture::new(display, Screencapture::system()).with_overlay(overlay.clone()),
             input: MacInput::new(CanaryMode::Session)?,
-            ax: MacAx::new(),
+            ax: MacAx::with_overlay(overlay.clone()),
+            overlay,
         })
+    }
+
+    /// Display-only setting; it does not change delivery mode or control admission.
+    pub fn set_show_cursor(&mut self, enabled: bool) {
+        self.overlay.configure(enabled);
+    }
+
+    pub fn overlay_available(&self) -> bool {
+        self.overlay.available()
+    }
+
+    fn show_typing_target(&self, target: &Target) {
+        if let Ok(windows) = self.capture.windows() {
+            let window = windows.iter().find(|window| match target {
+                Target::Desktop => window.focused,
+                Target::Window(id) => window.id == *id,
+            });
+            if let Some(window) = window {
+                self.ax.show_typing_target(window);
+            }
+        }
     }
 
     /// Applies the `computer.macosCanary` setting (`session` default).
@@ -132,11 +156,21 @@ impl Backend for MacosBackend {
         mode: DeliveryMode,
     ) -> CoreResult<()> {
         Self::require_input_permission()?;
+        let end = match &event {
+            PointerEvent::Click { x, y, .. } | PointerEvent::Move { x, y }
+                | PointerEvent::Scroll { x, y, .. } => Some((*x, *y)),
+            PointerEvent::Drag { path, .. } => {
+                if let Some((x, y)) = path.first() { self.overlay.target(*x, *y); }
+                path.last().copied()
+            }
+        };
+        if let Some((x, y)) = end { self.overlay.target(x, y); }
         self.input.pointer(target, event, mode, &self.capture)
     }
 
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         Self::require_input_permission()?;
+        self.show_typing_target(target);
         self.input.type_text(target, text, mode, &self.capture)
     }
 
@@ -157,6 +191,7 @@ impl Backend for MacosBackend {
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
         Self::require_input_permission()?;
+        self.show_typing_target(target);
         self.input.type_text_interruptible(target, text, mode, &self.capture, check_stop, delivered)
     }
 
