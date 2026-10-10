@@ -18,7 +18,31 @@ one where a human is a single call away. Never substitute one engine for the oth
 the attached engine is not set up, run the onboarding script and tell the user its one remaining
 step.
 
-## Step 0 — load omowright and prove the stack
+## Step 0 — which engine this session is allowed to use
+
+When `OMO_BROWSER_ENGINE` is set (the OmO desktop app sets it for every session), it wins over the table above:
+
+| Value | What you do |
+|---|---|
+| `connected` | Use `connectBrowserSkill()` only. If the user's browser is not connected you get a "Connect your browser" error: relay it and stop. Never open another browser |
+| `builtin` | Do not call `connectBrowserSkill()`; use the app's in-app browser tools |
+| `none` | Do not do browser work. Say that agent browser access is off for this project |
+| unset | The table above, as before (terminal use) |
+
+While any engine is set, `loadOmowright()` returns a guarded library. The owned engine (`connectPipe`,
+`connectCloakProfile`, `connect`) and every other export that acts on a browser is refused, so the table above
+does not apply: do not look for a way around it, and tell the user what the session allows. Under `connected`
+the app sees what the browser is doing, and before a click, Enter or script that sends, posts, pays, orders,
+subscribes, deletes or closes an account, and before Enter in a message box, it asks the user first. A "No" fails the action with
+`BrowserActionDeclinedError`: report that, never retry it or go around it (`session.tool()` lets only reads
+through; `evaluate` is guarded too). If the user presses Stop, the next call throws `BrowserUserStoppedError`: tell
+the user browser use was stopped and start no new session this turn.
+
+The guard prevents mistakes by a cooperating agent. It is not a security boundary: code that imports the raw
+entry (`resolveOmowrightEntry()`) is not guarded, and a host without the `omo_browser_bridge` tool cannot show state or
+honor Stop, though questions are still asked.
+
+## Step 1 — load omowright and prove the stack
 
 ```js
 const { loadOmowright } = await import("<skill-root>/scripts/omowright.mjs")
@@ -94,7 +118,7 @@ changing the extension's automation settings.
   out everywhere. No flow here needs it.
 - **`focused: false` by default.** The browser belongs to someone who is probably using it.
 - **One short, named session per task,** always stopped.
-- **Bot-scored or WAF targets go to the owned engine.** The attached engine's daemon enables console
+- **Bot-scored or WAF targets go to the owned engine** (not while `OMO_BROWSER_ENGINE` is set: then say the site needs a browser the session does not allow). The attached engine's daemon enables console
   capture on every tab it drives, which is a known automation signal; CloakBrowser through
   `connectCloakProfile()` is the stealth path.
 

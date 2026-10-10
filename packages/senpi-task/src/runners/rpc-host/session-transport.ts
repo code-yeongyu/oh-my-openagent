@@ -1,4 +1,4 @@
-import type { RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
+import type { RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
@@ -10,6 +10,11 @@ import { HostUnavailableError, TASK_DAEMON_PROTOCOL_VERSION, TASK_DAEMON_REQUIRE
  * behind it, the `open_session` payload, and whether the daemon that answered may host this child.
  */
 
+/** How the host settled a prompt: started a turn, delivered it to the running turn, or queued it. */
+export type HostPromptDisposition = Awaited<ReturnType<RpcClient["prompt"]>>
+/** How the host settled a steer/follow-up: delivered to the running turn, or queued behind it. */
+export type HostQueuedInputDisposition = Awaited<ReturnType<RpcClient["steer"]>>
+
 /** omo's structural view of the engine's `RpcClient`; the pinned engine may predate its fields. */
 export interface HostRpcClient {
   start(): Promise<void>
@@ -17,24 +22,25 @@ export interface HostRpcClient {
   onEvent(listener: (record: unknown) => void): () => void
   openSession(options: HostOpenSessionWire): Promise<{ sessionId: string; attached?: boolean }>
   closeSession(sessionId?: string): Promise<void>
-  // `include_workers` reaches the wire only on an engine whose client forwards it; on an older one
-  // the option is dropped and worker rows stay hidden, which reads as "no session is live" - the
-  // conservative answer (reopen from JSONL instead of attaching, and close nothing).
-  listSessions?(options?: { readonly include_workers?: boolean }): Promise<readonly HostSessionRow[]>
   sendExtensionUIResponse(response: RpcExtensionUIResponse): Promise<void>
-  prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp" }): Promise<void>
-  steer(message: string): Promise<void>
-  followUp(message: string): Promise<void>
+  prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp" }): Promise<HostPromptDisposition>
+  steer(message: string): Promise<HostQueuedInputDisposition>
+  followUp(message: string): Promise<HostQueuedInputDisposition>
   abort(): Promise<void>
   getState(): Promise<RpcSessionState>
+  getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
 }
 
-/** One `list_sessions` row, narrowed to the only field liveness keys on. */
-export interface HostSessionRow {
-  readonly sessionPath?: string
+/** A session's own fallback policy, held in memory by the host (senpi `retry_fallback_profile`). */
+export interface HostRetryFallbackProfile {
+  readonly modelFallback: boolean
+  readonly fallbackChains: Readonly<Record<string, readonly string[]>>
 }
+
+/** The capability a host advertises when it honors `open_session.retryFallback`. */
+export const RETRY_FALLBACK_PROFILE_CAPABILITY = "retry_fallback_profile"
 
 /** The wire shape of `open_session`, in the engine's names. */
 export interface HostOpenSessionWire {
@@ -47,6 +53,7 @@ export interface HostOpenSessionWire {
   readonly context: Readonly<Record<string, string>>
   readonly retain_on_disconnect: boolean
   readonly auto_title: boolean
+  readonly retryFallback?: HostRetryFallbackProfile
 }
 
 /** The immutable launch profile of one child session, in omo's names. */
@@ -60,6 +67,8 @@ export interface HostSessionOpenInput {
   readonly context: Readonly<Record<string, string>>
   readonly retainOnDisconnect: boolean
   readonly autoTitle: boolean
+  /** Sent only to a host advertising `retry_fallback_profile`; an older host opens without it. */
+  readonly retryFallback?: HostRetryFallbackProfile
 }
 
 export interface HostRpcClientOptions {
@@ -93,6 +102,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
     context: input.context,
     retain_on_disconnect: input.retainOnDisconnect,
     auto_title: input.autoTitle,
+    ...(input.retryFallback === undefined ? {} : { retryFallback: input.retryFallback }),
   }
 }
 
@@ -104,7 +114,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
  */
 export function assertHostUsable(info: SenpiHostProtocolInfo | undefined): SenpiHostProtocolInfo {
   if (info === undefined) {
-    throw new HostUnavailableError("protocol", {
+    throw new HostUnavailableError("host_unreachable", {
       fallbackAllowed: false,
       detail: "the daemon did not answer get_protocol_info",
     })

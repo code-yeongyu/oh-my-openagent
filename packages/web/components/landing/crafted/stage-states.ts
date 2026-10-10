@@ -1,5 +1,5 @@
 export type StageStateId =
-  "code-mode" | "absorption" | "correction" | "team" | "monitor" | "goal" | "reload"
+  "code-mode" | "absorption" | "correction" | "team" | "monitor" | "goal" | "reload" | "computer"
 
 export interface StageRect {
   readonly x0: number
@@ -22,6 +22,7 @@ export const STAGE_STATES: readonly StageState[] = [
   { id: "monitor", rect: { x0: 0.24, y0: 0.3, x1: 0.76, y1: 0.7 }, liveAtSeconds: 1.1 },
   { id: "goal", rect: { x0: 0.14, y0: 0.14, x1: 0.86, y1: 0.86 } },
   { id: "reload", rect: { x0: 0.08, y0: 0.36, x1: 0.92, y1: 0.64 }, liveAtSeconds: 0.7 },
+  { id: "computer", rect: { x0: 0.06, y0: 0.22, x1: 0.94, y1: 0.78 }, liveAtSeconds: 1.2 },
 ]
 
 export const STAGE_DWELL_SECONDS = 2.8

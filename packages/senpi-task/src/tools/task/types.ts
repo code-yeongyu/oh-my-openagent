@@ -4,8 +4,12 @@ import type { AgentDefinition, SkillInvocationState } from "../../agents"
 import type { IsolationDetails, IsolationStartedDetails } from "../../isolation/details"
 import type { KernelToolErrorCode } from "../../kernel-tools/contract"
 import type { ExecutionModeGate, TaskManager } from "../../manager"
-import type { RunnerFailure } from "../../runners/in-process/child-handle"
-import type { ResolvedModelRecord, TaskRunStats } from "../../state"
+import type {
+  ResolvedModelRecord,
+  TaskRunStats,
+  TaskStartFailureKind,
+  TaskStartFailureReason,
+} from "../../state"
 import type { TaskToolParamsStatic } from "./params"
 
 // The narrow slice of senpi's ExtensionContext the task tool reads. ExtensionContext satisfies it
@@ -135,6 +139,8 @@ export type TaskToolItemDetail = {
   readonly resolved_model?: ResolvedModelRecord
   readonly status: string
   readonly error_message?: string
+  readonly failure_kind?: TaskStartFailureKind | "isolation_unavailable"
+  readonly failure_reason?: TaskStartFailureReason
   readonly queue_position?: number
   readonly run_in_background?: boolean
   readonly skills?: TaskSkillSummary
@@ -152,13 +158,16 @@ export type TaskToolDetails = {
   readonly execution_mode?: string
   readonly model?: string
   readonly resolved_model?: ResolvedModelRecord
+  // The model the child actually started on, read from the child itself (#9722).
+  readonly effective_model?: ResolvedModelRecord
   readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly run_in_background?: boolean
   readonly queue_position?: number
   readonly items?: readonly TaskToolItemDetail[]
   // The runner's typed failure kind when a start failed, so the caller can tell a refused parent
   // kernel-tool grant from a generic runner failure without reading prose.
-  readonly failure_kind?: RunnerFailure["kind"] | "isolation_unavailable"
+  readonly failure_kind?: TaskStartFailureKind | "isolation_unavailable"
+  readonly failure_reason?: TaskStartFailureReason
   // A settled isolated child reports its merge outcome here; a background start reports only where
   // the child is working, because the merge has not happened yet.
   readonly isolation?: IsolationDetails | IsolationStartedDetails

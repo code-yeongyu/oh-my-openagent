@@ -5,6 +5,8 @@
 // thread so a static script can address the run team-core minted, and writes observation files so the
 // driver can assert cross-session delivery (lead->member envelope, member->lead custom message) without
 // scraping a background child's transcript.
+import { resolveProjectStateDirectory } from "../../../senpi-task/src/store/project-state-directory.ts"
+
 declare const process: {
   argv: string[]
   cwd(): string
@@ -185,10 +187,11 @@ function extractLine(text: string, needle: string): string {
 // message into its own live inbox, standing in for a prior live delivery that failed and released its
 // message back to unread. The lead's later live send then drives the revive-unread-injection path,
 // which must drain this backlog to zero. The inbox is located from OUR run's runtime tree so the seed
-// lands in the exact inbox team-core minted (never a guessed path).
+// lands in the exact inbox team-core minted (never a guessed path). This runs inside the member, whose
+// engine resolved the task state dir from this same process env.
 function seedDuraBacklog(cwd: string): void {
   const obsDir = process.env.OMO_TEAM_E2E_OBS
-  const runtimeRoot = join(cwd, ".omo", "senpi-task", "teams", "runtime")
+  const runtimeRoot = join(resolveProjectStateDirectory(cwd, "senpi-task", { env: process.env }), "teams", "runtime")
   if (!existsSync(runtimeRoot)) return
   for (const runId of readdirSync(runtimeRoot)) {
     const inboxDir = join(runtimeRoot, runId, "inboxes", "dura")

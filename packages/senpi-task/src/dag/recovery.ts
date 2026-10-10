@@ -68,6 +68,9 @@ export type DagRecoveryOptions = {
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly stopAdmission?: (runId: DagRunId) => void
   readonly reattach?: (runId: DagRunId, taskId: string) => void
+  // The recovering session's own task depth: resumed nodes spawn one level below it, exactly like
+  // a fresh run's nodes (scheduler `ancestry`), so a child session's workflow cannot reset depth.
+  readonly ancestry?: { readonly depth: number }
 }
 
 export type DagRecovery = {
@@ -84,6 +87,7 @@ type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager"
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly stopAdmission?: (runId: DagRunId) => void
   readonly reattach?: (runId: DagRunId, taskId: string) => void
+  readonly ancestry?: { readonly depth: number }
 }
 
 type RecoveryPendingTerminalResult = {
@@ -107,6 +111,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
     ...(options.stopAdmission === undefined ? {} : { stopAdmission: options.stopAdmission }),
     ...(options.reattach === undefined ? {} : { reattach: options.reattach }),
+    ...(options.ancestry === undefined ? {} : { ancestry: options.ancestry }),
   }
 
   return {
@@ -231,6 +236,7 @@ async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRe
       ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
       ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),
       ...(reattachedTasks.size === 0 ? {} : { preAttachedTasks: reattachedTasks }),
+      ...(context.ancestry === undefined ? {} : { ancestry: context.ancestry }),
       now: context.now,
     })
     const record = await scheduler.run()
@@ -277,7 +283,7 @@ async function reconcileNodes(
 
     if (task === undefined && observed.state === "scheduled" && observed.taskId === undefined) {
       const result = await context.taskManager.startOwned(
-        startSpec(journal.snapshot(), observed.id),
+        startSpec(journal.snapshot(), observed.id, context.ancestry?.depth ?? 0),
         taskOwner(journal.snapshot(), observed.id),
       )
       if (result.kind === "residency_denied") {
@@ -509,7 +515,7 @@ function listRunRecords(store: DagFileStore): readonly RecoverableRecord[] {
     .filter((record): record is RecoverableRecord => record !== null)
 }
 
-function startSpec(record: DagRunRecordV1, nodeId: DagNodeId): ManagerStartSpec {
+function startSpec(record: DagRunRecordV1, nodeId: DagNodeId, sessionDepth: number): ManagerStartSpec {
   const node = nodeById(record, nodeId)
   const persisted = persistedNode(record, nodeId)
   return {
@@ -517,7 +523,7 @@ function startSpec(record: DagRunRecordV1, nodeId: DagNodeId): ManagerStartSpec 
     ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
     parent_session_id: record.parentSessionId,
     root_session_id: record.rootSessionId,
-    depth: 1,
+    depth: sessionDepth + 1,
     ...(node.route.kind === "category"
       ? { category: node.route.category }
       : { subagent_type: node.route.agent, ...(node.route.model === undefined ? {} : { model: node.route.model }) }),

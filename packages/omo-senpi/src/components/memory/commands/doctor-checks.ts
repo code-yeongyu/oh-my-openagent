@@ -7,11 +7,11 @@ import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { V1_PERSONA_SEED_SHA256, parseLockRecord, parseMemoryFile, readReflectionParkFile } from "@oh-my-opencode/memory-core"
+import { V1_PERSONA_SEED_SHA256, auditMemoryRepo, isMemoryContentPath, parseLockRecord, readReflectionParkFile, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
 
 import { readReflectionHealth, reflectionParkNextProbeAt, reflectionRemediation } from "../worker"
 import { runGit } from "./repo"
-import { estimateSystemTokens } from "./tokens"
+import { estimateSystemTokens, type SystemTokenEstimate } from "./tokens"
 import { defaultIsProcessAlive, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
 
 export type CheckLevel = "ok" | "warn" | "fail"
@@ -55,16 +55,13 @@ export function checkRepository(identity: MemoryCommandIdentity): DoctorCheck {
   return { name: "repository", level: "ok", detail: identity.identityPaths.repo }
 }
 
-export async function checkFrontmatter(repoDir: string): Promise<DoctorCheck[]> {
-  const paths = await listMarkdown(repoDir, "")
-  const failures: string[] = []
-  for (const path of paths) {
-    try {
-      parseMemoryFile(await readFile(join(repoDir, path), "utf8"))
-    } catch (error) {
-      failures.push(`${path} (${error instanceof Error ? error.message : String(error)})`)
-    }
-  }
+export async function checkFrontmatter(repoDir: string, audit?: MemoryAuditReport): Promise<DoctorCheck[]> {
+  // Only the frontmatter contract (the set the pre-commit hook validates); root files such as
+  // ARCHIVE.md and notes/ are outside it.
+  const paths = (await listMarkdown(repoDir, "")).filter(isMemoryContentPath)
+  const failures = (audit ?? await auditMemoryRepo(repoDir)).issues
+    .filter((issue) => issue.code === "frontmatter_invalid")
+    .map((issue) => `${issue.path} (${issue.detail})`)
 
   const frontmatter: DoctorCheck = failures.length === 0
     ? { name: "frontmatter", level: "ok", detail: `${paths.length} memory file${paths.length === 1 ? "" : "s"} valid` }
@@ -181,6 +178,15 @@ export async function checkWorktrees(
   }
 }
 
+/** Reconciliation already discarded an interrupted launch's worktree; nothing is left to dispose of. */
+async function isInterruptedLaunch(sentinel: string): Promise<boolean> {
+  try {
+    return (JSON.parse(await readFile(sentinel, "utf8")) as { reason?: unknown }).reason === "launch_interrupted"
+  } catch {
+    return false
+  }
+}
+
 export async function checkAbandonedRuns(reflectionDir: string): Promise<DoctorCheck> {
   const runsDir = join(reflectionDir, "runs")
   let entries
@@ -189,10 +195,12 @@ export async function checkAbandonedRuns(reflectionDir: string): Promise<DoctorC
   } catch {
     return { name: "abandoned-runs", level: "ok", detail: "no abandoned runs" }
   }
-  const abandoned = entries
-    .filter((entry) => entry.isDirectory() && existsSync(join(runsDir, entry.name, "abandoned.json")))
-    .map((entry) => join(runsDir, entry.name))
-    .sort()
+  const abandoned: string[] = []
+  for (const entry of entries) {
+    const sentinel = join(runsDir, entry.name, "abandoned.json")
+    if (entry.isDirectory() && existsSync(sentinel) && !(await isInterruptedLaunch(sentinel))) abandoned.push(join(runsDir, entry.name))
+  }
+  abandoned.sort()
   if (abandoned.length === 0) return { name: "abandoned-runs", level: "ok", detail: "no abandoned runs" }
   return {
     name: "abandoned-runs",
@@ -244,8 +252,8 @@ async function describeReflectionPark(reflectionDir: string): Promise<string> {
   }
 }
 
-export async function checkTokens(repoDir: string, warnTokens: number): Promise<DoctorCheck> {
-  const estimate = await estimateSystemTokens(repoDir)
+export async function checkTokens(repoDir: string, warnTokens: number, estimate?: SystemTokenEstimate): Promise<DoctorCheck> {
+  estimate ??= await estimateSystemTokens(repoDir)
   if (estimate.totalTokens < warnTokens) {
     return {
       name: "tokens",

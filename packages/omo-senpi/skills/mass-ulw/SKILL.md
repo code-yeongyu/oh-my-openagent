@@ -1,6 +1,7 @@
 ---
 name: mass-ulw
 description: "Drives dependency-ordered child work through the native workflow tool, one run per phase with retry/amend/send recovery. Use when the user asks for mass-ulw, a DAG of tasks, or fan-out work where some tasks must wait on others."
+argument-hint: "<task>"
 metadata:
   short-description: Dependency-graph orchestration of child agents
 ---
@@ -22,6 +23,8 @@ Route every node by `category` using the routing table in `references/planning.m
 ## Goal before start
 
 Every run is goal-bound. In a standalone run, register the goal as written (`create_goal`, or a `# Goal` block where no goal tool exists). Under `ulw-loop` or `ulw-execute`, the loop's registered goal already covers the run, so register no second goal. The objective names the deliverable the graph produces, and the success criteria carry RESULT VERIFICATION - node and run completion claims are false until proven against captured evidence, the same contract the dag completion directive injects (TREAT AS FALSE UNTIL YOU PROVE IT). The verification wave (references/planning.md) produces the evidence those criteria name; the run ends when the criteria pass, never when the last node reports completion.
+
+Ask a decision only the user can make (scope, spend, anything irreversible) from the main session through the question tool, with header `Authorize` (`권한` in Korean) and `required: true` on the call, before starting the run that depends on it - never from an eval cell or a node prompt. A timed-out, dismissed, or unavailable answer is not an answer, even when the tool result says to continue on your best judgment: do not start that run.
 
 ## Running a dag - eval is the default
 

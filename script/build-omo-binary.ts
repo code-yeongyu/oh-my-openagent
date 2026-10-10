@@ -25,6 +25,7 @@ import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { z } from "zod"
 import { engineSidecarSources, resolvePackageDir, senpiPackageDir, type SidecarSource } from "./engine-sidecar-sources"
+import { CLAUDE_CODE_PIN_REL_PATH, claudeCodePinFor } from "./claude-code-pin"
 import nativeFixture from "./release-binary-native-fixture.json"
 import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
 import { parseBuildInfo, type EngineBuildStamp, type OmoBuildInfo } from "../packages/omo-native/build-info"
@@ -34,19 +35,34 @@ import {
   omoBinaryEngineStamp,
   releaseEngineBuildStamp,
 } from "./engine-build-defines"
+import { desktopEngineTarget, stageCompiledDesktopEngine } from "./release-desktop-engine-target"
+import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
+import { reportEmbeddedPayload } from "./embedded-payload-probe"
 
-export { compileDefinesForOmoBinary }
+export { compileDefinesForOmoBinary, reportEmbeddedPayload }
+export type { EmbeddedPayloadReport } from "./embedded-payload-probe"
+export {
+  EMBEDDED_PAYLOAD_ROOT,
+  embeddedNameForRelPath,
+  relPathForEmbeddedName,
+  RUNTIME_MANIFEST_REL_PATH,
+} from "./embedded-payload-naming"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
-/** Directory name that prefixes every embedded asset name. */
-export const EMBEDDED_PAYLOAD_ROOT = "omo-runtime"
-/** Relative path of the embedded runtime manifest inside the payload root. */
-export const RUNTIME_MANIFEST_REL_PATH = "runtime-manifest.json"
-/** Hard per-binary size budget (150MB). */
-export const MAX_BINARY_BYTES = 150 * 1024 * 1024
+/**
+ * Hard per-binary size budget (160 MiB). It exists to keep the download and install of one
+ * platform binary small: every install, `omo update` and CI smoke fetches the full binary, so
+ * growth is a user-facing cost, not just a storage one. A release that crosses it fails loud
+ * rather than shipping a quietly larger download. Raised from 150 MiB for 5.1.26, when linux-x64
+ * reached 157.6 MB; `reportBinaryHeadroom` warns well before the next crossing.
+ */
+export const MAX_BINARY_BYTES = 160 * 1024 * 1024
+
+/** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
+export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024
 
 export interface NativePrebuild {
   readonly fileStem: "senpi_pty" | "senpi_grep"
@@ -162,18 +178,6 @@ export function loadReleaseBinaryTargets(
 
 export const RELEASE_BINARY_TARGETS = loadReleaseBinaryTargets(nativeFixture)
 
-/** Maps a payload-relative path to the name bun assigns the embedded asset. */
-export function embeddedNameForRelPath(relPath: string): string {
-  return `${EMBEDDED_PAYLOAD_ROOT}/${relPath}`
-}
-
-/** Inverse of {@link embeddedNameForRelPath}; undefined for non-payload assets. */
-export function relPathForEmbeddedName(embeddedName: string): string | undefined {
-  const prefix = `${EMBEDDED_PAYLOAD_ROOT}/`
-  if (!embeddedName.startsWith(prefix)) return undefined
-  return embeddedName.slice(prefix.length)
-}
-
 /** Stamped sibling package.json the engine reads for its version contract. */
 export function createStampedPackageJson(
   omoAiVersion: string,
@@ -269,6 +273,14 @@ export async function buildRuntimeManifest(
   return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, entries }
 }
 
+/**
+ * The embedded runtime-manifest.json. `releaseTarget` names the release asset this binary was built as
+ * (musl / baseline included) so `omo update` fetches the same flavor; it is outside the payload digest.
+ */
+export function runtimeManifestFileContent(manifest: RuntimeManifest, releaseTarget: string): string {
+  return `${JSON.stringify({ marker: "OMO_RUNTIME_MANIFEST_V1", ...manifest, releaseTarget })}\n`
+}
+
 /** Fails loud when a compiled binary exceeds the per-binary size budget. */
 export function assertBinarySizeBudget(
   target: string,
@@ -284,62 +296,23 @@ export function assertBinarySizeBudget(
   }
 }
 
-const EMBEDDED_PROBE_SOURCE = `import { embeddedFiles } from "bun"
-const names = []
-let manifest = null
-for (const file of embeddedFiles) {
-  names.push(file.name)
-  if (file.name.endsWith("${RUNTIME_MANIFEST_REL_PATH}")) manifest = JSON.parse(await file.text())
-}
-console.log(JSON.stringify({ names, manifest }))
-`
-
-export interface EmbeddedPayloadReport {
-  /** Embedded asset names exactly as bun assigned them. */
-  readonly names: readonly string[]
-  /** Payload-relative paths recovered from the embedded names. */
-  readonly relPaths: readonly string[]
-  /** The embedded runtime manifest. */
-  readonly manifest: RuntimeManifest
-}
-
 /**
- * Reports what a staged payload actually embeds, by compiling a host-target
- * probe against the very same `--asset` directory and running it. The probe
- * shares the build's toolchain, so it also catches a bun that silently drops
- * assets (e.g. a stale bun shadowing PATH).
+ * One line per target with its headroom under the budget. Under BINARY_HEADROOM_WARN_BYTES the line is a
+ * GitHub Actions warning annotation, so a target drifting toward the budget shows up on the run summary.
  */
-export function reportEmbeddedPayload(stageDir: string): EmbeddedPayloadReport {
-  const probeRoot = mkdtempSync(join(tmpdir(), "omo-embed-probe-"))
-  try {
-    const probeEntry = join(probeRoot, "probe.ts")
-    const probeBinary = join(probeRoot, "probe")
-    writeFileSync(probeEntry, EMBEDDED_PROBE_SOURCE, "utf8")
-    runCommand(
-      "bun",
-      ["build", "--compile", `--asset=${stageDir}`, probeEntry, "--outfile", probeBinary],
-      probeRoot,
-    )
-    const probed = spawnSync(probeBinary, [], { encoding: "utf8" })
-    if (probed.status !== 0) {
-      throw new Error(`embedded payload probe failed: ${probed.stderr}`)
-    }
-    const parsed = JSON.parse(probed.stdout) as {
-      names: string[]
-      manifest: RuntimeManifest | null
-    }
-    if (parsed.manifest === null) {
-      throw new Error(
-        `embedded payload probe found no runtime manifest (${parsed.names.length} files embedded). The bun on PATH likely predates directory --asset support, which is accepted silently and dropped - resolve a bun >= 1.4 and retry.`,
-      )
-    }
-    const relPaths = parsed.names
-      .map((name) => relPathForEmbeddedName(name))
-      .filter((relPath): relPath is string => relPath !== undefined)
-    return { names: parsed.names, relPaths, manifest: parsed.manifest }
-  } finally {
-    rmSync(probeRoot, { recursive: true, force: true })
-  }
+export function reportBinaryHeadroom(
+  target: string,
+  size: number,
+  options: { readonly maxBytes?: number; readonly warnBytes?: number } = {},
+): string {
+  const maxBytes = options.maxBytes ?? MAX_BINARY_BYTES
+  const warnBytes = options.warnBytes ?? BINARY_HEADROOM_WARN_BYTES
+  const headroom = maxBytes - size
+  const mib = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(2)
+  const detail = `${target}: ${size} bytes, ${mib(headroom)} MiB headroom under the ${mib(maxBytes)} MiB budget`
+  return headroom < warnBytes
+    ? `::warning::release binary near its size budget, ${detail}`
+    : `release binary size ${detail}`
 }
 
 // Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts (locked by build-omo-binary.test.ts).
@@ -433,6 +406,8 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
   for (const entry of target.nativePrebuilds) {
     relPaths.add(nativePrebuildRelPath(entry))
   }
+  const desktopEngine = desktopEngineTarget(target.target).payload
+  if (desktopEngine !== null) relPaths.add(desktopEngine)
   return [...relPaths].sort()
 }
 
@@ -555,13 +530,27 @@ export function stageSidecarPayload(
   stageDir: string,
   omoAiVersion: string,
   buildInfo?: OmoBuildInfo,
+  desktopEngineSourceRoot?: string,
 ): string[] {
   mkdirSync(stageDir, { recursive: true })
   const staged = new Set<string>()
+  // The compiled desktop engine is a required input that only needs a stat and a copy: check it before the plugin
+  // build (a full build-omo-native run with submodule fetches) so a missing payload fails closed at once (#9857).
+  const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
+  if (desktopEngine !== null) staged.add(desktopEngine)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
   writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")
-  for (const source of engineSidecarSources()) stageSource(source, stageDir, staged)
+  const claudeCodePin = claudeCodePinFor(target.target, repoRoot)
+  if (claudeCodePin !== undefined) {
+    writeFileSync(join(stageDir, CLAUDE_CODE_PIN_REL_PATH), claudeCodePin, "utf8")
+    staged.add(CLAUDE_CODE_PIN_REL_PATH)
+  }
+  for (const source of engineSidecarSources()) {
+    const excluded = process.env.OMO_SIDECAR_EXCLUDE
+    if (excluded && (source.to.endsWith(`/node_modules/${excluded}`) || source.to.includes(`/node_modules/${excluded}/`))) continue
+    stageSource(source, stageDir, staged)
+  }
   stagePluginPayload(stageDir, staged)
   for (const entry of target.nativePrebuilds) stageNativePrebuild(entry, stageDir, staged)
   return [...staged].sort()
@@ -610,11 +599,7 @@ export async function buildReleaseBinary(
       buildInfo: options.buildInfo,
       engineBuild: releaseEngineBuildStamp(stamp),
     })
-    writeFileSync(
-      join(stageDir, RUNTIME_MANIFEST_REL_PATH),
-      `${JSON.stringify({ marker: "OMO_RUNTIME_MANIFEST_V1", ...manifest })}\n`,
-      "utf8",
-    )
+    writeFileSync(join(stageDir, RUNTIME_MANIFEST_REL_PATH), runtimeManifestFileContent(manifest, target.target), "utf8")
 
     mkdirSync(outDir, { recursive: true })
     const binaryPath = join(outDir, target.binaryName)
@@ -664,6 +649,7 @@ export async function buildReleaseBinary(
     }
 
     const size = statSync(binaryPath).size
+    console.log(reportBinaryHeadroom(target.target, size))
     const sha256 = sha256OfFile(binaryPath)
     appendFileSync(join(outDir, "SHA256SUMS"), `${sha256}  ${target.binaryName}\n`, "utf8")
     return { target: target.target, binaryPath, sha256, size, manifest }

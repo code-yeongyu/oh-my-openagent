@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { consumeSoulNoticeDelta, SOUL_SCAN_PAGE } from "./watermark"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR: GitCommitAuthor = {
   agentId: "agent-soul-watermark-test",
@@ -18,7 +19,7 @@ const roots: string[] = []
 setDefaultTimeout(WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function fixture(): Promise<{

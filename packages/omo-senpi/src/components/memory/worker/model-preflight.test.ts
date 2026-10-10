@@ -24,6 +24,11 @@ const candidates: MemoryModelChain = [
   { model: "builtin/fallback", thinking: "minimal" },
 ]
 
+function withExtensions(chain: MemoryModelChain): MemoryModelChain {
+  const [first, ...rest] = chain
+  return [{ ...first, loadExtensions: true }, ...rest.map((candidate) => ({ ...candidate, loadExtensions: true as const }))]
+}
+
 async function fixture(body: string): Promise<{
   readonly root: string
   readonly launch: { readonly command: string; readonly prefixArgs: readonly string[] }
@@ -71,11 +76,11 @@ describe("preflightMemoryModels", () => {
     })
   })
 
-  test("#given the same launcher and config mtime #when preflight runs twice #then the child catalog is probed once", async () => {
+  test("#given the same launcher and config mtime #when preflight runs twice #then each child catalog is probed once", async () => {
     // given
     const item = await fixture(`
 import { appendFileSync } from "node:fs"
-appendFileSync(process.env.PROBE_LOG, "probe\\n")
+appendFileSync(process.env.PROBE_LOG, process.argv.includes("--no-extensions") ? "core\\n" : "extensions\\n")
 process.stdout.write("builtin/fallback\\n")
 `)
     const probeLog = join(item.root, "probes.log")
@@ -91,7 +96,7 @@ process.stdout.write("builtin/fallback\\n")
     await preflightMemoryModels(input)
 
     // then
-    expect(await Bun.file(probeLog).text()).toBe("probe\n")
+    expect(await Bun.file(probeLog).text()).toBe("core\nextensions\n")
   })
 
   test("#given a fresh catalog that omits every candidate #when candidates are preflighted #then it degrades to reactive attempts and warns instead of failing closed", async () => {
@@ -110,7 +115,7 @@ process.stdout.write("builtin/fallback\\n")
     })
 
     // then
-    expect(result).toEqual({ kind: "unavailable", candidates })
+    expect(result).toEqual({ kind: "unavailable", candidates: withExtensions(candidates) })
     expect(warnings.join("\n")).toContain("omits every candidate")
   })
 
@@ -135,9 +140,9 @@ process.stdout.write("other/model\\n")
     const cached = await preflightMemoryModels(input)
 
     // then
-    expect(fresh).toEqual({ kind: "unavailable", candidates })
-    expect(cached).toEqual({ kind: "unavailable", candidates })
-    expect(await Bun.file(probeLog).text()).toBe("probe\n")
+    expect(fresh).toEqual({ kind: "unavailable", candidates: withExtensions(candidates) })
+    expect(cached).toEqual({ kind: "unavailable", candidates: withExtensions(candidates) })
+    expect(await Bun.file(probeLog).text()).toBe("probe\nprobe\n")
   })
 
   test("#given a cached negative catalog #when its ttl expires #then preflight probes again and observes newly visible credentials", async () => {
@@ -170,7 +175,8 @@ process.stdout.write(existsSync(process.env.AUTH_READY) ? "builtin/fallback\\n" 
       candidates: [{ model: "builtin/fallback", thinking: "minimal" }],
       rejected: [{ model: "extension-only/primary", cause: "model_not_visible" }],
     })
-    expect(await Bun.file(probeLog).text()).toBe("probe\nprobe\n")
+    // Both catalogs expire together, so each is probed again after the ttl.
+    expect(await Bun.file(probeLog).text()).toBe("probe\nprobe\nprobe\nprobe\n")
   })
 
   test("#given a changed config mtime #when preflight runs again #then it refreshes the child catalog", async () => {
@@ -197,8 +203,8 @@ process.stdout.write("builtin/fallback\\n")
     // when
     await preflightMemoryModels(input)
 
-    // then
-    expect((await Bun.file(probeLog).text()).trim().split("\n")).toHaveLength(2)
+    // then: the omitted candidate probes both catalogs on each run
+    expect((await Bun.file(probeLog).text()).trim().split("\n")).toHaveLength(4)
   })
 
   test("#given a launcher whose grandchild holds the output pipes #when the probe times out #then it degrades without waiting for the grandchild", async () => {

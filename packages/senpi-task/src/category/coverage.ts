@@ -2,13 +2,15 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { DEFAULT_CATEGORIES } from "./builtins"
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
-import { missingChainProviders, parseAvailableModels, resolveAvailableCategoryNames } from "./resolver"
+import { missingChainProviders, parseAvailableModels, resolveAvailableCategoryNames, unlistedProviderModel } from "./resolver"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "./types"
 
 export type UnusableCategory = {
   readonly name: string
   // The chain providers with no model in the registry, in chain order: the ones a /login would fix.
   readonly providers: readonly string[]
+  // The `provider/id` an unlisted gateway or proxy serves for this category: the opt-in pin (#9146).
+  readonly unlistedProviderModel?: string
 }
 
 export type CategoryCoverage = {
@@ -35,12 +37,14 @@ export function resolveCategoryCoverage<TModel extends SenpiModelPort>(
   const names = Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(userCategories)])).sort().filter(enabled)
   return {
     usable: names.filter((name) => usable.has(name)),
-    unusable: names.filter((name) => !usable.has(name)).map((name) => ({
-      name,
-      providers: missingChainProviders(
-        Object.hasOwn(CATEGORY_FALLBACK_CHAINS, name) ? CATEGORY_FALLBACK_CHAINS[name] : [],
-        available.models,
-      ),
-    })),
+    unusable: names.filter((name) => !usable.has(name)).map((name) => {
+      const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, name) ? CATEGORY_FALLBACK_CHAINS[name] : []
+      const optIn = unlistedProviderModel(chain, available.models)
+      return {
+        name,
+        providers: missingChainProviders(chain, available.models),
+        ...(optIn !== undefined ? { unlistedProviderModel: optIn } : {}),
+      }
+    }),
   }
 }

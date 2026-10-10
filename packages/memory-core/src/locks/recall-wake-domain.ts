@@ -17,7 +17,8 @@ import { randomUUID } from "node:crypto"
 import path from "node:path"
 
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "../fs/resilient"
-import { LockContentionError, acquireLock, delay, isLockOwnerProvenDead, releaseLock } from "./acquire"
+import { LockContentionError, acquireLock, isLockOwnerProvenDead, releaseLock } from "./acquire"
+import { delay, lockRetryDelayMs } from "./retry-delay"
 import { createLockRecord, parseLockRecord, type LockRecord } from "./lock-record"
 
 /** Concurrent wakes one machine admits when the caller names no count (`memory.recall.max_concurrent_wakes`). */
@@ -32,7 +33,7 @@ export type RecallWakeLeaseOptions = {
   readonly maxConcurrent?: number
   /** Total time to wait for a slot before {@link RecallWakeBusyError}; 0 means one pass. */
   readonly waitTimeoutMs?: number
-  /** Pause between queue polls while waiting. */
+  /** First pause between queue polls while waiting; later pauses back off from it. */
   readonly retryDelayMs?: number
   readonly signal?: AbortSignal
 }
@@ -67,6 +68,20 @@ let ticketSequence = 0
 /** In-process publication order: a later ticket is never visible before an earlier one. */
 let publishing: Promise<unknown> = Promise.resolve()
 
+export interface RecallWakeTicketFs {
+  readonly readFile?: (filePath: string, encoding: "utf8") => Promise<string>
+  readonly isSharingError?: (error: unknown) => boolean
+}
+
+let ticketFs: RecallWakeTicketFs = {}
+
+/** Test seam for deterministic Windows ticket-sharing coverage; production uses resilient fs. */
+export function setRecallWakeTicketFsForTests(next: RecallWakeTicketFs | undefined): () => void {
+  const previous = ticketFs
+  ticketFs = next ?? {}
+  return () => { ticketFs = previous }
+}
+
 function ticketName(): string {
   ticketSequence = (ticketSequence + 1) % 1_000_000
   const issued = String(Date.now()).padStart(16, "0")
@@ -100,15 +115,25 @@ async function unlinkIfPresent(filePath: string): Promise<void> {
   }
 }
 
+function isTicketReadSharingError(error: unknown): boolean {
+  if (ticketFs.isSharingError !== undefined) return ticketFs.isSharingError(error)
+  if (process.platform !== "win32") return false
+  const code = errorCode(error)
+  return code === "EBUSY" || code === "EPERM" || code === "EACCES"
+}
+
 /** Reaps the head ticket when its owner is proven dead; an unreadable or unparsable ticket keeps its place. */
 async function reapDeadHead(ticketDirectory: string, head: string): Promise<boolean> {
   const ticketPath = path.join(ticketDirectory, head)
   let raw: string
   try {
-    raw = await readFile(ticketPath, "utf8")
+    raw = await (ticketFs.readFile ?? readFile)(ticketPath, "utf8")
   } catch (error) {
     // Gone already: its owner acquired or withdrew between our readdir and this read.
     if (errorCode(error) === "ENOENT") return true
+    // Windows can deny the open while the ticket owner is publishing or withdrawing it. The
+    // unreadable ticket remains the queue head; wait for the next normal poll instead of rejecting.
+    if (isTicketReadSharingError(error)) return false
     throw error
   }
   const owner = parseLockRecord(raw)
@@ -156,7 +181,7 @@ export async function acquireRecallWakeLease(
   try {
     await published
     const record = await createLockRecord(SLOT_PURPOSE)
-    for (;;) {
+    for (let attempt = 0; ; attempt += 1) {
       signal?.throwIfAborted()
       const queue = await listTickets(ticketDirectory)
       const head = queue[0]
@@ -182,7 +207,7 @@ export async function acquireRecallWakeLease(
       }
       const now = Date.now()
       if (now >= deadline) throw new RecallWakeBusyError(now - started, maxConcurrent)
-      await delay(Math.min(retryDelayMs, Math.max(1, deadline - now)), signal)
+      await delay(Math.min(lockRetryDelayMs(attempt, retryDelayMs), Math.max(1, deadline - now)), signal)
     }
   } finally {
     await unlinkIfPresent(path.join(ticketDirectory, name)).catch(() => undefined)

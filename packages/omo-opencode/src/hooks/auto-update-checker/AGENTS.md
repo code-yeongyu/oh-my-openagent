@@ -40,9 +40,8 @@ Registered in `create-session-hooks.ts` as `autoUpdateChecker`. Part of the Sess
 
 ## RELATED
 
-Three `zauc-mocks-*` directories in `src/hooks/` exist specifically to test this hook with mocked dependencies:
+Two `zauc-mocks-*` directories in `src/hooks/` exist specifically to test this hook with mocked dependencies (hook orchestration, including CLI run mode, is covered by `hook.test.ts` here):
 - `zauc-mocks-cache/` -- tests cache invalidation paths
-- `zauc-mocks-hook/` -- tests hook orchestration with mocked submodules
 - `zauc-mocks-bg/` -- tests background check scheduling
 
 ## CROSS-REFERENCES

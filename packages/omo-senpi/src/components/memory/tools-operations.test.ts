@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { GitMemoryRepo, buildIdentityPaths, parseMemoryFile } from "@oh-my-opencode/memory-core"
@@ -8,7 +7,7 @@ import { GitMemoryRepo, buildIdentityPaths, parseMemoryFile } from "@oh-my-openc
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext } from "./context"
 import { createMemoryTools } from "./tools"
-import { IDENTITY, boundFixture, git, roots, seedFile, textOf } from "./tools.test-support"
+import { IDENTITY, boundFixture, git, seedFile, testRoot, textOf } from "./tools.test-support"
 import { realpathSync } from "node:fs"
 
 describe("memory tool execution", () => {
@@ -58,8 +57,7 @@ describe("memory tool execution", () => {
   }, 30_000)
   test("#given no repo exists yet #when the memory tool executes #then it lazily initializes with hooks and seeds", async () => {
     // given
-    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-senpi-memory-lazy-init-")))
-    roots.push(root)
+    const root = realpathSync.native(await testRoot("omo-senpi-memory-lazy-init-"))
     const identityPaths = buildIdentityPaths(root, IDENTITY)
     const binding = createMemoryBinding({ identity: IDENTITY, repoPath: identityPaths.repo, boundAt: Date.now() })
     const context = createMemoryIdentityContext({ identity: IDENTITY, identityPaths, binding })

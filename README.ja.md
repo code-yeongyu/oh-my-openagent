@@ -1,6 +1,6 @@
 > [!NOTE]
 > **OmO ベータ: OmO ❤️ Pi**
-> `bun add -g omo-ai` でインストールしてください。メモリシステム、CodeMode、Anthropic サブスクリプションにすべて対応しています。
+> `curl -fsSL https://get.omo.dev/install.sh | bash` でインストールしてください。メモリシステム、CodeMode、Anthropic サブスクリプションにすべて対応しています。
 > [![OmO Herdr DAG - live OmO workflow DAGs in a Herdr side pane](./.github/assets/omo-herdr-dag.png)](https://github.com/jc01rho/omo-herdr-dag)
 > *プロンプトに "mass ulw" と入れるだけ。あなたはもうグラフエンジニアリングのマスター。マルチモデルの ultracode を、より良いメモリシステムとともに。(右側のパネルは [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag) です)*
 
@@ -35,7 +35,7 @@
 **Your tool for real work. But it's an agent.**
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
-[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/omo-ai)
+[![downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fdownloads&style=flat-square)](https://omo.dev)
 [![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
@@ -52,11 +52,11 @@ OmO は、あなたのトークンを完成した成果に変える `omo` コマ
 ## インストール
 
 ```bash
-bun add -g omo-ai
+curl -fsSL https://get.omo.dev/install.sh | bash
 omo
 ```
 
-bun がない場合は `npm i -g omo-ai` でも動きます。パッケージ名は `omo-ai` です。npm にある `omo` パッケージは無関係の別物です。
+Windows では PowerShell で `irm https://get.omo.dev/install.ps1 | iex` を実行してください。OS と CPU に合ったネイティブの `omo` を `~/.local/bin` に入れ、リリースのチェックサムで検証します。パッケージマネージャーを使いたい場合は `bun add -g omo-ai`(または `npm i -g omo-ai`)で同じ OmO が入ります。パッケージ名は `omo-ai` です。npm にある `omo` パッケージは無関係の別物です。Windows CMD、`PATH` の直し方、更新とアンインストールは [omo.dev/docs/install](https://omo.dev/docs/install) で説明しています。
 
 プロジェクトを開いて `omo` を実行し、やることを伝えてください。セットアップはそれだけです。
 
@@ -88,6 +88,7 @@ OpenCode 版や LazyCodex から移行する場合は、`omo setup` を一度実
 - [OpenCode からの移行](docs/guide/migrating-from-opencode.md)
 - [設定リファレンス](docs/reference/configuration.md)
 - [機能一覧](docs/reference/features.md)
+- [コンピューター操作](docs/guide/computer-use.md)（実験的機能）
 - [Ultrawork マニフェスト](docs/manifesto.md)
 
 ## レビュー

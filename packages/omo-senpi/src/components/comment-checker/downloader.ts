@@ -4,6 +4,8 @@ import { join } from "node:path"
 import {
   COMMENT_CHECKER_RELEASE_VERSION,
   commentCheckerBinaryName,
+  isCachedCommentCheckerCurrent,
+  recordCachedCommentCheckerRelease,
   resolveCommentCheckerReleaseAsset,
 } from "@oh-my-opencode/comment-checker-core"
 import {
@@ -29,7 +31,7 @@ export async function downloadSenpiCommentCheckerBinary(options: SenpiCommentChe
 
   const cacheDir = options.cacheDir ?? defaultCommentCheckerCacheDir(platform)
   const binaryPath = join(cacheDir, commentCheckerBinaryName(platform))
-  if (existsSync(binaryPath)) return binaryPath
+  if (existsSync(binaryPath) && isCachedCommentCheckerCurrent(cacheDir)) return binaryPath
 
   const url = options.resolveAssetUrl?.(asset) ?? asset.url
   const archivePath = join(cacheDir, asset.assetName)
@@ -47,6 +49,7 @@ export async function downloadSenpiCommentCheckerBinary(options: SenpiCommentChe
       options.logger.warn("omo-senpi comment-checker archive did not contain the expected binary", { archivePath, binaryPath })
       return null
     }
+    recordCachedCommentCheckerRelease(cacheDir)
     return binaryPath
   } catch (error) {
     options.logger.warn("omo-senpi comment-checker download failed", {

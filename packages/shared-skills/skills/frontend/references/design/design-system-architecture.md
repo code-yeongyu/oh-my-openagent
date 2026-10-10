@@ -128,7 +128,7 @@ Document reusable patterns before implementation for greenfield work, and as the
 - **Spacing**: which tokens
 - **States**: default, hover, active, focus, disabled, loading, empty, error
 - **Accessibility**: keyboard, ARIA, contrast
-- **Motion**: entry/exit animations
+- **Motion**: entry/exit animations; a borrowed mechanism names its source (catalog, component, URL, reduced-motion path)
 - **Layout**: spatial primitive (stack / cluster / sidebar / grid / shell…) and, if the component scrolls or pins anything, its scroll owner
 
 Greenfield starts with the primitives you are about to build, assembled from
@@ -246,7 +246,7 @@ After every component implementation, check:
 - [ ] Radii come from the Section 7 scale; nested corners are concentric.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 - [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
-- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 375px with no horizontal scroll of primary content.
+- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 390px with no horizontal scroll of primary content.
 
 ## Memory Management
 

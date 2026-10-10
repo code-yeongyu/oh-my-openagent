@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
-import { markRecordLostForReconciliation, type TaskRecord } from "../state"
-import { delay, nowIso, type LifecycleContext } from "./context"
+import { markRecordLostForReconciliation, transitionTaskRecord, type TaskRecord, type TaskTransitionAudit } from "../state"
+import { nowIso, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
 
@@ -24,7 +24,7 @@ export async function terminateOldRpc(context: LifecycleContext, record: TaskRec
   if (pid === undefined || !context.signaller.isAlive(pid)) return true
   context.signaller.signal(pid, "SIGTERM")
   context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
-  await delay(context.orphanKillDelayMs)
+  await context.hostRetry.wait(context.orphanKillDelayMs)
   if (context.signaller.isAlive(pid)) {
     context.signaller.signal(pid, "SIGKILL")
     context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })
@@ -37,17 +37,29 @@ export function rollbackOrDeferred(
   taskId: string,
   residency: SuspendedResidency,
   successReason: ReconcileDeferredReason,
+  claim?: TaskRecord,
 ): ReconcileOutcome {
-  return rollbackClaim(context, taskId, residency)
+  return rollbackClaim(context, taskId, residency, claim)
     ? deferred(taskId, successReason)
     : deferred(taskId, "rollback_failed")
 }
 
-function rollbackClaim(context: LifecycleContext, taskId: string, residency: SuspendedResidency): boolean {
+/**
+ * Whether `fresh` is still held by the very claim `claim` took. Another revival in this process (same
+ * host pid) that claimed and attached the task since - at a later epoch, or at the same one when it
+ * revived an interrupted or terminal task - holds a different claim and is never undone by this one.
+ */
+export function holdsClaim(context: LifecycleContext, fresh: TaskRecord, claim: TaskRecord | undefined): boolean {
+  if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident") return false
+  if (claim === undefined) return true
+  return fresh.notification.run_epoch === claim.notification.run_epoch && fresh.residency_claim === claim.residency_claim
+}
+
+function rollbackClaim(context: LifecycleContext, taskId: string, residency: SuspendedResidency, claim: TaskRecord | undefined): boolean {
   try {
     context.store.mutate(taskId, (fresh) => {
-      if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident") return fresh
-      const { host_pid: _hostPid, ...withoutHost } = fresh
+      if (!holdsClaim(context, fresh, claim)) return fresh
+      const { host_pid: _hostPid, residency_claim: _released, ...withoutHost } = fresh
       if (residency === "rpc_detached") {
         return { ...withoutHost, residency_state: residency, updated_at: nowIso(context) }
       }
@@ -68,7 +80,7 @@ function rollbackClaim(context: LifecycleContext, taskId: string, residency: Sus
 export async function markLost(context: LifecycleContext, record: TaskRecord, message: string): Promise<void> {
   let applied = false
   context.store.mutate(record.task_id, (fresh) => {
-    if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident") return fresh
+    if (!holdsClaim(context, fresh, record.residency_claim === undefined ? undefined : record)) return fresh
     const result = markRecordLostForReconciliation(fresh, {
       timestamp: nowIso(context),
       error_message: message,
@@ -81,4 +93,16 @@ export async function markLost(context: LifecycleContext, record: TaskRecord, me
   if (!applied) return
   context.store.appendEvent(record.task_id, { type: "reconcile_lost", payload: { reason: message } })
   await destroyResidentTask(context, record.task_id, "reconcile_lost")
+}
+
+/** Dispose a terminal record this revival claimed, unless another revival has claimed it since. */
+export function disposeClaimed(context: LifecycleContext, claim: TaskRecord): void {
+  let audit: TaskTransitionAudit | undefined
+  context.store.mutate(claim.task_id, (fresh) => {
+    if (!holdsClaim(context, fresh, claim)) return fresh
+    const result = transitionTaskRecord(fresh, { type: "dispose", timestamp: nowIso(context) })
+    audit = result.audit
+    return result.applied ? result.record : fresh
+  })
+  if (audit !== undefined) context.store.appendEvent(claim.task_id, { type: audit.type, payload: audit })
 }

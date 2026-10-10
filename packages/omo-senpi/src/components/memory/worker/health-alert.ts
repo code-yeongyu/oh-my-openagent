@@ -10,6 +10,7 @@ import {
 } from "./entry-renderers"
 import { childFailureCause } from "./failure-detail"
 import { readReflectionHealth } from "./health"
+import { isModelUnreachableDetail } from "./memory-model-attempts"
 import { reflectionRemediation } from "./remediation"
 import type { ReflectionLauncher } from "./launcher-identity"
 
@@ -97,6 +98,8 @@ export async function emitReflectionHealthAlert(
   if (health.streak < 3 || health.fingerprint.length === 0) return false
   if (health.recentFailureFingerprints.filter((item) => item === health.fingerprint).length < 2) return false
   if (context !== undefined && !context.observedRunIds.some((runId) => (health.streakRunIds ?? []).includes(runId))) return false
+  // A definitive model miss parks on its first failure; the park alert is its one notice.
+  if (isModelUnreachableDetail(health.lastFailure?.detail)) return false
   if (!once(`${live.sessionId}:${health.fingerprint}`)) return false
   const failure = health.lastFailure
   const recommendation = reflectionRemediation(failure?.reason, failure?.detail)

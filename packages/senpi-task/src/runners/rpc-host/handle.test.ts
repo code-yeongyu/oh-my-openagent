@@ -5,6 +5,7 @@ import { classifySessionExit, type SessionExitClassification, type SessionExitIn
 import { openHostSessionHandle } from "./handle.test-support"
 import type { HostSessionParked } from "./session-client"
 import { sessionClientHarness } from "./session-client.test-support"
+import { TRANSPORT_LOST_REASON } from "./transport-recovery"
 
 const harness = sessionClientHarness()
 const { fakeHost, hostClient } = harness
@@ -49,9 +50,9 @@ const MAPPING_ROWS: readonly MappingRow[] = [
   },
   {
     given: "the connection to the daemon is lost under a live session",
-    then: "the exit is crashed with a transport_gone tail",
+    then: "the exit is crashed with a transport lost tail",
     input: { cause: { kind: "transport_gone" }, intent: "running" },
-    expected: { disposition: "exit", outcome: { kind: "crashed", facts: facts("transport_gone") } },
+    expected: { disposition: "exit", outcome: { kind: "crashed", facts: facts(TRANSPORT_LOST_REASON) } },
   },
   {
     given: "the session never opened",
@@ -64,27 +65,27 @@ const MAPPING_ROWS: readonly MappingRow[] = [
   },
   {
     given: "the daemon parks an idle session",
-    then: "it is not an exit at all",
+    then: "it is not an exit, and the cause is the idle sweep",
     input: { cause: { kind: "session_parked" }, intent: "running" },
-    expected: { disposition: "parked" },
+    expected: { disposition: "parked", cause: "idle_evicted" },
   },
   {
     given: "a handoff parks the session",
-    then: "it is not an exit at all",
+    then: "it is not an exit, and the cause is the handoff",
     input: { cause: { kind: "session_closed", reason: "handoff_parked" }, intent: "running" },
-    expected: { disposition: "parked" },
+    expected: { disposition: "parked", cause: "handoff_parked" },
   },
   {
     given: "the idle sweep evicts the session",
-    then: "it is not an exit at all",
+    then: "it is not an exit, and the cause is the idle sweep",
     input: { cause: { kind: "session_closed", reason: "idle_evicted" }, intent: "running" },
-    expected: { disposition: "parked" },
+    expected: { disposition: "parked", cause: "idle_evicted" },
   },
   {
     given: "the idle sweep evicts a session a terminate is already closing",
     then: "parking still wins over the terminate intent",
     input: { cause: { kind: "session_closed", reason: "idle_evicted" }, intent: "terminated" },
-    expected: { disposition: "parked" },
+    expected: { disposition: "parked", cause: "idle_evicted" },
   },
 ]
 
@@ -136,7 +137,7 @@ describe("createHostSessionHandle over a daemon session", () => {
     await client.getState()
 
     // then
-    expect(parked).toEqual([{ sessionId: "routing-1", sessionPath: "/tmp/sessions/b.jsonl" }])
+    expect(parked).toEqual([{ sessionId: "routing-1", sessionPath: "/tmp/sessions/b.jsonl", reason: "idle_evicted" }])
     expect(handle.exitOutcome()).toBeUndefined()
     expect(handle.attached).toBe(false)
     await handle.dispose()
@@ -178,7 +179,7 @@ describe("createHostSessionHandle over a daemon session", () => {
 
     // then
     await expect(started).rejects.toMatchObject({ code: "rpc_transport_gone" })
-    expect(await handle.waitForExit()).toEqual({ kind: "crashed", facts: facts("transport_gone") })
+    expect(await handle.waitForExit()).toEqual({ kind: "crashed", facts: facts(TRANSPORT_LOST_REASON) })
     expect((await handle.waitForOutcome()).status).toBe("error")
     expect(handle.attached).toBe(false)
     await handle.dispose()

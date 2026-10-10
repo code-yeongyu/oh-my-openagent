@@ -1,17 +1,16 @@
+import { randomUUID } from "node:crypto"
+
 import type { TaskRecord } from "../state"
 import { log } from "@oh-my-opencode/utils"
 
 import { acquireSessionAdmissionLease, type AdmissionLeaseTiming } from "./admission-lease"
+import { isRevivalCandidate, isUnboundedResidency, residentsOf, selectRevivalBatch } from "./revival-selection"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
+import { parkHandlelessResident } from "./park-terminal-resident"
 import { suspendHandle } from "./shutdown"
 import type { AdmissionResult } from "./types"
-
-// Both the "unlimited" literal and a 0 cap mean unbounded residency (omo.json accepts either).
-function isUnbounded(maxChildren: number | "unlimited"): maxChildren is "unlimited" | 0 {
-  return maxChildren === "unlimited" || maxChildren === 0
-}
 
 /**
  * Residency cap gate (codex residency contract). A resident is a spawned-not-disposed child of the
@@ -23,7 +22,7 @@ function isUnbounded(maxChildren: number | "unlimited"): maxChildren is "unlimit
 export async function admitResident(context: LifecycleContext, parentSessionId: string): Promise<AdmissionResult> {
   const residents = residentsFor(context, parentSessionId)
   const maxChildren = context.config.residency_max_children
-  if (isUnbounded(maxChildren) || residents.length < maxChildren) return { kind: "admitted" }
+  if (isUnboundedResidency(maxChildren) || residents.length < maxChildren) return { kind: "admitted" }
 
   const victim = lruEvictable(context, residents)
   if (victim === undefined) {
@@ -44,9 +43,7 @@ export async function admitResident(context: LifecycleContext, parentSessionId: 
 function residentsFor(context: LifecycleContext, parentSessionId: string): readonly TaskRecord[] {
   // Capacity remains scoped to the parent session for compatibility with the persisted contract.
   // A process-wide cap needs a host registry shared by all session engines and is follow-up work.
-  return context.store
-    .list()
-    .records.filter((record) => record.parent_session_id === parentSessionId && record.residency_state === "resident")
+  return residentsOf(context.store.list().records, parentSessionId)
 }
 
 /** Reclaim terminal residents that have not been touched during the idle retention window. */
@@ -60,39 +57,44 @@ export async function reclaimIdleResidents(context: LifecycleContext): Promise<r
       Date.parse(record.updated_at) <= cutoff &&
       !context.registry.hasPendingSends(record.task_id),
   )
-  const reclaimed: string[] = []
-  for (const candidate of candidates) {
-    // Reuse send/teardown arbitration across suspension's asynchronous abort and dispose.
-    if (context.registry.tryClaimEviction?.(candidate.task_id) === false) continue
-    try {
-      const fresh = context.store.load(candidate.task_id)
-      if (
-        fresh === null ||
-        fresh.residency_state !== "resident" ||
-        (fresh.host_pid !== context.hostPid && context.registry.get(fresh.task_id) === undefined) ||
-        !TERMINAL_STATUSES.has(fresh.status) ||
-        Date.parse(fresh.updated_at) > cutoff ||
-        context.registry.hasPendingSends(fresh.task_id)
-      ) continue
-      if (fresh.killed === true || fresh.status === "cancelled" || fresh.status === "lost") {
-        await destroyResidentTask(context, fresh.task_id, "cancel")
-      } else {
-        const handle = context.registry.get(fresh.task_id)
-        // Reconciliation owns missing handles; a prior failed dispose is not a successful park.
-        if (handle === undefined) continue
-        await suspendHandle(context, handle, "idle")
-      }
-      reclaimed.push(fresh.task_id)
-    } catch (error) {
-      log("senpi-task idle resident suspension failed", {
-        taskId: candidate.task_id,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    } finally {
-      context.registry.releaseEviction?.(candidate.task_id)
+  // Each resident is reclaimed on its own (omo#9785): one child that is slow to stop never delays the
+  // others, and every teardown step is bounded, so the sweep always settles and the next one runs.
+  const outcomes = await Promise.all(candidates.map((candidate) => reclaimIdleResident(context, candidate, cutoff)))
+  return outcomes.filter((taskId): taskId is string => taskId !== undefined)
+}
+
+async function reclaimIdleResident(context: LifecycleContext, candidate: TaskRecord, cutoff: number): Promise<string | undefined> {
+  // Reuse send/teardown arbitration across suspension's asynchronous abort and dispose.
+  if (context.registry.tryClaimEviction?.(candidate.task_id) === false) return undefined
+  try {
+    const fresh = context.store.load(candidate.task_id)
+    if (
+      fresh === null ||
+      fresh.residency_state !== "resident" ||
+      (fresh.host_pid !== context.hostPid && context.registry.get(fresh.task_id) === undefined) ||
+      !TERMINAL_STATUSES.has(fresh.status) ||
+      Date.parse(fresh.updated_at) > cutoff ||
+      context.registry.hasPendingSends(fresh.task_id)
+    ) return undefined
+    if (fresh.killed === true || fresh.status === "cancelled" || fresh.status === "lost") {
+      await destroyResidentTask(context, fresh.task_id, "cancel")
+    } else {
+      const handle = context.registry.get(fresh.task_id)
+      // Without a handle only the record is parked, and only when nothing can still be running for it;
+      // anything else (a daemon session, a live pid) stays for reconciliation.
+      if (handle === undefined) return parkHandlelessResident(context, fresh, "idle") ? fresh.task_id : undefined
+      await suspendHandle(context, handle, "idle")
     }
+    return fresh.task_id
+  } catch (error) {
+    log("senpi-task idle resident suspension failed", {
+      taskId: candidate.task_id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return undefined
+  } finally {
+    context.registry.releaseEviction?.(candidate.task_id)
   }
-  return reclaimed
 }
 
 export function startIdleResidentReclaimer(
@@ -129,9 +131,6 @@ function lruEvictable(context: LifecycleContext, residents: readonly TaskRecord[
 // batch runs under the per-parent-session admission lease (admission-lease.ts); the critical
 // section contains ONLY record reads and store.mutate claims - no respawn I/O, no filesystem
 // deletion, no process spawning - so it stays short by construction.
-
-const SUSPENDED_RESIDENCIES = new Set(["persisted_only", "rpc_detached"])
-const REVIVABLE_STATUSES = new Set(["pending", "running", "interrupted"])
 
 export type BatchAdmissionDeferral = "capacity" | "lock_contended" | "foreign_live_owner" | "lease_lost"
 
@@ -170,7 +169,7 @@ export function claimResidencySlot(
   const claimed = context.store.mutate(taskId, (fresh) => {
     if (!expect(fresh)) return fresh
     applied = true
-    return { ...fresh, residency_state: "resident", host_pid: context.hostPid, updated_at: nowIso(context) }
+    return { ...fresh, residency_state: "resident", host_pid: context.hostPid, updated_at: nowIso(context), residency_claim: randomUUID() }
   })
   if (claimed === null) return "not_claimable"
   return applied ? "claimed" : "not_claimable"
@@ -202,7 +201,9 @@ export async function admitSuspendedBatch(
     // Bounded wait expired: the WHOLE batch defers, never a throw aborting session start.
     return {
       lease: "lock_contended",
-      outcomes: revivalCandidates(context, parentSessionId, options.excludeTaskIds).map((record) => ({
+      outcomes: context.store.list().records
+        .filter((record) => !options.excludeTaskIds?.has(record.task_id) && isRevivalCandidate(record, parentSessionId))
+        .map((record) => ({
         task_id: record.task_id,
         kind: "deferred",
         reason: "lock_contended",
@@ -214,14 +215,14 @@ export async function admitSuspendedBatch(
   const outcomes: BatchAdmissionOutcome[] = []
   let leaseState: BatchAdmissionResult["lease"] = "acquired"
   try {
-    const candidates = byRevivalPriority(revivalCandidates(context, parentSessionId, options.excludeTaskIds))
     // Residents include live foreign owners; when the configured cap sits below the current
-    // resident count, available clamps to 0 - revive none, keep owned residents, evict nothing.
-    const maxChildren = context.config.residency_max_children
-    const available = isUnbounded(maxChildren)
-      ? candidates.length
-      : Math.max(0, maxChildren - residentsFor(context, parentSessionId).length)
-    const selected = candidates.slice(0, available)
+    // resident count, nothing is selected - revive none, keep owned residents, evict nothing.
+    const { selected, deferred } = selectRevivalBatch(
+      context.store.list().records,
+      parentSessionId,
+      context.config.residency_max_children,
+      options.excludeTaskIds,
+    )
     for (const record of selected) {
       // Holder-side fencing: re-read the lease before EVERY mutation; a displaced holder aborts
       // its batch rather than write under a lease it has lost.
@@ -234,11 +235,7 @@ export async function admitSuspendedBatch(
         const result = claimResidencySlot(
           context,
           record.task_id,
-          (fresh) =>
-            fresh.parent_session_id === parentSessionId &&
-            SUSPENDED_RESIDENCIES.has(fresh.residency_state) &&
-            REVIVABLE_STATUSES.has(fresh.status) &&
-            fresh.killed !== true,
+          (fresh) => isRevivalCandidate(fresh, parentSessionId),
         )
         outcomes.push(
           result === "claimed"
@@ -251,39 +248,11 @@ export async function admitSuspendedBatch(
       }
     }
     // Overflow stays suspended with deferred/capacity - never evicted, never lost.
-    for (const record of candidates.slice(available)) {
+    for (const record of deferred) {
       outcomes.push({ task_id: record.task_id, kind: "deferred", reason: "capacity" })
     }
   } finally {
     lease.release()
   }
   return { lease: leaseState, outcomes }
-}
-
-function revivalCandidates(
-  context: LifecycleContext,
-  parentSessionId: string,
-  excludeTaskIds: ReadonlySet<string> | undefined,
-): readonly TaskRecord[] {
-  return context.store
-    .list()
-    .records.filter(
-      (record) =>
-        !excludeTaskIds?.has(record.task_id) &&
-        record.parent_session_id === parentSessionId &&
-        SUSPENDED_RESIDENCIES.has(record.residency_state) &&
-        REVIVABLE_STATUSES.has(record.status) &&
-        record.killed !== true,
-    )
-}
-
-// Non-terminal suspended records first, then terminal by updated_at DESC (MRU), tie-break
-// task_id ASC. The class boundary always beats recency.
-function byRevivalPriority(records: readonly TaskRecord[]): readonly TaskRecord[] {
-  return [...records].toSorted((left, right) => {
-    const terminality = Number(TERMINAL_STATUSES.has(left.status)) - Number(TERMINAL_STATUSES.has(right.status))
-    if (terminality !== 0) return terminality
-    const recency = right.updated_at.localeCompare(left.updated_at)
-    return recency !== 0 ? recency : left.task_id.localeCompare(right.task_id)
-  })
 }

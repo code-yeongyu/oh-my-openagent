@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join, parse, relative } from "node:path"
-import { migrationReport } from "../bin/lib/doctor-migration.js"
+import { migrationReport, resolveMigrationEnvironment, scanOmoBins, shadowingOmoBins } from "../bin/lib/doctor-migration.js"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { updateTarget } from "../bin/lib/package-paths.js"
 
@@ -54,12 +54,31 @@ function installBunNative(sandbox: Sandbox): void {
   installPackage(join(sandbox.bunRoot, "install", "global", "node_modules"), sandbox.bunBin, "omo-ai", "5.0.0-0.beta.89")
 }
 
+function installBunWindowsNative(sandbox: Sandbox): void {
+  const packageDir = installPackage(join(sandbox.bunRoot, "install", "global", "node_modules"), sandbox.bunBin, "omo-ai", "5.0.0-0.beta.89", false)
+  writeFile(join(sandbox.bunBin, "omo.exe"), "\0Bun launcher")
+  writeFileSync(join(sandbox.bunBin, "omo.bunx"), bunxSidecar(relative(sandbox.bunRoot, join(packageDir, "bin", "omo.js"))))
+}
+
+// The bytes `bun add -g omo-ai` wrote on a windows-latest runner: the target relative to the bin dir's
+// parent in UTF-16LE with backslashes, `"` + NUL, then the `node ` shebang tail and the flags word.
+function bunxSidecar(target: string): Buffer {
+  return Buffer.concat([
+    Buffer.from(`${target.replaceAll("/", "\\")}"\0`, "utf16le"),
+    Buffer.from("6e006f006400650020005a0000000a00000037ab", "hex"),
+  ])
+}
+
 function report(sandbox: Sandbox, pathDirs: string[], extraEnv: Record<string, string> = {}): string[] {
   return migrationReport({
     env: { PATH: pathDirs.join(delimiter), BUN_INSTALL: sandbox.bunRoot, ...extraEnv },
     homeDir: sandbox.home,
     platform: "linux",
   }, RESTORE)
+}
+
+function resolveEnv(sandbox: Sandbox, pathDirs: string[]) {
+  return resolveMigrationEnvironment({ env: { PATH: pathDirs.join(delimiter), BUN_INSTALL: sandbox.bunRoot }, platform: "linux", homeDir: sandbox.home })
 }
 
 afterEach(() => {
@@ -119,6 +138,75 @@ describe("omo doctor migration checks", () => {
       writeFile(join(foreignDir, "omo"), "#!/bin/sh\necho other\n")
 
       expect(report(sandbox, [sandbox.bunBin, foreignDir])).toEqual([])
+    })
+  })
+
+  describe("#given Bun's Windows omo.exe points at omo-ai through its .bunx sidecar", () => {
+    test("#then it is native and a preceding legacy omo.cmd remains the only shadowing entry", () => {
+      const sandbox = createSandbox()
+      const legacyBin = join(sandbox.root, "legacy-bin")
+      const legacyEntry = installPackage(join(sandbox.npmPrefix, "node_modules"), legacyBin, "oh-my-openagent", "4.19.4", false)
+      writeFile(join(legacyBin, "omo.cmd"), `@echo off\nnode "${join(legacyEntry, "bin", "omo.js")}" %*\n`)
+      installBunWindowsNative(sandbox)
+
+      const bins = scanOmoBins({
+        isWindows: true,
+        pathDirectories: [legacyBin, sandbox.bunBin],
+        npmPrefixes: [],
+        bunRoot: sandbox.bunRoot,
+        opencodeConfigFiles: [],
+      })
+
+      expect(bins).toEqual([
+        {
+          binPath: join(legacyBin, "omo.cmd"),
+          directory: legacyBin,
+          owner: { name: "oh-my-openagent", version: "4.19.4" },
+          kind: "legacy",
+        },
+        {
+          binPath: join(sandbox.bunBin, "omo.exe"),
+          directory: sandbox.bunBin,
+          owner: { name: "omo-ai", version: "5.0.0-0.beta.89" },
+          kind: "native",
+        },
+      ])
+      expect(shadowingOmoBins(bins)).toEqual([bins[0]])
+    })
+
+    test("#then a legacy home-root install the sidecar reaches through ..\\node_modules is native too", () => {
+      const sandbox = createSandbox()
+      const packageDir = installPackage(join(sandbox.home, "node_modules"), sandbox.bunBin, "omo-ai", "5.0.0", false)
+      const bunBin = join(sandbox.home, ".bun", "bin")
+      writeFile(join(bunBin, "omo.exe"), "\0Bun launcher")
+      writeFileSync(join(bunBin, "omo.bunx"), bunxSidecar(relative(dirname(bunBin), join(packageDir, "bin", "omo.js"))))
+
+      const bins = scanOmoBins({ isWindows: true, pathDirectories: [bunBin], npmPrefixes: [], bunRoot: sandbox.bunRoot, opencodeConfigFiles: [] })
+
+      expect(bins.map(({ kind, owner }) => ({ kind, owner }))).toEqual([{ kind: "native", owner: { name: "omo-ai", version: "5.0.0" } }])
+    })
+  })
+
+  describe("#given a legacy Bun global install under the user home", () => {
+    test("#then its update target uses Bun when either Bun lockfile owns the home root", () => {
+      const home = String.raw`C:\Users\omo user`
+      const expected = {
+        manager: "bun",
+        command: "bun add -g omo-ai",
+        argv: ["bun", "add", "-g", "omo-ai"],
+      }
+      for (const lockfile of ["bun.lock", "bun.lockb"]) {
+        expect(updateTarget(`${home}\\node_modules\\omo-ai`, "win32", "5.0.0", home, (path) => String(path).endsWith(lockfile))).toEqual(expected)
+      }
+    })
+
+    test("#then an npm install in the home root keeps the npm update target without a Bun lockfile", () => {
+      const home = String.raw`C:\Users\omo user`
+      expect(updateTarget(`${home}\\node_modules\\omo-ai`, "win32", "5.0.0", home, () => false)).toEqual({
+        manager: "npm",
+        command: "npm i -g omo-ai",
+        argv: ["npm", "i", "-g", "omo-ai"],
+      })
     })
   })
 
@@ -257,6 +345,91 @@ describe("omo doctor migration checks", () => {
     })
   })
 
+  describe("#given a standalone omo release binary on PATH", () => {
+    const BINARY = Buffer.concat([Buffer.from("\x7fELF-omo"), Buffer.alloc(200_000, 7), Buffer.from("tail")])
+
+    function provision(sandbox: Sandbox, version: string, bytes: Buffer = BINARY): string {
+      const provisioned = join(sandbox.home, ".omo", "binary-runtime", version, "omo")
+      writeFile(provisioned, "")
+      writeFileSync(provisioned, bytes)
+      return provisioned
+    }
+
+    function installStandalone(sandbox: Sandbox, bytes: Buffer = BINARY): string {
+      const dir = join(sandbox.root, "local-bin")
+      writeFile(join(dir, "omo"), "")
+      writeFileSync(join(dir, "omo"), bytes)
+      return dir
+    }
+
+    test("#then a copy of the provisioned binary ahead of omo-ai is reported as an OmO install, not an unknown file", () => {
+      const sandbox = createSandbox()
+      provision(sandbox, "5.0.1")
+      const standaloneDir = installStandalone(sandbox)
+      installBunNative(sandbox)
+
+      const lines = report(sandbox, [standaloneDir, sandbox.bunBin])
+
+      expect(lines.some((line) => line.includes("unknown owner"))).toBe(false)
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toStartWith(`WARN more than one OmO install is on PATH: ${join(standaloneDir, "omo")} (standalone omo binary 5.0.1) runs when you type omo`)
+      expect(lines[0]).toContain("omo-ai@5.0.0-0.beta.89")
+      expect(lines[0]).toContain(`BUN_INSTALL='${sandbox.bunRoot}' bun remove -g omo-ai`)
+    })
+
+    test("#then omo-ai ahead of the standalone binary names omo-ai as the one that runs", () => {
+      const sandbox = createSandbox()
+      provision(sandbox, "5.0.1")
+      const standaloneDir = installStandalone(sandbox)
+      installBunNative(sandbox)
+
+      const lines = report(sandbox, [sandbox.bunBin, standaloneDir])
+
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toContain("(omo-ai@5.0.0-0.beta.89) runs when you type omo")
+      expect(lines[0]).toContain(`rm -f -- '${join(standaloneDir, "omo")}'`)
+    })
+
+    test("#then a symlink into binary-runtime is standalone even with no copy elsewhere", () => {
+      const sandbox = createSandbox()
+      const provisioned = provision(sandbox, "5.0.1")
+      const linkDir = join(sandbox.root, "link-bin")
+      mkdirSync(linkDir, { recursive: true })
+      symlinkSync(provisioned, join(linkDir, "omo"))
+
+      expect(scanOmoBins(resolveEnv(sandbox, [linkDir]))[0]).toMatchObject({ kind: "standalone", owner: { version: "5.0.1" } })
+      expect(report(sandbox, [linkDir])).toEqual([])
+    })
+
+    test("#then a same-size file with different bytes stays foreign", () => {
+      const sandbox = createSandbox()
+      provision(sandbox, "5.0.1")
+      const other = Buffer.from(BINARY)
+      other[other.length - 1] = 0
+      const dir = installStandalone(sandbox, other)
+      installBunNative(sandbox)
+
+      const lines = report(sandbox, [dir, sandbox.bunBin])
+
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toContain("(unknown owner)")
+    })
+
+    test("#then a foreign omo ahead of the standalone binary points the fix at the binary's directory", () => {
+      const sandbox = createSandbox()
+      provision(sandbox, "5.0.1")
+      const standaloneDir = installStandalone(sandbox)
+      const foreignDir = join(sandbox.root, "custom-bin")
+      writeFile(join(foreignDir, "omo"), "#!/bin/sh\necho other\n")
+
+      const lines = report(sandbox, [foreignDir, standaloneDir])
+
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toStartWith("WARN another omo precedes the standalone omo binary on PATH:")
+      expect(lines[0]).toContain(`move ${standaloneDir} ahead of ${foreignDir}`)
+    })
+  })
+
   describe("#given a clean sandbox with only omo-ai installed", () => {
     test("#then the migration section prints nothing", () => {
       const sandbox = createSandbox()
@@ -379,6 +552,34 @@ describe("omo doctor migration checks", () => {
       )
 
       expect(report(sandbox, [sandbox.bunBin], { npm_config_prefix: sandbox.npmPrefix })).toEqual([])
+    })
+  })
+
+  describe("#given OpenCode edition agent models in the [opencode] block", () => {
+    const withOmoConfig = (config: unknown): Sandbox => {
+      const sandbox = createSandbox()
+      installBunNative(sandbox)
+      writeFile(join(sandbox.home, ".omo", "omo.jsonc"), JSON.stringify(config))
+      return sandbox
+    }
+
+    test("#then one INFO line names each setting under its native key", () => {
+      const sandbox = withOmoConfig({ "[opencode]": { agents: { momus: { model: "zai-coding-plan/glm-5.2" }, oracle: { model: "openai/gpt-5.5" } } } })
+
+      const lines = report(sandbox, [sandbox.bunBin]).filter((line) => line.includes("momus"))
+
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toStartWith("INFO ")
+      for (const token of ["plan-reviewer", "zai/glm-5.2", "oracle", "openai/gpt-5.5"]) expect(lines[0]).toContain(token)
+    })
+
+    test("#then nothing is reported once Native sets them", () => {
+      const sandbox = withOmoConfig({
+        "[opencode]": { agents: { momus: { model: "zai-coding-plan/glm-5.2" } } },
+        "[native]": { agents: { "plan-reviewer": { model: "anthropic/claude-opus-5-5" } } },
+      })
+
+      expect(report(sandbox, [sandbox.bunBin])).toEqual([])
     })
   })
 })

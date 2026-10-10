@@ -5,8 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  REWRITE_TOOL_DESCRIPTION,
-  REWRITE_TOOL_NAME,
   buildRewriteArgs,
   buildRewriteApplyArgs,
   executeRewrite,
@@ -57,20 +55,6 @@ function baseInput(dir: string, overrides: Partial<RewriteInput> = {}): RewriteI
 
 afterEach(() => {
   for (const dir of directories.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
-
-// ---- constants ----
-
-describe("rewrite tool: constants", () => {
-  it("#given the module #when imported #then exports the raw tool name", () => {
-    expect(REWRITE_TOOL_NAME).toBe("rewrite");
-  });
-
-  it("#given the description #when read #then it is the verbatim plan text", () => {
-    expect(REWRITE_TOOL_DESCRIPTION).toBe(
-      "Preview or apply an AST-aware rewrite. The pattern follows the same metavariable rules as `search`; the replacement may only reference metavariables captured by the pattern, and an empty replacement deletes the match. Dry-run is the default. Apply uses a JSON preview followed by a separate `--update-all` process because `sg` cannot safely combine JSON output and mutation. Truncated previews are never applied, and rewrite idempotency is not guaranteed.",
-    );
-  });
 });
 
 // ---- schema ----

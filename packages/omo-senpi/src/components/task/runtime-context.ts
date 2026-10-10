@@ -22,6 +22,7 @@ export interface LiveTaskContext {
     getSessionFile?(): string | undefined
   }
   isIdle?(): boolean
+  isProjectTrusted?(): boolean
 }
 
 // The slice of senpi's ExtensionUIContext the task component drives (setStatus/setWidget power the
@@ -55,6 +56,7 @@ function asParentServiceTier(value: unknown): ParentServiceTier | undefined {
 export class TaskRuntimeContext {
   #cwd: string
   #modelRegistry: ChildModelRegistry | undefined
+  #modelContext: Pick<LiveTaskContext, "model"> | undefined
   #loadedExtensionPaths: readonly string[] = []
   #parentServiceTier: ParentServiceTier | undefined
   #idle = true
@@ -63,12 +65,14 @@ export class TaskRuntimeContext {
   #sessionId: string | undefined
   #sessionFile: string | undefined
   #mode: string | undefined
+  #projectTrusted: boolean | undefined
 
   constructor(cwd: string) {
     this.#cwd = cwd
   }
 
   captureFrom(ctx: LiveTaskContext): void {
+    this.#modelContext = ctx
     if (typeof ctx.cwd === "string" && ctx.cwd.length > 0) this.#cwd = ctx.cwd
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
     if (ctx.loadedExtensionPaths !== undefined) this.#loadedExtensionPaths = ctx.loadedExtensionPaths
@@ -82,6 +86,7 @@ export class TaskRuntimeContext {
       this.#sessionFile = ctx.sessionManager.getSessionFile?.()
     }
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
+    if (typeof ctx.isProjectTrusted === "function") this.#projectTrusted = ctx.isProjectTrusted()
   }
 
   clearUi(): void {
@@ -98,6 +103,14 @@ export class TaskRuntimeContext {
 
   modelRegistry(): ChildModelRegistry | undefined {
     return this.#modelRegistry
+  }
+
+  // Retain the host context's live getter: fallback can replace its model before a queued wake lands.
+  parentModel(): string | undefined {
+    const model = this.#modelContext?.model
+    if (typeof model === "string") return model
+    if (typeof model !== "object" || model === null || !("id" in model)) return undefined
+    return typeof model.id === "string" ? model.id : undefined
   }
 
   loadedExtensionPaths(): readonly string[] {
@@ -124,6 +137,11 @@ export class TaskRuntimeContext {
 
   mode(): string | undefined {
     return this.#mode
+  }
+
+  // The parent session's project-trust decision at the last captured event; undefined until seen.
+  projectTrusted(): boolean | undefined {
+    return this.#projectTrusted
   }
 
   parentState(): ParentState {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
-import { isRoutedTo } from "./session-client"
+import { isRoutedTo, type HostSessionParked } from "./session-client"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 
 const harness = sessionClientHarness()
@@ -37,22 +37,30 @@ describe("HostSessionClient records", () => {
     expect(seen.map((event) => event.type)).toEqual(["agent_end"])
   })
 
-  test("#given a UI request on the session #when it arrives #then a deny answer is on the wire within 50 ms", async () => {
+  test("#given a UI request on the session #when it arrives #then the deny is on the wire before the client's next command", async () => {
     // given
     const host = await fakeHost()
     const client = hostClient(host)
     const opened = await client.open(childOpenInput("/tmp/sessions/l.jsonl"))
     const answered = host.waitForCommand("extension_ui_response")
+    const ingestedPastRequest = new Promise<void>((resolve) => {
+      client.onEvent((event) => {
+        if (event.type === "agent_end") resolve()
+      })
+    })
 
     // when
-    const startedAt = performance.now()
     host.requestUi(opened.sessionId, { id: "ui-1", method: "confirm", title: "Delete?", message: "really?" })
-    const answer = await answered
-    const elapsedMs = performance.now() - startedAt
+    host.emitRecord(opened.sessionId, { type: "agent_end", willRetry: false })
+    await ingestedPastRequest
+    await client.getState()
 
     // then
-    expect(answer.payload).toMatchObject({ type: "extension_ui_response", id: "ui-1", confirmed: false })
-    expect(elapsedMs).toBeLessThan(50)
+    // The record after the request has been delivered, so the request was already ingested; a deny
+    // that waited on anything (a UI timeout, a timer) would reach the host after get_state.
+    const order = host.commands.map((command) => command.type).filter((type) => type === "extension_ui_response" || type === "get_state")
+    expect(order).toEqual(["extension_ui_response", "get_state"])
+    expect((await answered).payload).toMatchObject({ type: "extension_ui_response", id: "ui-1", confirmed: false })
   })
 
   test("#given a question UI request #when it arrives #then the client answers cancelled without blocking its own commands", async () => {
@@ -70,12 +78,12 @@ describe("HostSessionClient records", () => {
     expect((await answered).payload).toMatchObject({ id: "ui-2", cancelled: true })
   })
 
-  test("#given an idle retained session #when the host parks it #then onParked fires and the routing handle is released", async () => {
+  test("#given an idle retained session #when the host parks it #then onParked fires with the idle-sweep cause and the routing handle is released", async () => {
     // given
     const host = await fakeHost()
     const client = hostClient(host)
     const opened = await client.open(childOpenInput("/tmp/sessions/n.jsonl"))
-    const parked: Array<{ readonly sessionId: string; readonly sessionPath: string }> = []
+    const parked: HostSessionParked[] = []
     const seen = new Promise<void>((resolve) => {
       client.onParked((event) => {
         parked.push(event)
@@ -88,7 +96,7 @@ describe("HostSessionClient records", () => {
     await seen
 
     // then
-    expect(parked).toEqual([{ sessionId: opened.sessionId, sessionPath: "/tmp/sessions/n.jsonl" }])
+    expect(parked).toEqual([{ sessionId: opened.sessionId, sessionPath: "/tmp/sessions/n.jsonl", reason: "idle_evicted" }])
     expect(client.sessionId).toBeUndefined()
   })
 

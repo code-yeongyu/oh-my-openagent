@@ -23,6 +23,7 @@ import {
 import { childModelChainSpec, type ChildModelChainSpec } from "../memory-child-model-chain"
 import { resolveReflectionModel, type ReflectionModelCandidate, type ReflectionThinkingLevel } from "../worker/resolve-model"
 import type { KibitzerSidecarChildInput } from "./sidecar"
+import { orderKibitzerCandidatesByConnection } from "./sidecar-connected-order"
 import type { KibitzerWakeConfiguration } from "./sidecar-outcome"
 import { KIBITZER_SIDECAR_TOOL_NAMES } from "./sidecar-prompt"
 import { loadKibitzerTaskRuntime, type KibitzerTaskRuntime } from "./task-runtime"
@@ -76,13 +77,27 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
   if (resolution.source !== undefined) {
     return { kind: "unavailable", category, cause: "beyond_category", ...chainProviders(category, input) }
   }
-  return {
-    kind: "resolved",
+  // A pin wins even when unconnected; the sidecar child could not survive that, so the first
+  // connected candidate leads whenever the availability list can say which one that is (#9216).
+  const order = orderKibitzerCandidatesByConnection({
     category: resolution.category,
+    config: input.config,
+    registry: input.registry,
     model: resolution.model,
     ...(resolution.thinking === undefined ? {} : { thinking: resolution.thinking }),
     fallbacks: resolution.fallbacks,
-    chain: childModelChainSpec({ model: resolution.model, fallbacks: resolution.fallbacks }),
+  })
+  if (order.kind === "none_connected") {
+    return { kind: "unavailable", category, cause: "category_unavailable", missingProviders: order.missingProviders }
+  }
+  const chosen = order.kind === "ordered" ? order : resolution
+  return {
+    kind: "resolved",
+    category: resolution.category,
+    model: chosen.model,
+    ...(chosen.thinking === undefined ? {} : { thinking: chosen.thinking }),
+    fallbacks: chosen.fallbacks,
+    chain: childModelChainSpec({ model: chosen.model, fallbacks: chosen.fallbacks }),
   }
 }
 

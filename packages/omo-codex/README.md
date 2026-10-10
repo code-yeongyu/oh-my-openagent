@@ -88,6 +88,16 @@ The installer does not write a global Codex shell config. On Windows it enables 
 
 To install both editions in one command, use `--platform=both`.
 
+### Subagent model and reasoning
+
+The bundled agent TOMLs ship LazyCodex defaults (currently `gpt-6-astra`). To pick another model per role durably, set it in `~/.omo/omo.jsonc`; every reinstall and marketplace bootstrap re-applies it, and deleting the entry restores the bundled default:
+
+```jsonc
+{ "[codex]": { "agents": { "explorer": { "model": "gpt-6-luna", "reasoning": "low" } } } }
+```
+
+A `model` or `model_reasoning_effort` you edit directly in `~/.codex/agents/<role>.toml` is also kept across updates; a model LazyCodex itself wrote there follows the new bundled default. See [`docs/reference/omo-json.md`](../../docs/reference/omo-json.md#codex-managed-agent-roles).
+
 ### Subagent service tier (explorer/librarian)
 
 The bundled `explorer` and `librarian` agent TOMLs ship with `service_tier = "fast"` so recon subagents run on the cheaper Fast tier by default. To opt out, edit the tier in your installed agent files and the installer will preserve your choice across every reinstall and bootstrap:

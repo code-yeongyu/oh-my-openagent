@@ -102,9 +102,9 @@ The main agent is your session. It runs on your session model (a profile, a pin,
 Recommended models, named plainly:
 
 - **Claude Opus 5.5** (or Claude Fable 5.1). The reference configuration. The orchestration prompt was built against Claude's habit of following long, mechanics-driven instructions.
-- **GPT-6 Astra or GPT-6 Sol**. The GPT-recommended configuration. It gets the GPT-native `gpt-6-astra` prompt preset built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
+- **GPT-6 Astra, GPT-6.1 Sol or GPT-6 Sol**. The GPT-recommended configuration. It gets the GPT-native `gpt-6-astra` prompt preset built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
 
-Kimi K3 and GLM 5.3 are on the Recommended list too, lower down and with lighter validation. Models outside it aren't supported as the main agent. You don't have to choose: with no `model_profile`, a fresh session runs **Recommended** (Opus 5.5, Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6 Sol, GLM 5.3) and takes the first one you have connected. The Daily lanes lead with Claude; Geeky · Normal runs GPT-5.6 Sol and Geeky · Heavy GPT-6 Astra. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
+Kimi K3 and GLM 5.3 are on the Recommended list too, lower down and with lighter validation. Models outside it aren't supported as the main agent. You don't have to choose: with no `model_profile`, a fresh session runs **Recommended** (Opus 5.5, Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol, GLM 5.3) and takes the first one you have connected. The Daily lanes lead with Claude; Geeky · Normal runs GPT-6.1 Sol Fast at medium (then plain GPT-6.1 Sol, and GPT-5.6 Sol where 6.1 Sol isn't served) and Geeky · Heavy GPT-6 Astra at high. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
 
 ### The category worker
 
@@ -180,7 +180,7 @@ Override specific categories or curated agents in `omo.json`:
     "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
 
     // Autonomous research and execution: GPT-6 Astra high, then GPT-5.6 Sol medium
-    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
+    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
     // Creative and design work
     "artistry": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
@@ -188,14 +188,14 @@ Override specific categories or curated agents in `omo.json`:
     // Quick tasks: fast and cheap
     "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
-    // Low-effort fallback: MiMo V2.6 Pro max
-    "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
+    // Low-effort fallback: Claude Sonnet 5.5 medium, then MiMo V2.6 Pro and Grok 4.7
+    "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
     // High-effort fallback: Opus 5, then GLM 5.3 and Kimi K3
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
     // Prose and documentation
-    "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "low" }
+    "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" }
   }
 }
 ```
@@ -204,21 +204,21 @@ Override specific categories or curated agents in `omo.json`:
 
 **Claude-like models** (instruction-following, structured output):
 
-- Claude Fable 5, Claude Opus 5.5, Claude Sonnet 5, Claude Haiku 4.5
+- Claude Fable 5, Claude Opus 5.5, Claude Sonnet 5.5, Claude Sonnet 5, Claude Haiku 5.5
 - Kimi K3: behaves very similarly to Claude
 - GLM 5.2 / 5.3: Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (xhigh), with `gpt-6-astra-fast` as the Fast-mode variant
-- GPT-5.6 Sol: `deep-low` runs it at medium, on the Fast (priority) tier `gpt-5.6-sol-fast` where the OpenAI lanes serve it
+- GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (high), with `gpt-6-astra-fast` as the Fast-mode variant
+- GPT-6.1 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.1-sol-fast`, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; it is also the fourth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Geeky · Normal rung, with plain GPT-6.1 Sol right behind it
 - GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max)
-- GPT-5.6 Terra: balanced mid-tier; second rung in `unspecified-low`
+- GPT-5.6 Terra: balanced mid-tier; an optional override, not part of any default chain
 - GPT 5.6 Luna Fast: fast and cheap; default for `explore` and `librarian`
 
 **Other families**:
 
-- Grok 4.6: default for the `unspecified-low` category (xhigh)
+- Grok 4.7: third rung in the `unspecified-low` category (xhigh)
 - DeepSeek V4.1 Flash (`deepseek-flash`) / V4 Pro: utility rungs in `explore`, `librarian`, `quick`, and `unspecified-low`
 
 See the [Agent-Model Matching Guide](./agent-model-matching.md) for the full chains, safe vs risky overrides, and the tuned-preset list.

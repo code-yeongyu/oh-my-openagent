@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
+import { engineDependencyDir } from "../bin/lib/engine-dependency.js"
 import providerMap from "../bin/lib/provider-map.json"
 import omoNativeManifest from "../package.json"
 
@@ -11,17 +12,9 @@ const senpiPackageRoot = dirname(dirname(senpiEntryPath))
 const senpiManifest = JSON.parse(
   await readFile(join(senpiPackageRoot, "package.json"), "utf8"),
 ) as { version: string }
-const providerRegistryUrl = pathToFileURL(
-  join(
-    senpiPackageRoot,
-    "node_modules",
-    "@earendil-works",
-    "pi-ai",
-    "dist",
-    "providers",
-    "all.js",
-  ),
-).href
+const piAiRoot = engineDependencyDir(senpiPackageRoot, "@earendil-works/pi-ai")
+if (piAiRoot === undefined) throw new Error(`@earendil-works/pi-ai is not resolvable from ${senpiPackageRoot}`)
+const providerRegistryUrl = pathToFileURL(join(piAiRoot, "dist", "providers", "all.js")).href
 const { builtinProviders } = await import(providerRegistryUrl) as {
   builtinProviders(): Array<{ id: string, auth?: { oauth?: unknown } }>
 }

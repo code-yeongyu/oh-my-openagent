@@ -7,7 +7,7 @@ import {
 import { shouldRetryError } from "./model-error-classifier"
 
 describe("provider exhaustion fallback policy", () => {
-  test("#given quota subscription and billing exhaustion #when checked for provider fallback #then they are eligible without weakening legacy stop semantics", () => {
+  test("#given quota subscription and billing exhaustion #when checked for provider fallback #then they are eligible and the model classifier agrees", () => {
     //#given
     const errors = [
       { name: "QuotaExceededError", message: "Quota exceeded for this billing period." },
@@ -22,13 +22,13 @@ describe("provider exhaustion fallback policy", () => {
       signal: classifyProviderExhaustionFallbackSignal(error),
       eligible: isProviderExhaustionFallbackEligible(error),
     }))
-    const legacyRetryResults = errors.map((error) => shouldRetryError(error))
+    const modelRetryResults = errors.map((error) => shouldRetryError(error))
 
     //#then
     expect(providerExhaustionResults).toEqual(
       errors.map(() => ({ signal: "quota_exceeded", eligible: true })),
     )
-    expect(legacyRetryResults).toEqual(errors.map(() => false))
+    expect(modelRetryResults).toEqual(errors.map(() => true))
   })
 
   test("#given hard-stop runtime errors #when checked for provider exhaustion fallback #then they stay ineligible", () => {

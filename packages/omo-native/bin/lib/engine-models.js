@@ -11,13 +11,16 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { parseJsonc } from "./jsonc.js"
+import { engineDependencyDir } from "./engine-dependency.js"
 import { resolveSenpi } from "./package-paths.js"
 
 // The same module the engine's model-runtime.js composes its builtins from
-// (`builtinProviderCatalog.builtinProviders()`), at the path claude-code-floor.js already relies on.
+// (`builtinProviderCatalog.builtinProviders()`), in the pi-ai the engine itself resolves.
 async function builtinCatalog() {
   const { packageRoot } = resolveSenpi()
-  const path = join(packageRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "providers", "all.js")
+  const piAiRoot = engineDependencyDir(packageRoot, "@earendil-works/pi-ai")
+  if (piAiRoot === undefined) throw new Error(`the engine model catalog is missing: @earendil-works/pi-ai is not resolvable from ${packageRoot}`)
+  const path = join(piAiRoot, "dist", "providers", "all.js")
   if (!existsSync(path)) throw new Error(`the engine model catalog is missing at ${path}`)
   return (await import(pathToFileURL(path).href)).builtinProviders()
 }

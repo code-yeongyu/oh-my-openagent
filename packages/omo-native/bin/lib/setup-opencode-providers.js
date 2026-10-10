@@ -9,6 +9,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { literalConfigValue } from "./auth-store.js"
 import { convertPlaceholders, opencodeConfigSources, readOpencodeSection, unconvertedPlaceholder } from "./setup-opencode-assets.js"
+import providerMap from "./provider-map.json" with { type: "json" }
 
 // The AI SDK package an OpenCode provider names decides its wire protocol; each engine api id here
 // speaks the same one (pi-ai compat.js BUILTIN_APIS). Any other package is reported, never guessed.
@@ -38,8 +39,7 @@ function positive(value) {
 }
 
 function builtinProviderIds() {
-  const map = JSON.parse(readFileSync(new URL("./provider-map.json", import.meta.url), "utf8"))
-  return new Set([...map.builtinProviderIds, ...Object.keys(map.providers)])
+  return new Set([...providerMap.builtinProviderIds, ...Object.keys(providerMap.providers)])
 }
 
 // The engine resolves api keys and header values as config values: literal bytes are escaped, and

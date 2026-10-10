@@ -59,20 +59,20 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
+      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-      { providers: ["opencode-go"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-4-5" }
+      { providers: ["opencode-go"], model: "minimax-m2.7" }
     ],
   },
   explore: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
+      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-      { providers: ["opencode-go"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-4-5" }
+      { providers: ["opencode-go"], model: "minimax-m2.7" }
     ],
   },
   "multimodal-looker": {

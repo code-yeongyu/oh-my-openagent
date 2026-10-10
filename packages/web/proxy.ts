@@ -13,6 +13,13 @@ const installationPaths = new Set([
   "docs/installation.md",
 ])
 
+// get.omo.dev sent browsers here before /docs/install existed.
+const installGuidePaths = new Set([
+  "docs/guide/installation",
+  "docs/guide/install",
+  "docs/guide/install.md",
+])
+
 function getLocaleSegment(segment: string | undefined): Locale | null {
   if (!segment) return null
   return locales.find((locale) => locale === segment) ?? null
@@ -26,6 +33,16 @@ function getInstallationDocsPath(pathname: string): string | null {
   if (!installationPaths.has(routeSegments.join("/"))) return null
 
   return locale ? `/${locale}/docs` : "/docs"
+}
+
+function getInstallGuidePath(pathname: string): string | null {
+  const segments = pathname.split("/").filter(Boolean)
+  const locale = getLocaleSegment(segments[0])
+  const routeSegments = locale ? segments.slice(1) : segments
+
+  if (!installGuidePaths.has(routeSegments.join("/"))) return null
+
+  return locale ? `/${locale}/docs/install` : "/docs/install"
 }
 
 export default function proxy(request: NextRequest): NextResponse {
@@ -46,6 +63,12 @@ export default function proxy(request: NextRequest): NextResponse {
     redirectUrl.pathname = installationDocsPath
     redirectUrl.search = ""
     redirectUrl.hash = "installation"
+    shouldRedirect = true
+  }
+
+  const installGuidePath = getInstallGuidePath(request.nextUrl.pathname)
+  if (installGuidePath) {
+    redirectUrl.pathname = installGuidePath
     shouldRedirect = true
   }
 
@@ -72,6 +95,8 @@ export const config = {
     "/installation.md",
     "/:locale(en|ko|ja|zh)/installation.md",
     "/docs/installation.md",
+    "/docs/guide/install.md",
+    "/:locale(en|ko|ja|zh)/docs/guide/install.md",
     "/:locale(en|ko|ja|zh)/docs/installation.md",
   ],
 }

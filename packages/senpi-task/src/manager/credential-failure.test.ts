@@ -80,6 +80,22 @@ describe("runtimeFallbackCandidates", () => {
 
     expect(candidates).toEqual({ remaining: [ZAI_GLM], skipped: [GO_M27] })
   })
+
+  test.each([
+    ["a Claude session limit", "You've hit your session limit \u00b7 resets 3pm (Asia/Seoul)"],
+    ["an OpenCode Go monthly limit", "429 Monthly usage limit reached. It will reset in 2 days 8 hours"],
+    ["a Codex usage limit", '429 {"type":"usage_limit_reached","message":"The usage limit has been reached"}'],
+  ])("#given %s on the first rung #when the candidates are computed #then other providers come first and the spent provider's rungs stay as the last resort", (_label, message) => {
+    const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), message)
+
+    expect(candidates).toEqual({ remaining: [ZAI_GLM, GO_M27], skipped: [], limit: "account" })
+  })
+
+  test("#given a limit that names one model #when the candidates are computed #then the sibling model on the same provider is next", () => {
+    const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), "You've hit your Fable weekly limit \u00b7 resets Oct 2, 9am")
+
+    expect(candidates).toEqual({ remaining: [GO_M27, ZAI_GLM], skipped: [], limit: "model" })
+  })
 })
 
 describe("terminalFailureMessage", () => {
@@ -96,5 +112,28 @@ describe("terminalFailureMessage", () => {
     expect(message).toContain("Provider authentication settings")
     expect(message).toContain("/login opencode-go")
     expect(message).toContain("omo.json")
+  })
+
+  test("#given a single-model lane whose only model hits an account usage limit #when the terminal message is built #then it says the chain is exhausted and how to recover", () => {
+    const astra = { ...rung("chatgpt-subscription", "gpt-6-astra"), display: "GPT-6 Astra" }
+    const limit = `403: {"message":"You've reached your usage limit for this billing cycle.","type":"access_terminated_error"}`
+
+    const message = terminalFailureMessage(record(astra, []), limit)
+
+    expect(message.startsWith(limit)).toBe(true)
+    expect(message).toContain("chatgpt-subscription/gpt-6-astra reached its usage limit, so this task stopped.")
+    expect(message).toContain("No other model in its fallback chain could take over.")
+    expect(message).toContain("omo.json")
+  })
+
+  test("#given a usage limit while fallback rungs remain #when the terminal message is built #then it does not claim the chain is exhausted", () => {
+    const message = terminalFailureMessage(record(GO_M3, [ZAI_GLM]), "You've hit your session limit")
+
+    expect(message).toContain("opencode-go/minimax-m3 reached its usage limit, so this task stopped.")
+    expect(message).not.toContain("No other model")
+  })
+
+  test("#given an ordinary provider error #when the terminal message is built #then it is passed through unchanged", () => {
+    expect(terminalFailureMessage(record(GO_M3, []), "500: upstream connect error")).toBe("500: upstream connect error")
   })
 })

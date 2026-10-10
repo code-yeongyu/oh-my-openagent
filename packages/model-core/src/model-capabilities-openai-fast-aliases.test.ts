@@ -12,6 +12,7 @@ const OPENAI_FAST_ALIASES = [
   { aliasModelID: "gpt-5.6-sol-fast", canonicalModelID: "gpt-5.6-sol" },
   { aliasModelID: "gpt-6-astra-fast", canonicalModelID: "gpt-6-astra" },
   { aliasModelID: "gpt-6-sol-fast", canonicalModelID: "gpt-6-sol" },
+  { aliasModelID: "gpt-6.1-sol-fast", canonicalModelID: "gpt-6.1-sol" },
   { aliasModelID: "gpt-6-luna-fast", canonicalModelID: "gpt-6-luna" },
   { aliasModelID: "gpt-5.6-terra-fast", canonicalModelID: "gpt-5.6-terra" },
   { aliasModelID: "gpt-5.6-luna-fast", canonicalModelID: "gpt-5.6-luna" },
@@ -120,6 +121,7 @@ describe("OpenAI GPT fast capability aliases", () => {
     { providerID: "vercel", modelID: "openai/gpt-5.6-sol-fast:high" },
     { providerID: "openai", modelID: "gpt-6-astra-fast:high" },
     { providerID: "openai", modelID: "gpt-6-sol-fast:high" },
+    { providerID: "openai", modelID: "gpt-6.1-sol-fast:high" },
     { providerID: "openai", modelID: "gpt-6-luna-fast:high" },
   ])("inherits canonical capabilities for suffixed fast alias $providerID/$modelID", ({ providerID, modelID }) => {
     const alias = getModelCapabilities({

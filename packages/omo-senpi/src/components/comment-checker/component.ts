@@ -4,6 +4,7 @@ import { reportToolHookStatus } from "../../extension/tool-hook-status"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { COMMENT_CHECKER_FEEDBACK_HEADER } from "./constants"
 import { downloadSenpiCommentCheckerBinary } from "./downloader"
+import { reportCommentCheckerFailure } from "./failure-notice"
 import { parseToolResultContext, parseToolResultEvent, toApplyPatchHookInputs, toHookInput } from "./hook-input"
 import { resolveSenpiCommentCheckerBinary } from "./resolver"
 import { defaultRunCommentChecker } from "./runner"
@@ -65,7 +66,7 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           },
         })
         const resolvedBinaryPath = await ensuring
-        if (resolvedBinaryPath === null) {
+        if (resolvedBinaryPath === null || inertForSession) {
           return undefined
         }
 
@@ -76,6 +77,12 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           const path = hookInput.tool_input.file_path
           if (typeof path !== "string" || !uniquePaths.includes(path)) continue
           const result = await check({ binaryPath: resolvedBinaryPath, hookInput })
+          if (result.failure !== undefined) {
+            // A checker that cannot start fails the same way on every edit; stop re-running it (#8850).
+            inertForSession = true
+            reportCommentCheckerFailure(ctx.logger, eventContext, resolvedBinaryPath, result.failure)
+            break
+          }
           const message = normalizeFeedbackText(result.message)
           if (result.hasComments && message.length > 0) {
             reportedFilesThisTurn.add(path)

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import {
   compiledBannerLines,
   answerCompiledFastPath,
@@ -11,22 +12,28 @@ import {
   reexecProvisionedRuntime,
   runCompiledLauncher,
   shouldPrintCompiledBanner,
-  updateLine,
   updateHint,
   versionLine,
 } from "../compile-entry"
-import { loadChatGptSubscriptionOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js"
-import { chatgptSubscriptionOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/chatgpt-subscription.js"
-import { chatgptSubscriptionProvider } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/providers/chatgpt-subscription.js"
+import { compiledUpdate, pickUpdateVersion, releaseAssetName, releaseVersionOf, replaceCommand } from "../compiled-update"
+import { engineDependencyDir } from "../bin/lib/engine-dependency.js"
+import { registerEngineRuntimeModules } from "../engine-runtime-modules"
 import {
   isProvisionedExecutable,
   materializeProvisionedExecutable,
   provisionEmbeddedRuntime,
   runningExecutablePath,
   selectRuntimeManifest,
-  shouldReexecAfterProvisioning,
   type EmbeddedManifest,
 } from "../compile-runtime"
+
+const senpiRoot = dirname(dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))))
+const piAiRoot = engineDependencyDir(senpiRoot, "@earendil-works/pi-ai")
+if (piAiRoot === undefined) throw new Error(`@earendil-works/pi-ai is not resolvable from ${senpiRoot}`)
+const importPiAi = (relative: string) => import(pathToFileURL(join(piAiRoot, "dist", relative)).href)
+const { loadChatGptSubscriptionOAuth } = await importPiAi("auth/oauth/load.js")
+const { chatgptSubscriptionOAuth } = await importPiAi("auth/oauth/chatgpt-subscription.js")
+const { chatgptSubscriptionProvider } = await importPiAi("providers/chatgpt-subscription.js")
 
 const roots: string[] = []
 const temp = () => { const root = mkdtempSync(join(homedir(), "omo-compile-entry-test-")); roots.push(root); return root }
@@ -79,7 +86,8 @@ describe("provisioned executable handoff", () => {
 })
 
 describe("compiled OMO OAuth module identity", () => {
-  test("registers the loader in the same nested pi-ai graph used by the provider", async () => {
+  test("registers the loader in the same pi-ai graph senpi resolves for the provider", async () => {
+    await registerEngineRuntimeModules()
     const loadedFlow = await loadChatGptSubscriptionOAuth()
 
     expect(loadedFlow).toBe(chatgptSubscriptionOAuth)
@@ -103,8 +111,6 @@ describe("compiled omo entry launcher parity", () => {
     )
     expect(runningExecutablePath("bun", "/usr/local/bin/bun", "win32")).toBe("/usr/local/bin/bun")
     expect(runningExecutablePath("/runtime/omo", "/usr/local/bin/bun", "darwin")).toBe("/usr/local/bin/bun")
-    expect(shouldReexecAfterProvisioning("win32")).toBe(false)
-    expect(shouldReexecAfterProvisioning("darwin")).toBe(true)
   })
 
   test("strips Linux procfs deleted suffix but preserves it on other platforms", () => {
@@ -123,10 +129,20 @@ describe("compiled omo entry launcher parity", () => {
     expect(isProvisionedExecutable(runningExecutablePath(expected, `${expected} (deleted)`, "linux"), expected)).toBe(true)
   })
 
-  test("re-exec source contract uses signal-aware child execution", () => {
-    const source = readFileSync(new URL("../compile-entry.ts", import.meta.url), "utf8")
-    expect(source).toContain('import { propagateResult, runChild } from "./bin/lib/child-process.js"')
-    expect(source).not.toContain("spawn(expected")
+  test("re-exec without an injected runner runs the provisioned child through the default runner", async () => {
+    // given: no run override and no execve, the path Windows always takes
+    const propagated: unknown[] = []
+
+    // when: the provisioned "runtime" is this bun binary told to exit with a distinctive code
+    await reexecProvisionedRuntime(process.execPath, {
+      argv: ["-e", "process.exit(7)"],
+      execve: null,
+      propagate: (result) => { propagated.push(result) },
+    })
+
+    // then: the real child ran and its exit status reached propagation
+    expect(propagated).toHaveLength(1)
+    expect(propagated[0]).toMatchObject({ status: 7, signal: null })
   })
 
   test("pins the engine package dir to the provisioned root", () => {
@@ -139,6 +155,12 @@ describe("compiled omo entry launcher parity", () => {
 
   test("early commands pass through without an extension", () => {
     expect(buildSenpiArgs(["install", "x"], "/provisioned")).toEqual(["install", "x"])
+  })
+
+  test("app-server appends the provisioned plugin after its subcommand", () => {
+    expect(buildSenpiArgs(["app-server", "daemon", "start"], "/provisioned")).toEqual([
+      "app-server", "daemon", "start", "--extension", join("/provisioned", "plugin"),
+    ])
   })
 
   test("main commands prepend the provisioned plugin extension", () => {
@@ -184,9 +206,10 @@ describe("compiled omo entry launcher parity", () => {
     expect(isProvisionedExecutable(expected, executable)).toBe(true)
   })
 
-  test("self-update prints the curl reinstall command", () => {
-    expect(updateLine("darwin", "arm64")).toContain("curl")
-    expect(updateLine("darwin", "arm64")).toContain("omo-darwin-arm64")
+  test("a release build's update notice points at omo update instead of a fixed download", () => {
+    const env = remapSenpiEnvironment({ PATH: "/bin" }, temp())
+    const brand = JSON.parse(env.SENPI_BRAND ?? "{}") as { update?: { command?: string } }
+    expect(brand.update?.command).toBe("omo update")
   })
 
   test("package-root environment values point into the provisioned runtime", () => {
@@ -224,10 +247,10 @@ describe("pre-provisioning fast paths", () => {
     expect(extra.output).toEqual([])
   })
 
-  test("self-update spellings answer with the curl line while engine updates fall through", () => {
+  test("self-update spellings are answered while engine updates fall through", () => {
     const selfUpdate = captureLog(() => answerCompiledFastPath(["update"], manifest))
     expect(selfUpdate.handled).toBe(true)
-    expect(selfUpdate.output[0]).toContain("curl")
+    expect(selfUpdate.output[0]).toContain("omo-")
     expect(captureLog(() => answerCompiledFastPath(["update", "self"], manifest)).handled).toBe(true)
     expect(captureLog(() => answerCompiledFastPath(["update", "--extensions"], manifest)).handled).toBe(false)
   })
@@ -385,6 +408,41 @@ describe("embedded runtime provisioning", () => {
     expect(output.join("\n")).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.28; scheme nodef)")
   })
 
+  test("compiled doctor reports an npm omo-ai that the standalone binary shadows on PATH", async () => {
+    const root = temp()
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
+    const home = join(root, "home")
+    const binary = Buffer.concat([Buffer.from("omo-binary"), Buffer.alloc(4096, 1)])
+    mkdirSync(join(home, ".omo", "binary-runtime", "9.2.1"), { recursive: true })
+    writeFileSync(join(home, ".omo", "binary-runtime", "9.2.1", "omo"), binary)
+    mkdirSync(join(root, "local-bin"), { recursive: true })
+    writeFileSync(join(root, "local-bin", "omo"), binary)
+    const bunRoot = join(root, "bun")
+    const pkg = join(bunRoot, "install", "global", "node_modules", "omo-ai")
+    mkdirSync(join(pkg, "bin"), { recursive: true })
+    writeFileSync(join(pkg, "package.json"), JSON.stringify({ name: "omo-ai", version: "9.2.0" }))
+    writeFileSync(join(pkg, "bin", "omo.js"), "#!/usr/bin/env node\n")
+    mkdirSync(join(bunRoot, "bin"), { recursive: true })
+    symlinkSync(join(pkg, "bin", "omo.js"), join(bunRoot, "bin", "omo"))
+    const output: string[] = []
+    const originalLog = console.log
+    const originalExitCode = process.exitCode
+    console.log = (value?: unknown) => { output.push(String(value)) }
+    try {
+      await runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+        env: { PATH: [join(root, "local-bin"), join(bunRoot, "bin")].join(delimiter), BUN_INSTALL: bunRoot },
+        homeDir: home,
+        platform: "linux",
+      })
+    } finally {
+      console.log = originalLog
+      process.exitCode = originalExitCode
+    }
+    const warning = output.join("\n").split("\n").find((line) => line.startsWith("WARN more than one OmO install is on PATH:"))
+    expect(warning).toContain("(standalone omo binary 9.2.1) runs when you type omo")
+    expect(warning).toContain("omo-ai@9.2.0")
+  })
+
   test("version uses the manifest engine pin without a provisioned senpi package", async () => {
     const root = temp()
     writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
@@ -506,7 +564,7 @@ describe("omob provenance degrades sanely", () => {
     )
   })
 
-  test("updateHint tells dev builds to rebuild and release builds to curl", () => {
+  test("updateHint tells dev builds to rebuild and names the release asset otherwise", () => {
     const info = {
       command: "omob",
       omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
@@ -514,8 +572,76 @@ describe("omob provenance degrades sanely", () => {
     }
 
     expect(updateHint(info)).toBe("rebuild with: bun run omob")
-    expect(updateHint(malformed, "darwin", "arm64")).toBe(updateLine("darwin", "arm64"))
-    expect(updateHint(undefined, "darwin", "arm64")).toBe(updateLine("darwin", "arm64"))
+    expect(updateHint(malformed, "darwin", "arm64")).toContain("omo-darwin-arm64 from https://github.com/code-yeongyu/oh-my-openagent/releases")
+    expect(updateHint(undefined, "win32", "x64")).toContain("omo-windows-x64.exe")
+  })
+})
+
+describe("compiled release self-update", () => {
+  const release = (tag: string, assets: readonly string[], draft = false) => ({ tag_name: tag, draft, assets: assets.map((name) => ({ name })) })
+  const ALL = ["omo-linux-x64", "omo-linux-x64-musl", "omo-linux-x64-baseline", "omo-windows-x64.exe", "omo-darwin-arm64"]
+  const releases = [
+    release("next", []),
+    release("v5.1.0-beta.2", ALL),
+    release("v5.0.1", ALL),
+    release("v5.0.0", ALL),
+    release("v5.2.0", ALL, true),
+  ]
+
+  test("the asset follows the stamped build flavor, not only the OS and CPU", () => {
+    expect(releaseAssetName("linux-x64-musl", "linux", "x64")).toBe("omo-linux-x64-musl")
+    expect(releaseAssetName("linux-x64-musl-baseline", "linux", "x64")).toBe("omo-linux-x64-musl-baseline")
+    expect(releaseAssetName("windows-x64-baseline", "win32", "x64")).toBe("omo-windows-x64-baseline.exe")
+    expect(releaseAssetName(undefined, "darwin", "arm64")).toBe("omo-darwin-arm64")
+    expect(releaseAssetName("../evil", "linux", "x64")).toBe("omo-linux-x64")
+  })
+
+  test("a stable build only moves to stable releases and a beta build follows betas", () => {
+    expect(pickUpdateVersion("5.0.0", releases, "omo-linux-x64")).toBe("5.0.1")
+    expect(pickUpdateVersion("5.0.0-beta.90", releases, "omo-linux-x64")).toBe("5.1.0-beta.2")
+    expect(pickUpdateVersion("5.0.1", releases, "omo-linux-x64")).toBeUndefined()
+    expect(releaseVersionOf("5.0.0-0.beta.90")).toBe("5.0.0-beta.90")
+  })
+
+  test("a release that does not ship this flavor is skipped", () => {
+    const partial = [release("v5.0.2", ["omo-linux-x64"]), release("v5.0.1", ALL)]
+    expect(pickUpdateVersion("5.0.0", partial, "omo-linux-x64-musl")).toBe("5.0.1")
+  })
+
+  test("the POSIX command swaps the running binary through a sibling file and survives spaces", () => {
+    const command = replaceCommand("https://x/omo-linux-x64", "/home/me/my tools/omo", "linux")
+    expect(command).toBe("curl -fsSL 'https://x/omo-linux-x64' -o '/home/me/my tools/omo.new' && chmod +x '/home/me/my tools/omo.new' && mv -f '/home/me/my tools/omo.new' '/home/me/my tools/omo'")
+  })
+
+  test("the Windows command moves the running exe aside and never calls chmod", () => {
+    const command = replaceCommand("https://x/omo-windows-x64.exe", "C:\\Users\\me\\bin\\omo.exe", "win32")
+    expect(command).not.toContain("chmod")
+    expect(command).toContain("curl.exe -fsSL 'https://x/omo-windows-x64.exe' -o 'C:\\Users\\me\\bin\\omo.exe.new'")
+    expect(command).toContain("Move-Item -Force -LiteralPath 'C:\\Users\\me\\bin\\omo.exe' -Destination 'C:\\Users\\me\\bin\\omo.exe.old'")
+  })
+
+  test("omo update pins the version and replaces the binary the user ran", async () => {
+    const result = await compiledUpdate({
+      omoAiVersion: "5.0.0",
+      releaseTarget: "linux-x64-musl",
+      destination: "/opt/omo/omo",
+      platform: "linux",
+      arch: "x64",
+      fetchReleases: async () => releases,
+    })
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toContain("https://github.com/code-yeongyu/oh-my-openagent/releases/download/v5.0.1/omo-linux-x64-musl")
+    expect(result.output).toContain("mv -f '/opt/omo/omo.new' '/opt/omo/omo'")
+    expect(result.output).not.toContain("releases/latest")
+  })
+
+  test("an up-to-date binary says so and a failed lookup exits non-zero with the releases page", async () => {
+    const base = { releaseTarget: "darwin-arm64", destination: "/omo", platform: "darwin" as const, arch: "arm64" }
+    const current = await compiledUpdate({ ...base, omoAiVersion: "5.0.1", fetchReleases: async () => releases })
+    expect(current).toEqual({ output: "omo 5.0.1 is the newest stable release", exitCode: 0 })
+    const failed = await compiledUpdate({ ...base, omoAiVersion: "5.0.0", fetchReleases: async () => { throw new Error("GitHub answered 503") } })
+    expect(failed.exitCode).toBe(1)
+    expect(failed.output).toContain("https://github.com/code-yeongyu/oh-my-openagent/releases")
   })
 })
 

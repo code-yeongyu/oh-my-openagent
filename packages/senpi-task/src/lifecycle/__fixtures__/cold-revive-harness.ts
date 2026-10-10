@@ -10,6 +10,7 @@ import { createTaskLifecycle } from "../create"
 import type { ReviveDriftPolicy, ReviveGenerationWarning } from "../revive-policy"
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { createConfigGenerationStampingStore } from "../../../../omo-senpi/src/components/task/config-generation-store"
+import { NO_HOST_ENDPOINT } from "../host-session"
 
 export function coldReviveHarness(options: {
   readonly policy?: ReviveDriftPolicy
@@ -49,7 +50,7 @@ export function coldReviveHarness(options: {
     destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
   })
   const registry = createManagerResidencyRegistry(() => manager)
-  const lifecycle = createTaskLifecycle({ store, registry, config, now: options.now,
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config, now: options.now,
     revivePolicy: { currentGeneration: () => 2, warn: (warning) => warnings.push(warning), ...(options.policy === undefined ? {} : { policy: options.policy }) },
     idleReclaimerScheduler: { setInterval: () => ({}), clearInterval: () => undefined },
   })

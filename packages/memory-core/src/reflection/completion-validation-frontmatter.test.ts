@@ -6,6 +6,7 @@ import { dirname, join } from "node:path"
 import { GitMemoryRepo } from "../git"
 import { validateCompletion } from "./completion-validation"
 import { createReflectionWorktree, type ReflectionWorktree } from "./worktree"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
 const AUTHOR = { agentId: "agent-one", authorName: "Reflection Agent" }
@@ -14,7 +15,7 @@ const LEGACY = "---\ndescription: Run the chain by default: verify, merge\n---\n
 setDefaultTimeout(process.platform === "win32" ? 20_000 : 5_000)
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function fixture(seedFiles: Record<string, string> = {}) {

@@ -1,0 +1,25 @@
+[package]
+name = "senpi-desktop-backend-macos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics.workspace = true
+foreign-types.workspace = true
+image.workspace = true
+libc.workspace = true
+objc2.workspace = true
+objc2-app-kit.workspace = true
+objc2-application-services.workspace = true
+objc2-core-foundation.workspace = true
+objc2-core-graphics.workspace = true
+objc2-foundation.workspace = true
+parking_lot.workspace = true
+senpi-desktop-core = { path = "../senpi-desktop-core", features = ["system-clipboard"] }
+senpi-desktop-safety = { path = "../senpi-desktop-safety" }
+tempfile.workspace = true
+xcap.workspace = true

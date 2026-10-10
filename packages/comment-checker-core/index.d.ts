@@ -73,14 +73,19 @@ export interface HookInput {
 export interface CheckResult {
 	readonly hasComments: boolean;
 	readonly message: string;
+	readonly failure?: CheckFailure;
+}
+
+export interface CheckFailure {
+	readonly exitCode: number | null;
+	readonly stderr: string;
 }
 
 export type SpawnSignal = "SIGTERM" | "SIGKILL";
 
 export type SpawnProcess = {
 	readonly stdin: {
-		write(input: string): void;
-		end(): void;
+		send(input: string): Promise<void>;
 	};
 	readonly stdout: ReadableStream<Uint8Array>;
 	readonly stderr: ReadableStream<Uint8Array>;
@@ -96,6 +101,15 @@ export interface ResolveCommentCheckerBinaryInput {
 	readonly existsSync: (path: string) => boolean;
 	readonly importMetaUrl?: string;
 	readonly packageName?: string;
+}
+
+export interface FindCommentCheckerPackageBinaryInput {
+	readonly packageJsonPath: string;
+	readonly binaryName: string;
+	readonly existsSync: (path: string) => boolean;
+	readonly packageName?: string;
+	readonly platform?: string;
+	readonly arch?: string;
 }
 
 export interface RunCommentCheckerInput {
@@ -147,5 +161,17 @@ export function resolveCommentCheckerReleaseAsset(
 ): CommentCheckerReleaseAsset | null;
 export function commentCheckerBinaryName(platform: string): string;
 export function commentCheckerCacheDir(input: CommentCheckerCacheDirInput): string;
+export const COMMENT_CHECKER_VERSION_MARKER: string;
+export function isCachedCommentCheckerCurrent(cacheDir: string, readFile?: (path: string) => string): boolean;
+export function recordCachedCommentCheckerRelease(cacheDir: string): void;
+export const COMMENT_CHECKER_PACKAGE_NAME: string;
+export function findCommentCheckerPackageBinary(input: FindCommentCheckerPackageBinaryInput): string | null;
 export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryInput): string | null;
 export function runCommentChecker(input: RunCommentCheckerInput, options: RunCommentCheckerOptions): Promise<CheckResult>;
+export function sendAndCloseStdin(stdin: {
+	on(event: "error", listener: (error: Error) => void): unknown;
+	end(chunk: string, callback: (error?: Error | null) => void): unknown;
+} | {
+	write(chunk: string): unknown;
+	end(): unknown;
+}, input: string): Promise<void>;

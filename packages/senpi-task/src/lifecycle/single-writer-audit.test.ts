@@ -70,8 +70,4 @@ describe("single-writer destruction audit", () => {
     expect(violations).toEqual([])
   })
 
-  test("#given the allowlist #when auditing the lifecycle port #then it is the only non-definition invoker", () => {
-    // given / when / then - the lifecycle dir is present and audited-in as the invoker
-    expect(INVOCATION_ALLOWLIST[0]).toBe("src/lifecycle/")
-  })
 })

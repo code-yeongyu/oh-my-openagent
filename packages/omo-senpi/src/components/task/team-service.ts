@@ -39,9 +39,6 @@ import {
   resolveTeamSpec,
 } from "./team-service-support"
 
-// The team members spawn one level below the current (lead) session, matching the task tool's
-// (ancestry.depth + 1) child spawn depth for a top-level lead.
-const TEAM_MEMBER_SPAWN_DEPTH = 1
 const CANONICAL_TEAM_RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 function assertCanonicalTeamRunId(teamRunId: string): void {
@@ -60,6 +57,9 @@ export interface TeamServiceDeps {
   readonly omoConfig: OmoConfig
   readonly cwd: string
   readonly agentNames: ReadonlySet<string>
+  // The lead session's own place in the task tree. Members spawn one level below it, matching the
+  // task tool's (ancestry.depth + 1), so a child session leading a team cannot reset depth (#9036).
+  readonly ancestry?: { readonly depth: number }
   // The session's package-aware inherited list, so a team member reproduces the same providers an
   // ordinary child gets (#8492). Absent, member launches fall back to the parent's argv entries.
   readonly resolveInheritedExtensions?: () => Promise<readonly string[]>
@@ -144,7 +144,7 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         stateDir,
         taskSettings: deps.settings,
         leadSessionId,
-        spawnDepth: TEAM_MEMBER_SPAWN_DEPTH,
+        spawnDepth: (deps.ancestry?.depth ?? 0) + 1,
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         memberExtension: {
           entryPath: memberExtensionEntryPath,

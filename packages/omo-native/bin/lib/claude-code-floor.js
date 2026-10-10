@@ -1,7 +1,10 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { engineDependencyDir } from "./engine-dependency.js"
 
-const claudeCodeVersionRelative = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
+const piAiPackage = "@earendil-works/pi-ai"
+const claudeCodeVersionRelative = "dist/api/anthropic-messages.js"
+const claudeCodeVersionTarget = `${piAiPackage}/${claudeCodeVersionRelative}`
 const claudeCodeVersionPattern = /const claudeCodeVersion = "(\d+)\.(\d+)\.(\d+)";/
 // Claude Opus 5.5 rejects OAuth requests advertising Claude Code below 2.1.280 (claude_code_version_too_old).
 export const claudeCodeVersionFloor = "2.1.280"
@@ -13,11 +16,12 @@ function isBelowFloor([major, minor, patch]) {
 }
 
 function floorPiAi(senpiRoot) {
-  const path = join(senpiRoot, claudeCodeVersionRelative)
-  if (!existsSync(path)) throw new Error(`omo-ai: installed Senpi target is missing: ${claudeCodeVersionRelative}`)
+  const piAiRoot = engineDependencyDir(senpiRoot, piAiPackage)
+  const path = piAiRoot === undefined ? undefined : join(piAiRoot, claudeCodeVersionRelative)
+  if (path === undefined || !existsSync(path)) throw new Error(`omo-ai: installed Senpi target is missing: ${claudeCodeVersionTarget}`)
   const source = readFileSync(path, "utf8")
   const match = claudeCodeVersionPattern.exec(source)
-  if (match === null) throw new Error(`omo-ai: unsupported Senpi ${claudeCodeVersionRelative}`)
+  if (match === null) throw new Error(`omo-ai: unsupported Senpi ${claudeCodeVersionTarget}`)
   if (!isBelowFloor(match.slice(1).map(Number))) return
   writeFileSync(path, source.replace(claudeCodeVersionPattern, `const claudeCodeVersion = "${claudeCodeVersionFloor}";`))
 }

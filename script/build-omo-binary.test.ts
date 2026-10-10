@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url"
 import {
   assertBinarySizeBudget,
   assertEngineGraphBundled,
+  BINARY_HEADROOM_WARN_BYTES,
   EMBEDDED_PAYLOAD_ROOT,
   ENGINE_MINIMUM_MODULES,
   MAX_BINARY_BYTES,
@@ -27,10 +28,12 @@ import {
   PLUGIN_PAYLOAD_FILES,
   RELEASE_BINARY_TARGETS,
   buildRuntimeManifest,
+  runtimeManifestFileContent,
   collectStagedFiles,
   createStampedPackageJson,
   embeddedNameForRelPath,
   relPathForEmbeddedName,
+  reportBinaryHeadroom,
   reportEmbeddedPayload,
   resolveExpectedSidecarRelPaths,
   RUNTIME_MANIFEST_REL_PATH,
@@ -354,6 +357,21 @@ describe("runtime manifest", () => {
   })
 })
 
+describe("embedded runtime manifest file", () => {
+  test("#given a musl target #when the manifest file is written #then it names that release asset flavor outside the digest", async () => {
+    const stageDir = makeTempDir("omo-manifest-target-")
+    writeFileSync(join(stageDir, "package.json"), createStampedPackageJson("1.2.3"), "utf8")
+    const manifest = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+
+    const written = JSON.parse(runtimeManifestFileContent(manifest, "linux-x64-musl"))
+
+    expect(written.releaseTarget).toBe("linux-x64-musl")
+    expect(written.marker).toBe("OMO_RUNTIME_MANIFEST_V1")
+    expect(written.manifestSha).toBe(manifest.manifestSha)
+    rmSync(stageDir, { recursive: true, force: true })
+  })
+})
+
 describe("size budget", () => {
   test("#given a synthetic oversize binary #when the budget is enforced #then it fails loud naming the target", () => {
     // given
@@ -372,8 +390,24 @@ describe("size budget", () => {
     // then
     expect(oversize).toThrow(/darwin-arm64/)
     expect(withinBudget).not.toThrow()
-    expect(MAX_BINARY_BYTES).toBe(150 * 1024 * 1024)
+    expect(MAX_BINARY_BYTES).toBe(160 * 1024 * 1024)
     rmSync(stageDir, { recursive: true, force: true })
+  })
+
+  test("#given a binary within 5 MiB of the budget #when headroom is reported #then the line is a warning annotation naming the target", () => {
+    // given
+    const near = MAX_BINARY_BYTES - BINARY_HEADROOM_WARN_BYTES + 1
+    const roomy = MAX_BINARY_BYTES - BINARY_HEADROOM_WARN_BYTES
+
+    // when
+    const nearLine = reportBinaryHeadroom("linux-x64", near)
+    const roomyLine = reportBinaryHeadroom("linux-x64", roomy)
+
+    // then
+    expect(nearLine.startsWith("::warning::")).toBe(true)
+    expect(nearLine).toContain("linux-x64")
+    expect(roomyLine.startsWith("::warning::")).toBe(false)
+    expect(roomyLine).toContain("5.00 MiB headroom")
   })
 })
 
@@ -491,10 +525,11 @@ describe("sidecar parity set", () => {
     })
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node")
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_grep.darwin-arm64.node")
-    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(2)
+    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(3)
+    expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi-desktop-engine")
   })
 
-  test("#given a native-absent target #when the expected sidecar set is resolved #then no native prebuild is required", () => {
+  test("#given a native-addon-absent target #when expected paths are resolved #then the desktop engine remains required", () => {
     // given
     const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "linux-x64")
     expect(target).toBeDefined()
@@ -503,7 +538,9 @@ describe("sidecar parity set", () => {
     const relPaths = resolveExpectedSidecarRelPaths(target!)
 
     // then
-    expect(relPaths.some((relPath) => relPath.startsWith("native/prebuilds/"))).toBe(false)
+    expect(relPaths.filter((relPath) => relPath.startsWith("native/prebuilds/"))).toEqual([
+      "native/prebuilds/linux-x64/senpi-desktop-engine",
+    ])
     expect(relPaths).toContain("package.json")
   })
 })

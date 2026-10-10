@@ -1,3 +1,14 @@
+import type { AgentSession } from "@code-yeongyu/senpi"
+import { reportedEffectiveModel, type CatalogModelIdentity, type EffectiveModel } from "../pinned-model-equivalence"
+
+import type { TaskStartFailureKind, TaskStartFailureReason } from "../../state/start-failure"
+
+/** How the engine settled a steer/follow-up: delivered to the running turn, or queued behind it. */
+export type QueuedInputDisposition = Awaited<ReturnType<AgentSession["steer"]>>
+
+// ChildHandle.steer settles with no value: the manager does not consume the engine disposition.
+const ignoreQueuedInputDisposition = (_disposition: QueuedInputDisposition): void => undefined
+
 export type ChildSessionEvent = {
   readonly type: string
   readonly message?: unknown
@@ -5,16 +16,29 @@ export type ChildSessionEvent = {
 
 export type ChildSessionListener = (event: ChildSessionEvent) => void
 
-// Structural subset of senpi's AgentSession that the handle drives. The default seam returns a
-// live AgentSession; fakes implement only these members.
+/** The slice of senpi's ExtensionRunner that child teardown needs to run session_shutdown. */
+export type ChildExtensionRunner = {
+  hasHandlers(eventType: string): boolean
+  emit(event: { readonly type: "session_shutdown"; readonly reason: "quit" }): Promise<unknown>
+}
+
+/**
+ * Structural subset of senpi's AgentSession that the handle drives. The default seam returns a
+ * live AgentSession; fakes implement only these members. `model` is what the session actually
+ * started on, read by the runner's post-start pin check (#9722); fakes may omit it.
+ */
 export type ChildSession = {
   readonly sessionId: string
+  readonly model?: CatalogModelIdentity
+  readonly effectiveServiceTier?: string
   prompt(text: string): Promise<void>
-  steer(text: string): Promise<void>
-  followUp(text: string): Promise<void>
+  steer(text: string): Promise<QueuedInputDisposition>
+  followUp(text: string): Promise<QueuedInputDisposition>
   abort(): Promise<void>
   subscribe(listener: ChildSessionListener): () => void
   getLastAssistantText(): string | undefined
+  /** Absent on fakes that load no extensions; a live AgentSession always has one. */
+  readonly extensionRunner?: ChildExtensionRunner
   dispose(): void
 }
 
@@ -23,28 +47,18 @@ export type ChildSession = {
  * ever derived from child output, so it is the one part of a failure that is safe to surface and
  * persist verbatim - and `manager.ts` still treats it only as a lookup key, never as text to echo.
  */
-export type RunnerFailureReason =
-  | "model_not_in_child_profile"
-  | "catalog_probe_timed_out"
-  | "catalog_probe_failed"
+export type RunnerFailureReason = TaskStartFailureReason
 
 export type RunnerFailure = {
   // The snake_case kinds map 1:1 onto the manager's respawn disposition codes (todo 12): a resume
   // rebuild failure is TYPED and retryable, never a silently weakened tool set or transcript.
-  readonly kind:
-    | "child-prompt-failed"
-    | "child-turn-failed"
-    | "session-create-failed"
-    | "depth-exceeded"
-    | "model_unavailable"
-    | "tools_unavailable"
-    | "session_unavailable"
-    // The shared task daemon cannot host this child and no per-child fallback was allowed
-    // (`runners/rpc-host/daemon.ts`): the client fails closed instead of starting a second host.
-    | "host_unavailable"
+  readonly kind: TaskStartFailureKind
   readonly message: string
   readonly reason?: RunnerFailureReason
   readonly cause?: unknown
+  // Set only with `launch_spec_insecure`: the refused spec path omo resolved itself, never child
+  // output, so the public start failure may name the file and its fix (#9208).
+  readonly launch_spec_path?: string
   /**
    * Structured exit facts for the internal event log, when the child actually reached a process exit.
    *
@@ -79,13 +93,15 @@ export type ChildCompletionPolicy = "final-text" | "turn"
 export type ChildHandle = {
   readonly task_id: string
   readonly sessionId: string
+  /** The model the child session is ACTUALLY on, read live - the post-start record's source (#9722). */
+  effectiveModel(): EffectiveModel | undefined
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildSessionListener): () => void
   waitForIdle(): Promise<RunnerOutcome>
   lastAssistantText(): string | undefined
-  dispose(): void
+  dispose(): Promise<void> | void
 }
 
 export type CreateChildHandleInput = {
@@ -264,7 +280,8 @@ function createTrackedChildHandle(
   const handle: ChildHandle = {
     task_id: taskId,
     sessionId: session.sessionId,
-    steer: (text) => session.steer(text),
+    effectiveModel: () => reportedEffectiveModel(session.model, session.effectiveServiceTier),
+    steer: (text) => session.steer(text).then(ignoreQueuedInputDisposition),
     followUp: async (text) => {
       // While a turn is running, a follow-up is queued and delivered when the agent settles. Once
       // the child is idle/resident, a follow-up REVIVES it: drive a fresh turn and re-arm tracking.
@@ -281,11 +298,11 @@ function createTrackedChildHandle(
     subscribe: (listener) => session.subscribe(listener),
     waitForIdle: () => running,
     lastAssistantText: () => session.getLastAssistantText(),
-    dispose: () => {
+    dispose: async () => {
       if (disposed) return
       disposed = true
       unsubscribeObserver()
-      session.dispose()
+      await shutDownChildSession(session)
     },
   }
   return { handle, beginTurn }
@@ -309,6 +326,20 @@ export function createRestoredChildHandle(input: CreateRestoredChildHandleInput)
 // the manager nor the lifecycle destruction port can ever reach it. Discarding it here keeps that
 // teardown inside the handle-definition module that owns dispose delegation, so the single-writer
 // rule still holds: lifecycle remains the only INVOKER for admitted handles.
-export function discardUnstartedChildSession(session: ChildSession): void {
-  session.dispose()
+export async function discardUnstartedChildSession(session: ChildSession): Promise<void> {
+  await shutDownChildSession(session)
+}
+
+// #9413: a bare dispose() never emits session_shutdown; only senpi's AgentSessionRuntime does. An
+// in-process child loads the builtin extensions, and codemode closes its per-session bridge server
+// (like every other shutdown-scoped resource) only on session_shutdown, so without this the child
+// leaks a listening socket that keeps `omo -p` alive. The runner applies the host's per-handler
+// shutdown budget, so a hung handler cannot hold teardown, and dispose() runs either way.
+async function shutDownChildSession(session: ChildSession): Promise<void> {
+  try {
+    const runner = session.extensionRunner
+    if (runner?.hasHandlers("session_shutdown") === true) await runner.emit({ type: "session_shutdown", reason: "quit" })
+  } finally {
+    session.dispose()
+  }
 }

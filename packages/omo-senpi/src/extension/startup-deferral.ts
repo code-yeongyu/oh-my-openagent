@@ -78,7 +78,7 @@ const FIRST_PAINT_EVENTS = ["input", "before_agent_start"] as const
 export const FIRST_PAINT_BACKSTOP_MS = 750
 
 export interface FirstPaintSchedulerOptions {
-  readonly on: (event: string, handler: () => void) => void
+  readonly on: (event: string, handler: (payload?: unknown) => void, options?: { previewSafe?: boolean }) => void
   readonly backstopMs?: number
 }
 
@@ -99,7 +99,13 @@ export function createFirstPaintScheduler(options: FirstPaintSchedulerOptions): 
       entry.run()
     }
   }
-  for (const event of FIRST_PAINT_EVENTS) options.on(event, open)
+  const openOnPaint = (payload?: unknown): void => {
+    if (isPreview(payload)) return
+    open()
+  }
+  for (const event of FIRST_PAINT_EVENTS) {
+    options.on(event, openOnPaint, event === "before_agent_start" ? { previewSafe: true } : undefined)
+  }
 
   return (run) => {
     if (opened) return scheduleOnNextTick(run)
@@ -116,6 +122,10 @@ export function createFirstPaintScheduler(options: FirstPaintSchedulerOptions): 
       clearTimeout(entry.timer)
     }
   }
+}
+
+function isPreview(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }
 
 export function createStartupDeferral(options: StartupDeferralOptions = {}): StartupDeferral {

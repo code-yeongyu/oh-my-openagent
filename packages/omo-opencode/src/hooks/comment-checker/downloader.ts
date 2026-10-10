@@ -4,6 +4,8 @@ import { homedir, tmpdir } from "os"
 import {
   commentCheckerBinaryName,
   commentCheckerCacheDir,
+  isCachedCommentCheckerCurrent,
+  recordCachedCommentCheckerRelease,
   resolveCommentCheckerReleaseAsset,
 } from "@oh-my-opencode/comment-checker-core"
 import {
@@ -50,10 +52,14 @@ export function getBinaryName(): string {
 }
 
 /**
- * Get the cached binary path if it exists.
+ * Get the cached binary path if it exists and was recorded at the pinned release. The slot is shared
+ * with the OmO Native edition and carries no version in its name, so an unrecorded or older binary is
+ * left for the downloader to replace (#8850).
  */
 export function getCachedBinaryPath(): string | null {
-  return getCachedBinaryPathShared(getCacheDir(), getBinaryName())
+  const cacheDir = getCacheDir()
+  const cached = getCachedBinaryPathShared(cacheDir, getBinaryName())
+  return cached !== null && isCachedCommentCheckerCurrent(cacheDir) ? cached : null
 }
 
 /**
@@ -72,8 +78,8 @@ export async function downloadCommentChecker(): Promise<string | null> {
   const binaryName = getBinaryName()
   const binaryPath = join(cacheDir, binaryName)
   
-  // Already exists in cache
-  if (existsSync(binaryPath)) {
+  // Already cached at the pinned release
+  if (existsSync(binaryPath) && isCachedCommentCheckerCurrent(cacheDir)) {
     debugLog("Binary already cached at:", binaryPath)
     return binaryPath
   }
@@ -105,6 +111,7 @@ export async function downloadCommentChecker(): Promise<string | null> {
     
     // Set execute permission on Unix
     ensureExecutable(binaryPath)
+    recordCachedCommentCheckerRelease(cacheDir)
     
     debugLog(`Successfully downloaded binary to: ${binaryPath}`)
     log(`[${PUBLISHED_PACKAGE_NAME}] comment-checker binary ready.`)

@@ -93,10 +93,33 @@ describe("buildChildContext", () => {
     expect(actualKeys).toEqual(expectedKeys)
   })
 
+  test("#given a spec carrying the tree and shard keys #when building context #then both fields are written verbatim", () => {
+    // given
+    const key = "6d410ba846ba1550"
+
+    // when
+    const result = buildChildContext({ ...baseSpec, treeKey: key, shardKey: key })
+
+    // then
+    expect(new Set(Object.keys(result.context))).toEqual(new Set(["role", "task_id", "state_dir", "tree_key", "shard_key"]))
+    expect(result.context.tree_key).toBe(key)
+    expect(result.context.shard_key).toBe(key)
+  })
+
+  test("#given a spec without the keys #when building context #then neither field is present", () => {
+    // when
+    const result = buildChildContext(baseSpec)
+
+    // then
+    expect("tree_key" in result.context).toBe(false)
+    expect("shard_key" in result.context).toBe(false)
+  })
+
   test("#given any context #when building #then no key matches the forbidden pattern", () => {
-    // given multiple specs (plain, member)
+    // given multiple specs (plain, keyed, member)
     const specs = [
       baseSpec,
+      { ...baseSpec, treeKey: "6d410ba846ba1550", shardKey: "6d410ba846ba1550" },
       {
         ...baseSpec,
         memberEnv: {

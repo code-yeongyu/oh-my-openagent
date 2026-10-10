@@ -356,6 +356,53 @@ describe("resolveReflectionModel", () => {
     expect(shouldWarnCategoryUnavailable({ categories: { quick: { model: "missing/model" } } }, "quick")).toBe(false)
   })
 
+  describe("#given a category pinned to a model outside its builtin chain", () => {
+    // A memory child has no other rung to rotate to when the pin is refused (Devin answers some
+    // lanes with permission_denied), so the builtin chain's connected rungs must stay reachable.
+    const pinned: SenpiModelPort = { provider: "devin", id: "swe-2-low" }
+    const deepseek: SenpiModelPort = { provider: "deepseek", id: "deepseek-flash" }
+    const haiku: SenpiModelPort = { provider: "anthropic", id: "claude-haiku-5-5" }
+    const userRung: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
+    const connected = [pinned, deepseek, haiku, userRung]
+    const liveRegistry = {
+      getAvailable: () => connected,
+      find: (provider: string, modelId: string) =>
+        connected.find((candidate) => candidate.provider === provider && candidate.id === modelId),
+    }
+
+    test("#when resolved #then the builtin chain's connected rungs follow the pin as fallbacks", () => {
+      // when
+      const result = resolveReflectionModel("quick", { categories: { quick: { model: "devin/swe-2-low" } } }, liveRegistry)
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind === "resolved") {
+        expect(result.model).toBe("devin/swe-2-low")
+        expect(result.fallbacks).toEqual([
+          { model: "anthropic/claude-haiku-5-5", thinking: "medium" },
+          { model: "deepseek/deepseek-flash", thinking: "off" },
+        ])
+      }
+    })
+
+    test("#when the user also configured a chain #then the user rungs keep priority over the builtin ones", () => {
+      // given
+      const config: OmoConfig = {
+        categories: { quick: { models: ["devin/swe-2-low", "omo-mock/mock-1"] } },
+      }
+
+      // when
+      const result = resolveReflectionModel("quick", config, liveRegistry)
+
+      // then
+      expect(result.kind === "resolved" ? result.fallbacks.map((fallback) => fallback.model) : []).toEqual([
+        "omo-mock/mock-1",
+        "anthropic/claude-haiku-5-5",
+        "deepseek/deepseek-flash",
+      ])
+    })
+  })
+
   test("#given a pinned user model whose model id contains a slash #when the availability snapshot is stale #then the whole model id is looked up rather than its first segment", () => {
     // given: apitopia publishes the model id "z-ai/glm-5.2-ultrafast-unlocked", which itself contains a
     // slash, and the availability snapshot is still empty when reflection resolves the pin.

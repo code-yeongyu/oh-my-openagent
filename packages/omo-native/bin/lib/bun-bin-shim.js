@@ -3,8 +3,8 @@ import { homedir as osHomedir } from "node:os"
 import { join } from "node:path"
 import { bunRoot, findBunBinary, isUnderBunGlobalTree } from "./bun-runtime.js"
 
-// Bumping this rewrites every generated shim on its next node boot; the value is embedded so a
-// stale shim is recognizable by content comparison alone.
+// Bumping this rewrites every generated shim on its next launch; the value is embedded so a stale
+// shim is recognizable by content comparison alone.
 const SHIM_VERSION = 1
 const SHIM_MARKER = "omo-ai bun launcher shim"
 
@@ -26,8 +26,8 @@ function quoteForShell(value) {
  * entrypoint so the launch never pays for a node boot. Both fallbacks land on the entrypoint's
  * own `#!/usr/bin/env node` shebang, which is byte-identical to what the stock symlink did:
  *   - OMO_RUNTIME=node asks for node end to end, so bun is skipped on purpose;
- *   - a bun that moved or vanished falls back to the node path, and the next node boot rewrites
- *     the shim with the freshly discovered bun path.
+ *   - a bun that moved or vanished falls back to the node path, and the next launch rewrites the
+ *     shim with the freshly discovered bun path.
  */
 export function bunBinShimScript(entryPath, bunPath) {
   return [
@@ -88,8 +88,11 @@ function repairBinEntry(entry, root, script, io) {
  * when an entry is already a regular file, reading a few hundred bytes) and must never break a
  * launch: every failure path - foreign file, missing bin, unwritable bin dir - returns quietly,
  * one entry's failure never stops the other from being repaired, and only OMO_DEBUG narrates.
- * Repairs run under node only, because a bun process either arrived through a shim already or has
- * no node boot to save.
+ * It runs under bun as well as node: `bun add -g` links the bin back to the node-shebang entrypoint
+ * and then runs omo-ai's postinstall (`bin/senpi-patch.mjs`) under bun whenever node is not on
+ * PATH, and that postinstall is the only code that runs before the next `omo`. A node-only repair
+ * left a bun-only machine (a launchd job, cron, node only through nvm) with an `omo` that cannot
+ * start until something boots it under node (#9293).
  *
  * The answer is per entry (`entries`), with the primary `<bunRoot>/bin/omo` entry's action and
  * error mirrored at the top level for callers that only ever cared about that one.
@@ -98,7 +101,6 @@ export function ensureBunBinShim(input) {
   const env = input.env ?? process.env
   const homedir = input.homedir ?? osHomedir
   const platform = input.platform ?? process.platform
-  const versions = input.versions ?? process.versions
   const io = {
     env,
     scriptPath: input.scriptPath,
@@ -113,7 +115,6 @@ export function ensureBunBinShim(input) {
   }
 
   if (platform !== "darwin" && platform !== "linux") return { action: "skipped-platform", error: undefined, entries: [] }
-  if (versions.bun) return { action: "skipped-runtime", error: undefined, entries: [] }
   if (!isUnderBunGlobalTree(input.scriptPath, { env, homedir, platform, realpath: io.realpath })) {
     return { action: "skipped-install", error: undefined, entries: [] }
   }

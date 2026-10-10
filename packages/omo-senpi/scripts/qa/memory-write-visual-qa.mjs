@@ -60,8 +60,11 @@ function freshSandbox() {
 try {
   function capture(label, inputs) {
     const sandbox = freshSandbox()
+    // Every agent-dir lane: an inherited OMO_CODING_AGENT_DIR outranks SENPI_CODING_AGENT_DIR.
     const envPrefix = [
+      `OMO_CODING_AGENT_DIR=${sandbox.agentDir}`,
       `SENPI_CODING_AGENT_DIR=${sandbox.agentDir}`,
+      `PI_CODING_AGENT_DIR=${sandbox.agentDir}`,
       `XDG_CONFIG_HOME=${sandbox.xdgConfigHome}`,
       `OMO_MEMORY_HOME=${join(sandbox.root, "memory")}`,
       `HOME=${sandbox.homeDir}`,

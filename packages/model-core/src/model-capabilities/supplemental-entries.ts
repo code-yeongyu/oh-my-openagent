@@ -94,6 +94,36 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 128000,
 		},
 	},
+	"gpt-6.1-sol": {
+		id: "gpt-6.1-sol",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 400000,
+			output: 128000,
+		},
+	},
+	"gpt-6.1-sol-fast": {
+		id: "gpt-6.1-sol-fast",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 400000,
+			output: 128000,
+		},
+	},
 	"gpt-6-luna": {
 		id: "gpt-6-luna",
 		family: "gpt-nano",
@@ -296,6 +326,36 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		limit: {
 			context: 500000,
 			output: 32768,
+		},
+	},
+	"claude-sonnet-5-5": {
+		id: "claude-sonnet-5-5",
+		family: "claude-sonnet",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
+	"anthropic/claude-sonnet-5-5": {
+		id: "anthropic/claude-sonnet-5-5",
+		family: "claude-sonnet",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
 		},
 	},
 	"grok-4.7": {

@@ -11,6 +11,8 @@ import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
 import { childModelChainSpec } from "./memory-child-model-chain"
 import { updateRunLedger, writeRunJsonAtomic, type RunOutcome } from "./worker/run-artifacts"
 import type { FactsExtractorRunnerOptions } from "./facts-runner-types"
+import { admitOversizedFacts, FACTS_RECORD_BYTES, FACTS_RECORD_LIMIT, factsPrompt } from "./facts-oversized-budget"
+import { createOversizedFactsGuard } from "./facts-oversized-child"
 
 type ResolvedChildModel = NonNullable<StartChildInput["model"]>
 
@@ -18,6 +20,7 @@ type FactsInProcessLaunchInput = {
   readonly runId: string
   readonly runDir: string
   readonly payload: FactsPayload
+  readonly oversized?: boolean
   readonly resolution: Extract<ReflectionModelResolution, { readonly kind: "resolved" }>
   readonly modelRegistry?: ReturnType<FactsExtractorRunnerOptions["resolveModelRegistry"]>
   readonly options: FactsExtractorRunnerOptions
@@ -33,7 +36,7 @@ type FactsInProcessLaunchInput = {
 export async function launchFactsInProcess(input: FactsInProcessLaunchInput): Promise<boolean> {
   const candidates: readonly [ReflectionModelCandidate, ...ReflectionModelCandidate[]] = [
     { model: input.resolution.model, ...(input.resolution.thinking === undefined ? {} : { thinking: input.resolution.thinking }) },
-    ...input.resolution.fallbacks,
+    ...(input.oversized === true ? [] : input.resolution.fallbacks),
   ]
   const registry = input.modelRegistry
   const taskRuntime = await import("#omo-task-runtime")
@@ -70,15 +73,30 @@ async function launchCandidate(
   const payloadPath = join(input.runDir, "facts-payload.json")
   const extractionPath = join(input.runDir, "extraction.jsonl")
   const state: InProcessMemoryChildState = { cancelled: false }
-  const tool = createFactsRecordTool({ extractionPath, state })
+  if (input.oversized === true && !admitOversizedFacts(input.payload, model)) {
+    throw new Error("oversized facts input does not fit the pinned model budget")
+  }
+  const guard = input.oversized !== true ? undefined : createOversizedFactsGuard({
+    model,
+    ...(input.options.createSession === undefined ? {} : { createSession: input.options.createSession }),
+    onFailure: (reason) => {
+      tool.deactivate()
+      input.options.logger?.warn("oversized facts run refused", { runId: input.runId, reason })
+    },
+  })
+  const tool = createFactsRecordTool({
+    extractionPath, state,
+    ...(guard === undefined ? {} : { maxBytes: FACTS_RECORD_BYTES, maxRecords: FACTS_RECORD_LIMIT, onFailure: guard.fail }),
+  })
+  const createSession = guard?.createSession ?? input.options.createSession
   input.onState?.(state)
-  const result = await runInProcessMemoryChild({
+  let result = await runInProcessMemoryChild({
     runId: input.runId,
     deadlineMs: input.deadlineMs,
     state,
     logger: input.options.logger,
     ...(input.options.createRunner === undefined ? {} : { createRunner: input.options.createRunner }),
-    ...(input.options.createSession === undefined ? {} : { createSession: input.options.createSession }),
+    ...(createSession === undefined ? {} : { createSession }),
     setup: async () => {
       await chmod(payloadPath, 0o600).catch((error: unknown) => {
         if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
@@ -104,6 +122,7 @@ async function launchCandidate(
     tool.deactivate()
     return result
   }
+  if (result.status === "completed" && guard !== undefined && !guard.succeeded()) result = { status: "failed", cause: "child_failed" }
   const timedOut = result.status === "failed" && result.cause === "deadline"
   const outcome: RunOutcome = timedOut
     ? { version: 1, runId: input.runId, attempt, finishedAt: new Date().toISOString(), childExit: { code: null, signal: null }, timedOut: true }
@@ -130,6 +149,7 @@ function buildStart(
     modelRegistry: childRegistry,
     model,
     ...childModelChainSpec({ model: candidate.model, fallbacks }),
+    ...(input.oversized === true ? { retry: { maxRetries: 0 } } : {}),
     ...(candidate.thinking === undefined ? {} : { thinkingLevel: candidate.thinking }),
     toolAllowlist: [FACTS_RECORD_TOOL_NAME],
     memberScopedTools: [tool],
@@ -139,7 +159,7 @@ function buildStart(
     systemPrompt: loadFactsPersona(),
     promptEnvelope: "bare",
     completion: "turn",
-    prompt: `Extract durable facts from this payload and record each accepted fact with ${FACTS_RECORD_TOOL_NAME}.\n\n${payloadText}`,
+    prompt: factsPrompt(payloadText),
   }
 }
 

@@ -261,6 +261,7 @@ type E2eFixtureOptions = {
   readonly admit?: AdmitResident
   readonly defaultConcurrency?: number
   readonly materializeSkills?: ReturnType<typeof createDagSkillMaterializer>
+  readonly maxRunsPerSession?: number
 }
 
 type E2eFixture = {
@@ -283,7 +284,10 @@ type E2eFixture = {
 
 function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
   const project = options.project ?? tempProject()
-  const store = createDagFileStore({ project_dir: project })
+  const store = createDagFileStore({
+    project_dir: project,
+    ...(options.maxRunsPerSession === undefined ? {} : { task: { dag: { max_runs_per_session: options.maxRunsPerSession } } }),
+  })
   const taskStore = createTaskRecordStore({ project_dir: project })
   const runner = options.runner ?? new ImmediateRunner()
   const taskManager = resultPersistingManager(createTaskManager({
@@ -420,8 +424,8 @@ function immediateChildSession(): ChildSession {
   return {
     sessionId: "policy-child",
     prompt: () => Promise.resolve(),
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe: () => () => undefined,
     getLastAssistantText: () => "policy complete",
@@ -751,6 +755,7 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
+      env: { ...process.env },
     })
     const marker = JSON.parse(await readLine(child.stdout)) as { readonly armed: number }
     expect(marker.armed).toBe(stopAt)
@@ -873,6 +878,38 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
 })
 
 describe("DAG retry, amend, and revive end to end", () => {
+  test("#given a session at its active-run cap #when a failed run is retried #then the retry is refused before any node changes, and admitted once a slot frees", async () => {
+    // given - cap 1: the failed run frees its slot, a second run takes it
+    const runner = new ControlledRunner()
+    const fixture = e2eFixture({ runner, maxRunsPerSession: 1 })
+    const failedRun = (await fixture.start(definition("cap-failed", [categoryNode("broken")]))).snapshot.runId
+    await runner.whenStarted(1)
+    runner.settle("broken", failed("broken"))
+    await fixture.wait(failedRun)
+    const activeRun = (await fixture.start(definition("cap-active", [categoryNode("busy")]))).snapshot.runId
+    await runner.whenStarted(2)
+    const eventsBefore = fixture.events(failedRun).length
+
+    // when
+    const refused = () => fixture.retry(failedRun)
+
+    // then - refused with the way out, and nothing about the failed run moved
+    expect(refused).toThrow("DAG session run limit reached: 1 run is active")
+    expect(fixture.events(failedRun)).toHaveLength(eventsBefore)
+    expect(fixture.manager.record(failedRun, parentSessionId)).toMatchObject({ status: "failed" })
+    expect(fixture.manager.record(failedRun, parentSessionId).nodes[0]).toMatchObject({ state: "failed" })
+
+    // when - the active run settles and frees the slot
+    runner.settle("busy", completed("busy"))
+    await fixture.wait(activeRun)
+    const reentry = fixture.retry(failedRun)
+    await runner.whenStarted(3)
+    runner.settle("broken", completed("broken"))
+
+    // then
+    expect((await reentry.run).status).toBe("completed")
+  })
+
   test("#given a failed node in a completed-upstream run #when retried #then the run completes and every upstream task id is reused untouched", async () => {
     // given
     const runner = new ControlledRunner()

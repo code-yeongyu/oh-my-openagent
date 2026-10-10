@@ -7,6 +7,10 @@ import { TASK_HOST_SOCKET_ENV_NAMES } from "../../../../senpi-task/src/runners/r
 import { createLiveThreadSurface, resolveThreadSocket, THREAD_SOCKET_ENV_NAMES } from "./live-surface"
 import type { ThreadHost } from "./tools"
 
+/** An engine that cannot enumerate endpoints: the surface reaches the legacy socket alone. */
+const NO_ENUMERATION = async () => undefined
+const NO_REGISTRY = async () => []
+
 /**
  * `preamble` frames are written BEFORE the correlated response, exactly as the multi-session host
  * does: an `open_session` admission notice (`{type:"queued", for_request:<id>}`) and connection-wide
@@ -41,7 +45,7 @@ async function withRpc(
     const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
     server.listen(socketPath)
     await listening
-    await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath } }), frames)
+    await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, statusAll: NO_ENUMERATION, registry: NO_REGISTRY }), frames)
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const socket of sockets) socket.destroy()
@@ -80,10 +84,10 @@ describe("live thread socket discovery", () => {
     expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe(join("/h", ".senpi", "agent"))
   })
   test("always constructs a surface when the socket is absent at registration", () => {
-    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false })).toBeDefined()
+    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION, registry: NO_REGISTRY })).toBeDefined()
   })
   test("returns typed host_unavailable when the socket is absent at call time", async () => {
-    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false })
+    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION, registry: NO_REGISTRY })
     await expect(surface.listSessions()).rejects.toThrow("host_unavailable:/missing.sock")
   })
 })
@@ -170,7 +174,7 @@ describe("live thread request correlation", () => {
       { success: true, data: { sessions: [{ sessionId: "route-a", cwd: "/w" }] } },
       async (surface) => {
         const sessions = await surface.listSessions()
-        expect(sessions).toEqual([{ sessionId: "route-a", cwd: "/w" }])
+        expect(sessions).toEqual([{ sessionId: "route-a", cwd: "/w", socket: surface.socket, endpoint_kind: "rpc_host", controls: ["send", "read", "rename", "set_model", "set_reasoning", "interrupt"] }])
       },
       () => [
         { type: "agent_start", sessionId: "route-other" },

@@ -3,6 +3,8 @@ import type { Readable } from "node:stream"
 import { lstat } from "node:fs/promises"
 import { IsolationUnavailableError } from "../backend"
 
+const DEFAULT_GIT_TIMEOUT_MS = 120_000
+
 export async function exists(path: string): Promise<boolean> {
   try { await lstat(path); return true } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
@@ -16,10 +18,18 @@ export class GitCommandError extends Error {
     this.name = "GitCommandError"
   }
 }
+export class GitCommandTimeoutError extends GitCommandError {
+  constructor(args: readonly string[], cwd: string, readonly timeoutMs: number) {
+    super(args, cwd, 124, `git timed out after ${timeoutMs}ms`)
+    this.name = "GitCommandTimeoutError"
+  }
+}
 export interface GitOptions {
   cwd: string
   env?: Record<string, string | undefined>
   signal?: AbortSignal
+  /** Maximum command lifetime before the full Git process tree is terminated. */
+  timeoutMs?: number
   input?: string | Buffer
   allowedExitCodes?: readonly number[]
   maxOutputBytes?: number
@@ -38,16 +48,39 @@ export interface GitOptions {
 // leaves alias shells behind), and they are exactly what must die. POSIX group
 // kill still reaches them; the win32 taskkill shot only lands while the
 // leader lives, so the drain grace in runGit covers the rest.
-function killTree(child: ChildProcess): void {
+async function killTree(child: ChildProcess): Promise<void> {
   if (child.pid === undefined) return
+  const killDirect = () => {
+    try { child.kill("SIGKILL") } catch (error) {
+      if (error instanceof Error) return
+      throw error
+    }
+  }
   if (process.platform !== "win32") {
     // POSIX: the child leads its own process group; a group that already died
     // leaves nothing worth killing, so the ESRCH fall-through is a plain kill.
-    try { process.kill(-child.pid, "SIGKILL"); return } catch { try { child.kill("SIGKILL") } catch { /* already exited */ } }
+    try { process.kill(-child.pid, "SIGKILL"); return } catch (error) {
+      if (!(error instanceof Error)) throw error
+      killDirect()
+    }
     return
   }
-  const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true })
-  killer.once("error", () => { try { child.kill("SIGKILL") } catch { /* already exited */ } })
+  await new Promise<void>((resolve) => {
+    let settled = false
+    const finish = (needsFallback: boolean) => {
+      if (settled) return
+      settled = true
+      if (needsFallback) killDirect()
+      resolve()
+    }
+    try {
+      const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true })
+      killer.once("error", () => finish(true))
+      killer.once("close", (code) => finish(code !== 0))
+    } catch {
+      finish(true)
+    }
+  })
 }
 
 /** Drain both pipes concurrently; reject before retaining output beyond the budget. */
@@ -63,14 +96,15 @@ export async function runGit(args: string[], options: GitOptions): Promise<{ cod
     })
     options.onSpawn?.(child)
     if (options.input !== undefined) {
-      child.stdin!.end(typeof options.input === "string" ? options.input : new Uint8Array(options.input))
+      if (child.stdin === null) throw new TypeError("spawned Git process is missing its piped stdin")
+      child.stdin.end(typeof options.input === "string" ? options.input : new Uint8Array(options.input))
     }
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") throw new IsolationUnavailableError("git not on PATH")
     throw error
   }
   // A child that dies mid-write must surface as a failure, not an EPIPE crash.
-  child.stdin?.on("error", () => killTree(child))
+  child.stdin?.on("error", () => { void killTree(child) })
   // Drain both pipes concurrently; reject before retaining output beyond the budget.
   let retained = 0
   const collect = (stream: Readable): Promise<Buffer> => new Promise((resolve, reject) => {
@@ -79,7 +113,7 @@ export async function runGit(args: string[], options: GitOptions): Promise<{ cod
       retained += chunk.byteLength
       if (retained > (options.maxOutputBytes ?? Infinity)) {
         reject(options.outputLimitError?.() ?? new Error("Git output exceeds budget"))
-        killTree(child)
+        void killTree(child)
         // A grandchild may hold the pipe open past the kill; stop waiting on "end".
         child.stdout?.destroy()
         child.stderr?.destroy()
@@ -97,6 +131,9 @@ export async function runGit(args: string[], options: GitOptions): Promise<{ cod
   // failing; a normal drain closes them in milliseconds, so this only fires
   // when survivors hold the handles.
   const PIPE_DRAIN_GRACE_MS = 1_000
+  const timeoutMs = options.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS
+  let timeoutError: GitCommandTimeoutError | undefined
+  let timeout: ReturnType<typeof setTimeout> | undefined
   const exited = new Promise<number>((resolve, reject) => {
     // Node reports a missing executable through the async "error" event, so the
     // spawn try/catch above cannot see it; classify it here.
@@ -115,7 +152,7 @@ export async function runGit(args: string[], options: GitOptions): Promise<{ cod
     let drainGrace: ReturnType<typeof setTimeout> | undefined
     child.once("exit", (code, signal) => {
       if (signal === null && (options.allowedExitCodes ?? [0]).includes(code ?? 0)) return
-      killTree(child)
+      void killTree(child)
       drainGrace = setTimeout(() => {
         child.stdin?.destroy()
         child.stdout?.destroy()
@@ -124,26 +161,50 @@ export async function runGit(args: string[], options: GitOptions): Promise<{ cod
     })
     child.once("close", (code, signal) => {
       clearTimeout(drainGrace)
+      if (timeoutError !== undefined) return reject(timeoutError)
       // A signal death leaves exitCode null; "null ?? 0" would report success
       // for a killed git and its partial output.
       if (signal !== null) return reject(new GitCommandError(args, options.cwd, 128, `git terminated by signal ${signal}`))
       resolve(code ?? 0)
     })
   })
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      const error = new GitCommandTimeoutError(args, options.cwd, timeoutMs)
+      timeoutError = error
+      void killTree(child).finally(() => {
+        child.stdin?.destroy()
+        child.stdout?.destroy()
+        child.stderr?.destroy()
+        reject(error)
+      })
+    }, timeoutMs)
+    timeout.unref()
+  })
+  const stdoutStream = child.stdout
+  const stderrStream = child.stderr
+  if (stdoutStream === null || stderrStream === null) throw new TypeError("spawned Git process is missing piped output")
   try {
-    const [stdout, stderr, code] = await Promise.all([collect(child.stdout!), collect(child.stderr!), exited])
+    const [stdout, stderr, code] = await Promise.all([
+      collect(stdoutStream),
+      collect(stderrStream),
+      Promise.race([exited, deadline]),
+    ])
     options.signal?.throwIfAborted()
     if (!(options.allowedExitCodes ?? [0]).includes(code)) throw new GitCommandError(args, options.cwd, code, stderr.toString())
     return { code, stdout, stderr: stderr.toString() }
   } catch (error) {
-    killTree(child)
+    if (!(error instanceof GitCommandTimeoutError)) await killTree(child)
     child.stdout?.destroy()
     child.stderr?.destroy()
     // The teardown kill itself makes `exited` reject with a signal death; that
     // rejection must not displace the caller's error (the typed budget error,
     // for one) on its way out.
-    await exited.catch(() => {})
+    if (error instanceof GitCommandTimeoutError) void exited.catch(() => {})
+    else await exited.catch(() => {})
     throw error
+  } finally {
+    clearTimeout(timeout)
   }
 }
 

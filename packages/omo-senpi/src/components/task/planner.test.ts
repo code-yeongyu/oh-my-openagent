@@ -93,7 +93,7 @@ describe("createTaskChildPlanner", () => {
     })
   })
 
-  test("#given an explicit provider model #when planned #then explicit metadata does not invent variant or reasoning effort", () => {
+  test("#given an explicit provider model #when planned #then the pin resolves against the registry and the metadata invents no variant or reasoning effort", () => {
     // given
     const planner = createTaskChildPlanner(
       {
@@ -106,7 +106,7 @@ describe("createTaskChildPlanner", () => {
         },
       },
       {},
-      () => registry([model("anthropic", "claude-fable-5-1")]),
+      () => registry([model("openai", "gpt-5.5")]),
     )
 
     // when
@@ -128,6 +128,72 @@ describe("createTaskChildPlanner", () => {
         display: "openai/gpt-5.5",
       },
     })
+  })
+
+  test("#given an explicit provider model the registry does not serve #when planned #then it fails closed naming the pin (#9722)", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, () => registry([model("anthropic", "")]))
+
+    // when
+    const result = planner({
+      prompt: "Use this model directly.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "openai/gpt-5.5",
+    })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind === "error") {
+      expect(result.error.code).toBe("model_unavailable")
+      expect(result.error.message).toContain("openai/gpt-5.5")
+    }
+  })
+
+  test("#given an explicit provider model with a thinking level #when planned #then the level becomes the variant and the model is canonical (#9722)", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, () => registry([model("openai", "gpt-5.5")]))
+
+    // when
+    const result = planner({
+      prompt: "Use this model directly.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "openai/gpt-5.5:medium",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan).toEqual({
+      model: "openai/gpt-5.5",
+      variant: "medium",
+      resolved_model: {
+        source: "explicit",
+        provider: "openai",
+        model_id: "gpt-5.5",
+        display: "openai/gpt-5.5:medium",
+        reasoning: "medium",
+      },
+    })
+  })
+
+  test("#given a malformed explicit model #when planned #then it is a typed invalid_target (#9722)", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, () => registry([model("anthropic", "")]))
+
+    // when
+    const result = planner({
+      prompt: "Use this model directly.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "anthropic/:medium",
+    })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind === "error") {
+      expect(result.error.code).toBe("invalid_target")
+    }
   })
 
   test("#given subagent_type naming a builtin agent #when planned against a registry serving its chain #then the plan carries the agent persona and an agent-sourced model", () => {
@@ -173,7 +239,7 @@ describe("createTaskChildPlanner", () => {
     expect(resolved.plan.agentExecutionMode).toBe("in-process")
   })
 
-  test("#given an explicit model with subagent_type and no registry #when planned #then the agent persona is kept and the model stays explicit", () => {
+  test("#given an explicit model with subagent_type and no registry #when planned #then it fails closed as model_unavailable instead of keeping the pin verbatim (#9722)", () => {
     // given
     const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => undefined)
 
@@ -187,13 +253,39 @@ describe("createTaskChildPlanner", () => {
     })
 
     // then
+    expect(result.kind).toBe("error")
+    if (result.kind === "error") {
+      expect(result.error.code).toBe("model_unavailable")
+    }
+  })
+
+  test("#given an explicit model with subagent_type against a serving registry #when planned #then the agent persona is kept and the canonical pin is used (#9722)", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("openai", "gpt-5.5")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Review this design.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "plan-reviewer",
+      model: "openai/gpt-5.5:medium",
+    })
+
+    // then
     const resolved = expectResolved(result)
     expect(resolved.plan.model).toBe("openai/gpt-5.5")
+    expect(resolved.plan.variant).toBe("medium")
     expect(resolved.plan.resolved_model).toEqual({
       source: "explicit",
       provider: "openai",
       model_id: "gpt-5.5",
-      display: "openai/gpt-5.5",
+      display: "openai/gpt-5.5:medium",
+      reasoning: "medium",
     })
     expect(resolved.plan.agentType).toBe("plan-reviewer")
     expect(resolved.plan.instructions).toBeDefined()
@@ -368,7 +460,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       BUILTIN_AGENTS,
-      () => registry([model("anthropic", "claude-fable-5-1")]),
+      () => registry([model("anthropic", "claude-opus-5-5")]),
     )
 
     // when
@@ -391,7 +483,7 @@ describe("createTaskChildPlanner", () => {
       "plan-consultant",
       "plan-reviewer",
     ])
-    // writing survives when its Fable 5.1 rung resolves; ultrabrain's
+    // writing survives when its Opus 5.5 rung resolves; ultrabrain's
     // Astra-only chain is dead, so the dead-chain gate excludes it.
     expect(result.error.availableCategories).toContain("writing")
     expect(result.error.availableCategories).not.toContain("ultrabrain")
@@ -620,7 +712,7 @@ describe("createTaskChildPlanner reviewer category routing", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.plan.model).toBe("openai/gpt-6-astra")
-    expect(resolved.plan.variant).toBe("xhigh")
+    expect(resolved.plan.variant).toBe("high")
     expect(resolved.plan.fallback_models?.map((record) => record.display)).toContain("anthropic/claude-opus-5-5")
     expect(resolved.plan.instructions).toBe(BUILTIN_AGENTS["omo-native-gate-reviewer"]?.prompt)
     expect(resolved.plan.agentExecutionMode).toBe("in-process")

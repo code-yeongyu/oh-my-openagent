@@ -1,71 +1,10 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { spawn } from "node:child_process"
-import { existsSync, realpathSync, statSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { existsSync, statSync } from "node:fs"
+import { readFile, rm, writeFile } from "node:fs/promises"
+import { join } from "node:path"
 import { installHooks, resolveHooksDir } from "./hooks"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
-
-const tempDirs: string[] = []
-
-interface RunResult {
-  code: number
-  stdout: string
-  stderr: string
-}
-
-function run(argv: readonly string[], cwd: string, env: NodeJS.ProcessEnv = {}): Promise<RunResult> {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn(argv[0] ?? "", argv.slice(1), {
-      cwd,
-      env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: "0" },
-      stdio: ["ignore", "pipe", "pipe"],
-    })
-    let stdout = ""
-    let stderr = ""
-    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()))
-    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()))
-    child.on("error", reject)
-    child.on("close", (code) => resolvePromise({ code: code ?? 1, stdout, stderr }))
-  })
-}
-
-async function tempDir(prefix: string): Promise<string> {
-  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), prefix)))
-  tempDirs.push(dir)
-  return dir
-}
-
-async function createRepo(): Promise<string> {
-  const dir = await tempDir("memory-hooks-")
-  await run(["git", "init", "--quiet"], dir)
-  await run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], dir)
-  await run(["git", "config", "user.email", "agent@omo.local"], dir)
-  await run(["git", "config", "user.name", "OmO Agent"], dir)
-  await run(["git", "config", "commit.gpgsign", "false"], dir)
-  installHooks(dir)
-  return dir
-}
-
-async function writeFiles(dir: string, files: Record<string, string>): Promise<void> {
-  for (const [relativePath, content] of Object.entries(files)) {
-    const fullPath = join(dir, relativePath)
-    await mkdir(dirname(fullPath), { recursive: true })
-    await writeFile(fullPath, content, "utf8")
-  }
-}
-
-async function commit(
-  dir: string,
-  files: Record<string, string>,
-  message = "memory write",
-  env: NodeJS.ProcessEnv = {},
-): Promise<RunResult> {
-  await writeFiles(dir, files)
-  await run(["git", "add", "-A"], dir)
-  return run(["git", "commit", "-m", message], dir, env)
-}
+import { commit, createRepo, removeTempDirs, run, tempDir, writeFiles } from "./hooks.test-support"
 
 const VALID = "---\ndescription: Persona of the agent\n---\n\nbody\n"
 const LOCKED = "---\ndescription: Locked\nread_only: true\n---\n\nbody\n"
@@ -82,9 +21,7 @@ async function seedServerFile(dir: string, relativePath: string, content: string
   if (result.code !== 0) throw new Error(`seed failed: ${result.stdout}${result.stderr}`)
 }
 
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
-})
+afterEach(removeTempDirs)
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 

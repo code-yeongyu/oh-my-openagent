@@ -1,5 +1,5 @@
 import { existsSync } from "../fs/resilient"
-import { mkdir, writeFile } from "../fs/resilient"
+import { mkdir, rm, writeFile } from "../fs/resilient"
 import { dirname, join } from "node:path"
 import { withGitLockRetry, withSerializedGitConfigMutation } from "./config-lock"
 import { DirtyRepoError, NoEffectiveChangesError } from "./errors"
@@ -7,23 +7,30 @@ import { createNodeGitExec, type GitExec, type GitExecResult } from "./exec"
 import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
 import { GitPathStateStore } from "./path-state"
 import { authorFlags, commandError, normalizePathspecs, normalizeSeedPath } from "./repo-arguments"
-import { parseLogOutput, parseNulPaths } from "./repo-log"
+import { runMemoryRepoMaintenance } from "./repo-maintenance"
+import { PathCommitTimes } from "./repo-commit-times"
+import { GitRevisionReads } from "./repo-revision-reads"
 import { assertNoUnrelatedChanges } from "./repo-status"
+import { MemorySecretError, secretPatternClassOf } from "./secret"
+import { scanSecretLikeMaterial } from "../sync/redact"
 import { withSerializedGitWorktreeMutation } from "./worktree-mutation-queue"
 import type {
   GitCommitAuthor,
   GitCommitResult,
   GitLogOptions,
+  GitMaintenanceOptions,
+  GitMaintenanceResult,
   GitMemoryRepoOptions,
   GitMergeOptions,
+  GitTreeBlobEntry,
   GitTreeSizedEntry,
   InitializeGitRepoOptions,
   MemoryCommit,
 } from "./repo-types"
 
 export type {
-  GitCommitAuthor, GitCommitResult, GitLogOptions, GitMemoryRepoOptions,
-  GitMergeOptions, GitSeedFile, GitTreeSizedEntry, InitializeGitRepoOptions, MemoryCommit,
+  GitCommitAuthor, GitCommitResult, GitLogOptions, GitMaintenanceOptions, GitMaintenanceResult, GitMemoryRepoOptions,
+  GitMergeOptions, GitSeedFile, GitTreeBlobEntry, GitTreeSizedEntry, InitializeGitRepoOptions, MemoryCommit,
 } from "./repo-types"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -36,6 +43,8 @@ export class GitMemoryRepo {
   readonly pathState: GitPathStateStore
   private readonly exec: GitExec
   private readonly hookInstaller: (dir: string) => void | Promise<void>
+  private readonly reads: GitRevisionReads
+  private readonly commitTimes: PathCommitTimes
 
   constructor(options: GitMemoryRepoOptions) {
     this.dir = options.dir
@@ -43,6 +52,15 @@ export class GitMemoryRepo {
     this.exec = options.exec ?? createNodeGitExec()
     this.pathState = new GitPathStateStore(this.dir, this.exec)
     this.hookInstaller = options.installHooks ?? (() => undefined)
+    this.reads = new GitRevisionReads({
+      run: (argv, timeoutMs) => this.git(argv, timeoutMs),
+      result: (argv, stdin) => this.gitResult(argv, stdin),
+    })
+    this.commitTimes = new PathCommitTimes(
+      this.dir,
+      { run: (argv, timeoutMs) => this.git(argv, timeoutMs), result: (argv, stdin) => this.gitResult(argv, stdin) },
+      (revision) => this.reads.lsTree(revision),
+    )
   }
 
   async init(options: InitializeGitRepoOptions = {}): Promise<string> {
@@ -114,6 +132,7 @@ export class GitMemoryRepo {
     if (normalized.length === 0) throw new NoEffectiveChangesError(normalized)
     await assertNoUnrelatedChanges(this.dir, normalized, () => this.status())
     if (!(await this.hasPathChanges(normalized))) throw new NoEffectiveChangesError(normalized)
+    await this.assertNoSecretLikeStaging(normalized)
     return this.commitStaged(reason, author)
   }
 
@@ -123,53 +142,60 @@ export class GitMemoryRepo {
     return (await this.git(["-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
   }
 
-  async head(): Promise<string | null> {
-    const result = await this.gitResult(["rev-parse", "--verify", "HEAD"])
-    if (result.code !== 0) return null
-    return result.stdout.trim() || null
-  }
+  head(): Promise<string | null> { return this.reads.head() }
+  headCommitTimestamp(): Promise<number | null> { return this.reads.headCommitTimestamp() }
+  lsTree(revision = "HEAD", path?: string): Promise<string[]> { return this.reads.lsTree(revision, path) }
+  lsTreeSized(revision = "HEAD"): Promise<readonly GitTreeSizedEntry[]> { return this.reads.lsTreeSized(revision) }
+  lsTreeBlobs(revision = "HEAD"): Promise<readonly GitTreeBlobEntry[]> { return this.reads.lsTreeBlobs(revision) }
+  show(revision: string, path: string): Promise<string> { return this.reads.show(revision, path) }
+  pathCommitTimes(revision: string): Promise<ReadonlyMap<string, number>> { return this.commitTimes.at(revision) }
+  readBlobs(oids: readonly string[]): Promise<ReadonlyMap<string, string>> { return this.reads.readBlobs(oids) }
+  log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> { return this.reads.log(options) }
 
-  async headCommitTimestamp(): Promise<number | null> {
-    const result = await this.gitResult(["show", "-s", "--format=%ct", "HEAD"])
-    if (result.code !== 0) return null
-    const timestamp = Number.parseInt(result.stdout.trim(), 10)
-    return Number.isSafeInteger(timestamp) && timestamp >= 0 ? timestamp : null
-  }
-
-  async lsTree(revision = "HEAD", path?: string): Promise<string[]> {
-    const suffix = path ? ["--", path] : []
-    const result = await this.git(["ls-tree", "-r", "--name-only", "-z", revision, ...suffix])
-    return result.stdout.split("\0").filter(Boolean)
-  }
-
-  async lsTreeSized(revision = "HEAD"): Promise<readonly GitTreeSizedEntry[]> {
-    const result = await this.git(["ls-tree", "-r", "-l", "-z", revision])
-    return parseLsTreeSized(result.stdout)
-  }
-
-  async show(revision: string, path: string): Promise<string> {
-    return (await this.git(["show", `${revision}:${path}`])).stdout
-  }
-
-  async log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> {
-    const argv = ["log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI"]
-    // `--fixed-strings` because callers pass trailer literals, `--all-match` because every one of them
-    // must appear in the same commit. Filtering inside git means a caller after one trailer combination
-    // no longer parses the whole history into memory to find it.
-    if (options.grep !== undefined && options.grep.length > 0) {
-      argv.push("--fixed-strings", "--all-match", ...options.grep.map((pattern) => `--grep=${pattern}`))
+  /**
+   * Roll index and worktree back to HEAD for the given pathspecs after a refused
+   * staging: paths tracked at HEAD are restored on both sides (`git restore
+   * --source=HEAD --staged --worktree`), and paths new at HEAD are unstaged and
+   * removed, so a refused tool call leaves no trace behind.
+   */
+  async restorePaths(paths: readonly string[]): Promise<void> {
+    const normalized = normalizePathspecs(paths)
+    if (normalized.length === 0) return
+    const atHead = new Set(await this.lsTree("HEAD"))
+    const tracked = normalized.filter((path) => atHead.has(path))
+    const untracked = normalized.filter((path) => !atHead.has(path))
+    if (tracked.length > 0) {
+      await withGitLockRetry(() => this.git(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...tracked]))
     }
-    if (options.limit !== undefined) argv.push("-n", String(options.limit))
-    if (options.range !== undefined) argv.push(options.range)
-    if (options.paths !== undefined && options.paths.length > 0) argv.push("--", ...options.paths)
-    const records = parseLogOutput((await this.git(argv)).stdout)
-    if (options.includePaths !== true) return records
-    return Promise.all(records.map(async (commit) => ({
-      ...commit,
-      paths: parseNulPaths((await this.git([
-        "diff-tree", "--no-commit-id", "--name-only", "-z", "-r", commit.sha,
-      ])).stdout),
-    })))
+    for (const path of untracked) {
+      await withGitLockRetry(() => this.git(["rm", "-q", "--cached", "--ignore-unmatch", "--", path]))
+      await rm(join(this.dir, path), { force: true })
+    }
+  }
+
+  /**
+   * Refuse a staged commit that would carry secret-like material: first every
+   * normalized path string (a file name is repository-controlled text like any
+   * body), then every staged blob's full content. Reads come from the INDEX
+   * (`git show :<path>`), never the worktree, and deletions are skipped because
+   * their blob is gone.
+   */
+  private async assertNoSecretLikeStaging(paths: readonly string[]): Promise<void> {
+    for (const path of paths) {
+      const patternClass = secretPatternClassOf(path)
+      if (patternClass !== undefined) throw new MemorySecretError({ path, patternClass, where: "path" })
+    }
+    for (const path of paths) {
+      const result = await this.gitResult(["show", `:${path}`])
+      if (result.code !== 0) continue
+      const patternClass = secretPatternClassOf(result.stdout)
+      if (patternClass !== undefined) throw new MemorySecretError({ path, patternClass, where: "content" })
+    }
+  }
+
+  /** Packs loose objects off the hot path; see `runMemoryRepoMaintenance`. */
+  maintain(options: GitMaintenanceOptions): Promise<GitMaintenanceResult> {
+    return runMemoryRepoMaintenance((argv, timeoutMs, signal) => this.git(argv, timeoutMs, signal), options)
   }
 
   async worktreeAdd(path: string, branch: string, startPoint = "HEAD"): Promise<void> {
@@ -244,35 +270,24 @@ export class GitMemoryRepo {
     return head
   }
 
-  private async git(argv: readonly string[]): Promise<GitExecResult> {
-    const result = await this.gitResult(argv)
+  private async git(argv: readonly string[], timeoutMs?: number, signal?: AbortSignal): Promise<GitExecResult> {
+    const result = await this.gitResult(argv, undefined, timeoutMs, signal)
     if (result.code !== 0) throw commandError(argv, result)
     return result
   }
 
-  private gitResult(argv: readonly string[]): Promise<GitExecResult> {
+  private gitResult(
+    argv: readonly string[],
+    stdin?: string,
+    timeoutMs = GIT_TIMEOUT_MS,
+    signal?: AbortSignal,
+  ): Promise<GitExecResult> {
     return this.exec.run(argv, {
       cwd: this.dir,
-      timeoutMs: GIT_TIMEOUT_MS,
+      timeoutMs,
+      ...(signal === undefined ? {} : { signal }),
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      ...(stdin === undefined ? {} : { stdin }),
     })
   }
-}
-
-function parseLsTreeSized(stdout: string): GitTreeSizedEntry[] {
-  const entries: GitTreeSizedEntry[] = []
-  for (const record of stdout.split("\0")) {
-    if (record.length === 0) continue
-    const tab = record.indexOf("\t")
-    if (tab === -1) continue
-    const meta = record.slice(0, tab).trim().split(/\s+/)
-    const path = record.slice(tab + 1)
-    if (meta.length < 4 || path.length === 0) continue
-    const size = meta[3]
-    if (size === undefined || size === "-") continue
-    const bytes = Number.parseInt(size, 10)
-    if (!Number.isSafeInteger(bytes) || bytes < 0) continue
-    entries.push({ path, bytes })
-  }
-  return entries
 }

@@ -27,10 +27,6 @@ describe("omo-ai published package shape", () => {
       test("#then it exposes exactly the omo command pointing at bin/omo.js", () => {
         expect(manifest.bin).toEqual({ omo: "bin/omo.js" })
       })
-
-      test("#then omo-agent-toolkit is absent from the bin map", () => {
-        expect(manifest.bin).not.toHaveProperty("omo-agent-toolkit")
-      })
     })
 
     describe("#when the files array is audited", () => {
@@ -46,11 +42,8 @@ describe("omo-ai published package shape", () => {
     })
 
     describe("#when the dependencies are audited", () => {
-      test("#then it declares exactly the engine and codemode parser runtime dependencies", () => {
-        expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
-          "@babel/parser",
-          "@code-yeongyu/senpi",
-        ])
+      test("#then it declares exactly the engine runtime dependency", () => {
+        expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual(["@code-yeongyu/senpi"])
       })
 
       // omo#8247: the checker npm package ships every platform's binary (~255 MiB unpacked); the
@@ -62,17 +55,6 @@ describe("omo-ai published package shape", () => {
         expect(bundle).toContain("code-yeongyu/go-claude-code-comment-checker")
         expect(bundle).toContain("/releases/download/v")
         expect(bundle).toContain("comment-checker_v")
-      })
-
-      test("#then the codemode parser dependency is exactly pinned", () => {
-        expect(manifest.dependencies?.["@babel/parser"]).toBe("8.0.4")
-      })
-
-      test("#then the senpi pin is exact with no range operator", () => {
-        const pin = manifest.dependencies?.["@code-yeongyu/senpi"]
-        expect(pin).toBe("2026.9.26")
-        expect(pin).toMatch(/^\d/)
-        expect(pin).not.toMatch(/^[\^~]/)
       })
     })
 

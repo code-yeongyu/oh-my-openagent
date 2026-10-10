@@ -6,6 +6,47 @@ import { join } from "node:path"
 import { createFactsRecordTool } from "./facts-record-tool"
 
 describe("facts record tool", () => {
+  test("#given a one-record budget #when calls race #then the count is reserved before append", async () => {
+    const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))
+    try {
+      const path = join(root, "extraction.jsonl")
+      await Bun.write(path, "")
+      const failures: string[] = []
+      const tool = createFactsRecordTool({ extractionPath: path, maxRecords: 1, onFailure: (reason) => failures.push(reason) })
+      const record = { scope: "project" as const, text: "fact", date: "2026-08-10" }
+      const results = await Promise.all([tool.execute("one", record), tool.execute("two", record)])
+      expect(results.filter((result) => result.isError === true)).toHaveLength(1)
+      expect(failures).toHaveLength(1)
+      expect((await readFile(path, "utf8")).trim().split("\n")).toHaveLength(1)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  test("#given an exact JSONL byte budget #when two calls race #then only one reserves space and any rejection invalidates the run", async () => {
+    const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))
+    try {
+      const path = join(root, "extraction.jsonl")
+      await Bun.write(path, "")
+      const record = { scope: "project" as const, text: "é🌍", date: "2026-08-10" }
+      const line = `${JSON.stringify(record)}\n`
+      const failures: string[] = []
+      const tool = createFactsRecordTool({ extractionPath: path, maxBytes: Buffer.byteLength(line), onFailure: (reason) => failures.push(reason) })
+      const results = await Promise.all([tool.execute("one", record), tool.execute("two", record)])
+      expect(results.filter((result) => result.isError === true)).toHaveLength(1)
+      expect(failures).toHaveLength(1)
+      expect(await readFile(path, "utf8")).toBe(line)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  test("#given a bounded extraction append error #when recording fails #then the owner is notified instead of treating a prefix as success", async () => {
+    const failures: string[] = []
+    const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))
+    try {
+      const tool = createFactsRecordTool({ extractionPath: root, onFailure: (reason) => failures.push(reason) })
+      expect((await tool.execute("one", { scope: "project", text: "fact", date: "2026-08-10" })).isError).toBe(true)
+      expect(failures).toHaveLength(1)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
   test("#given the registered record_fact schema #when inspected #then it is a top-level object for provider tool contracts", () => {
     // given
     const tool = createFactsRecordTool({ extractionPath: "/tmp/facts-record-tool-test.jsonl" })

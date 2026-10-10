@@ -1,6 +1,7 @@
 ---
 name: hyperplan
 description: "Adversarial multi-agent planning: a hostile team cross-critiques a plan before it is formalized. Use when planning needs maximum rigor or the user asks for a hyperplan / adversarial or cross-critique plan."
+argument-hint: "[planning-request]"
 metadata:
   short-description: Adversarial 5-member cross-critique planning, then a planner formalizes the survivors
 ---

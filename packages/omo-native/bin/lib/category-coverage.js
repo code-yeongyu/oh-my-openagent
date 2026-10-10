@@ -97,7 +97,7 @@ export async function engineAvailableModels(input) {
 }
 
 /**
- * @typedef {{ name: string, providers: string[] }} UnusableCategory
+ * @typedef {{ name: string, providers: string[], unlistedProviderModel?: string }} UnusableCategory
  * @typedef {{ usable: string[], unusable: UnusableCategory[] }} CategoryCoverage
  * @typedef {{
  *   models: EngineModel[],
@@ -120,6 +120,10 @@ function total(coverage) {
 
 // The category-unavailable notice's wording (omo-senpi components/task/category-unavailable-warning.ts).
 function gapLine(gap) {
+  if (gap.unlistedProviderModel !== undefined) {
+    const gateway = gap.unlistedProviderModel.slice(0, gap.unlistedProviderModel.indexOf("/"))
+    return `Category "${gap.name}" is unavailable: only ${gateway}, which its chain does not list, serves its models, and omo never bills a builtin category to an unlisted provider. Connect one of its providers (${gap.providers.join(", ")}) with /login <provider>, or opt in with categories.${gap.name}.model = "${gap.unlistedProviderModel}" in omo.json.`
+  }
   if (gap.providers.length === 0) {
     return `Category "${gap.name}" has no usable model: your connected providers serve none of its fallback-chain models. Pin categories.${gap.name}.model in omo.json.`
   }

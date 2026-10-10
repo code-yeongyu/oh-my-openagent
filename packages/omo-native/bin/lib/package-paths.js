@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { basename, dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -19,6 +20,13 @@ export function releaseChannel(version = packageManifest().version) {
   return typeof version === "string" && version.includes("-") ? "beta" : "latest"
 }
 
+/** The version the npm dist-tag of `version`'s channel names, or undefined when the tags lack it. */
+export function channelDistTagVersion(distTags, version = packageManifest().version) {
+  if (distTags === null || distTags === undefined || typeof distTags !== "object") return undefined
+  const value = distTags[releaseChannel(version)]
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
 /** The startup banner line: a prerelease names its beta channel, a stable release does not. */
 export function releaseBanner(version = packageManifest().version) {
   return releaseChannel(version) === "beta" ? `omo (omo-ai beta ${version})` : `omo (omo-ai ${version})`
@@ -37,21 +45,45 @@ function installedVersion(root) {
   }
 }
 
-export function updateTarget(root = packageRoot, platform = process.platform, version = installedVersion(root)) {
-  const spec = channelPackageSpec(version)
+/**
+ * The package-manager command that updates the install at `root`. `targetVersion` pins the exact
+ * `omo-ai@<version>` spec; without it the channel spec is installed.
+ *
+ * @param {string} [root]
+ * @param {NodeJS.Platform} [platform]
+ * @param {string} [version]
+ * @param {string} [homeDir]
+ * @param {(path: string) => boolean} [exists]
+ * @param {string} [targetVersion]
+ */
+export function updateTarget(
+  root = packageRoot,
+  platform = process.platform,
+  version = installedVersion(root),
+  homeDir = process.env.HOME || process.env.USERPROFILE || homedir(),
+  exists = existsSync,
+  targetVersion = undefined,
+) {
+  // A resolved target installs that exact version; without one the channel spec is the only answer.
+  const spec = targetVersion === undefined ? channelPackageSpec(version) : `omo-ai@${targetVersion}`
   const updateCwd = dirname(join(root, "package.json"))
   const normalizedRoot = updateCwd.replaceAll("\\", "/")
-  if (normalizedRoot.endsWith(BUN_GLOBAL_PACKAGE_SUFFIX)) {
+  const normalizedHome = homeDir.replaceAll("\\", "/").replace(/\/+$/, "")
+  const bunInstall = normalizedRoot.endsWith(BUN_GLOBAL_PACKAGE_SUFFIX)
+    ? normalizedRoot.slice(0, -BUN_GLOBAL_PACKAGE_SUFFIX.length)
+    : undefined
+  const isLegacyBunGlobal = normalizedRoot === `${normalizedHome}/node_modules/omo-ai`
+    && (exists(join(homeDir, "bun.lock")) || exists(join(homeDir, "bun.lockb")))
+  if (bunInstall !== undefined || isLegacyBunGlobal) {
     // `--cwd` into this package dir does not retarget `bun add -g`; bun still installs into
     // `$BUN_INSTALL/install/global` (or `~/.bun` when that env is unset). The prefix is the
     // ancestor of `/install/global/`, and the spawn overlays it so this install is the one that
-    // moves. `platform` stays on the signature because callers pass the host they are describing.
-    const bunInstall = normalizedRoot.slice(0, -BUN_GLOBAL_PACKAGE_SUFFIX.length)
+    // moves. A legacy Bun home-root install must carry Bun's lockfile and keeps its ambient configuration.
     return {
       manager: "bun",
       command: `bun add -g ${spec}`,
       argv: ["bun", "add", "-g", spec],
-      env: { BUN_INSTALL: bunInstall },
+      ...(bunInstall === undefined ? {} : { env: { BUN_INSTALL: bunInstall } }),
     }
   }
   return {

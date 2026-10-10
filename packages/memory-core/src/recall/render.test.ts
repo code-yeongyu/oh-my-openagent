@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { loadKibitzerPersona } from "./assets/assets"
-import { RECALL_HINT_HEADER, RECALL_HINT_HEADER_KO, renderNudgeBlock, renderNudgeMessage } from "./render"
+import { RECALL_HINT_HEADER, RECALL_HINT_HEADER_KO, renderNudgeBlock } from "./render"
 
 describe("renderNudgeBlock", () => {
   it("#given a judged nudge #when the block is rendered #then the hint replaces the description and excerpt inside the sourced framing", () => {
@@ -46,6 +46,30 @@ describe("renderNudgeBlock", () => {
     expect(rendered.match(/<\/recalled-memory>/g)).toHaveLength(1)
     expect(rendered).toContain("&lt;/recalled-memory&gt;&lt;recalled-memory source=x&gt;")
   })
+
+  it("#given a hint carrying a credential assignment #when rendered #then the hint is masked", () => {
+    // given
+    const nudge = { path: "reference/a.md", hint: "see token=abc123456" }
+
+    // when
+    const block = renderNudgeBlock(nudge)
+
+    // then
+    expect(block).toContain("see ***")
+    expect(block).not.toContain("abc123456")
+  })
+
+  it("#given a path carrying a credential assignment #when rendered #then the source path is masked and no digits remain", () => {
+    // given
+    const nudge = { path: "reference/token=abc123456.md", hint: "clean" }
+
+    // when
+    const block = renderNudgeBlock(nudge)
+
+    // then: the whole assignment is masked (the value tail consumes `.md`), no digits survive
+    expect(block).toContain('source="[[reference/***]]"')
+    expect(block).not.toContain("abc123456")
+  })
 })
 
 describe("kibitzer persona sample block", () => {
@@ -73,25 +97,3 @@ function personaNudgeSample(persona: string): string {
   }
   throw new Error("the kibitzer persona has no <recalled-memory> sample block")
 }
-
-describe("renderNudgeMessage", () => {
-  it("#given no nudges #when the message is rendered #then the result is empty so callers inject nothing", () => {
-    // given / when / then
-    expect(renderNudgeMessage([])).toBe("")
-  })
-
-  it("#given several nudges #when the message is rendered #then one sourced block per nudge keeps the judge's order", () => {
-    // given
-    const nudges = [
-      { path: "notes/b.md", hint: "first fact" },
-      { path: "people/alice.md", hint: "second fact" },
-    ]
-
-    // when
-    const message = renderNudgeMessage(nudges)
-
-    // then
-    expect(message).toBe(`${renderNudgeBlock(nudges[0]!)}\n${renderNudgeBlock(nudges[1]!)}`)
-    expect(message.endsWith("\n")).toBe(false)
-  })
-})

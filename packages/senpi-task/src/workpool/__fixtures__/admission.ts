@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -13,9 +13,8 @@ import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec } fro
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { WorkpoolCreate, WorkpoolEvent } from "../types"
+import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
 
-const cleanups: (() => Promise<void>)[] = []
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup() })
 export const poolInput: WorkpoolCreate = { name: "batch", agent: { category: "quick", prompt: "Process input" }, mode: "fresh" }
 export function deferred<T>() {
   let resolve: (value: T) => void = () => { throw new Error("Deferred was not initialized") }
@@ -75,7 +74,7 @@ export function fixture(options: {
     tryClaimEviction: taskId => manager.tryClaimEviction?.(taskId) ?? false,
     releaseEviction: taskId => manager.releaseEviction?.(taskId),
   }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
     ...(options.kernelToolBindings === undefined ? {} : { kernelToolBindings: options.kernelToolBindings }),
     planner: options.planner ?? (spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model", ...(spec.subagent_type === undefined ? {} : { agentType: spec.subagent_type }) } })),
@@ -87,7 +86,7 @@ export function fixture(options: {
   })
   const events: WorkpoolEvent[] = []
   manager.workpools.subscribe(event => events.push(event))
-  cleanups.push(async () => {
+  onTestFinished(async () => {
     manager.workpools.dispose()
     lifecycle.dispose?.()
     for (const taskId of manager.residentTaskIds()) await lifecycle.destroyResidentTask(taskId, "cancel")

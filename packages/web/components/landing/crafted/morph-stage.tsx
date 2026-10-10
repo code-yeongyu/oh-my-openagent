@@ -133,6 +133,7 @@ export function MorphStage({
     activeRef.current = active
     const clock = clockRef.current
     clock.stateSince = clock.now
+    if (previous !== active) setLiveIndex(null)
     if (reduced || previous === active) {
       resetToActive()
       return

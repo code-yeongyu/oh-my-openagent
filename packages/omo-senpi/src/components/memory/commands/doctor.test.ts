@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { afterEach, describe, expect, setDefaultTimeout, spyOn, test } from "bun:test"
+import { mkdir, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { FactsFailureStore, memoryWriterLockPath } from "@oh-my-opencode/memory-core"
+import { FactsFailureStore, GitMemoryRepo, memoryWriterLockPath } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import {
@@ -16,13 +16,14 @@ import {
   type FakeDeps,
 } from "./commands.test-support"
 import { registerDoctorCommand } from "./doctor"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 const SEEDS = [
@@ -74,6 +75,78 @@ Changes to these files only take effect after a git commit. Use the memory tools
 const V1_PERSONA_SEED = `---\ndescription: Persona - who I am\n---\n${V1_PERSONA_BODY}`
 
 describe("/doctor", () => {
+  test("#given a dangling target #when doctor runs #then audit warns", async () => {
+    const { identity, pi, ctx } = await harness()
+    await mkdir(join(identity.identityPaths.repo, "reference"))
+    await writeFile(join(identity.identityPaths.repo, "reference/a.md"), "---\ndescription: Link\n---\n[[reference/missing.md]]\n")
+    const text = await invoke(pi, "doctor", "", ctx)
+    expect(text).toContain("[warn] audit:link_dangling: 1 issue: reference/a.md -> reference/missing.md")
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("warning")
+  })
+
+  test("#given a clean corpus #when doctor runs #then audit reports success once", async () => {
+    const { pi, ctx } = await harness()
+    const text = await invoke(pi, "doctor", "", ctx)
+    expect(text.match(/\[ok\] audit:/g)).toHaveLength(1)
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("info")
+  })
+
+  test("#given a clean corpus #when JSON is requested #then the audit notification is parseable and unchanged", async () => {
+    const { pi, ctx, identity } = await harness()
+    const text = await invoke(pi, "doctor", "--json", ctx)
+    const report = JSON.parse(text)
+    expect(report.audit.version).toBe(1)
+    expect(report.identity).toBe(identity.identity)
+    expect(report.checks.find((check: { name: string }) => check.name === "repository").level).toBe("ok")
+    expect(report.skills).toEqual({ scanned: 0, repaired: 0 })
+    expect(ctx.ui.notifications.at(-1)?.message).toBe(text)
+  })
+
+  test("#given legacy secrets #when JSON is requested #then audit redaction preserves counts", async () => {
+    const { identity, pi, ctx } = await harness()
+    await mkdir(join(identity.identityPaths.repo, "reference"))
+    await writeFile(join(identity.identityPaths.repo, "reference/a.md"), "---\ndescription: Legacy link\n---\n[[notes/token=abc123456.md]]\n")
+    await mkdir(identity.identityPaths.locks, { recursive: true })
+    await writeFile(join(identity.identityPaths.locks, "AKIAABCDEFGHIJKLMNOP.lock"), "invalid")
+    const text = await invoke(pi, "doctor", "--json", ctx)
+    const report = JSON.parse(text)
+    expect(report.audit.counts.link_dangling).toBe(1)
+    expect(Object.values(report.audit.counts).every((count) => typeof count === "number")).toBe(true)
+    expect(report.audit.issues[0].detail).toContain("***")
+    expect(report.checks.find((check: { name: string }) => check.name === "locks").detail).toContain("***")
+    expect(text).not.toContain("abc123456")
+    expect(text).not.toContain("AKIAABCDEFGHIJKLMNOP")
+  })
+
+  test("#given invalid frontmatter #when JSON is requested #then audit keeps the existing single failure check", async () => {
+    const { identity, pi, ctx } = await harness()
+    await writeFile(join(identity.identityPaths.repo, "system/bad.md"), "missing description")
+    const text = await invoke(pi, "doctor", "--json", ctx)
+    const report = JSON.parse(text)
+    expect(report.audit.counts.frontmatter_invalid).toBe(1)
+    expect(report.checks.filter((check: { name: string }) => check.name === "frontmatter")).toHaveLength(1)
+    expect(report.checks.find((check: { name: string }) => check.name === "frontmatter").level).toBe("fail")
+    expect(report.checks.some((check: { name: string }) => check.name === "audit:frontmatter_invalid")).toBe(false)
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
+  })
+
+  test("#given an unknown repair flag #when doctor runs #then audit refuses it", async () => {
+    const { pi, ctx } = await harness()
+    const text = await invoke(pi, "doctor", "--json --fix", ctx)
+    expect(text).toContain("unknown flag --fix")
+    expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
+  })
+
+  test("#given registration #when doctor is not invoked #then no identity or settings are resolved", () => {
+    const pi = new MemoryFakeExtensionAPI()
+    registerDoctorCommand(pi, {
+      contextForSession: () => { throw new Error("registration resolved identity") },
+      bustPromptCache: () => { throw new Error("registration cleared prompt cache") },
+      loadSettings: () => { throw new Error("registration loaded settings") },
+    })
+    expect(pi.commands.find((command) => command.name === "doctor")?.options.description).toBe("Run deterministic memory health checks and repair skill frontmatter.")
+  })
+
   test("#given a healthy repository #when doctor runs #then every deterministic check passes", async () => {
     // given
     const { pi, ctx } = await harness()
@@ -325,6 +398,77 @@ describe("/doctor", () => {
     expect(text).toContain("1")
   })
 
+  test("#given a projection inside its limits #when doctor runs #then it reports shown, omitted and bytes against the limits", async () => {
+    // given
+    const { pi, ctx } = await harness({
+      seeded: true,
+      deps: { loadSettings: () => ({ settings: memorySettings(), configPath: "/tmp/omo.jsonc" }) },
+    })
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toMatch(/^\[ok\] projection: \d+ entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 24576 bytes\)$/m)
+  })
+
+  test("#given commit times that cannot be read #when doctor runs #then the projection check warns that names fell back to name order", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ seeded: false })
+    await seededRepo(identity, [...SEEDS, { relativePath: "reference/a.md", content: "---\ndescription: A\n---\na\n" }])
+    const commitTimes = spyOn(GitMemoryRepo.prototype, "pathCommitTimes").mockRejectedValue(new Error("git log timed out"))
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx).finally(() => commitTimes.mockRestore())
+
+    // then
+    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 24576 bytes\); commit times unreadable, names listed in name order$/m)
+  })
+
+  test("#given more names than the per-directory limit #when doctor runs #then the omitted count is a warning", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({
+      seeded: false,
+      deps: {
+        loadSettings: () => ({
+          settings: memorySettings({ projection: { max_entries_per_directory: 1, max_bytes: 0 } }),
+          configPath: "/tmp/omo.jsonc",
+        }),
+      },
+    })
+    await seededRepo(identity, [
+      ...SEEDS,
+      { relativePath: "reference/a.md", content: "---\ndescription: A\n---\na\n" },
+      { relativePath: "reference/b.md", content: "---\ndescription: B\n---\nb\n" },
+    ])
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 1 omitted, \d+ bytes \(limits 1\/dir, no byte limit\)$/m)
+  })
+
+  test("#given a byte limit no listing fits #when doctor runs #then the overflow is reported with the smallest listing", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({
+      seeded: false,
+      deps: {
+        loadSettings: () => ({
+          settings: memorySettings({ projection: { max_entries_per_directory: 40, max_bytes: 10 } }),
+          configPath: "/tmp/omo.jsonc",
+        }),
+      },
+    })
+    await seededRepo(identity, [...SEEDS, { relativePath: "reference/a.md", content: "---\ndescription: A\n---\na\n" }])
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 10 bytes\); no listing fits max_bytes, the smallest is \d+ bytes over$/m)
+  })
+
   test("#given a skill missing name frontmatter #when doctor runs #then the repair helper reports the fix", async () => {
     // given
     const { identity, pi, ctx } = await harness()
@@ -384,5 +528,152 @@ describe("/doctor", () => {
     // then
     expect(text).toContain("not bound")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
+  })
+})
+
+describe("doctor receipts and quarantined runs", () => {
+  const NOW_MS = Date.parse("2026-10-06T12:00:00.000Z")
+  const HOUR_MS = 60 * 60_000
+
+  async function writeReceipts(runtimeDir: string, lines: readonly Record<string, unknown>[], tail = ""): Promise<void> {
+    await mkdir(runtimeDir, { recursive: true })
+    const base = { v: 1, host: "fixture-host", pid: 1 }
+    await writeFile(join(runtimeDir, "receipts.jsonl"), `${lines.map((line) => JSON.stringify({ ...base, ...line })).join("\n")}\n${tail}`)
+  }
+
+  function at(msBeforeNow: number): string {
+    return new Date(NOW_MS - msBeforeNow).toISOString()
+  }
+
+  test("#given receipts for dream and reflection #when doctor runs #then each kind shows its newest terminal receipt and facts shows never", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
+    await writeReceipts(identity.identityPaths.runtime, [
+      { at: at(72 * HOUR_MS), kind: "reflection", runId: "reflection-older", trigger: "step-count", event: "merged", generation: at(73 * HOUR_MS) },
+      { at: at(48 * HOUR_MS), kind: "dream", runId: "dream-run-abcdef", trigger: "idle", event: "merged", generation: at(49 * HOUR_MS), sha: "abc123" },
+      { at: at(HOUR_MS), kind: "reflection", runId: "reflection-newer", trigger: "step-count", event: "failed", generation: at(2 * HOUR_MS), reason: "validation_failed" },
+      { at: at(60_000), kind: "dream", runId: "dream-run-next", trigger: "idle", event: "launched", generation: at(60_000) },
+    ])
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    // then
+    expect(text).toContain("[ok] receipts: dream merged 2d ago (run dream-ru); reflection failed 1h ago (validation_failed); facts never")
+    expect(report.receipts).toEqual({
+      dream: { event: "merged", at: at(48 * HOUR_MS), runId: "dream-run-abcdef", trigger: "idle", sha: "abc123" },
+      reflection: { event: "failed", at: at(HOUR_MS), runId: "reflection-newer", trigger: "step-count", reason: "validation_failed" },
+      facts: null,
+    })
+  })
+
+  test("#given a run reconciliation quarantined #when doctor runs #then it is listed for manual disposal with its reason", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
+    const runDir = join(identity.identityPaths.reflection, "runs", "run-quarantined")
+    await mkdir(runDir, { recursive: true })
+    const record = {
+      version: 1, runId: "run-quarantined", kind: "reflection", trigger: "step-count", generation: at(3 * HOUR_MS),
+      reason: "ledger_unreadable", quarantinedAt: at(2 * HOUR_MS), evidence: ["final.json", "ledger.json"],
+    }
+    await writeFile(join(runDir, "quarantined.json"), JSON.stringify(record))
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    // then
+    expect(text).toContain(`[warn] quarantined-runs: 1 run needs manual disposal: ${runDir} (ledger_unreadable)`)
+    expect(report.quarantinedRuns).toEqual([{
+      runId: "run-quarantined", reason: "ledger_unreadable", at: record.quarantinedAt, dir: runDir, evidence: record.evidence,
+    }])
+    expect(report.level).toBe("warn")
+  })
+
+  test("#given a quarantine record whose evidence name holds a credential next to a quote #when doctor runs with --json #then the report still parses and the credential is masked", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
+    const runDir = join(identity.identityPaths.reflection, "runs", "run-quoted")
+    await mkdir(runDir, { recursive: true })
+    await writeFile(join(runDir, "quarantined.json"), JSON.stringify({
+      version: 1, runId: "run-quoted", kind: "reflection", trigger: "step-count", generation: at(3 * HOUR_MS),
+      reason: "ledger_unreadable", quarantinedAt: at(2 * HOUR_MS), evidence: ['notes/token=abc\\x"def.md', "ledger.json"],
+    }))
+
+    // when
+    const text = await invoke(pi, "doctor", "--json", ctx)
+
+    // then
+    const report = JSON.parse(text)
+    expect(report.quarantinedRuns[0].evidence).toEqual(['notes/***"def.md', "ledger.json"])
+    expect(text).not.toContain("token=abc")
+  })
+
+  test("#given a receipts file ending in a partial line #when doctor runs #then the receipts check warns and counts the skipped line", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
+    await writeReceipts(identity.identityPaths.runtime, [
+      { at: at(HOUR_MS), kind: "facts", batchId: "batch-0001", trigger: "settle", event: "committed" },
+    ], '{"v":1,"at":"2026-10-06T11:59')
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toContain("[warn] receipts: dream never; reflection never; facts committed 1h ago (batch batch-00) (1 partial line skipped)")
+  })
+
+  test("#given receipts, a quarantined run and projection omissions together #when doctor runs with --json #then one parsed report carries all three", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({
+      seeded: false,
+      deps: {
+        now: () => NOW_MS,
+        loadSettings: () => ({
+          settings: memorySettings({ projection: { max_entries_per_directory: 1, max_bytes: 0 } }),
+          configPath: "/tmp/omo.jsonc",
+        }),
+      },
+    })
+    await seededRepo(identity, [
+      ...SEEDS,
+      { relativePath: "reference/a.md", content: "---\ndescription: A\n---\na\n" },
+      { relativePath: "reference/b.md", content: "---\ndescription: B\n---\nb\n" },
+    ])
+    await writeReceipts(identity.identityPaths.runtime, [
+      { at: at(HOUR_MS), kind: "reflection", runId: "reflection-run-1", trigger: "step-count", event: "merged", generation: at(2 * HOUR_MS), sha: "abc" },
+    ])
+    const runDir = join(identity.identityPaths.reflection, "runs", "run-quarantined")
+    await mkdir(runDir, { recursive: true })
+    await writeFile(join(runDir, "quarantined.json"), JSON.stringify({
+      version: 1, runId: "run-quarantined", kind: "reflection", trigger: "step-count", generation: at(3 * HOUR_MS),
+      reason: "ledger_unreadable", quarantinedAt: at(2 * HOUR_MS), evidence: ["ledger.json"],
+    }))
+
+    // when
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    // then
+    expect(report.receipts.reflection).toMatchObject({ event: "merged", runId: "reflection-run-1" })
+    expect(report.quarantinedRuns).toEqual([expect.objectContaining({ runId: "run-quarantined", reason: "ledger_unreadable" })])
+    expect(report.checks).toContainEqual(expect.objectContaining({ name: "projection", level: "warn", detail: expect.stringMatching(/1 omitted/) }))
+  })
+
+  test("#given a launch the reconciler recorded as interrupted #when doctor runs #then it is not a run needing manual disposal", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
+    const runDir = join(identity.identityPaths.reflection, "runs", "run-interrupted")
+    await mkdir(runDir, { recursive: true })
+    await writeFile(join(runDir, "abandoned.json"), JSON.stringify({
+      version: 1, runId: "run-interrupted", abandonedAt: at(HOUR_MS), reason: "launch_interrupted",
+      generation: at(2 * HOUR_MS), kind: "reflection", trigger: "step-count",
+    }))
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toContain("[ok] abandoned-runs: no abandoned runs")
   })
 })

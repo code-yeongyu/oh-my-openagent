@@ -72,6 +72,24 @@ const FINAL_TEXT = "omo e2e fallback child final text"
 // (builtin quick rung-1 dead, rung-2 healthy, no user fallback_models), "chain-exhausted"
 // (every available rung dead).
 const SCENARIO = process.env.OMO_FALLBACK_SCENARIO ?? "user-fallback"
+// Usage-limit scenarios (#8296): "limit-account" spends the whole mock account (every omo-fallback-mock
+// model answers a session limit, only omo-fallback-other serves); "limit-model" caps only limit-fable.
+const LIMIT_ERRORS: Readonly<Record<string, string>> = {
+  "limit-account": "You've hit your session limit · resets 3pm (Asia/Seoul)",
+  "limit-model": "You've hit your Fable weekly limit · resets Oct 2, 9am",
+}
+// "limit-after-tool" (#9512): the child's primary first makes a tool call, then hits a usage limit on
+// the request that carries the tool result, so the fallback has to happen inside the running turn.
+const LIMIT_AFTER_TOOL = "limit-after-tool"
+const LIMIT_AFTER_TOOL_ERROR = "You've hit your session limit · resets 3pm (Asia/Seoul)"
+// "limit-near-compaction" (#9582): the same tool-then-limit turn, but the tool-call response reports a
+// context past the compaction threshold (window minus the 16384-token compaction reserve), so the engine
+// compacts before it retries. A pre-retry compaction runs on the CURRENT model, which is spent: the child
+// must still reach its fallback. The window stays well above senpi's start minimum (about 52K tokens with
+// the omo tool schemas on macOS, more where more tools load), or the session is refused before the turn.
+const LIMIT_NEAR_COMPACTION = "limit-near-compaction"
+const NEAR_COMPACTION_WINDOW = 128_000
+const NEAR_COMPACTION_INPUT = 114_000
 let parentCalls = 0
 
 export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
@@ -84,10 +102,14 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
       mockModel("parent", "Parent"),
       mockModel("dead-primary", "Dead primary"),
       mockModel("healthy-fallback", "Healthy fallback"),
+      mockModel("limit-fable", "Usage-limited primary"),
+      mockModel("limit-opus", "Same-account sibling"),
+      mockModel("limit-after-tool", "Primary limited after a tool call"),
+      { ...mockModel(LIMIT_NEAR_COMPACTION, "Primary limited near the compaction threshold"), contextWindow: NEAR_COMPACTION_WINDOW },
     ],
     streamSimple(model, context) {
       if (isChild(context)) {
-        return streamMessage(childReply(model.id))
+        return streamMessage(childReply(model.id, context))
       }
       parentCalls += 1
       return streamMessage(parentCalls === 1
@@ -96,7 +118,11 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
             id: "fallback-task-call",
             name: "task",
             arguments: {
-              category: SCENARIO === "user-fallback" ? "fallbackcat" : "quick",
+              category: SCENARIO === "user-fallback"
+                ? "fallbackcat"
+                : SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === LIMIT_NEAR_COMPACTION
+                  ? "toolcat"
+                  : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick",
               prompt: "complete through the configured fallback chain",
               run_in_background: false,
               name: "fallback-child",
@@ -106,16 +132,26 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     },
   })
 
-  // Builtin chain fixture providers for the "quick" category: rung 1 (openai-codex/
+  // Builtin chain fixture providers for the "quick" category: rung 1 (chatgpt-subscription/
   // gpt-6-luna-fast) always dies on the child; rung 2 (deepseek/deepseek-flash) answers
   // unless the scenario exhausts the chain. Both fixtures declare reasoning so the runtime
   // accepts the rung variants ("low" / "off") in its fallback selector.
-  pi.registerProvider("openai-codex", {
-    name: "omo runtime fallback openai-codex fixture",
+  pi.registerProvider("chatgpt-subscription", {
+    name: "omo runtime fallback chatgpt subscription fixture",
     baseUrl: "file://omo-runtime-fallback-mock",
     apiKey: "mock",
     api: "openai-completions",
     models: [{ ...mockModel("gpt-6-luna-fast", "Dead chain rung one"), reasoning: true }],
+    streamSimple(model, context) {
+      return streamMessage(childReply(model.id))
+    },
+  })
+  pi.registerProvider("omo-fallback-other", {
+    name: "omo runtime fallback second provider",
+    baseUrl: "file://omo-runtime-fallback-mock",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [mockModel("limit-kimi", "Other-provider rung")],
     streamSimple(model, context) {
       return streamMessage(childReply(model.id))
     },
@@ -139,10 +175,9 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
       fs.writeFileSync(`/tmp/fallback-dump-${label}.json`, JSON.stringify({
         label,
         count: ids.length,
-        quotio: ids.filter((id) => id.includes("quotio")),
-        kimi: ids.filter((id) => id.includes("kimi")),
+        quick: ids.filter((id) => id.includes("chatgpt-subscription") || id.includes("deepseek")),
         mock: ids.filter((id) => id.includes("omo-fallback-mock")),
-        findQuotio: registry?.find("openai-codex", "gpt-6-luna-fast") !== undefined,
+        findQuickPrimary: registry?.find("chatgpt-subscription", "gpt-6-luna-fast") !== undefined,
       }, null, 2))
     }
     dump("t0")
@@ -151,7 +186,35 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   }
 }
 
-function childReply(modelId: string): AssistantMessage {
+function childReply(modelId: string, context: Context): AssistantMessage {
+  if (SCENARIO === LIMIT_NEAR_COMPACTION && modelId === LIMIT_NEAR_COMPACTION) {
+    return hasToolResult(context)
+      ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
+      : {
+          ...assistant(modelId, "toolUse", [{
+            type: "toolCall",
+            id: "limit-near-compaction-call",
+            name: "bash",
+            arguments: { command: "printf limit-near-compaction-ran" },
+          }]),
+          usage: { input: NEAR_COMPACTION_INPUT, output: 40, cacheRead: 0, cacheWrite: 0, totalTokens: NEAR_COMPACTION_INPUT + 40, cost: 0 },
+        }
+  }
+  if (SCENARIO === LIMIT_AFTER_TOOL && modelId === LIMIT_AFTER_TOOL) {
+    return hasToolResult(context)
+      ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
+      : assistant(modelId, "toolUse", [{
+          type: "toolCall",
+          id: "limit-after-tool-call",
+          name: "bash",
+          arguments: { command: "printf limit-after-tool-ran" },
+        }])
+  }
+  const limitError = LIMIT_ERRORS[SCENARIO]
+  if (limitError !== undefined) {
+    const spent = modelId === "limit-fable" || (modelId === "limit-opus" && SCENARIO === "limit-account")
+    return spent ? assistant(modelId, "error", [], limitError) : assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+  }
   if (modelId === "healthy-fallback") {
     return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
   }
@@ -173,7 +236,19 @@ function mockModel(id: string, name: string) {
   }
 }
 
+// The identity line is written by the in-process subagent prompt only. A per-child process carries
+// OMO_SENPI_TASK_RPC_CHILD=1 from the process runner; that env marker is the signal that holds on Windows,
+// where the provider extension does not see the `--mode rpc` argv. A task daemon session still runs in
+// `--mode rpc` while the driver's parent runs `-p`, so the rpc argv stays a second signal there.
 function isChild(context: Context): boolean {
+  return messagesContainChild(context) || process.env.OMO_SENPI_TASK_RPC_CHILD === "1" || process.argv.includes("rpc")
+}
+
+function hasToolResult(context: Context): boolean {
+  return (context.messages ?? []).some((message) => (message as { readonly role?: string }).role === "toolResult")
+}
+
+function messagesContainChild(context: Context): boolean {
   return (context.messages ?? []).some((message) => {
     if (typeof message.content === "string") return message.content.includes(CHILD_IDENTITY)
     return message.content.some((part) => part.text?.includes(CHILD_IDENTITY) === true)

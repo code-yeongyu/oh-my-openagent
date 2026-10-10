@@ -8,6 +8,7 @@ export type BuildNode = {
 const OPENTUI_EXTERNALS = ["@opentui/core", "@opentui/keymap", "@opentui/solid"]
 
 export const BUILD_NODES: BuildNode[] = [
+	{ id: "service-auth", command: "bun", args: ["script/build-service-auth.ts"], deps: [] },
 	{ id: "git-bash-mcp", command: "bun", args: ["run", "build:git-bash-mcp"], deps: [] },
 	{ id: "ast-grep-mcp", command: "bun", args: ["run", "build:ast-grep-mcp"], deps: [] },
 	{ id: "lsp-tools-mcp", command: "bun", args: ["run", "build:lsp-tools-mcp"], deps: [] },
@@ -39,7 +40,7 @@ export const BUILD_NODES: BuildNode[] = [
  * binary build.
  */
 export const BUILD_PROFILES: Record<string, readonly string[]> = {
-	"omo-native": ["lsp-daemon", "ast-grep-mcp"],
+	"omo-native": ["lsp-daemon", "ast-grep-mcp", "service-auth"],
 }
 
 export function selectBuildNodes(

@@ -3,6 +3,7 @@ import type { AgentSessionEvent, RpcCommand, RpcExtensionUIRequest, RpcResponse 
 import { log } from "@oh-my-opencode/utils"
 
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
+import { createChildExtensionEvents } from "../child-extension-events"
 import { RpcCommandError } from "./errors"
 import { tailStderr } from "./exit-mapping"
 import { buildAutoUiResponse } from "./ui-auto-answer"
@@ -30,6 +31,7 @@ type PendingRequest = {
  * survives. This module NEVER sends process signals - see terminate.ts.
  */
 export class RpcProtocolClient {
+  readonly extensionEvents = createChildExtensionEvents()
   private readonly child: ChildProcess
   private readonly onMalformedLine: MalformedLineHandler
   private readonly autoAnswerUi: boolean
@@ -112,6 +114,7 @@ export class RpcProtocolClient {
   }
 
   detach(): void {
+    this.extensionEvents.clear()
     this.eventListeners.clear()
     this.exitListeners.clear()
   }
@@ -165,6 +168,7 @@ export class RpcProtocolClient {
       this.answerUi(parsed as RpcExtensionUIRequest)
       return
     }
+    if (this.extensionEvents.ingest(parsed)) return
     for (const listener of this.eventListeners) {
       listener(parsed as AgentSessionEvent)
     }

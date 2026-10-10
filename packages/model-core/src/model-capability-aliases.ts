@@ -47,7 +47,7 @@ const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
     providerIDs: ["openai"],
     allowedSubproviderHosts: ["vercel"],
     match: (normalizedModelID) =>
-      /^(?:gpt-5\.6-(?:sol|terra|luna)|gpt-6-(?:astra|sol|luna))-fast$/.test(normalizedModelID),
+      /^(?:gpt-5\.6-(?:sol|terra|luna)|gpt-6-(?:astra|sol|luna)|gpt-6\.1-sol)-fast$/.test(normalizedModelID),
     canonicalize: (normalizedModelID) => normalizedModelID.slice(0, -"-fast".length),
   },
   {

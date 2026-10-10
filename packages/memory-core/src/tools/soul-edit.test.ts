@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -8,6 +8,7 @@ import { renderMemoryFile } from "../memfs/frontmatter"
 import { MEMORY_SOUL_EDIT_RESULT_TOKEN } from "../soul"
 import { runMemoryTool, type MemoryToolLock } from "./memory"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR: GitCommitAuthor = {
   agentId: "agent-soul-edit-test",
@@ -18,7 +19,7 @@ const roots: string[] = []
 const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 async function fixture(): Promise<{ repo: GitMemoryRepo; lock: MemoryToolLock }> {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-soul-edit-")))

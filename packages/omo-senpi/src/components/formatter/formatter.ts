@@ -49,7 +49,7 @@ export function createFormatterStep(options: FormatterStepOptions = {}) {
     if (event.toolName === undefined || !MUTATION_TOOL_NAMES.has(event.toolName) || event.input === undefined) return { content: undefined, error: undefined }
     const config = { ...formatOnMutationDefaults, ...(options.config ?? {}) }
     if (config.mode === "off") return { content: undefined, error: undefined }
-    const additions: string[] = []
+    const additions: { readonly type: "text"; readonly text: string }[] = []
     let requiredError: string | undefined
     for (const rawPath of extractMutatedFilePaths(event)) {
       const filePath = resolve(cwd, rawPath)
@@ -61,7 +61,10 @@ export function createFormatterStep(options: FormatterStepOptions = {}) {
       const language = languageForPath(filePath)
       if (resolveFormatMode(config, language) === "off") continue
       const result = await runSingleFlight(filePath, () => formatOne(filePath, marker, cwd, config.timeoutMs, daemonFormat, options.resolveBinary))
-      if (result.status === "formatted") additions.push(`\n\n(OmO) auto-formatted ${relative(cwd, filePath)} with ${marker.tool} (+${result.added}/-${result.removed} lines). File content changed; re-read before exact-text edits.`)
+      if (result.status === "formatted") additions.push({
+        type: "text",
+        text: `\n\n(OmO) auto-formatted ${relative(cwd, filePath)} with ${marker.tool} (+${result.added}/-${result.removed} lines). File content changed; re-read before exact-text edits.`,
+      })
       if (result.status === "missing" && config.mode === "required") requiredError = `Formatter ${marker.tool} is unavailable for ${rawPath}`
       if (result.status === "missing" && config.mode === "best-effort" && !missingNotices.has(`${sessionId}:${marker.tool}`)) {
         missingNotices.add(`${sessionId}:${marker.tool}`)

@@ -1,6 +1,7 @@
 ---
 name: ulw-research
 description: "Runs maximum-saturation research with a cooperating team, claim-graph gating, and a cited, QA'd deliverable. Use when the user explicitly asks for research or a deep investigation, including any 'ulw' research wording."
+argument-hint: "<research-topic>"
 metadata:
   short-description: Team-default saturation research with debate cross-critique and cited synthesis
 ---

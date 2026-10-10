@@ -4,11 +4,36 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
-import { HostUnavailableError, RpcHostRunner, RpcProcessRunner } from "@oh-my-opencode/senpi-task"
+import { HostUnavailableError, RpcHostRunner, RpcProcessRunner, type EnsureTaskDaemonPort } from "@oh-my-opencode/senpi-task"
 
 import { buildProcessChildRunner, type RunnerBuildContext } from "./engine-runners"
 import { createHostExecutionModeGate, createHostNotices } from "./host-execution-mode"
 import { TaskRuntimeContext } from "./runtime-context"
+import { createSessionShardRouting } from "./shard-routing"
+
+function attachedRuntime(cwd: string, sessionId = "01a0e4ae-parent"): TaskRuntimeContext {
+  const runtime = new TaskRuntimeContext(cwd)
+  runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
+  return runtime
+}
+
+function routingFor(input: {
+  readonly settings: OmoTaskSettings
+  readonly notices: ReturnType<typeof createHostNotices>
+  readonly ensureDaemon: EnsureTaskDaemonPort
+}) {
+  return createSessionShardRouting({
+    settings: input.settings,
+    runtime: attachedRuntime("/tmp/dh-project"),
+    pi: {},
+    agentDir: "/tmp/dh-agent",
+    env: {},
+    notices: input.notices,
+    shardEvents: {},
+    ensureDaemon: input.ensureDaemon,
+    probeHost: () => Promise.resolve(undefined),
+  })
+}
 
 const tempDirs: string[] = []
 
@@ -24,6 +49,7 @@ function tempProject(): string {
 
 function buildContext(settings: OmoTaskSettings, platform: NodeJS.Platform): RunnerBuildContext {
   const cwd = tempProject()
+  const notices = createHostNotices(() => {})
   return {
     runtime: new TaskRuntimeContext(cwd),
     sharedParentTools: () => [],
@@ -31,6 +57,10 @@ function buildContext(settings: OmoTaskSettings, platform: NodeJS.Platform): Run
     platform,
     agentDir: join(cwd, "agent"),
     env: {},
+    hostRouting: {
+      ...routingFor({ settings, notices, ensureDaemon: () => Promise.reject(new Error("never ensured here")) }),
+      storeDir: join(cwd, ".omo", "senpi-task"),
+    },
   }
 }
 
@@ -77,20 +107,63 @@ describe("host execution mode gate", () => {
       agentDir: "/tmp/dh-agent",
       env: {},
       notices: input.notices,
-      ensureDaemon: async () => {
-        const ensured = await input.ensure()
-        return {
-          action: "reuse",
-          reason: "compatible",
-          socket: ensured.socket,
-          pid: 1234,
-          reused: true,
-          upgradeable: true,
-          ...(ensured.capabilities === undefined ? {} : { capabilities: ensured.capabilities }),
-        }
-      },
+      routing: routingFor({
+        settings: input.settings,
+        notices: input.notices,
+        ensureDaemon: async () => {
+          const ensured = await input.ensure()
+          return {
+            action: "reuse",
+            reason: "compatible",
+            socket: ensured.socket,
+            pid: 1234,
+            reused: true,
+            upgradeable: true,
+            ...(ensured.capabilities === undefined ? {} : { capabilities: ensured.capabilities }),
+          }
+        },
+      }),
     })
   }
+
+  test("#given an agent dir whose store index cannot be written #when the first spawn asks the gate #then no host is ensured", async () => {
+    // given - a regular file where the rpc directory would go makes the index unwritable
+    const agentDir = mkdtempSync(join(tmpdir(), "omo-gate-admit-"))
+    const storeDir = mkdtempSync(join(tmpdir(), "omo-gate-store-"))
+    await Bun.write(join(agentDir, "rpc"), "not a directory")
+    const notices = createHostNotices(() => {})
+    const settings = settingsOf()
+    let ensures = 0
+    const gate = createHostExecutionModeGate({
+      settings,
+      platform: "darwin",
+      agentDir,
+      env: {},
+      notices,
+      storeDir,
+      routing: routingFor({
+        settings,
+        notices,
+        ensureDaemon: () => {
+          ensures += 1
+          return Promise.reject(new Error("must not ensure"))
+        },
+      }),
+    })
+
+    try {
+      // when
+      const mode = await gate.ensure()
+
+      // then - the spawn goes to the host runner, which reports store_index_unavailable itself
+      expect(mode).toBe("process")
+      expect(ensures).toBe(0)
+      expect(gate.current()).toBeUndefined()
+    } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+      rmSync(storeDir, { recursive: true, force: true })
+    }
+  })
 
   test("#given a daemon advertising session context and generation handoff #when the gate resolves #then process mode is the effective default", async () => {
     // given
@@ -139,8 +212,12 @@ describe("host execution mode gate", () => {
       agentDir: "/tmp/dh-agent",
       env: {},
       notices,
-      ensureDaemon: () =>
-        Promise.reject(new HostUnavailableError("capability", { fallbackAllowed: true, detail: "missing session_context" })),
+      routing: routingFor({
+        settings: settingsOf(),
+        notices,
+        ensureDaemon: () =>
+          Promise.reject(new HostUnavailableError("capability", { fallbackAllowed: true, detail: "missing session_context" })),
+      }),
     })
 
     // when

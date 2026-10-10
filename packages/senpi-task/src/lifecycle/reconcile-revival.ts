@@ -1,6 +1,9 @@
+import { log } from "@oh-my-opencode/utils"
+
 import type { TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { hostSessionResumePath } from "./host-session"
+import { markRevivalDeferred } from "./host-session-record"
 import {
   deferred,
   isClaimHeld,
@@ -11,13 +14,10 @@ import {
   type SuspendedResidency,
 } from "./reconcile-reclamation"
 import { admitSuspendedBatch } from "./residency"
+import { isRevivalCandidate, isSuspendedResidency } from "./revival-selection"
 import type { ReconcileOutcome } from "./types"
 
 export { beginLocalReclamation } from "./reconcile-reclamation"
-
-const SUSPENDED_RESIDENCIES = new Set(["persisted_only", "rpc_detached"])
-// `interrupted` is terminal by status, but remains in the revival set here for in-flight session recovery.
-const SESSION_REVIVABLE_STATUSES = new Set(["pending", "running", "interrupted"])
 
 type RevivalCandidate = {
   readonly record: TaskRecord
@@ -73,7 +73,7 @@ export async function reconcileScopedRevival(
     .filter(({ record }) => !excludedFromAdmission.has(record.task_id))
   if (context.config.reattach_on_reconcile === false) {
     outcomes.push(...candidates.map(({ record }) => deferred(record.task_id, "reattach_disabled")))
-    return outcomes
+    return recordDeferrals(context, outcomes)
   }
 
   const priorResidencies = new Map(candidates.map((candidate) => [candidate.record.task_id, candidate.priorResidency]))
@@ -107,6 +107,22 @@ export async function reconcileScopedRevival(
       outcomes.push(deferred(candidate.record.task_id, "foreign_live_owner"))
     }
   }
+  return recordDeferrals(context, outcomes)
+}
+
+// The session is resumed now, so a child this pass deferred no longer "resumes with its session":
+// its record carries the deferral, which task_send and task_output then state (omo#9498).
+function recordDeferrals(context: LifecycleContext, outcomes: ReconcileOutcome[]): ReconcileOutcome[] {
+  for (const outcome of outcomes) {
+    if (outcome.kind !== "deferred" || outcome.reason === undefined) continue
+    // Annotating one record must not fail the pass: a contended record lock leaves that record's
+    // generic suspension text, and every other outcome still stands.
+    try {
+      markRevivalDeferred(context, outcome.task_id, outcome.reason)
+    } catch (error) {
+      log("senpi-task revival deferral not recorded", { taskId: outcome.task_id, reason: outcome.reason, error: String(error) })
+    }
+  }
   return outcomes
 }
 
@@ -117,7 +133,7 @@ function disposeSuspendedTerminalWithoutTranscript(
   let applied = false
   try {
     context.store.mutate(observed.task_id, (fresh) => {
-      if (!SUSPENDED_RESIDENCIES.has(fresh.residency_state) || !TERMINAL_STATUSES.has(fresh.status)) return fresh
+      if (!isSuspendedResidency(fresh.residency_state) || !TERMINAL_STATUSES.has(fresh.status)) return fresh
       applied = true
       const { host_pid: _hostPid, ...rest } = fresh
       return { ...rest, residency_state: "disposed", updated_at: nowIso(context) }
@@ -129,13 +145,10 @@ function disposeSuspendedTerminalWithoutTranscript(
 }
 
 function suspendedCandidates(context: LifecycleContext, parentSessionId: string): readonly RevivalCandidate[] {
-  return context.store.list().records.flatMap((record): readonly RevivalCandidate[] => {
-    if (record.parent_session_id !== parentSessionId || !isSuspended(record)) return []
-    if (!SESSION_REVIVABLE_STATUSES.has(record.status) || record.killed === true) return []
-    return [{ record, priorResidency: record.residency_state }]
-  })
+  return context.store.list().records.flatMap((record): readonly RevivalCandidate[] =>
+    isRevivalCandidate(record, parentSessionId) && isSuspended(record) ? [{ record, priorResidency: record.residency_state }] : [])
 }
 
 function isSuspended(record: TaskRecord): record is TaskRecord & { readonly residency_state: SuspendedResidency } {
-  return record.residency_state === "persisted_only" || record.residency_state === "rpc_detached"
+  return isSuspendedResidency(record.residency_state)
 }

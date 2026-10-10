@@ -47,8 +47,8 @@ function immediateSession(onPrompt?: () => void): ChildSession {
       lastText.value = "done"
       return Promise.resolve()
     },
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe: () => () => {},
     getLastAssistantText: () => lastText.value,

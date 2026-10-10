@@ -79,7 +79,8 @@ describe("facts payload byte cap", () => {
 
   test("#given a backlog larger than the cap #when a launch runs #then the payload stays within the cap and only shipped endpoints are consumed", async () => {
     // given
-    const { root, identity, queue } = await fixture()
+    let tick = 0
+    const { root, identity, queue } = await fixture(() => new Date(NOW.getTime() + tick++))
     await publish(queue, identity, "session-2", [message("m2", bulk())])
     await publish(queue, identity, "session-3", [message("m3", bulk())])
     const payloads: string[] = []

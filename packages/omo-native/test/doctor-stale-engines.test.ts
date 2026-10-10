@@ -203,3 +203,38 @@ describe("omo doctor stale engine detection", () => {
     })
   })
 })
+
+describe("standalone binary engines", () => {
+  const runtime = "/Users/dev/.omo/binary-runtime/5.1.4/omo"
+  const binary = (command: string, overrides: Partial<Entry> = {}) => entry({ command, ...overrides })
+
+  test("#given the provisioned runtime running an interactive session #when classified #then an orphan is stale and a parented one is attached", () => {
+    const result = classifyEngineProcesses([binary(runtime), binary(`${runtime} --continue`, { pid: 2, ppid: 4000 })])
+    expect(result.stale.map((item) => item.pid)).toEqual([75183])
+    expect(result.attached.map((item) => item.pid)).toEqual([2])
+  })
+
+  test("#given the runtime serving its own commands, hosts and bundled scripts #when classified #then none is an engine", () => {
+    const others = [
+      `${runtime} doctor`,
+      `${runtime} --internal-rpc-host-supervisor --socket /tmp/x`,
+      `${runtime} /Users/dev/.omo/binary-runtime/5.1.4/plugin/runtime/lsp-daemon/dist/cli.js daemon`,
+      `${runtime} host ensure`,
+    ].map((command, index) => binary(command, { pid: 10 + index }))
+    const result = classifyEngineProcesses(others)
+    expect([...result.stale, ...result.attached, ...result.managed]).toEqual([])
+  })
+
+  test("#given the runtime in rpc mode #when classified #then it is managed, never stale", () => {
+    const result = classifyEngineProcesses([binary(`${runtime} --mode rpc`)])
+    expect(result.managed).toHaveLength(1)
+    expect(result.stale).toEqual([])
+  })
+
+  test("#given an orphaned binary engine #when reaped by pid #then it is signalled", () => {
+    const signalled: number[] = []
+    const result = reapStaleEngines(["75183"], { list: () => [binary(runtime)], kill: (pid: number) => { signalled.push(pid) } })
+    expect(signalled).toEqual([75183])
+    expect(result.failed).toBe(false)
+  })
+})

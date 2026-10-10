@@ -16,6 +16,7 @@ import {
   createTaskLifecycle,
   createTaskManager,
   createTaskRecordStore,
+  NO_HOST_ENDPOINT,
   type ChildPlanner,
   type ManagedChildHandle,
   type ManagedRunner,
@@ -164,7 +165,7 @@ try {
     forget: (taskId) => manager().forget(taskId),
     hasPendingSends: (taskId) => manager().hasPendingSends?.(taskId) ?? false,
   }
-  const lifecycle = createTaskLifecycle({ store: taskStore, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: taskStore, registry, config })
   lifecycleDispose = () => lifecycle.dispose?.()
   managerRef = createTaskManager({
     store: taskStore,

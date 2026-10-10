@@ -1,17 +1,18 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, unlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { GitMemoryRepo } from "../git"
 import { projectedChangesBetween, revisionExists } from "./changes"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 const AUTHOR = { agentId: "changes-agent", authorName: "Changes Agent" }
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createRepo() {

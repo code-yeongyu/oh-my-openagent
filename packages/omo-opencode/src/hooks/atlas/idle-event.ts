@@ -57,6 +57,11 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
+  if (progress.total === 0) {
+    log(`[${HOOK_NAME}] Skipped: plan has no countable tasks`, { sessionID, plan: boulderState.plan_name })
+    return
+  }
+
   if (appendedSession) {
     log(`[${HOOK_NAME}] Appended subagent session to boulder during idle`, {
       sessionID,

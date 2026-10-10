@@ -39,7 +39,21 @@ export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 // plain JS, so this bundle is its route to the TypeScript resolver; omo-senpi installs never load it.
 export const CATEGORY_COVERAGE_ENTRY = join(packageDir, "category-coverage-entry.ts")
 export const CATEGORY_COVERAGE_ARTIFACT = join("runtime", "category-coverage", "index.js")
-export const NATIVE_REQUIRED_ARTIFACTS = [...REQUIRED_PLUGIN_ARTIFACTS, CATEGORY_COVERAGE_ARTIFACT] as const
+// The bundle inlines the computer-use doctor, whose prelude assets are read from beside the bundle
+// at import time: the same contract build-extension-core.mjs keeps for extensions/ (#9193).
+const COMPUTER_PRELUDE_ASSET_SOURCE = join(repoRoot, "packages", "senpi-desktop-prelude", "src", "assets.generated.json")
+export const CATEGORY_COVERAGE_PRELUDE_ASSET = join("runtime", "category-coverage", "assets.generated.json")
+// Native-only runtime: `omo daemon` resolves its settings (task.host_engine_policy and task.host_idle_exit_ms)
+// through the omo-config-core loader with it (packages/omo-native/task-config-entry.ts), loaded fail-open like
+// the category-coverage bundle.
+export const TASK_CONFIG_ENTRY = join(packageDir, "task-config-entry.ts")
+export const TASK_CONFIG_ARTIFACT = join("runtime", "task-config", "index.js")
+export const NATIVE_REQUIRED_ARTIFACTS = [
+  ...REQUIRED_PLUGIN_ARTIFACTS,
+  CATEGORY_COVERAGE_ARTIFACT,
+  CATEGORY_COVERAGE_PRELUDE_ASSET,
+  TASK_CONFIG_ARTIFACT,
+] as const
 
 interface BuildOptions {
   readonly outputDir: string
@@ -74,6 +88,15 @@ function parseArgs(argv: readonly string[]): BuildOptions {
 const PREBUILT_NATIVE_INPUTS = [
   { artifactPath: join("packages", "lsp-daemon", "dist"), buildScript: "build:lsp-daemon" },
   { artifactPath: join("packages", "ast-grep-mcp", "dist", "cli.js"), buildScript: "build:ast-grep-mcp" },
+  // The browser skill's bundled omowright runtime is gitignored and produced only by
+  // build:materialize-frontend (stage-omowright-runtime.mjs). runSenpiPluginBuild passes
+  // OMO_SKIP_MATERIALIZE=1 to the native chain, which skips that staging, so without this input a
+  // fresh checkout ships the binary payload's browser skill with no runtime and loadOmowright()
+  // always fails (issue #9661). Stage it up front like the other prebuilt inputs.
+  {
+    artifactPath: join("packages", "shared-skills", "skills", "browser", "runtime", "omowright", "index.js"),
+    buildScript: "build:materialize-frontend",
+  },
 ] as const
 
 export interface PrebuiltInputDependencies {
@@ -133,20 +156,26 @@ function runSenpiPluginBuild(outputDir: string): void {
     }
     copyFileSync(join(repoRoot, "CHANGELOG.md"), join(stagedPluginDir, "CHANGELOG.md"))
     buildCategoryCoverageRuntime(join(stagedPluginDir, CATEGORY_COVERAGE_ARTIFACT))
+    buildRuntimeBundle(TASK_CONFIG_ENTRY, join(stagedPluginDir, TASK_CONFIG_ARTIFACT), "task-config")
     copyPluginPayload(outputDir, stagedPluginDir)
   } finally {
     rmSync(buildRoot, { recursive: true, force: true })
   }
 }
 
-function buildCategoryCoverageRuntime(outfile: string): void {
+function buildRuntimeBundle(entry: string, outfile: string, name: string): void {
   const result = spawnSync(
     "bun",
-    ["build", CATEGORY_COVERAGE_ENTRY, "--target", "node", "--format", "esm", "--minify-syntax", "--minify-whitespace", "--outfile", outfile],
+    ["build", entry, "--target", "node", "--format", "esm", "--minify-syntax", "--minify-whitespace", "--outfile", outfile],
     { cwd: repoRoot, stdio: "inherit" },
   )
   if (result.error !== undefined) throw result.error
-  if (result.status !== 0) throw new Error(`category-coverage runtime build failed with exit code ${result.status ?? 1}`)
+  if (result.status !== 0) throw new Error(`${name} runtime build failed with exit code ${result.status ?? 1}`)
+}
+
+function buildCategoryCoverageRuntime(outfile: string): void {
+  buildRuntimeBundle(CATEGORY_COVERAGE_ENTRY, outfile, "category-coverage")
+  copyFileSync(COMPUTER_PRELUDE_ASSET_SOURCE, join(dirname(outfile), "assets.generated.json"))
 }
 
 function copyTree(sourceDir: string, outputDir: string): void {

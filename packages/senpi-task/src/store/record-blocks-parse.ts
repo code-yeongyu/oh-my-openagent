@@ -238,7 +238,7 @@ export function parseOptionalPendingSteering(
 
 export function parseOptionalResolvedModel(
   record: Record<string, unknown>,
-  key: "requested_model" | "resolved_model" = "resolved_model",
+  key: "requested_model" | "resolved_model" | "effective_model" = "resolved_model",
 ): ResolvedModelRecord | undefined {
   const value = record[key]
   if (value === undefined) return undefined

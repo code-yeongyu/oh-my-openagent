@@ -1,7 +1,11 @@
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { startFakeHost, type FakeHost, type FakeHostOptions } from "./rpc-host/__fixtures__/fake-host"
 import type { EnsuredTaskDaemon } from "./rpc-host/daemon"
+import type { ShardResolution } from "./rpc-host/shard-socket"
 import { HostSessionClient } from "./rpc-host/session-client"
 import { RpcHostRunner, type HostSessionChannel, type RpcHostRunnerOptions } from "./rpc-host"
 import type { ChildExitOutcome, RpcChildHandle, RpcRunnerSpec } from "./types"
@@ -34,6 +38,27 @@ export function ensuredDaemon(socket: string): EnsuredTaskDaemon {
   }
 }
 
+/** A root session's resolution naming `socket` (a fake host's socket is not a `p-*` name). */
+export function rootResolution(socket: string, key = "0000000000000000"): ShardResolution {
+  return { socket, shard: { kind: "p", key, ownerSessionId: `root-${key}`, inherited: false }, root: "primary" }
+}
+
+/**
+ * The routing every host runner must carry, pointed at `socket`. `agentDir` receives the store index
+ * the runner registers before each open; callers own its cleanup.
+ */
+export function testRouting(socket: string, agentDir: string) {
+  return {
+    agentDir,
+    storeDir: CHILD_STATE_DIR,
+    shardResolver: () => rootResolution(socket),
+    ownHostSocket: () => undefined,
+    insideHost: () => false,
+    onNotice: () => undefined,
+    shardEvents: {},
+  } as const
+}
+
 export interface HostRunnerHarness {
   fakeHost(options?: FakeHostOptions): Promise<FakeHost>
   /** A runner whose daemon IS the given fake host; every override replaces one port. */
@@ -51,9 +76,10 @@ export interface HostRunnerHarness {
 export function hostRunnerHarness(): HostRunnerHarness {
   const hosts: FakeHost[] = []
   const clients: HostSessionClient[] = []
+  const agentDir = join(tmpdir(), `dh-30-agent-${process.pid}-${Math.random().toString(36).slice(2)}`)
   const baseOptions = {
     policy: "upgrade",
-    agentDir: "/tmp/dh-30-agent",
+    agentDir,
     env: {},
     heartbeatIntervalMs: 60_000,
     closeGraceMs: 50,
@@ -68,6 +94,8 @@ export function hostRunnerHarness(): HostRunnerHarness {
     runnerOver: (host, overrides = {}) =>
       new RpcHostRunner({
         ...baseOptions,
+        ...testRouting(host.socketPath, ensureDir(agentDir)),
+        probeHost: () => host.probeProtocolInfo(),
         ensureDaemon: () => Promise.resolve(ensuredDaemon(host.socketPath)),
         createClient: (socketPath) => {
           const client = new HostSessionClient({
@@ -79,12 +107,24 @@ export function hostRunnerHarness(): HostRunnerHarness {
         },
         ...overrides,
       }),
-    runnerWithout: (overrides) => new RpcHostRunner({ ...baseOptions, ...overrides }),
+    runnerWithout: (overrides) =>
+      new RpcHostRunner({ ...baseOptions, ...testRouting("/tmp/dh-30-unreached.sock", ensureDir(agentDir)), ...overrides }),
     release: async () => {
       for (const client of clients.splice(0)) await client.detach()
       for (const host of hosts.splice(0)) await host.stop()
+      rmSync(agentDir, { recursive: true, force: true })
     },
   }
+}
+
+function ensureDir(dir: string): string {
+  mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+/** A throwaway agent dir for a runner built outside the harness. */
+export function tempAgentDir(): string {
+  return mkdtempSync(join(tmpdir(), "dh-30-agent-"))
 }
 
 export interface FakeFallbackRunner {
@@ -134,6 +174,8 @@ export interface StubChannel extends HostSessionChannel {
  */
 export function stubChannel(sendFailure: Error | undefined): StubChannel {
   const calls: string[] = []
+  // Like the real host, get_state reports the model the session was opened with.
+  let openedModel: { readonly provider: string; readonly id: string } | undefined
   const record = <T>(name: string, value: T): T => {
     calls.push(name)
     return value
@@ -144,8 +186,9 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
     get calls() {
       return calls
     },
-    open: () =>
-      record(
+    open: (request) => {
+      if (request.provider !== undefined && request.modelId !== undefined) openedModel = { provider: request.provider, id: request.modelId }
+      return record(
         "open",
         Promise.resolve({
           sessionId: "routing-stub",
@@ -153,10 +196,11 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
           instanceId: "inst-stub",
           engineVersion: "2026.9.18",
         }),
-      ),
+      )
+    },
     send: (command) =>
       record(command.type, sendFailure === undefined ? Promise.resolve() : Promise.reject(sendFailure)),
-    getState: () => Promise.resolve({ sessionId: "durable-stub" }),
+    getState: () => Promise.resolve({ sessionId: "durable-stub", ...(openedModel === undefined ? {} : { model: openedModel }) }),
     getEntries: () => Promise.resolve({ entries: [], leafId: null }),
     switchSession: () => record("switch_session", Promise.resolve({ cancelled: false })),
     onEvent: (_listener: (event: AgentSessionEvent) => void) => () => undefined,

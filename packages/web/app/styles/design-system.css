@@ -209,8 +209,11 @@
     --lit-follow-fade: 22vh;
     --lit-follow-gap: 1.25em;
     --lit-follow-rise: var(--space-6);
-    --lit-line: 50vh;
-    --lit-band: 1vh;
+    /* The manifesto reveal fully lights a word once its bottom (plus its in-line stagger) is above
+       --lit-line - --lit-band (83vh). Measured at word tops, the fully lit depth is 0.81 of the
+       viewport at the median and 0.76 at worst across 390/1440/1920, en and ko (#9591: the top 75-80%). */
+    --lit-line: 91vh;
+    --lit-band: 8vh;
     --dur-swap-out: 80ms;
     --dur-swap-in: 220ms;
     --dur-spring: 900ms;
@@ -408,24 +411,23 @@
     color: var(--text-lo);
   }
 
-  /* §6 Entrance — scroll-driven when supported, IntersectionObserver `.is-visible` otherwise */
-  .reveal {
-    opacity: 0;
-    transform: translate3d(0, 16px, 0);
-    transition:
-      opacity var(--dur-reveal) var(--ease-out-quart),
-      transform var(--dur-reveal) var(--ease-out-quart);
-    transition-delay: calc(var(--index, 0) * 60ms);
-  }
-  .reveal.is-visible {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
+  /* §6 Entrance — content is visible by default; motion only enhances it. Scroll-driven when
+     supported; otherwise the `Reveal` component arms `data-reveal="pending"` on elements below
+     the fold and clears it from an IntersectionObserver. Nothing waits on either to show up. */
+  @supports not (animation-timeline: view()) {
+    .reveal {
+      transition:
+        opacity var(--dur-reveal) var(--ease-out-quart),
+        transform var(--dur-reveal) var(--ease-out-quart);
+      transition-delay: calc(var(--index, 0) * 60ms);
+    }
+    .reveal[data-reveal="pending"] {
+      opacity: 0;
+      transform: translate3d(0, 16px, 0);
+    }
   }
   @supports (animation-timeline: view()) {
     .reveal {
-      opacity: 1;
-      transform: none;
-      transition: none;
       animation: reveal-in var(--dur-reveal) var(--ease-out-quart) both;
       animation-timeline: view();
       animation-range: entry 0% entry 40%;
@@ -484,7 +486,7 @@
   /* §6 Reduced motion: final states, no pulses, no transitions on the motion utilities */
   @media (prefers-reduced-motion: reduce) {
     .reveal,
-    .reveal.is-visible {
+    .reveal[data-reveal="pending"] {
       opacity: 1;
       transform: none;
       transition: none;
@@ -829,6 +831,7 @@
 
   /* Ticker: a vertical column of rows scrolling on translateY. */
   .ticker {
+    max-height: var(--ticker-max-h);
     overflow: hidden;
     mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
   }
@@ -856,25 +859,21 @@
     white-space: pre-line;
     view-timeline: --lit-body block;
   }
-  /* Line mode (`lit-lines`): each authored line is a block with its own view timeline, and its
-     words light while the line crosses the reading line (--lit-line ± --lit-band). Lines do not
-     overlap vertically, so at most one line (plus a few words of its neighbour) is ever mid-sweep. */
-  .lit-line {
-    display: block;
-  }
   @supports (animation-timeline: view()) {
-    .lit-progress.lit-scroll:not(.lit-lines) {
+    .lit-progress.lit-scroll {
       animation: lit-progress linear both;
       animation-timeline: --lit-body;
+    }
+    /* Paragraph mode (landing secret): sweep the body across `cover 20vh → 100% - 50vh`. */
+    .lit-progress.lit-scroll:not(.lit-read) {
       animation-range-start: cover 20vh;
       animation-range-end: cover calc(100% - 50vh);
     }
-    .lit-lines.lit-scroll .lit-line {
-      animation: lit-progress linear both;
-      animation-timeline: view();
-      animation-range-start: cover calc(100vh - var(--lit-line) - var(--lit-band));
-      animation-range-end: cover calc(100% - var(--lit-line) + var(--lit-band));
-    }
+    /* Reveal mode (manifesto reading blocks): the reveal is driven by the JS per-word geometry in
+       lit-progress.ts (each word lights as its bottom crosses the full line), so the lit frontier
+       is monotonic and already-revealed text never lags the scroll. The JS observer fallback is the
+       single authoritative driver; the CSS scroll-timeline approximation (a block cascade) cannot
+       track tall blocks word-by-word, so the reveal does not opt into it. */
     .lit-scroll .lit-follow {
       animation: lit-follow linear both;
       animation-timeline: --lit-body;
@@ -928,22 +927,31 @@
   }
 
   /* Reading blocks (manifesto): the same sweep, tuned for long-form prose. Unread words stay
-     legible (--text-lo instead of --text-faint), the blur is halved, and every word is lit until
-     hydration picks a mode, so the page reads before JavaScript does. */
+     legible (--text-lo instead of --text-faint) and are never blurred — a readable floor, not a
+     smeared one — and every word is lit until hydration picks a mode, so the page reads before
+     JavaScript does. */
   .lit-read {
-    --lit-blur: 2px;
+    --lit-blur: 0px;
   }
   .lit-read[data-lit-mode="pending"] {
     --lit-p: 1;
   }
+  /* Before JavaScript (or if it fails): every word is fully lit, so the page reads in full. */
+  .lit-read[data-lit-mode="pending"] .lit-word {
+    --lit-local: 1;
+  }
   .lit-read .lit-word {
-    background-image: linear-gradient(
-      90deg,
-      var(--text-hi) 0%,
-      var(--text-hi) 45%,
-      var(--text-lo) 55%,
-      var(--text-lo) 100%
+    /* Per-word fade (not a line-wide background gradient): each word's brightness is ONE value, so
+       no word is ever split in half mid-transition. --lit-local (0..1) lerps the word between the
+       unread floor and full lit; the stagger steps BETWEEN words. Opacity stays 1 — the floor must
+       keep its full --text-lo contrast (5.95:1, WCAG AA); dimming is done by colour alone. */
+    background: none;
+    color: color-mix(
+      in oklab,
+      var(--text-hi) calc(var(--lit-local) * 100%),
+      var(--text-lo) calc((1 - var(--lit-local)) * 100%)
     );
+    filter: blur(calc((1 - var(--lit-local)) * var(--lit-blur)));
   }
   .lit-link {
     text-decoration: underline;
@@ -1349,6 +1357,59 @@
     }
   }
 
+  /* §5 InstallTabs: until the visitor picks a tab (data-show), the target the <head> detect
+     script put on <html> (data-install) picks the visible panel and the selected tab; with no
+     detection at all the sh tab shows. */
+  [data-install-tabs] [data-panel],
+  [data-install-tabs] [data-panel-label] {
+    display: none;
+  }
+  :root:not([data-install]) [data-install-tabs]:not([data-show]) [data-panel="unix"],
+  :root[data-install="unix"] [data-install-tabs]:not([data-show]) [data-panel="unix"],
+  [data-install-tabs][data-show="unix"] [data-panel="unix"],
+  :root[data-install="powershell"] [data-install-tabs]:not([data-show]) [data-panel="powershell"],
+  [data-install-tabs][data-show="powershell"] [data-panel="powershell"],
+  :root[data-install="cmd"] [data-install-tabs]:not([data-show]) [data-panel="cmd"],
+  [data-install-tabs][data-show="cmd"] [data-panel="cmd"] {
+    display: block;
+  }
+  .install-tab {
+    margin-bottom: -1px;
+    border-bottom: 1px solid transparent;
+    white-space: nowrap;
+    transition:
+      color var(--dur-micro) var(--ease-standard),
+      border-color var(--dur-micro) var(--ease-standard);
+  }
+  .install-tab:hover {
+    color: var(--text-hi);
+  }
+  :root:not([data-install]) [data-install-tabs]:not([data-show]) .install-tab[data-tab="unix"],
+  :root[data-install="unix"] [data-install-tabs]:not([data-show]) .install-tab[data-tab="unix"],
+  [data-install-tabs][data-show="unix"] .install-tab[data-tab="unix"],
+  :root[data-install="powershell"]
+    [data-install-tabs]:not([data-show])
+    .install-tab[data-tab="powershell"],
+  [data-install-tabs][data-show="powershell"] .install-tab[data-tab="powershell"],
+  :root[data-install="cmd"] [data-install-tabs]:not([data-show]) .install-tab[data-tab="cmd"],
+  [data-install-tabs][data-show="cmd"] .install-tab[data-tab="cmd"] {
+    color: var(--text-hi);
+    border-bottom-color: var(--accent);
+  }
+  .install-caption {
+    display: grid;
+  }
+  .install-caption > [data-caption] {
+    grid-area: 1 / 1;
+  }
+  [data-install-tabs] [data-caption="computer"],
+  :root[data-install-hint="computer"] [data-install-tabs] [data-caption="next"] {
+    visibility: hidden;
+  }
+  :root[data-install-hint="computer"] [data-install-tabs] [data-caption="computer"] {
+    visibility: visible;
+  }
+
   /* Rotating word: a clipped line-height box; the track steps through --count words. */
   .rotate-word {
     display: inline-grid;
@@ -1376,6 +1437,10 @@
       mask-image: none;
       overflow: visible;
     }
+    /* The static list shows every row, so the scrolling window must grow to hold it. */
+    .ticker {
+      max-height: none;
+    }
     .marquee-track,
     .ticker-track {
       animation: none;
@@ -1389,8 +1454,7 @@
       display: none;
     }
     .lit-progress,
-    .lit-progress.lit-scroll,
-    .lit-lines.lit-scroll .lit-line {
+    .lit-progress.lit-scroll {
       --lit-p: 1;
       animation: none;
     }
@@ -1402,6 +1466,7 @@
     }
     .lit-word,
     .lit-read .lit-word {
+      --lit-local: 1;
       background-image: none;
       color: var(--text-hi);
       filter: none;

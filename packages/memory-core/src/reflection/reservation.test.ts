@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import * as fs from "../fs/resilient"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -8,9 +8,10 @@ import { TranscriptJournal, type ReflectionSnapshot } from "../journal"
 import { ReflectionReservationStore, type ReservationResult } from "./reservation"
 import type { ReflectionRequest, ReservedRun } from "./machine"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))))
 
 async function fixture(stepCount = 2, createRunId?: () => string | Promise<string>) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reservation-")))

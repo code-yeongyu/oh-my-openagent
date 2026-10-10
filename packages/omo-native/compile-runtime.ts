@@ -20,7 +20,7 @@ export type EmbeddedFile = Blob & {
   text?: () => Promise<string>
 }
 export type EmbeddedManifestEntry = { relPath: string; sha256: string; mode: number; size: number }
-export type EmbeddedManifest = { omoAiVersion: string; enginePin: string; manifestSha: string; entries: EmbeddedManifestEntry[]; buildInfo?: unknown; engineBuild?: unknown }
+export type EmbeddedManifest = { omoAiVersion: string; enginePin: string; manifestSha: string; entries: EmbeddedManifestEntry[]; buildInfo?: unknown; engineBuild?: unknown; releaseTarget?: unknown }
 
 export function isProvisionedExecutable(execPath: string, expectedPath: string): boolean {
   try {
@@ -84,10 +84,6 @@ export function runningExecutablePath(
 ): string {
   if (platform === "linux") return stripDeletedExecSuffix(execPath)
   return platform === "win32" && argv0.toLowerCase().endsWith(".exe") ? argv0 : execPath
-}
-
-export function shouldReexecAfterProvisioning(platform = process.platform): boolean {
-  return platform !== "win32"
 }
 
 export async function embeddedText(file: EmbeddedFile): Promise<string> {

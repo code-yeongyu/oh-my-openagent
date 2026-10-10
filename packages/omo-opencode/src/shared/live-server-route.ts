@@ -3,9 +3,6 @@ import { subagentSessions } from "../features/claude-code-session-state/state"
 import { getServerBasicAuthHeader, injectServerAuthIntoClient } from "./opencode-server-auth"
 import { log } from "./logger"
 
-export const LIVE_ROUTE_DISPATCH_LOG = "[live-server-route] dispatch via live listener"
-export const LIVE_ROUTE_UNAVAILABLE_LOG = "[live-server-route] route unavailable; using in-process client"
-
 const PROBE_TTL_MS = 60_000
 const PROBE_ABORT_MS = 1_500
 const AFFINITY_TTL_MS = 60_000

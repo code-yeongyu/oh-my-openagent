@@ -30,9 +30,9 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
 }
 
 describe("installer writing category", () => {
-  test("#given Claude #then writing is written on its Fable rung", () => {
+  test("#given Claude #then writing is written on its Opus 5.5 rung", () => {
     expect(generateModelConfig(createConfig({ hasClaude: true })).categories?.writing).toMatchObject({
-      model: "anthropic/claude-fable-5-1",
+      model: "anthropic/claude-opus-5-5",
     })
   })
 

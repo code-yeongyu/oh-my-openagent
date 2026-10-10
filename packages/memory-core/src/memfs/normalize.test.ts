@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parse as parseYaml } from "yaml"
@@ -9,6 +9,7 @@ import { parseMemoryFile } from "./frontmatter"
 import { MAX_DESCRIPTION_LENGTH, describeFrontmatterGrammarViolation, describeFrontmatterViolation } from "./frontmatter-validation"
 import { installHooks } from "./hooks"
 import { normalizeMemoryFrontmatter } from "./normalize"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR: GitCommitAuthor = { agentId: "agent-normalize", authorName: "Normalize Agent" }
 const LEGACY_NOTE = "---\ndescription: Run the chain by default: verify, merge\n---\n\nnote body\n"
@@ -19,7 +20,7 @@ const roots: string[] = []
 setDefaultTimeout(process.platform === "win32" ? 30_000 : 10_000)
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function fixture(files: Record<string, string>) {

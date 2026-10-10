@@ -1,5 +1,7 @@
 import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
 import type { RunnerOutcome } from "./in-process/child-handle"
+import type { ChildExtensionListener } from "./child-extension-events"
+import type { EffectiveModel } from "./pinned-model-equivalence"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -20,6 +22,13 @@ export type RpcRunnerSpec = {
   readonly state_dir: string
   readonly prompt: string
   readonly resumeSessionPath?: string
+  // The endpoint a daemon-hosted child's record names. A revival opens there and nowhere else; the
+  // per-child process runner ignores it.
+  readonly hostSocket?: string
+  // The tree and shard key a daemon-hosted child carries in its session context (`tree_key` /
+  // `shard_key`), so ITS children reuse the same host. Stamped by `RpcHostRunner`, never by callers.
+  readonly treeKey?: string
+  readonly shardKey?: string
   // The provider/modelId the child must resolve. A separate OS process cannot share the parent's
   // in-memory registry, so the model is threaded onto the child command line (`--model`).
   readonly model?: string
@@ -27,11 +36,19 @@ export type RpcRunnerSpec = {
   readonly reasoning?: string
   // The resolved variant the child must apply as its thinking level (`--thinking`).
   readonly variant?: string
+  // The child's own fallback chain after `model`, as `provider/model[:thinking]` selectors in try order.
+  // A daemon-hosted child sends it as `open_session.retryFallback` when the host advertises
+  // `retry_fallback_profile` (#9512); the per-child process runner does not carry it.
+  readonly fallbackModels?: readonly string[]
   // Extension entry paths the child must load (`-e`). The child is spawned with `--no-extensions` and
   // then ONLY these are loaded, so a keyless local provider (or a production `-e` extension) the parent
   // registered is reproducible in the detached child without inheriting the parent's whole package set.
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
+  // The child's own place in the task tree. A process child boots its own task engine, which reads
+  // these back (per-child env or daemon session context) so ITS spawns count from here, not from 0.
+  readonly depth?: number
+  readonly root_session_id?: string
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void
@@ -40,10 +57,13 @@ export type ChildHandle = {
   readonly task_id: string
   readonly sessionId: string | undefined
   readonly pid: number | undefined
+  /** The model the child actually opened on, when its open path observed one (host get_state; #9722). */
+  readonly reportedModel?: EffectiveModel
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
+  subscribeExtensionEvents?(listener: ChildExtensionListener): () => void
   waitForIdle(): Promise<void>
   waitForOutcome?(): Promise<RunnerOutcome>
   hasExited?(): boolean
@@ -85,6 +105,10 @@ export type RpcChildHandle = ChildHandle & {
   readonly spawnSpec?: RpcSpawnSpec
   terminalAssistantMessage?(): RpcTerminalAssistantMessage | undefined
   wasAbortedByUser?(): boolean
+  // Fires when the child starts a run on its own after its turn settled (omo#9069).
+  onSelfResumed?(listener: () => void): () => void
+  // A revival found the turn already finished in the transcript: settle it with that answer (omo#9069).
+  adoptFinishedTurn?(finalResponse: string): Promise<void>
   switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>
   getEntries?(since?: string): Promise<RpcEntriesResult>
   terminate(options?: TerminateOptions): Promise<void>

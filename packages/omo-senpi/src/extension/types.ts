@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@code-yeongyu/senpi"
+import type { EvalHandleHost, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import type { StartupWork } from "./startup-deferral"
@@ -14,6 +14,10 @@ export type ReadClassifier = (input: {
   readonly cwd: string
 }) => CompactReadClassification | undefined
 
+export interface BeforeAgentStartHandlerOptions {
+  previewSafe?: boolean
+}
+
 export interface SenpiExtensionAPI {
   /**
    * Absolute cwd of the session this extension instance was loaded for. senpi builds one
@@ -28,7 +32,11 @@ export interface SenpiExtensionAPI {
    * added it report none, and consumers fall back to the per-child process env.
    */
   readonly sessionContext?: unknown
-  on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
+  on(
+    event: string,
+    handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>,
+    options?: BeforeAgentStartHandlerOptions,
+  ): void
   rpc?: {
     emit(name: string, data: unknown): void
     handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
@@ -48,14 +56,31 @@ export interface SenpiExtensionAPI {
     },
   ): void
   getFlag(name: string): boolean | string | undefined
+  /** The session's current name (`/name`, `set_session_name`); undefined when it has none. */
+  getSessionName?(): string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
+  getCommands?(): readonly {
+    readonly name: string
+    readonly description?: string
+    readonly source: string
+    readonly sourceInfo?: { readonly path?: string }
+  }[]
   /** Feature-detected until the pinned Senpi runtime exports read classifiers. */
   registerReadClassifier?(classifier: ReadClassifier): () => void
   registerRemovedToolHint?(name: string, hint: string): void
+  /** Feature-detected: senpi runtimes before 2026.10.7 have no eval-handle capability slot. */
+  provideEvalHandleHost?(host: EvalHandleHost): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
   appendEntry?(customType: string, data?: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
+  exec?(
+    command: string,
+    args: string[],
+    options?: { cwd?: string; timeout?: number },
+  ): Promise<{ stdout: string; stderr: string; code: number }>
 }
 
 export interface ComponentLogger {

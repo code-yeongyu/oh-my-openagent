@@ -100,4 +100,51 @@ test.describe("Docs Page", () => {
     // then
     expect(overflow).toBeLessThanOrEqual(1)
   })
+
+  test("the install page shows the commands, the guide and its own sidebar", async ({ page }) => {
+    // given
+    await page.goto("/docs/install")
+
+    // then
+    await expect(page).toHaveTitle(/Install OmO/)
+    await expect(page.getByRole("heading", { name: "Install OmO", level: 1 })).toBeVisible()
+    await expect(page.getByRole("tab")).toHaveCount(3)
+    for (const section of ["Check the install", "Fix your PATH", "Uninstall"]) {
+      await expect(page.getByRole("button", { name: section })).toBeVisible()
+    }
+
+    // when
+    await page.getByRole("button", { name: "Fix your PATH" }).click()
+
+    // then
+    await expect(page).toHaveURL(/\/docs\/install#fix-your-path$/)
+    await expect(page.locator("#fix-your-path")).toBeInViewport()
+  })
+
+  test("each guide page OmO Desktop links to renders its title and sidebar", async ({ page }) => {
+    for (const [route, title, section] of [
+      ["/docs/workflows", "Workflows", "Start a workflow"],
+      ["/docs/agents", "Agents", "The Agents panel in OmO Desktop"],
+      ["/docs/keywords", "Keywords", "The keywords"],
+      ["/docs/telemetry", "Telemetry", "Turn it off"],
+      ["/docs/desktop-updates", "Desktop updates", "Release notes"],
+    ] as const) {
+      // given / when
+      await page.goto(route)
+
+      // then
+      await expect(page).toHaveTitle(new RegExp(title))
+      await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible()
+      await expect(page.getByRole("button", { name: section, exact: true })).toBeVisible()
+    }
+  })
+
+  test("the old get.omo.dev docs link lands on the install page", async ({ page }) => {
+    // given
+    await page.goto("/docs/guide/installation")
+
+    // then
+    await expect(page).toHaveURL(/\/docs\/install$/)
+    await expect(page.getByRole("heading", { name: "Install OmO", level: 1 })).toBeVisible()
+  })
 })

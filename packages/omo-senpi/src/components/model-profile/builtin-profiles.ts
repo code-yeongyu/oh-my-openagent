@@ -29,10 +29,13 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
  *
  * Unset sessions run `recommended`, which is not a lane (no family/tier): the same
  * ladder senpi's `recommended-models` builtin ships (`RECOMMENDED_DEFAULT_MODELS`,
- * senpi#2074), so the TUI and the desktop start from one order. Its rungs are served
- * ONLY by their ranked lanes (`rankedProvidersOnly`): the cross-provider fallback the
- * lanes keep would otherwise pull a gateway aggregator's vendor-prefixed copy
- * (`opengateway/anthropic/claude-opus-5-5`) into the default.
+ * senpi#2074, with GPT-6.1 Sol in the GPT-6 Sol slot from senpi#2394), so the TUI and the
+ * desktop start from one order. OmO carries one extra rung: `gpt-6-sol` (medium) right
+ * behind `gpt-6.1-sol`, because 6.1 Sol is served only on the two OpenAI lanes and a
+ * Copilot or OpenCode Zen user must still reach a GPT-6 Sol rung. Every builtin rung, in
+ * `recommended` and in the lanes, is served ONLY by its listed providers: a gateway
+ * aggregator's vendor-prefixed copy (`opengateway/anthropic/claude-opus-5-5`) never
+ * becomes the session model (#9146).
  */
 export type ModelProfileFamily = "daily" | "geeky"
 export type ModelProfileTier = "normal" | "heavy"
@@ -43,8 +46,6 @@ export type BuiltinModelProfile = {
   /** Picker axes; absent on `recommended`, which is the default rather than a lane. */
   readonly family?: ModelProfileFamily
   readonly tier?: ModelProfileTier
-  /** Serve each rung only from its listed providers, with no cross-provider fallback. */
-  readonly rankedProvidersOnly?: boolean
   readonly models: readonly DelegateFallbackEntry[]
 }
 
@@ -56,6 +57,10 @@ const KIMI_PROVIDERS = ["kimi-coding", "kimi-for-coding", "moonshotai", "opencod
 // Engine Z.AI ids. `omo setup` imports OpenCode's `zai-coding-plan` key as `zai` (#8799).
 const GLM_PROVIDERS = ["zai", "zai-coding-cn", "opencode-go"] as const
 const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as const
+// GPT-6.1 Sol and its Fast tier are served only on the two OpenAI lanes (not Copilot or OpenCode Zen),
+// so their rungs list just those; the rung behind them (GPT-5.6 Sol in Geeky · Normal, GPT-6 Sol in
+// Recommended) keeps the profile on every GPT provider.
+const GPT_6_1_PROVIDERS = ["chatgpt-subscription", "openai"] as const
 
 // Key order is the order a picker renders. `deep` is deliberately NOT an id: builtin
 // delegation categories already carry that name, and the two axes never compete (a
@@ -67,12 +72,12 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
   recommended: {
     displayName: "Recommended",
     description: "The best model you have connected, in OmO's recommended order.",
-    rankedProvidersOnly: true,
     models: [
       { providers: [...CLAUDE_PROVIDERS], model: "claude-opus-5-5", variant: "medium" },
       { providers: [...CLAUDE_PROVIDERS], model: "claude-fable-5-1", variant: "xhigh" },
       { providers: [...KIMI_PROVIDERS], model: "kimi-k3", variant: "max" },
       { providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "xhigh" },
+      { providers: [...GPT_6_1_PROVIDERS], model: "gpt-6.1-sol", variant: "medium" },
       { providers: [...GPT_PROVIDERS], model: "gpt-6-sol", variant: "medium" },
       { providers: [...GLM_PROVIDERS], model: "glm-5.3", variant: "max" },
     ],
@@ -100,13 +105,17 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     tier: "normal",
     displayName: "Geeky · Normal",
     description: "Works on one task and thinks it through.",
-    models: [{ providers: [...GPT_PROVIDERS], model: "gpt-5.6-sol", variant: "medium" }],
+    models: [
+      { providers: [...GPT_6_1_PROVIDERS], model: "gpt-6.1-sol-fast", variant: "medium" },
+      { providers: [...GPT_6_1_PROVIDERS], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: [...GPT_PROVIDERS], model: "gpt-5.6-sol", variant: "medium" },
+    ],
   },
   "geeky-heavy": {
     family: "geeky",
     tier: "heavy",
     displayName: "Geeky · Heavy",
     description: "Works on one task and thinks it over from every side.",
-    models: [{ providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "xhigh" }],
+    models: [{ providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "high" }],
   },
 })

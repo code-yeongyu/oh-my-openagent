@@ -28,6 +28,7 @@ export const TaskOutputParams = Type.Object({
 export type TaskOutputInput = Static<typeof TaskOutputParams>
 
 const DEFAULT_TAIL_LINES = 60
+const STOP_PENDING_EXPLANATION = "cancel requested, child unreachable: it is stopped on its host before it runs anything else"
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
 const DESCRIPTION = [
@@ -61,7 +62,9 @@ function hasLegacyBlockingParam(params: object): boolean {
 function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskOutputInput): TaskOutputToolResult {
   const now = (deps.now ?? Date.now)()
   const lease = deps.manager.concurrency?.leaseState(record.task_id, record.notification.run_epoch)
-  const snapshot = { ...buildTaskSnapshot(record, deps.stateDir, now), ...(lease === undefined ? {} : { lease }) }
+  // Only a still-running child can be waiting on its cancel; a cancelled record says so itself.
+  const stop = record.status === "running" && record.cancel_requested !== undefined ? { stop: STOP_PENDING_EXPLANATION } : {}
+  const snapshot = { ...buildTaskSnapshot(record, deps.stateDir, now), ...(lease === undefined ? {} : { lease }), ...stop }
   const mode = params.mode ?? "status"
 
   if (mode === "status" || record.status === "lost") {
@@ -120,6 +123,7 @@ function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
   if (snapshot.lease !== undefined) parts.push(`lease: ${snapshot.lease}`)
   if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
+  if (snapshot.stop !== undefined) parts.push(snapshot.stop)
   if (snapshot.pid !== undefined) parts.push(`pid ${snapshot.pid}`)
   if (snapshot.lost !== undefined) parts.push(snapshot.lost.explanation)
   if (snapshot.isolation !== undefined) parts.push(isolationLine(snapshot.isolation))

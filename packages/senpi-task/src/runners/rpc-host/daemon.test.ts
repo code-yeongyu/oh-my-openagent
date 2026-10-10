@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type {
+  EnsuredSenpiHost,
   EnsureHostInput,
   HostDecision,
   HostEnginePolicy,
@@ -12,6 +13,7 @@ import { DAEMON_LAUNCH_FIXTURE } from "./__fixtures__/daemon-launch"
 import {
   daemonLaunchOptions,
   ensureTaskDaemon,
+  forgetTaskDaemon,
   HostUnavailableError,
   resolveTaskHostSocket,
   TASK_DAEMON_REQUIRED_CAPABILITIES,
@@ -40,7 +42,7 @@ function protocolInfo(overrides: Partial<SenpiHostProtocolInfo> = {}): SenpiHost
  */
 function fakeHostPort(options: {
   readonly host?: SenpiHostProtocolInfo | undefined
-  readonly ensure?: (input: EnsureHostInput) => Promise<{ pid: number; socket: string; reused: boolean }>
+  readonly ensure?: (input: EnsureHostInput) => Promise<EnsuredSenpiHost>
 } = {}): TaskDaemonHostPort & { readonly probes: string[]; readonly ensured: EnsureHostInput[] } {
   const probes: string[] = []
   const ensured: EnsureHostInput[] = []
@@ -87,8 +89,10 @@ function ensureInput(
   overrides: { readonly policy?: HostEnginePolicy; readonly agentDir?: string; readonly now?: () => number } = {},
 ) {
   agentDirSeq += 1
+  const agentDir = overrides.agentDir ?? join("/tmp", `agent-${agentDirSeq}`)
   return {
-    agentDir: overrides.agentDir ?? join("/tmp", `agent-${agentDirSeq}`),
+    agentDir,
+    socket: resolveTaskHostSocket(DAEMON_LAUNCH_FIXTURE.parentEnv, agentDir),
     env: DAEMON_LAUNCH_FIXTURE.parentEnv,
     policy: overrides.policy ?? ("upgrade" as HostEnginePolicy),
     ports: {
@@ -321,6 +325,25 @@ describe("ensureTaskDaemon", () => {
     expect(host.probes).toHaveLength(2)
   })
 
+  test("#given a cached ensure #when its host generation is seen gone #then the next ensure probes again, and a stale generation's loss leaves it cached", async () => {
+    // given
+    const host = fakeHostPort({ host: protocolInfo({ instanceId: "instance-b" }) })
+    const input = ensureInput(host, { agentDir: join("/tmp", "agent-forget"), now: () => 1_000 })
+    const socket = join(input.agentDir, "rpc", "rpc.sock")
+    await ensureTaskDaemon(input)
+
+    // when
+    forgetTaskDaemon(socket, "instance-a")
+    await ensureTaskDaemon(input)
+    const probesAfterStaleLoss = host.probes.length
+    forgetTaskDaemon(socket, "instance-b")
+    await ensureTaskDaemon(input)
+
+    // then
+    expect(probesAfterStaleLoss).toBe(1)
+    expect(host.probes).toHaveLength(2)
+  })
+
   test("#given a refused ensure #when it is retried #then nothing was cached and the host is probed again", async () => {
     // given
     const host = fakeHostPort({ host: protocolInfo({ protocolVersion: 2 }) })
@@ -333,6 +356,7 @@ describe("ensureTaskDaemon", () => {
     // then
     expect(host.probes).toHaveLength(2)
   })
+
 })
 
 // What the ensured daemon can do decides `task.default_execution_mode: "auto"`, so the ensure hands
@@ -386,5 +410,102 @@ describe("ensureTaskDaemon capabilities", () => {
 
     // then
     expect(ensured.capabilities).toBeUndefined()
+  })
+})
+
+// senpi #2242: the ensured host carries an attach hold the caller owns. The task daemon is transient,
+// so a hold kept for the life of a long omo session would keep it from ever idle-exiting (omo#9041).
+describe("ensureTaskDaemon attach hold", () => {
+  function heldEnsure(order: string[], result: { readonly reused: boolean }) {
+    return async (input: EnsureHostInput): Promise<EnsuredSenpiHost> => {
+      order.push("ensure")
+      return { pid: 4242, socket: input.socket, reused: result.reused, release: () => order.push("release") }
+    }
+  }
+
+  test("#given a host this call starts #when it is ensured #then the hold is released once, after the capability probe and before the ensure returns", async () => {
+    // given
+    const order: string[] = []
+    let started = false
+    const base = fakeHostPort({ host: undefined, ensure: async (input) => {
+      started = true
+      return await heldEnsure(order, { reused: false })(input)
+    } })
+    const host: typeof base = {
+      ...base,
+      probeHost: async ({ socket }) => {
+        base.probes.push(socket)
+        if (started) order.push("probe")
+        return started ? protocolInfo() : undefined
+      },
+    }
+
+    // when
+    const ensured = await ensureTaskDaemon(ensureInput(host))
+
+    // then
+    expect(ensured.action).toBe("start")
+    expect(order).toEqual(["ensure", "probe", "release"])
+  })
+
+  test("#given a running host #when it is reused #then the hold is released exactly once", async () => {
+    // given
+    const order: string[] = []
+    const host = fakeHostPort({ host: protocolInfo(), ensure: heldEnsure(order, { reused: true }) })
+
+    // when
+    await ensureTaskDaemon(ensureInput(host))
+
+    // then
+    expect(order).toEqual(["ensure", "release"])
+  })
+
+  test("#given a started host whose capability probe throws #when ensuring #then the ensure fails and the hold is still released once", async () => {
+    // given
+    const order: string[] = []
+    let started = false
+    const base = fakeHostPort({ host: undefined, ensure: async (input) => {
+      started = true
+      return await heldEnsure(order, { reused: false })(input)
+    } })
+    const host: typeof base = {
+      ...base,
+      probeHost: async () => {
+        if (started) throw new Error("probe transport reset")
+        return undefined
+      },
+    }
+
+    // when
+    const failure = await ensureTaskDaemon(ensureInput(host)).catch((error: unknown) => error)
+
+    // then
+    expect(failure).toBeInstanceOf(Error)
+    expect(order).toEqual(["ensure", "release"])
+  })
+
+  test("#given concurrent and cached ensures of one socket #when they all resolve #then the one engine ensure is released once", async () => {
+    // given
+    const order: string[] = []
+    const host = fakeHostPort({ host: protocolInfo(), ensure: heldEnsure(order, { reused: true }) })
+    const input = ensureInput(host, { agentDir: join("/tmp", "agent-hold-shared"), now: () => 1_000 })
+
+    // when
+    await Promise.all([ensureTaskDaemon(input), ensureTaskDaemon(input)])
+    await ensureTaskDaemon(input)
+
+    // then
+    expect(order).toEqual(["ensure", "release"])
+  })
+
+  test("#given an engine pin whose ensure carries no hold #when ensuring #then the ensure still succeeds", async () => {
+    // given
+    const host = fakeHostPort({ host: protocolInfo(), ensure: async (input) => ({ pid: 1, socket: input.socket, reused: true }) })
+
+    // when
+    const ensured = await ensureTaskDaemon(ensureInput(host))
+
+    // then
+    expect(ensured.action).toBe("reuse")
   })
 })

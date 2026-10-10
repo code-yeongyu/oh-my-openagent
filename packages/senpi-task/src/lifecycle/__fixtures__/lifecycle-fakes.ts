@@ -43,6 +43,7 @@ export type SeedInput = {
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly spawn_spec?: TaskRecord["spawn_spec"]
+  readonly fallback_models?: TaskRecord["fallback_models"]
 }
 
 // Write a persisted record at an exact status/residency/timestamp so lifecycle logic can be driven
@@ -73,6 +74,7 @@ export function seedRecord(store: TaskRecordStore, input: SeedInput): TaskRecord
     ...(input.runner_kind === undefined ? {} : { runner_kind: input.runner_kind }),
     ...(input.host_session === undefined ? {} : { host_session: input.host_session }),
     ...(input.spawn_spec === undefined ? {} : { spawn_spec: input.spawn_spec }),
+    ...(input.fallback_models === undefined ? {} : { fallback_models: input.fallback_models }),
     ...(input.pid !== undefined ? { pid: input.pid } : {}),
     ...(input.child_session_id !== undefined ? { child_session_id: input.child_session_id } : {}),
     ...(input.host_pid !== undefined ? { host_pid: input.host_pid } : {}),

@@ -94,7 +94,7 @@ export async function runSetup(args = process.argv.slice(2), options = {}) {
   const inventory = await detectHarnesses(runtime)
   const plans = await planAll(runtime, agentDir)
   if (dryRun) process.stdout.write("DRY RUN: no files will be written\n")
-  const categories = await setupCoverage({ agentDir, home, env, plans, loadRuntime: options.loadCoverageRuntime })
+  const categories = await setupCoverage({ agentDir, home, env, plans, loadRuntime: options.loadCoverageRuntime, loadEngine: options.loadCoverageEngine })
   process.stdout.write(formatSetupSummary({ home, agentDir, inventory, ...plans, categories }))
   process.stdout.write(`${TELEMETRY_NOTICE}\n`)
   if (dryRun) {

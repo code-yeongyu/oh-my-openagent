@@ -73,13 +73,13 @@ function setupPlans(input: { additions: { provider: string, key: string }[], add
 
 describe("category coverage from the engine's model list", () => {
   describe("#given an agent dir whose only credential is a zai key", () => {
-    test("#when coverage is computed #then only unspecified-high is usable and nothing is written", async () => {
+    test("#when coverage is computed #then quick and unspecified-high are usable and nothing is written", async () => {
       const { models, coverage, agentDir } = await coverageFor("zai")
 
       expect([...new Set(models.map((model) => model.provider))]).toEqual(["zai"])
-      expect(coverage.usable).toEqual(["unspecified-high"])
+      expect(coverage.usable).toEqual(["quick", "unspecified-high"])
       expect(coverage.unusable.map((gap) => gap.name)).toEqual([
-        "architect", "artistry", "deep-high", "deep-low", "quick", "ultrabrain", "unspecified-low", "visual-engineering", "writing",
+        "architect", "artistry", "deep-high", "deep-low", "ultrabrain", "unspecified-low", "visual-engineering", "writing",
       ])
       expect(readdirSync(agentDir)).toEqual(["auth.json"])
     })
@@ -121,7 +121,7 @@ describe("category coverage from the engine's model list", () => {
   })
 
   describe("#given a setup plan that imports a zai key, a custom provider and a category pin", () => {
-    test("#when setup coverage is computed #then the planned credentials, provider and pin all count and nothing is written", async () => {
+    test("#when setup coverage is computed #then the planned credential and pin count, the unlisted custom provider is only an opt-in, and nothing is written", async () => {
       const { home, agentDir } = sandbox()
       const acme = { id: "acme", config: { baseUrl: "https://api.acme.example/v1", api: "openai-completions", apiKey: "acme-key", models: [{ id: "claude-fable-5-1" }] } }
 
@@ -134,7 +134,9 @@ describe("category coverage from the engine's model list", () => {
         loadRuntime,
       })
 
-      expect(coverage?.usable).toEqual(["architect", "artistry", "quick", "unspecified-high", "visual-engineering", "writing"])
+      // acme serves claude-fable-5-1 but no builtin chain lists it, so it opens nothing on its own (#9146)
+      expect(coverage?.usable).toEqual(["quick", "unspecified-high"])
+      expect(coverage?.unusable.find((gap) => gap.name === "architect")?.unlistedProviderModel).toBe("acme/claude-fable-5-1")
       expect(readdirSync(agentDir)).toEqual([])
     })
   })
@@ -233,6 +235,16 @@ describe("coverage rendering shape", () => {
       expect(formatDoctorCoverageLines(coverage)).toHaveLength(3)
       expect(coverageSummaryParts(coverage)).toHaveLength(3)
       expect(summaryRowLabels(coverage)).toContain("categories")
+    })
+  })
+
+  describe("#given a category only an unlisted gateway serves", () => {
+    test("#when rendered for doctor #then its gap line names the exact opt-in pin", () => {
+      const coverage = {
+        usable: [],
+        unusable: [{ name: "writing", providers: ["anthropic"], unlistedProviderModel: "openrouter/anthropic/claude-opus-5.5" }],
+      }
+      expect(formatDoctorCoverageLines(coverage)[1]).toContain('categories.writing.model = "openrouter/anthropic/claude-opus-5.5"')
     })
   })
 })

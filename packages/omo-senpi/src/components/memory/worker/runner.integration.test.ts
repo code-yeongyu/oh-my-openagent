@@ -274,7 +274,10 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(fresh.outcome).toBe("merged")
     expect(cached.outcome).toBe("merged")
     expect(item.spawnCalls).toHaveLength(2)
-    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
+    // Reactive attempts run in the most permissive child, so a miss there is conclusive (#9175).
+    expect(item.spawnCalls.map((spawn) => spawn.args.includes("--no-extensions"))).toEqual([false, false])
+    // One discovery-disabled and one extension-loading catalog, each probed once and then cached.
+    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\nprobe\n")
   }, 60_000)
 
   test("#given every child-visible candidate misses its model or auth #when the chain is exhausted #then the failed outcome fingerprints every attempted cause", async () => {

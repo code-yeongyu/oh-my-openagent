@@ -8,6 +8,10 @@ import { composeOmoSenpiExtension } from "../../extension/compose"
 import { omoSenpiComponents } from "../../extension/index"
 import { createTaskTerminalObservers } from "../task/terminal-observers"
 import { sharedKibitzerTelemetryObservers } from "../memory/kibitzer/wake-observers"
+import type {
+  ComputerUseTelemetryObservation,
+  ComputerUseTelemetryObservers,
+} from "./omo-native-computer-use"
 import { createOmoNativeTelemetryComponent } from "./omo-native-component"
 import { OMO_NATIVE_PROPERTY_ALLOWLISTS, OMO_NATIVE_SCHEMA_VERSION } from "./product-identity"
 import {
@@ -86,6 +90,25 @@ function toolResult(): Record<string, unknown> {
 
 function nativeMessages(messages: readonly TelemetryCaptureMessage[]): TelemetryCaptureMessage[] {
   return messages.filter(({ event }) => event !== "omo_senpi_daily_active")
+}
+
+function computerObservers(): {
+  readonly registry: ComputerUseTelemetryObservers
+  publish(observation: ComputerUseTelemetryObservation): void
+} {
+  let observer: ((observation: ComputerUseTelemetryObservation) => void) | undefined
+  return {
+    registry: {
+      publish: (observation) => observer?.(observation),
+      subscribe: (next) => {
+        observer = next
+        return () => {
+          if (observer === next) observer = undefined
+        }
+      },
+    },
+    publish: (observation) => observer?.(observation),
+  }
 }
 
 // Token totals and `cost_usd` are omitted by design when the provider never reported them, so a
@@ -331,6 +354,40 @@ describe("OmO Native telemetry component integration", () => {
       ], { logger: createSilentLogger() })(pi)
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context("disabled"))
 
+      expect(recorder.messages).toEqual([])
+    })
+  })
+
+  test("#given config telemetry opt-out #when computer use publishes #then its event also captures nothing", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createTransportRecorder()
+      const pi = new FakeExtensionAPI()
+      const computer = computerObservers()
+      createOmoNativeTelemetryComponent({
+        computerUseTelemetryObservers: computer.registry,
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => false,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("disabled-host"),
+        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        transportFactory: recorder.factory,
+      }).register(pi, { config: pi, logger: createSilentLogger() })
+
+      // when
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context("disabled"))
+      computer.publish({
+        kind: "activation",
+        sessionId: "disabled",
+        active: true,
+        source: "tool_call",
+        platform: "linux",
+        backend: "x11",
+      })
+
+      // then
       expect(recorder.messages).toEqual([])
     })
   })

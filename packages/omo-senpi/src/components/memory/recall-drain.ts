@@ -113,6 +113,7 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
       pi.registerEntryRenderer("omo-memorian:nudged", renderKibitzerNudgedEntry)
       pi.registerEntryRenderer("omo-memorian:gate", renderKibitzerGateEntry)
       pi.on("before_agent_start", async (payload, eventCtx) => {
+        if (isRecord(payload) && payload.preview === true) return undefined
         try {
           const injection = await inject(payload, eventCtx)
           if (injection === undefined) return undefined
@@ -135,7 +136,7 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
           options.logger?.warn("omo-senpi memory recall skipped", { error: describe(error) })
           return undefined
         }
-      })
+      }, { previewSafe: true })
     },
   }
 }

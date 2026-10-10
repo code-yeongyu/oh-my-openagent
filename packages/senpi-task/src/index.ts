@@ -1,4 +1,6 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
+export { CHILD_PERMISSION_EVENT, TASK_CHILD_EXTENSION_EVENT, parseChildExtensionEvent } from "./runners/child-extension-events"
+export type { ChildExtensionEvent, ChildExtensionListener } from "./runners/child-extension-events"
 export { createWorkpoolTool, createWorkpoolWorkerTool, buildWorkpoolExecute } from "./tools/workpool"
 export { WorkpoolParams, WorkpoolYieldParams } from "./tools/workpool-schema"
 export { WorkpoolCommandSchema, WorkpoolCreateSchema } from "./workpool/schema"
@@ -11,6 +13,7 @@ export {
   KERNEL_TOOL_ERROR_CODES,
   KernelToolError,
   createKernelToolWrappers,
+  type KernelToolWrapper,
   isReservedKernelToolName,
   kernelToolKey,
   normalizeKernelToolName,
@@ -56,6 +59,7 @@ export type {
   ResolvedModelSource,
   SpawnSpecV1,
   TaskNotification,
+  CancelRequest,
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
@@ -66,7 +70,7 @@ export type {
   TaskTransitionResult,
   TokenCoverageStatus,
 } from "./state"
-export { TaskRecordCollisionError, createTaskRecordStore, resolveStateDir } from "./store"
+export { TaskRecordCollisionError, createTaskRecordStore, projectStateKey, resolveProjectStateDirectory, resolveStateDir } from "./store"
 export type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
@@ -96,6 +100,14 @@ export {
 } from "./progress"
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
+export { readSettingsDefaultRoute, resolveExplicitTaskPin, splitModelDecorators } from "./senpi/explicit-pin"
+export type {
+  ExplicitPinFailure,
+  ExplicitPinResolution,
+  ExplicitPinRuntime,
+  ResolvedExplicitPin,
+  SettingsDefaultRoute,
+} from "./senpi/explicit-pin"
 export {
   MEMBER_IDENTITY_ENV,
   SenpiTeamSpecError,
@@ -126,6 +138,7 @@ export {
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
+  builtinCategoryChainCandidates,
   resolveAvailableCategoryNames,
   resolveCategory,
 } from "./category"
@@ -160,23 +173,49 @@ export type {
   CreateChildSession,
   DepthPolicy,
   InProcessRunnerOptions,
+  QueuedInputDisposition,
   RunnerFailure,
   RunnerOutcome,
   SharedToolFilterOptions,
   SubagentPromptInput,
+  TaskHostWarmth,
+  WarmHostSessionInput,
 } from "./runners"
 export {
+  attachOwnEndpoint,
+  createHostEndpointPort,
+  probeWithEngine,
+  parseShardBasename,
+  resolveShardSocket,
+  SHARD_KEY_CONTEXT,
+  shardKey,
+  shardSocketPath,
+  shardSocketPathForKey,
   ensureTaskDaemon,
+  HOST_NOTICE_TOKENS,
   HostUnavailableError,
   isHostSessionHandle,
+  isOwnEndpoint,
+  readOwnHostSocket,
+  readTaskStoreIndex,
+  registerStoreIndex,
+  StoreIndexUnavailableError,
+  taskStoreIndexPath,
   readMemberSessionIdentity,
+  readSessionAncestry,
   readSessionContext,
   readSessionRole,
+  HOST_WARMUP_CONTEXT,
+  HOST_WARMUP_TASK_ID,
+  isHostWarmupSession,
+  HostWarmRefusedError,
+  warmTaskHost,
   resolveTaskHostSocket,
   RpcCommandError,
   RpcHostRunner,
   RpcProcessRunner,
   RpcProtocolClient,
+  createLiveHostChildren,
   buildAutoUiResponse,
   buildChildArgs,
   buildRpcSpawn,
@@ -207,6 +246,17 @@ export type {
   EnsureTaskDaemonPort,
   FallbackChildRunner,
   HostUnavailableReason,
+  HostEndpointPortInput,
+  HostNoticeSink,
+  HostNoticeToken,
+  HostShardEvents,
+  LiveHostChildren,
+  ReattachOutcome,
+  ReattachOutcomeInfo,
+  TransportLostInfo,
+  HostProtocolProbe,
+  ShardIdentity,
+  ShardResolution,
   HostSessionChannel,
   HostSessionChildHandle,
   HostSessionFacts,
@@ -220,11 +270,14 @@ export type {
   RpcSpawnDescriptor,
   RpcSpawnRuntime,
   SenpiLauncher,
+  SessionAncestry,
   SessionRole,
+  ShardResolver,
   RunnerErrorFacts,
   TerminateOptions,
 } from "./runners"
 export {
+  HOST_TURN_RESUMED_EVENT,
   NameRegistry,
   TaskConcurrency,
   adaptInProcessHandle,
@@ -323,6 +376,8 @@ export {
   buildCompletionMessage,
   completionMessageLines,
   createCompletionNotifier,
+  ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE,
+  ASTRA_DAG_VERIFICATION_DIRECTIVE,
   DAG_VERIFICATION_DIRECTIVE,
   routeCompletion,
   shouldNotifyStatus,
@@ -350,14 +405,17 @@ export {
   createTaskLifecycle,
   getLifecycleDetachedRevivalRollback,
   getLifecycleReattachPorts,
+  NO_HOST_ENDPOINT,
   registerLifecycleDetachedRevivalRollback,
   registerLifecycleReattachPorts,
+  selectRevivalBatch,
 } from "./lifecycle"
 export type {
   AdmissionResult,
   CleanupResult,
   DestroyCause,
   DetachedRevivalRollbackResult,
+  HostEndpointPort,
   LifecycleDeps,
   LifecycleReattachPorts,
   ProcessSignaller,
@@ -371,11 +429,14 @@ export type {
   ResidencyRegistry,
   RespawnPort,
   RespawnResult,
+  RevivalSelection,
   SuspendFailure,
   SuspendInput,
   SuspendSummary,
   TaskLifecycle,
 } from "./lifecycle"
+export { deferralOutlookFor } from "./lifecycle/deferred-revival-reasons"
+export type { DeferralOutlook } from "./lifecycle/deferred-revival-reasons"
 export { DEFAULT_SEND_DELIVERY, createSteeringEngine } from "./steering"
 export type {
   CancelOutcome,
@@ -596,3 +657,5 @@ export type {
 } from "./team"
 
 export * from "./tools/team"
+export { createEvalHandleHost, type EvalHandleHostDeps } from "./eval-handles"
+export { isPriorityAliasOf } from "./runners/pinned-model-equivalence"

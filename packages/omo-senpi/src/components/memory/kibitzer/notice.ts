@@ -10,6 +10,8 @@ export const GATE_REASON_MAX_CHARS = 160
 /** Bounds for the unavailable notice's stored fields; the renderer re-validates against them. */
 export const UNAVAILABLE_CATEGORY_MAX_CHARS = 128
 export const UNAVAILABLE_PROVIDER_MAX_CHARS = 64
+/** Matches the producer's `WAKE_MODEL_MAX_CHARS` cap on the stored model. */
+export const GATE_MODEL_MAX_CHARS = 128
 /** The builtin quick chain alone lists twelve unconnected providers; every one must stay nameable. */
 export const UNAVAILABLE_PROVIDER_MAX_COUNT = 16
 
@@ -24,6 +26,8 @@ export interface KibitzerGateRecord {
   readonly status: "skipped" | "failed" | "dropped"
   readonly cause?: string
   readonly model?: string
+  /** Resident era (additive): the `memory.recall.category` the failing model was answering for. */
+  readonly category?: string
   readonly candidateCount: number
   readonly reason?: string
   /** One-shot era: the judge run that failed. Resident records carry `wake` instead. */
@@ -145,6 +149,13 @@ function validGateReason(value: unknown): string | undefined {
   return normalized
 }
 
+/** A stored model or category is drawn only when it is one bounded, secret-free line. */
+function validGateField(value: unknown, maxChars: number): string | undefined {
+  if (typeof value !== "string" || /[\r\n]/u.test(value) || containsSecretLikeMaterial(value)) return undefined
+  const normalized = normalizeRendererText(value)
+  return normalized.length === 0 || normalized.length > maxChars ? undefined : normalized
+}
+
 function validRunId(value: unknown): string | undefined {
   return typeof value === "string" && /^[A-Za-z0-9-]{1,64}$/.test(value) ? value : undefined
 }
@@ -162,11 +173,22 @@ export const renderKibitzerGateEntry: EntryRenderer<KibitzerGateRecord> = (entry
   const cause = typeof record.cause === "string" ? normalizeRendererText(record.cause) : undefined
   const reason = validGateReason(record.reason)
   const runId = validRunId(record.runId)
+  const model = validGateField(record.model, GATE_MODEL_MAX_CHARS)
+  const category = validGateField(record.category, UNAVAILABLE_CATEGORY_MAX_CHARS)
   const consecutiveFailures = record.consecutiveFailures
+  // The fix names the exact setting when the record knows its recall category; older records and
+  // one-shot records do not, and keep the generic hint.
+  const fix = category === undefined
+    ? "check Kibitzer model/provider settings"
+    : `set categories.${category}.model (or memory.recall.category) in omo.json to a model that answers`
   const extra = [
     ...(reason === undefined ? [] : [{ text: reason, tone: "dim" as const }]),
     ...(runId === undefined ? [] : [{ text: `run ${runId}`, tone: "dim" as const }]),
-    { text: `after ${consecutiveFailures} consecutive failures; check Kibitzer model/provider settings`, tone: "dim" as const },
+    ...(model === undefined ? [] : [{
+      text: `last failed model: ${model}${category === undefined ? "" : ` (memory recall category "${category}")`}`,
+      tone: "dim" as const,
+    }]),
+    { text: `after ${consecutiveFailures} consecutive failures; ${fix}`, tone: "dim" as const },
   ]
   return noticeComponent({
     glyph: record.status === "skipped" ? "⚠" : "✗",

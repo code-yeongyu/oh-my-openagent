@@ -45,6 +45,11 @@ export interface ProjectionAdvanceInput {
 
 export interface ProjectionPins {
   advance(input: ProjectionAdvanceInput): Promise<ProjectionTurn>
+  /**
+   * The revision the next `advance` compiles at, without recording, caching or announcing anything:
+   * a before_agent_start preview must compose the real turn's bytes and leave the session untouched.
+   */
+  peek(input: Omit<ProjectionAdvanceInput, "record">): Promise<string | null>
   /** /recompile: every session repins to HEAD on its next turn, including ones resumed later in this process. */
   requestRefresh(): void
 }
@@ -55,19 +60,28 @@ export function createProjectionPins(options: { readonly now?: () => number } = 
   let refreshEpoch = 0
   let refreshRequestedAtMs = Number.NEGATIVE_INFINITY
 
+  const resolve = async (repo: GitMemoryRepo, sessionId: string, branch: readonly unknown[]) => {
+    const compactionId = latestCompactionId(branch)
+    const cached = live.get(sessionId)
+    const state = cached?.record ?? readPinRecord(branch, sessionId)
+    const staleByRefresh = cached === undefined
+      ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
+      : cached.epoch < refreshEpoch
+    const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId)
+    return { compactionId, state, reason }
+  }
+
   return {
     requestRefresh(): void {
       refreshEpoch += 1
       refreshRequestedAtMs = now()
     },
+    async peek({ repo, sessionId, branch, head }): Promise<string | null> {
+      const { state, reason } = await resolve(repo, sessionId, branch)
+      return state === undefined || reason !== undefined ? head : state.revision
+    },
     async advance({ repo, sessionId, branch, head, record }): Promise<ProjectionTurn> {
-      const compactionId = latestCompactionId(branch)
-      const cached = live.get(sessionId)
-      const state = cached?.record ?? readPinRecord(branch, sessionId)
-      const staleByRefresh = cached === undefined
-        ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
-        : cached.epoch < refreshEpoch
-      const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId)
+      const { compactionId, state, reason } = await resolve(repo, sessionId, branch)
       if (state === undefined || reason !== undefined) {
         const fresh: ProjectionPinRecord = {
           version: 1,

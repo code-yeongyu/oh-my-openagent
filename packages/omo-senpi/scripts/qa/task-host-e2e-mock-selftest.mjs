@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import registerMockProvider from "./task-host-e2e-mock-provider.mjs"
 import { childStartDiagnosis } from "./task-host-e2e-support.mjs"
 import { recordMockEvent } from "./task-host-e2e-audit.mjs"
-import { injectDaemonMockProvider } from "./task-host-e2e-sandbox.mjs"
+import { injectDaemonMockProvider, scenarioStateDir } from "./task-host-e2e-sandbox.mjs"
 
 export async function checkMockSessionIsolation(root) {
   const cwd = join(root, "mock-provider")
@@ -79,7 +79,7 @@ async function checkAbortEvidence(cwd, provider, handlers) {
   handlers.get("agent_end")({
     aborted: true, abortSource: "system", willRetry: false, messages: [message],
   }, { cwd, sessionManager: { getSessionId: () => "fixture-child" } })
-  const stateDir = join(cwd, ".omo", "senpi-task")
+  const stateDir = scenarioStateDir(cwd, join(dirname(cwd), "mock-provider-agent"))
   mkdirSync(join(stateDir, "tasks"), { recursive: true })
   const sessionPath = join(cwd, "child.jsonl")
   writeFileSync(sessionPath, [

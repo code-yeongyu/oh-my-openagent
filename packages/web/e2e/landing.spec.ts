@@ -1,6 +1,23 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, type Page } from "@playwright/test"
 
 import { scrollSecret } from "./secret-reading-state"
+
+const UNIX_COMMAND = "curl -fsSL https://get.omo.dev/install.sh | bash"
+const POWERSHELL_COMMAND = "irm https://get.omo.dev/install.ps1 | iex"
+const CMD_COMMAND =
+  'powershell -ExecutionPolicy Bypass -c "irm https://get.omo.dev/install.ps1 | iex"'
+const IPHONE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+
+/** Chromium reports the host OS through userAgentData whatever the UA says; pin it per test. */
+async function pretendPlatform(page: Page, platform: string | null): Promise<void> {
+  await page.addInitScript((value) => {
+    Object.defineProperty(Navigator.prototype, "userAgentData", {
+      configurable: true,
+      get: () => (value === null ? undefined : { platform: value, mobile: false }),
+    })
+  }, platform)
+}
 
 const STORY_SECTIONS = [
   "secret",
@@ -28,20 +45,90 @@ test.describe("Landing Page", () => {
     await expect(heading).toBeVisible()
     await expect(heading).toContainText("But it's an agent.")
     await expect(getStarted).toBeVisible()
-    await expect(getStarted).toHaveAttribute("href", /\/docs#installation$/)
+    await expect(getStarted).toHaveAttribute("href", /\/docs\/install$/)
     await expect(readManifesto).toBeVisible()
   })
 
-  test("renders exactly one install command in the hero", async ({ page }) => {
+  test("shows the macOS/Linux install command first on a Mac", async ({ page }) => {
     // given
+    await pretendPlatform(page, "macOS")
     await page.goto("/")
     const hero = page.locator('[data-section="hero"]')
 
     // then
-    await expect(hero.getByTestId("command-bar")).toHaveCount(1)
-    await expect(hero.getByText("bun install -g omo-ai", { exact: true })).toBeVisible()
+    await expect(hero.getByRole("tab")).toHaveCount(3)
+    await expect(hero.getByRole("tab", { name: "macOS, Linux, WSL" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+    await expect(hero.getByTestId("command-bar").filter({ visible: true })).toHaveCount(1)
+    await expect(hero.getByText(UNIX_COMMAND, { exact: true })).toBeVisible()
     await expect(hero.getByRole("button", { name: "Copy install command" })).toBeVisible()
-    await expect(hero.getByRole("tab")).toHaveCount(0)
+    await expect(hero.getByText("Then open a new terminal and run omo.")).toBeVisible()
+  })
+
+  test("shows PowerShell first on Windows and moves between tabs with the arrow keys", async ({
+    page,
+  }) => {
+    // given
+    await pretendPlatform(page, "Windows")
+    await page.goto("/")
+    const hero = page.locator('[data-section="hero"]')
+    const powershell = hero.getByRole("tab", { name: "Windows PowerShell" })
+    await expect(powershell).toHaveAttribute("aria-selected", "true")
+    await expect(hero.getByText(POWERSHELL_COMMAND, { exact: true })).toBeVisible()
+
+    // when
+    await powershell.focus()
+    await page.keyboard.press("ArrowRight")
+
+    // then
+    const cmd = hero.getByRole("tab", { name: "Windows CMD" })
+    await expect(cmd).toBeFocused()
+    await expect(cmd).toHaveAttribute("aria-selected", "true")
+    await expect(powershell).toHaveAttribute("tabindex", "-1")
+    await expect(hero.getByText(CMD_COMMAND, { exact: true })).toBeVisible()
+    await expect(hero.getByText(POWERSHELL_COMMAND, { exact: true })).toBeHidden()
+
+    // when
+    await page.keyboard.press("Home")
+
+    // then
+    await expect(hero.getByRole("tab", { name: "macOS, Linux, WSL" })).toBeFocused()
+    await expect(hero.getByText(UNIX_COMMAND, { exact: true })).toBeVisible()
+  })
+
+  test("tells a phone visitor to run the command on a computer", async ({ browser }) => {
+    // given
+    const context = await browser.newContext({
+      userAgent: IPHONE_UA,
+      viewport: { width: 375, height: 812 },
+    })
+    const page = await context.newPage()
+    await pretendPlatform(page, null)
+    await page.goto("/")
+    const hero = page.locator('[data-section="hero"]')
+
+    // then
+    await expect(hero.getByText(UNIX_COMMAND, { exact: true })).toBeVisible()
+    await expect(hero.getByText("Run this on your Mac, Linux or Windows computer.")).toBeVisible()
+    await expect(hero.getByText("Then open a new terminal and run omo.")).toBeHidden()
+    await context.close()
+  })
+
+  test("keeps every install command reachable without JavaScript", async ({ browser }) => {
+    // given
+    const context = await browser.newContext({ javaScriptEnabled: false })
+    const page = await context.newPage()
+    await page.goto("/")
+    const hero = page.locator('[data-section="hero"]')
+
+    // then
+    for (const command of [UNIX_COMMAND, POWERSHELL_COMMAND, CMD_COMMAND]) {
+      await expect(hero.getByText(command, { exact: true })).toBeVisible()
+    }
+    await expect(hero.getByRole("tablist")).toBeHidden()
+    await context.close()
   })
 
   test("carries no legacy brand, edition or host names", async ({ page }) => {
@@ -213,6 +300,26 @@ test.describe("Landing Page", () => {
     await expect(page.getByTestId("crafted-list").locator('[aria-current="true"]')).toHaveCount(1)
   })
 
+  test("re-entering a live crafted state waits for its live moment again", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const stage = page.getByTestId("crafted-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "true")
+    const list = page.getByTestId("crafted-list")
+
+    await list.locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).toHaveClass(/is-live/, { timeout: 5000 })
+
+    await list.locator('[data-crafted-index="3"]').click()
+    await expect(stage).toHaveAttribute("data-state", "team")
+    await list.locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).not.toHaveClass(/is-live/)
+    await expect(stage).toHaveClass(/is-live/, { timeout: 5000 })
+  })
+
   test("holds the crafted stage still under reduced motion and still follows the list", async ({
     page,
   }) => {
@@ -231,6 +338,10 @@ test.describe("Landing Page", () => {
     await page.getByTestId("crafted-list").locator('[data-crafted-index="4"]').click()
     await expect(stage).toHaveAttribute("data-state", "monitor")
     await expect(stage).toHaveClass(/is-live/)
+
+    await page.getByTestId("crafted-list").locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).toHaveClass(/is-live/)
   })
 
   test("confirms a copied install command with a check and a status message", async ({
@@ -238,8 +349,12 @@ test.describe("Landing Page", () => {
     context,
   }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"])
+    await pretendPlatform(page, "macOS")
     await page.goto("/")
-    const bar = page.locator('[data-section="hero"]').getByTestId("command-bar")
+    const bar = page
+      .locator('[data-section="hero"]')
+      .getByTestId("command-bar")
+      .filter({ visible: true })
     await bar.getByRole("button", { name: "Copy install command" }).click()
 
     await expect(bar.getByRole("button", { name: "Copy install command" })).toHaveAttribute(
@@ -252,7 +367,7 @@ test.describe("Landing Page", () => {
     await expect
       .poll(async () => check.evaluate((node) => getComputedStyle(node).transform))
       .toBe("matrix(1, 0, 0, 1, 0, 0)")
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("bun install -g omo-ai")
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(UNIX_COMMAND)
   })
 
   test("renders the desktop DAG view in the hero with 10 nodes across 5 waves", async ({

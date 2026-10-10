@@ -8,31 +8,39 @@
 //                    each leaf's first rung + thinking level in the applied notice.
 //   daily-normal-kimi / daily-normal-glm  later Daily · Normal rungs.
 //   geeky-normal-gpt6-only-unavailable  only GPT-6 Sol ids served: unavailable, the lane never falls back to GPT-6.
-//   geeky-normal-api-sol / geeky-normal-copilot-sol  gpt-5.6-sol medium through the openai / github-copilot ids.
+//   geeky-normal-sol serves gpt-6.1-sol next to gpt-5.6-sol and proves 6.1 Sol is the first rung.
+//   geeky-normal-api-sol / geeky-normal-copilot-sol  the gpt-5.6-sol medium fallback through the openai / github-copilot ids.
 //   unset            empty omo.json applies the recommended ladder (kimi-k3 on kimi-coding here).
 //   unset-skips-gateway  recommended never takes opengateway's vendor-prefixed Opus; kimi-k3 wins.
+//   unset-gpt-6-1-sol / unset-copilot-gpt-6-sol  recommended's GPT rungs: gpt-6.1-sol medium on the
+//                    subscription next to gpt-6-sol, and the gpt-6-sol medium fallback on Copilot.
 //   empty-registry   Daily · Normal against only mock-1: unavailable, session keeps mock-1.
 //   literal-pin      model_profile "anthropic/claude-opus-5": that model id is applied.
 //   unknown-profile / capable-removed / deep-work-removed / simple-work-removed
 //                    unknown-profile notice listing recommended and the four lane ids.
 //   custom-profile   user model_profiles.night-shift applies its chain.
 //   cli-model-wins   `--model` (provenance "cli") with an active lane: the CLI model survives.
-//   lane-beats-recommended-models  senpi recommended-models first auto-switches to gpt-6-sol;
-//                    Daily · Normal still wins with glm-5.3.
+//   lane-beats-recommended-models  the session starts off senpi's recommended ladder (mock-1), the
+//                    recommended-models builtin switches to gpt-6-astra, Daily · Normal still wins with glm-5.3.
 //   unset-rejected-login-falls-back / unset-every-login-rejected / unset-pooled-login-sibling-account
 //                    a stored login the fixture OAuth exchange refuses to refresh (offline, no real
 //                    identity endpoint): the walk skips it and the turn runs on the next rung, or
 //                    stays on the engine default; a pool whose sibling account is valid is kept.
 // Isolation: SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME point at a throwaway sandbox; the real
 // ~/.senpi/agent credential files are digest-compared before/after and MUST stay identical.
+// The memory root is sandboxed too (isolatedChildEnv sets OMO_MEMORY_HOME): every scenario checks
+// that its child resolves a memory root inside the sandbox and that no child output names the
+// caller's real memory root, so a sweep over the real ~/.omo/memory fails the run (#9239).
+// The real tree is not content-digested: other live sessions on the same machine write to it.
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { delimiter, dirname, join, resolve } from "node:path"
+import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createHash } from "node:crypto"
 
 import { createSandbox } from "./drive.mjs"
+import { resolveMemoryRoot } from "../../../memory-core/src/identity/layout.ts"
 
 const HOST_VOLATILE_SETTINGS_KEYS = ["workflow-skills", "tipsHistory", "skills"]
 
@@ -65,6 +73,19 @@ const packageRoot = resolve(scriptDir, "..", "..")
 const defaultPluginRoot = join(packageRoot, "plugin")
 const mockProviderEntry = join(scriptDir, "model-profile-e2e-mock-provider.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
+const realMemoryRoot = resolveMemoryRoot(process.env, process.cwd())
+
+function isInside(root, path) {
+  const rel = relative(root, path)
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
+}
+
+function mentionsPath(text, path) {
+  const home = homedir()
+  const forms = [path]
+  if (path === home || path.startsWith(home + sep)) forms.push("~" + path.slice(home.length))
+  return forms.some((form) => text.includes(form))
+}
 
 import { APPLIED_TYPE, UNKNOWN_TYPE, UNAVAILABLE_TYPE, PROFILE_TYPES, KNOWN_PROFILES, SCENARIOS } from "./model-profile-e2e-scenarios.mjs"
 
@@ -136,6 +157,7 @@ function seedScenario(pluginRoot, scenario) {
 }
 
 import { readSessionEntries, loadStreamCaptures, observeEngineThinking } from "./model-profile-e2e-observations.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 // An omo/senpi session exports its own runtime locators; a child senpi that inherits them boots
 // against that runtime dir instead of the binary on PATH, so they are dropped from the spawn env.
@@ -147,7 +169,7 @@ function spawnEnv(sandbox, sessionDir, scenario) {
   env.OMO_PROFILE_QA_PROVIDERS = (scenario.registerProviders ?? []).join(",")
   env.OMO_PROFILE_QA_OAUTH_PROVIDERS = (scenario.oauthProviders ?? []).join(",")
   return {
-    ...env,
+    ...isolatedChildEnv(env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     XDG_DATA_HOME: sandbox.xdgDataHome,
@@ -202,6 +224,8 @@ function runScenario(name, scenario, args, senpiBin) {
           ? profileNotices.length === 0
           : profileNotices.length === 1 && profileNotices[0].customType === scenario.expect.notice,
     }
+    checks.memory_root_in_sandbox = isInside(sandbox.root, resolveMemoryRoot(spawnEnv(sandbox, sessionDir, scenario), sandbox.cwd))
+    checks.real_memory_root_unseen = runs.every((each) => !mentionsPath(`${each.stdout ?? ""}\n${each.stderr ?? ""}`, realMemoryRoot))
     const provider = scenario.expect.provider ?? "omo-mock"
     const engine = observeEngineThinking(entries, loadStreamCaptures(sandbox.cwd))
     checks.stream_model = engine.captures.some((capture) => capture.model === scenario.expect.model)
@@ -264,8 +288,11 @@ function runScenario(name, scenario, args, senpiBin) {
         profileNotices[0]?.content.includes(`model_profile "${retired}" is not defined; known profiles: ${KNOWN_PROFILES}`) === true
     }
     if (name === "lane-beats-recommended-models") {
-      const changes = entries.filter((entry) => entry.type === "model_change").map((entry) => entry.modelId)
-      checks.recommended_models_switched_first = changes.indexOf("gpt-6-sol") !== -1 && changes.indexOf("gpt-6-sol") < changes.lastIndexOf("glm-5.3")
+      // The first model_change is the engine's record of the session's initial model, never a switch.
+      const changes = entries.filter((entry) => entry.type === "model_change").map((entry) => `${entry.provider}/${entry.modelId}`)
+      const switched = changes.indexOf(scenario.expect.recommendedSwitch)
+      checks.started_off_recommended_ladder = changes[0]?.endsWith(`/${scenario.expect.initialModel}`) === true
+      checks.recommended_models_switched_first = switched > 0 && switched < changes.lastIndexOf(`${provider}/${scenario.expect.model}`)
     }
     if (scenario.resumeRun === true) {
       checks.resumed_one_session = entries.filter((entry) => entry.type === "session").length === 1

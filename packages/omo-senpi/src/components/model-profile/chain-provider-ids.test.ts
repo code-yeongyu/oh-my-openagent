@@ -1,18 +1,20 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { dirname, join } from "node:path"
+import { realpathSync } from "node:fs"
+import { dirname } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
 
-// Same load path as packages/omo-native/test/provider-map-registry.test.ts: the pinned senpi's
-// nested `@earendil-works/pi-ai` registry, not a checked-in snapshot that can drift from the pin.
+// Same registry as packages/omo-native/test/provider-map-registry.test.ts: the `@earendil-works/pi-ai`
+// the pinned senpi itself resolves (bundled inside it or installed beside it), not a checked-in
+// snapshot that can drift from the pin.
 const senpiEntryPath = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))
-const senpiPackageRoot = dirname(dirname(senpiEntryPath))
+const senpiPackageRoot = realpathSync(dirname(dirname(senpiEntryPath)))
 const providerRegistryUrl = pathToFileURL(
-  join(senpiPackageRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "providers", "all.js"),
+  Bun.resolveSync("@earendil-works/pi-ai/providers/all", senpiPackageRoot),
 ).href
 const { builtinProviders } = (await import(providerRegistryUrl)) as {
   builtinProviders(): Array<{ id: string }>

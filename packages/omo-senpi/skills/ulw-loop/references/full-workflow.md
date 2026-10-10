@@ -185,7 +185,7 @@ Use steering only for structured evidence-backed mutation. Reject natural-langua
 
 | Kind | When to use | Required fields |
 |------|-------------|-----------------|
-| add_subgoal | Any defect met mid-run, pre-existing included, or a real blocker; it becomes a story fixed to the ideal state, never a follow-up note. | `title`, `objective`, `evidence`, `rationale` |
+| add_subgoal | A defect inside the change's blast radius (the request not delivered, a regression this change introduces, an invalid proof, a failing test or stale doc of touched code) or a real blocker; it becomes a story fixed to the ideal state. A defect outside it gets a tracked issue, not a subgoal. | `title`, `objective`, `evidence`, `rationale` |
 | split_subgoal | Story too large; needs decomposition | `targetGoalId`, `childGoals` (array of `{ title, objective }`), `evidence`, `rationale` |
 | reorder_pending | Discovered dependency order | `pendingOrder` (array of ids), `evidence`, `rationale` |
 | revise_pending_wording | Title/objective ambiguous | `targetGoalId`, `revisedTitle?`, `revisedObjective?`, `evidence`, `rationale` |

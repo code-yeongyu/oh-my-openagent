@@ -2,7 +2,7 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 import type { IsolationDetails } from "../../isolation/details"
 
 import type { TaskManager } from "../../manager"
-import type { ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus } from "../../state"
+import type { StartQueued, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus } from "../../state"
 import type { CallerSessionResolver } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "concurrency">
@@ -41,9 +41,14 @@ export type TaskSnapshot = {
   readonly status: TaskStatus
   readonly residency_state: ResidencyState
   readonly suspended?: SuspendedDetails
+  // A cancel waits for this child's lost connection; it may still be running on its host.
+  readonly stop?: string
+  // The child has not launched yet: its start-time fallback model is waiting for a lane slot.
+  readonly start_queued?: StartQueued
   readonly execution_mode: string
   readonly model: string
   readonly resolved_model?: ResolvedModelRecord
+  readonly effective_model?: ResolvedModelRecord
   readonly agent_type?: string
   readonly category?: string
   readonly parent_session_id: string

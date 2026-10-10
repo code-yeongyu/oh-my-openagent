@@ -3,6 +3,7 @@ import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
+import { findCommentCheckerPackageBinary as findInstalledCommentChecker } from "@oh-my-opencode/comment-checker-core"
 import { astGrepRuntimeDir, findSgBinarySync } from "@oh-my-opencode/utils"
 
 import type { DependencyInfo } from "../framework/types"
@@ -73,13 +74,9 @@ export function findCommentCheckerPackageBinary(
   resolvePackageJsonPath: () => string = resolveCommentCheckerPackageJson,
 ): string | null {
   const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
-  const platformKey = `${process.platform}-${process.arch === "x64" ? "x64" : process.arch}`
   try {
-    const packageDir = baseDirOverride ?? dirname(resolvePackageJsonPath())
-    const vendorPath = join(packageDir, "vendor", platformKey, binaryName)
-    if (existsSync(vendorPath)) return vendorPath
-    const binPath = join(packageDir, "bin", binaryName)
-    if (existsSync(binPath)) return binPath
+    const packageJsonPath = baseDirOverride === undefined ? resolvePackageJsonPath() : join(baseDirOverride, "package.json")
+    return findInstalledCommentChecker({ packageJsonPath, binaryName, existsSync })
   } catch (error) {
     if (!(error instanceof Error) && !isModuleResolutionFailure(error)) throw error
   }
