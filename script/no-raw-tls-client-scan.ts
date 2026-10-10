@@ -203,15 +203,6 @@ export function discoverPluginBuiltRuntimes(): string[] {
   return [...new Set(found)].sort()
 }
 
-// The guard's own files: their pattern definitions and guidance name the
-// flagged calls as data (regex sources, prose) and would match themselves.
-// The compiled dist carries them as strings, never as executed calls.
-const GUARD_OWN_FILES = new Set([
-  "packages/omo-opencode/src/shared/no-raw-tls-client.ts",
-  "packages/omo-opencode/src/shared/no-raw-tls-client-scan.ts",
-  "packages/omo-opencode/src/shared/no-raw-tls-client.test.ts",
-])
-
 // Scan roots, derived from what actually ships (review O3):
 // - the npm payload: root package.json "files" (bin, postinstall.mjs,
 //   script/qa, packages/shared-skills, packages/omo-codex plugin+scripts,
@@ -252,11 +243,7 @@ function isUnderRoots(relativePath: string, roots: string[]): boolean {
 export function collectShippedSourceFiles(): string[] {
   const roots = shippedRootEntries()
   const files = listTrackedFiles().filter(
-    (file) =>
-      !GUARD_OWN_FILES.has(file) &&
-      isScannedSourceFile(file) &&
-      !THIRD_PARTY_EXCLUDED_BUNDLES.includes(file) &&
-      isUnderRoots(file, roots),
+    (file) => isScannedSourceFile(file) && !THIRD_PARTY_EXCLUDED_BUNDLES.includes(file) && isUnderRoots(file, roots),
   )
   const probe = evaluateBuiltRuntimeProbe({
     known: KNOWN_BUILT_RUNTIMES,

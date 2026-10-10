@@ -54,7 +54,7 @@ const OFFENDER_GUIDANCE = [
   "the dots, and APIs like https.get(urlString)/http2.connect(authority) parse",
   "their argument. If this call's host provably does the same, or is a literal,",
   "add a reviewed entry to ALLOWLIST in",
-  "packages/omo-opencode/src/shared/no-raw-tls-client.test.ts:",
+  "script/no-raw-tls-client.test.ts:",
   '    { file: "<path>", call: "<exact normalized call text>", count: <n>, reason: "<host provenance>" },',
   "Otherwise route the request through fetch(), which parses the URL.",
 ].join("\n")
