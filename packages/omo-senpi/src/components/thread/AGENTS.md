@@ -219,6 +219,21 @@ Every scenario drives the product as a user runs it: the RELEASED senpi (`THREAD
 
 A `DEFECT <scenario>/<check> PD-n` line is a documented behavior the product does not hold yet; it is counted in the run-all summary (`product_defects=`) and never printed as PASS. None is open. PD-1 (a send with no endpoint of the agent dir live answered `host_unavailable`) and PD-2 (a process that never saw an offline or stopped terminal alive answered `not_found`) are fixed; their checks are hard assertions now.
 
+### Measured cost (todo 23, `scripts/qa/task-host-e2e-gateway-cost.mjs`)
+
+One measurement hold on one quiet 18-core machine (35.9 min, 1-minute load 1.5-4.9 in every batch, compressor 5.4-5.7 %, 0 batches discarded). Startup and memory are listener OFF vs ON on ONE engine (released senpi 2026.10.8) and ONE launcher (omo 5.1.17). ON is the released plugin unchanged. OFF is a scratch, never-committed build of the same bundle whose thread component is created with `sessionControl: null` (`src/extension/component-list.ts`: `createThreadComponent()` -> `createThreadComponent({ sessionControl: null })`, the early return at `component.ts` `registerControlEndpoint`). Every OFF sample registered 0 `tui` endpoints, and every ON sample exactly 1, which accepted a real connect. Intervals are seeded bootstrap 95% intervals of the ON - OFF delta.
+
+| Bound | Measured | Verdict |
+| --- | --- | --- |
+| p95 fully-ready delta < 20 ms (150 interleaved pairs; spawn to the session_start work settled, the endpoint accepting on ON) | p95 +13.3 ms [4.9, 24.4]; median +18.1 ms [12.3, 22.8]; min-of-150 +16.6 ms | UNRESOLVED: the band straddles 20 ms, and 150 pairs (the most the 45-minute cap allowed) did not narrow it below the bound |
+| idle memory delta < 3 MB (150 pairs, 1 s idle after a 2 s echo window, two forced full collections) | Retained main-thread heap (size + extra memory) median +1.2 MB [1.2, 1.2], +2914 objects [2830, 3026] | PASS on that direct measure. ON runs one more thread (the gateway store worker), whose heap the census does not cover. Whole-engine physical footprint median +0.7 MB [-2.7, 3.9] and RSS +9.7 MB [-4.6, 20.7] cannot resolve 3 MB |
+| `thread_list` with 12 endpoints < 1.5 s p95 (20 cold + 20 warm) | Cold 246.5 ms (min 235.3 ms); warm 14.5 ms (min 11.2 ms) | PASS |
+| `thread_send` to an idle endpoint < 300 ms p95 (10 cold + 10 warm, tool entry to return) | 25.3 ms (min 12.9 ms); every send `started` | PASS |
+| zero `event loop blocked` lines (406 pty streams, 399 agent-dir files, a live shard host's `stderr.log`; positive control found) | 0 | PASS |
+
+- **The user does not wait longer.** Spawn to prompt median +1.1 ms [-1.0, 2.4]. The worst keystroke echo in the 2 s after the prompt: median +0.3 ms [-1.1, 2.0]. The probe's `settled` mark: median +3.1 ms [-2.8, 8.3]. The fully-ready delta is the endpoint's own asynchronous registration finishing after `session_start` returned.
+- **Calibration (the failure QA can fail).** ON against ON plus 50 ms of synchronous blocking right before the endpoint bind, 30 pairs: fully ready moved median +52.2 ms [44.1, 56.8] (min-of-30 +54.6 ms), and the driver judged that startup row FAIL. The prompt moved +2.0 ms. The worst echo did not move (+0.3 ms): a keystroke every 100 ms only sometimes lands inside a 50 ms block.
+
 ## Conventions
 
 - Every entry point returns its outcome as data; the error branch carries a taxonomy code and a `next_action` that names the recovery, so a runner hands the failure straight to the model.
