@@ -10,13 +10,27 @@ import {
   latestAssistantTurnIsCompletedEmptyNoProgress,
 } from "./parent-wake-history-state"
 import type { PendingParentWake } from "./parent-wake-dedupe"
-import { getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
+import { getParentWakeMessageActivityAt, getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
 import type { ParentWakeSessionMessage } from "./parent-wake-session-message"
 
 export type ToolWaitDeferralDecision = {
   readonly defer: boolean
   readonly skipPromptGateToolStateCheck: boolean
 }
+
+/**
+ * Ceiling on how long a parent-wake may keep deferring because the latest
+ * assistant turn holds a tool block (waiting/unresolved tool). Once the
+ * block's own last activity is older than this, the deferral is stale: the
+ * tool is either silently wedged (its "running" part never completes) or its
+ * busy signals are blind to this process, and the parent would otherwise park
+ * forever with no sibling, idle, or terminal event to resume it. A stale
+ * block still defers (never forks a concurrent reply); it only stops the
+ * *unbounded* retry loop by requiring a full noReply re-admission before the
+ * next attempt. This bounds the deferred-wake lifetime while preserving the
+ * tool-block safety invariant (issue #6546 round 5).
+ */
+export const PARENT_WAKE_TOOL_BLOCK_DEFER_AGE_CEILING_MS = 10 * 60 * 1_000
 
 export function parentWakeUserMessageIsInProgress(input: {
   readonly messages: readonly ParentWakeSessionMessage[] | undefined
@@ -115,6 +129,23 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     return { defer: true, skipPromptGateToolStateCheck: true }
   }
   if (
+    latestAssistantTurnHasToolBlock(messages)
+    && !latestAssistantTurnHasFreshToolActivity(messages, now, PARENT_WAKE_TOOL_BLOCK_DEFER_AGE_CEILING_MS)
+    && latestToolBlockActivityAt(messages) !== undefined
+    && now - latestToolBlockActivityAt(messages)! >= PARENT_WAKE_TOOL_BLOCK_DEFER_AGE_CEILING_MS
+  ) {
+    // The tool block has been silent for the entire ceiling — the wake is no
+    // longer permitted to keep deferring on it. The block still blocks a reply
+    // dispatch, so reset the deferral clock and drop to the admit-only path on
+    // the next attempt: the wake is re-admitted as noReply (never a reply fork)
+    // and the bounded admission+defer cycle is now finite (#6546 round 5).
+    log("[background-agent] Resetting parent wake deferral after tool-block age ceiling:", {
+      sessionID: input.sessionID,
+    })
+    delete input.wake.toolCallDeferralStartedAt
+    return { defer: true, skipPromptGateToolStateCheck: true }
+  }
+  if (
     now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs
     && latestAssistantTurnHasStaleUnknownSubstantiveOutput(messages, now, input.toolCallDeferMaxMs)
   ) {
@@ -188,6 +219,28 @@ export function hasAssistantOrToolOutputAfterParentWake(input: {
 
 function getParentWakeMessageRole(message: ParentWakeSessionMessage): string | undefined {
   return message.info?.role ?? message.role
+}
+
+// Latest activity timestamp across the latest assistant turn that holds a tool
+// block (waiting/unresolved tool part). Feeds the tool-block deferral age
+// ceiling: a block whose own last activity predates the ceiling is wedged or
+// blind, so the wake must stop deferring on it.
+function latestToolBlockActivityAt(messages: readonly ParentWakeSessionMessage[]): number | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    const role = getParentWakeMessageRole(message)
+    if (role === "assistant") {
+      const activityAt = getParentWakeMessageActivityAt(message)
+      if (activityAt === undefined) {
+        return undefined
+      }
+      return activityAt
+    }
+    if (role === "user" && !isSyntheticOrInternalUserMessage(message)) {
+      return undefined
+    }
+  }
+  return undefined
 }
 
 function parentWakeMessageHasOutput(message: ParentWakeSessionMessage): boolean {
