@@ -23,6 +23,7 @@ describe("facts secret screening", () => {
           return {
             task_id: spec.taskId,
             sessionId: `session-${spec.taskId}`,
+            effectiveModel: () => undefined,
             steer: async () => undefined,
             followUp: async () => undefined,
             abort: async () => undefined,

@@ -118,7 +118,7 @@ describe("generateModelConfig provider routes", () => {
   })
 
   describe("librarian agent special cases", () => {
-    test("librarian uses Claude fallback when ZAI is available with Claude", () => {
+    test("librarian uses Haiku 5.5 medium when ZAI is available with Claude", () => {
       // given Claude and ZAI are available
       const config = createConfig({ hasClaude: true, hasZaiCodingPlan: true })
 
@@ -126,11 +126,12 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Librarian uses the current Claude fallback
-      expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-5-5")
+      expect(result.agents?.librarian?.variant).toBe("medium")
       expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
     })
 
-    test("librarian uses Claude fallback when Claude is available", () => {
+    test("librarian uses Haiku 5.5 medium when Claude is available", () => {
       // given only Claude is available
       const config = createConfig({ hasClaude: true })
 
@@ -138,7 +139,8 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Librarian uses the shared Claude fallback
-      expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-5-5")
+      expect(result.agents?.librarian?.variant).toBe("medium")
     })
   })
 
@@ -165,7 +167,8 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Explore has no remaining fallback
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-5-5")
+      expect(result.agents?.explore?.variant).toBe("medium")
       expect(result.agents?.explore?.fallback_models).toBeUndefined()
     })
 

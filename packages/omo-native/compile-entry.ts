@@ -12,11 +12,13 @@ import {
   type EmbeddedManifest,
 } from "./compile-runtime"
 import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
-import { buildLabel, parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
+import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
-import { nearestNodeBin, readJson, releaseBanner } from "./bin/lib/package-paths.js"
+import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
+import { remapSenpiEnvironment } from "./compiled-environment"
+import { runServiceAuthCommand } from "../omo-opencode/src/cli/service-auth/commands"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
@@ -31,12 +33,7 @@ import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
 import { spawnSync } from "node:child_process"
-import { delimiter } from "node:path"
-import {
-  migrateHostSessionSockets,
-  planHostSessionSocketMigration,
-} from "../senpi-task/src/store/rollback-migrate"
-import { pruneMissingStoreIndexEntriesSync } from "../senpi-task/src/runners/rpc-host/store-index"
+import { compiledRollbackMigration } from "./compiled-rollback"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -75,58 +72,7 @@ export function updateHint(rawBuildInfo: unknown, platform: NodeJS.Platform = pr
   return `omo update runs from the compiled omo binary; download ${releaseAssetName(undefined, platform, arch)} from ${RELEASES_URL}`
 }
 
-export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, execDir: string): NodeJS.ProcessEnv {
-  const env = { ...source }
-  delete env.OMO_BIN
-  delete env.SENPI_BIN
-  const agentDir = canonicalAgentDir(env)
-  env.OMO_CODING_AGENT_DIR = agentDir
-  env.SENPI_CODING_AGENT_DIR = agentDir
-  // The engine resolves its package dir from PACKAGE_DIR before falling back to
-  // dirname(process.execPath). Provisioning can complete without a re-exec (and the
-  // size guard in materializeProvisionedExecutable makes that path common), so
-  // execPath may stay at the user's install path while the payload lives under
-  // execDir - pin the root explicitly rather than trusting the running image.
-  env.OMO_PACKAGE_DIR = execDir
-  env.SENPI_PACKAGE_DIR = execDir
-  env.OMO_NATIVE = "1"
-  env.SENPI_RUNTIME = process.versions.bun ? "bun" : "node"
-  let displayVersion = "unknown"
-  let devCommand: string | undefined
-  let devUpdateCommand: string | undefined
-  let changelogVersion: string | undefined
-  try {
-    const stamped = readJson(join(execDir, "package.json")) as { version?: string; omoBuild?: unknown }
-    displayVersion = typeof stamped.version === "string" ? stamped.version : "unknown"
-    const info = parseBuildInfo(stamped.omoBuild)
-    if (info !== undefined) {
-      devCommand = info.command
-      devUpdateCommand = `rebuild with: bun run ${info.command}`
-      displayVersion = buildLabel(info)
-    } else {
-      const pluginManifest = readJson(join(execDir, "plugin", "package.json")) as { version?: string }
-      changelogVersion = typeof pluginManifest.version === "string" ? pluginManifest.version : undefined
-    }
-  } catch { /* test fixtures may omit the sibling manifest */ }
-  env.SENPI_BRAND = JSON.stringify({
-    name: "OmO", command: devCommand ?? "omo", displayVersion,
-    configDir: ".omo", flatLayout: false, envPrefix: "OMO", userAgent: "omo", originator: "omo",
-    changelog: {
-      path: join(execDir, "plugin", "CHANGELOG.md"),
-      ...(changelogVersion === undefined ? {} : { version: changelogVersion }),
-    },
-    update: { packageName: "omo-ai", distTag: displayVersion.includes("-") ? "beta" : "latest", command: devUpdateCommand ?? "omo update", changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
-  })
-  const binDir = nearestNodeBin(execDir)
-  if (binDir) {
-    const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH"
-    env[pathKey] = env[pathKey] ? `${binDir}${delimiter}${env[pathKey]}` : binDir
-    const shim = join(binDir, process.platform === "win32" ? "senpi.cmd" : "senpi")
-    if (existsSync(shim)) env.SENPI_BIN = shim
-  }
-  env.OMO_BIN = join(execDir, process.platform === "win32" ? "omo.exe" : "omo")
-  return env
-}
+export { remapSenpiEnvironment } from "./compiled-environment"
 
 type CompiledLauncherOptions = CompiledDoctorOptions & {
   readonly runSetup?: (args: string[], options: Record<string, unknown>) => Promise<void>
@@ -176,42 +122,15 @@ export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersi
   return info === undefined ? [releaseBanner(manifest.omoAiVersion)] : versionLines(info)
 }
 
-type CompiledRollbackMigrationRequest =
-  | {
-      readonly operation?: "migrate"
-      readonly storeDir: string
-      readonly to: string
-      readonly deadEndpoints?: readonly string[]
-      readonly dryRun?: boolean
-      readonly planOnly?: boolean
-    }
-  | {
-      readonly operation: "prune-store-index"
-      readonly indexPath: string
-    }
-
-function compiledRollbackMigration() {
-  return {
-    run(request: CompiledRollbackMigrationRequest) {
-      if (request.operation === "prune-store-index") {
-        return { removed: pruneMissingStoreIndexEntriesSync(request.indexPath) }
-      }
-      if (request.planOnly) {
-        return planHostSessionSocketMigration(request.storeDir, request.to)
-      }
-      return migrateHostSessionSockets(request.storeDir, {
-        to: request.to,
-        deadEndpoints: new Set(request.deadEndpoints ?? []),
-        dryRun: request.dryRun,
-      })
-    },
-  }
-}
 
 /** Test seam: the thread SDK `omo daemon adopt` locates and releases through (the plugin's by default). */
 type CompiledLauncherSeams = { readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }> }
 
 export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string, migration: CompiledLauncherOptions = {}, seams: CompiledLauncherSeams = {}): Promise<boolean> {
+  if (["login", "logout", "whoami"].includes(args[0] ?? "")) {
+    await runServiceAuthCommand(args)
+    return true
+  }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
   migrateLegacyBunGlobalManifest(execDir)
   adoptLegacyFlatState()

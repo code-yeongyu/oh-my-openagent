@@ -16,6 +16,7 @@ import {
   type ChildSession,
 } from "./in-process/child-handle"
 import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
+import { assertPinnedModelHonoured } from "./in-process/pin-check"
 import { RunnerError } from "./in-process/runner-error"
 import type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -170,6 +171,7 @@ export class InProcessRunner {
     }
 
     let session: ChildSession
+    let createdSession: ChildSession | undefined
     try {
       // SessionManager and the child option helpers below read barrel values synchronously, so the
       // barrel is loaded here (memoized: a cache hit in any process that already runs the engine).
@@ -182,11 +184,27 @@ export class InProcessRunner {
         ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
       session = await this.#createSession(options)
+      createdSession = session
+      assertPinnedModelHonoured(spec, session)
     } catch (error) {
       // A start that never produced a session must leave NO binding behind: the runner floor refuses
       // curated/policy-narrowed/colliding grants by throwing from here, and a stale entry would keep
       // a strong reference to the parent kernel until TTL expunge.
       this.#kernelToolBindings?.release(spec.taskId)
+      // A session that WAS created but failed the pin check is disposed here (session_shutdown +
+      // dispose): no handle exists yet, so nobody else owns that teardown (#9722 M1). A teardown
+      // that itself fails still escapes as a typed RunnerError - never an untyped AggregateError.
+      if (createdSession !== undefined) {
+        try {
+          await discardUnstartedChildSession(createdSession)
+        } catch (shutdownError) {
+          throw new RunnerError({
+            kind: "model_unavailable",
+            message: "the pin check failed, and shutting down its session failed",
+            cause: new AggregateError([error, shutdownError]),
+          })
+        }
+      }
       if (RunnerError.is(error)) throw error
       throw new RunnerError({ kind: "session-create-failed", message: sessionCreateMessage(error), cause: error })
     }

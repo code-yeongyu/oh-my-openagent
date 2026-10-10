@@ -36,6 +36,7 @@ export async function cancelRef(deps: SteerDeps, ref: HandleRef, ctx: HandleCall
       return { ref, cancelled: true, phase: run.verdict === "live" ? run.phase(ref) : "cancelled" }
     case "cancel_pending":
     case "noop":
+    case "released":
     case "not_found":
       // Nothing was stopped yet: once the run has moved, any phase read now would be the next run's.
       if (run.verdict !== "live") throw run.stale(ref)

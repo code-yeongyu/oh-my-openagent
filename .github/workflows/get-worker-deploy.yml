@@ -16,8 +16,10 @@ jobs:
   deploy:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
+    # The Sisyphus Labs account (moved 2026-10-09). The token in this environment can edit Workers scripts and
+    # the omo.dev zone's routes; it has NO D1 access, so migrations are applied by a separate reviewed step.
     environment:
-      name: web-production
+      name: omo-production
       url: https://get.omo.dev
     defaults:
       run:
@@ -31,18 +33,13 @@ jobs:
         with:
           bun-version: "1.4.2"
       - run: bun install --frozen-lockfile
-      - name: Apply D1 migrations
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_GET_DEPLOY_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/get-worker
-          command: d1 migrations apply omo-get --remote
+      - name: Refuse to deploy over a pending D1 migration
+        run: bash scripts/check-migrations-applied.sh migrations
       - name: Deploy
         uses: cloudflare/wrangler-action@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_GET_DEPLOY_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 6511ce566bfe27228f536a8fb9448be5
           workingDirectory: packages/get-worker
           command: deploy
       - name: Smoke the live endpoints
@@ -59,7 +56,7 @@ jobs:
           JOB_SUMMARY_TITLE: get.omo.dev deploy
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Applies D1 migrations and deploys the omo-get Worker.
+            - Refuses to deploy while a D1 migration is pending, then deploys the omo-get Worker.
             - Smoke-checks healthz, install.sh caching and the latest channel.
-          JOB_SUMMARY_NEXT: Check wrangler authentication and D1 migration output first.
+          JOB_SUMMARY_NEXT: A pending-migration stop means the migration must be applied through the reviewed step first; otherwise check wrangler authentication.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

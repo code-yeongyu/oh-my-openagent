@@ -1,4 +1,5 @@
 export const TASK_START_FAILURE_KINDS = [
+  "suspended_unresumable",
   "child-prompt-failed",
   "child-turn-failed",
   "session-create-failed",

@@ -75,3 +75,33 @@ test("an unavailable transitive asset blocks migration rather than publishing an
     await expect(liveAssetInventory(origin)).rejects.toThrow()
   })
 })
+
+test("an operator reason waives only the identified-deployment refusal: the inventory is still built and verified", async () => {
+  // Given: the live deployment was made outside the retention pipeline (no history) and identifies itself.
+  await live({ advertised: true }, async (origin) => {
+    // When: an operator acknowledges the missing history with a reason.
+    const inventory = await liveAssetInventory(origin, {
+      acceptMissingHistory: "first deploy after the account move",
+    })
+    // Then: the full graph is collected and every recorded asset downloads.
+    const responses = await Promise.all(inventory.paths.map((path) => fetch(new URL(path, origin))))
+    expect(responses.every((response) => response.ok)).toBe(true)
+    expect(inventory.paths.some((path) => path.endsWith("lazy.js"))).toBe(true)
+  })
+})
+
+test("a blank reason does not waive the refusal", async () => {
+  await live({ advertised: true }, async (origin) => {
+    await expect(liveAssetInventory(origin, { acceptMissingHistory: "   " })).rejects.toThrow(
+      "asset history is missing",
+    )
+  })
+})
+
+test("the waiver never hides an unavailable asset", async () => {
+  await live({ advertised: true, broken: true }, async (origin) => {
+    await expect(
+      liveAssetInventory(origin, { acceptMissingHistory: "first deploy after the account move" }),
+    ).rejects.toThrow()
+  })
+})

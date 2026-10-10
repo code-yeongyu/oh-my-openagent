@@ -20,6 +20,13 @@ import {
 const generatedDirectivePath = resolve("packages/omo-senpi/src/components/ultrawork/generated-directive.ts")
 
 describe("omo-senpi ultrawork component", () => {
+  it("#given a task child role #when a brief carrying the keyword is classified #then reports a suppressed child session", () => {
+    expect(classifyUltraworkInput(
+      { text: "ulw: implement the unit; evidence goes in .omo/ulw-execute/ledger.jsonl", source: "rpc", sessionRole: "child" },
+      { wasArmed: true, compactRearmPending: true },
+    )).toMatchObject({ matchedUlw: true, effective: false, stage: "none", route: "none", suppressionReason: "child_session" })
+  })
+
   it("#given the generated directives #when read #then the baseline carries no variant marker and the Astra variant swaps only the marked blocks", () => {
     // The markers are authoring scaffolding in SKILL.md; the shipped directives must not leak them,
     // and the Astra variant must be a strict rewrite of the baseline (shorter, same sentinel).

@@ -23,6 +23,7 @@ function initSubmodules({ strict }) {
 		execFileSync("git", ["submodule", "update", "--init", "--recursive", ...upstreamPaths], {
 			cwd: repoRoot,
 			stdio: "inherit",
+			windowsHide: true,
 		});
 		return true;
 	} catch (error) {

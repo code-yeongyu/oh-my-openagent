@@ -79,7 +79,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   const kibitzerRef: { current?: KibitzerComposition } = {}
-  const maintenance = createMemoryMaintenance(options.logger === undefined ? {} : { logger: options.logger })
+  const maintenance = createMemoryMaintenance({
+    isLiveSession: (sessionId) => options.sessions.has(sessionId),
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
     for (const tracker of skillsUsageTrackersRef.current.values()) {

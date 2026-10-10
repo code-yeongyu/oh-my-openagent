@@ -40,6 +40,7 @@ describe("facts runner shutdown abort boundary", () => {
           return {
             task_id: "facts-child",
             sessionId: "facts-child",
+            effectiveModel: () => undefined,
             steer: async () => undefined,
             followUp: async () => undefined,
             abort: async () => { aborted += 1 },

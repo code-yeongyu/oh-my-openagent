@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode-linux-x64-musl",
-  "version": "5.1.24",
+  "version": "5.1.29",
   "description": "Platform-specific binary for oh-my-opencode (linux-x64-musl)",
   "license": "MIT",
   "repository": {

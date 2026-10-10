@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
+import { loadSenpiBarrel, senpiBarrel } from "../../lazy/senpi-barrel"
 import type { ResolvedModelRecord } from "../../state"
 import { createRuntimeFallbackSettings, type CallerSettingsSource } from "./runtime-fallback-settings"
 
@@ -31,10 +31,12 @@ function caller(global: Record<string, unknown>, project?: Record<string, unknow
   const agentDir = join(root, "agent")
   const cwd = join(root, "project")
   mkdirSync(agentDir, { recursive: true })
-  mkdirSync(join(cwd, ".senpi"), { recursive: true })
+  // The project dir is the running engine's config dir: a branded process (SENPI_BRAND) reads `.omo`, not `.senpi`.
+  const projectConfigDir = join(cwd, senpiBarrel().CONFIG_DIR_NAME)
+  mkdirSync(projectConfigDir, { recursive: true })
   const globalPath = join(agentDir, "settings.json")
   writeFileSync(globalPath, JSON.stringify(global))
-  if (project !== undefined) writeFileSync(join(cwd, ".senpi", "settings.json"), JSON.stringify(project))
+  if (project !== undefined) writeFileSync(join(projectConfigDir, "settings.json"), JSON.stringify(project))
   return { cwd, agentDir, projectTrusted, globalPath }
 }
 

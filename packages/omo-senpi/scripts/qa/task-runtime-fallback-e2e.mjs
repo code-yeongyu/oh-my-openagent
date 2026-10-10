@@ -13,7 +13,7 @@ import {
 } from "node:fs"
 import { createHash } from "node:crypto"
 import { homedir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { delimiter, dirname, extname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
@@ -145,33 +145,35 @@ const scenarios = [
       }
     },
   })),
-  // #9512: the child's primary makes a tool call, then hits a usage limit inside the same turn. A
-  // host-session child carries its own chain on open_session (retry_fallback_profile), so the hop
-  // happens inside the session; the user's settings file must not be touched by it.
-  {
-    name: "limit-after-tool",
+  // #9512 / #9582: the child's primary makes a tool call, then hits a usage limit inside the same turn. Every
+  // process runner now hands the child its own chain (a host session on open_session.retryFallback, a per-child
+  // process on set_retry_fallback), so the hop happens inside the session, after the tool call, and the user's
+  // settings file is never touched. "limit-near-compaction" adds a context near the compaction threshold, so the
+  // engine's pre-retry compaction runs on the spent model first; the child must still reach its fallback.
+  ...[
+    { name: "limit-after-tool", model: "omo-fallback-mock/limit-after-tool", tool: "limit-after-tool-ran" },
+    { name: "limit-near-compaction", model: "omo-fallback-mock/limit-near-compaction", tool: "limit-near-compaction-ran" },
+  ].map((turn) => ({
+    name: turn.name,
     omoConfig: {
       categories: {
         toolcat: {
-          model: "omo-fallback-mock/limit-after-tool",
+          model: turn.model,
           fallback_models: ["omo-fallback-mock/healthy-fallback"],
         },
       },
     },
-    checks: (artifacts, stdoutText, runner) => ({
+    checks: (artifacts, stdoutText) => ({
       final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
       fallback_event: fallbackRecorded(artifacts.log),
-      // The task event log records each finished tool call as `tool_execution`; the in-session hop must come
-      // after it. Only a host-session child carries its own chain (retry_fallback_profile, #9512); a per-child
-      // process cannot receive one, so its manager-level fallback is a different path and is not judged here.
-      tool_ran_before_limit: runner.name !== "host-session"
-        ? "N/A"
-        : /"type":"tool_execution","payload":\{"tool":"bash"/.test(artifacts.log) ? "PASS" : "FAIL",
+      // The task event log records each finished tool call as `tool_execution`; the hop must come after it.
+      tool_ran_before_limit: /"type":"tool_execution","payload":\{"tool":"bash"/.test(artifacts.log) ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "omo-fallback-mock/healthy-fallback" ? "PASS" : "FAIL",
       settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
         ? "PASS"
         : "FAIL",
     }),
-  },
+  })),
   {
     name: "chain-exhausted",
     omoConfig: {},
@@ -218,18 +220,55 @@ function settingsDigest(sandbox) {
   return existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : undefined
 }
 
-function sandboxProcesses(sandbox) {
-  const table = execFileSync("ps", ["-axo", "pid=,args="], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
+// SENPI_BIN or `senpi` on PATH (repo node_modules/.bin first). On Windows the bin is a `.exe`/`.cmd` shim,
+// so PATHEXT names are tried; the spawn below never uses a shell.
+function resolveSenpi() {
+  const bin = process.env.SENPI_BIN?.trim() || "senpi"
+  const names = process.platform !== "win32" || extname(bin) !== ""
+    ? [bin]
+    : [...(process.env.PATHEXT?.trim() || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).map((ext) => `${bin}${ext}`), bin]
+  const dirs = isAbsolute(bin) || bin.includes("/") || bin.includes("\\")
+    ? [""]
+    : [join(process.cwd(), "node_modules", ".bin"), ...(process.env.PATH ?? "").split(delimiter)]
+  for (const dir of new Set(dirs)) {
+    for (const name of names) {
+      const candidate = dir === "" ? resolve(name) : resolve(dir, name)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+  return bin
+}
+
+// One process table for both platforms: `ps` on POSIX, the CIM process list on Windows (no `ps`/`pgrep`).
+function processTable() {
+  if (process.platform === "win32") {
+    const json = execFileSync(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command",
+        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress"],
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+    )
+    const rows = JSON.parse(json || "[]")
+    return (Array.isArray(rows) ? rows : [rows]).map((row) => ({
+      pid: Number(row.ProcessId),
+      ppid: Number(row.ParentProcessId),
+      args: String(row.CommandLine ?? ""),
+    }))
+  }
+  const table = execFileSync("ps", ["-axo", "pid=,ppid=,args="], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
   return table.split("\n").flatMap((line) => {
-    const match = /^\s*(\d+)\s+(.*)$/.exec(line)
-    return match !== null && match[2].includes(sandbox.root) ? [Number(match[1])] : []
+    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line)
+    return match === null ? [] : [{ pid: Number(match[1]), ppid: Number(match[2]), args: match[3] }]
   })
 }
 
-function descendants(pid) {
-  const result = spawnSync("pgrep", ["-P", String(pid)], { encoding: "utf8" })
-  const direct = (result.stdout ?? "").split("\n").filter(Boolean).map(Number)
-  return direct.flatMap((child) => [child, ...descendants(child)])
+function sandboxProcesses(sandbox, table = processTable()) {
+  return table.filter((row) => row.args.includes(sandbox.root) && row.pid !== process.pid).map((row) => row.pid)
+}
+
+function descendants(pid, table) {
+  const direct = table.filter((row) => row.ppid === pid).map((row) => row.pid)
+  return direct.flatMap((child) => [child, ...descendants(child, table)])
 }
 
 function alive(pid) {
@@ -256,8 +295,9 @@ function signal(pids, name) {
 // the receipt fails when anything naming the sandbox, or any stopped pid, survives. Process exit of
 // a non-child pid has no event to await, so the grace period is a bounded liveness re-check.
 async function stopSandboxProcesses(sandbox) {
-  const found = sandboxProcesses(sandbox)
-  const owned = [...new Set(found.flatMap((pid) => [pid, ...descendants(pid)]))]
+  const table = processTable()
+  const found = sandboxProcesses(sandbox, table)
+  const owned = [...new Set(found.flatMap((pid) => [pid, ...descendants(pid, table)]))]
   signal(owned, "SIGTERM")
   const deadline = Date.now() + 10_000
   while (owned.some(alive) && Date.now() < deadline) {
@@ -265,6 +305,13 @@ async function stopSandboxProcesses(sandbox) {
   }
   signal(owned.filter(alive), "SIGKILL")
   return { stopped: owned, survivors: [...sandboxProcesses(sandbox), ...owned.filter(alive)] }
+}
+
+const senpiBin = resolveSenpi()
+// A `.cmd`/`.bat` shim only runs through a shell, which would re-split the prompt argument; bun installs a
+// `.exe` shim, and SENPI_BIN can name the engine itself.
+if (process.platform === "win32" && /\.(cmd|bat)$/i.test(senpiBin)) {
+  throw new Error(`SENPI_BIN resolved to a shell shim (${senpiBin}); point it at senpi.exe or the engine binary`)
 }
 
 async function runScenario(scenario, runner, outDir) {
@@ -294,7 +341,7 @@ async function runScenario(scenario, runner, outDir) {
     mkdirSync(homeDir, { recursive: true })
     settingsBefore = settingsDigest(sandbox)
     runResult = spawnSync(
-      process.env.SENPI_BIN?.trim() || "senpi",
+      senpiBin,
       [
         "-e",
         providerEntry,
@@ -321,7 +368,9 @@ async function runScenario(scenario, runner, outDir) {
           OMO_FALLBACK_SCENARIO: scenario.name,
         },
         encoding: "utf8",
-        timeout: 120_000,
+        windowsHide: true,
+        // A cold Windows runner needs well over a minute for a parent turn plus a child and its fallback.
+        timeout: process.platform === "win32" ? 240_000 : 120_000,
         maxBuffer: 64 * 1024 * 1024,
       },
     )
@@ -347,7 +396,7 @@ async function runScenario(scenario, runner, outDir) {
     real_credentials_untouched: afterCredentials === beforeCredentials ? "PASS" : "FAIL",
     cleanup,
   }
-  const result = Object.values(checks).every((value) => value === "PASS" || value === "N/A") ? "PASS" : "FAIL"
+  const result = Object.values(checks).every((value) => value === "PASS") ? "PASS" : "FAIL"
   const verdict = {
     result,
     runner: runner.name,

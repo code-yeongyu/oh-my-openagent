@@ -117,7 +117,7 @@ AGENTS.md files carry directory-scoped conventions. Obey them for files in their
 
 [Outcome so far] toward [the user's original ask and the result they wanted]. You need: [ledger N/M done, findings, blockers]. Now: [todo task in progress]. Next: [next open task].
 
-Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration.
+Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration. The block is for multi-step work tracked in todos. A request finished in a single turn with no todo list gets a plain answer with no block, and a final message never opens or closes with ledger lines such as \`Next: none\`.
 
 **Final message.** Lead with the result. Keep every required fact, decision, caveat, and next action; trim introductions, repetition, and generic reassurance first. Group by user-facing outcome, not by file. Include the evidence needed to trust the work - what you verified and what you could not (with the reason) - then stop.
 

@@ -1,6 +1,6 @@
 # skills
 
-Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 10 skill dirs with their own authoring contract.
+Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 11 skill dirs with their own authoring contract.
 
 ## WHERE TO LOOK
 
@@ -15,6 +15,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 | `init-deep/` | Hierarchical AGENTS.md generation via a size-formula dag map-reduce (quick scanners -> high writers, ALWAYS-REDUCE); senpi-local override shadowing the shared-pool copy. |
 | `dag-library/` | Store a dag definition once and re-run it by name; loads through `plugin/runtime/dag/library.js`. |
 | `onboarding/` | First-run onboarding; `qa-validator.sh` pins the skill contract (front matter `name: onboarding`), `qa-savings-fixture.sh` expects `qa-savings-fixture: OK`. |
+| `visualize/` | Builds a self-contained HTML page to show inline in a thread (`show_html_page` / `html_preview` / `html_render`): a short router to `data-scientist` (figures, traceable query) and `frontend` (design), plus the inline-page constraints (no network, host theme tokens, scripts-off render, render-and-look in both themes at 390 px and the reply width). |
 | `give-me-tips/` | Explains any senpi tip in depth (`Tip:` lines incl. the Fable-5-refusal fallback tip and the kibitzer `Aha moment!` recall notice); queries the product's tip list first (`omo --list-tips` on OmO Native, `senpi --list-tips` on a plain senpi install), checks what THIS user can see, verifies feature code before explaining. |
 
 ## CONVENTIONS

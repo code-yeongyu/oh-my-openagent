@@ -1,13 +1,23 @@
 import { isGpt6AstraModel } from "@oh-my-opencode/model-core"
+import { readSessionRole, type SessionRole } from "@oh-my-opencode/senpi-task"
+
 import { transformContextText } from "../../extension/context-text-transform"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { stripQuotedRegions } from "../skill-pointers/strip-quoted-regions"
+import {
+  maskNegatedInvocations,
+  NOT_AFTER_IDENTIFIER,
+  NOT_BEFORE_PATH,
+  NOT_INTO_IDENTIFIER,
+  stripQuotedRegions,
+  stripQuotedSpans,
+} from "../skill-pointers/strip-quoted-regions"
 import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 
-// Match complete words so prose such as "ulwfoo" and identifiers such as "ulw_helper" do not
-// arm ultrawork. Hyphens and spaces remain boundaries, so skill names like "ulw-loop" and phrases
-// like "ulw loop" still arm. Quoted and injected regions are blanked before this pattern runs.
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = /\b(?:ultrawork|ulw)\b/i
+// The keyword arms only as a word of its own: "ulw", "ulw loop", a leading "ulw-loop" or "ulw-plan." do;
+// "ulwfoo", "ulw_helper", "mass-ulw-refactor", "ulw-plan.md" and ".omo/ulw/" do not (#9738). Quoted,
+// injected, relayed and negated regions are blanked before this pattern runs.
+const ULTRAWORK_KEYWORD = /\b(?:ultrawork|ulw)\b/i
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = new RegExp(String.raw`${NOT_AFTER_IDENTIFIER}\b(?:ultrawork|ulw)\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`, "i")
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
 const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
 const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
@@ -39,7 +49,10 @@ export type UltraworkRoute = "none" | "direct" | "skill_args" | "skill_expansion
 export type UltraworkSuppressionReason =
   | "none"
   | "extension_source"
+  | "child_session"
   | "no_keyword"
+  | "identifier_reference"
+  | "negated_mention"
   | "skill_name_only"
   | "skill_expansion"
   | "embedded_directive"
@@ -184,10 +197,11 @@ export function armingSnapshot(sessionId: string | undefined): ArmingSnapshot {
 }
 
 export function classifyUltraworkInput(
-  input: { readonly text: string; readonly source: SenpiInputEvent["source"] },
+  input: { readonly text: string; readonly source: SenpiInputEvent["source"]; readonly sessionRole?: SessionRole },
   snapshot: ArmingSnapshot,
 ): UltraworkClassification {
-  const visibleText = stripQuotedRegions(input.text)
+  const quotedText = stripQuotedSpans(input.text)
+  const visibleText = maskNegatedInvocations(quotedText)
   const matches = [...visibleText.matchAll(new RegExp(ULTRAWORK_CURRENT_PROMPT_PATTERN.source, "gi"))]
   let matchedUlw = false
   let matchedUltrawork = false
@@ -205,12 +219,21 @@ export function classifyUltraworkInput(
     occurrenceCount: matches.length,
   }
 
+  if (input.sessionRole !== undefined) {
+    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "child_session" }
+  }
+
   if (input.source === "extension") {
     return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "extension_source" }
   }
 
   if (matches.length === 0) {
-    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "no_keyword" }
+    const suppressionReason = ULTRAWORK_KEYWORD.test(visibleText)
+      ? "identifier_reference"
+      : ULTRAWORK_KEYWORD.test(quotedText)
+        ? "negated_mention"
+        : "no_keyword"
+    return { ...base, effective: false, stage: "none", route: "none", suppressionReason }
   }
 
   if (input.text.includes(ULTRAWORK_MODE_OPEN_TAG) && input.text.includes(ULTRAWORK_MODE_CLOSE_TAG)) {
@@ -336,7 +359,10 @@ function handleInput(
   // hosts that only expose the id on session events.
   const sessionId = sessionIdFromEventCtx(eventCtx) ?? arming.currentSessionId()
   const directive = directiveForModel(modelIdFromContext(eventCtx))
-  const classification = classifyUltraworkInput(payload, snapshotSessionArming(arming, sessionId))
+  const classification = classifyUltraworkInput(
+    { ...payload, sessionRole: readSessionRole(pi) },
+    snapshotSessionArming(arming, sessionId),
+  )
 
   // A pasted transcript (or an earlier injection) already carries the directive
   // block; injecting again would duplicate the same ~17KB of rules in one turn.

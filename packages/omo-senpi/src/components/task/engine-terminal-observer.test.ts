@@ -83,6 +83,7 @@ function fixture(): Fixture {
     terminalObservers: observers,
   })
   engine.runtime.captureFrom({
+    modelRegistry: createTeamServiceTestModelRegistry(),
     mode: "tui",
     ui: {
       notify: () => undefined,

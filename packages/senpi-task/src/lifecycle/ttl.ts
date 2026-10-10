@@ -193,6 +193,9 @@ async function endExpiredChild(context: LifecycleContext, record: TaskRecord): P
 }
 
 function shouldRetain(context: LifecycleContext, record: TaskRecord, cutoff: number): boolean {
+  // The session-scoped background closer owns these obligations. TTL must neither wait on their
+  // sockets again nor remove their durable pointer before a confirmed close clears it.
+  if (record.fallback_closing_child?.requires_confirmation === true) return true
   if (context.registry.get(record.task_id) !== undefined) return true
   if (hasLiveHostClaim(context, record)) return true
   if (!TERMINAL_STATUSES.has(record.status)) return true

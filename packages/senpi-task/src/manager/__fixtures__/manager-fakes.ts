@@ -45,7 +45,7 @@ export type FakeHandle = {
   selfResume(): void
 }
 
-export function makeHandle(taskId: string, pid?: number): FakeHandle {
+export function makeHandle(taskId: string, pid?: number, effectiveModel?: { readonly provider: string; readonly id: string }): FakeHandle {
   let resolveOutcome: (outcome: RunnerOutcome) => void = () => {}
   // Re-armable: each settle resolves the current cycle's promise and arms a fresh one for the next
   // tracking cycle, so a revived task (re-tracked under a new epoch) awaits its OWN completion.
@@ -65,6 +65,7 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
     pid,
+    ...(effectiveModel === undefined ? {} : { effectiveModel: () => effectiveModel }),
     steer: async (text) => {
       steerCalls.push(text)
     },
@@ -135,12 +136,15 @@ export class FakeRunner implements ManagedRunner {
   // When set, every handle this runner produces reports this pid (an rpc-style child with a real OS
   // process). Left undefined it mimics an in-process child with no pid.
   childPid: number | undefined = undefined
+  // The model every produced child reports as its own effective route (#9722); left undefined the
+  // handle observes none.
+  childEffectiveModel: { readonly provider: string; readonly id: string } | undefined = undefined
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     this.startedSpecs.push(spec)
     if (this.startError !== undefined) throw this.startError
     if (this.throwOnStart) throw new Error("runner boom")
-    const fake = makeHandle(spec.taskId, this.childPid)
+    const fake = makeHandle(spec.taskId, this.childPid, this.childEffectiveModel)
     this.handles.set(spec.taskId, fake)
     return Promise.resolve(fake.handle)
   }

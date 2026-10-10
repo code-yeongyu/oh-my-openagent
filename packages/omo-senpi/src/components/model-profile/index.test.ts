@@ -1,8 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, spyOn, test } from "bun:test"
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
@@ -16,6 +15,7 @@ import {
   MODEL_PROFILE_UNAVAILABLE_TYPE,
   MODEL_PROFILE_UNKNOWN_TYPE,
 } from "./index"
+import { testTempDir } from "../../../test-support/temp-dir"
 
 type FakeModel = { readonly provider: string; readonly id: string }
 
@@ -116,7 +116,7 @@ function harness(
 ) {
   const pi = new FakeExtensionAPI()
   const logs: string[] = []
-  const agentDir = mkdtempSync(join(tmpdir(), "omo-model-profile-"))
+  const agentDir = testTempDir("omo-model-profile-")
   createModelProfileComponent({
     loadConfig: () => ({ config, diagnostics: [], layers: [], sources: [] }),
   }).register(pi, context(logs))
@@ -699,7 +699,7 @@ describe("model profile diagnostics through the composed default logger", () => 
         {
           mode: "print",
           cwd: "/project",
-          agentDir: mkdtempSync(join(tmpdir(), "omo-model-profile-composed-")),
+          agentDir: testTempDir("omo-model-profile-composed-"),
           modelRegistry: registry([OPUS, GLM, KIMI], probe.getAuth),
           sessionManager: { getSessionId: () => "session-composed" },
         },

@@ -1,0 +1,133 @@
+name: Cutover target deploy (Sisyphus Labs, manual)
+
+# The account move's manual path to the Sisyphus Labs account (plan: sisyphuslabs/common-infra
+# docs/cutover-workers.md), with the short-lived cutover token. Since the move the default configs ARE the
+# Sisyphus Labs configs, so this deploys exactly what web-deploy.yml / get-worker-deploy.yml deploy. It stays
+# until those two are proven on their own long-lived token, then it is removed. Run by hand only. No D1
+# migrations run here.
+on:
+  workflow_dispatch:
+    inputs:
+      worker:
+        description: Which Worker
+        required: true
+        type: choice
+        options: [web, get]
+      missing_history_reason:
+        description: "web only: why /__asset-history.json is missing on the live origin (leave blank otherwise)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cutover-target-deploy-${{ inputs.worker }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: cutover-target
+    env:
+      CLOUDFLARE_ACCOUNT_ID: 6511ce566bfe27228f536a8fb9448be5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Build oh-my-openagent-web (no token in this step)
+        if: inputs.worker == 'web'
+        working-directory: packages/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run prebuild
+          bunx opennextjs-cloudflare build
+
+      - name: Retain predecessor static assets (no token in this step)
+        if: inputs.worker == 'web'
+        working-directory: packages/web
+        env:
+          ACCEPT_MISSING_ASSET_HISTORY: ${{ inputs.missing_history_reason }}
+        run: bun scripts/retain-static-assets.mjs .open-next/assets https://omo.dev 1800 --bootstrap-current
+
+      - name: Deploy oh-my-openagent-web
+        if: inputs.worker == 'web'
+        working-directory: packages/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_DEST_API_TOKEN }}
+        run: bunx opennextjs-cloudflare deploy -- --no-x-provision
+
+      - name: Smoke oh-my-openagent-web (a fresh script answers 404/5xx until it propagates; waited up to 5 min)
+        if: inputs.worker == 'web'
+        run: |
+          set -euo pipefail
+          url=https://oh-my-openagent-web.sisyphus-labs.workers.dev/
+          deadline=$(( $(date +%s) + 300 )); wait=2
+          while :; do
+            code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$url" || true)
+            echo "workers.dev answered ${code:-000}"
+            case "${code:-000}" in 000|404|5??) ;; *) break ;; esac
+            [ $(( $(date +%s) + wait )) -le "$deadline" ] || { echo "still failing after 300 s"; exit 1; }
+            sleep "$wait"; wait=$(( wait < 30 ? wait * 2 : 30 ))
+          done
+          case "$code" in 200|307|308) ;; *) exit 1 ;; esac
+
+      - name: Install omo-get (no token in this step)
+        if: inputs.worker == 'get'
+        working-directory: packages/get-worker
+        run: bun install --frozen-lockfile
+
+      - name: Refuse to deploy over a pending D1 migration
+        if: inputs.worker == 'get'
+        working-directory: packages/get-worker
+        run: bash scripts/check-migrations-applied.sh migrations
+
+      - name: Deploy omo-get
+        if: inputs.worker == 'get'
+        working-directory: packages/get-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_DEST_API_TOKEN }}
+        run: bunx wrangler deploy --no-x-provision
+
+      - name: Smoke omo-get (waits up to 5 min for the fresh script, then checks R2 and D1)
+        if: inputs.worker == 'get'
+        run: |
+          set -euo pipefail
+          base=https://omo-get.sisyphus-labs.workers.dev
+          deadline=$(( $(date +%s) + 300 )); wait=2
+          while :; do
+            code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/healthz" || true)
+            echo "healthz answered ${code:-000}"
+            case "${code:-000}" in 000|404|5??) ;; *) break ;; esac
+            [ $(( $(date +%s) + wait )) -le "$deadline" ] || { echo "still failing after 300 s"; exit 1; }
+            sleep "$wait"; wait=$(( wait < 30 ? wait * 2 : 30 ))
+          done
+          test "$code" = 200
+          # /channels/latest falls back to npm with a 200 if R2 fails; only an r2 source proves the binding.
+          curl -fsS --max-time 20 -D - -o /dev/null "$base/channels/latest" | tr -d '\r' | grep -qi '^x-omo-source: r2$'
+          # D1 is read without a fallback; it answers 200 once the cutover copy has filled the target.
+          curl -fsS --max-time 20 "$base/stats/downloads" >/dev/null
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          MISSING_HISTORY_REASON: ${{ inputs.missing_history_reason }}
+          JOB_SUMMARY_TITLE: Cutover target deploy (${{ inputs.worker }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Deploys the `${{ inputs.worker }}` Worker to the Sisyphus Labs account from its default config (its omo.dev routes or custom domain included; omo-get refuses a pending D1 migration).
+            - The smoke waits up to 5 min for the fresh workers.dev script, then checks the Worker answers (web) or its R2 and D1 bindings (get).
+          JOB_SUMMARY_NEXT: A smoke that stops at 404 or 5xx after 5 min means the script is not serving; any other wrong answer is a real fault in the deployed Worker or its bindings.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+          if [ -n "$MISSING_HISTORY_REASON" ]; then
+            printf '\n**Missing asset history accepted for this run.** Reason: %s\n' "$MISSING_HISTORY_REASON" >> "$GITHUB_STEP_SUMMARY"
+          fi

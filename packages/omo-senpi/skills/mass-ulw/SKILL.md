@@ -24,6 +24,8 @@ Route every node by `category` using the routing table in `references/planning.m
 
 Every run is goal-bound. In a standalone run, register the goal as written (`create_goal`, or a `# Goal` block where no goal tool exists). Under `ulw-loop` or `ulw-execute`, the loop's registered goal already covers the run, so register no second goal. The objective names the deliverable the graph produces, and the success criteria carry RESULT VERIFICATION - node and run completion claims are false until proven against captured evidence, the same contract the dag completion directive injects (TREAT AS FALSE UNTIL YOU PROVE IT). The verification wave (references/planning.md) produces the evidence those criteria name; the run ends when the criteria pass, never when the last node reports completion.
 
+Ask a decision only the user can make (scope, spend, anything irreversible) from the main session through the question tool, with header `Authorize` (`권한` in Korean) and `required: true` on the call, before starting the run that depends on it - never from an eval cell or a node prompt. A timed-out, dismissed, or unavailable answer is not an answer, even when the tool result says to continue on your best judgment: do not start that run.
+
 ## Running a dag - eval is the default
 
 Build and run every dag INSIDE an eval cell. The eval kernel installs the `tool.workflow` proxy and the extension publishes a small JS SDK at `OMO_DAG_SDK_ROOT`; driving runs from a cell is what unlocks the orchestration patterns in `references/planning.md` (data-driven graph construction, multi-run composition, concurrent runs, adaptive retries).

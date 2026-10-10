@@ -11,6 +11,7 @@
 !/plugin/extensions/omo-computer-use.js
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js
+!/plugin/extensions/omo-side-panel.js
 !/plugin/extensions/omo-task.js
 !/plugin/extensions/omo.js
 !/plugin/extensions/reflection-persona.md

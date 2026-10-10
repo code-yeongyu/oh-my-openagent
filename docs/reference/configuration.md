@@ -30,6 +30,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
   - [LSP](#lsp)
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
+  - [Anthropic Prompt Cache Lifetime](#anthropic-prompt-cache-lifetime)
   - [Model Capabilities](#model-capabilities)
   - [Hashline Edit](#hashline-edit)
   - [Experimental](#experimental)
@@ -192,7 +193,7 @@ Override built-in agent settings. The main agent runs in your session on your se
 ```json
 {
   "agents": {
-    "explore": { "model": "anthropic/claude-haiku-4-5", "temperature": 0.5 },
+    "explore": { "model": "anthropic/claude-haiku-5-5", "temperature": 0.5 },
     "plan-reviewer": { "disable": true }
   }
 }
@@ -425,8 +426,8 @@ The main agent has no chain of its own: it runs on your session model (Claude Op
 
 | Agent | Default Model | Provider Priority |
 | --- | --- | --- |
-| **explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
-| **librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
+| **explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
+| **librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
 | **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
 | **plan-reviewer** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 
@@ -441,8 +442,8 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 | **Deep Low** | `gpt-6.1-sol` | `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription/gpt-6.1-sol-fast (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `openai\|chatgpt-subscription/gpt-5.6-sol-fast (medium)` |
 | **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (high)` |
 | **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
-| **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` → `zai-coding-plan/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
-| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `zai-coding-plan/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
+| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
 | **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
@@ -1134,7 +1135,7 @@ Use strings when you only need an ordered fallback chain:
     "reviewer": {
       "model": "anthropic/claude-sonnet-5",
       "fallback_models": [
-        "anthropic/claude-haiku-4-5",
+        "anthropic/claude-haiku-5-5",
         "openai/gpt-5.6-sol",
         "google/gemini-3.1-pro"
       ]
@@ -1245,6 +1246,54 @@ This shows every supported object-style parameter in one place:
 In this example the explicit `"reasoning": "high"` is canonical; deprecated fields are resolved with precedence `reasoning` > `reasoningEffort` > `variant`, while the inline `(low)` suffix is normalized separately.
 
 This final example is a **complete canonical shape reference** for `[opencode]` fallback objects. Prefer unified `reasoning` for model tuning, and use provider-specific `[opencode]` fields only when the target model requires them.
+
+### Anthropic Prompt Cache Lifetime
+
+OmO Native caches the prompt prefix on Anthropic models. The cached prefix lives for 5 minutes by default. If your turns are usually more than 5 minutes apart (long reviews, waiting on builds, stepping away), every turn after a gap rewrites the whole prefix into the cache, and cache-write tokens dominate the bill. Anthropic also offers a 1-hour cache lifetime, and OmO Native can use it.
+
+**Turn it on for every Anthropic model** by setting the environment variable before you start `omo`:
+
+```sh
+export PI_CACHE_RETENTION=long
+```
+
+**Or turn it on per model** in `~/.omo/agent/models.json`, one entry per model id. This applies to every session that reads that agent directory, regardless of the shell it was started from:
+
+```jsonc
+{
+  "providers": {
+    "anthropic": {
+      "modelOverrides": {
+        "claude-opus-5-5": { "cacheRetention": "long" },
+        "claude-sonnet-5-5": { "cacheRetention": "long" }
+      }
+    }
+  }
+}
+```
+
+`cacheRetention` accepts `"short"` (5 minutes, the default), `"long"` (1 hour) and `"none"` (no caching). A per-model value wins over the environment variable. Put it under `modelOverrides`: a `cacheRetention` set directly on a built-in provider such as `anthropic` is rejected, because provider-level values only apply to the custom models you define under that provider's `models`.
+
+The 1-hour lifetime is sent only to the Anthropic API itself (`https://api.anthropic.com`). A model served through a proxy or another base URL keeps the 5-minute lifetime even when `cacheRetention` is `"long"`, because those endpoints don't all accept it.
+
+**Cost trade-off.** On Anthropic, a 5-minute cache write costs 1.25x the base input price, a 1-hour cache write costs 2x, and a cache read costs 0.1x either way. The longer lifetime makes each write more expensive, so it pays off when your turns are often more than 5 minutes apart. If you usually answer within a few minutes, keep the default.
+
+**Keeping the cache warm instead.** `promptCache.keepAlive` in `~/.omo/agent/settings.json` sends a small warm-up request shortly before the cache would expire while the session is idle, so the next turn reads the cache instead of rewriting it. It is off by default and capped per session:
+
+```jsonc
+{
+  "promptCache": {
+    "keepAlive": {
+      "enabled": true,
+      "maxRequestsPerSession": 3,   // warm-up requests per session (default 3)
+      "maxCostUsdPerSession": 0.05, // estimated spend cap per session (default 0.05)
+      "marginSeconds": 60           // send this many seconds before expiry (default 60)
+    }
+  }
+}
+```
+
+The keep-alive also runs only for Anthropic Messages models on the Anthropic API base URL. Use it for short pauses. For gaps that are regularly longer than a few warm-ups would cover, the 1-hour lifetime is the simpler option.
 
 ### Model Capabilities
 
@@ -1369,6 +1418,7 @@ The shared base and Senpi use an object:
 | --------------------- | ----------------------------------------------------------------- |
 | `OPENCODE_CONFIG_DIR` | Override OpenCode config directory (useful for profile isolation) |
 | `OPENGATEWAY_API_KEY` | API key for the OpenGateway provider; without this or an `opengateway` auth entry, the plugin does not inject the provider |
+| `PI_CACHE_RETENTION` | Set to `long` to use Anthropic's 1-hour prompt cache lifetime instead of 5 minutes. A per-model `cacheRetention` in `models.json` takes precedence. See [Anthropic Prompt Cache Lifetime](#anthropic-prompt-cache-lifetime). |
 | `OMO_DEBUG` | Set to `1` (any non-empty value) to print omo-senpi component `info` diagnostics on stderr. Unset, those lines are silent. `warn` and `error` still print. Component logs never go to stdout. |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry |
 | `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1`, `true`, or `yes` to disable PostHog |
