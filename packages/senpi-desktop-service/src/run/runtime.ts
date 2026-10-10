@@ -113,7 +113,6 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 	if (request.signal?.aborted) onCallerAbort();
 	const audit: AuditRecord[] = [];
 	const unsubscribe = host.service.onAudit((event) => audit.push(auditRecord(event, snapshot.sessionId, runId)));
-	const settled = Promise.withResolvers<never>();
 
 	const context: RunContext = {
 		signal,
@@ -185,15 +184,11 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 		};
 	} catch (error) {
 		const failure = isVmTimeout(error) ? timeout() : error;
-		// A failed run revokes the control grant (lead add (a) of #9651): the next foreground action
-		// asks the human again. The interrupt's aborted run lands here too; best effort, never thrown.
-		// Isolated from the throw: the run settles now, the revoke still completes before it finishes.
-		const revoked = host.service.revokeControl();
-		void revoked.catch(() => undefined);
-		void revoked.finally(() => {
-			settled.reject(failure);
-		});
-		return await settled.promise;
+		// A failed run revokes the control grant (lead add (a) of #9651), so the next foreground action
+		// asks the human again; an interrupted (aborted) run lands here too. The revoke is bounded and best
+		// effort: it completes before the run's failure is reported, and its own failure never replaces it.
+		await host.service.revokeControl().catch(() => undefined);
+		throw failure;
 	} finally {
 		clearTimeout(timer);
 		request.signal?.removeEventListener("abort", onCallerAbort);

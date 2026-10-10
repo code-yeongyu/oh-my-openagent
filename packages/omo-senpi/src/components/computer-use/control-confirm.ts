@@ -50,7 +50,11 @@ export async function confirmComputerControl(
     const onAbort = (): void => settle(false)
     const cancelTimeout = scheduleTimeout(() => settle(false), timeoutMs)
     request.signal.addEventListener("abort", onAbort, { once: true })
-    Promise.resolve(confirm(CONTROL_CONFIRM_TITLE, controlConfirmBody(request.reason), { signal: request.signal })).then(
+    // The host's own timeout is passed through too, so an RPC client's pending dialog is cleared and
+    // a desktop client can show the deadline; the local timer still bounds a host that ignores it.
+    Promise.resolve(
+      confirm(CONTROL_CONFIRM_TITLE, controlConfirmBody(request.reason), { signal: request.signal, timeout: timeoutMs }),
+    ).then(
       (approved) => settle(approved === true),
       () => settle(false),
     )
