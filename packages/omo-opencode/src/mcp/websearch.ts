@@ -12,6 +12,15 @@ type RemoteMcpConfig = {
 export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig | undefined {
   const provider = config?.provider || "exa"
 
+  if (provider === "parallel") {
+    return {
+      type: "remote",
+      url: "https://search.parallel.ai/mcp",
+      enabled: true,
+      oauth: false,
+    }
+  }
+
   if (provider === "tavily") {
     const tavilyKey = process.env.TAVILY_API_KEY
     if (!tavilyKey) {

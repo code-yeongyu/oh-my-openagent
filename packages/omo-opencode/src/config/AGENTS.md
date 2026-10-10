@@ -24,7 +24,7 @@ config/schema/
 ├── goal.ts                     # GoalConfigSchema (enabled, auto_start, default_max_iterations) - replaces ralph_loop
 ├── ralph-loop.ts               # RalphLoopConfigSchema (DEPRECATED: parsed loose at root, migrated to goal in validate.ts)
 ├── tmux.ts                     # TmuxConfigSchema + TmuxLayoutSchema
-├── websearch.ts                # provider: "exa" | "tavily"
+├── websearch.ts                # provider: "exa" | "tavily" | "parallel"
 ├── claude-code.ts              # CC compatibility settings (plugins, plugins_override)
 ├── comment-checker.ts          # AI comment detection config
 ├── notification.ts             # OS notification settings
