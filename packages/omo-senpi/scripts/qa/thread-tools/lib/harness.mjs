@@ -26,8 +26,8 @@ import { fileURLToPath } from "node:url"
 const here = dirname(fileURLToPath(import.meta.url))
 
 export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
-export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
-export const DESKTOP_ROOT = process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
+export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? resolve(OMO_ROOT, "..", "senpi-thread-tools")
+export const DESKTOP_ROOT = process.env.THREAD_QA_DESKTOP_ROOT ?? resolve(OMO_ROOT, "..", "omo-desktop-thread-tools")
 
 const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-app-server", "lib")
 const SENPI_CLI = join(SENPI_ROOT, "packages", "coding-agent", "src", "cli.ts")

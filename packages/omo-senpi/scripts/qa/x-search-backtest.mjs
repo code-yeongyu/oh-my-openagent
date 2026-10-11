@@ -77,9 +77,11 @@ async function loadFixture(fixturesDir, query, lane, variant, carrier, request) 
   return null;
 }
 
+const GROK_BIN = process.env.GROK_BIN ?? "grok";
+
 async function probeGrokLogin() {
   return new Promise((resolveResult) => {
-    const child = spawn("/Users/yeongyu/.grok/bin/grok", ["--no-auto-update", "-p", "ping", "--output-format", "json", "--max-turns", "1"], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(GROK_BIN, ["--no-auto-update", "-p", "ping", "--output-format", "json", "--max-turns", "1"], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "", stderr = "", settled = false;
     const finish = (value) => { if (!settled) { settled = true; resolveResult(value); } };
     child.stdout.on("data", (x) => { stdout += x; }); child.stderr.on("data", (x) => { stderr += x; });
@@ -101,7 +103,7 @@ async function runGrok(query, variant, carrier, runDate, timeoutMs) {
   const prompt = requestFor(query, variant, carrier, runDate).input[0].content;
   const args = ["--no-auto-update", "-p", prompt, "--output-format", "json", "--disable-web-search", "--max-turns", "1", "--always-approve", "--no-memory", "--no-subagents"];
   return new Promise((resolveResult) => {
-    const child = spawn("/Users/yeongyu/.grok/bin/grok", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(GROK_BIN, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "", stderr = "", settled = false;
     const finish = (value) => { if (!settled) { settled = true; resolveResult(value); } };
     child.stdout.on("data", (x) => { stdout += x; }); child.stderr.on("data", (x) => { stderr += x; });
