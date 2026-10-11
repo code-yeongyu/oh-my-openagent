@@ -27,7 +27,7 @@ export function resolveSkillContent(skillName: string, options?: SkillResolution
 	if (!skill) return null
 
 	if (skill.name === "git-master") {
-		return injectGitMasterConfig(skill.template, options?.gitMasterConfig)
+		return injectGitMasterConfig(skill.template, options?.gitMasterConfig, options?.shellType)
 	}
 
 	return skill.template
@@ -51,7 +51,7 @@ export function resolveMultipleSkills(
 		const match = skillMap.get(name)
 		if (match) {
 			if (match.name === "git-master") {
-				resolved.set(name, injectGitMasterConfig(match.template, options?.gitMasterConfig))
+				resolved.set(name, injectGitMasterConfig(match.template, options?.gitMasterConfig, options?.shellType))
 			} else {
 				resolved.set(name, match.template)
 			}
@@ -115,7 +115,7 @@ async function resolveBuiltinSkillTemplate(skillName: string, options?: SkillRes
 	if (options?.disabledSkills?.has(skillName)) return null
 
 	const configuredSkill = await loadConfiguredGitMasterSkill(options)
-	if (configuredSkill) return injectGitMasterConfig(await extractSkillTemplate(configuredSkill), options?.gitMasterConfig)
+	if (configuredSkill) return injectGitMasterConfig(await extractSkillTemplate(configuredSkill), options?.gitMasterConfig, options?.shellType)
 
 	const skills = createBuiltinSkills({
 		browserProvider: options?.browserProvider,
@@ -125,7 +125,7 @@ async function resolveBuiltinSkillTemplate(skillName: string, options?: SkillRes
 	const skill = skills.find((builtinSkill) => builtinSkill.name === skillName)
 	if (!skill) return null
 
-	return injectGitMasterConfig(skill.template, options?.gitMasterConfig)
+	return injectGitMasterConfig(skill.template, options?.gitMasterConfig, options?.shellType)
 }
 
 export async function resolveSkillContentAsync(
@@ -142,7 +142,7 @@ export async function resolveSkillContentAsync(
 	const template = await extractSkillTemplate(skill)
 
 	if (skill.name === "git-master") {
-		return injectGitMasterConfig(template, options?.gitMasterConfig)
+		return injectGitMasterConfig(template, options?.gitMasterConfig, options?.shellType)
 	}
 
 	return template
@@ -176,7 +176,7 @@ export async function resolveMultipleSkillsAsync(
 		if (skill) {
 			const template = await extractSkillTemplate(skill)
 			if (skill.name === "git-master") {
-				resolvedTemplates.set(name, injectGitMasterConfig(template, options?.gitMasterConfig))
+				resolvedTemplates.set(name, injectGitMasterConfig(template, options?.gitMasterConfig, options?.shellType))
 			} else {
 				resolvedTemplates.set(name, template)
 			}
