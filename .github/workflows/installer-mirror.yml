@@ -43,7 +43,8 @@ permissions:
 jobs:
   mirror:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9942.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     # omo-releases lives on the Sisyphus Labs account (moved 2026-10-09). The key pair in this environment is
     # scoped to that one bucket (object read + write), nothing else.
