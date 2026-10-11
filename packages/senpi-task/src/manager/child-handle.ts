@@ -164,7 +164,10 @@ async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
   if (exit !== undefined && exit.kind !== "clean") {
     const facts = mapExitOutcomeToError(exit, { alreadyTerminal: false })
     const message = facts?.error_message ?? "RPC child terminated abnormally"
-    return { status: "error", failure: { kind: "child-prompt-failed", message }, killed: facts?.killed === true }
+    const processExit = exit.facts.pid !== undefined && exit.kind !== "spawn_error"
+      ? { exit: { kind: exit.kind, code: exit.facts.code, signal: exit.facts.signal } }
+      : {}
+    return { status: "error", failure: { kind: "child-prompt-failed", message, ...processExit }, killed: facts?.killed === true }
   }
   // A user-requested abort is a cancellation, never a turn failure. Handles that expose the tracked
   // per-turn outcome never reach here; this fallback serves legacy/custom handles only.
