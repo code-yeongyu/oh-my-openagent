@@ -62,10 +62,7 @@ fn method_enum_lists_exactly_the_table_in_order() {
     // Then
     let table: Vec<&str> = METHODS.iter().map(|spec| spec.name).collect();
     assert_eq!(schema["definitions"]["Method"]["enum"], json!(table));
-    assert_eq!(
-        schema["methods"].as_object().unwrap().keys().collect::<Vec<_>>(),
-        table
-    );
+    assert_eq!(schema["methods"].as_object().unwrap().keys().collect::<Vec<_>>(), table);
 }
 
 #[test]
@@ -89,6 +86,8 @@ fn only_session_and_stop_path_controls_are_host_only() {
         string_set([
             "session.open",
             "session.close",
+            "control.grant",
+            "control.revoke",
             "stopPath.start",
             "stopPath.heartbeat",
             "stopPath.resume"
@@ -114,10 +113,7 @@ fn error_table_lists_every_error_code_in_ordinal_order() {
     let names = string_set(ERROR_CODES.iter().map(|code| code.as_str()));
     assert_eq!(enum_names(&schema["definitions"]["ErrorCode"]), names);
     let codes: Vec<i64> = ERROR_CODES.into_iter().map(rpc_error_code).collect();
-    assert_eq!(
-        codes,
-        (0..21).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>()
-    );
+    assert_eq!(codes, (0..23).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>());
     assert_eq!(schema["errors"]["Cancelled"], json!(-32_017));
 }
 
@@ -125,10 +121,7 @@ fn error_table_lists_every_error_code_in_ordinal_order() {
 fn notification_names_are_their_wire_form() {
     let schema = engine_schema();
     for notification in Notification::ALL {
-        assert_eq!(
-            serde_json::to_value(notification).unwrap(),
-            json!(notification.name())
-        );
+        assert_eq!(serde_json::to_value(notification).unwrap(), json!(notification.name()));
         assert!(schema["notifications"][notification.name()]["params"].is_object());
     }
 }

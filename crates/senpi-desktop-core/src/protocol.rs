@@ -26,7 +26,7 @@ pub const INVALID_PARAMS: i64 = -32_602;
 pub const ENGINE_ERROR_BASE: i64 = -32_000;
 
 /// Every `ErrorCode`, in declaration (ordinal) order.
-pub const ERROR_CODES: [ErrorCode; 21] = [
+pub const ERROR_CODES: [ErrorCode; 23] = [
     ErrorCode::PermissionDenied,
     ErrorCode::CaptureFailed,
     ErrorCode::InputFailed,
@@ -48,6 +48,8 @@ pub const ERROR_CODES: [ErrorCode; 21] = [
     ErrorCode::CursorRestoreFailed,
     ErrorCode::FocusRestoreFailed,
     ErrorCode::TransactionFailed,
+    ErrorCode::InputBusy,
+    ErrorCode::ControlRequired,
 ];
 
 /// The numeric JSON-RPC error code for `code`: `-32000 - ordinal`.

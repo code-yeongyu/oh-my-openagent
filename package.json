@@ -219,6 +219,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.3",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@typescript/typescript6": "6.0.2",
     "@xterm/addon-unicode11": "^0.9.0",
     "@xterm/xterm": "^6.0.0",
     "bun-types": "1.4.2",

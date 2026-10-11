@@ -30,6 +30,11 @@ pub enum ErrorCode {
     CursorRestoreFailed,
     FocusRestoreFailed,
     TransactionFailed,
+    /// Another session holds the foreground control grant. The slot is never
+    /// stolen; the caller can retry after it releases.
+    InputBusy,
+    /// Foreground delivery without this session's live control grant.
+    ControlRequired,
 }
 
 impl ErrorCode {
@@ -56,6 +61,8 @@ impl ErrorCode {
             Self::CursorRestoreFailed => "CursorRestoreFailed",
             Self::FocusRestoreFailed => "FocusRestoreFailed",
             Self::TransactionFailed => "TransactionFailed",
+            Self::InputBusy => "InputBusy",
+            Self::ControlRequired => "ControlRequired",
         }
     }
 }
@@ -139,10 +146,7 @@ impl DesktopError {
     }
 
     pub fn ax_unsupported() -> Self {
-        Self::new(
-            ErrorCode::AxUnsupported,
-            "accessibility is unavailable on this backend",
-        )
+        Self::new(ErrorCode::AxUnsupported, "accessibility is unavailable on this backend")
     }
 
     pub fn ax_failed(message: impl Into<String>) -> Self {
@@ -151,6 +155,14 @@ impl DesktopError {
 
     pub fn timeout(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::Timeout, message)
+    }
+
+    pub fn input_busy(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InputBusy, message)
+    }
+
+    pub fn control_required(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::ControlRequired, message)
     }
 
     pub fn closed() -> Self {

@@ -11,3 +11,8 @@ crate-type = ["rlib"]
 parking_lot.workspace = true
 senpi-desktop-core = { path = "../senpi-desktop-core" }
 thiserror.workspace = true
+
+[features]
+# Test-only helpers that bypass the user-only resume proof. Never enabled by
+# a production dependency; only dev-dependencies turn it on.
+test-support = []
