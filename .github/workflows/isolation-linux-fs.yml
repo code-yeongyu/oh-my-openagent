@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y btrfs-progs fuse-overlayfs zfsutils-linux
+          sudo apt-get install -y btrfs-progs e2fsprogs fuse-overlayfs zfsutils-linux
           truncate -s 512M "$RUNNER_TEMP/btrfs.img"
           mkfs.btrfs -f "$RUNNER_TEMP/btrfs.img"
           sudo mkdir -p /mnt/btrfs
@@ -44,8 +44,16 @@ jobs:
           test -r /dev/fuse && test -w /dev/fuse
           command -v fusermount3
           echo 'ISOLATION_TEST_OVERLAY=1' >> "$GITHUB_ENV"
-          test "$(findmnt -n -o FSTYPE -T /tmp)" = ext4
-          echo 'ISOLATION_TEST_EXT4_ROOT=/tmp' >> "$GITHUB_ENV"
+          echo "Runner /tmp filesystem: $(findmnt -n -o FSTYPE -T /tmp)"
+          # /tmp is not guaranteed to be ext4 on newer runner images. Own the
+          # filesystem fixture so the unsupported-reflink test keeps its meaning.
+          truncate -s 512M "$RUNNER_TEMP/ext4.img"
+          mkfs.ext4 -F "$RUNNER_TEMP/ext4.img"
+          sudo mkdir -p /mnt/ext4
+          sudo mount -o loop "$RUNNER_TEMP/ext4.img" /mnt/ext4
+          sudo chown "$(id -u):$(id -g)" /mnt/ext4
+          test "$(findmnt -n -o FSTYPE -T /mnt/ext4)" = ext4
+          echo 'ISOLATION_TEST_EXT4_ROOT=/mnt/ext4' >> "$GITHUB_ENV"
           if sudo modprobe zfs; then
             truncate -s 512M "$RUNNER_TEMP/zfs.img"
             sudo zpool create -f omoiso "$RUNNER_TEMP/zfs.img"
@@ -91,6 +99,7 @@ jobs:
           set -euo pipefail
           if sudo zpool list omoiso >/dev/null 2>&1; then sudo zpool destroy omoiso; fi
           if mountpoint -q /mnt/btrfs; then sudo umount /mnt/btrfs; fi
+          if mountpoint -q /mnt/ext4; then sudo umount /mnt/ext4; fi
       - name: Write job summary
         if: always()
         run: |
