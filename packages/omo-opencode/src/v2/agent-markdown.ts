@@ -114,6 +114,9 @@ export function renderAgentMarkdown(name: string, config: Record<string, unknown
   return `${lines.join("\n")}`
 }
 
+/** Windows and macOS resolve "Sisyphus-Junior.md" and "sisyphus-junior.md" to one file. */
+const CASE_INSENSITIVE_AGENT_PATHS = process.platform === "win32" || process.platform === "darwin"
+
 export type WrittenAgent = {
   name: string
   id: string
@@ -124,14 +127,36 @@ export type WrittenAgent = {
 export function writeAgentMarkdown(input: {
   directory: string
   agents: Record<string, unknown>
+  caseInsensitivePaths?: boolean
 }): WrittenAgent[] {
   mkdirSync(input.directory, { recursive: true })
-  const written: WrittenAgent[] = []
+  const caseInsensitivePaths = input.caseInsensitivePaths ?? CASE_INSENSITIVE_AGENT_PATHS
+  const pathKey = (path: string) => (caseInsensitivePaths ? path.toLowerCase() : path)
+  const pending: Array<{ name: string; path: string; markdown: string }> = []
   for (const [name, value] of Object.entries(input.agents)) {
     if (!isRecord(value) || value.disable === true || value.disabled === true) continue
     const markdown = renderAgentMarkdown(name, value)
     if (!markdown) continue
-    const path = join(input.directory, agentFileName(name))
+    pending.push({ name, path: join(input.directory, agentFileName(name)), markdown })
+  }
+  // A display name and its hidden config-key alias can differ only by case
+  // ("Sisyphus-Junior" / "sisyphus-junior"). On a case-insensitive filesystem both resolve to
+  // one file, so writing each in turn flips the file on every boot. The last entry owns it.
+  const owner = new Map<string, string>()
+  for (const agent of pending) owner.set(pathKey(agent.path), agent.name)
+
+  const written: WrittenAgent[] = []
+  const aliases: Array<{ name: string; path: string }> = []
+  for (const { name, path, markdown } of pending) {
+    if (owner.get(pathKey(path)) !== name) {
+      log("agent file name collides ignoring case; another entry owns the file", {
+        name,
+        owner: owner.get(pathKey(path)),
+        path,
+      })
+      aliases.push({ name, path })
+      continue
+    }
     let existing: string | undefined
     try {
       existing = readFileSync(path, "utf8")
@@ -147,6 +172,11 @@ export function writeAgentMarkdown(input: {
     const changed = existing === undefined || existing !== markdown
     if (changed) writeFileSync(path, markdown)
     written.push({ name, id: name, path, changed })
+  }
+  // An alias shares its owner's file, so it is registered only when the owner was.
+  for (const alias of aliases) {
+    if (!written.some((agent) => pathKey(agent.path) === pathKey(alias.path))) continue
+    written.push({ name: alias.name, id: alias.name, path: alias.path, changed: false })
   }
   return written
 }

@@ -303,3 +303,60 @@ describe("claude-code-agent-loader", () => {
     })
   })
 });
+
+describe("claude-code-agent-loader plugin-generated agent files", () => {
+  const dirs: string[] = [];
+  const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
+
+  afterEach(() => {
+    for (const dir of dirs) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    dirs.length = 0;
+    if (originalClaudeConfigDir === undefined) {
+      delete process.env.CLAUDE_CONFIG_DIR
+    } else {
+      process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+    }
+  });
+
+  const GENERATED_AGENT = `---
+# generated-by: oh-my-openagent
+description: "(opencode) Build agent (OpenCode default)"
+mode: subagent
+---
+
+`;
+
+  const AGENT_MENTIONING_STAMP = `---
+description: Hand written
+---
+Never edit files carrying # generated-by: oh-my-openagent
+`;
+
+  test("skips files stamped by the v2 agent writer and keeps hand-written ones", () => {
+    const root = createProjectWithAgents({
+      opencodeAgents: [
+        { filename: "ocBuilder.md", content: GENERATED_AGENT },
+        { filename: "mine.md", content: MINIMAL_AGENT },
+        { filename: "mentions-stamp.md", content: AGENT_MENTIONING_STAMP },
+      ],
+    });
+    dirs.push(root);
+
+    const result = loadOpencodeProjectAgents(root);
+
+    expect(Object.keys(result).sort()).toEqual(["mentions-stamp", "mine"]);
+  });
+
+  test("does not load the user agents dir a second time as project agents", () => {
+    const home = createProjectWithAgents({
+      claudeAgents: [{ filename: "my-agent.md", content: BASIC_AGENT }],
+    });
+    dirs.push(home);
+    process.env.CLAUDE_CONFIG_DIR = join(home, ".claude");
+
+    expect(Object.keys(loadUserAgents())).toEqual(["test-agent"]);
+    expect(Object.keys(loadProjectAgents(home))).toEqual([]);
+  });
+});
