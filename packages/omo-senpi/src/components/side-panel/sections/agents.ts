@@ -8,7 +8,8 @@ import { field, heading } from "./layout"
 const GLYPH: Record<PanelChildStatus, string> = {
   queued: "◦",
   running: "●",
-  suspended: "‖",
+  resuming: "‖",
+  ending: "‖",
   finished: "✓",
   failed: "✗",
   cancelled: "—",
@@ -17,7 +18,8 @@ const GLYPH: Record<PanelChildStatus, string> = {
 const COLOR: Record<PanelChildStatus, PanelRow["color"]> = {
   queued: "dim",
   running: "text",
-  suspended: "warning",
+  resuming: "muted",
+  ending: "muted",
   finished: "muted",
   failed: "error",
   cancelled: "dim",
@@ -32,14 +34,14 @@ export function buildAgentRows(children: readonly PanelChild[], now: number, wid
   const running = children.filter((child) => child.status === "running" || child.status === "queued").length
   // Parked children are counted on their own: folding them into either side would say the engine is
   // working on something it is holding, or that it finished something it did not.
-  const parked = children.filter((child) => child.status === "suspended").length
+  const parked = children.filter((child) => child.status === "resuming" || child.status === "ending").length
   const done = children.length - running - parked
   const summary = [running > 0 ? `${running} running` : undefined, parked > 0 ? `${parked} parked` : undefined, `${done} done`]
     .filter((part): part is string => part !== undefined)
     .join(" · ")
   const rows: PanelRow[] = [heading("AGENTS", summary)]
   for (const child of children) {
-    const elapsed = child.status === "suspended" ? undefined : duration((child.finishedAt ?? now) - child.startedAt)
+    const elapsed = child.status === "resuming" || child.status === "ending" ? undefined : duration((child.finishedAt ?? now) - child.startedAt)
     const head = elapsed === undefined ? `${GLYPH[child.status]} ${child.name}` : `${GLYPH[child.status]} ${child.name}  ${elapsed}`
     const activity = child.status === "running" ? child.activity : undefined
     const text = activity === undefined ? head : `${head}  ${activity}`
@@ -57,9 +59,9 @@ export function buildAgentRows(children: readonly PanelChild[], now: number, wid
  * narrow width; this is where the parts that did not fit go.
  */
 export function buildAgentCardRows(child: PanelChild, now: number): readonly PanelRow[] {
-  const rows: PanelRow[] = [field("status", `${GLYPH[child.status]} ${child.status}`, COLOR[child.status])]
-  if (child.status !== "suspended") rows.push(field("elapsed", duration((child.finishedAt ?? now) - child.startedAt)))
-  if (child.parkedReason !== undefined) rows.push(field("parked", child.parkedReason, "warning"))
+  const rows: PanelRow[] = [field("status", `${GLYPH[child.status]} ${child.status}${child.parkedReason === undefined ? "" : ` (${child.parkedReason})`}`, COLOR[child.status])]
+  if (child.status !== "resuming" && child.status !== "ending") rows.push(field("elapsed", duration((child.finishedAt ?? now) - child.startedAt)))
+  if (child.parkedReason !== undefined) rows.push(field("reason", child.parkedReason, "muted"))
   if (child.category !== undefined) rows.push(field("category", child.category))
   if (child.host !== undefined) rows.push(field("runs", child.host, "muted"))
   if (child.activity !== undefined) rows.push(field("doing", child.activity, "muted"))

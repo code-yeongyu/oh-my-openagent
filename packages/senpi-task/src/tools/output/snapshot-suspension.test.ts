@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { TaskRecord } from "../../state"
+import { recoveryPresentation } from "../../state/recovery-presentation"
 import { buildTaskSnapshot } from "./snapshot"
 
 const NOW = Date.parse("2026-09-17T12:00:00.000Z")
@@ -54,7 +55,7 @@ describe("task_output suspension explanation", () => {
     const snapshot = buildTaskSnapshot(parked("daemon_unavailable"), "/tmp/state", NOW)
 
     // then
-    expect(snapshot.suspended?.explanation).toBe("suspended (daemon unavailable)")
+    expect(snapshot.suspended?.explanation).toBe(recoveryPresentation(parked("daemon_unavailable"))?.text)
   })
 
   test("#given a host-session child suspended while a generation drains #when the snapshot is built #then it names the draining host", () => {
@@ -62,7 +63,7 @@ describe("task_output suspension explanation", () => {
     const snapshot = buildTaskSnapshot(parked("host_draining"), "/tmp/state", NOW)
 
     // then
-    expect(snapshot.suspended?.explanation).toBe("suspended (host draining)")
+    expect(snapshot.suspended?.explanation).toBe(recoveryPresentation(parked("host_draining"))?.text)
   })
 
   test("#given a parked child with no recorded suspension reason #when the snapshot is built #then the session-resume wording is unchanged", () => {
@@ -70,6 +71,6 @@ describe("task_output suspension explanation", () => {
     const snapshot = buildTaskSnapshot(parked(), "/tmp/state", NOW)
 
     // then
-    expect(snapshot.suspended?.explanation).toBe("suspended (resumes with session)")
+    expect(snapshot.suspended?.explanation).toBe(recoveryPresentation(parked())?.text)
   })
 })
