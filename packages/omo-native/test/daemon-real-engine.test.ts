@@ -42,6 +42,9 @@ function sandbox() {
   mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true })
   const env = {
     ...process.env,
+    TMPDIR: agentDir,
+    TEMP: agentDir,
+    TMP: agentDir,
     OMO_RUNTIME: "node",
     OMO_CODING_AGENT_DIR: agentDir,
     SENPI_CODING_AGENT_DIR: agentDir,
