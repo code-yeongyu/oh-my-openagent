@@ -338,6 +338,36 @@
       ],
       "overlapsWith": [],
       "orderNote": "Independent of 01-21; touches packages/utils/src/command-executor/execute-hook-command.ts. Runtime constant is consumed by the actual spawn option and survives bundling; comments are not used as markers. Companion open-code-review.ts spawn fixes live outside this repo. Activation of the rebuilt plugin in existing backends requires separate verification; restart remains owner-initiated."
+    },
+    {
+      "id": "23-skill-v2-ctx-ask-guard",
+      "title": "Guard the legacy skill permission ask when projected into OpenCode v2",
+      "commit": "d117ac603fb02ab74abddea66fd2fe83e075202b",
+      "patch": "patches/23-skill-v2-ctx-ask-guard.patch",
+      "pr": null,
+      "why": "The V1 skill tool calls ctx.ask, but the v2 host projects it through ctx.tool.transform with a v2 tool context that has no ask(). Optional chaining guards ctx, not a missing method, so every skill load on the v2 lane failed with 'ctx?.ask is not a function' (observed 2026-10-10/11). ask is now called only when the host provides it; a rejection or error from a real ask still propagates, so the V1 gate is unchanged. KNOWN GAP on v2: the per-skill approval prompt is not shown there. The public v2 plugin API has no way to create a permission request from a tool executor (ctx.permission offers list/get/reply/rules and an evaluate hook only), so the skill loads without asking. Each skipped prompt is logged as '[skill] tool context has no ask(); skill permission prompt skipped'. Closing the gap needs a native v2 skill tool with Permission.Service.assert, or a public v2 permission-assert API.",
+      "markers": [
+        "tool context has no ask(); skill permission prompt skipped"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-22; touches only packages/omo-opencode/src/tools/skill/tools.ts and its factory test. The marker is the runtime log string, not the typeof guard, so it survives bundling regardless of how the bundler prints the comparison. pr is null because the v2 host (src/v2) is not in upstream dev; the defect is unreachable in released upstream builds."
+    },
+    {
+      "id": "24-agent-writer-self-ingest",
+      "title": "Stop the v2 agent writer from rewriting its own output on every boot",
+      "commit": "4de313c86c324ad40c265c0f7299a6608411b3ae",
+      "patch": "patches/24-agent-writer-self-ingest.patch",
+      "pr": null,
+      "why": "After fix 21 wrote agents flat into the global agents dir, the plugin rewrote four files at every plugin init (ocBuilder.md, OpenCode-Builder.md, codex-teammate.md, Sisyphus-Junior.md), and each write under the config dir triggers the opencode 2.0.25 skill-watcher reload burst (upstream #53393; storm investigation 2026-10-10/11). Three causes: (1) loadOpencodeGlobalAgents re-ingested the files the host had written, so any agent not shadowed by a protected builtin name or a later source came back with one more '(opencode) ' description prefix per boot (ocBuilder is the displayName of OpenCode-Builder and is not a protected name; codex-teammate overrides the ~/.claude/agents original); (2) 'Sisyphus-Junior' and its hidden config-key alias 'sisyphus-junior' map to one file on a case-insensitive filesystem, so it was written twice per boot with and without 'hidden: true'; (3) with the home directory as the project, ~/.claude/agents was loaded again as project agents and relabelled '(project)'. The loader now skips files carrying the generated-by stamp in their frontmatter, a case-colliding file has one owner (the last entry, which keeps the on-disk result unchanged), and the user agents dir is never loaded as project agents.",
+      "markers": [
+        "agent file name collides ignoring case; another entry owns the file",
+        "skipped plugin-generated agent files",
+        "project agents dir is the user agents dir; not loading it twice"
+      ],
+      "overlapsWith": [
+        "21-agent-registration-flat"
+      ],
+      "orderNote": "Must come after 21: it edits writeAgentMarkdown from 21 and relies on the stamp 21 introduced. Two of the three markers live in packages/claude-code-compat-core/src, which is why apply.mjs and verify.mjs search that package as well. An agent file WITHOUT the stamp is user-authored: the writer never overwrites it and the loader still loads it as a custom agent. To hand a file back to the plugin, put '# generated-by: oh-my-openagent' as the first frontmatter line. pr is null: the writer and the stamp exist only on the v2 integration line."
     }
   ],
   "externalFixes": [

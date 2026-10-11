@@ -85,7 +85,7 @@ if (!existsSync(bundlePath)) {
 let srcMissing = 0
 for (const fix of manifest.fixes) {
   for (const marker of fix.markers || []) {
-    const hit = tryGit(["grep", "-l", "-F", marker, "--", "packages/omo-opencode/src", "packages/utils/src"])
+    const hit = tryGit(["grep", "-l", "-F", marker, "--", "packages/omo-opencode/src", "packages/utils/src", "packages/claude-code-compat-core/src"])
     if (!hit) {
       srcMissing += 1
       bad(`source tree is missing marker '${marker}' for ${fix.id}`)

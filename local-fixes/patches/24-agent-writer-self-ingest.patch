@@ -1,0 +1,308 @@
+From 4de313c86c324ad40c265c0f7299a6608411b3ae Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Sun, 11 Oct 2026 21:49:55 +0300
+Subject: [PATCH] fix(v2): stop the agent writer from rewriting its own output
+ on every boot
+
+Three causes made the v2 host rewrite four agent files at every plugin init: the agent loader re-ingested files the host itself had written (one '(opencode) ' description prefix per boot), a display name and its hidden config-key alias that differ only by case shared one file on a case-insensitive filesystem, and the user agents dir was loaded a second time as project agents when the project directory is the home directory. Skip stamped files in the loader, give a case-colliding file a single owner, and never load the user agents dir twice.
+---
+ .../claude-code-agent-loader/loader.test.ts   | 57 ++++++++++++++++++
+ .../claude-code-agent-loader/loader.ts        | 53 +++++++++++++++-
+ .../src/v2/agent-markdown.test.ts             | 60 +++++++++++++++++++
+ .../omo-opencode/src/v2/agent-markdown.ts     | 34 ++++++++++-
+ 4 files changed, 199 insertions(+), 5 deletions(-)
+ create mode 100644 packages/omo-opencode/src/v2/agent-markdown.test.ts
+
+diff --git a/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.test.ts b/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.test.ts
+index 2a81b2d51..21eaef784 100644
+--- a/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.test.ts
++++ b/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.test.ts
+@@ -303,3 +303,60 @@ describe("claude-code-agent-loader", () => {
+     })
+   })
+ });
++
++describe("claude-code-agent-loader plugin-generated agent files", () => {
++  const dirs: string[] = [];
++  const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
++
++  afterEach(() => {
++    for (const dir of dirs) {
++      rmSync(dir, { recursive: true, force: true });
++    }
++    dirs.length = 0;
++    if (originalClaudeConfigDir === undefined) {
++      delete process.env.CLAUDE_CONFIG_DIR
++    } else {
++      process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
++    }
++  });
++
++  const GENERATED_AGENT = `---
++# generated-by: oh-my-openagent
++description: "(opencode) Build agent (OpenCode default)"
++mode: subagent
++---
++
++`;
++
++  const AGENT_MENTIONING_STAMP = `---
++description: Hand written
++---
++Never edit files carrying # generated-by: oh-my-openagent
++`;
++
++  test("skips files stamped by the v2 agent writer and keeps hand-written ones", () => {
++    const root = createProjectWithAgents({
++      opencodeAgents: [
++        { filename: "ocBuilder.md", content: GENERATED_AGENT },
++        { filename: "mine.md", content: MINIMAL_AGENT },
++        { filename: "mentions-stamp.md", content: AGENT_MENTIONING_STAMP },
++      ],
++    });
++    dirs.push(root);
++
++    const result = loadOpencodeProjectAgents(root);
++
++    expect(Object.keys(result).sort()).toEqual(["mentions-stamp", "mine"]);
++  });
++
++  test("does not load the user agents dir a second time as project agents", () => {
++    const home = createProjectWithAgents({
++      claudeAgents: [{ filename: "my-agent.md", content: BASIC_AGENT }],
++    });
++    dirs.push(home);
++    process.env.CLAUDE_CONFIG_DIR = join(home, ".claude");
++
++    expect(Object.keys(loadUserAgents())).toEqual(["test-agent"]);
++    expect(Object.keys(loadProjectAgents(home))).toEqual([]);
++  });
++});
+diff --git a/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.ts b/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.ts
+index 13009a41e..c9e2609d6 100644
+--- a/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.ts
++++ b/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.ts
+@@ -1,11 +1,39 @@
+-import { existsSync, readdirSync } from "fs"
+-import { join } from "path"
++import { existsSync, readdirSync, readFileSync } from "fs"
++import { join, resolve } from "path"
+ import { isMarkdownFile } from "../../shared/file-utils"
+ import { getClaudeConfigDir } from "../../shared"
++import { log } from "../../shared/logger"
+ import type { AgentScope, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
+ import { getOpenCodeConfigDirs } from "../../shared/opencode-config-dir"
+ import { parseMarkdownAgentFile } from "./agent-definitions-loader"
+ 
++/**
++ * Stamp the OpenCode v2 host writes into the frontmatter of every agent file it materialises
++ * (omo-opencode/src/v2/agent-markdown.ts). A stamped file is this plugin's own output, not an
++ * agent source: loading it feeds the previous boot's result into the next one, so the
++ * description gains one "(opencode) " prefix per boot and the file is rewritten forever.
++ */
++const PLUGIN_GENERATED_AGENT_STAMP = "# generated-by: oh-my-openagent"
++
++export function isPluginGeneratedAgentFile(agentPath: string): boolean {
++  try {
++    const content = readFileSync(agentPath, "utf-8")
++    if (!content.startsWith("---")) return false
++    const frontmatterEnd = content.indexOf("\n---", 3)
++    const frontmatter = frontmatterEnd === -1 ? content : content.slice(0, frontmatterEnd)
++    return frontmatter.split(/\r?\n/).some((line) => line.trim() === PLUGIN_GENERATED_AGENT_STAMP)
++  } catch {
++    return false
++  }
++}
++
++function isSameDirectory(left: string, right: string): boolean {
++  const resolvedLeft = resolve(left)
++  const resolvedRight = resolve(right)
++  if (process.platform === "win32") return resolvedLeft.toLowerCase() === resolvedRight.toLowerCase()
++  return resolvedLeft === resolvedRight
++}
++
+ function loadAgentsFromDir(agentsDir: string, scope: AgentScope, anthropicProvider?: string): LoadedAgent[] {
+   if (!existsSync(agentsDir)) {
+     return []
+@@ -13,11 +41,17 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope, anthropicProvid
+ 
+   const entries = readdirSync(agentsDir, { withFileTypes: true })
+   const agents: LoadedAgent[] = []
++  let skippedGenerated = 0
+ 
+   for (const entry of entries) {
+     if (!isMarkdownFile(entry)) continue
+ 
+     const agentPath = join(agentsDir, entry.name)
++    if (isPluginGeneratedAgentFile(agentPath)) {
++      skippedGenerated += 1
++      continue
++    }
++
+     const agent = parseMarkdownAgentFile(agentPath, scope, anthropicProvider)
+ 
+     if (agent) {
+@@ -25,6 +59,10 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope, anthropicProvid
+     }
+   }
+ 
++  if (skippedGenerated > 0) {
++    log("[agent-loader] skipped plugin-generated agent files", { agentsDir, scope, count: skippedGenerated })
++  }
++
+   return agents
+ }
+ 
+@@ -41,9 +79,18 @@ export function loadUserAgents(anthropicProvider?: string): Record<string, Claud
+ 
+ export function loadProjectAgents(directory?: string, anthropicProvider?: string): Record<string, ClaudeCodeAgentConfig> {
+   const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
++  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
++
++  // With the home directory as the project, <directory>/.claude/agents IS the user agents dir.
++  // loadUserAgents already owns it; loading it again relabels every user agent as "(project)"
++  // depending on where the session was opened.
++  if (isSameDirectory(projectAgentsDir, join(getClaudeConfigDir(), "agents"))) {
++    log("[agent-loader] project agents dir is the user agents dir; not loading it twice", { projectAgentsDir })
++    return result
++  }
++
+   const agents = loadAgentsFromDir(projectAgentsDir, "project", anthropicProvider)
+ 
+-  const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
+   for (const agent of agents) {
+     result[agent.name] = agent.config
+   }
+diff --git a/packages/omo-opencode/src/v2/agent-markdown.test.ts b/packages/omo-opencode/src/v2/agent-markdown.test.ts
+new file mode 100644
+index 000000000..40a8b2bda
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/agent-markdown.test.ts
+@@ -0,0 +1,60 @@
++/// <reference types="bun-types" />
++
++import { afterEach, describe, expect, it } from "bun:test"
++import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++
++import { writeAgentMarkdown } from "./agent-markdown"
++
++describe("writeAgentMarkdown", () => {
++  const dirs: string[] = []
++
++  afterEach(() => {
++    for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
++    dirs.length = 0
++  })
++
++  function tempAgentDirectory(): string {
++    const directory = mkdtempSync(join(tmpdir(), "agent-markdown-test-"))
++    dirs.push(directory)
++    return directory
++  }
++
++  const junior = { description: "Focused task executor.", mode: "subagent", prompt: "work" }
++  const agents = {
++    "Sisyphus-Junior": junior,
++    "sisyphus-junior": { ...junior, hidden: true },
++  }
++
++  it("writes one file once when two names differ only by case", () => {
++    // given
++    const directory = tempAgentDirectory()
++
++    // when
++    const first = writeAgentMarkdown({ directory, agents, caseInsensitivePaths: true })
++    const second = writeAgentMarkdown({ directory, agents, caseInsensitivePaths: true })
++
++    // then
++    expect(first.filter((agent) => agent.changed).map((agent) => agent.name)).toEqual(["sisyphus-junior"])
++    expect(first.map((agent) => agent.name).sort()).toEqual(["Sisyphus-Junior", "sisyphus-junior"])
++    expect(second.some((agent) => agent.changed)).toBe(false)
++    const files = readdirSync(directory)
++    expect(files.length).toBe(1)
++    expect(readFileSync(join(directory, files[0] ?? ""), "utf8")).toContain("hidden: true")
++  })
++
++  it("is stable across boots for names that do not collide", () => {
++    // given
++    const directory = tempAgentDirectory()
++    const distinct = { atlas: { ...junior, hidden: true }, "Atlas - Plan Executor": junior }
++
++    // when
++    writeAgentMarkdown({ directory, agents: distinct, caseInsensitivePaths: true })
++    const second = writeAgentMarkdown({ directory, agents: distinct, caseInsensitivePaths: true })
++
++    // then
++    expect(second.map((agent) => agent.changed)).toEqual([false, false])
++    expect(readdirSync(directory).length).toBe(2)
++  })
++})
+diff --git a/packages/omo-opencode/src/v2/agent-markdown.ts b/packages/omo-opencode/src/v2/agent-markdown.ts
+index a0c97a495..b9a68a09c 100644
+--- a/packages/omo-opencode/src/v2/agent-markdown.ts
++++ b/packages/omo-opencode/src/v2/agent-markdown.ts
+@@ -114,6 +114,9 @@ export function renderAgentMarkdown(name: string, config: Record<string, unknown
+   return `${lines.join("\n")}`
+ }
+ 
++/** Windows and macOS resolve "Sisyphus-Junior.md" and "sisyphus-junior.md" to one file. */
++const CASE_INSENSITIVE_AGENT_PATHS = process.platform === "win32" || process.platform === "darwin"
++
+ export type WrittenAgent = {
+   name: string
+   id: string
+@@ -124,14 +127,36 @@ export type WrittenAgent = {
+ export function writeAgentMarkdown(input: {
+   directory: string
+   agents: Record<string, unknown>
++  caseInsensitivePaths?: boolean
+ }): WrittenAgent[] {
+   mkdirSync(input.directory, { recursive: true })
+-  const written: WrittenAgent[] = []
++  const caseInsensitivePaths = input.caseInsensitivePaths ?? CASE_INSENSITIVE_AGENT_PATHS
++  const pathKey = (path: string) => (caseInsensitivePaths ? path.toLowerCase() : path)
++  const pending: Array<{ name: string; path: string; markdown: string }> = []
+   for (const [name, value] of Object.entries(input.agents)) {
+     if (!isRecord(value) || value.disable === true || value.disabled === true) continue
+     const markdown = renderAgentMarkdown(name, value)
+     if (!markdown) continue
+-    const path = join(input.directory, agentFileName(name))
++    pending.push({ name, path: join(input.directory, agentFileName(name)), markdown })
++  }
++  // A display name and its hidden config-key alias can differ only by case
++  // ("Sisyphus-Junior" / "sisyphus-junior"). On a case-insensitive filesystem both resolve to
++  // one file, so writing each in turn flips the file on every boot. The last entry owns it.
++  const owner = new Map<string, string>()
++  for (const agent of pending) owner.set(pathKey(agent.path), agent.name)
++
++  const written: WrittenAgent[] = []
++  const aliases: Array<{ name: string; path: string }> = []
++  for (const { name, path, markdown } of pending) {
++    if (owner.get(pathKey(path)) !== name) {
++      log("agent file name collides ignoring case; another entry owns the file", {
++        name,
++        owner: owner.get(pathKey(path)),
++        path,
++      })
++      aliases.push({ name, path })
++      continue
++    }
+     let existing: string | undefined
+     try {
+       existing = readFileSync(path, "utf8")
+@@ -148,5 +173,10 @@ export function writeAgentMarkdown(input: {
+     if (changed) writeFileSync(path, markdown)
+     written.push({ name, id: name, path, changed })
+   }
++  // An alias shares its owner's file, so it is registered only when the owner was.
++  for (const alias of aliases) {
++    if (!written.some((agent) => pathKey(agent.path) === pathKey(alias.path))) continue
++    written.push({ name: alias.name, id: alias.name, path: alias.path, changed: false })
++  }
+   return written
+ }
+-- 
+2.55.0.windows.3
+

@@ -1,0 +1,115 @@
+From d117ac603fb02ab74abddea66fd2fe83e075202b Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Sun, 11 Oct 2026 21:49:55 +0300
+Subject: [PATCH] fix(skill): guard the legacy permission ask on the OpenCode
+ v2 tool context
+
+The V1 skill tool calls ctx.ask, but the v2 host projects it through ctx.tool.transform with a v2 tool context that has no ask(). Optional chaining guards ctx, not a missing method, so every skill load failed with 'ctx?.ask is not a function'. Call ask only when the host provides it; a rejection from a real ask still propagates. The skipped prompt is logged.
+---
+ .../src/tools/skill/tools.factory.test.ts     | 47 +++++++++++++++++++
+ .../omo-opencode/src/tools/skill/tools.ts     | 26 +++++++---
+ 2 files changed, 66 insertions(+), 7 deletions(-)
+
+diff --git a/packages/omo-opencode/src/tools/skill/tools.factory.test.ts b/packages/omo-opencode/src/tools/skill/tools.factory.test.ts
+index 20c70838c..fa96567a8 100644
+--- a/packages/omo-opencode/src/tools/skill/tools.factory.test.ts
++++ b/packages/omo-opencode/src/tools/skill/tools.factory.test.ts
+@@ -199,3 +199,50 @@ describe("createSkillTool", () => {
+     expect(skillTool.description).toContain("<name>/seeded-command</name>")
+   })
+ })
++
++describe("createSkillTool permission ask", () => {
++  it("loads the skill when the tool context has no ask (OpenCode v2 projection)", async () => {
++    // given
++    const { ask: _ask, ...contextWithoutAsk } = mockContext
++    const skillTool = await createSkillTool({})
++
++    // when
++    const result = await skillTool.execute({ name: "lazy-skill" }, contextWithoutAsk as ToolContext)
++
++    // then
++    expect(result).toContain("## Skill: lazy-skill")
++  })
++
++  it("asks for the skill permission when the host provides ask", async () => {
++    // given
++    const ask = mock(async () => {})
++    const skillTool = await createSkillTool({})
++
++    // when
++    await skillTool.execute({ name: "lazy-skill" }, { ...mockContext, ask })
++
++    // then
++    expect(ask.mock.calls.length).toBe(1)
++    expect(ask.mock.calls[0]).toEqual([
++      {
++        permission: "skill",
++        patterns: ["lazy-skill"],
++        always: ["lazy-skill"],
++        metadata: { skill: "lazy-skill" },
++      },
++    ])
++  })
++
++  it("propagates a rejected ask instead of loading the skill", async () => {
++    // given
++    const ask = mock(async () => {
++      throw new Error("permission denied")
++    })
++    const skillTool = await createSkillTool({})
++
++    // when / then
++    await expect(skillTool.execute({ name: "lazy-skill" }, { ...mockContext, ask })).rejects.toThrow(
++      "permission denied",
++    )
++  })
++})
+diff --git a/packages/omo-opencode/src/tools/skill/tools.ts b/packages/omo-opencode/src/tools/skill/tools.ts
+index 334ad0d6a..4645b0b13 100644
+--- a/packages/omo-opencode/src/tools/skill/tools.ts
++++ b/packages/omo-opencode/src/tools/skill/tools.ts
+@@ -18,6 +18,7 @@ import {
+   matchSkillByName,
+ } from "./skill-matcher"
+ import { extractSkillBody } from "./skill-body"
++import { log } from "../../shared/logger"
+ import {
+   isPromiseLike,
+   loadedSkillToInfo,
+@@ -150,14 +151,25 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
+       })
+ 
+       if (matchedSkill) {
+-        await ctx?.ask({
+-          permission: "skill",
+-          patterns: [matchedSkill.name],
+-          always: [matchedSkill.name],
+-          metadata: {
++        // The OpenCode v2 host projects this V1 tool through ctx.tool.transform, and a v2 tool
++        // context has no ask(). Optional chaining guards ctx, not a missing method, so only
++        // call ask when the host provides it. A rejection from a real ask still propagates.
++        const ask = ctx?.ask
++        if (typeof ask === "function") {
++          await ask.call(ctx, {
++            permission: "skill",
++            patterns: [matchedSkill.name],
++            always: [matchedSkill.name],
++            metadata: {
++              skill: matchedSkill.name,
++            },
++          })
++        } else if (ctx) {
++          log("[skill] tool context has no ask(); skill permission prompt skipped", {
+             skill: matchedSkill.name,
+-          },
+-        })
++            sessionID: ctx.sessionID,
++          })
++        }
+ 
+         if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
+           throw new Error(`Skill "${matchedSkill.name}" is restricted to agent "${matchedSkill.definition.agent}"`)
+-- 
+2.55.0.windows.3
+

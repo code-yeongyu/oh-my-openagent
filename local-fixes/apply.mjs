@@ -43,7 +43,7 @@ function fixAlreadyPresent(fix) {
   if (markers.length === 0) return false
   return markers.every((marker) => {
     try {
-      return git(["grep", "-l", "-F", marker, "--", "packages/omo-opencode/src", "packages/utils/src"]).length > 0
+      return git(["grep", "-l", "-F", marker, "--", "packages/omo-opencode/src", "packages/utils/src", "packages/claude-code-compat-core/src"]).length > 0
     } catch {
       return false
     }
