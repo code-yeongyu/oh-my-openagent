@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -65,6 +65,28 @@ describe("onboarding entry", () => {
     const h = createOnboardingHarness(dir)
     expect(await h.prompt()).toEqual([undefined])
     expect(h.pi.messages).toEqual([])
+  })
+
+  test("#given an externally created marker and sidecar #when normal lifecycle events fire #then both stay untouched", async () => {
+    const dir = freshDir()
+    const marker = join(dir, "onboarding-completed")
+    const sidecar = join(dir, "opaque-desktop-sidecar")
+    writeFileSync(marker, "")
+    writeFileSync(sidecar, "opaque fixture; not interpreted by onboarding")
+    for (const mode of ["rpc", "tui"]) {
+      const h = createOnboardingHarness(dir, mode, mode)
+      await h.start()
+      expect(await h.prompt()).toEqual([undefined])
+      await h.agentStart()
+      await h.end("error")
+      await h.settle()
+      await h.pi.dispatch("session_abort", {}, h.ctx)
+      await h.pi.dispatch("session_shutdown", {}, h.ctx)
+      expect(h.pi.messages).toEqual([])
+      expect(h.widgets.size).toBe(0)
+      expect(readFileSync(marker, "utf8")).toBe("")
+      expect(readFileSync(sidecar, "utf8")).toBe("opaque fixture; not interpreted by onboarding")
+    }
   })
 
   for (const trigger of ["extension", "delivery"]) {

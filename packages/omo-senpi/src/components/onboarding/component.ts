@@ -73,7 +73,7 @@ export function createOnboardingComponent(
       pi.registerFlag("onboard", {
         type: "boolean",
         default: false,
-        description: "Force the onboarding flow on startup.",
+        description: "Start the guided tour.",
       })
 
       pi.on("session_start", async (event, ctx) => {
@@ -107,8 +107,8 @@ export function createOnboardingComponent(
             customType: "omo-onboarding:context",
             display: false,
             content: forced
-              ? `${tour} Run the requested --onboard tour using their message.`
-              : `Answer their request fully, then greet in their language and offer a one-line tour. If accepted or requested: ${tour}`,
+              ? `${tour} Include their message in the tour.`
+              : `Answer fully, greet in their language, offer a one-line tour. If accepted or requested: ${tour}`,
           },
         }
       })
