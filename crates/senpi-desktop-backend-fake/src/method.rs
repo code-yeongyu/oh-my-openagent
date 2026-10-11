@@ -38,4 +38,6 @@ pub enum FakeMethod {
     AxFocusedElement,
     AxAttributes,
     AxOwner,
+    MenuItems,
+    MenuSelect,
 }

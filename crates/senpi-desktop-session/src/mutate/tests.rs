@@ -5,8 +5,8 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::keys::parse_keys;
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, DragParams, KeyChordParams, PointParams,
-    ClipboardText, RaiseWindowParams, ScrollParams, TypeTextParams,
+    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, DragParams, KeyChordParams, MenuPathParams,
+    PointParams, ClipboardText, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
 use senpi_desktop_core::types::{DesktopPoint, Target};
 use senpi_desktop_safety::{MutatingAction, StopPathId, StopSource};
@@ -156,14 +156,21 @@ fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
         MutatingAction::ClipboardWrite => Op::ClipboardWrite(ClipboardText {
             text: "hello".to_owned(),
         }),
+        MutatingAction::MenuSelect => Op::MenusSelect(MenuPathParams {
+            window_id: target,
+            path: vec!["File".to_owned(), "Save".to_owned()],
+        }),
     }
 }
 
 #[test]
 fn every_mutating_request_emits_one_audit_event() {
     for action in MutatingAction::ALL {
-        // Given
-        let mut harness = harness(&json!({}));
+        // Given: window 101 has a File > Save menu, so a menu selection is
+        // admitted like every other mutation.
+        let mut harness = harness(&json!({
+            "menus": {"101": [{"title": "File", "children": [{"title": "Save"}]}]}
+        }));
         let op = request_for(&mut harness, action);
         // When
         let reply = harness.process(op);
