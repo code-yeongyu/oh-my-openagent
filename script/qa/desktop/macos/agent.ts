@@ -123,6 +123,8 @@ export class AgentSession {
   #step = 0
   #closed = false
   #lastEvents: string[] = []
+  /** Foreground-control confirms this session approved. */
+  confirms = 0
 
   constructor(computer: Json, bin: string, enginePath?: string) {
     this.#sandbox = createSandbox(computer, enginePath)
@@ -148,6 +150,12 @@ export class AgentSession {
       if (!isRecord(parsed)) return
       if (parsed.type !== "extension_ui_request" || parsed.method === "notify")
         this.#lastEvents = [...this.#lastEvents, JSON.stringify(parsed).slice(0, 700)].slice(-16)
+      // The QA stands in for the human: it approves the foreground-control confirm (#9651 B5) that
+      // `desktop.control.acquire` raises, the way a person clicking "Allow" would.
+      if (parsed.type === "extension_ui_request" && parsed.method === "confirm" && typeof parsed.id === "string") {
+        this.#child.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: parsed.id, confirmed: true })}\n`)
+        this.confirms += 1
+      }
       for (const waiter of [...this.#waiters]) {
         if (!waiter.predicate(parsed)) continue
         this.#waiters.delete(waiter)
