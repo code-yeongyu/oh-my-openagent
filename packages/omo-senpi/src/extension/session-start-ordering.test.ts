@@ -21,7 +21,10 @@ import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { omoSenpiComponents } from "./index"
 import type { ComponentContext } from "./types"
 
-afterEach(() => resetTestHome())
+afterEach(() => {
+  Reflect.deleteProperty(globalThis, Symbol.for("omo.onboard"))
+  resetTestHome()
+})
 
 describe("session_start component ordering", () => {
   test("#given the production component list #when startup handlers are ordered #then onboarding immediately precedes the advisor after native badge", () => {

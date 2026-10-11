@@ -1,8 +1,11 @@
 import type { ExtensionAPI } from "@code-yeongyu/senpi"
-import { createOnboardingComponent } from "../../src/components/onboarding/component"
+import { omoSenpiComponents } from "../../plugin/extensions/omo.js"
+
+const component = omoSenpiComponents.find((component) => component.name === "onboarding")
 
 export default function onboardingQaExtension(pi: ExtensionAPI): void {
-  createOnboardingComponent().register(pi, {
+  if (!component) throw new Error("Built onboarding component is missing")
+  component.register(pi, {
     logger: { info() {}, warn() {}, error() {} },
     config: { getFlag: (name) => pi.getFlag(name) },
   })
