@@ -29,11 +29,20 @@ async function terminatePosixProcessGroup(child: ChildProcess, pid: number, dela
     return
   }
   const exited = childExit(child)
-  signalProcessGroup(pid, "SIGTERM")
+  if (!signalProcessGroup(pid, "SIGTERM")) {
+    await terminateDirectChild(child, delay)
+    return
+  }
   await waitForExitOrDelay(exited, delay)
   if (processGroupExists(pid)) {
-    signalProcessGroup(pid, "SIGKILL")
-    await waitForCondition(() => processGroupExists(pid), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
+    if (signalProcessGroup(pid, "SIGKILL")) {
+      await waitForCondition(() => processGroupExists(pid), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
+      return
+    }
+    if (!hasExited(child)) {
+      child.kill("SIGKILL")
+    }
+    await exited
     return
   }
   await exited
@@ -113,18 +122,32 @@ function processGroupExists(pid: number): boolean {
   }
 }
 
-function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
+/**
+ * Signals the owned child's process group. Returns false when the OS refuses the
+ * signal, which leaves the group unreachable and hands escalation back to the
+ * caller's own child handle rather than failing the whole termination.
+ */
+function signalProcessGroup(pid: number, signal: NodeJS.Signals): boolean {
   try {
     process.kill(-pid, signal)
+    return true
   } catch (error) {
-    if (!isNoSuchProcess(error)) {
-      throw error
+    if (isNoSuchProcess(error)) {
+      return true
     }
+    if (isPermissionDenied(error)) {
+      return false
+    }
+    throw error
   }
 }
 
 function isNoSuchProcess(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ESRCH"
+}
+
+function isPermissionDenied(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "EPERM"
 }
 
 function hasExited(child: ChildProcess): boolean {
