@@ -93,7 +93,7 @@ impl Guard {
     const fn kind(action: MutatingAction) -> GuardKind {
         match action {
             MutatingAction::RaiseWindow | MutatingAction::AxFocus => GuardKind::Untouched,
-            MutatingAction::TypeText | MutatingAction::KeyChord => GuardKind::Keys,
+            MutatingAction::TypeText | MutatingAction::KeyChord | MutatingAction::MenuSelect => GuardKind::Keys,
             MutatingAction::Click
             | MutatingAction::MoveMouse
             | MutatingAction::Drag

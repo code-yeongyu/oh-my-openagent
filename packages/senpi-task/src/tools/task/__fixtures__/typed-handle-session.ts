@@ -65,7 +65,7 @@ export async function realSessionHandle() {
     }
   } finally {
     for (const handle of handles) {
-      manager.forget(handle.task_id)
+      manager.forget(handle.task_id, { path: "end" })
       await handle.abort()
       await handle.dispose()
     }

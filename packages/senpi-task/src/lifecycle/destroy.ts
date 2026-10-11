@@ -7,6 +7,8 @@ import { closeHostSessionConfirmed } from "./host-session-close"
 import { isHostSessionRecord } from "./host-session"
 import type { DestroyCause, ResidentHandle } from "./port"
 import { withinTeardownBudget } from "./teardown-budget"
+import { suspendHandle } from "./shutdown"
+import { newestSessionPath } from "./session-path"
 
 /**
  * THE single-writer destruction port. This is the ONLY function in the package that invokes a
@@ -14,11 +16,8 @@ import { withinTeardownBudget } from "./teardown-budget"
  * kill. Cancel (todo 10), LRU eviction, TTL, and reconciliation all route here so terminal state
  * never auto-disposes and every teardown is bookkept identically.
  *
- * The ONLY sibling caller of handle abort/terminate/dispose is shutdown.ts's
- * suspendOnSessionShutdown (a deliberate deviation from the single-writer rule, recorded in the
- * work plan): suspension is NOT destruction - this port's contract is terminal teardown (forget +
- * dispose transition), while suspension must keep the record continuable as persisted_only /
- * rpc_detached, so it cannot route through destroyResidentTask.
+ * Revivable eviction delegates to shutdown.ts's suspendHandle: it releases the runtime but keeps
+ * the transcript and queue. Every permanent end and failed-rung handoff still closes the child.
  */
 /**
  * What an orphan (a child with no live handle in this process) looks like to the destruction port.
@@ -35,12 +34,34 @@ export async function destroyResidentTask(
   cause: DestroyCause,
   orphan?: OrphanTarget,
 ): Promise<void> {
+  if (cause === "recovery_detach") {
+    // A typed pre-delivery refusal says nothing about the daemon's running turn. dispose drops
+    // only our protocol connection; abort/terminate would close the session we intend to reattach.
+    const handle = context.registry.get(taskId)
+    try {
+      if (handle !== undefined) {
+        await withinTeardownBudget(context.teardownStepDeadline, { taskId, pid: handle.pid }, "dispose", () => handle.dispose())
+      }
+    } finally {
+      context.registry.forget(taskId, { path: "park" })
+    }
+    return
+  }
   const claimedEviction = cause === "evict" ? (context.registry.tryClaimEviction?.(taskId) ?? true) : false
   if (cause === "evict" && !claimedEviction) return
-  // Deliberate teardown drops the child's runtime parent kernel-tool binding: nothing may keep a
-  // strong reference to a kernel this child can never be revived onto. Parking never lands here.
-  if (cause !== "fallback_handoff") context.kernelToolBindings?.release(taskId)
   try {
+    // Handoffs retain their ownership until the next rung launches. Reconciliation must end the
+    // orphan before deciding whether its transcript remains revivable.
+    if (cause === "evict" || cause === "revive_failure") {
+      const queued = context.store.load(taskId)
+      const handle = context.registry.get(taskId)
+      if ((queued?.pending_steering?.length ?? 0) > 0 && queued?.killed !== true
+        && queued?.status !== "cancelled" && queued?.status !== "lost" && handle !== undefined) {
+        await suspendHandle(context, handle, cause)
+        return
+      }
+    }
+    if (cause !== "fallback_handoff") context.kernelToolBindings?.release(taskId)
     const handle = context.registry.get(taskId)
     if (handle !== undefined) {
       try {
@@ -50,17 +71,33 @@ export async function destroyResidentTask(
         context.failedTeardowns.add(taskId)
         throw error
       } finally {
-        if (cause !== "fallback_handoff") context.registry.forget(taskId)
+        if (cause !== "fallback_handoff") context.registry.forget(taskId, {
+          path: cause === "revive_failure" ? "park" : cause === "evict" ? "evict" : "end",
+          ...(cause === "target_gone" || cause === "reconcile_lost" || cause === "ttl" ? { reason: "target_gone" as const } : {}),
+        })
         if (cause === "revive_failure") recordRevivalFailure(context, taskId)
       }
       // A daemon child whose stop could not reach its host (the transport was down, or crash recovery
       // gave up) may still hold its session there: the cancel ends it once the host answers.
       if (handle.kind !== "in-process" && (cause === "cancel" || cause === "cancel_without_abort")) await closeParkedSession(context, taskId)
-    } else if (cause === "reconcile_lost" || cause === "ttl" || cause === "revive_failure") {
+    } else if (cause === "reconcile_lost" || cause === "ttl" || cause === "revive_failure" || cause === "target_gone") {
       await terminateOrphan(context, taskId, orphan)
       if (cause === "revive_failure") recordRevivalFailure(context, taskId)
+      const record = context.store.load(taskId)
+      if (cause === "reconcile_lost" && record !== null && record.killed !== true
+        && record.status !== "cancelled" && record.status !== "lost"
+        && (record.pending_steering?.length ?? 0) > 0
+        && (isHostSessionRecord(record) || newestSessionPath(context, taskId) !== undefined)) {
+        context.registry.forget(taskId, { path: "park" })
+        context.store.transition(taskId, {
+          type: record.execution_mode === "process" ? "detach_rpc" : "persist_only", timestamp: nowIso(context),
+        })
+        return
+      }
+      if (cause !== "revive_failure") context.registry.forget(taskId, { path: "end", reason: "target_gone" })
     } else if (cause === "cancel" || cause === "cancel_without_abort") {
       await closeParkedSession(context, taskId)
+      context.registry.forget(taskId, { path: "end" })
     }
     // Runtime fallback starts the next model only once the failed rung's child is confirmed gone: the
     // handle's own teardown is best-effort and bounded, so it cannot tell a refused close from a done one.

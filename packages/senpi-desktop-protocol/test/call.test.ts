@@ -49,4 +49,9 @@ describe("isReadOnlyComputerCall", () => {
 	it("rejects a chained call on a root that returns no handle", () => {
 		expect(rejectionReason([{ method: "screenshot" }, { method: "click" }])).toBe("notChainable");
 	});
+
+	it("classifies menu.items as inspection and menu.select as mutation on a window handle", () => {
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "menu.items" }])).toBe(true);
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "menu.select" }])).toBe(false);
+	});
 });
