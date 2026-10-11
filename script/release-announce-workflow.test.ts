@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
+import { resolveReleaseVersion } from "./release-version.mjs"
 
 test("#given release automation #when parsed #then published events, safe dispatch defaults, and publisher provenance are wired", async () => {
   const step = z.object({
@@ -16,7 +17,10 @@ test("#given release automation #when parsed #then published events, safe dispat
     on: z.object({
       release: z.object({ types: z.array(z.string()) }),
       workflow_call: z.object({
-        inputs: z.object({ tag: z.object({ type: z.literal("string"), required: z.literal(true) }).passthrough() }),
+        inputs: z.object({
+          tag: z.object({ type: z.literal("string"), required: z.literal(true) }).passthrough(),
+          automatic: z.object({ type: z.literal("boolean"), default: z.literal(true) }).passthrough(),
+        }),
         secrets: z.object({ DISCORD_OMO_RELEASES_WEBHOOK_URL: z.object({ required: z.literal(true) }) }),
       }),
       workflow_dispatch: z.object({ inputs: z.record(z.string(), z.object({
@@ -44,7 +48,7 @@ test("#given release automation #when parsed #then published events, safe dispat
   expect(announce?.env?.DISCORD_OMO_RELEASES_WEBHOOK_URL).toBe("${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}")
   expect(announce?.env?.DRY_RUN).toBe("${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}")
   expect(announce?.env?.PROBE).toBe("${{ github.event_name == 'workflow_dispatch' && inputs.probe }}")
-  expect(announce?.env?.ANNOUNCEMENT_EVENT).toBe("${{ github.event_name == 'release' && 'release' || 'workflow_dispatch' }}")
+  expect(announce?.env?.ANNOUNCEMENT_EVENT).toBe("${{ inputs.automatic && 'workflow_call' || (github.event_name == 'release' && 'release' || 'workflow_dispatch') }}")
   expect(announce?.run).toBe("timeout -k 10 120 bun script/release-announce.ts")
   const publisher = z.object({ jobs: z.record(z.string(), z.object({
     steps: z.array(step).optional(),
@@ -63,7 +67,10 @@ test("#given release automation #when parsed #then published events, safe dispat
   expect(publisher.jobs.release?.outputs?.created).toBe("${{ steps.github-release.outputs.created }}")
   const caller = publisher.jobs["release-announce"]
   expect(caller?.needs).toEqual(["release-metadata", "release"])
-  expect(caller?.if).toBe("inputs.lazycodex_only != true && inputs.prepared_release_sha != '' && needs.release.outputs.created == 'true'")
+  expect(caller?.if).toBe("inputs.lazycodex_only != true && inputs.prepared_release_sha != '' && needs.release.outputs.created == 'true' && needs.release-metadata.outputs.dist_tag == ''")
+  expect(publisher.jobs["release-metadata"]?.outputs?.dist_tag).toBe("${{ steps.version.outputs.dist_tag }}")
+  expect(resolveReleaseVersion("5.1.29", false).distTag).toBe("")
+  expect(resolveReleaseVersion("5.1.29-beta.1", false).distTag).toBe("beta")
   expect(caller?.uses).toBe("./.github/workflows/release-announce.yml")
   expect(caller?.with).toEqual({ tag: "v${{ needs.release-metadata.outputs.version }}" })
   expect(caller?.secrets).toEqual({ DISCORD_OMO_RELEASES_WEBHOOK_URL: "${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}" })

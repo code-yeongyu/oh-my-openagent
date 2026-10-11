@@ -13,7 +13,7 @@ const messageSchema = z.object({ id: z.string().regex(/^\d+$/) })
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>
 type Options = {
   readonly tag: string
-  readonly event: "release" | "workflow_dispatch"
+  readonly event: "release" | "workflow_dispatch" | "workflow_call"
   readonly webhook: string | undefined
   readonly token?: string
   readonly dryRun: boolean
@@ -24,10 +24,25 @@ class AnnouncementError extends Error {}
 
 export function composeMessage(tag: string, body: string | null): string {
   if (!body?.trim()) throw new AnnouncementError("Release body is empty")
-  const paragraphs = body.replace(/\r\n/g, "\n").trim().split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim().replace(/@(here|everyone)\b/gi, "$1"))
-  const headlines = paragraphs.filter((paragraph) => /^\*\*.+?\*\*/s.test(paragraph))
-  const opening = (headlines[0] ?? paragraphs[0]).replace(/\*\*/g, "").replace(/\s+/g, " ")
+  const paragraphs: string[] = []
+  let lines: string[] = []
+  let fence: string | undefined
+  for (const line of body.replace(/\r\n/g, "\n").trim().split("\n")) {
+    const delimiter = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
+    if (delimiter) {
+      if (!fence) fence = delimiter[1]
+      else if (delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length && !delimiter[2].trim()) fence = undefined
+    }
+    if (!line.trim() && !fence) {
+      if (lines.length) paragraphs.push(lines.join("\n").trim())
+      lines = []
+    } else lines.push(line)
+  }
+  if (fence) lines.push(fence)
+  if (lines.length) paragraphs.push(lines.join("\n").trim())
+  const sanitized = paragraphs.map((paragraph) => paragraph.replace(/@(here|everyone)\b/gi, "$1"))
+  const headlines = sanitized.filter((paragraph) => /^\*\*.+?\*\*/s.test(paragraph))
+  const opening = (headlines[0] ?? sanitized[0]).split("\n")[0].replace(/\*\*/g, "").replace(/\s+/g, " ")
   const sentence = opening.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() ?? opening
   const hook = sentence.length <= 300 ? sentence : "New fixes and improvements are ready to install."
   const blocks = [
@@ -63,7 +78,10 @@ async function request(fetcher: Fetch, url: URL, method: string, body?: string, 
 
 export async function announce(options: Options, fetcher: Fetch = fetch, log: (line: string) => void = console.log) {
   if (!stableTag.test(options.tag)) {
-    if (options.event === "release") return "skipped"
+    if (options.event !== "workflow_dispatch") {
+      log(`::notice::Skipping non-stable release ${escapeCommand(options.tag)}`)
+      return "skipped"
+    }
     throw new AnnouncementError("Tag must be a stable vX.Y.Z release")
   }
   if (!options.webhook?.trim()) throw new AnnouncementError("DISCORD_OMO_RELEASES_WEBHOOK_URL is missing")
@@ -133,7 +151,7 @@ if (import.meta.main) {
   if (webhook) console.log(`::add-mask::${escapeCommand(webhook)}`)
   try {
     const event = process.env.ANNOUNCEMENT_EVENT ?? process.env.GITHUB_EVENT_NAME
-    if (event !== "release" && event !== "workflow_dispatch") throw new AnnouncementError("Unsupported workflow event")
+    if (event !== "release" && event !== "workflow_dispatch" && event !== "workflow_call") throw new AnnouncementError("Unsupported workflow event")
     const result = await announce({
       tag, event, webhook, token: process.env.GH_TOKEN,
       dryRun: process.env.DRY_RUN === "true",

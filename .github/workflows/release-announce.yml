@@ -12,6 +12,10 @@ on:
         description: "Stable omo release tag (vX.Y.Z)"
         required: true
         type: string
+      automatic:
+        description: "Reusable calls skip non-stable tags; the caller's event is inherited"
+        type: boolean
+        default: true
     secrets:
       DISCORD_OMO_RELEASES_WEBHOOK_URL:
         required: true
@@ -55,7 +59,7 @@ jobs:
       - name: Announce release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANNOUNCEMENT_EVENT: ${{ github.event_name == 'release' && 'release' || 'workflow_dispatch' }}
+          ANNOUNCEMENT_EVENT: ${{ inputs.automatic && 'workflow_call' || (github.event_name == 'release' && 'release' || 'workflow_dispatch') }}
           DISCORD_OMO_RELEASES_WEBHOOK_URL: ${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}

@@ -3,7 +3,9 @@
 `release-announce.yml` announces published stable omo tags (`vX.Y.Z`) to
 `#omo-releases`. Drafts, prereleases, and other tags are skipped. The release
 body supplies the hook and up to four bold headline paragraphs. Whole paragraphs
-are dropped to keep the message below 2000 characters. Mentions are disabled.
+are dropped to keep the message below 2000 characters. Blank lines inside code
+fences do not split a paragraph, so truncation cannot leave a partial fenced
+block. Mentions are disabled.
 
 The repository secret `DISCORD_OMO_RELEASES_WEBHOOK_URL` must exist, including for
 dry runs. It is passed only through the step environment and masked. Missing
@@ -18,6 +20,13 @@ than finding it already published. It skips LazyCodex-only and preparation
 runs and passes only the Discord webhook secret. A failed
 announcement makes the publish run itself red; no PAT is needed for this path.
 The reusable job has read-only contents permission.
+
+The caller also requires the validated release-metadata `dist_tag` to be empty,
+which identifies a stable version; beta/other prerelease channels are excluded.
+A non-stable tag passed directly through `workflow_call` exits successfully with
+a skip notice. Manual `workflow_dispatch` still rejects a non-stable tag.
+Reusable calls have an `automatic` input defaulting to true to distinguish them
+from their inherited caller event.
 
 The `release: published` trigger also handles releases created by a person.
 That path explicitly skips releases authored by `github-actions[bot]` to avoid

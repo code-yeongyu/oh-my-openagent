@@ -1426,7 +1426,7 @@ jobs:
 
   release-announce:
     needs: [release-metadata, release]
-    if: inputs.lazycodex_only != true && inputs.prepared_release_sha != '' && needs.release.outputs.created == 'true'
+    if: inputs.lazycodex_only != true && inputs.prepared_release_sha != '' && needs.release.outputs.created == 'true' && needs.release-metadata.outputs.dist_tag == ''
     permissions:
       contents: read
     uses: ./.github/workflows/release-announce.yml

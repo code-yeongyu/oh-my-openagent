@@ -54,6 +54,23 @@ describe("release announcement composition", () => {
     expect(content).not.toContain("**Change 4.**")
   })
 
+  test.each(["```", "~~~~"])("#given a headline with blank lines inside %s fences #when composed #then its entire block is retained", (fence) => {
+    const paragraph = `**Example**\n${fence}ts\nfirst line\n\nsecond line\n${fence}`
+    const content = composeMessage(tag, `${paragraph}\n\n**Next.** Another fix.`)
+    expect(content).toContain(paragraph)
+    expect(content.length).toBeLessThan(2000)
+    expect(content).toContain(`${fence}\n\n**Next.**`)
+  })
+
+  test.each(["```", "~~~~"])("#given an oversized fenced headline using %s #when truncated #then no partial fence is emitted", (fence) => {
+    const paragraph = `**Example**\n${fence}ts\nfirst line\n\n${"whole words ".repeat(220)}\n${fence}`
+    const content = composeMessage(tag, paragraph)
+    expect(content.length).toBeLessThan(2000)
+    expect(content).not.toContain(`${fence}ts`)
+    expect(content).not.toContain("first line")
+    expect(content).not.toContain("**Example**")
+  })
+
   test("#given an oversized opening #when composed #then the hook does not overflow", () => {
     expect(composeMessage(tag, `**${"word ".repeat(500)}**`).length).toBeLessThan(2000)
   })
@@ -103,6 +120,20 @@ describe("release announcement delivery", () => {
     const fake = transport([release(flags)])
     expect(await announce(options, fake.fetch)).toBe("skipped")
     expect(fake.calls).toHaveLength(1)
+  })
+
+  test("#given a beta through workflow_call #when announced #then it skips with a notice and no requests", async () => {
+    const fake = transport([])
+    const output: string[] = []
+    expect(await announce({ ...options, tag: "v5.1.29-beta.1", event: "workflow_call" }, fake.fetch, (line) => output.push(line))).toBe("skipped")
+    expect(fake.calls).toHaveLength(0)
+    expect(output.some((line) => line.startsWith("::notice::") && line.includes("v5.1.29-beta.1"))).toBe(true)
+  })
+
+  test("#given a beta through workflow_dispatch #when announced #then it fails loudly without requests", async () => {
+    const fake = transport([])
+    await expect(announce({ ...options, tag: "v5.1.29-beta.1" }, fake.fetch)).rejects.toThrow("Tag must be a stable vX.Y.Z release")
+    expect(fake.calls).toHaveLength(0)
   })
 
   test("#given an empty fetched body #when run #then no Discord post occurs", async () => {
