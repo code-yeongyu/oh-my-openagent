@@ -175,13 +175,23 @@ impl Backend for MacosBackend {
         &mut self,
         window: &DesktopWindow,
         path: &[String],
+        delivery: DeliveryMode,
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
         Self::require_input_permission()?;
         let (input, capture) = (&mut self.input, &self.capture);
-        crate::ax::menus::select(window, path, check_stop, &mut || {
-            input.make_menu_window_key(window, capture)
-        })
+        match delivery {
+            DeliveryMode::Background => crate::ax::menus::select(window, path, check_stop, &mut || {
+                input.make_menu_window_key(window, capture)
+            }),
+            // The window is already key inside the foreground scope, so `make_key` only verifies it.
+            DeliveryMode::Foreground => {
+                crate::ax::menus::preflight(window, path, check_stop)?;
+                input.with_menu_window_foreground(window, || {
+                    crate::ax::menus::select(window, path, check_stop, &mut || Ok(()))
+                })
+            }
+        }
     }
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {

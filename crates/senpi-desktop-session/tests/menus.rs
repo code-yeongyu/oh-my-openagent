@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, RecordingSink, SinkOp};
-use senpi_desktop_core::backend::Backend;
+use senpi_desktop_core::backend::{Backend, DeliveryMode};
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::methods::Method;
-use senpi_desktop_core::protocol_params::MenuPathParams;
+use senpi_desktop_core::protocol_params::{MenuPathParams, MenuSelectParams};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::types::{DesktopSessionOptions, FrontWindow};
 use senpi_desktop_safety::{FakeClock, StopPathId, StopSource, Supervisor};
@@ -80,9 +80,10 @@ fn start(overlay: &str) -> MenusSession {
 }
 
 fn select(window: &str, path: &[&str]) -> Op {
-    Op::MenusSelect(MenuPathParams {
+    Op::MenusSelect(MenuSelectParams {
         window_id: window.to_owned(),
         path: path.iter().map(|label| (*label).to_owned()).collect(),
+        delivery_mode: None,
     })
 }
 
@@ -180,6 +181,7 @@ async fn select_records_the_path_and_emits_exactly_one_audit_event() {
         guarded(vec![SinkOp::MenuSelect {
             window: "101".to_owned(),
             path: vec!["File".to_owned(), "Save".to_owned()],
+            delivery: DeliveryMode::Background,
         }])
     );
     let audits = audits.lock();

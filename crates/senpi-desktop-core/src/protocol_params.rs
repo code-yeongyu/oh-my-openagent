@@ -86,14 +86,27 @@ pub struct ControlGrantParams {
     pub confirmation_id: String,
 }
 
-/// `menus.items` / `menus.select`: the window whose menu is addressed and the
-/// path inside it (empty lists the menu bar; select requires 1..=32 labels).
+/// `menus.items`: the window whose menu is addressed and the path inside it
+/// (empty lists the menu bar). `menus.select` takes [`MenuSelectParams`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MenuPathParams {
     pub window_id: String,
     #[serde(default)]
     pub path: Vec<String>,
+}
+
+/// `menus.select`: the window, the 1..=32-label path to a command, and the
+/// delivery. An omitted delivery is background; `foreground` raises and keys
+/// the target window and needs this session's live control grant (#9888).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuSelectParams {
+    pub window_id: String,
+    #[serde(default)]
+    pub path: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_mode: Option<String>,
 }
 
 /// `clipboard.write` params and `clipboard.read` result.

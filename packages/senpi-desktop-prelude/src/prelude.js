@@ -88,7 +88,7 @@
 		defineMethod(win, "ref", ref => resolveElement([step("ref", [ref])]));
 		defineMethod(win, "menu", Object.freeze({
 			items: path => callValue(via(step("menu.items", [path]))),
-			select: path => callValue(via(step("menu.select", [path]))),
+			select: (path, options) => callValue(via(step("menu.select", options === undefined ? [path] : [path, options]))),
 		}));
 		return Object.freeze(win);
 	};

@@ -13,7 +13,7 @@ use crate::menus::MenuItem;
 use crate::protocol_params::{
     AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
     AxSetValueParams, AxSnapshotParams, CancelParams, CaptureParams, ClipboardText, ControlGrantParams, DragParams,
-    EmptyParams, KeyChordParams, MenuPathParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
+    EmptyParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{
@@ -103,7 +103,7 @@ method_table! {
     KeyChord = "keyChord", Exec, Public, KeyChordParams => ();
     RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => ();
     MenusItems = "menus.items", Read, Public, MenuPathParams => Vec<MenuItem>;
-    MenusSelect = "menus.select", Exec, Public, MenuPathParams => ();
+    MenusSelect = "menus.select", Exec, Public, MenuSelectParams => ();
     ClipboardRead = "clipboard.read", Read, Public, EmptyParams => ClipboardText;
     ClipboardWrite = "clipboard.write", Exec, Public, ClipboardText => ();
     AxSnapshot = "ax.snapshot", Read, Public, AxSnapshotParams => AxSnapshot;

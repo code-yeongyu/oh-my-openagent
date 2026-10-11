@@ -118,6 +118,7 @@ pub enum SinkOp {
     MenuSelect {
         window: String,
         path: Vec<String>,
+        delivery: DeliveryMode,
     },
 }
 

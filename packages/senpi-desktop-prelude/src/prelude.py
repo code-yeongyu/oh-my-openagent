@@ -110,8 +110,9 @@ def _make_computer():
         def items(self, path=None):
             return self._call("menu.items", (path,), {})
 
-        def select(self, path):
-            return self._call("menu.select", (path,), {})
+        def select(self, path, delivery=None):
+            args = (path,) if delivery is None else (path, {"delivery": delivery})
+            return self._call("menu.select", args, {})
 
     class _Clipboard:
         __slots__ = ()

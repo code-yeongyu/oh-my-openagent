@@ -3,7 +3,7 @@
 use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::protocol_params::{
     AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
-    CaptureParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, PointParams,
+    CaptureParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
     RaiseWindowParams, ScrollParams, TypeTextParams,
 };
 use senpi_desktop_core::protocol_results::ControlStateResult;
@@ -44,7 +44,7 @@ pub enum Op {
     ControlRevoke,
     ControlState,
     MenuItems(MenuPathParams),
-    MenusSelect(MenuPathParams),
+    MenusSelect(MenuSelectParams),
 }
 
 /// A request's result; serializes to its engine method's wire `result`
