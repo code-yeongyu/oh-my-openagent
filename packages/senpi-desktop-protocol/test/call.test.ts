@@ -50,6 +50,11 @@ describe("isReadOnlyComputerCall", () => {
 		expect(rejectionReason([{ method: "screenshot" }, { method: "click" }])).toBe("notChainable");
 	});
 
+	it("classifies menu.items as inspection and menu.select as mutation on a window handle", () => {
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "menu.items" }])).toBe(true);
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "menu.select" }])).toBe(false);
+	});
+
 	it("classifies control.acquire and control.release as exec (#9651 B5b)", () => {
 		expect(isReadOnlyComputerCall([{ method: "control.acquire", args: [{ reason: "click Run" }] }])).toBe(false);
 		expect(isReadOnlyComputerCall([{ method: "control.release" }])).toBe(false);

@@ -9,6 +9,7 @@ mod global;
 mod guard;
 mod held;
 mod keys;
+mod menu_key;
 mod post;
 
 #[cfg(test)]

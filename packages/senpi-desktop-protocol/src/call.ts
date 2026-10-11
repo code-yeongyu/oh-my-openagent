@@ -48,6 +48,8 @@ export const WINDOW_METHODS: MethodPolicies = {
 	ax: "read",
 	find: "read",
 	ref: "read",
+	"menu.items": "read",
+	"menu.select": "exec",
 };
 
 /** Helpers callable on an AX element handle resolved through `desktop.ref(ref)`. */

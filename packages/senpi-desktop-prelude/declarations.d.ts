@@ -58,6 +58,16 @@ interface ComputerBounds {
 	height: number;
 }
 
+/** A native menu item snapshot; selection revalidates the command before dispatch. */
+interface ComputerMenuItem {
+	title: string;
+	path: string[];
+	enabled: boolean;
+	checked: boolean;
+	hasSubmenu: boolean;
+	shortcut?: string | null;
+}
+
 /** One capturable top-level window in global logical desktop coordinates. */
 interface ComputerWindowInfo extends ComputerBounds {
 	/** Opaque backend-defined id; never parse it. */
@@ -175,6 +185,12 @@ interface ComputerWindow extends ComputerInputTarget {
 	readonly bounds: ComputerBounds;
 	readonly focused: boolean;
 	raise(): Promise<void>;
+	readonly menu: {
+		/** Inspect a menu path without activating the application (empty path = the menu bar). */
+		items(path?: string[]): Promise<ComputerMenuItem[]>;
+		/** Select one unambiguous enabled leaf command using the window's native menu context. */
+		select(path: string[]): Promise<void>;
+	};
 	/** Formatted accessibility tree as one string, one node per line with `[ref=eN]` tags. */
 	ax(options?: ComputerAxOptions): Promise<string>;
 	find(query: ComputerAxQuery): Promise<ComputerElement[]>;

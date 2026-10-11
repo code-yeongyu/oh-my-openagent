@@ -23,6 +23,8 @@ const CHAIN_METHOD_SNAPSHOT = [
 	"focus",
 	"focusedElement",
 	"focusedWindow",
+	"menu.items",
+	"menu.select",
 	"move",
 	"parent",
 	"perform",

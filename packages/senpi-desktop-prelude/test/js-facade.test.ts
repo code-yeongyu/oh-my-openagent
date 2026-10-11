@@ -159,6 +159,65 @@ describe("JavaScript computer facade", () => {
 		expect(kernel.calls).toEqual([{ action: "capabilities" }, { action: "close" }]);
 	});
 
+	it("sends menu.items and menu.select as window-hopped chains with the path forwarded", async () => {
+		// Given
+		const kernel = loadJsFacade(windowResponder);
+
+		// When
+		await kernel.run(`
+			const win = await computer.window({ app: "Code" });
+			await win.menu.items();
+			await win.menu.items(["File"]);
+			await win.menu.select(["File", "Export…", "PDF"]);
+		`);
+
+		// Then
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "window", args: [{ app: "Code" }] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [["File"]] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.select", args: [["File", "Export…", "PDF"]] },
+				],
+			},
+		]);
+	});
+
+	it("returns the items array from win.menu.items", async () => {
+		// Given
+		const menu = [
+			{ title: "File", path: ["File"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },
+		];
+		const kernel = loadJsFacade((args) => {
+			const chain = Array.isArray(args.chain) ? args.chain : [];
+			if (chain.length === 1 && chain[0].method === "window") {
+				return { text: "", details: { value: WINDOW_SNAPSHOT } };
+			}
+			return { text: "", details: { value: menu } };
+		});
+
+		// When
+		const value = await kernel.run(`return (await computer.window("w1")).menu.items(["File"]);`);
+
+		// Then
+		expect(value).toEqual(menu);
+	});
+
 	it("sends control helpers as one-step call chains (#9651 B5b)", async () => {
 		// Given
 		const kernel = loadJsFacade(() => ({ text: "", details: { value: { active: true } } }));

@@ -26,6 +26,8 @@ export const ENGINE_METHODS = [
 	"typeText",
 	"keyChord",
 	"raiseWindow",
+	"menus.items",
+	"menus.select",
 	"clipboard.read",
 	"clipboard.write",
 	"ax.snapshot",

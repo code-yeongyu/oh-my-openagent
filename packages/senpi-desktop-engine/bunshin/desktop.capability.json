@@ -17,6 +17,8 @@
 		"desktop.typeText",
 		"desktop.keyChord",
 		"desktop.raiseWindow",
+		"desktop.menus.items",
+		"desktop.menus.select",
 		"desktop.clipboard.read",
 		"desktop.clipboard.write",
 		"desktop.ax.snapshot",
@@ -48,6 +50,8 @@
 		"desktop.typeText": "mutate",
 		"desktop.keyChord": "mutate",
 		"desktop.raiseWindow": "mutate",
+		"desktop.menus.items": "read",
+		"desktop.menus.select": "mutate",
 		"desktop.clipboard.read": "read",
 		"desktop.clipboard.write": "mutate",
 		"desktop.ax.snapshot": "read",
@@ -646,6 +650,46 @@
 			"required": [
 				"windowId"
 			],
+			"additionalProperties": false
+		},
+		"desktop.menus.items": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				},
+				"path": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": []
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
+			"additionalProperties": false
+		},
+		"desktop.menus.select": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				},
+				"path": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": []
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
 			"additionalProperties": false
 		},
 		"desktop.clipboard.read": {
