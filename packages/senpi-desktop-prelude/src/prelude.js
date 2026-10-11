@@ -86,6 +86,10 @@
 		defineValueMethods(win, windowValueMethods, via);
 		defineMethod(win, "find", async query => (await callValue(via(step("find", [query])))).map(makeElement));
 		defineMethod(win, "ref", ref => resolveElement([step("ref", [ref])]));
+		defineMethod(win, "menu", Object.freeze({
+			items: path => callValue(via(step("menu.items", [path]))),
+			select: path => callValue(via(step("menu.select", [path]))),
+		}));
 		return Object.freeze(win);
 	};
 	const resolveWindow = async chain => {

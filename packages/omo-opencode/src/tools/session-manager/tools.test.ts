@@ -127,6 +127,28 @@ describe("session-manager tools", () => {
     expect(typeof result).toBe("string")
   })
 
+  test("#given newer sessions outside the to_date window #when session_list runs with to_date and limit #then the limit applies after the date filter", async () => {
+    //#given
+    const newestFirst: SessionMetadata[] = ["ses_new_1", "ses_new_2", "ses_old_1", "ses_old_2"].map((id, index) => ({
+      id,
+      projectID: "project-1",
+      directory: projectDir,
+      time: { created: 4 - index, updated: 4 - index },
+    }))
+    const { session_list } = createSessionManagerTools(mockCtx, {
+      setStorageClient: () => {},
+      getMainSessions: async ({ limit }) => newestFirst.slice(0, limit),
+      filterSessionsByDate: async (sessionIDs) => sessionIDs.filter((id) => id.startsWith("ses_old_")),
+      formatSessionList: async (sessionIDs) => `sessions:${sessionIDs.join(",")}`,
+    })
+
+    //#when
+    const result = await session_list.execute({ to_date: "2025-12-01T00:00:00Z", limit: 2 }, mockContext)
+
+    //#then
+    expect(result).toBe("sessions:ses_old_1,ses_old_2")
+  })
+
   test("session_read handles non-existent session", async () => {
     const { session_read } = createTestTools()
     const result = await session_read.execute({ session_id: "ses_nonexistent" }, mockContext)

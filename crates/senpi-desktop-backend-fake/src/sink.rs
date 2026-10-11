@@ -115,6 +115,10 @@ pub enum SinkOp {
     AxFocus {
         node: u64,
     },
+    MenuSelect {
+        window: String,
+        path: Vec<String>,
+    },
 }
 
 /// Shared, cloneable log of every [`SinkOp`]; clones observe the same log, so
