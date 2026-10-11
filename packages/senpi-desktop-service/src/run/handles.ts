@@ -150,8 +150,13 @@ export class WindowHandle extends InputTarget {
 				const items = await call("menus.items", { windowId: this.id, path: [...(path ?? [])] });
 				return expectResult("menus.items", items, listOf(isMenuItem));
 			}),
-		select: (path: readonly string[]): Promise<void> =>
-			this.send("menu.select", "menus.select", { windowId: this.id, path: [...path] }),
+		select: (path: readonly string[], options?: { readonly delivery?: string }): Promise<void> =>
+			this.send("menu.select", "menus.select", {
+				windowId: this.id,
+				path: [...path],
+				// Foreground keys the target window and needs the control grant (#9888); omitted stays background.
+				...(options?.delivery === undefined ? {} : { deliveryMode: options.delivery }),
+			}),
 	};
 
 	/** The formatted accessibility tree, one node per line with `[ref=eN]` tags. */

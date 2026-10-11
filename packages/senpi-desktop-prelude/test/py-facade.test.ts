@@ -106,6 +106,20 @@ describe("Python computer facade", () => {
 		});
 	});
 
+	it("forwards a win.menu.select delivery keyword as an options argument (#9888)", () => {
+		// When
+		const run = runPythonFacade("win = computer.window(app='Code')\nwin.menu.select(['File', 'Save'], delivery='foreground')");
+
+		// Then
+		expect(run.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "window", args: ["w1"] },
+				{ method: "menu.select", args: [["File", "Save"], { delivery: "foreground" }] },
+			],
+		});
+	});
+
 	it("sends menu.items and menu.select as window-hopped chains with the path forwarded", () => {
 		// When
 		const run = runPythonFacade(

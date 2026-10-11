@@ -176,3 +176,31 @@ fn an_app_with_two_windows_is_refused_before_any_activation() {
     println!("two_window_last_activated={activated:?}");
     assert_eq!(activated, None);
 }
+
+#[test]
+#[ignore = "needs a logged-in macOS session, an Accessibility grant and swiftc"]
+fn foreground_delivery_selects_in_the_target_window_of_a_two_window_app() {
+    report_origin();
+    let dir = tempfile::tempdir().unwrap();
+    let record = dir.path().join("record.txt");
+    let title = format!("senpi-menu-fg-{}", std::process::id());
+    let (_fixture, window) = launch(&build_fixture(dir.path()), &title, &record, Some("two"));
+    let mut input = MacInput::new(CanaryMode::Off).unwrap();
+    let front_before = crate::front_app::current_front_pid();
+    println!("front_before={front_before:?}");
+
+    // The session admits this only under the control grant (#9888); here the
+    // backend is driven directly through the same foreground scope it uses.
+    let path = vec!["File".to_owned(), "Save".to_owned()];
+    let chosen = input
+        .with_menu_window_foreground(&window, || select(&window, &path, &|| Ok(()), &mut || Ok(())))
+        .map_err(|e| (e.code, e.message));
+    println!("fg_select={chosen:?}");
+    assert_eq!(chosen, Ok(()));
+    let recorded = wait_for_record(&record);
+    println!("fg_recorded={recorded:?}");
+    assert_eq!(recorded, format!("Save@{title}\n"), "the command ran against another window");
+    let front_after = crate::front_app::current_front_pid();
+    println!("front_after={front_after:?}");
+    assert_eq!(front_after, front_before, "the user's front app was not handed back");
+}

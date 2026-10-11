@@ -198,6 +198,26 @@ describe("JavaScript computer facade", () => {
 		]);
 	});
 
+	it("forwards a win.menu.select delivery option as a second argument (#9888)", async () => {
+		// Given
+		const kernel = loadJsFacade(windowResponder);
+
+		// When
+		await kernel.run(`
+			const win = await computer.window({ app: "Code" });
+			await win.menu.select(["File", "Save"], { delivery: "foreground" });
+		`);
+
+		// Then
+		expect(kernel.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "window", args: ["w1"] },
+				{ method: "menu.select", args: [["File", "Save"], { delivery: "foreground" }] },
+			],
+		});
+	});
+
 	it("returns the items array from win.menu.items", async () => {
 		// Given
 		const menu = [

@@ -37,7 +37,8 @@ impl Worker {
         params: &MenuSelectParams,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
-        let delivery = DeliveryMode::Background;
+        // An omitted delivery stays background; foreground is admitted only under the control grant (#9888).
+        let delivery = DeliveryMode::parse(params.delivery_mode.as_deref());
         let mutation = Mutation::new(MutatingAction::MenuSelect, params.window_id.clone(), delivery);
         let supervisor = self.safety.supervisor.clone();
         self.mutate(&mutation, cancelled, |worker| {

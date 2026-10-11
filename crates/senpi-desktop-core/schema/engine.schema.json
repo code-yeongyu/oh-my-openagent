@@ -216,7 +216,7 @@
       "hostOnly": false,
       "testOnly": false,
       "params": {
-        "$ref": "#/definitions/MenuPathParams"
+        "$ref": "#/definitions/MenuSelectParams"
       },
       "result": {
         "type": "null"
@@ -1404,6 +1404,32 @@
         "hasSubmenu"
       ],
       "description": "One immediate child of a native application menu. `path` holds the native\nlabels, ellipses included; selection accepts normalized labels.",
+      "additionalProperties": false
+    },
+    "MenuSelectParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "deliveryMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`menus.select`: the window, the 1..=32-label path to a command, and the\ndelivery. An omitted delivery is background; `foreground` raises and keys\nthe target window and needs this session's live control grant (#9888).",
       "additionalProperties": false
     },
     "ClipboardText": {

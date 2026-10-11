@@ -197,6 +197,24 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(select?.params).toEqual({ windowId: "101", path: ["File", "Export…", "PDF"] });
 	});
 
+	it("forwards an explicit menu.select delivery as deliveryMode and omits it otherwise (#9888)", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+		const code = `
+			const editor = await desktop.window({ app: "Code" });
+			await editor.menu.select(["File", "Save"]);
+			await editor.menu.select(["File", "Save"], { delivery: "foreground" });
+		`;
+
+		// When
+		await run(service, code);
+
+		// Then
+		const selects = log.requests.filter((request) => request.method === "menus.select").map((request) => request.params);
+		expect(selects[0]).toEqual({ windowId: "101", path: ["File", "Save"] });
+		expect(selects[1]).toEqual({ windowId: "101", path: ["File", "Save"], deliveryMode: "foreground" });
+	});
+
 	it("allows screenshot in a read-only run", async () => {
 		// Given
 		const { service, log } = await openDesktop();

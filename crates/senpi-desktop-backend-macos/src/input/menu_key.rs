@@ -1,6 +1,7 @@
-//! Making a window key for a menu command: the sole-window rule and the
-//! activation record that background keystrokes use, with menu-specific
-//! refusals (`menus.select` has no delivery option to fall back on).
+//! Making a window key for a menu command. Background: the sole-window rule
+//! and the activation record that background keystrokes use. Foreground (only
+//! under the session's control grant, #9888): the target app is raised and
+//! the window made main and key, so multi-window apps are allowed.
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::types::DesktopWindow;
@@ -38,5 +39,21 @@ impl MacInput {
         })?;
         self.last_activated = Some((pid, wid));
         Ok(())
+    }
+
+    /// Runs `select` with `window` raised and keyed in the foreground, then
+    /// hands the front back the way pointer foreground delivery does. The
+    /// session only reaches this under the control grant (#9888), so a
+    /// multi-window app is fine: the target window is the key one.
+    pub(crate) fn with_menu_window_foreground(
+        &mut self,
+        window: &DesktopWindow,
+        select: impl FnOnce() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        let (pid, _wid) = window_identity(window)?;
+        skylight::with_foreground(pid, || {
+            crate::ax::prepare_foreground_input(window)?;
+            select()
+        })
     }
 }
