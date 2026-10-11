@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync, spawnSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import {
   chmodSync,
   copyFileSync,
@@ -8,6 +8,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs"
@@ -17,6 +18,7 @@ import { delimiter, dirname, extname, isAbsolute, join, resolve } from "node:pat
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
+import { stopSandboxProcesses } from "./task-runtime-fallback-process.ts"
 import { parseJsonEvents } from "./task-e2e-analysis.mjs"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
@@ -239,82 +241,19 @@ function resolveSenpi() {
   return bin
 }
 
-// One process table for both platforms: `ps` on POSIX, the CIM process list on Windows (no `ps`/`pgrep`).
-function processTable() {
-  if (process.platform === "win32") {
-    const json = execFileSync(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command",
-        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress"],
-      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, windowsHide: true },
-    )
-    const rows = JSON.parse(json || "[]")
-    return (Array.isArray(rows) ? rows : [rows]).map((row) => ({
-      pid: Number(row.ProcessId),
-      ppid: Number(row.ParentProcessId),
-      args: String(row.CommandLine ?? ""),
-    }))
-  }
-  const table = execFileSync("ps", ["-axo", "pid=,ppid=,args="], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
-  return table.split("\n").flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line)
-    return match === null ? [] : [{ pid: Number(match[1]), ppid: Number(match[2]), args: match[3] }]
-  })
-}
-
-function sandboxProcesses(sandbox, table = processTable()) {
-  return table.filter((row) => row.args.includes(sandbox.root) && row.pid !== process.pid).map((row) => row.pid)
-}
-
-function descendants(pid, table) {
-  const direct = table.filter((row) => row.ppid === pid).map((row) => row.pid)
-  return direct.flatMap((child) => [child, ...descendants(child, table)])
-}
-
-function alive(pid) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function signal(pids, name) {
-  for (const pid of pids) {
-    try {
-      process.kill(pid, name)
-    } catch {
-      continue
-    }
-  }
-}
-
-// The daemon a host-session run ensured outlives the parent (it idles out after minutes). Its argv
-// names the sandbox plugin, so it and its process tree are stopped before the sandbox is removed;
-// the receipt fails when anything naming the sandbox, or any stopped pid, survives. Process exit of
-// a non-child pid has no event to await, so the grace period is a bounded liveness re-check.
-async function stopSandboxProcesses(sandbox) {
-  const table = processTable()
-  const found = sandboxProcesses(sandbox, table)
-  const owned = [...new Set(found.flatMap((pid) => [pid, ...descendants(pid, table)]))]
-  signal(owned, "SIGTERM")
-  const deadline = Date.now() + 10_000
-  while (owned.some(alive) && Date.now() < deadline) {
-    await new Promise((resolveWait) => setTimeout(resolveWait, 200))
-  }
-  signal(owned.filter(alive), "SIGKILL")
-  return { stopped: owned, survivors: [...sandboxProcesses(sandbox), ...owned.filter(alive)] }
-}
 
 const senpiBin = resolveSenpi()
-// A `.cmd`/`.bat` shim only runs through a shell, which would re-split the prompt argument; bun installs a
-// `.exe` shim, and SENPI_BIN can name the engine itself.
-if (process.platform === "win32" && /\.(cmd|bat)$/i.test(senpiBin)) {
-  throw new Error(`SENPI_BIN resolved to a shell shim (${senpiBin}); point it at senpi.exe or the engine binary`)
+
+function processReceipt(runResult) {
+  return {
+    code: runResult?.status ?? null,
+    signal: runResult?.signal ?? null,
+    error: runResult?.error === undefined ? undefined : String(runResult.error),
+    deadline: runResult?.error?.code === "ETIMEDOUT",
+  }
 }
 
-async function runScenario(scenario, runner, outDir) {
+async function runScenario(scenario, runner, outDir, onProgress) {
   const scenarioOutDir = join(outDir, runner.name, scenario.name)
   mkdirSync(scenarioOutDir, { recursive: true })
   const sandbox = createSandbox()
@@ -326,7 +265,11 @@ async function runScenario(scenario, runner, outDir) {
   let artifacts = { task: undefined, log: "" }
   let settingsBefore
   let settingsAfter
+  let artifactError
+  let scenarioError
+  let cleanupError
   try {
+    onProgress({ stateDir: sandboxStateDir(sandbox) })
     seedSandbox(sandbox)
     if (runner.daemon === true) seedDaemonPlugin(sandbox)
     const omoDir = join(sandbox.cwd, ".omo")
@@ -374,17 +317,41 @@ async function runScenario(scenario, runner, outDir) {
         maxBuffer: 64 * 1024 * 1024,
       },
     )
+    onProgress({ process: processReceipt(runResult) })
     settingsAfter = settingsDigest(sandbox)
     artifacts = { ...readTaskArtifacts(sandboxStateDir(sandbox)), settingsBefore, settingsAfter }
+  } catch (error) {
+    scenarioError = error
   } finally {
-    writeFileSync(join(scenarioOutDir, "stdout.json.log"), runResult?.stdout ?? "")
-    writeFileSync(join(scenarioOutDir, "stderr.log"), runResult?.stderr ?? "")
-    writeFileSync(join(scenarioOutDir, "task.json"), `${JSON.stringify(artifacts.task ?? {}, null, 2)}\n`)
-    writeFileSync(join(scenarioOutDir, "task.jsonl.log"), artifacts.log)
-    processes = await stopSandboxProcesses(sandbox)
-    rmSync(sandbox.root, { recursive: true, force: true })
-    cleanup = existsSync(sandbox.root) || processes.survivors.length > 0 ? "FAIL" : "PASS"
+    try {
+      writeFileSync(join(scenarioOutDir, "stdout.json.log"), runResult?.stdout ?? "")
+      writeFileSync(join(scenarioOutDir, "stderr.log"), runResult?.stderr ?? "")
+      writeFileSync(join(scenarioOutDir, "task.json"), `${JSON.stringify(artifacts.task ?? {}, null, 2)}\n`)
+      writeFileSync(join(scenarioOutDir, "task.jsonl.log"), artifacts.log)
+    } catch (error) {
+      artifactError = error
+      console.error(`Could not save fallback scenario artifacts: ${String(error)}`)
+    } finally {
+      try {
+        // An ENOENT launch with no PID never created a process tree to inspect.
+        // Keep the sweep for every actual or uncertain launch, including deadline failures.
+        if (!(runResult?.error?.code === "ENOENT" && !runResult.pid)) {
+          processes = await stopSandboxProcesses(sandbox)
+        }
+        rmSync(sandbox.root, { recursive: true, force: true })
+        cleanup = existsSync(sandbox.root) || processes.survivors.length > 0 ? "FAIL" : "PASS"
+      } catch (error) { cleanupError = error }
+    }
   }
+  if (scenarioError !== undefined || artifactError !== undefined || cleanupError !== undefined) {
+    throw new Error([
+      scenarioError === undefined ? "" : `Scenario error: ${String(scenarioError)}`,
+      `Scenario process: ${JSON.stringify(processReceipt(runResult))}`,
+      artifactError === undefined ? "" : `Artifact error: ${String(artifactError)}`,
+      cleanupError === undefined ? "" : `Cleanup error: ${String(cleanupError)}`,
+    ].filter(Boolean).join("\n"))
+  }
+
 
   const events = parseJsonEvents(runResult?.stdout ?? "")
   const stdoutText = JSON.stringify(events)
@@ -402,6 +369,7 @@ async function runScenario(scenario, runner, outDir) {
     runner: runner.name,
     scenario: scenario.name,
     checks,
+    process: processReceipt(runResult),
     task_id: artifacts.task?.task_id,
     execution_mode: artifacts.task?.execution_mode,
     runner_kind: artifacts.task?.runner_kind,
@@ -423,12 +391,54 @@ async function run() {
     return entries.filter((entry) => names === undefined || names.includes(entry.name))
   }
   const verdicts = []
+  const progress = { state: "RUNNING", active: null, scenarios: [] }
   for (const runner of pick("TASK_RUNTIME_FALLBACK_RUNNERS", runners, "runner")) {
     for (const scenario of pick("TASK_RUNTIME_FALLBACK_SCENARIOS", scenarios, "scenario")) {
-      verdicts.push(await runScenario(scenario, runner, outDir))
+      progress.scenarios.push({ runner: runner.name, scenario: scenario.name, state: "PENDING" })
+    }
+  }
+  // Persist the active scenario BEFORE setup/spawn. A killed driver may never write its verdict.
+  const saveProgress = () => {
+    const path = join(outDir, "progress.json")
+    writeFileSync(`${path}.tmp`, `${JSON.stringify(progress, null, 2)}\n`)
+    renameSync(`${path}.tmp`, path)
+  }
+  saveProgress()
+// A `.cmd`/`.bat` shim only runs through a shell, which would re-split the prompt argument; bun installs a
+// `.exe` shim, and SENPI_BIN can name the engine itself.
+if (process.platform === "win32" && /\.(cmd|bat)$/i.test(senpiBin)) {
+  throw new Error(`SENPI_BIN resolved to a shell shim (${senpiBin}); point it at senpi.exe or the engine binary`)
+}
+
+  for (const entry of progress.scenarios) {
+    entry.state = "RUNNING"
+    progress.active = { runner: entry.runner, scenario: entry.scenario }
+    saveProgress()
+    try {
+      const verdict = await runScenario(
+        scenarios.find((scenario) => scenario.name === entry.scenario),
+        runners.find((runner) => runner.name === entry.runner),
+        outDir,
+        (update) => { Object.assign(entry, update); saveProgress() },
+      )
+      verdicts.push(verdict)
+      entry.state = verdict.result
+      entry.checks = verdict.checks
+      entry.process = verdict.process
+      progress.active = null
+      saveProgress()
+    } catch (error) {
+      entry.state = "ERROR"
+      entry.error = String(error)
+      progress.state = "ERROR"
+      try { saveProgress() }
+      catch (progressError) { console.error(`Could not save fallback progress: ${String(progressError)}`) }
+      throw error
     }
   }
   const result = verdicts.every((verdict) => verdict.result === "PASS") ? "PASS" : "FAIL"
+  progress.state = result
+  saveProgress()
   const summary = { result, scenarios: verdicts }
   writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(summary, null, 2)}\n`)
   console.log(JSON.stringify(summary))
