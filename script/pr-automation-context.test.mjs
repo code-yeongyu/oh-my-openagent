@@ -8,7 +8,7 @@ function fixture() {
   const pr = {
     number: 42, state: "open", title: "$(exit 1)", body: "fork metadata",
     head: { sha: "abc", repo: { id: 2 } },
-    base: { repo: { full_name: "owner/project" } },
+    base: { repo: { id: 1, full_name: "owner/project" } },
   }
   const run = {
     path: ".github/workflows/pr-automation-signal.yml",
@@ -95,7 +95,7 @@ test("CLA adapter serializes API-derived PR metadata as data", async () => {
     const eventPath = join(dir, "event.json")
     expect(await prepareCLAEvent({ ...f, eventPath })).toBe(f.pr)
     expect(JSON.parse(await readFile(eventPath, "utf8"))).toEqual({
-      action: "synchronize", number: 42, pull_request: f.pr,
+      action: "synchronize", number: 42, pull_request: f.pr, repository: f.pr.base.repo,
     })
     expect(f.outputs.get("pr_number")).toBe(42)
   } finally {

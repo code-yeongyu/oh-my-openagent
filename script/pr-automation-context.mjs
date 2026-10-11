@@ -57,7 +57,10 @@ export async function prepareCLAEvent({ github, context, core, eventPath }) {
   const { writeFile } = await import("node:fs/promises")
   // Contributor Assistant expects a PR event. Only API-derived metadata is
   // serialized; the action never checks out or executes the PR's source.
-  const payload = { action: "synchronize", number: pr.number, pull_request: pr }
+  const payload = {
+    action: "synchronize", number: pr.number, pull_request: pr,
+    repository: pr.base.repo,
+  }
   await writeFile(eventPath, JSON.stringify(payload), { mode: 0o600 })
   core.setOutput("pr_number", pr.number)
   context.payload = payload
