@@ -115,6 +115,14 @@ const AX_NODE: FieldSpec = {
 	childCount: "number",
 };
 
+const MENU_ITEM: FieldSpec = {
+	title: "string",
+	enabled: "boolean",
+	checked: "boolean",
+	hasSubmenu: "boolean",
+	shortcut: "string?",
+};
+
 const CAPTURE: FieldSpec = {
 	mode: "string",
 	data: "string?",
@@ -138,6 +146,19 @@ export const isWindow: Guard<DesktopWindow> = (value): value is DesktopWindow =>
 
 export const isAxNode: Guard<AxNode> = (value): value is AxNode =>
 	matches(value, AX_NODE) && (value.actions === undefined || value.actions === null || isStringArray(value.actions));
+
+/** One immediate child of a native menu; `path` holds the native labels, ellipses included. */
+export interface MenuItem {
+	readonly title: string;
+	readonly path: readonly string[];
+	readonly enabled: boolean;
+	readonly checked: boolean;
+	readonly hasSubmenu: boolean;
+	readonly shortcut?: string | null;
+}
+
+export const isMenuItem: Guard<MenuItem> = (value): value is MenuItem =>
+	matches(value, MENU_ITEM) && isStringArray(value.path);
 
 export const isCaptureResult: Guard<CaptureResult> = (value): value is CaptureResult => matches(value, CAPTURE);
 

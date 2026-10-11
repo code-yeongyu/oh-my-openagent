@@ -105,4 +105,37 @@ describe("Python computer facade", () => {
 			calls: [],
 		});
 	});
+
+	it("sends menu.items and menu.select as window-hopped chains with the path forwarded", () => {
+		// When
+		const run = runPythonFacade(
+			"win = computer.window(app='Code')\nwin.menu.items()\nwin.menu.items(['File'])\nwin.menu.select(['File', 'Export…', 'PDF'])",
+		);
+
+		// Then
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "window", args: [{ app: "Code" }] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [["File"]] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.select", args: [["File", "Export…", "PDF"]] },
+				],
+			},
+		]);
+	});
 });

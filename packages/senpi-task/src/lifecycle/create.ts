@@ -1,5 +1,6 @@
 import { resolveContext } from "./context"
 import { disposeScopedRetries, resumeScopedRetries, stopScopedRetries } from "./deferred-revival"
+import { reconcileDeferredDeadChildren, retryDeferredLegacyOwners } from "./deferred-owner-reconcile"
 import { destroyResidentTask } from "./destroy"
 import { parkHostSessionOnDaemonLoss, retryDeferredHostSessions, type HostSessionParkOptions } from "./host-session-revive"
 import { registerLifecycleDetachedRevival, registerLifecycleDetachedRevivalRollback, type DestroyCause, type LifecycleDeps } from "./port"
@@ -45,8 +46,12 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
     reconcileOnSessionStart: async (parentSessionId?: string) => {
       if (parentSessionId !== undefined) resumeScopedRetries(context, parentSessionId)
       retrySuspendedClosures(context, parentSessionId)
-      const result = await reconcileOnSessionStart(context, parentSessionId)
+      const result = await recovery.reconcile(async () => {
+        const initial = await reconcileOnSessionStart(context, parentSessionId)
+        return { outcomes: await reconcileDeferredDeadChildren(context, initial.outcomes, parentSessionId) }
+      })
       retryDeferredHostSessions(context, result.outcomes, parentSessionId)
+      retryDeferredLegacyOwners(context, result.outcomes, parentSessionId)
       recovery.scan()
       return result
     },

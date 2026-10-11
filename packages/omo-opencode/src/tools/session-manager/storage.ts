@@ -2,11 +2,12 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { log } from "../../shared"
 import { getFileAllSessions, getFileMainSessions, fileSessionExists, getFileSessionInfo, getFileSessionMessages, getFileSessionTodos, getFileSessionTranscript } from "./file-storage"
-import { getSdkAllSessions, getSdkMainSessions, getSdkSessionMessages, getSdkSessionTodos, sdkSessionExists, shouldFallbackFromSdkError } from "./sdk-storage"
+import { getSdkAllSessions, getSdkMainSessions, getSdkSessionMessages, getSdkSessionTodos, sdkSessionExists, shouldFallbackFromSdkError, type GlobalSessionClient } from "./sdk-storage"
 import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"
 
 export interface GetMainSessionsOptions {
   directory?: string
+  limit?: number
 }
 
 // In multi-project server mode (opencode web / opencode serve) ctx.directory is the
@@ -38,22 +39,25 @@ function mergeSessionIds(sdkSessionIds: string[], fileSessionIds: string[]): str
   return [...new Set([...sdkSessionIds, ...fileSessionIds])]
 }
 
-// SDK client reference for beta mode
+// SDK clients for beta mode
 let sdkClient: PluginInput["client"] | null = null
+let globalSessionClient: GlobalSessionClient | null = null
 
-export function setStorageClient(client: PluginInput["client"]): void {
+export function setStorageClient(client: PluginInput["client"], globalClient?: GlobalSessionClient): void {
   sdkClient = client
+  globalSessionClient = globalClient ?? null
 }
 
 export function resetStorageClient(): void {
   sdkClient = null
+  globalSessionClient = null
 }
 
 export async function getMainSessions(options: GetMainSessionsOptions): Promise<SessionMetadata[]> {
   const directory = normalizeProjectFilter(options.directory)
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkSessions = await getSdkMainSessions(sdkClient, directory)
+      const sdkSessions = await getSdkMainSessions(sdkClient, directory, globalSessionClient ?? undefined, options.limit)
       const fileSessions = await getFileMainSessions(directory)
       return mergeSessionMetadataLists(sdkSessions, fileSessions)
     } catch (error) {
@@ -65,10 +69,10 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
   return getFileMainSessions(directory)
 }
 
-export async function getAllSessions(): Promise<string[]> {
+export async function getAllSessions(limit?: number): Promise<string[]> {
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkSessionIds = await getSdkAllSessions(sdkClient)
+      const sdkSessionIds = await getSdkAllSessions(sdkClient, globalSessionClient ?? undefined, limit)
       const fileSessionIds = await getFileAllSessions()
       return mergeSessionIds(sdkSessionIds, fileSessionIds)
     } catch (error) {

@@ -10,7 +10,7 @@ export async function javascriptHelperNames(): Promise<string[]> {
 				.map((name) => prefix + name);
 		const win = await computer.window("w1");
 		const el = await computer.ref("e1");
-		return [...own(computer), ...own(computer.clipboard, "clipboard."), ...own(win), ...own(el)];
+		return [...own(computer), ...own(computer.clipboard, "clipboard."), ...own(win), ...own(win.menu, "menu."), ...own(el)];
 	`);
 	return Array.isArray(names) ? names.map(String) : [];
 }
@@ -22,7 +22,7 @@ def own(target, prefix=''):
     names = [n for n in dir(target) if not n.startswith('_') and callable(getattr(target, n))]
     return [prefix + ('raise' if n == 'raise_' else n) for n in names]
 win = computer.window('w1')
-out = own(computer) + own(computer.clipboard, 'clipboard.') + own(win) + own(win.ref('e1'))
+out = own(computer) + own(computer.clipboard, 'clipboard.') + own(win) + own(win.menu, 'menu.') + own(win.ref('e1'))
 `);
 	return Array.isArray(run.out) ? run.out.map(String) : [];
 }
