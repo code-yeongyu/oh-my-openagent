@@ -132,6 +132,26 @@ pub trait Backend: Send {
     }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
     fn raise_window(&mut self, id: &str) -> CoreResult<()>;
+
+    /// The immediate children of `window`'s menu at `path` (empty = the menu
+    /// bar). Backends without menus yet refuse with `AxUnsupported`.
+    fn menu_items(&mut self, _window: &DesktopWindow, _path: &[String]) -> CoreResult<Vec<crate::menus::MenuItem>> {
+        Err(DesktopError::ax_unsupported())
+    }
+
+    /// Invokes the leaf command `path` names in `window`'s menu. Backends
+    /// call `check_stop` at every menu level they open and immediately before
+    /// the native press, so a stop chord or cancel landing mid-walk dispatches
+    /// nothing. Backends without menus yet refuse with `AxUnsupported`.
+    fn menu_select(
+        &mut self,
+        _window: &DesktopWindow,
+        _path: &[String],
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        Err(DesktopError::ax_unsupported())
+    }
+
     fn ax(&mut self) -> Option<&mut dyn AxBackend>;
 
     /// Releases every button and key this backend may still hold down.
