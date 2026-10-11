@@ -359,7 +359,7 @@ that such a question closed only from a refused answer: `already_answered` after
 
 A binding attaches one session to one external thread, named by `(platform, account, chat,
 thread)`; `--thread` defaults to `@chat` (the chat itself). `--platform` is one of `discord`,
-`telegram`, `slack`, `notion`, `feishu`, `herdr` or `custom` (any other connector). Nothing here talks to a chat platform:
+`telegram`, `slack`, `notion`, `feishu`, `herdr`, `custom` or `whatsapp`. Nothing here talks to a chat platform:
 a connector drives the binding.
 
 - At most one `active` binding holds a thread. Binding a thread that is already held is
