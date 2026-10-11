@@ -353,3 +353,47 @@ describe("runtime fallback error classifier", () => {
     }
   })
 })
+
+describe("OpenCode UnknownError wrapping (fixes #7702)", () => {
+  test("treats UnknownError unexpected server error as retryable", () => {
+    //#given
+    const error = {
+      name: "UnknownError",
+      data: { message: "Unexpected server error" },
+    }
+
+    //#when
+    const retryable = isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("treats UnknownError authentication expired as retryable", () => {
+    //#given
+    const error = {
+      name: "UnknownError",
+      message: "authentication expired",
+    }
+
+    //#when
+    const retryable = isRuntimeFallbackRetryableError(error, [401, 429])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("does not treat UnknownError programming failures as retryable", () => {
+    //#given
+    const error = {
+      name: "UnknownError",
+      message: "Cannot read properties of undefined",
+    }
+
+    //#when
+    const retryable = isRuntimeFallbackRetryableError(error, [401, 429, 500])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+})
