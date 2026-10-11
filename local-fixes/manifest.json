@@ -368,6 +368,20 @@
         "21-agent-registration-flat"
       ],
       "orderNote": "Must come after 21: it edits writeAgentMarkdown from 21 and relies on the stamp 21 introduced. Two of the three markers live in packages/claude-code-compat-core/src, which is why apply.mjs and verify.mjs search that package as well. An agent file WITHOUT the stamp is user-authored: the writer never overwrites it and the loader still loads it as a custom agent. To hand a file back to the plugin, put '# generated-by: oh-my-openagent' as the first frontmatter line. pr is null: the writer and the stamp exist only on the v2 integration line."
+    },
+    {
+      "id": "25-v2-todo-tool-schema",
+      "title": "Make v2 todo tools discoverable with complete item schemas and replacement semantics",
+      "commit": "5127c1129344d95c5c9bb417575eebad8db352c6",
+      "patch": "patches/25-v2-todo-tool-schema.patch",
+      "pr": null,
+      "why": "The v2 stand-in advertised only an untyped todos array and a five-word description, so Code Mode discovery did not teach agents the required content/status/priority shape or whole-list replacement. Subagent sessions therefore had no usable tool guidance. Advertise required item fields and status/priority enums, describe per-session replacement and single in-progress discipline, and give todoread a zero-argument schema. This improves discovery; a standing instruction is still needed to require usage.",
+      "markers": [
+        "Each call replaces the entire list",
+        "Read this session's current todo list; takes no arguments"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-24; touches only packages/omo-opencode/src/v2/project-config.ts and adds project-config.todo.test.ts. Runtime description literals survive bundling. Tests cover exact schemas, per-session persistence, whole-list replacement/clear, and preserving host-provided tools. Use the staging lane introduced in b7151fa79: fixes:apply stages beside the checkout and fixes:verify accepts that bundle path. Do not write live dist/index.js under active OpenChamber; activation is owner-initiated offline. pr is null because src/v2 is not in upstream dev."
     }
   ],
   "externalFixes": [
