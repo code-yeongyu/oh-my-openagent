@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   ci-mode:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -96,7 +96,7 @@ jobs:
 
   # Block PRs targeting master branch (comment + auto-close, then fail the check)
   block-master-pr:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: github.event_name == 'pull_request'
     permissions:
       pull-requests: write
@@ -158,7 +158,8 @@ jobs:
 
   test:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
@@ -318,7 +319,7 @@ jobs:
 
   typecheck:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -360,7 +361,8 @@ jobs:
 
   codex-compatibility:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
       # merge_group retains all three required compatibility contexts.
@@ -477,7 +479,8 @@ jobs:
 
   senpi-compatibility:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
       # merge_group retains this matrix, including the required ubuntu context.
@@ -603,7 +606,7 @@ jobs:
 
   lazycodex-published-smoke:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/setup-node@v7
@@ -692,7 +695,7 @@ jobs:
 
   build:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -757,7 +760,7 @@ jobs:
 
   omo-ai-payload-check:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -921,7 +924,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   auto-commit-schema:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
@@ -971,7 +974,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   draft-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&
