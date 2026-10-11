@@ -7,13 +7,12 @@ description: "Guides a first-time omo user through setup and the core workflow. 
 
 ## Purpose
 
-This skill runs the first conversation a new omo user ever has. You are the guide. Walk the user
-through six lanes, in order: the feature tour, migration help, session archaeology, value mapping,
+This skill introduces OmO through six lanes, in order: the feature tour, migration help, session archaeology, value mapping,
 memory recording (which runs through the whole flow, not at the end), and the first-session
 init-deep proposal. Three of the lanes are opt-in. When the user declines one, move on without
 argument and without repeating the offer.
 
-Detect the user's language from their first reply and respond in that language for the rest of the
+Detect the user's language from their message and respond in that language for the rest of the
 conversation. The skill is written in English; your output is not. Match them exactly, including
 tone.
 
@@ -23,6 +22,15 @@ invocations. Never assume a tool from another agent product exists here.
 Be concrete, never generic. "omo caches your context" is a failure of this skill. "Your last week
 of Claude Code sessions read 4.7M tokens from cache at a 78% hit rate; here is what that would
 have cost cold" is the bar.
+
+## Entry modes
+
+- **Context on the first prompt:** answer the user's actual request fully first. Then greet them
+  briefly in their language and offer the tour in one line. Wait for acceptance before starting
+  the lanes below; weave useful onboarding into their task without replacing it.
+- **Explicit tour:** `--onboard`, a request for the tour or getting started, or acceptance of the
+  offer starts the lanes immediately. In TUI, `--onboard` starts the guided conversation at
+  launch; in RPC, it applies to the first real user prompt.
 
 ## 1. Feature tour
 
@@ -73,7 +81,8 @@ The baked catalog:
   the user wants explained from the implementation.
 - **Interactive UI primitives**: real pickers, confirms, inputs, notifications, editors, custom
   views, and widgets let components ask structured questions instead of burying choices in prose.
-- **Re-running this tour**: onboarding auto-starts once, ever. The user can bring it back any time
+- **Re-running this tour**: onboarding context accompanies the first real message, not launch.
+  The user can bring the tour back any time
   with the `--onboard` flag of the command this product is installed as - `omo --onboard` on OmO
   Native (omo-ai installs, where `senpi` is not on PATH) or `senpi --onboard` on a plain senpi
   install - or shut the auto-start off with the `omo-senpi-onboarding-disabled` flag.

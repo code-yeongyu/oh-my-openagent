@@ -21,7 +21,10 @@ import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { omoSenpiComponents } from "./index"
 import type { ComponentContext } from "./types"
 
-afterEach(() => resetTestHome())
+afterEach(() => {
+  Reflect.deleteProperty(globalThis, Symbol.for("omo.onboard"))
+  resetTestHome()
+})
 
 describe("session_start component ordering", () => {
   test("#given the production component list #when startup handlers are ordered #then onboarding immediately precedes the advisor after native badge", () => {
@@ -39,11 +42,12 @@ describe("session_start component ordering", () => {
     expect(onboardingIndex).toBeLessThan(advisorIndex)
   })
 
-  test("#given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed", async () => {
+  test("#given forced TUI onboarding and an active ulw loop #when startup then agent_end fire #then the tour is preserved and the first-session advisor stays suppressed", async () => {
     // given
     setTestHome("missing")
     const root = makeCoverageRepo()
-    const pi = new FakeExtensionAPI()
+    const pi = Object.assign(new FakeExtensionAPI(), { sessionKind: "interactive" as const })
+    pi.setFlag("onboard", true)
     const logger = createLogger()
     const scheduledFlushes: Array<() => void> = []
     const idleCoordinator = new IdleInjectionCoordinator(() => undefined, {
@@ -55,7 +59,7 @@ describe("session_start component ordering", () => {
     const select = mockFn(async () => undefined)
     // The ulw-loop probe is session-scoped and fails closed without a session id, so the context carries
     // the host session identity the real Senpi host exposes.
-    const eventCtx = sessionEventCtx(root, { hasUI: true, ui: { select } })
+    const eventCtx = sessionEventCtx(root, { hasUI: true, mode: "tui", ui: { select, setWidget() {} } })
     const componentContext: ComponentContext = {
       logger,
       config: { getFlag: (name) => pi.getFlag(name) },
@@ -81,7 +85,6 @@ describe("session_start component ordering", () => {
     expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         customType: "omo-onboarding:bootstrap",
-        content: expect.stringMatching(/^Read the onboarding skill at/),
       }),
       expect.objectContaining({ triggerTurn: true, deliverAs: "followUp" }),
     )
