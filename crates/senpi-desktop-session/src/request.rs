@@ -2,10 +2,11 @@
 
 use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams,
-    AxSnapshotParams, CaptureParams, ClipboardText, DragParams, KeyChordParams, MenuPathParams, PointParams,
+    AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
+    CaptureParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, PointParams,
     RaiseWindowParams, ScrollParams, TypeTextParams,
 };
+use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_core::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow,
 };
@@ -39,6 +40,9 @@ pub enum Op {
     AxClick(AxClickParams),
     ClipboardRead,
     ClipboardWrite(ClipboardText),
+    ControlGrant(ControlGrantParams),
+    ControlRevoke,
+    ControlState,
     MenuItems(MenuPathParams),
     MenusSelect(MenuPathParams),
 }
@@ -59,5 +63,6 @@ pub enum Response {
     Nodes(Vec<AxNode>),
     Attributes(Vec<(String, String)>),
     Clipboard(ClipboardText),
+    ControlState(ControlStateResult),
     MenuItems(Vec<MenuItem>),
 }

@@ -76,7 +76,7 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `computer_use_permission_denied` | `scope` | `string` | `os`, `tier` |
 | `computer_use_engine_error` | `$session_id` | `string` | - |
 | `computer_use_engine_error` | `backend` | `string` | `quartz`, `x11`, `wayland`, `win32`, `fake`, `unavailable`, `other` |
-| `computer_use_engine_error` | `code` | `string` | `PermissionDenied`, `CaptureFailed`, `InputFailed`, `BackgroundUnavailable`, `WindowNotFound`, `InvalidTarget`, `InvalidKey`, `InvalidCoordinateFrame`, `StaleRef`, `AxUnsupported`, `AxFailed`, `Timeout`, `Closed`, `Internal`, `StopPathUnavailable`, `Suspended`, `ScreenLocked`, `Cancelled`, `CursorRestoreFailed`, `FocusRestoreFailed`, `TransactionFailed`, `native-unavailable`, `quarantined`, `abi-mismatch`, `other` |
+| `computer_use_engine_error` | `code` | `string` | `PermissionDenied`, `CaptureFailed`, `InputFailed`, `BackgroundUnavailable`, `WindowNotFound`, `InvalidTarget`, `InvalidKey`, `InvalidCoordinateFrame`, `StaleRef`, `AxUnsupported`, `AxFailed`, `Timeout`, `Closed`, `Internal`, `StopPathUnavailable`, `Suspended`, `ScreenLocked`, `Cancelled`, `CursorRestoreFailed`, `FocusRestoreFailed`, `TransactionFailed`, `InputBusy`, `ControlRequired`, `native-unavailable`, `quarantined`, `abi-mismatch`, `other` |
 | `computer_use_engine_error` | `host_platform` | `string` | `darwin`, `linux`, `win32`, `other` |
 | `kibitzer_summary` | `$session_id` | `string` | - |
 | `kibitzer_summary` | `buffered_cooldown` | `number` | - |
