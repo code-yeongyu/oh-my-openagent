@@ -8,12 +8,14 @@ import { parkedReason, reachRecordedHost } from "./host-endpoint-reach"
 import { hostSessionResumePath, isHostSessionRecord } from "./host-session"
 import { clearSuspensionReason, markSuspensionReason } from "./host-session-record"
 import { detachTerminalResident } from "./reconcile-terminal"
-import { getLifecycleReattachPorts, type RespawnFailureCode, type RespawnPort, type RespawnResult } from "./port"
+import { getLifecycleReattachPorts, type RespawnPort, type RespawnResult } from "./port"
 import { markCrashedResident } from "./reconcile-crashed-resident"
+import { settleProvisionalExitLoss } from "./provisional-exit"
 import { finishPendingCancel } from "./pending-cancel"
 import { reclaimOrphanedResident } from "./residency"
+import { deferredCode, isSuspendingCode } from "./respawn-failure-code"
 import { deferred, disposeClaimed, markLost, rollbackOrDeferred, terminateOldRpc, type SuspendedResidency } from "./revive-rollback"
-import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
+import type { ReconcileOutcome } from "./types"
 
 export { deferred } from "./revive-rollback"
 export type { SuspendedResidency } from "./revive-rollback"
@@ -104,6 +106,9 @@ export async function reviveClaimed(
   sessionPath: string | undefined,
   options: ReviveClaimedOptions = {},
 ): Promise<ReconcileOutcome> {
+  if (claimed.provisional_exit !== undefined && !TERMINAL_STATUSES.has(claimed.status)) {
+    return settleProvisionalExitLoss(context, claimed)
+  }
   if (claimed.isolation !== undefined) {
     if (context.deferUnresumable)
       return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "isolated_not_revivable", claimed)
@@ -285,14 +290,6 @@ export function isClaimHeld(
 
 function isSpawnSpecV1Record(record: TaskRecord): boolean {
   return record.spawn_spec !== undefined && isSpawnSpecV1(record.spawn_spec)
-}
-
-function isSuspendingCode(code: RespawnFailureCode): code is "host_draining" | "host_incompatible" | "store_index_unavailable" {
-  return code === "host_draining" || code === "host_incompatible" || code === "store_index_unavailable"
-}
-
-function deferredCode(code: RespawnFailureCode): ReconcileDeferredReason {
-  return code === "respawn_failed" ? "session_unavailable" : code
 }
 
 export function beginLocalReclamation(context: LifecycleContext, taskId: string): (() => void) | undefined {
