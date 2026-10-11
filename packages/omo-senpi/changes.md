@@ -1,3 +1,7 @@
+## 2026-10-11 - The engine probe names both waits and loses a dead phase (#9742 follow-up)
+
+The computer-use engine probe's timeout phase names where the handshake stopped. Its `spawned, requests not yet sent` phase could never be reported: the timer is armed inside the Promise executor and both `stdin.write` calls ran synchronously later in that same executor, so by the time any timer callback could fire the requests were always already sent; a write that threw would reject the promise outright and still never surface the phase. The branch and the `requestsSent` flag are gone. The neither-reply label now reads `requests sent, awaiting engine.hello and capabilities`, which is what the probe actually waits for. The phase tests assert the exact timeout message instead of a substring, a new in-process test covers the reachable-but-untested out-of-order engine that answers `capabilities` before `engine.hello`, and the `omo-computer-use` bundle is regenerated.
+
 ## 2026-10-10 - Bindings take whatsapp as a native platform name
 
 The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.

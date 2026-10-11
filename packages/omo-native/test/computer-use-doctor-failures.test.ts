@@ -102,8 +102,9 @@ createInterface({ input: process.stdin }).on("line", () => {});
     expect(report.kind).toBe("failed")
     if (report.kind !== "failed") throw new Error(`expected failed report, got ${report.kind}`)
     expect(report.code).toBe("timeout")
-    expect(report.message).toContain("timed out after 25 ms")
-    expect(report.message).toMatch(/\(phase: [^)]+\)$/)
+    expect(report.message).toBe(
+      `desktop engine probe timed out after 25 ms at ${enginePath} (phase: requests sent, awaiting engine.hello and capabilities)`,
+    )
   })
 
   test("#given an unsupported platform #when inspected #then no engine process is needed", async () => {
