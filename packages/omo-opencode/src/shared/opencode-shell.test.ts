@@ -95,8 +95,14 @@ describe("resolveOpenCodeShell on Windows", () => {
   })
 
   test("#given a configured shell that does not resolve #when resolving #then the Windows default order applies, not SHELL", () => {
-    const host = windowsHost({ ...withPwsh7, env: { SHELL: "/usr/bin/bash" } })
+    const host = windowsHost({
+      ...withPwsh7,
+      pathDirs: [...withPwsh7.pathDirs, GIT_CMD],
+      files: [...withPwsh7.files, path.win32.join(GIT_CMD, "git.exe"), GIT_BASH],
+      env: { SHELL: "/usr/bin/bash" },
+    })
 
+    expect(resolveOpenCodeShell(undefined, host)).toBe(GIT_BASH)
     expect(resolveOpenCodeShell("C:\\missing\\zsh.exe", host)).toBe(path.win32.join(PWSH_7, "pwsh.exe"))
   })
 
@@ -105,6 +111,45 @@ describe("resolveOpenCodeShell on Windows", () => {
     const host = windowsHost({ ...windowsPowerShell51, files: [...windowsPowerShell51.files, custom], env: { OPENCODE_GIT_BASH_PATH: custom } })
 
     expect(resolveOpenCodeShell("bash", host)).toBe(custom)
+  })
+})
+
+describe("unusable shell files", () => {
+  for (const code of ["ENOTDIR", "EACCES", "EPERM"]) {
+    test(`${code} in Windows PATH is skipped for a usable shell`, () => {
+      const bad = "C:\\blocked"
+      const host = windowsHost({ ...withPwsh7, pathDirs: [bad, ...withPwsh7.pathDirs] })
+      const probe = host.isFile
+      const throwingHost = {
+        ...host,
+        isFile(file: string) {
+          if (file.startsWith(`${bad}\\`)) throw Object.assign(new Error(code), { code })
+          return probe(file)
+        },
+      }
+
+      expect(resolveOpenCodeShell(undefined, throwingHost)).toBe(path.win32.join(PWSH_7, "pwsh.exe"))
+    })
+  }
+
+  test("an inaccessible rooted shell falls back to the platform default", () => {
+    const host = posixHost("darwin", {}, [])
+    expect(resolveOpenCodeShell("/blocked/bash", {
+      ...host,
+      isFile() { throw Object.assign(new Error("EACCES"), { code: "EACCES" }) },
+    })).toBe("/bin/zsh")
+  })
+
+  test("an inaccessible derived Git Bash file falls back to cmd", () => {
+    const host = windowsHost({ pathDirs: [GIT_CMD], files: [path.win32.join(GIT_CMD, "git.exe")] })
+    const probe = host.isFile
+    expect(resolveOpenCodeShell(undefined, {
+      ...host,
+      isFile(file) {
+        if (file === GIT_BASH) throw Object.assign(new Error("EPERM"), { code: "EPERM" })
+        return probe(file)
+      },
+    })).toBe(`${SYSTEM32}\\cmd.exe`)
   })
 })
 

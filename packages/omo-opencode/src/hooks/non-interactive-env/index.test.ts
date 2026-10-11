@@ -3,6 +3,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { openCodeShellTypeResolver } from "../../shared/opencode-shell"
+import { resolveSkillContent } from "../../features/opencode-skill-loader/skill-content"
 import type { ShellType } from "../../shared/shell-env"
 import { createNonInteractiveEnvHook, NON_INTERACTIVE_ENV } from "./index"
 
@@ -194,6 +195,27 @@ describe("non-interactive-env hook", () => {
   })
 
   describe("prefix syntax follows the shell OpenCode runs", () => {
+    test("#given a file-as-directory PATH entry #when the default hook and git-master resolve bash #then neither throws", async () => {
+      const root = mkdtempSync(join(tmpdir(), "omo-opencode-bad-path-"))
+      const bad = join(root, "not-a-directory")
+      writeFileSync(bad, "")
+      const previousPath = process.env.PATH
+      process.env.PATH = `${bad}${process.platform === "win32" ? ";" : ":"}${previousPath ?? ""}`
+      openCodeShellTypeResolver.setConfiguredShell("bash")
+      try {
+        const command = await prefixedGitCommand(createNonInteractiveEnvHook(mockCtx))
+        expect(command).toEndWith("git status")
+        expect(command).toContain("GIT_TERMINAL_PROMPT")
+        openCodeShellTypeResolver.setConfiguredShell(undefined)
+        openCodeShellTypeResolver.setConfiguredShell("bash")
+        expect(resolveSkillContent("git-master")).not.toBeNull()
+      } finally {
+        process.env.PATH = previousPath
+        openCodeShellTypeResolver.setConfiguredShell(undefined)
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
     test("#given OpenCode runs a unix shell #when a git command executes #then the prefix uses export syntax", async () => {
       const cmd = await prefixedGitCommand(createNonInteractiveEnvHook(mockCtx, shellDeps("unix")))
 

@@ -31,6 +31,14 @@ function defaultHost(): OpenCodeShellHost {
   }
 }
 
+function isFile(host: OpenCodeShellHost, file: string): boolean {
+  try {
+    return host.isFile(file)
+  } catch {
+    return false
+  }
+}
+
 function envValue(host: OpenCodeShellHost, key: string): string | undefined {
   if (host.platform !== "win32") return host.env[key]
   const name = Object.keys(host.env).find((item) => item.toLowerCase() === key.toLowerCase())
@@ -55,7 +63,7 @@ function which(host: OpenCodeShellHost, command: string): string | undefined {
   const win = host.platform === "win32"
   const pathApi = win ? path.win32 : path.posix
   if (command.includes("/") || (win && command.includes("\\"))) {
-    return host.isFile(command) ? command : undefined
+    return isFile(host, command) ? command : undefined
   }
   const extensions = win ? (envValue(host, "PATHEXT") ?? DEFAULT_WINDOWS_PATHEXT).split(";").filter(Boolean) : []
   const names = win ? [command, ...extensions.map((extension) => `${command}${extension.toLowerCase()}`)] : [command]
@@ -63,7 +71,7 @@ function which(host: OpenCodeShellHost, command: string): string | undefined {
     if (!directory) continue
     for (const name of names) {
       const candidate = pathApi.join(directory, name)
-      if (host.isFile(candidate)) return candidate
+      if (isFile(host, candidate)) return candidate
     }
   }
   return undefined
@@ -76,7 +84,7 @@ function gitBash(host: OpenCodeShellHost): string | undefined {
   const git = which(host, "git")
   if (!git) return undefined
   const file = path.win32.join(git, "..", "..", "bin", "bash.exe")
-  return host.isFile(file) ? file : undefined
+  return isFile(host, file) ? file : undefined
 }
 
 function full(host: OpenCodeShellHost, file: string): string {
@@ -93,7 +101,7 @@ function full(host: OpenCodeShellHost, file: string): string {
 function resolveShell(host: OpenCodeShellHost, file: string): string | undefined {
   const shell = full(host, file)
   const rooted = host.platform === "win32" ? path.win32.isAbsolute(windowsPath(host, shell)) : path.posix.isAbsolute(shell)
-  if (rooted) return host.isFile(shell) ? shell : undefined
+  if (rooted) return isFile(host, shell) ? shell : undefined
   return which(host, shell)
 }
 
