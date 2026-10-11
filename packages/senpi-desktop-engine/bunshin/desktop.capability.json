@@ -684,12 +684,18 @@
 						"type": "string"
 					},
 					"default": []
+				},
+				"deliveryMode": {
+					"type": [
+						"string",
+						"null"
+					]
 				}
 			},
 			"required": [
 				"windowId"
 			],
-			"description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
+			"description": "`menus.select`: the window, the 1..=32-label path to a command, and the\ndelivery. An omitted delivery is background; `foreground` raises and keys\nthe target window and needs this session's live control grant (#9888).",
 			"additionalProperties": false
 		},
 		"desktop.clipboard.read": {
