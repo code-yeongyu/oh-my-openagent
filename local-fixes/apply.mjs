@@ -2,7 +2,13 @@
 /**
  * Applies every local OMO fix we own, rebuilds dist, and verifies the result.
  *
- *   bun run fixes:apply
+ *   bun run fixes:apply            apply the fixes, then STAGE the bundle beside the checkout
+ *   bun run fixes:apply --live     apply the fixes, then rebuild dist/ in place (offline only)
+ *
+ * OpenCode v2 watches dist/index.js. Rebuilding it under a running backend unloads every
+ * plugin ordered after this one and fails Claude sessions that are mid-loop, so the default
+ * never touches the live bundle: it stages one (stage-bundle.mjs) for activate-staged.ps1 to
+ * swap in during the owner's restart. --live refuses to run while OpenChamber/opencode is up.
  *
  * Run this after every OMO update (pull / new release) before using the bundle.
  * Safe to run repeatedly: fixes already in history are skipped.
@@ -160,6 +166,33 @@ for (const fix of manifest.fixes) {
 
 // ── 3. Rebuild ───────────────────────────────────────────────────────────────
 console.log(results.map(([id, state]) => `${id.padEnd(34)} ${state}`).join("\n"))
+
+if (!process.argv.includes("--live")) {
+  console.log("\nApplying complete; staging the bundle beside the checkout (live dist/ is not touched)…\n")
+  try {
+    execFileSync("bun", [join(here, "stage-bundle.mjs")], { cwd: repo, stdio: "inherit" })
+  } catch {
+    fail("FAIL: staging failed. Nothing was activated; the live bundle is unchanged.", 3)
+  }
+  process.exit(0)
+}
+
+let harnessRunning = ""
+try {
+  harnessRunning = execFileSync("tasklist", ["/FO", "CSV", "/NH"], quiet)
+    .split("\n")
+    .filter((line) => /^"(OpenChamber|opencode)\.exe"/i.test(line))
+    .map((line) => line.split(",")[0])
+    .join(", ")
+} catch {}
+if (harnessRunning && !process.argv.includes("--force")) {
+  fail(
+    "FAIL: --live rebuilds dist/index.js in place, and OpenChamber/opencode is running (" + harnessRunning + ").\n" +
+      "      That unloads every plugin ordered after OMO and fails running Claude sessions.\n" +
+      "      Quit OpenChamber fully, or drop --live to stage the bundle instead.",
+    6,
+  )
+}
 console.log("\nApplying complete; building…\n")
 
 try {

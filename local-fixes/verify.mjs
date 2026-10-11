@@ -2,7 +2,8 @@
 /**
  * Verify that the LOADED bundle actually contains every ledgered local fix.
  *
- *   bun run fixes:verify
+ *   bun run fixes:verify                  check the live bundle (dist/index.js)
+ *   bun run fixes:verify <path/to/index.js>   check another bundle, e.g. the staged one
  *
  * Why this exists
  * ---------------
@@ -60,9 +61,11 @@ if (!expected) {
 }
 
 // ── 2. Does the loaded bundle contain every fix? ─────────────────────────────
-const bundlePath = join(repo, manifest.build.artifact)
+const bundleOverride = process.argv.slice(2).find((arg) => !arg.startsWith("--"))
+const bundlePath = bundleOverride ?? join(repo, manifest.build.artifact)
+if (bundleOverride) console.log(`  note  checking ${bundleOverride} instead of the live bundle`)
 if (!existsSync(bundlePath)) {
-  bad(`${manifest.build.artifact} does not exist. Fix: bun run fixes:apply`)
+  bad(`${bundleOverride ?? manifest.build.artifact} does not exist. Fix: bun run fixes:apply`)
 } else {
   const bundle = readFileSync(bundlePath, "utf8")
   const mtime = statSync(bundlePath).mtime.toISOString().replace("T", " ").slice(0, 19)
