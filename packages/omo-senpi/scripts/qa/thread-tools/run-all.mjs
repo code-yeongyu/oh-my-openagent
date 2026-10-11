@@ -71,6 +71,8 @@ if (!SUITES.includes(suite)) {
 }
 const outDir = option("--out-dir")
 if (outDir !== undefined) mkdirSync(outDir, { recursive: true })
+const defaultReportDir = outDir ?? mkdtempSync(join(tmpdir(), "thread-qa-reports-"))
+if (outDir === undefined) process.once("exit", () => rmSync(defaultReportDir, { recursive: true, force: true }))
 
 /**
  * What a legacy scenario needs on disk before it can run at all. A checkout that exists but was
@@ -101,7 +103,7 @@ function legacyMissing() {
 }
 
 const results = []
-function runOne(name, file, extraArgs = [], reportDir = outDir) {
+function runOne(name, file, extraArgs = [], reportDir = defaultReportDir) {
   process.stdout.write(`\n===== ${name} =====\n`)
   const args = [process.execPath, join(here, file), ...extraArgs]
   const outFile = reportDir === undefined ? undefined : join(reportDir, `${name}.txt`)

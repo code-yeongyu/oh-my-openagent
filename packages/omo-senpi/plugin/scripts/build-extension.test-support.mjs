@@ -28,15 +28,17 @@ export function outputPathsIn(root) {
  * which keeps them isolated for a fraction of the cost. `cleanupTest` / `cleanupFile` belong in
  * the file's `afterEach` / `afterAll`.
  */
-export function createBuildFixture() {
+export function createBuildFixture(build = buildExtension) {
   const perTestRoots = []
   let sharedBuildPromise = null
+  let sharedRoot
   async function sharedOutputs() {
     sharedBuildPromise ??= (async () => {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-shared-"))
+      sharedRoot = root
       const paths = outputPathsIn(root)
-      const build = await buildExtension(paths)
-      return { root, ...paths, ...build }
+      const outputs = await build(paths)
+      return { root, ...paths, ...outputs }
     })()
     return sharedBuildPromise
   }
@@ -56,8 +58,11 @@ export function createBuildFixture() {
     },
     cleanupFile: async () => {
       if (sharedBuildPromise === null) return
-      const shared = await sharedBuildPromise
-      await rm(shared.root, { recursive: true, force: true })
+      try {
+        await sharedBuildPromise
+      } finally {
+        if (sharedRoot !== undefined) await rm(sharedRoot, { recursive: true, force: true })
+      }
     },
   }
 }
