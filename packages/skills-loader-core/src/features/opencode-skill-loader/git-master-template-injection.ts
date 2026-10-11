@@ -49,11 +49,14 @@ export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellTy
  * operator's own author/committer and never a GitHub-resolvable automation identity. The
  * body footer is opt-in (default off) and `include_co_authored_by` is a deprecated no-op.
  */
-export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
+export function injectGitMasterConfig(
+	template: string,
+	config?: GitMasterConfig,
+	shellType: ShellType = detectShellType(),
+): string {
 	const commitFooter = config?.commit_footer ?? false
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
-	const shellType = detectShellType()
 	const shellPrefix = gitEnvPrefix ? buildShellAwareGitPrefix(gitEnvPrefix, shellType) : ""
 	const codeBlockLang = shellType === "powershell" ? "pwsh" : shellType === "csh" ? "csh" : "bash"
 	const skipBashBlockPrefixing = shellType === "powershell" || shellType === "cmd" || shellType === "csh"
