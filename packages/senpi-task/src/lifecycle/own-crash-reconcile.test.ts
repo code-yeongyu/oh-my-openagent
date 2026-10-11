@@ -14,7 +14,7 @@ test("a genuine child exit before parent death stays error after reconciliation"
     const failed = await settled
     expect(failed.status).toBe("error")
     // When the parent subsequently dies and a new session reconciles the persisted child.
-    f.manager.forget(f.taskId)
+    f.manager.forget(f.taskId, { path: "park" })
     await f.lifecycle.reconcileOnSessionStart("new-parent")
     const reconciled = f.store.load(f.taskId)
     // Then the failure and its identity survive; no loss event is fabricated.

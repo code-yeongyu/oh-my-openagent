@@ -49,7 +49,7 @@ test.each(["resident", "rpc_detached"])("same-session deferred retry loses a pro
     if (residency === "rpc_detached") {
       f.store.transition(f.taskId, { type: "detach_rpc", timestamp: new Date(f.clock.now()).toISOString() })
     }
-    f.manager.forget(f.taskId)
+    f.manager.forget(f.taskId, { path: "park" })
     alive.delete(ownerPid)
     retry.resolve()
     await settled.promise

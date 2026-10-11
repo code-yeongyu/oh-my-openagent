@@ -87,7 +87,7 @@ export async function suspendOnSessionShutdown(
 // suspended record), then live resources are torn down and the record is parked at its suspended
 // residency. The pre-dispose steps are best-effort so dispose ALWAYS runs.
 export async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
-  context.registry.forget(handle.task_id)
+  context.registry.forget(handle.task_id, { path: "park" })
   const target = { taskId: handle.task_id, pid: handle.pid }
   await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
   if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()))

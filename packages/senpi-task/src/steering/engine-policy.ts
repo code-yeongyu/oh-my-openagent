@@ -27,11 +27,8 @@ export function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome |
 }
 
 const DEFERRAL_OUTLOOK_TEXT: Readonly<Record<DeferralOutlook, string>> = {
-  waits_for_capacity: "it is retried while a running child finishes or is reclaimed, and otherwise at the session's next start.",
-  may_stay_with_live_owner: "another live session holds it; it is revived here only if that session lets it go.",
-  retried_then_lost: "it is retried a few times, then marked lost if it still cannot be revived.",
-  retried_not_lost: "it is retried a few times and otherwise waits for its host; it is never marked lost for this.",
-  not_retried: "it is not retried; it stays suspended until its session starts again.",
+  recovering: "automatic recovery is in progress; it will resume or end within the recovery budget.",
+  ending: "it cannot be resumed and is being ended automatically.",
 }
 
 /** The sentence a deferral outlook is shown as; tests compare against it rather than restating the prose. */
@@ -45,9 +42,9 @@ export function notContinuableReason(record: TaskRecord): string {
   if (record.residency_state === "persisted_only" || record.residency_state === "rpc_detached") {
     if (record.suspension_reason === "revival_deferred") {
       const reason = record.revival_deferred_reason ?? "unknown"
-      return `Task ${record.task_id} is suspended: its session was resumed, but reviving it was deferred (${reason}); ${DEFERRAL_OUTLOOK_TEXT[deferralOutlookFor(reason, isHostSessionRecord(record))]} task_output shows its state and task_cancel ends it.`
+      return `Task ${record.task_id} is recovering (${reason}); ${DEFERRAL_OUTLOOK_TEXT[deferralOutlookFor(reason, isHostSessionRecord(record))]}`
     }
-    return `Task ${record.task_id} is suspended - resumes when its session is resumed.`
+    return `Task ${record.task_id} is recovering automatically.`
   }
   if (record.residency_state === "disposed") return `Task ${record.task_id} was disposed and can no longer be continued.`
   if (record.residency_state === "evicted") return `Task ${record.task_id} was evicted from residency and can no longer be continued.`

@@ -52,7 +52,7 @@ function makeZeroCapManager(): TaskManager {
       const handle = toResidentHandle(manager().getResidentHandle(taskId))
       return handle === undefined ? [] : [handle]
     }),
-    forget: (taskId) => manager().forget(taskId),
+    forget: (taskId, options) => manager().forget(taskId, options),
     hasPendingSends: () => false,
   }
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })

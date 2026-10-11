@@ -59,7 +59,7 @@ export async function parkHostSessionOnDaemonLoss(
 ): Promise<HostSessionParkOutcome> {
   const parked = context.store.load(taskId)
   if (!isHostSessionRecord(parked)) return { kind: "suspended", reason: "daemon_unavailable" }
-  context.registry.forget(taskId)
+  context.registry.forget(taskId, { path: "park" })
   parkHostSessionRecord(context, taskId)
   context.store.appendEvent(taskId, { type: "suspended", payload: { reason: "daemon_unavailable" } })
 

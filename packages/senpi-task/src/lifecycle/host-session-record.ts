@@ -25,8 +25,8 @@ export function markSuspensionReason(context: LifecycleContext, taskId: string, 
 /** A revival that landed clears the marker: the child is reachable again. */
 export function clearSuspensionReason(context: LifecycleContext, taskId: string): void {
   context.store.mutate(taskId, (fresh) => {
-    if (fresh.suspension_reason === undefined && fresh.revival_deferred_reason === undefined) return fresh
-    const { suspension_reason: _reason, revival_deferred_reason: _deferred, ...rest } = fresh
+    if (fresh.suspension_reason === undefined && fresh.revival_deferred_reason === undefined && fresh.recovery_deadline_at === undefined) return fresh
+    const { suspension_reason: _reason, revival_deferred_reason: _deferred, recovery_deadline_at: _deadline, ...rest } = fresh
     return rest
   })
 }

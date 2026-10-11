@@ -111,7 +111,7 @@ for (const cause of ["child-first tree kill", "own crash then parent death insid
       const f = await exitedTask()
       try {
         f.clock.advance(1_000)
-        f.manager.forget(f.taskId)
+        f.manager.forget(f.taskId, { path: "park" })
         // When the owner dies before confirming ERROR, either reconciliation scope sees loss.
         await f.lifecycle.reconcileOnSessionStart(sessionId)
         // Then the conservative contract is LOST even for an independent crash in this window.
@@ -134,7 +134,7 @@ test("a committed own-crash ERROR survives a later parent death", async () => {
     const terminal = f.manager.waitFor(f.taskId)
     f.clock.advance(2_000)
     const failed = await terminal
-    f.manager.forget(f.taskId)
+    f.manager.forget(f.taskId, { path: "park" })
     // When parent death occurs after ERROR was committed, reconciliation cannot relabel it.
     await f.lifecycle.reconcileOnSessionStart("new-parent")
     expect(f.store.load(f.taskId)?.status).toBe("error")
@@ -150,7 +150,7 @@ test.each(["parent-1", "new-parent", undefined])("a shutdown-detached provisiona
   try {
     // Given shutdown detached the dead child's record before the process exited.
     f.store.transition(f.taskId, { type: "detach_rpc", timestamp: new Date(f.clock.now()).toISOString() })
-    f.manager.forget(f.taskId)
+    f.manager.forget(f.taskId, { path: "park" })
     // When the parent resumes, suspension must not erase the unconfirmed exit.
     await f.lifecycle.reconcileOnSessionStart(sessionId)
     expect(f.store.load(f.taskId)?.status).toBe("lost")

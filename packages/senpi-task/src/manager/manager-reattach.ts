@@ -35,7 +35,7 @@ export async function reattachManagedTask(input: {
   readonly armOutcome: (record: TaskRecord, handle: ManagedChildHandle, epoch: number) => void
 }): Promise<ReattachResult> {
   const fresh = input.store.load(input.record.task_id)
-  if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident") {
+  if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident" || fresh.killed === true) {
     await letGoOfRejected(input.handle)
     return { ok: false, kind: "failed", reason: "task ownership claim is not held by this host" }
   }

@@ -69,7 +69,7 @@ async function reclaimResidentExclusive(
   // own session dir, so preferring the record keeps a parked session from reading as transcript-less.
   const sessionPath = hostSessionResumePath(claimed) ?? sessionPathFor(claimed.task_id)
   if (TERMINAL_STATUSES.has(claimed.status) && sessionPath === undefined) {
-    context.store.transition(claimed.task_id, { type: "dispose", timestamp: nowIso(context) })
+    await destroyResidentTask(context, claimed.task_id, "target_gone")
     return {
       task_id: claimed.task_id,
       kind: "resumed",
@@ -83,6 +83,10 @@ async function reclaimResidentExclusive(
   }
   const rollbackResidency: SuspendedResidency = claimed.execution_mode === "process" ? "rpc_detached" : "persisted_only"
   if (context.config.reattach_on_reconcile === false) {
+    if ((claimed.pending_steering?.length ?? 0) > 0) {
+      await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
+      return { task_id: claimed.task_id, kind: "deferred", reason: "reattach disabled; queued continuation parked" }
+    }
     const marked = await markCrashedResident(context, claimed, "reattach disabled for crashed resident")
     if (marked) await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
     return { task_id: claimed.task_id, kind: "lost", reason: "reattach disabled for crashed resident" }
@@ -152,6 +156,12 @@ export async function reviveClaimed(
     markSuspensionReason(context, fresh.task_id, parkedReason(reached))
     return outcome
   }
+  if (context.deferUnresumable && !terminalAllowed && fresh.fallback_handoff_epoch !== fresh.notification.run_epoch
+    && ((resumePath === undefined && fresh.started_at !== undefined)
+      || (fresh.execution_mode === "in-process" && !isSpawnSpecV1Record(fresh)))) {
+    const reason = resumePath === undefined ? "transcript_unavailable" : "spawn_spec_unavailable"
+    return { ...rollbackOrDeferred(context, fresh.task_id, rollbackResidency, reason, fresh), permanent: true }
+  }
 
   if (resumePath === undefined && !isSpawnSpecV1Record(fresh)) {
     if (context.deferUnresumable)
@@ -200,7 +210,7 @@ export async function reviveClaimed(
     }
     if (TERMINAL_STATUSES.has(fresh.status)) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code), fresh)
     if (context.deferUnresumable)
-      return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code), fresh)
+      return { ...rollbackOrDeferred(context, fresh.task_id, rollbackResidency, deferredCode(respawned.code), fresh), permanent: true }
     await markLost(context, fresh, `reattach failed: ${respawned.reason}`)
     return { task_id: fresh.task_id, kind: "lost", reason: respawned.reason }
   }
@@ -216,6 +226,7 @@ export async function reviveClaimed(
   if (!reattached.ok) {
     reservation.release()
     if (reattached.kind === "already_attached") {
+      clearSuspensionReason(context, fresh.task_id)
       return { task_id: fresh.task_id, kind: "resumed", reason: reattached.reason }
     }
     return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)

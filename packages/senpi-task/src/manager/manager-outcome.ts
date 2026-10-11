@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { SuspensionReason, TaskRecord, TaskRunStats, TaskTransition } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
+import type { ForgetOptions } from "./types"
 import { terminalFailureMessage } from "./credential-failure"
 import { nowIso } from "./manager-helpers"
 import { createProvisionalExitTracker, type ExitConfirmationSchedule } from "./provisional-exit"
@@ -30,7 +31,7 @@ export type OutcomeTrackerPorts = {
   readonly tryLoad: (taskId: string) => TaskRecord | null
   readonly runStatsSnapshot: (taskId: string) => TaskRunStats | undefined
   readonly releaseSlot: (taskId: string, model: string, epoch: number) => void
-  readonly forget: (taskId: string) => void
+  readonly forget: (taskId: string, options: ForgetOptions) => void
   // `terminal` is supplied only when the store could not persist the terminal state: the on-disk
   // record is then guaranteed non-terminal, so the waiters must be settled from this record instead.
   readonly settleWaiters: (taskId: string, terminal?: TaskRecord) => void
@@ -129,7 +130,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         path: errnoField(error, "path"),
         error: String(error),
       })
-      ports.forget(taskId)
+      ports.forget(taskId, { path: "park" })
       ports.settleWaiters(taskId, {
         ...owned,
         status: "error",
@@ -172,7 +173,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
       return { ...rest, residency_state: "rpc_detached", suspension_reason: reason, updated_at: nowIso(ports.now) }
     })
     ports.store.appendEvent(taskId, { type: "suspended", payload: { reason } })
-    ports.forget(taskId)
+    ports.forget(taskId, { path: "park" })
   }
 
   // One park watch per task, re-armed with every tracked run. It outlives the run's outcome: a child

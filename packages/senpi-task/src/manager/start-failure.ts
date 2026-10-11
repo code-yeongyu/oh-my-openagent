@@ -135,7 +135,7 @@ function publicMessage(
     case "child-turn-failed":
       return GENERIC_START_FAILURE_MESSAGE
     case "suspended_unresumable":
-      return "The suspended child could not be resumed."
+      return "The child could not be resumed."
     default:
       return assertNever(kind)
   }

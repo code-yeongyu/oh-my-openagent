@@ -4,6 +4,7 @@ import { processOwnerProbe } from "@oh-my-opencode/isolation-core"
 
 import { needsCrashSalvage, salvageCrashedIsolation, sweepIsolations } from "../isolation"
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { isFallbackHandoff } from "./fallback-handoff"
@@ -89,7 +90,11 @@ export async function reconcileOnSessionStart(
   }
 
   outcomes.push(...await reconcileScopedRevival(
-    { ...context, reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival } },
+    {
+      ...context,
+      deferUnresumable: context.registry.ownsRecord?.({ parent_session_id: parentSessionId }) === true || context.deferUnresumable,
+      reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival },
+    },
     parentSessionId,
     candidates.filter((record) => record.parent_session_id === parentSessionId),
     (taskId) => newestSessionPath(context, taskId),
@@ -272,7 +277,7 @@ async function markLost(context: LifecycleContext, taskId: string, message: stri
   const record = context.store.mutate(taskId, (fresh) => {
     const result = markRecordLostForReconciliation(fresh, {
       timestamp: nowIso(context),
-      error_message: message,
+      error_message: withDroppedSteeringNotice(message, fresh.pending_steering?.length ?? 0),
       updateReason: fresh.status === "lost",
     })
     applied = result.applied
@@ -281,7 +286,8 @@ async function markLost(context: LifecycleContext, taskId: string, message: stri
   if (applied) {
     context.store.appendEvent(taskId, { type: "reconcile_lost", payload: { reason: message } })
   }
-  if (record?.residency_state === "resident") await destroyResidentTask(context, taskId, "reconcile_lost")
+  if (record?.residency_state === "resident") await destroyResidentTask(context, taskId, "target_gone")
+  else if (applied) context.registry.forget(taskId, { path: "end" })
 }
 
 // Startup order is load-bearing: records are reconciled FIRST so a crashed child is terminal, then

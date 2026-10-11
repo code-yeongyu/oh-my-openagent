@@ -94,6 +94,6 @@ export async function exitedTask(
   return {
     manager, store, backing, taskId, clock, lifecycle, respawns: () => respawns,
     events: () => readEvents(store, taskId),
-    dispose: () => { manager.forget(taskId); lifecycle.dispose?.() },
+    dispose: () => { manager.forget(taskId, { path: "end" }); lifecycle.dispose?.() },
   }
 }
