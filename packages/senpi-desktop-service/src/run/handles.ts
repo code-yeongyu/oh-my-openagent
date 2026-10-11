@@ -3,9 +3,11 @@ import { type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from
 import {
 	type AxNode,
 	type DesktopWindow,
+	type MenuItem,
 	expectResult,
 	isAttributePairs,
 	isAxNode,
+	isMenuItem,
 	isText,
 	listOf,
 	optional,
@@ -140,6 +142,17 @@ export class WindowHandle extends InputTarget {
 	raise(): Promise<void> {
 		return this.send("raise", "raiseWindow", { windowId: this.id });
 	}
+
+	/** The window's native menu: `items` lists children (empty path = the menu bar), `select` invokes a leaf. */
+	readonly menu = {
+		items: (path?: readonly string[]): Promise<readonly MenuItem[]> =>
+			this.method("menu.items", async ({ call }) => {
+				const items = await call("menus.items", { windowId: this.id, path: [...(path ?? [])] });
+				return expectResult("menus.items", items, listOf(isMenuItem));
+			}),
+		select: (path: readonly string[]): Promise<void> =>
+			this.send("menu.select", "menus.select", { windowId: this.id, path: [...path] }),
+	};
 
 	/** The formatted accessibility tree, one node per line with `[ref=eN]` tags. */
 	ax(options?: AxOptions): Promise<string> {
