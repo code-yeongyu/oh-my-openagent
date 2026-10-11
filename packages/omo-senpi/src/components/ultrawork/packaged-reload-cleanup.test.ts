@@ -116,15 +116,17 @@ describe("cleanUpReloadRun", () => {
 })
 
 describe("ownsHostSocket", () => {
+  const root = join(tmpdir(), "omo-ulw-reload-abc")
+
   it("#given a socket under the test root #when matched #then it is owned", () => {
-    expect(ownsHostSocket(["--socket", join("/tmp/omo-ulw-reload-abc", "p-1.sock")], "/tmp/omo-ulw-reload-abc")).toBe(true)
+    expect(ownsHostSocket(["--socket", join(root, "p-1.sock")], root)).toBe(true)
   })
 
   it("#given a sibling root that shares the prefix #when matched #then it is not owned", () => {
-    expect(ownsHostSocket(["--socket", join("/tmp/omo-ulw-reload-abcX", "p-1.sock")], "/tmp/omo-ulw-reload-abc")).toBe(false)
+    expect(ownsHostSocket(["--socket", join(`${root}X`, "p-1.sock")], root)).toBe(false)
   })
 
   it("#given the root only in another argument #when matched #then it is not owned", () => {
-    expect(ownsHostSocket(["--cwd", join("/tmp/omo-ulw-reload-abc", "x"), "--socket", "/var/run/other.sock"], "/tmp/omo-ulw-reload-abc")).toBe(false)
+    expect(ownsHostSocket(["--cwd", join(root, "x"), "--socket", join(tmpdir(), "other.sock")], root)).toBe(false)
   })
 })
