@@ -1286,7 +1286,8 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN-created releases cannot trigger release-announce.yml.
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           # pipefail matters: an empty tag list is indistinguishable from "no releases
           # exist yet" and would resolve to --latest, so a failed `gh release list`

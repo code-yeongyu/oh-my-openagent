@@ -1,0 +1,61 @@
+name: Release announcement
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Stable omo release tag (vX.Y.Z)"
+        required: true
+        type: string
+      dry_run:
+        description: "Print the message without posting (requires the webhook secret)"
+        type: boolean
+        default: true
+      probe:
+        description: "Post a test message, delete it, and verify deletion"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-announce-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    if: github.event_name == 'workflow_dispatch' || (!github.event.release.draft && !github.event.release.prerelease)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - name: Install dependencies
+        run: timeout -k 10 600 bun install --frozen-lockfile --ignore-scripts
+      - name: Announce release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_OMO_RELEASES_WEBHOOK_URL: ${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          PROBE: ${{ github.event_name == 'workflow_dispatch' && inputs.probe }}
+        run: timeout -k 10 120 bun script/release-announce.ts
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_SUMMARY_TITLE: Discord release announcement
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Stable published omo releases only; edited releases do not trigger posts.
+            - Dry runs compose only; probes post a test, delete it, and require GET 404.
+            - Every failed request or missing credential fails the job.
+          JOB_SUMMARY_NEXT: Inspect the announcement step before rerunning; production reruns can duplicate a post.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
