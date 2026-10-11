@@ -9,6 +9,7 @@ mod clock;
 mod desktop_impl;
 mod fake;
 mod faults;
+mod menus_impl;
 mod method;
 mod scenario;
 mod sink;
@@ -18,7 +19,7 @@ pub use fake::FakeBackend;
 pub use faults::Faults;
 pub use method::FakeMethod;
 pub use scenario::{
-    fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeScenario, ResizeWindow, ScenarioError,
-    ScriptedFailure,
+    fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeMenuNode, FakeScenario, ResizeWindow,
+    ScenarioError, ScriptedFailure,
 };
 pub use sink::{RecordedPointer, RecordingSink, SinkOp};

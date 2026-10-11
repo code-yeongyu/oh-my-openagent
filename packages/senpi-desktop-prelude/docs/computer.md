@@ -20,6 +20,10 @@ computer.type(text, { delivery? }?) / computer.press("cmd+shift+p" | keys[], { d
     Same helpers on a window handle: win.type, win.press.
 win.raise() → None
     Brings the window to the front (exec tier). Unavailable on Wayland.
+win.menu.items(path?) → ComputerMenuItem[]
+    Read-only (read tier): lists the immediate children of the window's menu at `path`; no argument lists the menu bar. Item fields: title, path (native labels, ellipses included), enabled, checked, hasSubmenu, shortcut.
+win.menu.select(path) → None
+    Exec tier: invokes the leaf command `path` names. Matching prefers a case-insensitive exact title, otherwise compares titles ignoring a trailing `...` or `…`; each tier must match exactly one item. An ambiguous label, a disabled item anywhere in the path, a submenu as the leaf, or an untitled separator is refused and NOTHING is dispatched; the engine revalidates the command before the press.
 win.ax({ all?, maxDepth? }?) → str
     One formatted TEXT tree, one node per line with `[ref=eN]` tags; NEVER iterate or `.map` it.
 win.find({ role?, title?, value?, limit? }) → ComputerElement[]

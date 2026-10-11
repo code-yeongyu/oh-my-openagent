@@ -27,6 +27,8 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("typeText", "exec", "public"),
     ("keyChord", "exec", "public"),
     ("raiseWindow", "exec", "public"),
+    ("menus.items", "read", "public"),
+    ("menus.select", "exec", "public"),
     ("clipboard.read", "read", "public"),
     ("clipboard.write", "exec", "public"),
     ("ax.snapshot", "read", "public"),

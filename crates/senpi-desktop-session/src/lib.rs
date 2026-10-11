@@ -22,6 +22,7 @@ mod worker_ax;
 mod worker_capture;
 mod worker_clipboard;
 mod worker_input;
+mod worker_menus;
 
 pub use grant::ControlSlot;
 pub use mutate::SessionSafety;

@@ -140,6 +140,8 @@ impl Worker {
             Op::ControlGrant(params) => self.control_grant(&params),
             Op::ControlRevoke => self.control_revoke(),
             Op::ControlState => Ok(Response::ControlState(self.control_state())),
+            Op::MenuItems(params) => self.menu_items(&params),
+            Op::MenusSelect(params) => served(self.menu_select(&params, cancelled)),
         }
     }
 
