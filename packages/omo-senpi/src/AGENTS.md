@@ -19,7 +19,7 @@ Source root of the Senpi adapter package. The package barrel (`index.ts`) export
 Colocated at `src/` root. These are executable package-contract tests, not documentation:
 
 - `bundle-purity.test.ts` - import allowlist for the extension bundle; keep aligned with `SENPI_LOADER_ALIASES` in `plugin/scripts/build-extension.mjs` (peer-external rule in `../AGENTS.md`).
-- `bundle-size.test.ts` - bundle size budget.
+- `bundle-size.test.ts` - raw byte budget for built `plugin/extensions/omo.js`. Every ceiling increase requires a separate measured PR with bundle sizes before/after and the reason; never fold it into a feature PR.
 - `package-shape.test.ts` - adapter manifest contract; license/notice files must ship with generated artifacts.
 - `plugin-manifest.test.ts` - packaged plugin manifest.
 - `runtime-dependency-resolution.test.ts` - a symlinked plugin without host hoisting still resolves runtime deps from the real path.

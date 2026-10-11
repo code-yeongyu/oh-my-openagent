@@ -167,10 +167,13 @@ fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
 fn every_mutating_request_emits_one_audit_event() {
     for action in MutatingAction::ALL {
         // Given: window 101 has a File > Save menu, so a menu selection is
-        // admitted like every other mutation.
+        // admitted like every other mutation; raiseWindow and foreground
+        // deliveries need the grant.
         let mut harness = harness(&json!({
             "menus": {"101": [{"title": "File", "children": [{"title": "Save"}]}]}
         }));
+        harness.grant("audit sweep");
+        harness.audits.lock().clear();
         let op = request_for(&mut harness, action);
         // When
         let reply = harness.process(op);

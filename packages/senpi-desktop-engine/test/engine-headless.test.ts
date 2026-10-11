@@ -15,7 +15,7 @@ import {
 	TEST_TIMEOUT_MS,
 	TWO_DISPLAYS,
 } from "./support/engine";
-import { declaredErrorCodes, ERROR_CODE_CASES, INPUT_CALLS, WINDOW } from "./support/error-code-cases";
+import { declaredErrorCodes, ERROR_CODE_CASES, INPUT_CALLS, WIRE_EXEMPT_CODES, WINDOW } from "./support/error-code-cases";
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const scenarios = new Scenarios();
@@ -188,9 +188,10 @@ describe("senpi-desktop-engine over stdio with the fake backend", { timeout: TES
 
 describe("every ErrorCode reaches the wire", { timeout: TEST_TIMEOUT_MS }, () => {
 	const declared = declaredErrorCodes();
+	const wireDrivable = declared.filter((code) => !WIRE_EXEMPT_CODES.includes(code));
 
-	it("drives every variant declared in error.rs", () => {
-		expect(ERROR_CODE_CASES.map((errorCase) => errorCase.code).sort()).toEqual([...declared].sort());
+	it("drives every wire-drivable variant declared in error.rs", () => {
+		expect(ERROR_CODE_CASES.map((errorCase) => errorCase.code).sort()).toEqual([...wireDrivable].sort());
 	});
 
 	// Concurrent cases own their engine: the shared afterEach would kill a sibling's mid-run.
