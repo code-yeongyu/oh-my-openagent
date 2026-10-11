@@ -56,6 +56,9 @@ jobs:
             core.setOutput('number', pr.number);
             core.setOutput('title', pr.title);
             core.setOutput('body', pr.body ?? '');
+      - name: Write job summary
+        if: always()
+        run: echo 'Resolved current PR identity from authenticated GitHub metadata.' >> "$GITHUB_STEP_SUMMARY"
 
   ensure-labels:
     runs-on: ubuntu-latest

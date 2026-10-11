@@ -98,7 +98,7 @@ describe("merge group review claim gate", () => {
     const steps = gateSteps()
     expect(steps.find((step) => step["id"] === "queue-claims")?.["if"]).toBe("github.event_name == 'merge_group'")
     expect(steps.find((step) => step["name"] === "Fail while a review claim label is present")?.["if"])
-      .toBe("github.event_name == 'pull_request_target'")
+      .toBe("github.event_name == 'pull_request'")
     const checkout = steps.find((step) => String(step["uses"]).startsWith("actions/checkout@"))
     if (checkout === undefined || !isRecord(checkout["with"])) throw new Error("gate must check out helper")
     expect(checkout["if"]).toBe("github.event_name == 'merge_group'")

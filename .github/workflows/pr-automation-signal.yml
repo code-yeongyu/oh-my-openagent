@@ -17,3 +17,6 @@ jobs:
     steps:
       - name: Signal metadata automation
         run: echo "PR metadata is ready for trusted workflow_run consumers."
+      - name: Write job summary
+        if: always()
+        run: echo 'Read-only PR metadata signal; no PR code or artifacts were executed.' >> "$GITHUB_STEP_SUMMARY"
