@@ -1,54 +1,23 @@
 ---
 name: sisyphus-junior-agent
-description: Developer reference for the Sisyphus-Junior category-spawned executor agent -- model variants and discipline.
+description: Sisyphus-Junior factory, shared Native model core, and OpenCode role composition.
 ---
 
-# src/agents/sisyphus-junior/ -- Category-Spawned Executor
+# Sisyphus-Junior
 
-**Generated:** 2026-05-18
+The category-spawned executor renders its model core through
+`native-model-prompt.ts` and appends its OpenCode role through
+`opencode-role-append.ts`. There are no local per-model prompt files or routing tables.
+The public Senpi preset contract owns both selection and content.
 
-## OVERVIEW
+- `agent.ts` owns the factory, defaults, permission merging and user appends.
+- `index.ts` exports the factory and prompt entrypoints.
+- `index.test.ts` covers configuration and permission behavior.
+- The parent `per-agent-prompt-parity.test.ts` compares rendered content over the catalog.
 
-12 files. Sisyphus-Junior is a focused task executor spawned by `delegate-task` when category routing requires it. Runs in subagent mode with its own fallback chain. Does not delegate further; executes directly.
-
-## FILES
-
-| File | Purpose |
-|------|---------|
-| `agent.ts` | `createSisyphusJuniorAgentWithOverrides()` factory, model-variant routing, `SISYPHUS_JUNIOR_DEFAULTS` |
-| `index.ts` | Barrel exports |
-| `default.ts` | Base/Claude prompt: todo discipline, verification, termination rules |
-| `gemini.ts` | Gemini-optimized prompt variant |
-| `gpt.ts` | Base GPT prompt variant |
-| `gpt-5-4.ts` | GPT-5.4-native prompt variant |
-| `gpt-5-5.ts` | Shared GPT-5.5/GPT-5.6 model-aware prompt variant |
-| `kimi-k2-6.ts` | Kimi K2.6 prompt variant |
-| `kimi-k2-7.ts` | Kimi K2.7-native prompt variant |
-| `kimi-k3.ts` | Kimi K3-native prompt variant (reasoning depth with built-in stop conditions) |
-| `glm-5-2.ts` | GLM-5.2-native prompt variant |
-| `index.test.ts` | Unit tests |
-
-## VARIANT SELECTION
-
-Parent `agent.ts` selects prompt variant by model name:
-- Kimi K3 -> `kimi-k3.ts`
-- Kimi K2.7 -> `kimi-k2-7.ts`
-- Contains "kimi-k2" -> `kimi-k2-6.ts`
-- Contains "gpt-5.5" or "gpt-5.6" -> shared `gpt-5-5.ts` prompt family with model-aware identity
-- Contains "gpt-5.4" -> `gpt-5-4.ts`
-- Contains "gpt" -> `gpt.ts`
-- Contains "gemini" -> `gemini.ts`
-- Contains "glm" -> `glm-5-2.ts`
-- Default -> `default.ts` (Claude, etc.)
-
-## KEY BEHAVIORS
-
-- Mode: `subagent` (uses own fallback chain, ignores UI selection)
-- Default model: `claude-sonnet-5`
-- Default temperature: `0.1` (`SISYPHUS_JUNIOR_DEFAULTS`)
-- Fallback chain: claude-sonnet-5 -> kimi-k3 -> gpt-5.6-sol medium -> minimax-m3 -> MiniMax-M3 -> minimax-m2.7 -> big-pickle
-- Blocked tools: `task` (all models); `apply_patch` also blocked for GPT models
-- `call_omo_agent` explicitly allowed so subagents can spawn explore/librarian
-- Max tokens: 64000
-- Thinking enabled for non-GPT/non-GLM models (budgetTokens: 32000)
-- Reasoning effort "medium" for GPT models
+Mode remains subagent, the default model is claude-sonnet-5, temperature is
+0.1 and maxTokens is 64000. The task tool is denied for every model;
+call_omo_agent remains allowed for research. GPT uses medium reasoning by
+default; GLM has no injected thinking, and the existing Claude thinking
+configuration applies elsewhere. User file-backed prompt appends still
+resolve through the existing URI boundary and remain last.

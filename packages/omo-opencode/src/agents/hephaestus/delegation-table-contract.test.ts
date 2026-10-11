@@ -6,9 +6,14 @@ import type {
 	AvailableCategory,
 	AvailableSkill,
 } from "../dynamic-agent-prompt-builder";
-import { buildGpt55SisyphusPrompt } from "../sisyphus/gpt-5-5";
-import { buildGpt55HephaestusPrompt } from "./gpt-5-5";
-import { buildGpt56HephaestusPrompt } from "./gpt-5-6";
+import { createSisyphusAgent } from "../sisyphus";
+import { createHephaestusAgent } from "./agent";
+
+function renderHephaestus(model: string, agents: AvailableAgent[], _tools: unknown[], skills: AvailableSkill[], categories: AvailableCategory[], tasks: boolean): string {
+  return createHephaestusAgent(model, agents, [], skills, categories, tasks).prompt ?? "";
+}
+const buildGpt55HephaestusPrompt = (agents: AvailableAgent[], tools: unknown[], skills: AvailableSkill[], categories: AvailableCategory[], tasks: boolean) => renderHephaestus("openai/gpt-5.5", agents, tools, skills, categories, tasks);
+const buildGpt56HephaestusPrompt = (agents: AvailableAgent[], tools: unknown[], skills: AvailableSkill[], categories: AvailableCategory[], tasks: boolean) => renderHephaestus("openai/gpt-5.6-sol", agents, tools, skills, categories, tasks);
 
 const AVAILABLE_AGENTS: AvailableAgent[] = [
 	{
@@ -219,14 +224,14 @@ for (const { name, build } of PROMPT_BUILDERS) {
 describe("planner delegation contracts", () => {
 	test("keeps every advisor route in Sisyphus", () => {
 		// given: the same agent catalog used to build Hephaestus prompts
-		const prompt = buildGpt55SisyphusPrompt(
+		const prompt = createSisyphusAgent(
 			"openai/gpt-5.5",
 			AVAILABLE_AGENTS,
 			[],
 			AVAILABLE_SKILLS,
 			AVAILABLE_CATEGORIES,
 			false,
-		);
+		).prompt ?? "";
 
 		// then: the orchestrator routes to exactly its full planning specialist set
 		expect(routedAgentNames(prompt)).toEqual(

@@ -47,7 +47,7 @@ describe("maybeCreateHephaestusConfig GPT-5.6 registration", () => {
 			expect(config).toBeDefined();
 			expect(config?.model).toBe(model);
 			expect(config?.variant).toBe(EXPLICIT_VARIANT);
-			expect(getHephaestusPromptSource(config?.model)).toBe("gpt-5-6");
+			expect(getHephaestusPromptSource(config?.model)).toBe("gpt-5.6");
 			expect(config?.prompt).toBe(getHephaestusPrompt(model));
 		});
 	}

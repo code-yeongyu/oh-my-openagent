@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { createSisyphusAgent } from "./sisyphus";
-import {
-  resolveSisyphusPromptFamily,
-  type SisyphusPromptFamily,
-} from "./sisyphus-agent-factory";
 
 function permissionValue(
   permission: ReturnType<typeof createSisyphusAgent>["permission"],
@@ -35,38 +31,6 @@ describe("createSisyphusAgent", () => {
   });
 
   describe("#given routed native prompt models", () => {
-    test("#when resolving prompt families #then maps each model id to the routed family", () => {
-      // given - aliases that intentionally share a family are represented explicitly
-      const cases: Array<[model: string, family: SisyphusPromptFamily]> = [
-        ["opencode-go/kimi-k3", "kimi-k3"],
-        ["moonshotai/kimi-k2.6", "kimi-k2-6"],
-        ["opencode-go/kimi-k2.7", "kimi-k2-7"],
-        ["moonshotai/kimi-k2.8", "kimi-k2-8"],
-        ["kimi-for-coding/kimi-for-coding", "kimi-k2-8"],
-        ["kimi-for-coding/kimi-for-coding-highspeed", "kimi-k2-7"],
-        ["openai/gpt-5.6-sol", "gpt-5-5"],
-        ["openai/gpt-5.5", "gpt-5-5"],
-        ["openai/gpt-5.4", "gpt-5-4"],
-        ["anthropic/claude-fable-5.1", "fable-5-1"],
-        ["anthropic/claude-fable-5", "fable-5"],
-        ["anthropic/claude-opus-5", "opus-5"],
-        ["anthropic/claude-opus-4-8", "opus-4-8"],
-        // Opus 5.5 deliberately shares the Opus 5 family: the guide's patterns carry over and the
-        // variant renders the running model's own name.
-        ["anthropic/claude-opus-5.5", "opus-5-5"],
-        ["anthropic/claude-opus-4-7", "opus-4-7"],
-        ["xai/grok-4.6", "grok-4"],
-        ["x-ai/grok-4.5", "grok-4"],
-        ["zai/glm-5.2", "glm-5-2"],
-        ["google/gemini-3.1-pro", "fallback"],
-      ];
-
-      // when / then
-      expect(cases.map(([model]) => resolveSisyphusPromptFamily(model))).toEqual(
-        cases.map(([, family]) => family),
-      );
-    });
-
     test("#when selecting a tracking mode #then wires the matching tool contract", () => {
       // given
       const models = ["openai/gpt-5.5", "openai/gpt-5.6-sol"];
@@ -169,38 +133,6 @@ describe("createSisyphusAgent", () => {
         expect(agent.prompt).not.toBe(grokPrompt);
         expect(agent.reasoningEffort).toBeUndefined();
       }
-    });
-  });
-
-  describe("#given fallback-family Sisyphus models", () => {
-    test("#when baking prompts for Gemini vs MiniMax #then the fallback family is not prompt-uniform", () => {
-      // given - both models resolve to the broad fallback family
-      const geminiModel = "google/gemini-3.1-pro";
-      const minimaxModel = "minimax-coding-plan/MiniMax-M3";
-      expect(resolveSisyphusPromptFamily(geminiModel)).toBe("fallback");
-      expect(resolveSisyphusPromptFamily(minimaxModel)).toBe("fallback");
-
-      // when
-      const geminiPrompt = createSisyphusAgent(geminiModel).prompt;
-      const minimaxPrompt = createSisyphusAgent(minimaxModel).prompt;
-
-      // then - Gemini fallback overrides are baked in; MiniMax bakes the plain body
-      expect(geminiPrompt).toContain("TOOL_CALL_MANDATE");
-      expect(minimaxPrompt).not.toContain("TOOL_CALL_MANDATE");
-      expect(geminiPrompt).not.toBe(minimaxPrompt);
-    });
-
-    test("#when baking prompts for DeepSeek vs MiniMax #then the plain fallback bodies are identical", () => {
-      // given - neither model triggers fallback overrides
-      const deepseekModel = "deepseek/deepseek-v4-pro";
-      const minimaxModel = "minimax-coding-plan/MiniMax-M3";
-
-      // when
-      const deepseekPrompt = createSisyphusAgent(deepseekModel).prompt;
-      const minimaxPrompt = createSisyphusAgent(minimaxModel).prompt;
-
-      // then - genuine no-op swaps are detectable by prompt equality (#6966)
-      expect(deepseekPrompt).toBe(minimaxPrompt);
     });
   });
 

@@ -76,110 +76,7 @@ describe("isHephaestusSupportedModel with a hosted vendor prefix", () => {
   });
 });
 
-describe("getHephaestusPromptSource", () => {
-  test("#given Bedrock-hosted gpt-5 ids #when the prompt source is resolved #then the family-specific prompt is selected", () => {
-    // given
-    const bedrockModels = [
-      "amazon-bedrock/openai.gpt-5.4",
-      "amazon-bedrock/openai.gpt-5-4",
-      "amazon-bedrock/openai.gpt-5.6",
-      "amazon-bedrock/openai.gpt-5.3-codex",
-    ];
-
-    // when
-    const sources = bedrockModels.map((model) => getHephaestusPromptSource(model));
-
-    // then
-    expect(sources).toEqual(["gpt-5-4", "gpt-5-4", "gpt-5-6", "gpt-5-3-codex"]);
-  });
-
-  test("returns 'gpt-5-4' for gpt-5.4 models", () => {
-    // given
-    const model1 = "openai/gpt-5.4";
-    const model2 = "openai/gpt-5.4-codex";
-    const model3 = "github-copilot/gpt-5.4";
-
-    // when
-    const source1 = getHephaestusPromptSource(model1);
-    const source2 = getHephaestusPromptSource(model2);
-    const source3 = getHephaestusPromptSource(model3);
-
-    // then
-    expect(source1).toBe("gpt-5-4");
-    expect(source2).toBe("gpt-5-4");
-    expect(source3).toBe("gpt-5-4");
-  });
-
-  test("returns 'gpt-5-5' for gpt-5.5 models", () => {
-    // given
-    const model1 = "openai/gpt-5.5";
-    const model2 = "openai/gpt-5-5";
-    const model3 = "github-copilot/gpt-5.5";
-
-    // when
-    const source1 = getHephaestusPromptSource(model1);
-    const source2 = getHephaestusPromptSource(model2);
-    const source3 = getHephaestusPromptSource(model3);
-
-    // then
-    expect(source1).toBe("gpt-5-5");
-    expect(source2).toBe("gpt-5-5");
-    expect(source3).toBe("gpt-5-5");
-  });
-
-  test("returns 'gpt-5-5' for GPT 5.5 models", () => {
-    // given
-    const model1 = "openai/gpt-5.5";
-    const model2 = "github-copilot/gpt-5.5";
-
-    // when
-    const source1 = getHephaestusPromptSource(model1);
-    const source2 = getHephaestusPromptSource(model2);
-
-    // then
-    expect(source1).toBe("gpt-5-5");
-    expect(source2).toBe("gpt-5-5");
-  });
-
-  test("returns 'gpt-5-6' for GPT-6 Astra models", () => {
-    expect(getHephaestusPromptSource("openai/gpt-6-astra")).toBe("gpt-5-6")
-    expect(getHephaestusPromptSource("github-copilot/gpt-6-astra-fast")).toBe("gpt-5-6")
-  })
-
-  test("returns 'gpt-5-6' for gpt-5.6 family models", () => {
-    // given
-    const model1 = "openai/gpt-5.6";
-    const model2 = "openai/gpt-5.6-sol";
-    const model3 = "vercel/openai/gpt-5.6-terra";
-
-    // when
-    const source1 = getHephaestusPromptSource(model1);
-    const source2 = getHephaestusPromptSource(model2);
-    const source3 = getHephaestusPromptSource(model3);
-
-    // then
-    expect(source1).toBe("gpt-5-6");
-    expect(source2).toBe("gpt-5-6");
-    expect(source3).toBe("gpt-5-6");
-  });
-
-  test("returns 'gpt-5-3-codex' for GPT 5.3 Codex models", () => {
-    // given
-    const model1 = "openai/gpt-5.3-codex";
-    const model2 = "github-copilot/gpt-5-3-codex";
-    const model3 = "opencode/gpt-5.3-codex-spark";
-
-    // when
-    const source1 = getHephaestusPromptSource(model1);
-    const source2 = getHephaestusPromptSource(model2);
-    const source3 = getHephaestusPromptSource(model3);
-
-    // then
-    expect(source1).toBe("gpt-5-3-codex");
-    expect(source2).toBe("gpt-5-3-codex");
-    expect(source3).toBe("gpt-5-3-codex");
-  });
-
+describe("getHephaestusPromptSource eligibility", () => {
   test("throws for generic GPT, unsupported GPT 5.x, non-GPT, and undefined models", () => {
     // given
     const model1 = "openai/gpt-4o";
@@ -210,7 +107,7 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt("openai/gpt-5.5");
 
     // then - the prompt matches the output of the routed source builder
-    expect(prompt).toBe(getHephaestusPrompt("github-copilot/gpt-5.5"));
+    expect(prompt).toBe(createHephaestusAgent("openai/gpt-5.5").prompt);
     expect(prompt).not.toBe(getHephaestusPrompt("openai/gpt-5.4"));
   });
 

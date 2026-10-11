@@ -1,5 +1,6 @@
 import type { DefaultModeConfig } from "../config/schema/default-mode"
 import { reconcileSisyphusRuntimePrompt } from "../agents/sisyphus-runtime-prompt-reconciler"
+import { reconcileNativeModelPrompts } from "../agents/native-model-prompt"
 
 const ULTRAWORK_MODE_TAG = "<ultrawork-mode>"
 
@@ -17,7 +18,7 @@ function toCanonicalModel(
   model: { id: string; providerID: string } | undefined,
 ): string | undefined {
   if (!model?.id) return undefined
-  if (model.id.includes("/") || !model.providerID) return model.id
+  if (!model.providerID || model.id.startsWith(`${model.providerID}/`)) return model.id
   return `${model.providerID}/${model.id}`
 }
 
@@ -35,6 +36,7 @@ export function createSystemTransformHandler(
     // is the only seam that knows the model actually selected at runtime, so
     // rebuild the whole body for the runtime model here (issue #5297/#6966).
     reconcileSisyphusRuntimePrompt(output.system, toCanonicalModel(input.model))
+    reconcileNativeModelPrompts(output.system, toCanonicalModel(input.model))
 
     const restoredGuidance = input.sessionID
       ? ultraworkRestoration?.getSystemTransformGuidance?.(input.sessionID, input.model?.id)

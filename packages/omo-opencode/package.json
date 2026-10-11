@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",
+    "@code-yeongyu/senpi": "2026.10.10-12",
+    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.10-12",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",

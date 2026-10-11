@@ -2,16 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { createMomusAgent } from "./momus";
 
 describe("createMomusAgent", () => {
-  test("uses the GPT-5.6-class prompt and high reasoning for GPT-6 Astra", () => {
+  test("uses high reasoning for GPT-6 Astra", () => {
     const agent = createMomusAgent("openai/gpt-6-astra")
     expect(agent.reasoningEffort).toBe("high")
-    expect(agent.prompt).toBe(createMomusAgent("openai/gpt-5.6-sol").prompt)
   })
 
-  test("keeps the GPT-5.6-class prompt for the Copilot and fast Astra ids momus now resolves to", () => {
+  test("keeps high reasoning for Copilot and fast Astra ids", () => {
     // given
-    const solConfig = createMomusAgent("openai/gpt-5.6-sol")
-    const genericGptConfig = createMomusAgent("openai/gpt-5.5")
 
     // when
     const copilotConfig = createMomusAgent("github-copilot/gpt-6-astra")
@@ -19,8 +16,6 @@ describe("createMomusAgent", () => {
 
     // then
     for (const config of [copilotConfig, fastConfig]) {
-      expect(config.prompt).toBe(solConfig.prompt)
-      expect(config.prompt).not.toBe(genericGptConfig.prompt)
       expect(config.reasoningEffort).toBe("high")
       expect(config.textVerbosity).toBe("high")
     }
@@ -32,11 +27,9 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model);
-      const gpt55Config = createMomusAgent("openai/gpt-5.5");
 
       // then
       expect(config.reasoningEffort).toBe("high");
-      expect(config.prompt).not.toBe(gpt55Config.prompt);
     });
 
     test("#when creating the agent #then review contract and restrictions are preserved", () => {
@@ -57,16 +50,13 @@ describe("createMomusAgent", () => {
 
     test("#when the model is a dotted or dashed 5.6 alias #then the 5.6 path is selected", () => {
       // given
-      const solConfig = createMomusAgent("openai/gpt-5.6-sol");
 
       // when
       const aliasConfig = createMomusAgent("openai/gpt-5.6");
       const dashedConfig = createMomusAgent("vercel/openai/gpt-5-6-sol");
 
       // then
-      expect(aliasConfig.prompt).toBe(solConfig.prompt);
       expect(aliasConfig.reasoningEffort).toBe("high");
-      expect(dashedConfig.prompt).toBe(solConfig.prompt);
       expect(dashedConfig.reasoningEffort).toBe("high");
     });
   });
@@ -78,11 +68,9 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model);
-      const gpt56Config = createMomusAgent("openai/gpt-5.6-sol");
 
       // then
       expect(config.reasoningEffort).toBe("medium");
-      expect(config.prompt).not.toBe(gpt56Config.prompt);
     });
   });
 
@@ -93,11 +81,9 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model) as Record<string, unknown>;
-      const gptConfig = createMomusAgent("openai/gpt-5.5");
 
       // then
       expect(config.reasoningEffort).toBeUndefined();
-      expect(config.prompt).not.toBe(gptConfig.prompt);
       expect(config.thinking).toEqual({ type: "enabled", budgetTokens: 32000 });
     });
   });

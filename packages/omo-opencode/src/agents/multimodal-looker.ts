@@ -1,3 +1,4 @@
+import { buildNativeAgentPrompt } from "./native-model-prompt"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolAllowlist } from "../shared/permission-compat"
@@ -21,7 +22,7 @@ export function createMultimodalLookerAgent(model: string): AgentConfig {
     model,
     temperature: 0.1,
     ...restrictions,
-    prompt: `You interpret media files that cannot be read as plain text.
+    prompt: buildNativeAgentPrompt(model, `You interpret media files that cannot be read as plain text.
 
 During look_at invocations, the file or image is already attached to the message. Analyze the attachment directly. Never call tools, never spawn other agents, and never try to load the file by path.
 
@@ -56,7 +57,7 @@ Response rules:
 - Match the language of the request
 - Be thorough on the goal, concise on everything else
 
-Your output goes straight to the main agent for continued work.`,
+Your output goes straight to the main agent for continued work.`),
   }
 }
 createMultimodalLookerAgent.mode = MODE

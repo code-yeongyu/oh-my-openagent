@@ -11,12 +11,6 @@ export type {
   SyncRuntimeInjection,
   VariantTable,
 } from "./types"
-export { atlasPromptVariants } from "./atlas-prompts"
-export {
-  atlasPresetDisplayName,
-  MODEL_DISPLAY_TOKEN,
-  renderAtlasPresetContent,
-} from "./atlas-preset-contract"
 export { prometheusPromptVariants } from "./prometheus-prompts"
 export {
   CODEX_ULTRAWORK_PROMPT,
