@@ -18,11 +18,11 @@ const defaultDependencies: OnboardingComponentDependencies = {
 }
 
 export function isSessionStartEvent(v: unknown): v is SessionStartEvent {
-  return typeof v === "object" && v !== null && "reason" in v
+  return isRecord(v) && "reason" in v
 }
 
 export function isExtensionContext(v: unknown): v is ExtensionContext {
-  return typeof v === "object" && v !== null && "ui" in v
+  return isRecord(v) && "ui" in v
 }
 
 export function createOnboardingComponent(
@@ -32,14 +32,14 @@ export function createOnboardingComponent(
     name: "onboarding",
     register(pi: SenpiExtensionAPI, _ctx: ComponentContext): void {
       const stateDir = getOmoNativeStateDir(process.env)
-      const skillsRoot = getBuiltinSkillsRoot()
-      let consumed = false
+      const tour = `Read ${getBuiltinSkillsRoot()}/onboarding/SKILL.md and follow it.`
+      // Undefined is unclaimed; null is a successfully completed onboarding turn.
       let pending: {
         sessionId: string
         ownsMarker: boolean
         active: boolean
         outcome?: unknown
-      } | undefined
+      } | null | undefined
 
       const eligible = (ctx: unknown): ctx is ExtensionContext =>
         isExtensionContext(ctx) && ctx.hasUI && pi.sessionKind === "interactive"
@@ -49,24 +49,22 @@ export function createOnboardingComponent(
         if (ctx.mode !== "tui") return
         ctx.ui.setWidget("omo-onboarding", [
           "Welcome to OmO. Ask for anything.",
-          "Put ulw in a prompt for the full workflow. Ask for the tour to get started.",
+          "Put ulw in a prompt for the full workflow.",
         ])
       }
       const ownsRun = (ctx: unknown): ctx is ExtensionContext =>
-        isExtensionContext(ctx) && pending !== undefined
+        isExtensionContext(ctx) && pending != null
         && ctx.sessionManager.getSessionId() === pending.sessionId
 
       const release = (ctx: ExtensionContext): void => {
         if (pending?.ownsMarker) dependencies.releaseOnboarding(stateDir)
         pending = undefined
-        consumed = false
         if (eligible(ctx) && !dependencies.isOnboardingComplete(stateDir)) showWelcome(ctx)
       }
       const claim = (ctx: ExtensionContext, forced: boolean): boolean => {
-        if (consumed) return false
+        if (pending !== undefined) return false
         const ownsMarker = dependencies.claimOnboarding(stateDir)
         if (!ownsMarker && !forced) return false
-        consumed = true
         pending = { sessionId: ctx.sessionManager.getSessionId(), ownsMarker, active: false }
         if (ctx.mode === "tui") ctx.ui.setWidget("omo-onboarding", undefined)
         return true
@@ -86,11 +84,10 @@ export function createOnboardingComponent(
           return
         }
         if (!claim(ctx, true)) return
-        pi.appendEntry?.("omo-onboarding:started", { reason: "startup", forced: true })
         try {
           await pi.sendMessage({
             customType: "omo-onboarding:bootstrap",
-            content: `Read the onboarding skill at ${skillsRoot}/onboarding/SKILL.md with the read tool and follow it. Greet the user first.`,
+            content: `${tour} Greet first.`,
             display: false,
           }, { triggerTurn: true, deliverAs: "followUp" })
         } catch (error) {
@@ -110,8 +107,8 @@ export function createOnboardingComponent(
             customType: "omo-onboarding:context",
             display: false,
             content: forced
-              ? `The user explicitly requested onboarding with --onboard. Read ${skillsRoot}/onboarding/SKILL.md and run the guided tour, incorporating their message.`
-              : `This is the user's first message to OmO. Do what they asked first, fully. Then greet them in their language and offer the tour in one line. If they accept, read ${skillsRoot}/onboarding/SKILL.md and follow it. If their message itself asks for a tour or getting started, follow the skill now.`,
+              ? `${tour} Run the requested --onboard tour using their message.`
+              : `Answer their request fully, then greet in their language and offer a one-line tour. If accepted or requested: ${tour}`,
           },
         }
       })
@@ -132,18 +129,17 @@ export function createOnboardingComponent(
         if (!ownsRun(ctx) || !pending?.active) return
         // The host can join a late user abort onto the same agent_end object.
         if (readAgentEndOutcome(pending.outcome).blockedBy !== null) release(ctx)
-        else pending = undefined
+        else pending = null
       })
       pi.on("input_disposition", (event, ctx) => {
         if (ownsRun(ctx) && pending && !pending.active
           && isRecord(event) && event.disposition === "rejected") release(ctx)
       })
-      pi.on("session_abort", (_event, ctx) => {
-        if (ownsRun(ctx)) release(ctx)
-      })
-      pi.on("session_shutdown", (_event, ctx) => {
-        if (ownsRun(ctx)) release(ctx)
-      })
+      for (const event of ["session_abort", "session_shutdown"]) {
+        pi.on(event, (_event, ctx) => {
+          if (ownsRun(ctx)) release(ctx)
+        })
+      }
     },
   }
 }

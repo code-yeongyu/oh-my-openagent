@@ -111,6 +111,10 @@ describe("onboarding entry", () => {
       options: { triggerTurn: true, deliverAs: "followUp" },
     }])
     expect(await h.prompt()).toEqual([undefined])
+    await h.agentStart()
+    await h.end()
+    await h.settle()
+    expect(await h.prompt()).toEqual([undefined])
   })
 
   test("#given forced RPC onboarding #when opened #then it waits for the first prompt", async () => {
