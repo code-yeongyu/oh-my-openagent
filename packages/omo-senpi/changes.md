@@ -9,7 +9,6 @@ The confirm is bounded at 45 s, under the default 60 s run budget, and is capped
 - `declined`: no grant.
 - `approved`: the grant is audited, and the end of the turn revokes it. This is the positive control.
 
-||||||| 6f20a8e011
 
 ## 2026-10-10 - Bindings take whatsapp as a native platform name
 
