@@ -107,6 +107,8 @@ impl Engine {
             }
             Method::ClipboardRead => parse::<EmptyParams>(params).and_then(|_| op(Op::ClipboardRead)),
             Method::ClipboardWrite => op(Op::ClipboardWrite(parse(params)?)),
+            Method::MenusItems => op(Op::MenuItems(parse(params)?)),
+            Method::MenusSelect => op(Op::MenusSelect(parse(params)?)),
             Method::Cancel => Ok(Route::Cancel(parse::<CancelParams>(params)?.id)),
             Method::TestAdvanceClock => {
                 let Some(clock) = self.fake_clock() else {

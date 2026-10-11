@@ -60,7 +60,7 @@ test("#given the parent dies before the failed rung's session closes #when anoth
   const disconnected = host.waitForConnections(0)
   await failedRung?.dispose()
   await disconnected
-  owner.forget(task.task_id)
+  owner.forget(task.task_id, { path: "park" })
   owner.workpools.dispose()
   const sweeper = createTaskManager({
     store,
@@ -90,7 +90,7 @@ test("#given the parent dies before the failed rung's session closes #when anoth
     expect(store.load(task.task_id)?.fallback_closing_child).toBeUndefined()
   } finally {
     await sweeper.getResidentHandle(task.task_id)?.dispose()
-    sweeper.forget(task.task_id)
+    sweeper.forget(task.task_id, { path: "end" })
     sweeper.workpools.dispose()
     lifecycle.dispose?.()
   }

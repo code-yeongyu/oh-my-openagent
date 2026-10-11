@@ -42,7 +42,7 @@ describe("TaskManager release guard growth", () => {
     expect(manager.releasedKeyCount()).toBe(1)
 
     // when
-    manager.forget(started.task_id)
+    manager.forget(started.task_id, { path: "end" })
 
     // then
     expect(manager.releasedKeyCount()).toBe(0)
@@ -66,7 +66,7 @@ describe("TaskManager transcript subscription ownership", () => {
     expect(fake.unsubscribeCount()).toBe(0)
 
     // when
-    manager.forget(started.task_id)
+    manager.forget(started.task_id, { path: "end" })
 
     // then
     expect(fake.unsubscribeCount()).toBe(fake.subscribeCount())
@@ -87,7 +87,7 @@ describe("TaskManager park watch ownership", () => {
     expect(fake.parkWatchCount()).toBe(1)
 
     // when
-    manager.forget(started.task_id)
+    manager.forget(started.task_id, { path: "end" })
     fake.park("idle_evicted")
 
     // then

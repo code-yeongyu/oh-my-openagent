@@ -19,6 +19,66 @@ function throwOnNonFallbackableSdkError(response: unknown): void {
 }
 
 const SDK_TRANSIENT_RETRY_ATTEMPTS = 3
+const GLOBAL_SESSION_PAGE_SIZE = 100
+
+type ExperimentalSessionList = (input: { roots?: boolean; cursor?: number; limit: number }) => Promise<unknown>
+
+export type GlobalSessionClient = { experimental: { session: { list: ExperimentalSessionList } } }
+
+function getNextCursor(response: unknown): number | undefined {
+  if (!response || typeof response !== "object" || !("response" in response)) return undefined
+
+  const headers = response.response instanceof Response ? response.response.headers : undefined
+  const cursorHeader = headers?.get("x-next-cursor")
+  if (cursorHeader === undefined || cursorHeader === null) return undefined
+
+  const cursor = Number(cursorHeader)
+  return Number.isFinite(cursor) ? cursor : undefined
+}
+
+function isGlobalSessionListUnavailable(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "name" in error && error.name === "NotFoundError"
+}
+
+async function getSdkGlobalSessions(
+  client: GlobalSessionClient | undefined,
+  options: {
+    roots?: boolean
+    limit?: number
+    sessionMatches?: (session: SessionMetadata) => boolean
+  },
+): Promise<SessionMetadata[] | undefined> {
+  if (!client) return undefined
+
+  try {
+    const desired = options.limit ?? Number.POSITIVE_INFINITY
+    const sessions: SessionMetadata[] = []
+    let matched = 0
+    let cursor: number | undefined
+    while (matched < desired) {
+      const limit = options.sessionMatches
+        ? GLOBAL_SESSION_PAGE_SIZE
+        : Math.min(GLOBAL_SESSION_PAGE_SIZE, desired - matched)
+      const input = {
+        ...(options.roots === undefined ? {} : { roots: options.roots }),
+        ...(cursor === undefined ? {} : { cursor }),
+        limit,
+      }
+      const response = await fetchSdkResponse(() => client.experimental.session.list(input))
+      const pageSessions = normalizeSDKResponse(response, [] as SessionMetadata[])
+      sessions.push(...pageSessions)
+      matched += options.sessionMatches ? pageSessions.filter(options.sessionMatches).length : pageSessions.length
+
+      const nextCursor = getNextCursor(response)
+      if (nextCursor === undefined || nextCursor === cursor) return sessions
+      cursor = nextCursor
+    }
+    return sessions
+  } catch (error) {
+    if (isGlobalSessionListUnavailable(error)) return undefined
+    throw error
+  }
+}
 
 // session_read checks existence and then reads messages through SDK calls,
 // so a single transient HTTP failure on either call would fall back to file storage,
@@ -43,10 +103,16 @@ async function fetchSdkResponse(operation: () => Promise<unknown>): Promise<unkn
 export async function getSdkMainSessions(
   client: PluginInput["client"],
   directory?: string,
+  globalClient?: GlobalSessionClient,
+  limit?: number,
 ): Promise<SessionMetadata[]> {
-  const response = await fetchSdkResponse(() => client.session.list())
-
-  const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
+  const globalSessions = await getSdkGlobalSessions(globalClient, {
+    roots: true,
+    limit,
+    sessionMatches: directory ? (session) => sessionDirectoriesMatch(session.directory, directory) : undefined,
+  })
+  const response = globalSessions ? undefined : await fetchSdkResponse(() => client.session.list())
+  const sessions = globalSessions ?? normalizeSDKResponse(response, [] as SessionMetadata[])
   const mainSessions = sessions.filter((session) => !session.parentID)
   if (directory) {
     return mainSessions
@@ -57,9 +123,14 @@ export async function getSdkMainSessions(
   return mainSessions.sort((a, b) => b.time.updated - a.time.updated)
 }
 
-export async function getSdkAllSessions(client: PluginInput["client"]): Promise<string[]> {
-  const response = await fetchSdkResponse(() => client.session.list())
-  const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
+export async function getSdkAllSessions(
+  client: PluginInput["client"],
+  globalClient?: GlobalSessionClient,
+  limit?: number,
+): Promise<string[]> {
+  const globalSessions = await getSdkGlobalSessions(globalClient, { limit })
+  const response = globalSessions ? undefined : await fetchSdkResponse(() => client.session.list())
+  const sessions = globalSessions ?? normalizeSDKResponse(response, [] as SessionMetadata[])
   return sessions
     .slice()
     .sort((a, b) => b.time.updated - a.time.updated)

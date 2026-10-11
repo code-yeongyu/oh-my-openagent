@@ -132,6 +132,8 @@ impl Worker {
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
+            Op::MenuItems(params) => self.menu_items(&params),
+            Op::MenusSelect(params) => served(self.menu_select(&params, cancelled)),
         }
     }
 

@@ -138,6 +138,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly suspension_reason?: SuspensionReason
   // With `suspension_reason: "revival_deferred"`: the reconcile outcome's reason (capacity, lock_contended, ...).
   readonly revival_deferred_reason?: string
+  // One parked episode's absolute deadline; retry writes and parent restarts must not extend it.
+  readonly recovery_deadline_at?: number
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly fallback_handoff_epoch?: number

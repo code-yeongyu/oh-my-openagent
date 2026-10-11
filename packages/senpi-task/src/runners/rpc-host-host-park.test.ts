@@ -62,7 +62,7 @@ async function expectParked(child: Child, reason: SuspensionReason, status: Task
   expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(0)
   const output = await runTaskOutput({ manager: parent.manager, stateDir: parent.store.stateDir }, { task_id: record.task_id }, parent.sessionId)
   expect(output.details).toMatchObject({ kind: "status", snapshot: { residency_state: "rpc_detached", status } })
-  expect(output.details.kind === "status" ? output.details.snapshot.suspended : undefined).toBeDefined()
+  expect(output.details.kind === "status" && output.details.snapshot.suspended !== undefined).toBe(status === "running" || status === "pending")
 }
 
 describe("a session the host parks parks its task record", () => {
