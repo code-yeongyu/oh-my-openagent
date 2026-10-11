@@ -165,13 +165,14 @@ test.each([
   const commands = `
 gh() {
   case "$1 $2" in
-    "release list") printf 'v5.1.28\\n' ;;
+    # Exceed pipe capacity so a non-consuming reader fails deterministically.
+    "release list") printf 'v5.1.28\\n%.0s' {1..16384} ;;
     "release view") return "$VIEW_STATUS" ;;
     "release create") printf 'create\\n' >> "$CALLS_FILE"; return "$CREATE_STATUS" ;;
     *) return 99 ;;
   esac
 }
-bun() { printf '%s' '--latest'; }
+bun() { cat >/dev/null; printf '%s' '--latest'; }
 `
   try {
     const result = spawnSync("bash", ["-c", commands + run], {
