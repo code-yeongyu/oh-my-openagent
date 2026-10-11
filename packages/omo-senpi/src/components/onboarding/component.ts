@@ -77,7 +77,7 @@ export function createOnboardingComponent(
       pi.registerFlag("onboard", {
         type: "boolean",
         default: false,
-        description: "Tour.",
+        description: "Start the guided tour.",
       })
 
       pi.on("session_start", async (event, ctx) => {

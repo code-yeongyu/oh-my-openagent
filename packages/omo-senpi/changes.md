@@ -839,13 +839,31 @@ extension-triggered and delivery-triggered turns cannot claim onboarding.
 
 The TUI shows a static welcome until that prompt. Explicit `--onboard` still starts the
 guided tour immediately in TUI; RPC defers the forced tour to its first user prompt.
-The skill distinguishes task-first context entry from the explicit tour.
+The skill distinguishes task-first context entry from the explicit tour. A
+`Symbol.for("omo.onboard")` latch on `globalThis` makes the forced tour run once per process
+on in-process paths (TUI, socket host, and `--session-runtime in-process`) and across
+`/new`, `/resume`, and `/fork` within one worker. The default stdio `--multi-session`
+worker runtime gives each `open_session` its own realm, so newly opened workers still
+repeat the forced tour; the once-per-host gap is tracked in
+[#9917](https://github.com/code-yeongyu/oh-my-openagent/issues/9917).
+
+The forced latch is set when the tour is claimed, not when it succeeds, and is not reset
+on release. This deliberately prevents later sessions in that process from repeating a
+forced tour whose first turn failed or aborted. A retry in the same session re-claims the
+marker without re-injecting when `getBranch()` already contains `omo-onboarding:context`;
+the earlier context remains in that session's history.
 
 Claim ownership is local to the injecting session and active run. Automatic retry retains
 it; terminal failure, abort, preflight rejection or teardown before completion releases it
 through `state.ts` `releaseOnboarding`. Settlement checks the end event again for late aborts.
 A successful turn retains the install-wide marker, and a forced tour never deletes a marker
 it did not create. `src/extension/types.ts` exposes the host's existing `sessionKind`.
+
+`getBuiltinSkillsRoot()` now resolves source-mode `.ts` modules to
+`packages/omo-senpi/skills/` instead of the wrong parent directory, while built extensions
+continue to resolve `plugin/skills/`. This also fixes source-mode skill paths for
+`skill-pointers`, `init-deep-advisor`, and `omo-native-tools`. Tests check that the emitted
+onboarding skill path exists in source and bundle modes.
 
 This fixes background-session onboarding for desktop #2197 and #2199 without changing
 Senpi or requiring each RPC caller to opt out. The desktop greeting card and pin remain
