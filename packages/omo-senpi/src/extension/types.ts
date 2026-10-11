@@ -19,6 +19,7 @@ export interface BeforeAgentStartHandlerOptions {
 }
 
 export interface SenpiExtensionAPI {
+  readonly sessionKind?: "interactive" | "worker"
   /**
    * Absolute cwd of the session this extension instance was loaded for. senpi builds one
    * ExtensionAPI per session and already knows the value at load time. Optional because hosts

@@ -828,3 +828,25 @@ With senpi 2026.9.29-4 adopted (wake, admitExternalMessage, terminal control end
 - `components/task/category-unavailable-warning.ts`: when only an unlisted provider serves a hidden category's chain,
   the one notice per session names it and the exact opt-in line
   (`categories.<name>.model = "<gateway>/<model>"`); `details.unlisted_provider_model` carries it for remote clients.
+
+## 2026-10-11 - Onboarding rides the first real prompt (#9905)
+
+`src/components/onboarding/component.ts` no longer claims first-run state or starts a model
+turn when a session opens. An interactive session with UI receives one hidden
+`omo-onboarding:context` message on its first real `before_agent_start` prompt. The handler
+is not preview-safe and also rejects preview events explicitly. Worker, headless, disabled,
+extension-triggered and delivery-triggered turns cannot claim onboarding.
+
+The TUI shows a static welcome until that prompt. Explicit `--onboard` still starts the
+guided tour immediately in TUI; RPC defers the forced tour to its first user prompt.
+The skill distinguishes task-first context entry from the explicit tour.
+
+Claim ownership is local to the injecting session and active run. Automatic retry retains
+it; terminal failure, abort, preflight rejection or teardown before completion releases it
+through `state.ts` `releaseOnboarding`. Settlement checks the end event again for late aborts.
+A successful turn retains the install-wide marker, and a forced tour never deletes a marker
+it did not create. `src/extension/types.ts` exposes the host's existing `sessionKind`.
+
+This fixes background-session onboarding for desktop #2197 and #2199 without changing
+Senpi or requiring each RPC caller to opt out. The desktop greeting card and pin remain
+downstream work; the independent init-deep advisor startup dialog is tracked in #9904.

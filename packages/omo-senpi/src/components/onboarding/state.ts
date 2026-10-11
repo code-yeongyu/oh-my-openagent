@@ -45,6 +45,14 @@ export function isOnboardingComplete(stateDir: string): boolean {
   }
 }
 
+export function releaseOnboarding(stateDir: string): void {
+  try {
+    unlinkSync(join(stateDir, ONBOARDING_MARKER))
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") throw error
+  }
+}
+
 export function getOnboardingMarkerMtime(stateDir: string): number | null {
   try {
     return statSync(join(stateDir, ONBOARDING_MARKER)).mtimeMs
