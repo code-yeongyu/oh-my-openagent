@@ -195,6 +195,7 @@ export function reclaimOrphanedResident(context: LifecycleContext, observed: Tas
     (fresh) =>
       fresh.residency_state === "resident" &&
       fresh.host_pid === observed.host_pid &&
+      (fresh.host_pid === undefined || fresh.host_pid === context.hostPid || !context.signaller.isAlive(fresh.host_pid)) &&
       fresh.updated_at === observed.updated_at,
   )
 }

@@ -98,7 +98,15 @@ export function probeComputerUseEngine(
   const child = launch(enginePath, ["--stdio"], { ...process.env, ...env })
   return new Promise((resolveProbe) => {
     const replies = new Map<number, unknown>()
+    let requestsSent = false
     let stderrTail = ""
+    // The point a stalled probe reached, so a timeout says where the engine stopped answering (#9720).
+    const phase = (): string => {
+      if (!requestsSent) return "spawned, requests not yet sent"
+      if (replies.has(1) && !replies.has(2)) return "engine.hello answered, awaiting capabilities"
+      if (replies.has(2) && !replies.has(1)) return "capabilities answered, awaiting engine.hello"
+      return "requests sent, awaiting engine.hello"
+    }
     let settled: EngineProbeResult | undefined
     const settle = (result: EngineProbeResult) => {
       if (settled !== undefined) return
@@ -107,7 +115,7 @@ export function probeComputerUseEngine(
     }
     const timer = setTimeout(() => {
       const result: EngineProbeResult = settled ?? {
-        ok: false, code: "timeout", message: `desktop engine probe timed out after ${timeoutMs} ms at ${enginePath}`,
+        ok: false, code: "timeout", message: `desktop engine probe timed out after ${timeoutMs} ms at ${enginePath} (phase: ${phase()})`,
       }
       settle(result)
       resolveProbe(result)
@@ -176,5 +184,6 @@ export function probeComputerUseEngine(
 
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "engine.hello", params: {} })}\n`)
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "capabilities", params: {} })}\n`)
+    requestsSent = true
   })
 }
