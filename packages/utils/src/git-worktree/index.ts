@@ -5,3 +5,15 @@ export { parseGitStatusPorcelain } from "./parse-status-porcelain"
 export { parseGitDiffNumstat } from "./parse-diff-numstat"
 export { collectGitDiffStats } from "./collect-git-diff-stats"
 export { formatFileChanges } from "./format-file-changes"
+export type {
+  GitAttributionCheckOptions,
+  GitAttributionConfigLike,
+  ResolvedGitAttribution,
+} from "./git-attribution"
+export {
+  clearGitAttributionCache,
+  parseGitBoolean,
+  resolveGitAttribution,
+  shouldSuppressGitAttribution,
+} from "./git-attribution"
+
