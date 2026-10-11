@@ -9,7 +9,6 @@ The confirm is bounded at 45 s, under the default 60 s run budget, and is capped
 - `declined`: no grant.
 - `approved`: the grant is audited, and the end of the turn revokes it. This is the positive control.
 
-
 ## 2026-10-10 - Bindings take whatsapp as a native platform name
 
 The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.

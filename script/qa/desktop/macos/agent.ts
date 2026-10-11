@@ -113,6 +113,9 @@ function outcome(event: Json): ToolOutcome {
 }
 
 /** The real Senpi RPC process loads the packaged OmO extension and the scripted provider. */
+/** The only confirm this QA approves: the foreground-control grant's (#9651 B5). */
+const CONTROL_CONFIRM_TITLE = "Allow foreground computer control?"
+
 export class AgentSession {
   readonly #sandbox: Sandbox
   readonly #child
@@ -152,7 +155,8 @@ export class AgentSession {
         this.#lastEvents = [...this.#lastEvents, JSON.stringify(parsed).slice(0, 700)].slice(-16)
       // The QA stands in for the human: it approves the foreground-control confirm (#9651 B5) that
       // `desktop.control.acquire` raises, the way a person clicking "Allow" would.
-      if (parsed.type === "extension_ui_request" && parsed.method === "confirm" && typeof parsed.id === "string") {
+      if (parsed.type === "extension_ui_request" && parsed.method === "confirm" && typeof parsed.id === "string" &&
+        parsed.title === CONTROL_CONFIRM_TITLE) {
         this.#child.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: parsed.id, confirmed: true })}\n`)
         this.confirms += 1
       }
