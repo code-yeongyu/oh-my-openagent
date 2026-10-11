@@ -7,13 +7,21 @@ name: Review Claims
 # - claims idle for 3+ days are swept to stale-review
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  workflow_run:
+    workflows: [PR Automation Signal]
+    types: [completed]
   pull_request_review:
     types: [submitted]
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Open PR to reconcile (leave empty for the stale sweep)"
+        required: false
+        type: string
   merge_group:
     types: [checks_requested]
 
@@ -26,7 +34,7 @@ permissions:
 jobs:
   gate:
     name: Review claim gate
-    if: github.event_name == 'pull_request_target' || github.event_name == 'merge_group'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -53,7 +61,7 @@ jobs:
             const { checkMergeGroupReviewClaims } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/review-claim-gate.mjs`).href);
             await checkMergeGroupReviewClaims({ github, context, core });
       - name: Fail while a review claim label is present
-        if: github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
@@ -78,56 +86,37 @@ jobs:
             echo "| Event | ${{ github.event.action }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  claim:
-    name: Register claimer as reviewer
-    if: >-
-      github.event_name == 'pull_request_target' &&
-      github.event.action == 'labeled' &&
-      (github.event.label.name == 'will-review' || github.event.label.name == 'in-review')
+  reconcile:
+    name: Reconcile fork review claims
+    if: github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.pr_number != '')
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: write
     steps:
-      - name: Request review from the claimer and clear stale-review
+      - name: Check out trusted automation helpers
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            script/pr-automation-context.mjs
+            script/pr-review-claims.mjs
+          sparse-checkout-cone-mode: false
+      - name: Reconcile current claims using GitHub metadata
         uses: actions/github-script@v9
         with:
           script: |
-            const pr = context.payload.pull_request;
-            const claimer = context.payload.sender.login;
-            const { owner, repo } = context.repo;
-            if (pr.labels.some((l) => l.name === 'stale-review')) {
-              await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: 'stale-review' })
-                .then(() => core.info('Removed stale-review: superseded by a fresh claim.'))
-                .catch((e) => core.info(`stale-review removal skipped: ${e.message}`));
-            }
-            if (context.payload.sender.type === 'Bot') {
-              core.info(`Label applied by bot ${claimer}; skipping reviewer request.`);
-              return;
-            }
-            if (claimer === pr.user.login) {
-              core.info('Claimer is the PR author; skipping self review request.');
-              return;
-            }
-            const requested = (pr.requested_reviewers ?? []).map((r) => r.login);
-            if (requested.includes(claimer)) {
-              core.info(`${claimer} is already a requested reviewer.`);
-              return;
-            }
-            await github.rest.pulls.requestReviewers({ owner, repo, pull_number: pr.number, reviewers: [claimer] });
-            core.info(`Requested review from claimer ${claimer}.`);
+            const { pathToFileURL } = await import('node:url');
+            const { reconcileReviewClaims } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/pr-review-claims.mjs`).href);
+            await reconcileReviewClaims({ github, context, core });
       - name: Write job summary
         if: always()
-        shell: bash
-        run: |
-          {
-            echo "## Review claim registered"
-            echo
-            echo "| Field | Value |"
-            echo "| --- | --- |"
-            echo "| Job status | ${{ job.status }} |"
-            echo "| PR | #${{ github.event.pull_request.number }} |"
-            echo "| Label | ${{ github.event.label.name }} |"
-            echo "| Claimer | ${{ github.event.sender.login }} |"
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: echo 'Reconciled current PR metadata without executing PR code.' >> "$GITHUB_STEP_SUMMARY"
 
   release-claim:
     name: Release claim on claimer review
@@ -209,7 +198,7 @@ jobs:
 
   stale-sweep:
     name: Sweep stale review claims
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.pr_number == '')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -1,0 +1,19 @@
+name: PR Automation Signal
+
+# No checkout, artifacts, secrets, or write token. Privileged consumers resolve
+# the PR from GitHub's run metadata and read its current state through the API.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Signal metadata automation
+        run: echo "PR metadata is ready for trusted workflow_run consumers."
