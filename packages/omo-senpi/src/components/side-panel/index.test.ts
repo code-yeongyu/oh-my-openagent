@@ -6,7 +6,6 @@ import { OmoSidePanelSettingsSchema, type OmoSidePanelSettings } from "@oh-my-op
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
-import { homedir } from "node:os"
 
 import {
   GIT_REFRESH_FLOOR_MS,
@@ -240,8 +239,10 @@ function columnRows(tui: FakeTui, width = 52): string[] {
 function mounted(
   overrides: Partial<Parameters<typeof createSidePanelComponent>[0]> = {},
   hostExtras: Record<string, unknown> = {},
+  cwd = "/repo",
 ) {
   const pi = new FakeExtensionAPI()
+  pi.cwd = cwd
   const widgets: WidgetCall[] = []
   const timers = manualTimers()
   let clock = 100_000
@@ -308,9 +309,15 @@ function mounted(
 }
 
 describe("side panel wiring", () => {
-  test("#given a mounted panel #when the column renders #then it carries the session facts and the location", async () => {
+  test.each([
+    { cwd: "/repo", location: "/repo" },
+    {
+      cwd: "/workspaces/long-nested-directory/another-directory/oh-my-openagent-test-worktree",
+      location: "…ory/another-directory/oh-my-openagent-test-worktree",
+    },
+  ])("#given a mounted panel at $cwd #when the column renders #then it carries the session facts and the location", async ({ cwd, location }) => {
     // given
-    const harness = mounted()
+    const harness = mounted({}, {}, cwd)
     await harness.pi.dispatch("session_start", {}, harness.host)
 
     // when
@@ -321,7 +328,7 @@ describe("side panel wiring", () => {
     expect(rows[0]).toBe("SESSION  $1.20 · 16.8K")
     expect(rows).toContain("model   claude-opus-5")
     expect(rows).toContain("CONTEXT  29K/1M")
-    expect(rows[rows.length - 1]).toBe(process.cwd().replace(homedir(), "~"))
+    expect(rows[rows.length - 1]).toBe(location)
   })
 
   test("#given a tool starts #when the column renders #then the tool row appears with its target", async () => {
