@@ -294,15 +294,12 @@ Available categories: ${categoryNames.join(", ")}`)
   }
 
   if (categoryModel) {
-    if (userCategories?.[categoryName]?.variant !== undefined) {
-      // Explicit legacy variants also win in the sync sender, which lowers reasoning.
-      categoryModel = { ...categoryModel, reasoning: undefined }
-    } else if (categoryModel.reasoning !== undefined) {
+    if (categoryModel.reasoning !== undefined) {
       categoryModel = {
         ...categoryModel,
         variant: lowerReasoningForModel(categoryModel.reasoning, categoryModel).variant,
       }
-    } else if (effectiveEntry) {
+    } else if (effectiveEntry && (hasCanonicalModels || resolved.isUserConfiguredModel)) {
       categoryModel = { ...categoryModel, variant: effectiveEntry.variant }
     }
   }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import { OmoCategoryConfigSchema } from "@oh-my-opencode/omo-config-core"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { BackgroundManager } from "../../features/background-agent/manager"
 import type { BackgroundTask } from "../../features/background-agent/types"
@@ -32,6 +33,9 @@ const builtinProvider = builtinModel.slice(0, builtinModel.indexOf("/"))
 const builtinID = builtinModel.slice(builtinModel.indexOf("/") + 1)
 const cases: Array<{
   name: string
+  category?: string
+  availableModels?: Record<string, string[]>
+  expectedModel?: { providerID: string; modelID: string }
   config?: CategoryConfig
   variant?: string
   effort?: string
@@ -40,8 +44,16 @@ const cases: Array<{
   { name: "user models reasoning", config: { models: [{ model: "openai/gpt-5.4", reasoning: "high" }] }, variant: "high" },
   { name: "promoted models reasoning", config: { models: ["fixture/unavailable", { model: "openai/gpt-5.4", reasoning: "high" }] }, variant: "high" },
   { name: "builtin model", variant: builtin.variant },
-  { name: "explicit variant", config: { model: "openai/gpt-5.4", variant: "low", reasoning: "high" }, variant: "low" },
-  { name: "neutral default", config: { model: "openai/gpt-5.4", variant: "default", reasoning: "high" }, variant: "default" },
+  {
+    name: "builtin fallback without own variant",
+    category: "quick",
+    availableModels: { xai: ["grok-4.20-0309-non-reasoning"] },
+    expectedModel: { providerID: "xai", modelID: "grok-4.20-0309-non-reasoning" },
+    variant: "low",
+  },
+  { name: "loaded reasoning overrides legacy variant", config: { model: "openai/gpt-5.4", variant: "low", reasoning: "high" }, variant: "high" },
+  { name: "loaded reasoning overrides legacy default", config: { model: "openai/gpt-5.4", variant: "default", reasoning: "high" }, variant: "high" },
+  { name: "loaded legacy default", config: { model: "openai/gpt-5.4", variant: "default" }, variant: "default" },
   { name: "entry variant", config: { models: [{ model: "openai/gpt-5.4", variant: "low" }] }, variant: "low" },
   { name: "user model without level", config: { model: "openai/gpt-5.4" } },
   { name: "user chain without level", config: { models: ["openai/gpt-5.4"] } },
@@ -72,6 +84,13 @@ describe("category settings at provider request boundaries", () => {
     for (const path of ["sync", "background", "resume"] as const) {
       test(`${entry.name}: ${path}`, async () => {
         // given
+        if (entry.availableModels) {
+          cacheSpy.mockReturnValue({
+            connected: Object.keys(entry.availableModels),
+            models: entry.availableModels,
+            updatedAt: new Date().toISOString(),
+          })
+        }
         const sessionID = `ses_${crypto.randomUUID()}`
         const created: Array<{ body: { model?: { variant?: string } } }> = []
         let dispatched = Promise.withResolvers<Dispatch>()
@@ -96,7 +115,7 @@ describe("category settings at provider request boundaries", () => {
           enableParentSessionNotifications: false,
         })
         const args: DelegateTaskArgs = {
-          category: "unspecified-high",
+          category: entry.category ?? "unspecified-high",
           prompt: "Return the dispatch sentinel.",
           description: "Category dispatch regression",
           load_skills: [],
@@ -108,7 +127,7 @@ describe("category settings at provider request boundaries", () => {
             client: unsafeTestValue(client),
             manager,
             directory: "/tmp",
-            userCategories: entry.config ? { "unspecified-high": entry.config } : undefined,
+            userCategories: entry.config ? { [args.category!]: OmoCategoryConfigSchema.parse(entry.config) } : undefined,
           }, undefined, undefined)
           expect(resolution.error).toBeUndefined()
           expect(resolution.categoryModel).toBeDefined()
@@ -165,6 +184,7 @@ describe("category settings at provider request boundaries", () => {
             }
           }
           const request = await dispatched.promise
+          if (entry.expectedModel) expect(request.body.model).toEqual(entry.expectedModel)
           const dispatchedVariant = request.body.variant
           const output = { options: { ...request.body.options } }
           await createChatParamsHandler()({
