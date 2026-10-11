@@ -1286,8 +1286,7 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
-          # GITHUB_TOKEN-created releases cannot trigger release-announce.yml.
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # pipefail matters: an empty tag list is indistinguishable from "no releases
           # exist yet" and would resolve to --latest, so a failed `gh release list`
@@ -1417,6 +1416,17 @@ jobs:
             - Attempts the protected `master` mirror update after release.
           JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  release-announce:
+    needs: [release-metadata, release]
+    if: inputs.lazycodex_only != true && inputs.prepared_release_sha != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-announce.yml
+    with:
+      tag: v${{ needs.release-metadata.outputs.version }}
+    secrets:
+      DISCORD_OMO_RELEASES_WEBHOOK_URL: ${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}
 
   installer-mirror:
     needs: [release-metadata, release, post-publish-verify]

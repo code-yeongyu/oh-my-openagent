@@ -132,7 +132,7 @@ if (import.meta.main) {
   const webhook = process.env.DISCORD_OMO_RELEASES_WEBHOOK_URL
   if (webhook) console.log(`::add-mask::${escapeCommand(webhook)}`)
   try {
-    const event = process.env.GITHUB_EVENT_NAME
+    const event = process.env.ANNOUNCEMENT_EVENT ?? process.env.GITHUB_EVENT_NAME
     if (event !== "release" && event !== "workflow_dispatch") throw new AnnouncementError("Unsupported workflow event")
     const result = await announce({
       tag, event, webhook, token: process.env.GH_TOKEN,

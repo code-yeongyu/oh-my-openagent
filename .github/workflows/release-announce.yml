@@ -3,6 +3,15 @@ name: Release announcement
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Stable omo release tag (vX.Y.Z)"
+        required: true
+        type: string
+    secrets:
+      DISCORD_OMO_RELEASES_WEBHOOK_URL:
+        required: true
   workflow_dispatch:
     inputs:
       tag:
@@ -27,7 +36,7 @@ concurrency:
 
 jobs:
   announce:
-    if: github.event_name == 'workflow_dispatch' || (!github.event.release.draft && !github.event.release.prerelease)
+    if: github.event_name != 'release' || (!github.event.release.draft && !github.event.release.prerelease && github.event.release.author.login != 'github-actions[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -43,6 +52,7 @@ jobs:
       - name: Announce release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANNOUNCEMENT_EVENT: ${{ github.event_name == 'release' && 'release' || 'workflow_dispatch' }}
           DISCORD_OMO_RELEASES_WEBHOOK_URL: ${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
@@ -54,7 +64,8 @@ jobs:
           JOB_SUMMARY_TITLE: Discord release announcement
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Stable published omo releases only; edited releases do not trigger posts.
+            - Stable published omo releases only; edited and bot-authored release events do not trigger posts.
+            - The publisher calls this workflow directly so delivery failure fails its release run.
             - Dry runs compose only; probes post a test, delete it, and require GET 404.
             - Every failed request or missing credential fails the job.
           JOB_SUMMARY_NEXT: Inspect the announcement step before rerunning; production reruns can duplicate a post.

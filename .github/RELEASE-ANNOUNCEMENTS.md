@@ -10,10 +10,19 @@ dry runs. It is passed only through the step environment and masked. Missing
 credentials, empty release notes, malformed responses, and failed HTTP requests
 fail the job with a tag-specific error.
 
-The publish workflow uses its existing `GH_PAT` to create the omo GitHub release:
-events created with `GITHUB_TOKEN` do not start downstream release workflows.
-The announcement workflow reads the release by tag with read-only permissions
-and runs the maintained script from `dev`.
+The publish workflow creates the omo GitHub release with `GITHUB_TOKEN` and then
+calls `release-announce.yml` as a reusable workflow with the required string
+input `tag`. The caller waits for the `release` job, skips LazyCodex-only and
+preparation runs, and passes only the Discord webhook secret. A failed
+announcement makes the publish run itself red; no PAT is needed for this path.
+The reusable job has read-only contents permission.
+
+The `release: published` trigger also handles releases created by a person.
+That path explicitly skips releases authored by `github-actions[bot]` to avoid
+double posts. Events created with `GITHUB_TOKEN` do not start downstream workflows
+in any case. The announcement workflow reads the release by tag and runs the
+maintained script from `dev`. Reusable calls are production mode; dry-run and
+probe are only available through manual dispatch.
 
 ## Proof commands
 
@@ -40,7 +49,9 @@ announcement for an already-announced version to prove this workflow.
 
 ## Duplicate posts
 
-Only `published` triggers automatic announcements; editing release notes does
-not. A webhook cannot list channel history, so there is no channel-history
+The publisher invokes announcements directly; only person-authored `published`
+events also trigger announcements, not `edited` or bot-authored release events.
+A webhook cannot list channel history, so there is no channel-history
 deduplication guard. Rerunning a published-event job or dispatching with both
-`dry_run=false` and `probe=false` posts again. Use dry-run or probe for checks.
+`dry_run=false` and `probe=false`, or rerunning the publisher's announcement job,
+posts again. Use dry-run or probe for checks.
