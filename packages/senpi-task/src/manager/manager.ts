@@ -241,6 +241,7 @@ class TaskManagerImpl implements TaskManager {
       config: options.config,
     })
     this.#outcome = createOutcomeTracker({
+      scheduleExitConfirmation: options.scheduleExitConfirmation,
       store: options.store,
       settleIsolation: (taskId, merge) => this.#isolation.settle(taskId, merge),
       now: this.#now,
