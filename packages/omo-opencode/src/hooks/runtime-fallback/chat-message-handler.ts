@@ -7,6 +7,11 @@ import { createFallbackState, isModelInCooldown, stringifyRuntimeModelWithVarian
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import {
+  getGitHubCopilotRateLimitState,
+  isGitHubCopilotModel,
+  isGitHubCopilotRateLimitCooldown,
+} from "./copilot-rate-limit"
 
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
@@ -101,11 +106,14 @@ export function createChatMessageHandler(deps: HookDeps) {
       return
     }
 
+    const primaryCopilotInCooldown = isGitHubCopilotModel(state.originalModel)
+      && isGitHubCopilotRateLimitCooldown(getGitHubCopilotRateLimitState(deps), Date.now())
     if (
       config.restore_primary_after_cooldown &&
       state.currentModel !== state.originalModel &&
       !state.pendingFallbackModel &&
-      !isModelInCooldown(state.originalModel, state, config.cooldown_seconds)
+      !isModelInCooldown(state.originalModel, state, config.cooldown_seconds) &&
+      !primaryCopilotInCooldown
     ) {
       const primaryPayload = buildRetryModelPayload(
         state.originalModel,

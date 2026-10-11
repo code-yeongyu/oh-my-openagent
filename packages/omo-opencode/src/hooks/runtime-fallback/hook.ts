@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { clearGitHubCopilotRateLimitState } from "./copilot-rate-limit"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -113,6 +114,7 @@ export function createRuntimeFallbackHook(
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
     deps.internallyAbortedSessions.clear()
+    clearGitHubCopilotRateLimitState(deps)
   }
 
   return {
