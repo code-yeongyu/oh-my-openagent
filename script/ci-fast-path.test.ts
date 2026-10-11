@@ -184,7 +184,7 @@ describe("CI fast-path workflow wiring", () => {
     const reviewJobs = workflowJobs(reviewWorkflowPath)
     const gate = reviewJobs["gate"]
     if (!isRecord(gate)) throw new Error("review workflow must define gate")
-    expect(gate["if"]).toBe("github.event_name == 'pull_request_target' || github.event_name == 'merge_group'")
+    expect(gate["if"]).toBe("github.event_name == 'pull_request' || github.event_name == 'merge_group'")
     expect(gate["permissions"]).toEqual({ contents: "read", "pull-requests": "read" })
     contexts.push(String(gate["name"]))
     for (const required of [

@@ -1,10 +1,17 @@
 name: Package Labels
 
 on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Open pull request to relabel"
+        required: true
+        type: string
   issues:
     types: [opened, edited]
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows: [PR Automation Signal]
+    types: [completed]
 
 permissions:
   contents: read
@@ -18,6 +25,41 @@ env:
   PACKAGE_LABEL_COLOR: ededed
 
 jobs:
+  resolve-pr:
+    if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      number: ${{ steps.pr.outputs.number }}
+      title: ${{ steps.pr.outputs.title }}
+      body: ${{ steps.pr.outputs.body }}
+    steps:
+      - name: Check out trusted automation helper
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          sparse-checkout: script/pr-automation-context.mjs
+          sparse-checkout-cone-mode: false
+      - name: Resolve current PR from GitHub run metadata
+        id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const { resolveAutomationPR } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/pr-automation-context.mjs`).href);
+            const pr = await resolveAutomationPR({ github, context, core });
+            if (!pr) return;
+            core.setOutput('number', pr.number);
+            core.setOutput('title', pr.title);
+            core.setOutput('body', pr.body ?? '');
+      - name: Write job summary
+        if: always()
+        run: echo 'Resolved current PR identity from authenticated GitHub metadata.' >> "$GITHUB_STEP_SUMMARY"
+
   ensure-labels:
     runs-on: ubuntu-latest
     steps:
@@ -73,16 +115,16 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   label-pull-request:
-    needs: [ensure-labels]
-    if: github.event_name == 'pull_request_target'
+    needs: [ensure-labels, resolve-pr]
+    if: github.event_name != 'issues' && needs.resolve-pr.outputs.number != ''
     runs-on: ubuntu-latest
     steps:
       - name: Label by changed packages and PR text
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
+          PR_TITLE: ${{ needs.resolve-pr.outputs.title }}
+          PR_BODY: ${{ needs.resolve-pr.outputs.body }}
         run: |
           set -euo pipefail
 
