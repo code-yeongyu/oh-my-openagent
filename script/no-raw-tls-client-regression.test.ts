@@ -6,6 +6,16 @@ import { evaluateShippedSource, findRawTlsClients } from "./no-raw-tls-client-sc
 // a failed parse must reject the shipped file rather than pass an empty scan.
 describe("TLS guard reviewer regressions (H1/H2)", () => {
 
+  it("detects Bun destructuring assignment", () => {
+    assert.ok(findRawTlsClients("let connect; ({ connect } = Bun); connect({ tls: true });").length);
+  });
+
+  it("detects TypeScript import-equals acquisition and its call", () => {
+    const hits = findRawTlsClients('import client = require("node:https"); client.get(url);');
+    assert.ok(hits.some(hit => hit.text === 'import client = require("node:https")'));
+    assert.ok(hits.some(hit => hit.text === "client.get(url)"));
+  });
+
   it("detects calls independently of their module acquisition pins", () => {
     for (const [sample, call] of [
   [

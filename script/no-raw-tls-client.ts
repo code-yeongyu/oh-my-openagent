@@ -109,6 +109,10 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     return undefined
   }
   for (const node of list) {
+    if (ts.isImportEqualsDeclaration(node) && !node.isTypeOnly && ts.isExternalModuleReference(node.moduleReference)) {
+      const specifier = literal(node.moduleReference.expression), module = specifier?.replace(/^node:/, "")
+      if (specifier && module && CLIENTS[module]) bindings.set(node.name.text, { module, specifier })
+    }
     if (!ts.isImportDeclaration(node) || node.importClause?.isTypeOnly) continue
     const specifier = literal(node.moduleSpecifier), module = specifier?.replace(/^node:/, "")
     const clause = node.importClause, named = clause?.namedBindings
@@ -151,6 +155,14 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     hits.push({ line: source.getLineAndCharacterOfPosition(start).line + 1, id, text: normalized(node, source) })
   }
   for (const node of list) {
+    if (ts.isImportEqualsDeclaration(node) && !node.isTypeOnly && ts.isExternalModuleReference(node.moduleReference)
+      && CLIENTS[literal(node.moduleReference.expression)?.replace(/^node:/, "") ?? ""]) add(node, "import-equals acquisition")
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && kind(node.right)?.module === "Bun") {
+      const left = unwrap(node.left)
+      if (ts.isObjectLiteralExpression(left) && left.properties.some(p =>
+        (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p))
+        && (literal(p.name) ?? p.name.getText(source)) === "connect")) add(node, "Bun.connect destructuring assignment")
+    }
     if (ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly && CLIENTS[literal(node.moduleSpecifier)?.replace(/^node:/, "") ?? ""]) {
       const named = node.importClause?.namedBindings
       if (!(named && ts.isNamedImports(named) && !node.importClause?.name && named.elements.length > 0 && named.elements.every(e => e.isTypeOnly)))
