@@ -4,11 +4,12 @@ use image::Rgba;
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, Target};
+use std::collections::BTreeMap;
 
 use crate::ax_tree::AxTree;
 use crate::faults::Faults;
 use crate::method::FakeMethod;
-use crate::scenario::{DelayMs, FakeScenario, ResizeWindow};
+use crate::scenario::{DelayMs, FakeMenuNode, FakeScenario, ResizeWindow};
 use crate::sink::{RecordingSink, SinkOp};
 
 /// Scripted headless `Backend` + `AxBackend`: serves a [`FakeScenario`],
@@ -29,6 +30,7 @@ pub struct FakeBackend {
     pub(crate) resize_window: Option<ResizeWindow>,
     pub(crate) ax_tree: AxTree,
     pub(crate) ax_owner_unknown: bool,
+    pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
     pub(crate) sink: RecordingSink,
     faults: Faults,
 }
@@ -42,6 +44,7 @@ impl FakeBackend {
         Self {
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
+            menus: scenario.menus,
             displays: scenario.displays,
             windows: scenario.windows,
             capabilities: scenario.capabilities,
