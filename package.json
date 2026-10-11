@@ -232,6 +232,7 @@
     "picomatch": "^4.0.7",
     "posthog-node": "^5.52.4",
     "puppeteer-core": "^25.11.0",
+    "@typescript/typescript6": "6.0.2",
     "typescript": "^7.0.2"
   },
   "optionalDependencies": {

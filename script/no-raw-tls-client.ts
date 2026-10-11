@@ -1,282 +1,189 @@
-// Detector for the "stay on Bun 1.4.2" guard (senpi#3078, revisit-condition 3).
-// Bun 1.4.2 carries CVE-2026-48618: its TLS hostname check accepts
-// look-alike-dot hosts (U+3002, U+FF0E, U+FF61), fixed in 1.4.3. Staying on
-// 1.4.2 is safe only while every shipped outbound TLS path derives its host
-// from a URL parse: new URL() normalizes the look-alike dots, and APIs such
-// as http2.connect(authority) parse their authority string the same way.
-// This module reports raw TLS/HTTPS client usage; the reviewed allowlist in
-// no-raw-tls-client.test.ts pins the exact call text and occurrence count.
+import ts from "@typescript/typescript6"
 
 export type AllowlistEntry = { file: string; call: string; count: number; reason: string }
 export type ScanItem = { path: string; content: string }
 export type ScanVerdict = { offenders: string[]; stale: string[] }
 export type RawTlsHit = { line: number; id: string; text: string }
-
-// The client surface of each module. Named imports outside these lists
-// (createServer and friends) are inbound-only and stay unflagged.
-const DANGEROUS_IMPORTS: Record<string, string[]> = {
-  tls: ["connect", "TLSSocket"],
-  https: ["request", "get", "Agent"],
-  http2: ["connect"],
+type Binding = { module: string; member?: string; specifier?: string }
+const CLIENTS: Record<string, readonly string[]> = {
+  tls: ["connect", "createConnection", "TLSSocket", "createSecureContext", "checkServerIdentity"],
+  https: ["request", "get", "Agent", "globalAgent"], http2: ["connect"], Bun: ["connect"],
 }
 
-const CALL_PATTERNS: Array<[string, RegExp]> = [
-  ["tls.connect(", /\btls\s*\.\s*connect\s*\(/g],
-  ["https.request(", /\bhttps\s*\.\s*request\s*\(/g],
-  ["https.get(", /\bhttps\s*\.\s*get\s*\(/g],
-  ["http2.connect(", /\bhttp2\s*\.\s*connect\s*\(/g],
-  ["Bun.connect(", /\bBun\s*\.\s*connect\s*\(/g],
-  ["new https.Agent(", /\bnew\s+https\s*\.\s*Agent\s*\(/g],
-  ["new tls.TLSSocket(", /\bnew\s+tls\s*\.\s*TLSSocket\s*\(/g],
-  ["checkServerIdentity", /\bcheckServerIdentity\b/g],
-]
-
-// ES imports: group 1 catches "import type" (erased at compile time).
-// Named imports only create bindings, whose call sites are flagged below;
-// namespace and default imports grant the whole module and are flagged as
-// module access. require()/import()/getBuiltinModule()/re-exports/template
-// specifiers are module access too (review D1).
-const IMPORT_STATEMENT = /\bimport\s+(type\s+)?([^;'"]*?)\s*from\s*["']((?:node:)?(?:tls|https|http2))["']/g
-const REQUIRE_FORM = /\brequire\s*\(\s*["']((?:node:)?(?:tls|https|http2))["']\s*\)/g
-const DYNAMIC_IMPORT_FORM = /\bimport\s*\(\s*["']((?:node:)?(?:tls|https|http2))["']\s*\)/g
-const GET_BUILTIN_MODULE = /\bprocess\s*\.\s*getBuiltinModule\s*\(\s*["']((?:node:)?(?:tls|https|http2))["']\s*\)/g
-const EXPORT_FROM = /\bexport\s+(type\s+)?([^;'"]*?)\s*from\s*["']((?:node:)?(?:tls|https|http2))["']/g
-const TEMPLATE_MODULE_FORM = new RegExp("\\b(import|require)\\s*\\(\\s*`([^`]*)`\\s*\\)", "g")
-
-type Segment = { text: string; verbatim: boolean }
-
-// Split source into string literals (kept verbatim, comments dropped).
-function segmentSource(text: string): Segment[] {
-  const segments: Segment[] = []
-  let plain = ""
-  let literal = ""
-  let quote: string | null = null
-  let escaped = false
-  let comment: "" | "/" | "*" = ""
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i]
-    if (comment) {
-      const closes = (comment === "/" && ch === "\n") || (comment === "*" && ch === "*" && text[i + 1] === "/")
-      if (closes) {
-        if (comment === "*") i += 1
-        comment = ""
-        plain += " "
-      }
-      continue
-    }
-    if (quote) {
-      literal += ch
-      if (escaped) {
-        escaped = false
-      } else if (ch === "\\") {
-        escaped = true
-      } else if (ch === quote) {
-        quote = null
-        segments.push({ text: literal, verbatim: true })
-        literal = ""
-      }
-      continue
-    }
-    if (ch === "/" && (text[i + 1] === "/" || text[i + 1] === "*")) {
-      comment = text[i + 1] as "/" | "*"
-      i += 1
-      continue
-    }
-    if (ch === "'" || ch === '"' || ch === "`") {
-      if (plain) {
-        segments.push({ text: plain, verbatim: false })
-        plain = ""
-      }
-      quote = ch
-      literal = ch
-      continue
-    }
-    plain += ch
+function parse(content: string, file: string): ts.SourceFile {
+  const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true)
+  const diagnostics: unknown = Reflect.get(source, "parseDiagnostics")
+  if (!Array.isArray(diagnostics)) throw new SyntaxError(file + ": parser diagnostics unavailable")
+  const first: unknown = diagnostics[0]
+  if (first !== undefined) {
+    const message = typeof first === "object" && first !== null && "messageText" in first
+      && typeof first.messageText === "string" ? first.messageText : "invalid syntax"
+    throw new SyntaxError(file + ": " + message)
   }
-  if (plain) segments.push({ text: plain, verbatim: false })
-  if (literal) segments.push({ text: literal, verbatim: true })
-  return segments
+  return source
 }
 
-// Normalize a call for allowlist pinning: collapse whitespace and reformat
-// spacing OUTSIDE string literals only, so string contents stay distinct
-// (review D3) and reformatted calls still match their pinned text.
+function allNodes(root: ts.Node): ts.Node[] {
+  const result: ts.Node[] = []
+  const visit = (node: ts.Node): void => { result.push(node); ts.forEachChild(node, visit) }
+  visit(root)
+  return result
+}
+
+function literal(node: ts.Node | undefined): string | undefined {
+  if (!node) return undefined
+  if (ts.isStringLiteralLike(node)) return node.text
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = literal(node.left), right = literal(node.right)
+    return left !== undefined && right !== undefined ? left + right : undefined
+  }
+  if (ts.isTemplateExpression(node)) {
+    let value = node.head.text
+    for (const span of node.templateSpans) {
+      const part = literal(span.expression)
+      if (part === undefined) return undefined
+      value += part + span.literal.text
+    }
+    return value
+  }
+  return undefined
+}
+
+function unwrap(node: ts.Expression): ts.Expression {
+  return ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node)
+    || ts.isTypeAssertionExpression(node) || ts.isSatisfiesExpression(node) ? unwrap(node.expression) : node
+}
+function member(node: ts.Node): string | undefined {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text
+  if (ts.isElementAccessExpression(node)) return literal(node.argumentExpression)
+  return undefined
+}
+
+function normalized(node: ts.Node, source: ts.SourceFile): string {
+  const spans = allNodes(node).filter(n => ts.isStringLiteralLike(n) || ts.isRegularExpressionLiteral(n)
+    || n.kind === ts.SyntaxKind.TemplateHead || n.kind === ts.SyntaxKind.TemplateMiddle || n.kind === ts.SyntaxKind.TemplateTail)
+    .sort((a, b) => a.getStart(source) - b.getStart(source))
+  const plain = (s: string): string => s.replace(/\s+/g, " ").replace(/\(\s+/g, "(")
+    .replace(/,\s*\)/g, ")").replace(/\s+\)/g, ")")
+  let end = node.getStart(source), text = ""
+  for (const span of spans) {
+    const start = span.getStart(source)
+    if (start < end) continue
+    text += plain(source.text.slice(end, start)) + source.text.slice(start, span.end)
+    end = span.end
+  }
+  return (text + plain(source.text.slice(end, node.end))).trim().replace(/;$/, "")
+}
 export function normalizeCallText(text: string): string {
-  let out = ""
-  for (const segment of segmentSource(text)) {
-    if (segment.verbatim) {
-      out += segment.text
-      continue
-    }
-    out += segment.text
-      .replace(/\s+/g, " ")
-      .replace(/\(\s+/g, "(")
-      .replace(/,\s+\)/g, ")")
-      .replace(/\s+\)/g, ")")
-  }
-  return out.trim()
+  const source = parse(text, "call.ts")
+  return normalized(source, source)
 }
 
-// String- and comment-aware balanced-paren scan with no length cap, so
-// long calls and ")" inside string literals cannot truncate or mis-close
-// the pinned text (review D3).
-function findBalancedClose(content: string, openIndex: number): number {
-  let depth = 0
-  let quote: string | null = null
-  let escaped = false
-  let comment: "" | "/" | "*" = ""
-  for (let i = openIndex; i < content.length; i += 1) {
-    const ch = content[i]
-    if (comment) {
-      const closes = (comment === "/" && ch === "\n") || (comment === "*" && ch === "*" && content[i + 1] === "/")
-      if (closes) {
-        if (comment === "*") i += 1
-        comment = ""
-      }
-      continue
-    }
-    if (quote) {
-      if (escaped) {
-        escaped = false
-      } else if (ch === "\\") {
-        escaped = true
-      } else if (ch === quote) {
-        quote = null
-      }
-      continue
-    }
-    if (ch === "/" && (content[i + 1] === "/" || content[i + 1] === "*")) {
-      comment = content[i + 1] as "/" | "*"
-      i += 1
-      continue
-    }
-    if (ch === "'" || ch === '"' || ch === "`") {
-      quote = ch
-      continue
-    }
-    if (ch === "(") depth += 1
-    else if (ch === ")" && --depth === 0) return i
-  }
-  return -1
-}
-
-function lineNumber(content: string, index: number): number {
-  let line = 1
-  for (let i = 0; i < index; i += 1) {
-    if (content[i] === "\n") line += 1
-  }
-  return line
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(new RegExp("[.*+?^${}()|[\\]\\\\]", "g"), "\\$&")
-}
-
-function moduleNameOf(specifier: string): string {
-  return specifier.replace(/^node:/, "")
-}
-
-function namedSpecs(clause: string): Array<{ name: string; local: string }> {
-  const braces = clause.match(/\{([^}]*)\}/)
-  if (!braces) return []
-  return braces[1]
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const pieces = part.split(/\s+as\s+/)
-      return { name: pieces[0], local: pieces[1] ?? pieces[0] }
-    })
-}
-
-function grantsWholeModule(clause: string): boolean {
-  if (/\*\s*as\b/.test(clause)) return true
-  const outside = clause.replace(/\{[^}]*\}/g, "").replace(/,/g, "").trim()
-  return /[\w$]/.test(outside)
-}
-
-function templateModule(template: string): string | null {
-  const staticText = template.replace(new RegExp("\\$\\{[^}]*\\}", "g"), "")
-  const exact = staticText.match(/^\s*((?:node:)?(?:tls|https|http2))\s*$/)
-  if (exact) return exact[1]
-  if (/(?:node:)?(?:tls|https|http2)\b/.test(staticText)) return "unresolved"
-  return null
-}
-
-function callTextFrom(content: string, match: RegExpMatchArray): string {
-  const start = match.index ?? 0
-  if (!match[0].endsWith("(")) return normalizeCallText(match[0])
-  const close = findBalancedClose(content, start + match[0].length - 1)
-  return close === -1
-    ? normalizeCallText(content.slice(start))
-    : normalizeCallText(content.slice(start, close + 1))
-}
-
-export function findRawTlsClients(content: string): RawTlsHit[] {
-  const hits: RawTlsHit[] = []
-  const seen = new Set<number>()
-  const push = (index: number, id: string, text: string) => {
-    if (seen.has(index)) return
-    seen.add(index)
-    hits.push({ line: lineNumber(content, index), id, text })
-  }
-
-  for (const [id, pattern] of CALL_PATTERNS) {
-    for (const match of content.matchAll(pattern)) {
-      push(match.index ?? 0, id, callTextFrom(content, match))
-    }
-  }
-
-  // Named imports bind; their call sites are the flaggable act (the import
-  // line itself is inert when the binding is unused) - review D2.
-  const bindings: Array<{ local: string; specifier: string }> = []
-  for (const match of content.matchAll(IMPORT_STATEMENT)) {
-    if (match[1]) continue
-    const clause = match[2] ?? ""
-    const specifier = match[3] ?? ""
-    if (grantsWholeModule(clause)) {
-      push(match.index ?? 0, 'module access: import from "' + specifier + '"', normalizeCallText(match[0]))
-    }
-    for (const spec of namedSpecs(clause)) {
-      if (DANGEROUS_IMPORTS[moduleNameOf(specifier)].includes(spec.name)) {
-        bindings.push({ local: spec.local, specifier })
+export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHit[] {
+  const source = parse(content, file), list = allNodes(source)
+  const bindings = new Map<string, Binding>(Object.keys(CLIENTS).map(module => [module, { module }]))
+  const builtinNames = new Set<string>()
+  const requireFactories = new Set<string>()
+  const requireNames = new Set(["require", "__require"])
+  const kind = (expression: ts.Expression | undefined): Binding | undefined => {
+    if (!expression) return undefined
+    const node = unwrap(expression)
+    if (ts.isIdentifier(node)) return bindings.get(node.text)
+    if (ts.isAwaitExpression(node)) return kind(node.expression)
+    if (ts.isCallExpression(node)) {
+      const callee = unwrap(node.expression), name = member(callee) ?? (ts.isIdentifier(callee) ? callee.text : undefined)
+      const factory = ts.isCallExpression(callee) && ts.isIdentifier(callee.expression) && requireFactories.has(callee.expression.text)
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword || name && (requireNames.has(name) || name === "getBuiltinModule" || builtinNames.has(name)) || factory
+        || (member(callee) === "call" && ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && requireNames.has(callee.expression.text))) {
+        const specifier = literal(node.arguments[member(callee) === "call" ? 1 : 0])
+        if (specifier) return { module: specifier.replace(/^node:/, ""), specifier }
       }
     }
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const name = member(node)
+      if (ts.isIdentifier(node.expression) && node.expression.text === "globalThis" && name) return bindings.get(name)
+      const base = kind(node.expression)
+      if (base && name && CLIENTS[base.module]?.includes(name)) return { ...base, member: name }
+      if (base?.member && (name === "call" || name === "apply")) return base
+    }
+    return undefined
   }
-  for (const binding of bindings) {
-    const pattern = new RegExp("(?<![.\\w$])" + escapeRegExp(binding.local) + "\\s*\\(", "g")
-    for (const match of content.matchAll(pattern)) {
-      push(match.index ?? 0, 'binding call: ' + binding.local + ' (imported from "' + binding.specifier + '")', callTextFrom(content, match))
+  for (const node of list) {
+    if (!ts.isImportDeclaration(node) || node.importClause?.isTypeOnly) continue
+    const specifier = literal(node.moduleSpecifier), module = specifier?.replace(/^node:/, "")
+    const clause = node.importClause, named = clause?.namedBindings
+    if (!module || !specifier) continue
+    if (clause?.name && CLIENTS[module]) bindings.set(clause.name.text, { module, specifier })
+    if (named && ts.isNamespaceImport(named) && CLIENTS[module]) bindings.set(named.name.text, { module, specifier })
+    if (named && ts.isNamedImports(named)) for (const spec of named.elements) {
+      if (spec.isTypeOnly) continue
+      const name = (spec.propertyName ?? spec.name).text
+      if (module === "module" && name === "createRequire") requireFactories.add(spec.name.text)
+      if (CLIENTS[module]) bindings.set(spec.name.text, name === "default" ? { module, specifier } : { module, member: name, specifier })
     }
   }
-
-  const moduleForms: Array<[RegExp, string]> = [
-    [REQUIRE_FORM, "require"],
-    [DYNAMIC_IMPORT_FORM, "import"],
-    [GET_BUILTIN_MODULE, "getBuiltinModule"],
-  ]
-  for (const [pattern, label] of moduleForms) {
-    for (const match of content.matchAll(pattern)) {
-      push(match.index ?? 0, label + '("' + match[1] + '")', normalizeCallText(match[0]))
+  let changed: boolean
+  do {
+    changed = false
+    const bind = (name: string, value: Binding): void => {
+      if (!bindings.has(name)) { bindings.set(name, value); changed = true }
     }
-  }
-  for (const match of content.matchAll(EXPORT_FROM)) {
-    if (match[1]) continue
-    const clause = match[2] ?? ""
-    const specifier = match[3] ?? ""
-    const grants =
-      clause.includes("*") ||
-      namedSpecs(clause).some((spec) => DANGEROUS_IMPORTS[moduleNameOf(specifier)].includes(spec.name))
-    if (grants) {
-      push(match.index ?? 0, 're-export from "' + specifier + '"', normalizeCallText(match[0]))
+    for (const node of list) {
+      if (!ts.isVariableDeclaration(node) || !node.initializer) continue
+      const init = unwrap(node.initializer), value = kind(init)
+      if (ts.isIdentifier(node.name) && ts.isCallExpression(init) && ts.isIdentifier(init.expression) && requireFactories.has(init.expression.text)) requireNames.add(node.name.text)
+      if (ts.isIdentifier(node.name) && value) bind(node.name.text, value)
+      if (ts.isObjectBindingPattern(node.name)) for (const spec of node.name.elements) {
+        const name = spec.propertyName ? literal(spec.propertyName) ?? spec.propertyName.getText(source) : spec.name.getText(source)
+        if (ts.isIdentifier(init) && init.text === "process" && name === "getBuiltinModule" && ts.isIdentifier(spec.name)) builtinNames.add(spec.name.text)
+        if (value && ts.isIdentifier(spec.name)) {
+          if (name === "default" && CLIENTS[value.module]) bind(spec.name.text, value)
+          else if (CLIENTS[value.module]?.includes(name)) bind(spec.name.text, { ...value, member: name })
+        }
+      }
     }
+  } while (changed)
+  const hits: RawTlsHit[] = [], seen = new Set<number>()
+  const add = (node: ts.Node, id: string): void => {
+    const start = node.getStart(source)
+    if (seen.has(start)) return
+    seen.add(start)
+    hits.push({ line: source.getLineAndCharacterOfPosition(start).line + 1, id, text: normalized(node, source) })
   }
-  for (const match of content.matchAll(TEMPLATE_MODULE_FORM)) {
-    const module = templateModule(match[2] ?? "")
-    if (module === null) continue
-    const label = module === "unresolved" ? "tls/https/http2" : '"' + module + '"'
-    push(match.index ?? 0, "template " + match[1] + " of " + label, normalizeCallText(match[0]))
+  for (const node of list) {
+    if (ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly && CLIENTS[literal(node.moduleSpecifier)?.replace(/^node:/, "") ?? ""]) {
+      const named = node.importClause?.namedBindings
+      if (!(named && ts.isNamedImports(named) && !node.importClause?.name && named.elements.length > 0 && named.elements.every(e => e.isTypeOnly)))
+        add(node, 'module access: import from "' + literal(node.moduleSpecifier) + '"')
+    }
+    if (ts.isExportDeclaration(node) && !node.isTypeOnly && CLIENTS[literal(node.moduleSpecifier)?.replace(/^node:/, "") ?? ""]) {
+      if (!(node.exportClause && ts.isNamedExports(node.exportClause) && node.exportClause.elements.length > 0 && node.exportClause.elements.every(e => e.isTypeOnly)))
+        add(node, 're-export from "' + literal(node.moduleSpecifier) + '"')
+    }
+    if (ts.isCallExpression(node)) {
+      const value = kind(node)
+      if (value && !value.member && CLIENTS[value.module]) {
+        const label = node.expression.kind === ts.SyntaxKind.ImportKeyword ? "import" : member(node.expression) === "getBuiltinModule" ? "getBuiltinModule" : "require"
+        add(node, ts.isNoSubstitutionTemplateLiteral(node.arguments[0] ?? source) ? 'template ' + label + ' of "' + value.specifier + '"' : label + '("' + value.specifier + '")')
+      }
+    }
+    if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+      const value = kind(node.expression)
+      if (value?.member && CLIENTS[value.module]?.includes(value.member)) {
+        const direct = ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression)
+        const id = direct ? (ts.isNewExpression(node) ? "new " : "") + value.module + "." + value.member + "(" : 'binding call: ' + node.expression.getText(source) + ' (imported from "' + value.specifier + '")'
+        add(node, id)
+      }
+    }
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const value = kind(node)
+      if (value?.module === "Bun" && value.member === "connect"
+        && !((ts.isCallExpression(node.parent) || ts.isNewExpression(node.parent)) && node.parent.expression === node)) add(node, "Bun.connect reference")
+    }
+    if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && kind(node.initializer)?.module === "Bun"
+      && node.name.elements.some(e => (e.propertyName ?? e.name).getText(source).replace(/["']/g, "") === "connect")) add(node, "Bun.connect destructuring")
+    if ((ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) && node.name.getText(source) === "checkServerIdentity") add(node, "checkServerIdentity")
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && member(node.left) === "checkServerIdentity") add(node, "checkServerIdentity")
   }
-
   return hits.sort((a, b) => a.line - b.line || a.id.localeCompare(b.id))
 }

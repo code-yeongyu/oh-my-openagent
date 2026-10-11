@@ -4,13 +4,10 @@ import {
   type AllowlistEntry,
   type ScanItem,
   collectShippedSourceFiles,
-  discoverPluginBuiltRuntimes,
-  evaluateBuiltRuntimeProbe,
   evaluateShippedSource,
   findRawTlsClients,
   isKnownBuiltRuntime,
   isScannedSourceFile,
-  KNOWN_BUILT_RUNTIMES,
   listTrackedFiles,
   readSourceFile,
   WORKSPACE_ROOT,
@@ -26,6 +23,18 @@ import {
 // Adding or editing an entry is a reviewed act: name the host provenance
 // and reference senpi#3078.
 const ALLOWLIST: AllowlistEntry[] = [
+  ...["omo-codex", "omo-senpi"].flatMap((edition) => ["https", "tls"].map((module) => ({
+    file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
+    call: `__require("${module}")`,
+    count: 1,
+    reason: "bundled ws@8.21.3 acquisition: request options and tls.connect(options) derive host/servername from new URL(address).hostname; the connector call remains independently pinned (omowright#40, senpi#3078).",
+  }))),
+  {
+    file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
+    call: 'import { get as httpsGet } from "node:https"',
+    count: 1,
+    reason: "this acquisition supplies the single pinned httpsGet(url, ...) call below; https.get parses the literal api.github.com authority before TLS (senpi#3078).",
+  },
   {
     file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
     call: "httpsGet(url, { headers: { Accept: \"application/vnd.github+json\", \"User-Agent\": \"lazycodex-auto-update\", }, }, (response) => { if (response.statusCode !== 200) { response.resume(); resolve(undefined); return; } let body = \"\"; response.setEncoding(\"utf8\"); response.on(\"data\", (chunk) => { body += chunk; if (body.length > 128_000) request.destroy(); }); response.on(\"end\", () => { try { const parsed = JSON.parse(body); resolve(typeof parsed.body === \"string\" && parsed.body.trim() ? truncateReleaseNotes(parsed.body) : undefined); } catch (error) { if (error instanceof Error) { resolve(undefined); return; } throw error; } }); })",
@@ -64,6 +73,9 @@ const STALE_GUIDANCE = "Every allowlist entry must match the shipped tree: file 
 describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)", () => {
   test("#given raw client samples #when scanned #then every direct pattern, module form and binding is caught with line numbers", () => {
     const samples: Array<[string, string]> = [
+      ['module access: import from "node:tls"', 'import { connect } from "node:tls";'],
+      ['module access: import from "node:https"', 'import { createServer } from "node:https";'],
+      ['module access: import from "node:http2"', 'import { createServer } from "node:http2"; createServer(h);'],
       ["tls.connect(", 'await tls.connect({ host: hostname, port: 443 });'],
       ["https.request(", "https.request(url, onResponse);"],
       ["https.get(", "https.get(url, onResponse);"],
@@ -98,11 +110,8 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
 
   test("#given inert neighbors #when scanned #then nothing is flagged", () => {
     const samples = [
-      'import { createServer } from "node:http2"; createServer(h);',
-      'import { createServer } from "node:https";',
       'import { connect } from "node:tlsx"; connect(h);',
       'import type { Agent } from "node:https";',
-      'import { connect } from "node:tls";',
       "const response = await fetch(url);",
       "const { hostname } = new URL(url);",
       "tls.createServer(options, handler);",
@@ -217,8 +226,9 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       ).toBe(true)
     })
 
-    test("#given a named-import binding #when pinned by its call #then new binding calls still fail", () => {
+    test("#given a named import and call pinned separately #when evaluated #then new calls still fail", () => {
       const entries: AllowlistEntry[] = [
+        { file: "pkg/b.mjs", call: 'import { get as httpsGet } from "node:https"', count: 1, reason: "supplies the pinned URL client" },
         { file: "pkg/b.mjs", call: 'httpsGet(url, { redaction: "none" })', count: 1, reason: "host is a literal" },
       ]
       const exact: ScanItem[] = [
@@ -232,7 +242,7 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       const importPinned: AllowlistEntry[] = [
         { file: "pkg/b.mjs", call: 'import { get as httpsGet } from "node:https"', count: 1, reason: "x" },
       ]
-      expect(evaluateShippedSource(exact, importPinned).stale.length > 0, "import-pinned entries must go stale").toBe(true)
+      expect(evaluateShippedSource(exact, importPinned).offenders.length > 0, "pinning an acquisition does not exempt its calls").toBe(true)
     })
 
     test("#given reformatted calls #when evaluated #then they still match the pinned text", () => {
@@ -243,50 +253,6 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     })
   })
 
-  describe("built omowright runtime probe (CI)", () => {
-    test("#given CI and a missing KNOWN_BUILT_RUNTIMES file #when probed #then the failure names the expected path", () => {
-      const verdict = evaluateBuiltRuntimeProbe({
-        known: KNOWN_BUILT_RUNTIMES,
-        present: () => false,
-        discovered: [],
-        ci: "true",
-      })
-      expect(
-        verdict.failures.some((line) => line.includes("packages/omo-codex/plugin/skills/browser/runtime/omowright/index.js")),
-        JSON.stringify(verdict),
-      ).toBe(true)
-      expect(verdict.scanned).toEqual([])
-    })
-
-    test("#given CI and a staged runtime file missing from KNOWN_BUILT_RUNTIMES #when probed #then the failure names the file", () => {
-      const staged = "packages/omo-codex/plugin/skills/browser/runtime/omowright/worker.js"
-      const verdict = evaluateBuiltRuntimeProbe({
-        known: KNOWN_BUILT_RUNTIMES,
-        present: () => true,
-        discovered: [...KNOWN_BUILT_RUNTIMES, staged],
-        ci: "true",
-      })
-      expect(
-        verdict.failures.some((line) => line.includes(staged) && line.includes("KNOWN_BUILT_RUNTIMES")),
-        JSON.stringify(verdict),
-      ).toBe(true)
-    })
-
-    test("#given no CI #when a runtime is absent or unlisted #then the probe scans what exists without failing", () => {
-      const verdict = evaluateBuiltRuntimeProbe({
-        known: KNOWN_BUILT_RUNTIMES,
-        present: (file) => file === KNOWN_BUILT_RUNTIMES[0],
-        discovered: [KNOWN_BUILT_RUNTIMES[0], "packages/omo-codex/plugin/skills/browser/runtime/omowright/worker.js"],
-        ci: undefined,
-      })
-      expect(verdict).toEqual({ scanned: [KNOWN_BUILT_RUNTIMES[0]], failures: [] })
-    })
-
-    test("#given the built tree #when runtime directories are discovered #then every staged omowright file is a KNOWN_BUILT_RUNTIMES entry", () => {
-      const unlisted = discoverPluginBuiltRuntimes().filter((file) => !KNOWN_BUILT_RUNTIMES.includes(file))
-      expect(unlisted, "built omowright runtimes missing from KNOWN_BUILT_RUNTIMES").toEqual([])
-    })
-  })
 
   test("#given shipped production source #when scanned #then no raw TLS client call exists outside the reviewed allowlist", () => {
     const files = collectShippedSourceFiles()
