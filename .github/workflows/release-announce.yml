@@ -1,6 +1,7 @@
 # Publisher calls announce only releases created by that run; rerunning publish does not repost.
-# Recover a failed post with workflow_dispatch(tag, dry_run=false); the separate 30-minute
-# release-with-no-post watch alerts on missing announcements. Use dry-run/probe for proof.
+# Recover a failed post with workflow_dispatch(tag, dry_run=false); use dry-run/probe for proof.
+# An operator-side watch outside this repo checks omo-ai@latest every 5 minutes and alerts
+# after 30 minutes without a post. Workflow execution does not depend on that watch.
 name: Release announcement
 
 on:

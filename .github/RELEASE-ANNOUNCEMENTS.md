@@ -14,9 +14,13 @@ fail the job with a tag-specific error.
 
 The publish workflow creates the omo GitHub release with `GITHUB_TOKEN` and then
 calls `release-announce.yml` as a reusable workflow with the required string
-input `tag`. The caller waits for the `release` job and runs only when its
-`created` output is `true`: this run successfully created the release, rather
-than finding it already published. It skips LazyCodex-only and preparation
+input `tag`. The caller waits for `release` and `installer-mirror` to finish and
+runs only when the release's `created` output is `true`: this run successfully
+created the release, rather than finding it already published. `always()` allows
+the announcement after a later release step fails or a platform ancestor is
+skipped. A failed or skipped installer mirror does not block the announcement;
+installer freshness still depends on the mirror succeeding.
+It skips LazyCodex-only and preparation
 runs and passes only the Discord webhook secret. A failed
 announcement makes the publish run itself red; no PAT is needed for this path.
 The reusable job has read-only contents permission.
@@ -64,6 +68,9 @@ The publisher invokes announcements directly; only person-authored `published`
 events also trigger announcements, not `edited` or bot-authored release events.
 Rerunning the publisher finds an existing release, outputs `created=false`, and
 skips its announcement job. It never implicitly retries a failed post.
+For an existing stable release, the creation step emits an Actions warning and
+a job-summary line naming the version and its explicit recovery command. This
+also makes a rerun after an earlier release-job failure visible.
 A webhook cannot list channel history, so there is no channel-history
 deduplication guard. Rerunning a published-event job or dispatching with both
 `dry_run=false` and `probe=false`, or rerunning the publisher's announcement job,
@@ -78,6 +85,11 @@ tag with `dry_run=false` (leave `probe` at its default `false`):
 gh workflow run release-announce.yml -f tag=v5.1.29 -f dry_run=false
 ```
 
-The separate 30-minute release-with-no-post watch alerts when a published
-version has no announcement. This workflow does not replace that watch or
-automatically re-announce old versions.
+## Operator-side missed-post watch
+
+The maintainer runs a separate persistent monitor from ops tooling,
+`~/.omo/omocat/gh-feed/announce-watch.sh`. It checks npm `omo-ai@latest` every
+5 minutes and alerts when a new stable version has no `#omo-releases` post
+30 minutes after it appears. This is operator-side tooling, not a guarantee
+provided by this repository. Workflow execution does not depend on the watch
+and does not automatically re-announce old versions.

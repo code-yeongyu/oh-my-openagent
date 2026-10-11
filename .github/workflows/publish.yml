@@ -1289,6 +1289,7 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # pipefail matters: an empty tag list is indistinguishable from "no releases
@@ -1299,6 +1300,11 @@ jobs:
           LATEST_FLAG="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
             echo "created=false" >> "$GITHUB_OUTPUT"
+            if [ -z "$DIST_TAG" ]; then
+              RECOVERY_NOTICE="The release already existed, so it was not announced again. If the earlier run did not post, re-announce with: gh workflow run release-announce.yml -f tag=v${VERSION} -f dry_run=false"
+              printf '::warning::%s\n' "$RECOVERY_NOTICE"
+              printf '%s\n' "$RECOVERY_NOTICE" >> "$GITHUB_STEP_SUMMARY"
+            fi
           else
             gh release create "v${VERSION}" "$LATEST_FLAG" --title "v${VERSION}" --notes-file /tmp/changelog.md
             echo "created=true" >> "$GITHUB_OUTPUT"
@@ -1425,8 +1431,13 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   release-announce:
-    needs: [release-metadata, release]
-    if: inputs.lazycodex_only != true && inputs.prepared_release_sha != '' && needs.release.outputs.created == 'true' && needs.release-metadata.outputs.dist_tag == ''
+    needs: [release-metadata, release, installer-mirror]
+    if: >-
+      always() &&
+      needs.release.outputs.created == 'true' &&
+      needs.release-metadata.outputs.dist_tag == '' &&
+      inputs.lazycodex_only != true &&
+      inputs.prepared_release_sha != ''
     permissions:
       contents: read
     uses: ./.github/workflows/release-announce.yml
