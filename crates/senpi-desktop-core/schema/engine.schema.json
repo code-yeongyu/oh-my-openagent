@@ -164,6 +164,31 @@
         "type": "null"
       }
     },
+    "menus.items": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuPathParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/MenuItem"
+        }
+      }
+    },
+    "menus.select": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuPathParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
     "clipboard.read": {
       "effect": "read",
       "hostOnly": false,
@@ -1245,6 +1270,64 @@
       ],
       "additionalProperties": false
     },
+    "MenuPathParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
+      "additionalProperties": false
+    },
+    "MenuItem": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "hasSubmenu": {
+          "type": "boolean"
+        },
+        "shortcut": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "path",
+        "enabled",
+        "checked",
+        "hasSubmenu"
+      ],
+      "description": "One immediate child of a native application menu. `path` holds the native\nlabels, ellipses included; selection accepts normalized labels.",
+      "additionalProperties": false
+    },
     "ClipboardText": {
       "type": "object",
       "properties": {
@@ -1796,6 +1879,8 @@
         "typeText",
         "keyChord",
         "raiseWindow",
+        "menus.items",
+        "menus.select",
         "clipboard.read",
         "clipboard.write",
         "ax.snapshot",
