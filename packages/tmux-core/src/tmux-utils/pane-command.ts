@@ -1,5 +1,3 @@
-import { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
-
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
 function shellQuoteForNestedCommand(value: string): string {
@@ -18,8 +16,9 @@ export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, dir
 }
 
 export function buildTmuxPlaceholderCommand(description: string): string {
-  const escapedDescription = shellEscapeForDoubleQuotedCommand(description)
-  return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' \\"OMO subagent pane ready: ${escapedDescription}\\" \\"Focus this pane to attach.\\"; while :; do sleep 86400; done"`
+  const banner = shellQuoteForNestedCommand(`OMO subagent pane ready: ${description}`)
+  const hint = shellQuoteForNestedCommand("Focus this pane to attach.")
+  return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' ${banner} ${hint}; while :; do sleep 86400; done"`
 }
 
 export function buildPaneAuthEnvironmentArgs(): string[] {

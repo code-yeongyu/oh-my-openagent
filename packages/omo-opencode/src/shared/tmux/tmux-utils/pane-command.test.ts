@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
@@ -106,10 +106,56 @@ describe("buildTmuxPlaceholderCommand", () => {
     expect(cmd).not.toContain("opencode attach")
   })
 
-  it("keeps single quotes and percent signs inside safe printf arguments", () => {
-    const cmd = buildTmuxPlaceholderCommand("Fix Bob's 100% broken pane")
-    expect(cmd).toContain(`printf '%s\\n%s\\n'`)
-    // Escaped quotes \" required for nested shell -c "..." argument
-    expect(cmd).toContain(`\\"OMO subagent pane ready: Fix Bob's 100% broken pane\\"`)
-  })
+  itWithUnixShell(
+    "#given single quotes and percent signs #when generated command runs through the shell #then they print literally",
+    () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "omo-tmux-placeholder-"))
+
+      try {
+        const description = "Fix Bob's 100% broken pane"
+
+        expect(runPlaceholderUntilLoop(buildTmuxPlaceholderCommand(description), tempDir)).toEqual([
+          `OMO subagent pane ready: ${description}`,
+          "Focus this pane to attach.",
+        ])
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+      }
+    },
+  )
+
+  itWithUnixShell(
+    "#given shell syntax in the description #when generated command runs through the shell #then nothing is evaluated and it prints literally",
+    () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "omo-tmux-placeholder-"))
+      const canary = join(tempDir, "canary")
+
+      try {
+        const description = `run $(touch ${canary}) \`touch ${canary}\` $HOME "quoted" a;b|c&d #e (f) back\\slash`
+
+        expect(runPlaceholderUntilLoop(buildTmuxPlaceholderCommand(description), tempDir)).toEqual([
+          `OMO subagent pane ready: ${description}`,
+          "Focus this pane to attach.",
+        ])
+        expect(existsSync(canary)).toBe(false)
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+      }
+    },
+  )
 })
+
+function runPlaceholderUntilLoop(command: string, tempDir: string): readonly string[] {
+  // The placeholder idles in `while :; do sleep 86400; done`. A fake `sleep`
+  // that terminates its parent shell ends the loop after the banner prints.
+  const binDir = join(tempDir, "bin")
+  mkdirSync(binDir, { recursive: true })
+  writeFileSync(join(binDir, "sleep"), ["#!/bin/sh", 'kill -TERM "$PPID"'].join("\n"))
+  chmodSync(join(binDir, "sleep"), 0o755)
+
+  // tmux hands the command string to `sh -c`, so run it exactly that way.
+  const result = Bun.spawnSync(["/bin/sh", "-c", command], {
+    env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+  })
+  return result.stdout.toString().replace(/\n$/, "").split("\n")
+}
