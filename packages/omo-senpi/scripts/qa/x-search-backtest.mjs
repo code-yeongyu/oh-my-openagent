@@ -85,6 +85,7 @@ async function probeGrokLogin() {
     let stdout = "", stderr = "", settled = false;
     const finish = (value) => { if (!settled) { settled = true; resolveResult(value); } };
     child.stdout.on("data", (x) => { stdout += x; }); child.stderr.on("data", (x) => { stderr += x; });
+    child.on("error", (error) => finish({ status: "error", reason: `cannot run ${GROK_BIN}: ${error.message}`, errors: [`cannot run ${GROK_BIN}: ${error.message}`] }));
     const timer = setTimeout(() => { child.kill("SIGKILL"); finish({ status: "blocked_auth", reason: "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)", errors: ["sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)"] }); }, 30000);
     child.on("close", (code) => {
       clearTimeout(timer);
@@ -107,6 +108,7 @@ async function runGrok(query, variant, carrier, runDate, timeoutMs) {
     let stdout = "", stderr = "", settled = false;
     const finish = (value) => { if (!settled) { settled = true; resolveResult(value); } };
     child.stdout.on("data", (x) => { stdout += x; }); child.stderr.on("data", (x) => { stderr += x; });
+    child.on("error", (error) => finish({ status: "error", reason: `cannot run ${GROK_BIN}: ${error.message}`, errors: [`cannot run ${GROK_BIN}: ${error.message}`] }));
     const timer = setTimeout(() => { child.kill("SIGKILL"); finish({ status: "error", errors: [`grok CLI timed out after ${timeoutMs}ms`] }); }, timeoutMs);
     child.on("close", (code) => { clearTimeout(timer); const blocked = /Sign in|Open this URL/i.test(stderr); finish({ status: blocked ? "blocked_auth" : code === 0 ? "ok" : "error", stdout: stdout.trim(), errors: stderr ? [stderr.trim()] : [] }); });
   });

@@ -1,6 +1,6 @@
 ## 2026-10-11 - QA scripts stop defaulting to a maintainer's local paths
 
-Four QA scripts fell back to absolute paths on one maintainer's machine when their environment override was unset. `script/qa/omp-item2-measure.ts` now requires `E` (the adoption-eval evidence directory) and fails with a message naming it instead of reading a personal path. The thread-tools harness and the task-14 helpers default `THREAD_QA_SENPI_ROOT`/`THREAD_QA_DESKTOP_ROOT` to sibling checkouts of this repository and `THREAD_QA_EVIDENCE_ROOT` to the repo-local `.omo/evidence`. The X-search backtest runs `grok` from `PATH`, overridable with `GROK_BIN`. Behaviour with the overrides set is unchanged.
+Four QA scripts fell back to absolute paths on one maintainer's machine when their environment override was unset. `script/qa/omp-item2-measure.ts` now requires `E` (the adoption-eval evidence directory) and fails with a message naming it instead of reading a personal path. The thread-tools harness and the task-14 helpers default `THREAD_QA_SENPI_ROOT` (and the harness's `THREAD_QA_DESKTOP_ROOT`) to sibling checkouts of this repository, and task-14's `THREAD_QA_EVIDENCE_ROOT` to the repo-local `.omo/evidence`. The X-search backtest runs `grok` from `PATH`, overridable with `GROK_BIN`, and records a missing binary as a lane error instead of crashing. A source comment in `model-core` drops a local checkout path. Behaviour with the overrides set is unchanged.
 
 ## 2026-10-10 - macOS native menu backend for computer use (#9651)
 
