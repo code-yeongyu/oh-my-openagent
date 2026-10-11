@@ -1,5 +1,6 @@
 //! Menu requests: `menus.items` is a read against the scripted tree, and
-//! `menus.select` is one background-delivered, gated, audited mutation.
+//! `menus.select` is one gated, audited mutation (background by default,
+//! foreground only under the control grant).
 
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
@@ -27,8 +28,9 @@ impl Worker {
             .map(Response::MenuItems)
     }
 
-    /// Selecting a command mutates the app: background delivery against the
-    /// window id, so the gate, the key-focus restore, and exactly one audit
+    /// Selecting a command mutates the app: delivery against the window id
+    /// (an omitted mode is background; foreground needs the control grant,
+    /// which `mutate` checks before anything else), so the gate, the key-focus restore, and exactly one audit
     /// event apply like every other exec, an invalid path included. The
     /// backend checks for a stop or cancel at every menu level and before the
     /// press, so a stop landing mid-walk dispatches nothing.

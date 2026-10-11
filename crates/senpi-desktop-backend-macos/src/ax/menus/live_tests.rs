@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+use senpi_desktop_core::backend::{Backend, DeliveryMode};
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::types::{DesktopWindow, DisplaySelector};
 
@@ -185,15 +186,25 @@ fn foreground_delivery_selects_in_the_target_window_of_a_two_window_app() {
     let record = dir.path().join("record.txt");
     let title = format!("senpi-menu-fg-{}", std::process::id());
     let (_fixture, window) = launch(&build_fixture(dir.path()), &title, &record, Some("two"));
-    let mut input = MacInput::new(CanaryMode::Off).unwrap();
+    let fixture_pid = libc::pid_t::try_from(window.pid.unwrap()).unwrap();
+    // The fixture may take the front at launch; hand it back to the launching
+    // app so "the front was restored" cannot pass vacuously.
+    if crate::front_app::current_front_pid() == Some(fixture_pid) {
+        if let Some(launcher) = responsible::current().map(|process| process.pid) {
+            let _ = crate::skylight::activate_application(launcher);
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    }
     let front_before = crate::front_app::current_front_pid();
-    println!("front_before={front_before:?}");
+    println!("front_before={front_before:?} fixture_pid={fixture_pid}");
+    assert_ne!(front_before, Some(fixture_pid), "precondition: the fixture must not already be front");
 
-    // The session admits this only under the control grant (#9888); here the
-    // backend is driven directly through the same foreground scope it uses.
+    // Through the production backend entry point, so the delivery branch in
+    // backend.rs is exercised; the session admits this only under the grant.
+    let mut backend = crate::MacosBackend::new(DisplaySelector::All).unwrap();
     let path = vec!["File".to_owned(), "Save".to_owned()];
-    let chosen = input
-        .with_menu_window_foreground(&window, || select(&window, &path, &|| Ok(()), &mut || Ok(())))
+    let chosen = backend
+        .menu_select(&window, &path, DeliveryMode::Foreground, &|| Ok(()))
         .map_err(|e| (e.code, e.message));
     println!("fg_select={chosen:?}");
     assert_eq!(chosen, Ok(()));
@@ -203,4 +214,14 @@ fn foreground_delivery_selects_in_the_target_window_of_a_two_window_app() {
     let front_after = crate::front_app::current_front_pid();
     println!("front_after={front_after:?}");
     assert_eq!(front_after, front_before, "the user's front app was not handed back");
+
+    // Background on the same two-window app keeps its refusal and dispatches nothing more.
+    let background = backend
+        .menu_select(&window, &path, DeliveryMode::Background, &|| Ok(()))
+        .map_err(|e| e.code);
+    println!("bg_two_window={background:?}");
+    assert_eq!(background, Err(ErrorCode::BackgroundUnavailable));
+    let after = std::fs::read_to_string(&record).unwrap_or_default();
+    println!("recorded_after_background={after:?}");
+    assert_eq!(after, format!("Save@{title}\n"));
 }

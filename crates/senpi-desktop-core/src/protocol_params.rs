@@ -86,8 +86,8 @@ pub struct ControlGrantParams {
     pub confirmation_id: String,
 }
 
-/// `menus.items` / `menus.select`: the window whose menu is addressed and the
-/// path inside it (empty lists the menu bar; select requires 1..=32 labels).
+/// `menus.items`: the window whose menu is addressed and the path inside it
+/// (empty lists the menu bar). `menus.select` takes [`MenuSelectParams`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MenuPathParams {

@@ -18,6 +18,20 @@ use super::walk::{children, context, resolve_menu};
 /// before the session hands key focus back (upstream's post-action settle).
 const POST_PRESS_SETTLE: Duration = Duration::from_millis(50);
 
+/// The checks that need no activation: the path shape, the exact native
+/// window, and a stop or cancel. Foreground delivery runs this BEFORE it
+/// raises the app, so a refused request never flashes the target to the
+/// front (#9888).
+pub(crate) fn preflight(
+    window: &DesktopWindow,
+    path: &[String],
+    check_stop: &dyn Fn() -> CoreResult<()>,
+) -> CoreResult<()> {
+    validate_path(path, false)?;
+    context(window)?;
+    check_stop()
+}
+
 pub(crate) fn select(
     window: &DesktopWindow,
     path: &[String],

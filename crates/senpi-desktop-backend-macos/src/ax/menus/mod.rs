@@ -13,7 +13,7 @@ use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::menus::{validate_path, MenuItem};
 use senpi_desktop_core::types::DesktopWindow;
 
-pub(crate) use self::select::select;
+pub(crate) use self::select::{preflight, select};
 
 #[cfg(test)]
 use self::describe::render_shortcut;

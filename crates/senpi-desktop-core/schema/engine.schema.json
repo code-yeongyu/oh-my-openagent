@@ -1365,7 +1365,7 @@
       "required": [
         "windowId"
       ],
-      "description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
+      "description": "`menus.items`: the window whose menu is addressed and the path inside it\n(empty lists the menu bar). `menus.select` takes [`MenuSelectParams`].",
       "additionalProperties": false
     },
     "MenuItem": {

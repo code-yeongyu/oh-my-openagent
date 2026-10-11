@@ -185,9 +185,12 @@ impl Backend for MacosBackend {
                 input.make_menu_window_key(window, capture)
             }),
             // The window is already key inside the foreground scope, so `make_key` only verifies it.
-            DeliveryMode::Foreground => input.with_menu_window_foreground(window, || {
-                crate::ax::menus::select(window, path, check_stop, &mut || Ok(()))
-            }),
+            DeliveryMode::Foreground => {
+                crate::ax::menus::preflight(window, path, check_stop)?;
+                input.with_menu_window_foreground(window, || {
+                    crate::ax::menus::select(window, path, check_stop, &mut || Ok(()))
+                })
+            }
         }
     }
 
