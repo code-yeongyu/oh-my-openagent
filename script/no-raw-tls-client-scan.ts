@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
-import { findRawTlsClients } from "./no-raw-tls-client"
+import { findRawTlsClients, normalizeCallText } from "./no-raw-tls-client"
 import type { AllowlistEntry, ScanItem, ScanVerdict } from "./no-raw-tls-client"
 
 export { findRawTlsClients, normalizeCallText } from "./no-raw-tls-client"
@@ -26,10 +26,11 @@ export const WORKSPACE_ROOT = repoRootFrom(import.meta.dir)
 export function evaluateShippedSource(scan: ScanItem[], allowlist: AllowlistEntry[]): ScanVerdict {
   const offenders: string[] = []
   const matched = new Map<AllowlistEntry, number>(allowlist.map((entry) => [entry, 0] as const))
+  const calls = new Map(allowlist.map((entry) => [entry, normalizeCallText(entry.call)] as const))
   const scannedPaths = new Set(scan.map((item) => item.path))
   for (const item of scan) {
     for (const hit of findRawTlsClients(item.content, item.path)) {
-      const entry = allowlist.find((candidate) => candidate.file === item.path && candidate.call === hit.text)
+      const entry = allowlist.find((candidate) => candidate.file === item.path && calls.get(candidate) === hit.text)
       if (entry) {
         matched.set(entry, (matched.get(entry) ?? 0) + 1)
         continue

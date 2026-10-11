@@ -5,6 +5,49 @@ import { evaluateShippedSource, findRawTlsClients } from "./no-raw-tls-client-sc
 // Security contract: regex/template trivia cannot hide raw TLS acquisitions;
 // a failed parse must reject the shipped file rather than pass an empty scan.
 describe("TLS guard reviewer regressions (H1/H2)", () => {
+  // Security regression: in-tree runtime access must expose the client, not just its global lookup.
+  for (const { name, sample } of [
+  {
+    "name": "cast alias",
+    "sample": "const runtime = globalThis as typeof globalThis & { readonly Bun?: Runtime }; runtime.Bun?.connect(o);"
+  },
+  {
+    "name": "parenthesized cast",
+    "sample": "(globalThis as Runtime).Bun?.connect(o);"
+  },
+  {
+    "name": "satisfies and non-null",
+    "sample": "const runtime = (globalThis satisfies object)!; runtime.Bun?.connect(o);"
+  },
+  {
+    "name": "Reflect direct",
+    "sample": "Reflect.get(globalThis, \"Bun\")?.connect(o);"
+  },
+  {
+    "name": "Reflect alias chain",
+    "sample": "const runtime = globalThis as Runtime; const target = runtime; Reflect.get((target satisfies object)!, \"Bun\")?.connect(o);"
+  },
+  {
+    "name": "Reflect cast",
+    "sample": "(Reflect.get(globalThis, \"Bun\") as Runtime)?.connect(o);"
+  }
+] as const) {
+    it("detects the AST-round " + name + " client", () => {
+      assert.ok(findRawTlsClients(sample).some(hit => hit.text.endsWith("connect(o)")), sample);
+    });
+  }
+  it("keeps non-client Bun lookups and unrelated Reflect receivers clean", () => {
+    for (const sample of ['const target = globalThis; const bun = Reflect.get(target, "Bun"); bun?.hash(value);', 'const local = {}; Reflect.get(local, "Bun").connect(o);'])
+      assert.deepEqual(findRawTlsClients(sample), []);
+  });
+  it("preserves object trailing-comma reflows without changing literals or counts", () => {
+    const entry = { file: "src/client.js", call: 'tls.connect({ host: u.hostname, options: { servername: u.hostname, label: "comma, }" } })', count: 2, reason: "URL-parsed host" };
+    const content = entry.call + ';\n tls.connect({ host: u.hostname, options: { servername: u.hostname, label: "comma, }", }, },);';
+    const scan = [{ path: entry.file, content }];
+    assert.deepEqual(evaluateShippedSource(scan, [entry]), { offenders: [], stale: [] });
+    assert.ok(evaluateShippedSource([{ path: entry.file, content: content + entry.call }], [entry]).stale.length);
+    assert.ok(evaluateShippedSource([{ path: entry.file, content: content.replace('comma, }', 'comma,}') }], [entry]).offenders.length);
+  });
 
   it("detects Bun destructuring assignment", () => {
     assert.ok(findRawTlsClients("let connect; ({ connect } = Bun); connect({ tls: true });").length);

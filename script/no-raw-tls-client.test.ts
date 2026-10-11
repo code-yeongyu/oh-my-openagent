@@ -22,6 +22,11 @@ import {
 // http2.connect(authority) that parses its argument - or is a literal.
 // Adding or editing an entry is a reviewed act: name the host provenance
 // and reference senpi#3078.
+// Known limits: createRequire through namespace/default module imports or
+// require("node:module") chains; require.apply, require aliases/sequence calls;
+// detached getBuiltinModule aliases/.call; variable Bun keys; globalThis Bun
+// destructuring; variable/const-folded module specifiers; Reflect.get(Bun, "connect").
+// This is a regression guard, not a complete data-flow or evasion detector.
 const ALLOWLIST: AllowlistEntry[] = [
   ...["omo-codex", "omo-senpi"].flatMap((edition) => ["https", "tls"].map((module) => ({
     file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
@@ -71,7 +76,7 @@ const OFFENDER_GUIDANCE = [
 const STALE_GUIDANCE = "Every allowlist entry must match the shipped tree: file scanned, normalized call text found, occurrence count exact, reason present."
 
 describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)", () => {
-  test("#given raw client samples #when scanned #then every direct pattern, module form and binding is caught with line numbers", () => {
+  test("#given raw client samples #when scanned #then sampled client patterns, module forms and bindings are caught with line numbers", () => {
     const samples: Array<[string, string]> = [
       ['module access: import from "node:tls"', 'import { connect } from "node:tls";'],
       ['module access: import from "node:https"', 'import { createServer } from "node:https";'],
@@ -105,7 +110,7 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       expect(hits.some((hit) => hit.id === id), "sample not caught as " + id + ": " + sample).toBe(true)
     }
     const positioned = findRawTlsClients('const a = 1;\n\nawait tls.connect({ host: "x", port: 1 });')
-    expect(positioned).toEqual([{ line: 3, id: "tls.connect(", text: 'tls.connect({ host: "x", port: 1 })' }])
+    expect(positioned).toEqual([{ line: 3, id: "tls.connect(", text: 'tls.connect({ host: "x", port: 1})' }])
   })
 
   test("#given inert neighbors #when scanned #then nothing is flagged", () => {
@@ -160,7 +165,7 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
 
   test("#given calls with tricky strings #when normalized #then string contents stay distinct", () => {
     const paren = findRawTlsClients('tls.connect({ host: ")" + h });')
-    expect(paren[0]?.text).toBe('tls.connect({ host: ")" + h })')
+    expect(paren[0]?.text).toBe('tls.connect({ host: ")" + h})')
     const withSpaces = findRawTlsClients('tls.connect({ host: "a  b" });')
     const single = findRawTlsClients('tls.connect({ host: "a b" });')
     expect(withSpaces[0]?.text).not.toBe(single[0]?.text)
@@ -201,7 +206,7 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       ]
       const verdict = evaluateShippedSource(scan, [pinnedCallEntry()])
       expect(
-        verdict.offenders.some((line) => line.includes('tls.connect({ host: "x", port: 1 })')),
+        verdict.offenders.some((line) => line.includes('tls.connect({ host: "x", port: 1})')),
         "expected the new tls.connect to be flagged: " + JSON.stringify(verdict),
       ).toBe(true)
     })

@@ -64,7 +64,7 @@ function normalized(node: ts.Node, source: ts.SourceFile): string {
     || n.kind === ts.SyntaxKind.TemplateHead || n.kind === ts.SyntaxKind.TemplateMiddle || n.kind === ts.SyntaxKind.TemplateTail)
     .sort((a, b) => a.getStart(source) - b.getStart(source))
   const plain = (s: string): string => s.replace(/\s+/g, " ").replace(/\(\s+/g, "(")
-    .replace(/,\s*\)/g, ")").replace(/\s+\)/g, ")")
+    .replace(/,\s*([)}])/g, "$1").replace(/\s+([)}])/g, "$1")
   let end = node.getStart(source), text = ""
   for (const span of spans) {
     const start = span.getStart(source)
@@ -81,7 +81,7 @@ export function normalizeCallText(text: string): string {
 
 export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHit[] {
   const source = parse(content, file), list = allNodes(source)
-  const bindings = new Map<string, Binding>(Object.keys(CLIENTS).map(module => [module, { module }]))
+  const bindings = new Map<string, Binding>([...Object.keys(CLIENTS), "globalThis"].map(module => [module, { module }]))
   const builtinNames = new Set<string>()
   const requireFactories = new Set<string>()
   const requireNames = new Set(["require", "__require"])
@@ -92,6 +92,9 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     if (ts.isAwaitExpression(node)) return kind(node.expression)
     if (ts.isCallExpression(node)) {
       const callee = unwrap(node.expression), name = member(callee) ?? (ts.isIdentifier(callee) ? callee.text : undefined)
+      const receiver = ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee) ? unwrap(callee.expression) : undefined
+      if (name === "get" && receiver && ts.isIdentifier(receiver) && receiver.text === "Reflect"
+        && kind(node.arguments[0])?.module === "globalThis" && literal(node.arguments[1]) === "Bun") return { module: "Bun" }
       const factory = ts.isCallExpression(callee) && ts.isIdentifier(callee.expression) && requireFactories.has(callee.expression.text)
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword || name && (requireNames.has(name) || name === "getBuiltinModule" || builtinNames.has(name)) || factory
         || (member(callee) === "call" && ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && requireNames.has(callee.expression.text))) {
@@ -101,8 +104,8 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     }
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const name = member(node)
-      if (ts.isIdentifier(node.expression) && node.expression.text === "globalThis" && name) return bindings.get(name)
       const base = kind(node.expression)
+      if (base?.module === "globalThis" && name) return bindings.get(name)
       if (base && name && CLIENTS[base.module]?.includes(name)) return { ...base, member: name }
       if (base?.member && (name === "call" || name === "apply")) return base
     }
@@ -174,7 +177,7 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     }
     if (ts.isCallExpression(node)) {
       const value = kind(node)
-      if (value && !value.member && CLIENTS[value.module]) {
+      if (value?.specifier && !value.member && CLIENTS[value.module]) {
         const label = node.expression.kind === ts.SyntaxKind.ImportKeyword ? "import" : member(node.expression) === "getBuiltinModule" ? "getBuiltinModule" : "require"
         add(node, ts.isNoSubstitutionTemplateLiteral(node.arguments[0] ?? source) ? 'template ' + label + ' of "' + value.specifier + '"' : label + '("' + value.specifier + '")')
       }
