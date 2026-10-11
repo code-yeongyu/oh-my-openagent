@@ -158,7 +158,7 @@ describe("suspended children in the heading", () => {
     // given a parked child is neither working nor over, and counting it as either is a lie
     const children = [
       child({ id: "a" }),
-      child({ id: "b", status: "suspended" }),
+      child({ id: "b", status: "resuming" }),
       child({ id: "c", status: "finished", finishedAt: 500 }),
     ]
 
@@ -173,15 +173,15 @@ describe("suspended children in the heading", () => {
 
   test("#given a parked child #when its row is drawn #then it reads as something to notice", () => {
     // given
-    const rows = buildAgentRows([child({ id: "b", status: "suspended" })], 1_000, 60)
+    const rows = buildAgentRows([child({ id: "b", status: "resuming" })], 1_000, 60)
 
     // then
-    expect(rows[1]?.color).toBe("warning")
+    expect(rows[1]?.color).toBe("muted")
   })
 
   test("#given a parked child without a suspension timestamp #when redrawn #then elapsed time does not keep ticking", () => {
     // given the task record has no timestamp for when suspension began
-    const parked = child({ id: "b", status: "suspended", startedAt: 0 })
+    const parked = child({ id: "b", status: "resuming", startedAt: 0 })
 
     // when
     const first = texts(buildAgentRows([parked], 60_000, 60))
@@ -196,9 +196,9 @@ describe("suspended children in the heading", () => {
 
 describe("why a child is parked", () => {
   test("#given a parked child #when its card is opened #then the card says what is holding it", () => {
-    // given "suspended" on its own leaves the obvious question unanswered, and the engine already
+    // given "resuming" on its own leaves the obvious question unanswered, and the engine already
     // knows the answer: a dead daemon and a draining host need different things from the user
-    const parked = child({ status: "suspended", parkedReason: "daemon_unavailable" })
+    const parked = child({ status: "resuming", parkedReason: "daemon_unavailable" })
 
     // when
     const rows = buildAgentCardRows(parked, 1_000)
