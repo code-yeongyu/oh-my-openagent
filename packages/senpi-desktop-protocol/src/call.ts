@@ -29,6 +29,9 @@ export const DESKTOP_METHODS: MethodPolicies = {
 	ref: "read",
 	"clipboard.read": "read",
 	"clipboard.write": "exec",
+	"control.acquire": "exec",
+	"control.release": "exec",
+	"control.state": "read",
 };
 
 /** Helpers callable on a window handle resolved through `desktop.window(id)`. */

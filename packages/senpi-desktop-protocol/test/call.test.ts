@@ -54,4 +54,13 @@ describe("isReadOnlyComputerCall", () => {
 		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "menu.items" }])).toBe(true);
 		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "menu.select" }])).toBe(false);
 	});
+
+	it("classifies control.acquire and control.release as exec (#9651 B5b)", () => {
+		expect(isReadOnlyComputerCall([{ method: "control.acquire", args: [{ reason: "click Run" }] }])).toBe(false);
+		expect(isReadOnlyComputerCall([{ method: "control.release" }])).toBe(false);
+	});
+
+	it("classifies control.state as read (#9651 B5b)", () => {
+		expect(isReadOnlyComputerCall([{ method: "control.state" }])).toBe(true);
+	});
 });

@@ -15,6 +15,7 @@ import {
 	CAPABILITIES_TIMEOUT_MS,
 	CLOSE_TIMEOUT_MS,
 	HEARTBEAT_MS,
+	REVOKE_TIMEOUT_MS,
 	START_TIMEOUT_MESSAGE,
 	START_TIMEOUT_MS,
 } from "./timeouts";
@@ -64,6 +65,9 @@ export class DesktopService {
 	#connection: Connection | undefined;
 	#desired: DesiredSession | undefined;
 	#lastStopPath: StopPathStatus | undefined;
+	/** `control.grant` requests sent, and how many of them a successful `control.revoke` has covered. */
+	#grantsSent = 0;
+	#grantsRevoked = 0;
 
 	constructor(options: DesktopServiceOptions = {}) {
 		this.#createChild = options.createChild ?? engineChildFactory();
@@ -109,7 +113,43 @@ export class DesktopService {
 
 	async call(method: EngineMethod, params: unknown, options: CallOptions = {}): Promise<unknown> {
 		const connection = await this.#live();
-		return connection.rpc.request(method, params, options);
+		// Counted before the request is sent: a grant whose reply is lost to a cancel may still be live.
+		if (method === "control.grant") this.#grantsSent += 1;
+		const covers = this.#grantsSent;
+		const result = await connection.rpc.request(method, params, options);
+		if (method === "control.revoke") this.#revoked(covers);
+		return result;
+	}
+
+	/** A revoke that succeeded covers every grant sent before it; one that failed or was dropped covers none. */
+	#revoked(covers: number): void {
+		this.#grantsRevoked = Math.max(this.#grantsRevoked, covers);
+	}
+
+	/**
+	 * `control.revoke`, best effort (#9651 B5b), sent only while a grant this service asked for may be
+	 * live (one sent and not yet covered by a revoke that succeeded), so a run or turn end without one
+	 * adds nothing to the engine's audit, and a revoke that failed or was dropped is sent again later. The request is written
+	 * before this returns, so it reaches the engine's serial queue ahead of anything sent afterwards;
+	 * callers need not wait for the reply. A failure is reported through the error hub, and
+	 * `session.close` stays the backstop that always releases the grant.
+	 */
+	revokeControl(): Promise<void> {
+		const connection = this.#connection;
+		if (connection === undefined || !connection.rpc.alive || this.#grantsSent <= this.#grantsRevoked) {
+			return Promise.resolve();
+		}
+		const covers = this.#grantsSent;
+		return connection.rpc.request("control.revoke", {}, { timeoutMs: REVOKE_TIMEOUT_MS }).then(
+			() => this.#revoked(covers),
+			(error: unknown) => {
+				if (error instanceof DesktopServiceError || error instanceof DesktopEngineRpcError) {
+					this.#hub.emitError(error);
+					return;
+				}
+				throw error;
+			},
+		);
 	}
 
 	async capabilities(): Promise<DesktopCapabilities> {

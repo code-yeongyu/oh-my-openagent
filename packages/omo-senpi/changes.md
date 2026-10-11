@@ -1,3 +1,14 @@
+## 2026-10-11 - The computer-use component confirms and revokes the foreground-control grant (#9651 B5b)
+
+`components/computer-use/control-confirm.ts` is the human confirm behind `desktop.control.acquire`. It shows upstream's title "Allow foreground computer control?" with the model's reason and the revocation rules. A headless context (`hasUI === false` or no `ui.confirm`) never prompts, and a refusal, an abort or a client that never answers means no grant.
+
+The confirm is bounded at 45 s, under the default 60 s run budget, and is capped further by the time a shorter run has left. With under 8 s of the run left (the 5 s kept for the grant and the action, plus 3 s to answer), `acquire` throws with that reason instead of asking, and the confirm itself declines to prompt with under 3 s as a backstop. An unanswered confirm therefore reports `{ active: false }` rather than a run timeout. The timeout is also handed to `ui.confirm`, so senpi's rpc dialog clears its pending request and a desktop client can show the deadline. `registration-support.ts` `wireComputerControlEvents` revokes the grant on `agent_end` and on `session_shutdown` (before `session.close`), and so does a failed or interrupted run. A revoke is sent only while a grant this host asked for may be live, so a turn without one adds no no-op event to the engine's audit. The revoke is written to the engine's serial queue without the run waiting for it, so a failed run still settles at its own deadline.
+
+`scripts/qa/computer-control-rpc-e2e.mjs` proves this through senpi's real `--mode rpc` on the engine's fake backend:
+- `no-answer`: the confirm never gets an answer, and no `control.grant` reaches the engine.
+- `declined`: no grant.
+- `approved`: the grant is audited, and the end of the turn revokes it. This is the positive control.
+
 ## 2026-10-10 - Bindings take whatsapp as a native platform name
 
 The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.

@@ -126,6 +126,19 @@ describe("runComputerCode", HANG_GUARD, () => {
 		]);
 	});
 
+	it("rejects with the error of code that throws before its first await, leaving nothing unhandled", async () => {
+		// Given: the vm rejects its evaluation promise while its own microtasks drain, before the host has
+		// attached a handler; that used to surface as an unhandled rejection in the host (Vitest fails the
+		// run on one, so this test guards that too)
+		const { service } = await openDesktop();
+
+		// When
+		const error = await rejectionOf(run(service, `throw new Error("thrown before any await");`));
+
+		// Then
+		expect(error).toMatchObject({ message: "thrown before any await" });
+	});
+
 	it("rejects click in a read-only run before it reaches the engine", async () => {
 		// Given
 		const { service, log } = await openDesktop();

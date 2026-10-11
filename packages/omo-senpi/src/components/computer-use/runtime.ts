@@ -8,6 +8,7 @@ import {
 } from "@oh-my-opencode/senpi-desktop-tool"
 
 import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
+import { confirmComputerControl } from "./control-confirm"
 import { defaultEngineChild, describeEngineSource } from "./engine-source"
 import { engineErrorCode, TrackedDesktopService, type TrackedDesktopServiceOptions } from "./engine-status"
 import { describeEnginePermissions } from "./permission-status"
@@ -35,7 +36,7 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
     onPermissionRequired: options.onPermissionRequired,
   })
   const handle = new ComputerHandle({ service, settings: () => options.settings })
-  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool }
+  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool, confirmControl: confirmComputerControl }
   return {
     handle,
     service,

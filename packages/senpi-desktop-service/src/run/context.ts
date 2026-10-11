@@ -49,6 +49,8 @@ export interface RunContext {
 	readonly output: RunOutput;
 	/** Artifacts written during the run; appended by `screenshot()`. */
 	readonly screenshots: ComputerScreenshot[];
+	/** Epoch ms when the run budget ends; a human confirm must answer before it. */
+	readonly deadline: number;
 }
 
 /** One engine request on behalf of the run, carrying the run signal. */
@@ -57,11 +59,19 @@ export type EngineCall = (method: EngineMethod, params: object) => Promise<unkno
 /** Returns `promise` after arranging for user code awaiting it to resume once it settles. */
 export type Resume = <T>(promise: Promise<T>) => Promise<T>;
 
+/**
+ * The human confirmation behind `desktop.control.acquire`; absent on a headless run, which then
+ * never grants (#9651 B5b).
+ */
+/** The human confirm; `budgetMs` is how long the run can still wait for the answer. */
+export type ConfirmControl = (reason: string, signal: AbortSignal, budgetMs: number) => Promise<boolean>;
+
 /** What every facade method needs: the run it belongs to, its engine channel, and the vm resume hook. */
 export interface RunScope {
 	readonly context: RunContext;
 	readonly call: EngineCall;
 	readonly resume: Resume;
+	readonly confirmControl?: ConfirmControl;
 }
 
 /** Tier table of one facade surface (`DESKTOP_METHODS`, `WINDOW_METHODS`, `ELEMENT_METHODS`). */

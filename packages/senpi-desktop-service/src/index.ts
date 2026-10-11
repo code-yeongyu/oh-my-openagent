@@ -1,13 +1,14 @@
 export {
 	ComputerRunError,
 	type ComputerRunErrorReason,
+	type ConfirmControl,
 	type EngineCall,
 	type RunContext,
 	RunOutput,
 	type RunScope,
 } from "./run/context";
 export type { AxNode, CaptureResult, DesktopDisplay, DesktopWindow } from "./run/engine-results";
-export { createDesktopFacade, type DesktopFacade, type WindowFilter } from "./run/facade";
+export { type ControlState, createDesktopFacade, type DesktopFacade, type WindowFilter } from "./run/facade";
 export { ElementHandle, WindowHandle } from "./run/handles";
 export { type ComputerRunHost, type ComputerRunRequest, type ExecuteTool, runComputerCode } from "./run/runtime";
 export type { ScreenshotOptions, ScreenshotResult } from "./run/screenshot";
@@ -32,6 +33,7 @@ export {
 	GRACE_MS,
 	HEARTBEAT_MS,
 	RESTART_MESSAGE,
+	REVOKE_TIMEOUT_MS,
 	START_TIMEOUT_MESSAGE,
 	START_TIMEOUT_MS,
 } from "./service/timeouts";

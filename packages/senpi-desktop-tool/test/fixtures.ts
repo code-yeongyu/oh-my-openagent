@@ -18,6 +18,7 @@ export function closedService(): ComputerService {
 		stop: unreachable,
 		resume: unreachable,
 		close: () => Promise.resolve(),
+		revokeControl: () => Promise.resolve(),
 	};
 }
 

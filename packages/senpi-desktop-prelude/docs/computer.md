@@ -35,6 +35,11 @@ el.setValue(text) / el.perform(action) / el.press() / el.click({ delivery? }?) /
     Element fields: ref, role, nativeRole, title, description, enabled, focused, childCount. AX actions need no screenshot.
 computer.clipboard.read() → str
 computer.clipboard.write(text) → None
+computer.control.acquire({ reason }) → { active, reason?, grantedAt? }
+    Ask the human for the foreground-control grant (exec tier). Headless, refusal, timeout, or interrupt returns { active: false }; a latched stop refuses Suspended. Foreground delivery and win.raise() are refused ControlRequired until this returns { active: true }.
+computer.control.release() → None
+    Release the grant; belongs in `finally`. Interrupts, task completion, session shutdown, and a failed run also revoke it.
+computer.control.state() → { active, reason?, grantedAt? }
 computer.run(fnOrCode, { args?, read_only?, timeout? }?) → value
     One multi-step JS run in the persistent desktop session. Functions receive `{ desktop, wait, assert }` (`desktop` = same helpers) and cannot capture cell closures; `args` pass JSON data, functions, RegExp. Python passes a JS code string only. `read_only: true` needs `computer:read` and blocks mutation; `timeout` is seconds. Not sandboxed.
 computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, … }
@@ -49,4 +54,5 @@ Rules:
     Input defaults to `delivery: "background"`. On macOS it leaves the frontmost app, its focused window, the cursor and the destination of the user's next keystroke unchanged, but a clicked target window may rise directly under the user's front window. `BackgroundUnavailable` means use AX or retry with `delivery: "foreground"` (briefly activates the target, then the focus guard restores it). Never assume a background action landed without re-observing.
     Background keyboard input goes only to an app's SOLE window: typing or pressing keys into a process with several windows throws `BackgroundUnavailable`; use AX `setValue`, or foreground delivery.
     The user's stop chord suspends all input. `Suspended` or `StopPathUnavailable` → stop acting and tell the user; only the user resumes (`/computer resume`).
+    FOREGROUND CONTROL: input defaults to background and needs no grant. `delivery: "foreground"` and `win.raise()` (raising always takes the user's foreground) require the human-confirmed grant: call `await computer.control.acquire({ reason })` first (early in the run: it throws with under 8 s of the run's budget left), and act only when it returns `{ active: true }`; `ControlRequired` means acquire first, `InputBusy` means another session holds the grant (never stolen — continue in the background or retry after release). A failed run revokes the grant, so re-acquire after any error. Release with `computer.control.release()` in `finally`.
     Wayland: no per-window input and no `raise()`; use AX, or desktop input after the user focuses the target.
