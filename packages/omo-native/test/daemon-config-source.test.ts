@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { daemonReportLines, runDaemonCommand } from "../bin/lib/daemon.js"
@@ -14,6 +14,7 @@ interface Workspace {
 
 function workspace(): Workspace {
   const root = mkdtempSync(join(tmpdir(), "omo-daemon-config-source-"))
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }))
   const home = join(root, "home")
   const project = join(home, "work", "project")
   const agentDir = join(home, ".omo", "agent")
