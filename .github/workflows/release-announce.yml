@@ -1,0 +1,80 @@
+# Publisher calls announce only releases created by that run; rerunning publish does not repost.
+# Recover a failed post with workflow_dispatch(tag, dry_run=false); use dry-run/probe for proof.
+# An operator-side watch outside this repo checks omo-ai@latest every 5 minutes and alerts
+# after 30 minutes without a post. Workflow execution does not depend on that watch.
+name: Release announcement
+
+on:
+  release:
+    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Stable omo release tag (vX.Y.Z)"
+        required: true
+        type: string
+      automatic:
+        description: "Reusable calls skip non-stable tags; the caller's event is inherited"
+        type: boolean
+        default: true
+    secrets:
+      DISCORD_OMO_RELEASES_WEBHOOK_URL:
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Stable omo release tag (vX.Y.Z)"
+        required: true
+        type: string
+      dry_run:
+        description: "Print the message without posting (requires the webhook secret)"
+        type: boolean
+        default: true
+      probe:
+        description: "Post a test message, delete it, and verify deletion"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-announce-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    if: github.event_name != 'release' || (!github.event.release.draft && !github.event.release.prerelease && github.event.release.author.login != 'github-actions[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - name: Install dependencies
+        run: timeout -k 10 600 bun install --frozen-lockfile --ignore-scripts
+      - name: Announce release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANNOUNCEMENT_EVENT: ${{ inputs.automatic && 'workflow_call' || (github.event_name == 'release' && 'release' || 'workflow_dispatch') }}
+          DISCORD_OMO_RELEASES_WEBHOOK_URL: ${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          PROBE: ${{ github.event_name == 'workflow_dispatch' && inputs.probe }}
+        run: timeout -k 10 120 bun script/release-announce.ts
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_SUMMARY_TITLE: Discord release announcement
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Stable published omo releases only; edited and bot-authored release events do not trigger posts.
+            - The publisher calls this workflow directly so delivery failure fails its release run.
+            - Dry runs compose only; probes post a test, delete it, and require GET 404.
+            - Every failed request or missing credential fails the job.
+          JOB_SUMMARY_NEXT: Inspect the announcement step before rerunning; production reruns can duplicate a post.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
