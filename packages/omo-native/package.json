@@ -17,7 +17,7 @@
     "postinstall": "node bin/senpi-patch.mjs"
   },
   "dependencies": {
-    "@code-yeongyu/senpi": "2026.10.10-11"
+    "@code-yeongyu/senpi": "2026.10.10-12"
   },
   "repository": {
     "type": "git",

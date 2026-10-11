@@ -223,13 +223,33 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
     hook: runHook,
     delay: (ms) => delay(ms),
   }
-  await ops.migrate(context)
-  extensions = new StoreExtensions(context, resolveTarget)
-  const legacy = await ops.migrateLegacyMailboxes(context, request.now)
-  context.stats.writes = 0
-  context.stats.transactions = 0
-  context.stats.marker_unlinks = 0
-  return { self, legacy_migrated: legacy }
+  try {
+    await ops.migrate(context)
+    extensions = new StoreExtensions(context, resolveTarget)
+    const legacy = await ops.migrateLegacyMailboxes(context, request.now)
+    context.stats.writes = 0
+    context.stats.transactions = 0
+    context.stats.marker_unlinks = 0
+    return { self, legacy_migrated: legacy }
+  } catch (error) {
+    // A failed open must not leave the store's database held: the caller's retry opens a fresh
+    // worker, and a reader reopening the file must find it free. Roll back any half-open
+    // transaction, close the connection, and only then let the error cross the worker boundary.
+    // The parent terminates this worker when the init reply fails, so its lifetime ends here.
+    try {
+      connection.exec("ROLLBACK")
+    } catch {
+      // No transaction was open; the connection still closes.
+    }
+    try {
+      connection.close()
+    } finally {
+      connection = undefined
+      context = undefined
+      emit({ kind: "store_closed" })
+    }
+    throw error
+  }
 }
 
 async function runHook(name: "beforeDbCommit" | "afterDbCommit"): Promise<void> {
