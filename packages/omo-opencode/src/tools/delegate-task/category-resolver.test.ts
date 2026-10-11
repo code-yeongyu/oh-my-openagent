@@ -305,6 +305,7 @@ describe("resolveCategoryExecution", () => {
 			providerID: "openai",
 			modelID: "gpt-5.4-preview",
 			reasoning: "medium",
+			variant: "medium",
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
