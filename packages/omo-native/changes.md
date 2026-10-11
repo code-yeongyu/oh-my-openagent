@@ -1,3 +1,7 @@
+## 2026-10-11 - The never-replies doctor test pins the whole probe timeout message (#9742 follow-up)
+
+The fake engine in `computer-use-doctor-failures.test.ts` never replies, so the phase in the timeout report is deterministic. The test asserted only the message shape with `/(phase: [^)]+)$/`, which accepted any phase label; it now asserts the exact message ending in `(phase: requests sent, awaiting engine.hello and capabilities)`.
+
 ## 2026-10-09 - Settle native logout refresh failures and crash recovery (#9833)
 
 The regenerated auth bundle distinguishes refresh refusals from unconfirmed outcomes. Both clear locally and exit successfully. The unconfirmed-revocation warning is skipped only for `account_deleted` and `reauth_required`, where the service has already revoked the device; `unauthorized`, `invalid_grant` and every unconfirmed outcome warn. Crash recovery never replays a refresh token marked uncertain.
