@@ -16,6 +16,7 @@ import { resolveModelForDelegateTask } from "./model-selection"
 import type { DelegatedModelConfig } from "./types"
 import { applyCategoryParams } from "./delegated-model-config"
 import { applyFallbackEntrySettings } from "./fallback-entry-settings"
+import { lowerReasoningForModel } from "../../shared/agent-variant"
 
 function getConfiguredModel(entry: string | { model: string } | undefined): string | undefined {
   return typeof entry === "string" ? entry : entry?.model
@@ -290,6 +291,20 @@ Available categories: ${categoryNames.join(", ")}`)
       effectiveEntry,
       variantOverride: userCategories?.[args.category!]?.variant,
     })
+  }
+
+  if (categoryModel) {
+    if (userCategories?.[categoryName]?.variant !== undefined) {
+      // Explicit legacy variants also win in the sync sender, which lowers reasoning.
+      categoryModel = { ...categoryModel, reasoning: undefined }
+    } else if (categoryModel.reasoning !== undefined) {
+      categoryModel = {
+        ...categoryModel,
+        variant: lowerReasoningForModel(categoryModel.reasoning, categoryModel).variant,
+      }
+    } else if (effectiveEntry) {
+      categoryModel = { ...categoryModel, variant: effectiveEntry.variant }
+    }
   }
 
   return {
