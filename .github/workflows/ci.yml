@@ -285,7 +285,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}
-          path: ${{ runner.temp }}/windows-root-test-telemetry/*.json
+          path: |
+            ${{ runner.temp }}/windows-root-test-telemetry/*.json
+            ${{ runner.temp }}/omo-runtime-fallback-failures/**
           if-no-files-found: warn
           overwrite: false
 
@@ -570,7 +572,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: windows-senpi-compatibility-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
+          path: |
+            ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
+            ${{ runner.temp }}/omo-runtime-fallback-failures/**
           if-no-files-found: warn
           overwrite: false
 
