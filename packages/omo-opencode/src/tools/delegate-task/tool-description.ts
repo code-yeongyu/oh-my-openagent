@@ -1,5 +1,6 @@
 import type { AvailableCategory, AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { mergeCategories } from "../../shared/merge-categories"
+import { resolveEffectiveModelChain } from "../../shared/effective-model-chain"
 import { CATEGORY_CALLER_GUIDANCE } from "./builtin-categories"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import type { DelegateTaskToolOptions } from "./types"
@@ -33,7 +34,7 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
       return {
         name,
         description: description || "General tasks",
-        model: categoryConfig.model,
+        model: resolveEffectiveModelChain(categoryConfig).primaryModel,
       }
     })
 

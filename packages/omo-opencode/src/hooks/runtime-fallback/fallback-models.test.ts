@@ -145,4 +145,80 @@ describe("runtime-fallback fallback-models", () => {
     //#then
     expect(result).toEqual([])
   })
+
+  test("uses the tail of a category models chain when session category is registered (issue #6868)", () => {
+    //#given - the chain head drives spawn selection; retries consume the tail
+    const sessionID = "ses_runtime_fallback_category_chain"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession(sessionID, undefined, pluginConfig)
+
+    //#then
+    expect(result).toEqual(["anthropic/claude-opus-4-7"])
+  })
+
+  test("merges a legacy model written beside a canonical chain into the chain head", () => {
+    //#given - issue #6868 both-keys case
+    const sessionID = "ses_runtime_fallback_category_both_keys"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = unsafeTestValue({
+      categories: {
+        quick: {
+          model: "quotio/primary",
+          models: ["quotio/second", "quotio/third"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession(sessionID, undefined, pluginConfig)
+
+    //#then - the merged head is primary, everything after it is retry fallback
+    expect(result).toEqual(["quotio/second", "quotio/third"])
+  })
+
+  test("uses the tail of an agent models chain when agent is resolved", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: {
+          models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_agent_chain", "oracle", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["anthropic/claude-opus-4-7"])
+  })
+
+  test("uses the tail of the agent category models chain when the agent has no own chain", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        oracle: { category: "deep" },
+      },
+      categories: {
+        deep: {
+          models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_agent_category_chain", "oracle", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["anthropic/claude-opus-4-7"])
+  })
 })

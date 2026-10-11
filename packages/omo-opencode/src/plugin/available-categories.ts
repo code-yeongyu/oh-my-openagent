@@ -2,6 +2,7 @@ import type { AvailableCategory } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
+import { resolveEffectiveModelChain } from "../shared/effective-model-chain"
 
 export function createAvailableCategories(
   pluginConfig: OhMyOpenCodeConfig,
@@ -9,8 +10,7 @@ export function createAvailableCategories(
   const categories = mergeCategories(pluginConfig.categories)
 
   return Object.entries(categories).map(([name, categoryConfig]) => {
-    const model =
-      typeof categoryConfig.model === "string" ? categoryConfig.model : undefined
+    const model = resolveEffectiveModelChain(categoryConfig).primaryModel
 
     return {
       name,
