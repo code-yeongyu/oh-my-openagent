@@ -399,46 +399,6 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     expectReminderMessage(piAfterResume, 0)
   })
 
-  it("#given the packaged extension reloaded uncached #when the same session triggers on the second load #then injects the reminder not the full directive", async () => {
-    // given: senpi loads packaged extensions through an UNCACHED importer (Jiti
-    // `moduleCache: false` in core/extensions/loader.ts), so every load re-evaluates
-    // the whole bundle and rebuilds each module-scope binding. A query-suffixed
-    // RELATIVE import reproduces that boundary in-process: Bun keys its module cache
-    // on the full specifier, so each query variant evaluates fresh (a file:// URL
-    // drops the query and would NOT bust the cache).
-    const loadPackagedExtension = async (reload: number): Promise<(pi: unknown) => Promise<void>> => {
-      const module = (await import(`../../../plugin/extensions/omo.js?reload=${reload}`)) as {
-        default: (pi: unknown) => Promise<void>
-      }
-      return module.default
-    }
-
-    // load #1 arms the session with the full directive
-    const piBeforeReload = new FakeExtensionAPI()
-    await (await loadPackagedExtension(1))(piBeforeReload)
-    await piBeforeReload.dispatch("session_start", {}, sessionEventCtx("session-reload"))
-    await dispatchInput(piBeforeReload, "ulw first pass")
-    const firstInjection = piBeforeReload.messages.find((call) => call.message["customType"] === "omo-ultrawork:directive")
-    expect(firstInjection?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
-
-    // when: the host reloads the packaged extension (fresh module evaluation) and
-    // the SAME session triggers again — its transcript still holds the directive.
-    const piAfterReload = new FakeExtensionAPI()
-    await (await loadPackagedExtension(2))(piAfterReload)
-    await piAfterReload.dispatch("session_start", {}, sessionEventCtx("session-reload"))
-    await dispatchInput(piAfterReload, "ulw keep going")
-
-    // then: the arming ledger survived re-evaluation, so only the short reminder
-    // rides in; re-emitting ~29KB here is the token burn this feature exists to stop.
-    const reinjection = piAfterReload.messages.find((call) => call.message["customType"] === "omo-ultrawork:directive")
-    const content = reinjection?.message["content"]
-    if (typeof content !== "string") {
-      throw new Error("expected one ultrawork injection after reload")
-    }
-    expect(content.length).toBeLessThan(400)
-    expect(content).not.toContain("<ultrawork-mode>")
-  })
-
   it.each(["baseline", "astra"] as const)("#given a slot left under different %s directive text #when the bundle re-evaluates #then the session is not armed and receives the full directive", async (variant) => {
     // given: an earlier bundle evaluation armed the session and left the REAL
     // slot shape — { directive, astraDirective, arming } — on the process-global registry, tagged

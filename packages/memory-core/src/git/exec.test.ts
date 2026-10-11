@@ -39,7 +39,6 @@ function createHermeticExec(runCommand: CommandRunner, platform: NodeJS.Platform
 }
 
 describe("createNodeGitExec", () => {
-
   test("#given Git resolves on PATH #when Windows roots exist #then bare Git keeps precedence", async () => {
     const attempts: string[] = []
     const exec = createHermeticExec(async (executable) => {
@@ -247,7 +246,6 @@ describe("createNodeGitExec", () => {
     expect(result).toBe(nonzero)
     expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
   })
-
 
   test("#given stdin and a Windows fallback #when bare Git is absent #then stdin reaches the fallback runner", async () => {
     const original = missingGitError()
