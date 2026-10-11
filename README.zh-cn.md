@@ -60,7 +60,7 @@ Windows 请在 PowerShell 中运行 `irm https://get.omo.dev/install.ps1 | iex`�
 
 打开项目，运行 `omo`，说出要做的事。设置就这么多。
 
-在会话里，`/thinking <level>` 设置模型思考的深度（只输入 `/thinking` 会打开选择器），`Shift+Tab` 依次切换级别，`/efforts <level>` 直接设置推理强度。想接着之前的工作，用 `/resume`（或 `/sessions`）打开过去的会话；在 shell 里，`omo -c` 继续上一个会话，`omo -r` 打开会话列表。其余命令都在 `/help` 里。
+在会话里，`/thinking <level>` 设置模型思考的深度（只输入 `/thinking` 会打开选择器），`Shift+Tab` 依次切换级别，`/efforts <level>` 在有强度分级的模型上直接设置推理强度。想接着之前的工作，用 `/resume`（或 `/sessions`）打开过去的会话；在 shell 里，`omo -c` 继续上一个会话，`omo -r` 打开会话列表。其余命令都在 `/help` 里。
 
 从 OpenCode 版或 LazyCodex 迁移过来？运行一次 `omo setup`。它会把你的提供商密钥、自定义提供商、MCP 服务器、技能和模型选择一并带过来。
 

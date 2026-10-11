@@ -133,7 +133,7 @@ The habits map like this. Every entry in the right column is a command or key th
 | `/exit` | `/exit` or `/quit`, or `Ctrl+D` on an empty prompt. |
 | `@file` (attach a file) | `@path`, with fuzzy suggestions; `Tab` accepts the highlighted one. |
 | `!command` (run a shell command) | `!command`. `!!command` runs it without adding the output to the context. |
-| `Ctrl+T` (cycle the model's variant) | `Shift+Tab` cycles the thinking level. `/thinking <level>` sets it, `/thinking` alone opens a picker, and `/efforts <level>` sets the reasoning effort. |
+| `Ctrl+T` (cycle the model's variant) | `Shift+Tab` cycles the thinking level. `/thinking <level>` sets it, `/thinking` alone opens a picker, and `/efforts <level>` sets the reasoning effort on models with effort grades. |
 | `Tab` (switch between build and plan) | No equivalent. omo has one main session; `Shift+Tab` cycles the thinking level instead. Categories and agents you carried over live in `~/.omo/omo.jsonc` and drive delegation, not the main session. |
 | `/agents` | No equivalent. See the row above. |
 
