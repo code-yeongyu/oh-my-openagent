@@ -5,7 +5,7 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::keys::parse_keys;
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, DragParams, KeyChordParams, MenuPathParams,
+    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, DragParams, KeyChordParams, MenuSelectParams,
     PointParams, ClipboardText, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
 use senpi_desktop_core::types::{DesktopPoint, Target};
@@ -156,9 +156,10 @@ fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
         MutatingAction::ClipboardWrite => Op::ClipboardWrite(ClipboardText {
             text: "hello".to_owned(),
         }),
-        MutatingAction::MenuSelect => Op::MenusSelect(MenuPathParams {
+        MutatingAction::MenuSelect => Op::MenusSelect(MenuSelectParams {
             window_id: target,
             path: vec!["File".to_owned(), "Save".to_owned()],
+            delivery_mode: None,
         }),
     }
 }

@@ -4,7 +4,7 @@
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::menus::validate_path;
-use senpi_desktop_core::protocol_params::MenuPathParams;
+use senpi_desktop_core::protocol_params::{MenuPathParams, MenuSelectParams};
 use senpi_desktop_core::types::Target;
 
 use senpi_desktop_safety::MutatingAction;
@@ -32,12 +32,13 @@ impl Worker {
     /// event apply like every other exec, an invalid path included. The
     /// backend checks for a stop or cancel at every menu level and before the
     /// press, so a stop landing mid-walk dispatches nothing.
-    pub(crate) fn menu_select(&mut self, params: &MenuPathParams, cancelled: &dyn Fn() -> bool) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
-            MutatingAction::MenuSelect,
-            params.window_id.clone(),
-            DeliveryMode::Background,
-        );
+    pub(crate) fn menu_select(
+        &mut self,
+        params: &MenuSelectParams,
+        cancelled: &dyn Fn() -> bool,
+    ) -> CoreResult<Audited> {
+        let delivery = DeliveryMode::Background;
+        let mutation = Mutation::new(MutatingAction::MenuSelect, params.window_id.clone(), delivery);
         let supervisor = self.safety.supervisor.clone();
         self.mutate(&mutation, cancelled, |worker| {
             validate_path(&params.path, false)?;
@@ -59,7 +60,9 @@ impl Worker {
                     Ok(())
                 }
             };
-            worker.backend()?.menu_select(&window, &params.path, &check_stop)?;
+            worker
+                .backend()?
+                .menu_select(&window, &params.path, delivery, &check_stop)?;
             Ok(Response::Unit)
         })
     }

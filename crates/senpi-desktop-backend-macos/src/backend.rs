@@ -175,6 +175,7 @@ impl Backend for MacosBackend {
         &mut self,
         window: &DesktopWindow,
         path: &[String],
+        _delivery: DeliveryMode,
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
         Self::require_input_permission()?;

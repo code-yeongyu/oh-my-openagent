@@ -1,6 +1,7 @@
 //! The fake backend's scripted menu tree: listing children along a path and
 //! selecting a leaf command through core's shared matching rules.
 
+use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::menus::{match_index, require_command, require_enabled, validate_path, MenuItem};
 use senpi_desktop_core::types::DesktopWindow;
@@ -86,6 +87,7 @@ impl FakeBackend {
         &mut self,
         window: &DesktopWindow,
         path: &[String],
+        delivery: DeliveryMode,
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
         self.begin(crate::method::FakeMethod::MenuSelect)?;
@@ -98,6 +100,7 @@ impl FakeBackend {
         self.record(SinkOp::MenuSelect {
             window: window.id.clone(),
             path: items[index].path.clone(),
+            delivery,
         });
         Ok(())
     }

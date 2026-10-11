@@ -99,9 +99,10 @@ impl Backend for PanickyFake {
         &mut self,
         window: &DesktopWindow,
         path: &[String],
+        delivery: DeliveryMode,
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
-        self.inner.menu_select(window, path, check_stop)
+        self.inner.menu_select(window, path, delivery, check_stop)
     }
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
         self.inner.ax()

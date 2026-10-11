@@ -142,11 +142,15 @@ pub trait Backend: Send {
     /// Invokes the leaf command `path` names in `window`'s menu. Backends
     /// call `check_stop` at every menu level they open and immediately before
     /// the native press, so a stop chord or cancel landing mid-walk dispatches
-    /// nothing. Backends without menus yet refuse with `AxUnsupported`.
+    /// nothing. `delivery` is the session-admitted mode: background keys the
+    /// window without raising it; foreground raises and keys it (the session
+    /// admits foreground only under the control grant). Backends without menus
+    /// yet refuse with `AxUnsupported`.
     fn menu_select(
         &mut self,
         _window: &DesktopWindow,
         _path: &[String],
+        _delivery: DeliveryMode,
         _check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
         Err(DesktopError::ax_unsupported())

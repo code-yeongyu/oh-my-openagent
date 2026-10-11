@@ -194,9 +194,10 @@ impl Backend for FakeBackend {
         &mut self,
         window: &DesktopWindow,
         path: &[String],
+        delivery: DeliveryMode,
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
-        self.menu_select_impl(window, path, check_stop)
+        self.menu_select_impl(window, path, delivery, check_stop)
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
