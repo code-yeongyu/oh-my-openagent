@@ -273,9 +273,12 @@ describe.skipIf(process.platform === "win32")("archive extraction preflight", ()
 // process whose PATH starts with a stand-in `tar` printing one such line (a spawned child only sees the
 // environment it is given), so the entry parser sees the bytes those systems emit. Like GNU tar, the
 // stand-in prefixes lines for TAR_OPTIONS=--block-number and translates " link to " when LANGUAGE is set
-// outside the C locale, and like both tars it prints owner and group names as stored unless
-// --numeric-owner is passed. The archive bytes are not a tar, so a run that reached the real tar would
-// fail its listing instead of passing. POSIX-only: the stand-in is a shell script.
+// and the effective message locale is not C; like both tars it prints owner and group names as stored
+// unless --numeric-owner is passed; and like bsdtar it prints a row's C-locale rendering (non-ASCII
+// names as backslash escapes) when the effective character locale is C. With STAND_IN_TAR_SAME_ENV set,
+// the extraction fails unless it runs with the environment the listing ran with. The archive bytes are
+// not a tar, so a run that reached the real tar would fail its listing instead of passing. POSIX-only:
+// the stand-in is a shell script.
 describe.skipIf(process.platform === "win32")("tar listing layouts", () => {
 	it.each([
 		[
@@ -326,6 +329,25 @@ describe.skipIf(process.platform === "win32")("tar listing layouts", () => {
 			{ TAR_OPTIONS: "--block-number" },
 		],
 		[
+			"extracts a contained hard link when LC_ALL and LANG ask GNU tar for German messages",
+			"hrw-r--r-- 0/0               0 2026-10-08 20:47 bin/hard link to bin/tool",
+			/^resolved$/m,
+			{ LANGUAGE: "de", LC_ALL: "de_DE.UTF-8", LANG: "de_DE.UTF-8" },
+		],
+		[
+			"extracts a non-ASCII name at the archive root, which bsdtar escapes in a C character locale",
+			"-rw-r--r--  0 1000   1001        1 Oct  8 20:47 한.txt",
+			/^resolved$/m,
+			{ LC_ALL: "en_US.UTF-8", LANG: "C" },
+			"-rw-r--r--  0 1000   1001        1 Oct  8 20:47 \\355\\225\\234.txt",
+		],
+		[
+			"extracts with the environment it validated the listing under",
+			"-rw-r--r-- 0/0               1 2026-10-08 20:47 bin/tool",
+			/^resolved$/m,
+			{ STAND_IN_TAR_SAME_ENV: "1", TAR_OPTIONS: "--block-number", LC_ALL: "de_DE.UTF-8" },
+		],
+		[
 			"extracts a file whose owner and group names contain spaces (GNU tar layout)",
 			"-rw-r--r-- {gnu-owner}     1 2026-10-08 20:47 bin/tool",
 			/^resolved$/m,
@@ -345,7 +367,7 @@ describe.skipIf(process.platform === "win32")("tar listing layouts", () => {
 			"?rw-r--r-- an unrecognized listing layout bin/tool",
 			/could not be parsed/i,
 		],
-	])("%s", (_name, listingLine, expected, extraEnv: Record<string, string> = {}) => {
+	])("%s", (_name, listingLine, expected, extraEnv: Record<string, string> = {}, cLocaleListingLine?: string) => {
 		//#given
 		const rootDir = createTestDir()
 		const archivePath = join(rootDir, "localized-listing.tar.gz")
@@ -356,16 +378,20 @@ describe.skipIf(process.platform === "win32")("tar listing layouts", () => {
 		mkdirSync(binDir)
 		const listingPath = join(rootDir, "listing.txt")
 		writeFileSync(listingPath, `${listingLine}\n`)
+		if (cLocaleListingLine !== undefined) writeFileSync(`${listingPath}.c`, `${cLocaleListingLine}\n`)
+		const envPath = join(rootDir, "listing-env.txt")
 		const fakeTar = join(binDir, "tar")
 		writeFileSync(
 			fakeTar,
 			[
 				"#!/bin/sh",
-				'case " $* " in *" -tvzf "*) ;; *) exit 0 ;; esac',
+				'snap() { env | grep -E "^(TAR_OPTIONS|LC_[A-Z]+|LANG|LANGUAGE|PATH)=" | LC_ALL=C sort; }',
+				`case " $* " in *" -tvzf "*) [ -z "\${STAND_IN_TAR_SAME_ENV:-}" ] || snap > '${envPath}' ;; *) if [ -n "\${STAND_IN_TAR_SAME_ENV:-}" ] && [ "$(snap)" != "$(cat '${envPath}')" ]; then echo "extraction environment differs from the validated listing" >&2; exit 1; fi; exit 0 ;; esac`,
 				`line=$(cat '${listingPath}')`,
+				`case "\${LC_ALL:-\${LC_CTYPE:-\${LANG:-C}}}" in C|POSIX) [ ! -f '${listingPath}.c' ] || line=$(cat '${listingPath}.c') ;; esac`,
 				'case " $* " in *" --numeric-owner "*) gnu="1000/1001"; bsd="1000   1001" ;; *) gnu="John Doe/Domain Users"; bsd="John Doe Domain Users" ;; esac',
 				'line=$(printf "%s\\n" "$line" | sed -e "s#{gnu-owner}#$gnu#" -e "s#{bsd-owner}#$bsd#")',
-				'if [ "${LC_ALL:-}" != "C" ] && [ -n "${LANGUAGE:-}" ]; then line=$(printf "%s\\n" "$line" | sed "s/ link to / Verknüpfung zu /"); fi',
+				'case "${LC_ALL:-${LC_MESSAGES:-${LANG:-C}}}" in C|POSIX) ;; *) if [ -n "${LANGUAGE:-}" ]; then line=$(printf "%s\\n" "$line" | sed "s/ link to / Verknüpfung zu /"); fi ;; esac',
 				'case " ${TAR_OPTIONS:-} " in *" --block-number "*) line="block 0: $line" ;; esac',
 				'printf "%s\\n" "$line"',
 			].join("\n"),
