@@ -18,6 +18,7 @@ import {
   matchSkillByName,
 } from "./skill-matcher"
 import { extractSkillBody } from "./skill-body"
+import { log } from "../../shared/logger"
 import {
   isPromiseLike,
   loadedSkillToInfo,
@@ -150,14 +151,25 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       })
 
       if (matchedSkill) {
-        await ctx?.ask({
-          permission: "skill",
-          patterns: [matchedSkill.name],
-          always: [matchedSkill.name],
-          metadata: {
+        // The OpenCode v2 host projects this V1 tool through ctx.tool.transform, and a v2 tool
+        // context has no ask(). Optional chaining guards ctx, not a missing method, so only
+        // call ask when the host provides it. A rejection from a real ask still propagates.
+        const ask = ctx?.ask
+        if (typeof ask === "function") {
+          await ask.call(ctx, {
+            permission: "skill",
+            patterns: [matchedSkill.name],
+            always: [matchedSkill.name],
+            metadata: {
+              skill: matchedSkill.name,
+            },
+          })
+        } else if (ctx) {
+          log("[skill] tool context has no ask(); skill permission prompt skipped", {
             skill: matchedSkill.name,
-          },
-        })
+            sessionID: ctx.sessionID,
+          })
+        }
 
         if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
           throw new Error(`Skill "${matchedSkill.name}" is restricted to agent "${matchedSkill.definition.agent}"`)
