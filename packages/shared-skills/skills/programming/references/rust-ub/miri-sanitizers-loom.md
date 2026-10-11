@@ -66,7 +66,7 @@ cargo +nightly miri test
 MIRIFLAGS="-Zmiri-tree-borrows" cargo +nightly miri test
 ```
 
-**Protocol:** Run Stacked Borrows first. If it fails, fix it. Then run Tree Borrows to confirm. Code that passes Stacked Borrows is sound under both models.
+**Protocol:** Run Stacked Borrows first. If it fails, fix it. Then run Tree Borrows as a separate pass. The models are not nested: Stacked Borrows is stricter about most reborrow patterns, but Tree Borrows rejects some code Stacked Borrows accepts. Ship only when both are clean.
 
 #### Strict Provenance
 

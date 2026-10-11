@@ -4,28 +4,10 @@ import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
 import { describe, expect, test } from "bun:test"
 
-const corePackagePaths: readonly string[] = [
-  "packages/utils",
-  "packages/model-core",
-  "packages/omo-config-core",
-  "packages/delegate-core",
-  "packages/prompts-core",
-  "packages/rules-engine",
-  "packages/agents-md-core",
-  "packages/lsp-core",
-  "packages/mcp-stdio-core",
-  "packages/mcp-client-core",
-  "packages/comment-checker-core",
-  "packages/hashline-core",
-  "packages/tmux-core",
-  "packages/team-core",
-  "packages/openclaw-core",
-  "packages/boulder-state",
-  "packages/memory-core",
-  "packages/telemetry-core",
-  "packages/claude-code-compat-core",
-  "packages/skills-loader-core",
-] as const
+import { corePackagePaths as sharedCorePackagePaths } from "./core-package-paths"
+
+const corePackagePaths: readonly string[] = sharedCorePackagePaths
+
 
 const mcpPackagePaths: readonly string[] = [
   "packages/ast-grep-mcp",
@@ -37,6 +19,11 @@ const adapterPackagePaths: readonly string[] = [
   "packages/omo-codex",
   "packages/omo-senpi",
   "packages/senpi-task",
+  "packages/senpi-desktop-engine",
+  "packages/senpi-desktop-prelude",
+  "packages/senpi-desktop-protocol",
+  "packages/senpi-desktop-service",
+  "packages/senpi-desktop-tool",
   "packages/omo-opencode",
   "packages/omo-native",
 ] as const
@@ -205,17 +192,6 @@ function extractTypecheckPackagePaths(command: string): readonly string[] {
     .toSorted()
 }
 
-function extractSharedCoreGuardPackagePaths(source: string): readonly string[] {
-  const match = /const corePackages = \[([\s\S]*?)\] as const/.exec(source)
-  const body = match?.[1]
-  if (body === undefined) throw new Error("Could not find corePackages in shared-core-extraction-guard.test.ts")
-
-  return [...body.matchAll(/"([^"]+)"/g)]
-    .map((entry) => entry[1])
-    .filter((path): path is string => path !== undefined)
-    .toSorted()
-}
-
 describe("package registration audit", () => {
   test("#given managed packages #when root registration is audited #then workspaces typecheck and dev deps stay aligned", async () => {
     // given
@@ -260,17 +236,6 @@ describe("package registration audit", () => {
 
     // then
     expect(unknownWorkspacePaths).toEqual(["packages/zz-qa-unregistered-probe"])
-  })
-
-  test("#given shared extraction guard #when audited #then every core package is covered", async () => {
-    // given
-    const guardSource = await readFile("script/shared-core-extraction-guard.test.ts", "utf8")
-
-    // when
-    const guardPackagePaths = extractSharedCoreGuardPackagePaths(guardSource)
-
-    // then
-    expect(guardPackagePaths).toEqual([...corePackagePaths].toSorted())
   })
 
   test("#given package test scripts #when nested tests exist #then recursive globs are registered", async () => {

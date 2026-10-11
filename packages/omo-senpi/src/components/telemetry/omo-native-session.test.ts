@@ -415,6 +415,72 @@ describe("OmO Native session telemetry", () => {
     })
   })
 
+  it("#given a host that defers startup work #when session_start fires #then nothing is captured on the dispatch path and the deferred tick captures it", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const deferred: Array<() => void | Promise<void>> = []
+      const pi = new FakeExtensionAPI()
+      createOmoNativeSessionComponent({
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => true,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("native-session-host"),
+        transportFactory: recorder.factory,
+      }).register(pi, {
+        config: pi,
+        logger: createSilentLogger(),
+        deferStartupWork: (_label, work) => deferred.push(work),
+      })
+
+      // when
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())
+
+      // then
+      expect(recorder.messages).toEqual([])
+      expect(deferred).toHaveLength(1)
+
+      // when
+      await deferred[0]?.()
+
+      // then
+      expect(recorder.messages.map(({ event }) => event)).toContain("session_started")
+    })
+  })
+
+  it("#given a session that shuts down before the deferred tick #when the tick runs #then no telemetry client is created behind the closed session", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const deferred: Array<() => void | Promise<void>> = []
+      const pi = new FakeExtensionAPI()
+      createOmoNativeSessionComponent({
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => true,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("native-session-host"),
+        transportFactory: recorder.factory,
+      }).register(pi, {
+        config: pi,
+        logger: createSilentLogger(),
+        deferStartupWork: (_label, work) => deferred.push(work),
+      })
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())
+
+      // when
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, sessionCtx())
+      await deferred[0]?.()
+
+      // then
+      expect(recorder.messages).toEqual([])
+      expect(recorder.shutdowns).toEqual([])
+    })
+  })
+
   it("#given an injected timer #when session_shutdown fires #then the native client flushes once and uses the 1000ms bound", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given

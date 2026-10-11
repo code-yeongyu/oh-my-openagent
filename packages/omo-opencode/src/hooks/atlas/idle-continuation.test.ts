@@ -118,4 +118,46 @@ describe("scheduleRetry", () => {
     expect(sessionState.pendingRetryTimer).toBeDefined()
     expect(capturedTimers.has(1001)).toBe(true)
   })
+
+  test("#given the active plan has no countable tasks #when a pending retry fires #then it stops without re-arming", async () => {
+    // given
+    const planPath = join(testDirectory, "plan.md")
+    writeFileSync(planPath, "# Plan\nProse only, no checkboxes.\n")
+    writeBoulderState(testDirectory, createBoulderState(planPath, sessionID, "atlas"))
+
+    const sessionState: SessionState = { promptFailureCount: 0 }
+    const promptAsync = mock(async () => ({ data: {} }))
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: testDirectory,
+      client: { session: { promptAsync } },
+    })
+
+    scheduleRetry({
+      ctx,
+      sessionID,
+      sessionState,
+      options: {
+        directory: testDirectory,
+        backgroundManager: {
+          getTasksByParentSession: () => {
+            throw new Error("background status unavailable")
+          },
+        },
+      },
+    })
+
+    const firstTimer = capturedTimers.get(1000)
+    if (!firstTimer) {
+      throw new Error("Expected retry timer")
+    }
+
+    // when
+    await firstTimer.callback()
+
+    // then
+    expect(promptAsync).not.toHaveBeenCalled()
+    expect(sessionState.promptFailureCount).toBe(0)
+    expect(sessionState.pendingRetryTimer).toBeUndefined()
+    expect(capturedTimers.has(1001)).toBe(false)
+  })
 })

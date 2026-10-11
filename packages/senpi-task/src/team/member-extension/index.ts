@@ -4,13 +4,18 @@ import type { ExtensionAPI } from "@code-yeongyu/senpi"
 import { TeamModeConfigSchema, type TeamModeConfig } from "@oh-my-opencode/team-core/config"
 import { log } from "@oh-my-opencode/utils/logger"
 
-import { parseTaskId, type TaskId } from "../../state"
 import { createTaskRecordStore } from "../../store"
-import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_IDENTITY_ENV, WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "./identity"
+import { MEMBER_EXTENSION_BUNDLE_NAME, WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "./identity"
+import { createMemberWakeSource, resolveMemberExtensionConfig, type MemberWakeSource } from "./member-session"
 import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
 import { createQaAfterInjectHold } from "./qa-inject-hold"
 import { createMemberTaskSendTool } from "./tools"
 
+export {
+  MemberExtensionConfigError,
+  parseMemberExtensionEnv,
+} from "./parse-env"
+export type { MemberExtensionConfigErrorCode, ParsedMemberExtensionEnv } from "./parse-env"
 export {
   MEMBER_EXTENSION_BUNDLE_NAME,
   MEMBER_IDENTITY_ENV,
@@ -22,37 +27,10 @@ export {
 
 const MEMBER_POLL_INTERVAL_MS = 1_000
 const ACK_POLL_INTERVAL_MS = 100
-const MEMBER_NAME_PATTERN = /^[a-z0-9-]+$/
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-export type ParsedMemberExtensionEnv = {
-  readonly teamRunId: string
-  readonly memberName: string
-  readonly taskId: TaskId
-  readonly stateDir: string
-  readonly sessionDir: string
-  readonly config: TeamModeConfig & { readonly base_dir: string }
-  readonly members: readonly string[]
-}
-
-export type MemberExtensionConfigErrorCode =
-  | "missing_env"
-  | "invalid_identity"
-  | "invalid_task_id"
-  | "invalid_team_config"
-
-export class MemberExtensionConfigError extends Error {
-  readonly code: MemberExtensionConfigErrorCode
-
-  constructor(message: string, code: MemberExtensionConfigErrorCode) {
-    super(message)
-    this.name = "MemberExtensionConfigError"
-    this.code = code
-  }
-}
 
 type ActiveRuntime = {
   readonly poller: MemberSelfPoller
+  readonly wake: MemberWakeSource
   started: boolean
   pollTimer?: ReturnType<typeof setInterval>
   ackTimer?: ReturnType<typeof setInterval>
@@ -64,60 +42,6 @@ export function resolveMemberExtensionEntryPath(extensionUrl = import.meta.url):
   return fileURLToPath(new URL(`./${MEMBER_EXTENSION_BUNDLE_NAME}`, extensionUrl))
 }
 
-export function parseMemberExtensionEnv(env: NodeJS.ProcessEnv): ParsedMemberExtensionEnv {
-  const identity = requiredEnv(env, MEMBER_IDENTITY_ENV)
-  const taskIdRaw = requiredEnv(env, "SENPI_TASK_MEMBER_TASK_ID")
-  const teamConfigRaw = requiredEnv(env, "SENPI_TASK_TEAM_CONFIG")
-  const sessionDir = requiredEnv(env, "SENPI_CODING_AGENT_SESSION_DIR")
-  const identityParts = identity.split("::")
-  const teamRunId = identityParts[0]
-  const memberName = identityParts[1]
-  if (
-    identityParts.length !== 2
-    || teamRunId === undefined
-    || memberName === undefined
-    || !UUID_PATTERN.test(teamRunId)
-    || !MEMBER_NAME_PATTERN.test(memberName)
-  ) {
-    throw new MemberExtensionConfigError(
-      `${MEMBER_IDENTITY_ENV} must be '<teamRunId>::<memberName>'`,
-      "invalid_identity",
-    )
-  }
-
-  let taskId: TaskId
-  try {
-    taskId = parseTaskId(taskIdRaw)
-  } catch (error) {
-    if (!(error instanceof Error)) throw error
-    throw new MemberExtensionConfigError("SENPI_TASK_MEMBER_TASK_ID must be a valid st_ task id", "invalid_task_id")
-  }
-
-  const rawConfig = parseJsonRecord(teamConfigRaw)
-  const stateDir = rawConfig.stateDir
-  const members = parseMembers(rawConfig.members)
-  const configResult = TeamModeConfigSchema.safeParse(rawConfig)
-  if (
-    typeof stateDir !== "string"
-    || stateDir.length === 0
-    || !configResult.success
-    || configResult.data.base_dir === undefined
-    || !members.includes(memberName)
-  ) {
-    throw new MemberExtensionConfigError("SENPI_TASK_TEAM_CONFIG is malformed", "invalid_team_config")
-  }
-
-  return {
-    teamRunId,
-    memberName,
-    taskId,
-    stateDir,
-    sessionDir,
-    config: { ...configResult.data, base_dir: configResult.data.base_dir },
-    members,
-  }
-}
-
 export default async function registerMemberExtension(pi: ExtensionAPI): Promise<void> {
   // The shared extension boots before RPC switch_session can acknowledge. Ordinary team
   // members must not evaluate the workpool host-policy graph just to reject absent identity.
@@ -126,7 +50,10 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
     if (registerProcessWorkpoolWorker(pi)) return
   }
   if (activeRuntimes.has(pi)) return
-  const parsed = parseMemberExtensionEnv(process.env)
+  // Not a member session: on the shared daemon this same bundle is loaded for every session, so an
+  // absent member identity is the normal case and never an error.
+  const parsed = resolveMemberExtensionConfig(pi, process.env)
+  if (parsed === undefined) return
   const store = createTaskRecordStore({ project_dir: parsed.stateDir, task: { state_dir: parsed.stateDir } })
   const afterInject = createQaAfterInjectHold(process.env)
   const appendEvent = (event: Parameters<typeof store.appendEvent>[1]): void => {
@@ -149,7 +76,11 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
     appendEvent,
     ...(afterInject !== undefined ? { afterInject } : {}),
   })
-  const runtime: ActiveRuntime = { poller, started: false }
+  const runtime: ActiveRuntime = {
+    poller,
+    wake: createMemberWakeSource(pi, { teamRunId: parsed.teamRunId, memberName: parsed.memberName }),
+    started: false,
+  }
   activeRuntimes.set(pi, runtime)
 
   pi.registerTool(createMemberTaskSendTool({
@@ -167,6 +98,9 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
 async function startRuntime(runtime: ActiveRuntime): Promise<void> {
   if (runtime.started) return
   runtime.started = true
+  // On duty: while the team run holds this member, the host must not park the session out from
+  // under an inbound message it has not answered yet.
+  runtime.wake.publishActive()
   try {
     await runtime.poller.recoverReservations()
     if (!runtime.started) return
@@ -176,12 +110,14 @@ async function startRuntime(runtime: ActiveRuntime): Promise<void> {
     runtime.ackTimer = setInterval(() => runSafely("ack", runtime.poller.checkPendingAcks()), ACK_POLL_INTERVAL_MS)
   } catch (error) {
     runtime.started = false
+    runtime.wake.publishIdle()
     throw error
   }
 }
 
 function stopRuntime(pi: ExtensionAPI, runtime: ActiveRuntime): void {
   runtime.started = false
+  runtime.wake.publishIdle()
   if (runtime.pollTimer !== undefined) clearInterval(runtime.pollTimer)
   if (runtime.ackTimer !== undefined) clearInterval(runtime.ackTimer)
   delete runtime.pollTimer
@@ -196,32 +132,3 @@ function runSafely(operation: string, promise: Promise<void>): void {
   })
 }
 
-function requiredEnv(env: NodeJS.ProcessEnv, name: string): string {
-  const value = env[name]
-  if (value === undefined || value.length === 0) {
-    throw new MemberExtensionConfigError(`Missing ${name}`, "missing_env")
-  }
-  return value
-}
-
-function parseJsonRecord(raw: string): Record<string, unknown> {
-  try {
-    const value: unknown = JSON.parse(raw)
-    if (isRecord(value)) return value
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error
-    // Normalized below as the typed config error.
-  }
-  throw new MemberExtensionConfigError("SENPI_TASK_TEAM_CONFIG must be a JSON object", "invalid_team_config")
-}
-
-function parseMembers(value: unknown): readonly string[] {
-  if (!Array.isArray(value) || !value.every((member) => typeof member === "string" && MEMBER_NAME_PATTERN.test(member))) {
-    throw new MemberExtensionConfigError("SENPI_TASK_TEAM_CONFIG.members is malformed", "invalid_team_config")
-  }
-  return [...new Set(value)]
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}

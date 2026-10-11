@@ -12,9 +12,11 @@ import { createLineDecoder, encodeJsonLine } from "./socket-jsonrpc.js";
 
 export { InvalidRuntimeOverrideError, OMO_LSP_DAEMON_CLI, resolveDaemonRuntime } from "./runtime-contract.js";
 
-const PROBE_TIMEOUT_MS = 500;
+const PROBE_TIMEOUT_MS = 2_000;
 const DEFAULT_READY_TIMEOUT_MS = 5_000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
+const FAILED_SPAWN_COOLDOWN_MS = 5_000;
+const failedSpawnUntil = new Map<string, number>();
 
 export class DaemonUnreachableError extends Error {
 	constructor(socketPath: string) {
@@ -46,10 +48,21 @@ export async function ensureDaemonRunning(
 	const signal = options.signal;
 
 	throwIfAborted(signal);
-	if (await awaitWithSignal(deps.probe(paths, signal), signal)) return;
+	if (await awaitWithSignal(deps.probe(paths, signal), signal)) {
+		failedSpawnUntil.delete(paths.socket);
+		return;
+	}
 	throwIfAborted(signal);
+	const retryAt = failedSpawnUntil.get(paths.socket);
+	if (retryAt !== undefined && deps.now() < retryAt) throw new DaemonUnreachableError(paths.socket);
+	failedSpawnUntil.delete(paths.socket);
 	deps.spawnDaemon(paths);
-	await waitUntilReachable(paths, deps, readyTimeoutMs, pollIntervalMs, signal);
+	try {
+		await waitUntilReachable(paths, deps, readyTimeoutMs, pollIntervalMs, signal);
+	} catch (error) {
+		failedSpawnUntil.set(paths.socket, deps.now() + FAILED_SPAWN_COOLDOWN_MS);
+		throw error;
+	}
 }
 
 async function waitUntilReachable(

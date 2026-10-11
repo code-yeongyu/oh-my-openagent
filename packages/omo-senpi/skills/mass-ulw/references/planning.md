@@ -27,6 +27,8 @@ Reading this file is not planning. Before `start`, write the run plan in one bre
 
 **Default shape is fan-out, then fan-in.** N parallel lanes with no dependencies, then one synthesis node that depends on all of them. The synthesis node starts cheap too (`quick` or `unspecified-low`): merging verified pieces is mechanical unless the merge itself needs judgment. A 2-node graph with no dependency between the nodes is not a dag - use plain parallel `task` spawns instead. Reach for `workflow` when ordering itself is the point.
 
+**Join adjacent waves through one review node.** When every node of wave k+1 would depend on every node of wave k, never draw the n x m edges. One review node between them (wave k -> review -> wave k+1, n + m edges) gates the next wave on the verification wave's check (below); a finding re-runs only the producer it names, never the wave. A node that consumes only part of wave k gets its own review on that branch (A1 -> review-A1 -> B) and starts when A1 clears, not when the whole wave does.
+
 **Mass harvests: nodes are not units of work.** When a research or scan wave must cover thousands of sources or files (a 10,000-source harvest is legitimate when the work demands it), shard items INTO nodes instead of one node per item: each `quick` node owns a batch sized by its report contract - collect ~50-200 items and write ONE bounded file report (<= 5k tokens) to a ledger path - so `N_nodes = ceil(total_items / items_per_node)`. Under the default caps that is ~100k items per session before touching a knob; past one run's cap, chain runs with the multi-run composition below and give every run its own aggregator node, so synthesis reads per-run digests, never raw node outputs.
 
 **Split implementation from its test? No.** One node owns one deliverable end to end: the change AND its proof. A node that only writes code and a node that only tests it serialize on the same files and double the coordination cost.
@@ -50,10 +52,11 @@ Specialty categories - chosen by the KIND of work, never by difficulty:
 | `visual-engineering` | Frontend, UI, styling, animation. |
 | `writing` | Docs, prose, technical writing. |
 | `git` | Git operations only. |
-| `deep` | Hairy debugging or cross-module reasoning that a ladder rung already failed on, or clearly cannot hold. |
+| `deep-low` | Hairy debugging or cross-module reasoning a ladder rung could not hold, settled from what the worker reads. |
+| `deep-high` | The same, when the central decision cannot be settled from evidence: a trade-off, a cross-package contract, a mechanism with no in-repo pattern, or correctness argued from invariants. |
 | `ultrabrain` | At most ONE node per graph - the single genuinely hard reasoning problem everything else depends on. |
 
-A graph whose every node is `deep` is a routing failure: it pays the most expensive worker for mechanical lanes and starves the one lane that needed the horsepower.
+A graph whose every node is `deep-low` or `deep-high` is a routing failure: it pays the most expensive worker for mechanical lanes and starves the one lane that needed the horsepower.
 
 ## Concurrency and write-scope rules
 
@@ -87,12 +90,12 @@ const probe = await sdk.wait((await sdk.start(probeDag)).run_id)
 const findings = probe.nodes["probe"].output
 if (findings.includes("critical")) {
   const fix = sdk.define({ key: `fix-${today}`, name: "Fix" })
-  fix.node({ id: "fix", category: "deep", prompt: `TASK: ... FINDINGS:\n${findings}` })
+  fix.node({ id: "fix", category: "deep-low", prompt: `TASK: ... FINDINGS:\n${findings}` })
   await sdk.start(fix)
 }
 ```
 
-**Concurrent runs.** Distinct keys run concurrently (default cap: `task.dag.max_runs_per_session` = 16). When two graphs are independent, start both and `Promise.all([sdk.wait(a), sdk.wait(b)])`.
+**Concurrent runs.** Distinct keys run concurrently (default cap: `task.dag.max_runs_per_session` = 16 active runs; finished, failed and cancelled runs do not count). When two graphs are independent, start both and `Promise.all([sdk.wait(a), sdk.wait(b)])`.
 
 **Trigger-launched runs.** A run does not have to start from a user turn: a monitor hit, a goal-loop wake, or a task-completion notification can be the trigger, and the cell that fires on the wake builds and starts the next graph. Conditional pipelines live in your code, never in the definition - the graph itself has no branch construct.
 
@@ -119,11 +122,11 @@ A mass research run is a HARVEST, and the graph is sized by how many angles exis
 
 **Wave 1 opens at 60+ nodes, deliberately over-collecting.** Enumerate every angle the topic has - source territory, sub-question, entity, time window, competing approach, adjacent field - and give each one its own node. Sixty nodes is a floor for a genuinely broad topic, not a target to trim toward: coverage is the deliverable, and the slot limiter serializes width into queue time, never into lost correctness. Under-collecting wave 1 is the failure this mode exists to prevent.
 
-**Route the wave across the whole ladder in one graph.** Broad source sweeps and per-item harvest batches are `quick`. Angles needing a judgment call a template cannot make are `unspecified-low`. Angles with real integration surface across several territories are `unspecified-high`. Reserve `deep` for the few genuinely hairy cross-source contradictions. One tier across sixty nodes is the routing failure named above - name the tier for every node as you define it, and honor a user's literal routing words ("quick", "deep", "all quick") exactly.
+**Route the wave across the whole ladder in one graph.** Broad source sweeps and per-item harvest batches are `quick`. Angles needing a judgment call a template cannot make are `unspecified-low`. Angles with real integration surface across several territories are `unspecified-high`. Reserve `deep-low` for the few genuinely hairy cross-source contradictions, and `deep-high` only when one of them turns on a decision evidence cannot settle. One tier across sixty nodes is the routing failure named above - name the tier for every node as you define it, and honor a user's literal routing words ("quick", "deep", "all quick") exactly - a bare "deep" means `deep-low`.
 
 **Each wave's discoveries define the next wave's nodes.** Read the settled run's node outputs in the cell, harvest every EXPAND lead they returned, deduplicate against the leads already seen, then build the next run's nodes FROM those leads - chase the tail until the leads run dry under ulw-research's convergence rules. A mass research run that stops after one wave collected breadth and no depth.
 
-**Synthesis reduces through several architects, then one reducer.** Never hand sixty raw node outputs to a single node. Fan the converged material into several parallel `architect` nodes, each owning one slice of the synthesis and reading bounded per-wave digests, then depend ONE final `architect` reducer on all of them to merge their verdicts into the deliverable. **When this session's config has no `architect` category, `ultrabrain` is its substitute** - and the graph's one-`ultrabrain`-per-run rule applies to the reducer alone, so the parallel slice nodes drop to `deep` in that configuration.
+**Synthesis reduces through several architects, then one reducer.** Never hand sixty raw node outputs to a single node. Fan the converged material into several parallel `architect` nodes, each owning one slice of the synthesis and reading bounded per-wave digests, then depend ONE final `architect` reducer on all of them to merge their verdicts into the deliverable. **When this session's config has no `architect` category, `ultrabrain` is its substitute** - and the graph's one-`ultrabrain`-per-run rule applies to the reducer alone, so the parallel slice nodes drop to `deep-low` in that configuration.
 
 ## Node prompt contract
 

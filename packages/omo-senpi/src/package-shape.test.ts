@@ -79,14 +79,14 @@ describe("omo-senpi package shape", () => {
     expect(readBoolean(manifest, "private")).toBe(true)
     expect(readString(manifest, "type")).toBe("module")
     expect(readString(manifest, "version")).toBe(readString(rootManifest, "version"))
-    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./extension", "./install"])
+    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install"])
     expect(scripts).toMatchObject({
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
     })
-    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.9.16-3")
+    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.10-12")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
-    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.9.16-3")
+    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.10-12")
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -110,6 +110,9 @@ describe("omo-senpi package shape", () => {
     expect(files).toContain("extensions")
     expect(files).toContain("skills")
     expect(files).toContain("runtime")
+    // The task daemon's only argv source ships with the plugin; without it `omo daemon run`
+    // fails closed (exit 5) on every npm install.
+    expect(files).toContain("daemon-launch-spec.json")
     expect(files).toContain("README.md")
     expect(files).toContain("NOTICE")
     expect(files).toContain("LICENSE")

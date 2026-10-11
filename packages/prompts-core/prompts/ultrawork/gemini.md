@@ -211,43 +211,37 @@ When the `create_goal` tool exists, you MUST register the run's goal with it BEF
 
 ### SCENARIO CONTRACT (binding, defined BEFORE coding)
 
-Define scenarios sized to the change — 1-2 for a small single-surface change, 3+ for risky or multi-surface work — each with a binary pass condition and the cheapest faithful proof: a test file+test id at a code seam (test-first), or the real-surface scenario itself when no seam exists (prose, docs, visual-only: review + real-surface QA, no test). Classes:
+Define scenarios sized to the change — 1-2 for a small single-surface change, 3+ for risky or multi-surface work — each with a binary pass condition and the existing tests that cover it (read first) and the real-surface scenario that proves it (prose, docs, visual-only: review + real-surface QA, no test). Classes:
 - **Happy path** (always)
 - **Edge** (boundary, empty, malformed, concurrent — when risky)
 - **Adjacent-surface regression** (callers, sibling endpoints, related modules — when multi-surface)
 
-Scenarios are the contract. Done = every scenario PASSES with both artifacts (RED→GREEN proof AND real-surface artifact).
+Scenarios are the contract. Done = every scenario PASSES with its real-surface artifact captured and the tests of record green.
 
 ### DURABLE NOTEPAD
 
 At start: `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)`. Echo the path. APPEND-ONLY sections: Plan, Scenarios, Now, Todo, Findings (file:line), Learnings. If context is lost, re-read and resume — this is your only durable memory.
 
-### TDD (MANDATORY for code with a test seam)
+### TEST DECISION (every production code change)
 
-Every production code change — features, fixes, refactors, perf, glue, config-with-logic — follows RED→GREEN→SURFACE. Prose, docs, and visual-only changes have no seam: skip RED→GREEN, prove them through the surface channel.
+1. **READ** the tests covering the area BEFORE touching it — the behavior of record: do they encode the intent, cover this path, pass? One WRONG before your change is a FINDING to report — NEVER edit a test green. A bug: reproduce it first and capture the failure. A refactor: the existing tests are green on the unchanged code first.
+2. **CHANGE**: the SMALLEST change that meets the scenario; update the tests it makes stale. Add a test ONLY when BOTH hold: the repository keeps tests for this behavior AND a regression would otherwise pass unnoticed by the run and the existing tests — sized like its neighbors, never one that restates the change. The run is the proof, not a test that certifies the diff.
+3. **SURFACE**: Exercise the real user-facing surface (CLI / API / build / UI / config); a reproduction now passes. Capture artifact path.
+4. **REGRESSION**: Re-run the FULL scenario list plus the step-1 tests every increment. Record PASS/FAIL with artifact paths.
 
-1. **RED**: Write the failing test FIRST. Run it. Capture the assertion message that proves it fails for the RIGHT reason (not syntax, not import). Paste RED output into the notepad. No production code yet.
-2. **GREEN**: Smallest change to flip RED→GREEN. Re-run, capture GREEN output. If GREEN required ~20+ lines, your test was too coarse — split it.
-3. **SURFACE**: Exercise the real user-facing surface (CLI / API / build / UI / config). Capture artifact path.
-4. **REGRESSION**: Re-run the FULL scenario list every increment. Record PASS/FAIL with both artifact paths.
-
-**Refactors**: write characterization tests pinning current observable behavior FIRST, watch them GREEN against the old code, THEN refactor. Stay green throughout.
-
-**Exemption whitelist**: pure formatting, comment-only edits, version bumps with no behavior delta, rename-only moves. Each MUST be justified in writing. Unjustified exemption = rejection.
-
-**If you typed production code without a failing test preceding it: STOP, revert, write the test, watch it fail, then redo.** No exceptions — "obvious" / "one-liner" / "too small" do NOT exempt you.
+Prose, docs, and visual-only changes have no seam: prove them through the surface channel, NO test.
 
 ### COMMIT DISCIPLINE (MANDATORY)
 
-Commit frequently: one atomic commit per verified increment (RED→GREEN + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Skip committing only when the user forbade commits this session.
+Commit frequently: one atomic commit per verified increment (change + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Skip committing only when the user forbade commits this session.
 
 ### Evidence Gates
 
 | Gate | Required Evidence |
 |------|-------------------|
-| **RED** | Failing assertion msg before any production code |
-| **GREEN** | Same test now passing |
-| **Surface** | tmux / curl / browser / Playwright / computer-use / CLI / DB diff artifact path |
+| **Read** | Existing tests for the area noted (intent / coverage / pass) before the change |
+| **Run** | Tests of record green after it; stale expectations updated |
+| **Surface** | tmux / curl / browser (omowright) / computer-use / CLI / DB diff artifact path |
 | **Build** | Exit code 0 |
 | **Suite** | Full run green; no skip/.only/xfail added this turn |
 | **Lint** | lsp_diagnostics clean on changed files |
@@ -255,13 +249,13 @@ Commit frequently: one atomic commit per verified increment (RED→GREEN + evide
 <ANTI_OPTIMISM_CHECKPOINT>
 ## BEFORE YOU CLAIM DONE, ANSWER HONESTLY:
 
-1. Did EVERY scenario reach RED captured → GREEN captured → surface artifact captured? (paths in notepad)
+1. Did EVERY scenario reach surface artifact captured with the tests of record green? (paths in notepad)
 2. Did I run `lsp_diagnostics` and see ZERO errors on changed files? (not "I'm sure")
 3. Did I run the FULL suite and see it PASS? (not "they should pass")
 4. Did I read the actual output of every command? (not skim)
 5. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
 6. Did I classify intent at the start? (if not, my entire approach may be wrong)
-7. Did I write code BEFORE its failing test, anywhere? (if yes, REVERT and redo via TDD)
+7. Did I add a test that only restates the change, or edit a wrong test green? (if yes, delete it / report the finding)
 
 If ANY answer is no → GO BACK AND DO IT. Do not claim completion.
 </ANTI_OPTIMISM_CHECKPOINT>
@@ -286,7 +280,7 @@ Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task
 | Adds/modifies a CLI command | Run the command with Bash. Show the output. |
 | Changes build output | Run the build. Verify output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
-| Renders/changes a page | Drive the REAL page from js eval: (1) `new Bun.WebView()` on Bun >= 1.4 (macOS default; Linux/Windows need installed Chrome/Chromium/Edge). (2) Otherwise, or for Chrome semantics, stealth, trace, or auth, WRITE a `playwright-core` script and run it from the kernel against local Chrome (`chromium.launch({ channel: "chrome" })` / `launchPersistentContext`). Capture screenshot + action log. NEVER clear cookies, cache, or site data on the user's live profile. For login state, CLONE it first (`rsync -a <profile>/ <tmp-clone>/`) and use only the clone as the persistent user-data-dir; clear data only there. |
+| Renders/changes a page | Drive the REAL page from js eval with omowright (staged in the `browser` skill): the owned engine (`connectPipe` on a task-owned profile, `connectCloakProfile` for bot-scored targets) for unauthenticated pages, the attached engine (`connectBrowserSkill()` in the user's own signed-in browser) when the page needs their login. Capture screenshot + action log. NEVER clear cookies, cache, or site data on the user's live profile, and never clone it; if the attached engine is missing, run the browser skill's onboarding script and relay its one human step instead of launching a headless browser. |
 | Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Drives a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |

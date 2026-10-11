@@ -9,6 +9,8 @@ import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { createMemoryIdentityContext } from "./context"
 import {
   MEMORY_STATUS_KEY,
+  estimateSystemTokens,
+  estimateSystemTokensCached,
   refreshMemoryStatus,
   type GitRepoForStatus,
   type MemoryStatusUi,
@@ -792,4 +794,89 @@ describe("refreshMemoryStatus", () => {
     expect(estimate).toBeGreaterThanOrEqual(30_000)
     expect(estimate).toBeLessThanOrEqual(50_001)
   }, 30_000)
+})
+
+describe("estimateSystemTokensCached", () => {
+  function countingRepo(overrides: Partial<GitRepoForStatus> = {}): GitRepoForStatus & { calls: number } {
+    const repo = {
+      calls: 0,
+      async lsTree(): Promise<string[]> {
+        repo.calls += 1
+        return ["system/persona.md", "system/notes.txt", "docs/readme.md"]
+      },
+      async show(_revision: string, path: string): Promise<string> {
+        repo.calls += 1
+        return path === "system/persona.md" ? "x".repeat(400) : ""
+      },
+      ...overrides,
+    } as GitRepoForStatus & { calls: number }
+    return repo
+  }
+
+  test("#given the same commit twice #when the estimate is requested #then the second answer is the first one and nothing is re-read", async () => {
+    // given - a commit is immutable, so re-reading it can only produce the number already known
+    const repo = countingRepo()
+    const cache = new Map<string, number>()
+
+    // when
+    const first = await estimateSystemTokensCached(repo, "head-1", cache)
+    const callsAfterFirst = repo.calls
+    const second = await estimateSystemTokensCached(repo, "head-1", cache)
+
+    // then
+    expect(second).toBe(first)
+    expect(first).toBe(await estimateSystemTokens(countingRepo(), "head-1"))
+    expect(repo.calls).toBe(callsAfterFirst)
+  })
+
+  test("#given a different commit #when the estimate is requested #then it is computed again rather than served from the other commit", async () => {
+    // given
+    const repo = countingRepo()
+    const cache = new Map<string, number>()
+
+    // when
+    await estimateSystemTokensCached(repo, "head-1", cache)
+    const callsAfterFirst = repo.calls
+    await estimateSystemTokensCached(repo, "head-2", cache)
+
+    // then
+    expect(repo.calls).toBeGreaterThan(callsAfterFirst)
+  })
+
+  test("#given the tree cannot be read #when the estimate is requested #then the failure surfaces and is never cached as zero", async () => {
+    // given - answering 0 would report "no pressure" for a repository whose pressure is unknown,
+    // silencing the advisory exactly when it cannot be trusted
+    let attempts = 0
+    const repo = countingRepo({
+      async lsTree(): Promise<string[]> {
+        attempts += 1
+        throw new Error("tree unreadable")
+      },
+    })
+    const cache = new Map<string, number>()
+
+    // when / then
+    await expect(estimateSystemTokensCached(repo, "head-1", cache)).rejects.toThrow("tree unreadable")
+    expect(cache.has("head-1")).toBe(false)
+    await expect(estimateSystemTokensCached(repo, "head-1", cache)).rejects.toThrow("tree unreadable")
+    expect(attempts).toBe(2)
+  })
+
+  test("#given a system file holding invalid UTF-8 #when the estimate is requested #then it counts the decoded text the model is shown", async () => {
+    // given - three invalid bytes decode to three U+FFFD, nine bytes, not the three git stored
+    const repo = countingRepo({
+      async lsTree(): Promise<string[]> {
+        return ["system/raw.md"]
+      },
+      async show(): Promise<string> {
+        return new TextDecoder().decode(new Uint8Array([0xff, 0xfe, 0x80]))
+      },
+    })
+
+    // when
+    const estimate = await estimateSystemTokensCached(repo, "head-1", new Map())
+
+    // then
+    expect(estimate).toBe(Math.floor(9 / 4))
+  })
 })

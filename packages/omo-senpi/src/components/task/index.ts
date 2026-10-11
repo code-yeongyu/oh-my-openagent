@@ -12,6 +12,7 @@ import {
   evaluateSpawnPolicy,
   isTeamMemberProcess,
   loadPiTui,
+  readSessionRole,
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
@@ -30,7 +31,9 @@ import { createDagReloadSource } from "./dag-reload-source"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { createDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
+import { registerEvalHandleHost } from "./eval-handle-host"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
+import { wireHostPrewarm } from "./host-prewarm"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
@@ -64,6 +67,12 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   return {
     name: "task",
     async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
+      // One extension set serves every session of the shared daemon, so the component gates itself
+      // on what THIS session is. A DAG child never boots a task engine (parity with the per-child
+      // launch, which drops omo's own `-e` entry for DAG-owned children) and a team member gets the
+      // member bundle instead; every other session - parent or plain child - keeps the full surface.
+      const role = readSessionRole(pi)
+      if (role === "dag_child" || role === "member") return
       if (isTeamMemberProcess()) return
 
       // Unconditional omo process hygiene (T16): fires on session_start before any
@@ -160,6 +169,9 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       })
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
 
+      // Ahead of the recovery chain's session_start, so a revived child's host boots during the reconcile.
+      wireHostPrewarm(pi, engine)
+
       wireDagLifecycle(pi, dagRuntime, () => {
         wireEventBridge(pi, ctx, engine, statusUi, transitions, {
           reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
@@ -229,18 +241,25 @@ function registerTaskTools(
     }),
   })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
-  pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId }) })
+  pi.registerTool({
+    ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId, notices: engine.host.notices.list }),
+  })
   registerDagTool(pi, engine, dagRuntime)
   registerWorkpoolTool(pi, engine, skillInvocations, coordinator)
+  registerEvalHandleHost(pi, engine)
 }
 
 function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: DagRuntime): void {
   const sessionId = (): string => engine.runtime.sessionId() ?? ""
+  const rootSessionId = (): string => {
+    const id = sessionId()
+    return engine.resolveAncestry(id)?.rootSessionId ?? id
+  }
   pi.registerTool({
     ...createDagTool({
       manager: runtime.manager,
       parentSessionId: sessionId,
-      rootSessionId: sessionId,
+      rootSessionId,
       wait: runtime.wait,
       cancel: runtime.cancel,
       retry: runtime.retry,
@@ -271,12 +290,14 @@ function createTeamToolContext(
 ): TeamToolContext {
   const serviceDeps = {
     manager: engine.manager,
+    resolveInheritedExtensions: engine.resolveInheritedExtensions,
     destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,
     omoConfig: engine.omoConfig,
     cwd: engine.runtime.cwd(),
     agentNames: new Set(Object.keys(engine.agents)),
+    ...(engine.ancestry === undefined ? {} : { ancestry: engine.ancestry }),
   }
   const baseService = createTeamService(serviceDeps)
   const stateDir = {

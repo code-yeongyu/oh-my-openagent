@@ -1,5 +1,5 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
-import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -9,6 +9,7 @@ import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
+import { wireDagVerificationContext } from "./dag-verification-context"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -42,6 +43,7 @@ export function wireEventBridge(
   deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  wireDagVerificationContext(pi, engine.runtime)
   const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
@@ -49,7 +51,9 @@ export function wireEventBridge(
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
-    if (process.env[OMO_SENPI_TASK_RPC_CHILD] === "1" && sessionId === undefined) return
+    // A child session that has not reported its own id yet has nothing to reconcile: its records
+    // belong to the parent. The role comes from the session (shared daemon), else from the env.
+    if (readSessionRole(pi) !== undefined && sessionId === undefined) return
     transitions.onSessionStart(sessionId)
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
@@ -114,14 +118,24 @@ export function wireEventBridge(
     const parentSessionId = engine.runtime.sessionId()
     const reason = shutdownEvent.reason
     engine.lifecycle.dispose?.()
-    if (parentSessionId === undefined || typeof reason !== "string") {
+    if (typeof reason !== "string") {
       ctx.logger.warn(
-        "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",
+        "omo-senpi task session_shutdown skipped: malformed reason",
         { parentSessionId, reason },
       )
       return
     }
-    await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason })
+    // The context can lose its session id during teardown. Only this engine's live handles
+    // establish fallback ownership; scanning every record would suspend sibling host sessions.
+    const parentSessionIds = parentSessionId === undefined
+      ? new Set(engine.manager.residentTaskIds().flatMap((taskId) => {
+        const record = engine.manager.get(taskId)
+        return record === undefined ? [] : [record.parent_session_id]
+      }))
+      : new Set([parentSessionId])
+    for (const sessionId of parentSessionIds) {
+      await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
+    }
   })
 
   pi.on("model_select", (_payload, eventCtx) => {
@@ -139,7 +153,8 @@ export function wireEventBridge(
     )
   })
 
-  pi.on("before_agent_start", (_payload, eventCtx) => {
+  pi.on("before_agent_start", (payload, eventCtx) => {
+    if (isPreview(payload)) return undefined
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"
@@ -149,7 +164,7 @@ export function wireEventBridge(
       {},
     )
     return undefined
-  })
+  }, { previewSafe: true })
 }
 
 async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
@@ -178,4 +193,8 @@ function asLiveContext(value: unknown): LiveTaskContext {
 
 function isLiveContext(value: unknown): value is LiveTaskContext {
   return typeof value === "object" && value !== null
+}
+
+function isPreview(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }

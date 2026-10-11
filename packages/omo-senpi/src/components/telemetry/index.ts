@@ -12,6 +12,7 @@ import {
   TelemetryProductConfig,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
+import { createLazyValue } from "../../extension/startup-deferral"
 import type { ComponentLogger } from "../../extension/types"
 
 export const SENPI_TELEMETRY_EVENT_NAME = "omo_senpi_daily_active"
@@ -20,7 +21,10 @@ export const SENPI_MACHINE_ID_PREFIX = "omo-senpi:"
 const SENPI_TELEMETRY_SOURCE = "senpi-extension"
 const SESSION_START_REASON = "session_start"
 const DEFAULT_TIMEOUT_MS = 500
-const PACKAGE_VERSION = readPackageVersion()
+// Module scope is the one place this cannot be paid lazily-for-free: reading the manifest there put
+// a readFileSync in the bundle's module-import phase for every session, including the vast majority
+// that never capture legacy telemetry. Resolved on first capture instead.
+const packageVersion = createLazyValue(readPackageVersion)
 
 export type SenpiTelemetryOptions = {
   readonly env?: TelemetryEnv
@@ -39,7 +43,7 @@ export function createSenpiTelemetryProductConfig(): TelemetryProductConfig {
     eventName: SENPI_TELEMETRY_EVENT_NAME,
     machineIdPrefix: SENPI_MACHINE_ID_PREFIX,
     packageName: "@oh-my-opencode/omo-senpi",
-    packageVersion: PACKAGE_VERSION,
+    packageVersion: packageVersion.get(),
     platform: "omo-senpi",
     productEnvPrefix: "OMO_SENPI",
     productName: "omo-senpi",

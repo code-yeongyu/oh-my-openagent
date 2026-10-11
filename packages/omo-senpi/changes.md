@@ -1,625 +1,830 @@
-## 2026-09-16 — Kibitzer nudges are reference-only
-
-A recalled note used to arrive with no stated posture, and 54% of the hints
-Kibitzer delivered this month were written as orders to the primary agent
-("verify these before ...", "하지 말아야 합니다"), which is advice the agent did
-not ask for and cannot audit. The injected block now names its sender and its
-posture in the header itself - Kibitzer, a background memory advisor, surfaced
-this stored note; it may or may not apply, reference only, the current task
-stands - in English or Korean according to the hint
-(`packages/memory-core/src/recall/render.ts`). The persona's sample block and the
-renderer are pinned to each other byte for byte by `render.test.ts`, so the judge
-is never shown a block the harness does not produce.
+## 2026-10-10 - Bindings take whatsapp as a native platform name
 
-The persona asks for the other half of the contract: a hint states what the
-stored note records ("the note records that ..."), and an instruction to the
-agent joins commentary-only and topical-only nudges as a worked bad example
-(`packages/memory-core/src/recall/assets/kibitzer-persona.md`).
+The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.
 
-The rule is enforced where nudges are admitted instead of being left to the
-model. `describeInvalidHint` in `packages/memory-core/src/recall/gate.ts` answers
-`addresses-agent` for a hint that carries the second person, opens with an
-imperative or negated imperative, or ends in a Korean request form, next to the
-existing `empty`, `too-long`, `multiline` and `decision-commentary` reasons.
-`validateNudges` drops such a hint on the parent side and the sidecar's `nudge`
-tool refuses it at call time with the reason and the fix - restate what the note
-records as a plain observation - keeping the single correction the tool contract
-allows. Only the opening of the sentence is scanned for imperatives, so an
-observation that quotes a rule mid-sentence ("the release note records that
-publish must follow the green-main guard") is still accepted, as are Korean
-plain-form endings. `isValidHint` deliberately keeps its older shape-only
-meaning: pending payloads and stored `omo-kibitzer:nudged` entries were admitted
-under the contract of their own day, and replaying them must not retroactively
-drop a nudge that is already on screen (#8355).
+`whatsapp` is now a binding platform in all three spellings. Because SQLite cannot widen a CHECK in place, schema v7 rebuilds the `bindings` table with the widened list, carrying every column over verbatim and recreating `bindings_one_active_thread` and `bindings_session` before the old table drops. The rebuild runs with foreign keys off so an extension table referencing `bindings` is neither cascade-deleted nor able to block the migration, and the AUTOINCREMENT high-water mark is carried over so a deleted newest row's key is never reused. Before the version bump commits, `migrate()` runs `PRAGMA foreign_key_check` from TypeScript and throws (rolling back to v6) if the step introduced a violation referencing `bindings`; the `foreign_keys` pragma is restored to its prior value afterwards. A store migrated from v6 keeps its live bindings and accepts a `whatsapp` bind (`store-v7-whatsapp.test.ts`); the tool schema takes the native name and the store keeps it (`bindings.test.ts`).
 
-## 2026-09-16 — memory_notice reports only messages compacted out of the live context
+## 2026-10-09 - A suspended background child's row stops spinning and counting (#9350)
 
-`<memory_notice>` told every session that N previous messages had left the live context, with N read
-off `sessionManager.getBranch().length`. The branch is the whole path to the leaf, not what the
-compaction dropped, so a fresh session of fifteen entries and zero compactions announced that twelve
-of its own live messages were gone. The count now comes from the branch's latest compaction entry:
-the `message` entries positioned before its `firstKeptEntryId` - or before the compaction entry
-itself when that id is no longer on the branch - are the ones senpi no longer sends. A branch that
-never compacted counts zero, and a zero count prints no line at all.
+The live task widget (`components/task/status-row-format.ts` `formatLiveBackgroundRow`) took its spinner frame and elapsed time from the current clock for every row. A parked child therefore read `⠹ ... · suspended · 354m 31s`: it looked like it was working, its time kept climbing, and the row said neither why it stopped nor what the user could do. It also checked residency only, so a child a host parked with a `suspension_reason` while still marked resident rendered as `running`.
 
-The notice is now strictly session-volatile. When the compaction count is zero and there is no save
-nudge and no soul update, the `before_agent_start` handler returns its `systemPrompt` with no message
-at all, so an uncompacted session spends no tokens on a notice that has nothing to report.
+The row now uses the side panel's rule for a child that has not finished (`suspension_reason`, or any residency other than `resident`); a finished child, which is `evicted` or `disposed`, keeps its own status in `/tasks` and the widget. A suspended row shows a still `‖` mark instead of a spinner and no running time: the record has no park timestamp (`updated_at` moves with every revival attempt), and a climbing timer is what made it look alive. It names the cause (`parent session restarted` when no reason is recorded, otherwise the recorded reason in words; `revival deferred: <reason>` carries the deferral reason), then what actually brings it back and the user's one action, decided from the same facts the engine uses: `resumes on session restart` for most parked children, `... or a message` only for a running daemon-hosted child at `rpc_detached` (the one kind `task_send` revives), `resumes on a message` for such a child evicted while idle, `will not resume` for a host version mismatch, and for a deferred revival the engine's own outlook for its reason (for example `retried a few times, then marked lost`). Each is followed by `/task-kill to cancel`. Nothing watches for the cause to clear, so the row promises no more than that. `senpi-task` now exports `deferralOutlookFor` for this. On a narrow line it keeps only `/task-kill to cancel`, and a parked row gives its width to the child's name before its route.
 
-The reason the old line existed survives where it belongs. That relevant stored memory arrives on its
-own as `<recalled-memory>` blocks and that there is no recall tool to call are standing facts about
-the toolset, not facts about this turn, so they are one sentence at the end of memory-core's compiled
-REMINDER, present in every prompt whether or not anything compacted. Models still learn there is
-nothing to search for, and they learn it from the block that is always there.
+`status-ui.ts` no longer schedules the 250 ms repaint when every shown background child is parked, so a widget of suspended rows paints once.
 
-## 2026-09-13 — Project persisted reflection reports into TUI and RPC
+## 2026-10-08 - task_cancel can release a finished child's residency (#9785)
 
-Recap projection requires an explicit positive outcome attempt matching the
-ledger. Two omitted attempt IDs are not proof of the same child execution;
-legacy records without that evidence retain their operational notice.
+`components/task/engine.ts` forwards the lifecycle's new `parkTerminalResident` through the manager's destruction port. With it, `task_cancel` on a finished child that is still resident stops the child and parks the record, instead of answering "No change." The registry adapter (`residency-registry.ts`) now answers `ownsRecord`: a record is this engine's when its parent session is the engine's current session. Without that answer a handle-less record is never parked, so a sibling session's child in the same daemon is left alone. The engine side is described in `packages/senpi-task/changes.md`.
 
-Report and page reads use the existing resilient memory filesystem boundary.
-An interrupted positional report read retries the same explicit offset, retaining
-short-read and file-change checks; it does not become a missing report merely
-because a child-reaping signal interrupted the syscall.
+## 2026-10-08 - Gating questions are asked with `required: true` even when the model omits it (#9774)
 
-Bundle import normalization preserves `bun` and namespaced specifiers. Bun's
-ambient builtin catalog includes its own modules; prefixing those with `node:`
-made Bun-generated artifacts disagree with the Node-driven CI freshness check.
-Both launchers must generate identical bytes without relaxing artifact checks.
+senpi's `required: true` on `ask_user_question` turns a timed-out, dismissed or unavailable answer into "No answer: do not take the action it gates. Keep that action pending and end the turn." The flag is opt-in per call, and in live QA `zai/glm-5.3` never set it (0 of 6 gate calls; #9775), so its unanswered ulw-plan gate still read "continue on your best judgment".
 
-Committed reflection results derive a bounded, attributed report from existing
-run output and matching finalization artifacts. The completion file remains
-unchanged; only the delivered custom entry carries the presentation projection.
-The read-only `omo.memory.reflections` method pages relevant results without
-consuming delivery state. Failed, unchanged and unmerged runs do not become
-learned-memory recaps.
+The new `question-gates` component (`src/components/question-gates/`) enforces it from the plugin. One `tool_call` handler on `ask_user_question` and `request_user_input` sets `required: true` in place before senpi's tool runs; the agent loop passes the same arguments object to the hook and to `execute`. Gates are detected from the call itself:
+- **Primary:** a question header equal to one the skills now pin: `Approval` for the ulw-plan approval gate; `Authorize` for the final authorization block and for mass-ulw's scope, spend and irreversible decisions; `승인` / `권한` in Korean sessions. The match is exact, so Korean forks such as `권한 모델` are not gates. Every pinned header fits senpi's 12-character header limit: a longer one (`Authorization` is 13) is rejected by senpi before the hook runs.
+- **Fallback:** an option label starting with `approve` / `authorize`.
 
-The TUI supports compact and expanded report content without flattening Markdown
-whitespace. The real-runtime QA driver covers actual child commits, exclusions,
-disconnection recovery and source/recipient session switching. Its readiness
-signal is the existing memory binding entry, not an extension-event capability
-that the stdio client did not negotiate.
+Question text is never read, so a fork that only mentions approving something stays unflagged and still falls back to its recommended default. The flag is never set to false. Each forced call writes one `debug` line naming the tool, the header and the matched rule, with no question text.
 
-## 2026-09-13 - Ship the agent toolkit as an eval SDK
+A gate state rule (a ulw-plan draft at `status: awaiting-approval`) was rejected: in run t4 the model asked the gate while its draft still said `drafting`.
 
-Adds `plugin/runtime/agent-toolkit-sdk/sdk.js` at `OMO_AGENT_TOOLKIT_SDK_ROOT`. The SDK imports only Node builtins and binds each call synchronously from `PI_SESSION_ID`, `PI_SESSION_CWD`, and `PI_GOAL_STORE_FILE`; importing it performs no I/O. Missing session facts resolve as operation-tagged failure envelopes. Checkpoints and review blockers use the session's driver snapshot unless explicitly supplied, with authoritative `goal:null` stopping fallback reads. Invalid stores are advisory warnings and are never rewritten.
+Known limit: senpi persists the arguments the model sent, so a gate question still pending across a reload or resume is restored without `required` and the hook does not run again for it.
 
-The host status reader uses the additive `#omo-agent-toolkit-sdk` import map. Build freshness, installer/payload allowlists, node-only input checks, and isolated worker tests cover the new artifact. Generic directory provisioning preserves DAG behavior. This increment retains the old tool registration, runtime alias, and sidecar; their removal is a separate change.
+## 2026-10-08 - ulw-plan and mass-ulw ask their gating questions with `required: true` (#9735)
 
-## 2026-09-12 — Drop the retired agent-name alias notices
+senpi 2026.10.10-9 added `required: true` to `ask_user_question` (code-yeongyu/senpi#2959). On a required question, a timed-out, dismissed or unavailable answer returns "No answer: do not take the action it gates. Keep that action pending and end the turn." instead of the generic "Continue the work to completion on your best judgment". The approval gate (`ulw-plan/SKILL.md`, `references/full-workflow.md`), the final authorization block (`references/stance-calibration.md`) and mass-ulw's scope, spend and irreversible decisions (`mass-ulw/SKILL.md`) now set it on their call. Ordinary forks stay unflagged, so a timed-out fork still falls to its recommended default.
 
-The `omo-config:agent-alias-deprecated` startup warning is removed from `components/config-startup/index.ts` together with its `StartupNotice.kind` discriminator: with the alias gone from senpi-task, `agents.metis` / `agents.momus` are ordinary custom agent keys and there is nothing to deprecate. `components/task/dag-lint.ts` no longer warns on a retired `subagent_type`, and `components/telemetry/omo-native-tools.ts` reports the submitted subagent name (a retired id masks to `custom` like any other unknown name) instead of canonicalizing it first. `scripts/qa/plan-gated-agents-e2e.mjs`'s four alias scenarios become `retired-id` / `team-retired` / `dag-retired` / `retired-config`, each asserting the removal on a real senpi process: the retired id never reaches plan-reviewer, team_create names the submitted id, a workflow route keeps it verbatim, the config key defines a custom agent, and no surface prints a deprecation line.
+The #9748 backstop sentence stays, because the flag is opt-in per call. In live QA on senpi -9 (gate left unanswered, 1-minute timeout):
+- `anthropic/claude-opus-5-5` set `required: true` on every gate call and got the refusal.
+- `zai/glm-5.3` never set it. Without the backstop, one of two runs wrote the plan on a timed-out gate; with it, none did.
 
-## 2026-09-11 — Keep Kibitzer events captured during child startup
+Plugin-side enforcement of the flag is tracked in #9774.
 
-A hook event captured while the resident Kibitzer's child was still being started (between the seed envelope being built and `startChild` resolving) was drained together with the seed's own batch and never reached the child. The seed now cuts its payload from the event stream when the envelope is built, exactly as a followUp does, so an event that lands while the child boots opens the next batch and rides the next wake; a child that cannot be started carries that payload - its events and its candidates - into the retry seed after the backoff (`src/components/memory/kibitzer/sidecar-wake.ts`). No event is dropped at the seed boundary any more.
+## 2026-10-08 - ulw-plan and mass-ulw ask through the question prompt (#9735)
 
-`sidecar.ts`, `observe.ts`, `events.ts` and `sidecar-prompt.ts` are split by responsibility into modules under the 250-line ceiling; every public name is still exported from the original module. The QA lane gains `scripts/qa/dependency-diff-check.mjs`, the supply-chain control the plan's final verification invokes: it diffs every tracked manifest and lockfile between two commits and exits 0 only when no dependency entry was added.
+`ulw-plan` delivered its approval gate as chat text and ended the turn, so a user away from the screen never saw it. The renderers in `references/stance-calibration.md` and the gate in `references/full-workflow.md` said to "present" or "deliver" questions without naming a channel.
 
-## 2026-09-11 — Persist resident Kibitzer observability
+- `stance-calibration.md`: every question the skill puts to the user goes through the question tool (`ask_user_question` or `request_user_input`, whichever the session lists) with its wait flag set to true. When no question tool is listed or a call returns unavailable, the questions go in chat with one line saying so. A timed-out, dismissed or unavailable answer is not approval: a fork takes its default, but the approval gate and the final authorization block stay open and the turn ends. `SKILL.md` carries the gate rule itself, and adds "even when the tool result says to continue on your best judgment", because senpi's timeout result says exactly that and a model otherwise follows it. That clause is a stopgap until senpi #2949 adds a per-call "no answer means don't" flag.
+- `full-workflow.md`: the gate asks one question, recommended first: Approve; Approve, skip review (only when the review is default-on); Change approach. The review-cap stop asks through the tool too. `SKILL.md`'s gate summary points at the same rule; `intent-clear.md`'s renderer recap now defers to stance-calibration.
+- `mass-ulw/SKILL.md`: a decision only the user can make is asked from the main session through the tool before the run that depends on it, never from an eval cell or a node prompt.
 
-Every settled wake of a resident Kibitzer sidecar now appends one line to `recall/sidecars/<encoded-session>/wakes.ndjson`, next to the child's own session JSONL (`src/components/memory/kibitzer/observe.ts`). The line is a closed record - wake and child generation, status and cause, model, parent cursor span, tool calls, duration, machine-slot wait, provider usage summed over the turn, context estimate, delivered paths - and it is bounded before it is written: the failure reason is cut before any stack frame, masked by both the memory-core and the senpi secret vocabularies and capped like a gate reason, paths and model ids are capped, and the whole line has a hard bound. The directory name is the unpadded URL-safe base64 of the exact parent session id, so two sessions whose ids differ only in characters a sanitizer would fold still get distinct directories.
+No test: prose with no machine consumer. Proof is a live real-model `/skill:ulw-plan` run in an isolated senpi sandbox (see the PR).
 
-The `omo-kibitzer:gate` notice moves onto these outcomes with its policy unchanged: an isolated failure is silent (its ndjson line is the only trace), the third consecutive diagnostic failure of one main session appends exactly one actionable notice, and a normal completion or the session's shutdown resets the streak. The record keeps its one-shot fields (`runId` still renders for stored sessions) and gains the additive `wake`; the legacy `omo-memorian:*` renderers are untouched.
+## 2026-10-08 - A skill name inside an identifier, a path, a URL or a prohibition no longer arms (#9738, #9740)
 
-Retention is bounded: a sidecar directory idle for seven days is removed by a sweep that runs when an identity's first sidecar comes alive and at every session shutdown. A live session owns its directory through a memory-core lock (`locks/recall-sidecar.<encoded-session>.lock`) from sidecar creation to shutdown, so the sweep skips this process's live sessions by name, skips any directory whose owner lock is held by a live process, recovers a crashed owner only on pid/start-identity proof, and re-checks idleness under the lock before claiming the directory by rename.
+`ultrawork` and `skill-pointers` treat a skill name as a request only when it stands as a word of its own:
+- **Identifier or path segment:** `mass-ulw-refactor`, `senpi-ulw-loop`, `.omo/ulw/...` and `.omo/ulw-execute/ledger.jsonl` arm nothing. A leading bundled skill name still arms (`ulw-loop ...`, `ulw-plan this`), and so does a skill chain (`mass ulw-loop`). The hyphenated `mass-ulw ...` still injects the mass-ulw pointer but no longer arms ultrawork on its own: it is lexically the same as the reference "in a mass-ulw research pipeline" that every delegated research brief carries, so allowing one allows both; `mass ulw ...` (spaced) and `ulw-mass ...` still arm.
+- **A URL** is masked like a code span.
+- **A prohibition:** `do not` / `don't` / `never` + `load|use|run|invoke|start|trigger|arm|enable` masks its objects up to the next sentence or clause break (`.;:!?` or a newline; a comma does not end it), so "Do not load mass-ulw or ulw-research" arms neither. A request that starts a new sentence still arms ("Don't use tmux. ulw this"), and so does a negation outside that verb list ("do not stop until done, ulw").
+- **Delegated sessions:** `skill-pointers` now applies the same `readSessionRole` rule `ultrawork` got in #9602, so a task child, DAG child or team member never gets a pointer from its own brief.
 
-## 2026-09-11 — Remove the one-shot Kibitzer machinery
+Telemetry records the new suppression reasons `identifier_reference` and `negated_mention`.
 
-The resident sidecar (`src/components/memory/kibitzer/`) is now the only Kibitzer engine. Each bound main session owns ONE read-only in-process child, created lazily on the first wake-eligible prompt or `tool_call` and disposed at session shutdown. Every prompt, tool call and tool result reaches it as a bounded event - secrets redacted before truncation, then capped by `memory.recall.event_caps`, the newest 20 kept verbatim and older ones folded into a one-line digest - and it spends a model turn only when a batch carries a memory path it has not judged in its lifetime. A wake takes one slot of the machine-wide `recall-wake` lease (`max_concurrent_wakes`, default 2; a busy machine buffers, never drops), may make `tool_budget` (default 8) tool calls within 90 seconds, and speaks through exactly five member-scoped read-only tools: `read`, `grep`, `session_entries`, `memory` (`search`/`read` only) and `nudge`. There is no memory-write tool, no shell and no file write. Past 60% of `sidecar_max_tokens` the child is replaced by a fresh one seeded with its delivered and rejected paths, task summary and last cursor; a failed child is disposed and recreated after a jittered exponential backoff (1 s to 5 min) with every buffered event kept. Automatic reflection failures back off too, in memory-core's reflection journal (`next_eligible_at`, 5 s doubling to 5 min; a manual `/reflect` bypasses it and a successful reflection resets it).
+Measured: upstream's replay of 83 stored delegated briefs went from 83/83 to 0/83 ultrawork arms (47 identifier, 36 negated). Over 14 days of local root sessions the identifier rule removes about 926 arms, nearly all automated text naming lanes and paths; the 8 typed requests that open with a skill name still arm.
 
-Deleted, with their tests and test-support files: `kibitzer-trigger.ts`, `kibitzer-runner.ts`, `kibitzer-runner.fallback-support.ts`, `kibitzer-judge-run.ts`, `kibitzer-judge-spec.ts`, `kibitzer-prompt.ts`, `kibitzer-concurrency.ts`, `kibitzer-lifecycle.ts`, `kibitzer-run-retention.ts` and `kibitzer-wiring.ts` - the per-launch judge, its candidate-set fingerprint, launch ceiling, trailing slot, process-wide `globalThis` judge slots and the per-run `recall/runs/<id>` directories with `outcome.json`, `candidates.json` and `transcript-window.txt`. `abortAndDispose`, which the facts child also used, now lives in `in-process-memory-child.ts`. The compaction epoch is gone from the pending-nudge file (`PendingNudges.write`/`take` take no epoch; a stored file that still carries `compactionEpoch` is consumed normally), from `recall-drain`/`recall-wiring` (`currentCompactionEpoch`) and from `kibitzer/delivery.accept`: a parent compaction retracts what delivery still holds and never invalidates the sidecar. `omo-kibitzer:gate`, `omo-kibitzer:nudged` and the legacy `omo-memorian:*` renderers stay registered so stored sessions render unchanged; the sidecar's audit trail is its own session JSONL under `recall/sidecars/<encoded-session>/`. `memory.recall.enabled: false` remains the only off switch; there is no legacy mode. Docs (`docs/guide/orchestration.md`, `docs/guide/overview.md`, `docs/reference/configuration.md`, `docs/reference/omo-json.md`), the memory `AGENTS.md` rows, `kibitzer/AGENTS.md` and the give-me-tips skill describe the resident design.
+Tests: `ultrawork-references.test.ts` and the new `skill-pointers-suppression.test.ts` cases fail on `dev`; removing the identifier guard, the negation mask, the URL mask, the pointer's trailing guard, its chain allowance or its delegated-session guard each fails them again. Live: `scripts/qa/skill-pointers-e2e.mjs` gains identifier-reference, negated-mention, lead-relay and request-after-prohibition scenarios.
 
-## 2026-09-10 — Model profiles pick the main session model without persisting it
+## 2026-10-05 - A relayed report or a quoted mention no longer arms ultrawork or skill pointers (#9600)
 
-`model_profile` in omo.json now selects the main session model at session start: a profile id (builtin `capable`, `simple-work`, `deep-work`, or a `model_profiles.<name>` chain) walks its rungs against the live registry with the same matcher category chains use; a literal `provider/model` value pins that model. The component (`src/components/model-profile/`) applies the pick through senpi's session-only setter, so `settings.json` `defaultProvider`/`defaultModel` are never rewritten and the profile keeps working on the next start. It runs after senpi's own `recommended-models` builtin and overrides its auto-switch; an unset `model_profile` changes nothing. Mid-session fallback still follows senpi's `retry.fallbackChains`, and the applied notice says so.
+`skill-pointers/strip-quoted-regions.ts`, the masking that both `ultrawork` and `skill-pointers` run before they look for a keyword, now also hides text that is someone else's:
+- **A relayed message:** one that opens with a sender header is masked whole. The header is a bracketed tag such as `[REPORT]` or `[a -> b]`, or `Name (id), recipient:` / `Name (id) to recipient:`. A report pasted into a root session that describes a bug and so mentions `ulw`, `mass ulw` or a skill name used to arm the directive and inject pointers there.
+- **A Markdown block-quote line** (`> ...`).
+- **A span inside straight or curly double quotes** on one line.
 
-`scripts/qa/model-profile-e2e.mjs` proves this on a real senpi process in an isolated home: the tier's third rung is selected with the skipped rungs named, the literal pin applies, an unknown id yields one notice and no model change, no `model_profile` yields no notice, the tier beats the recommended-models auto-switch, and `<agentDir>/settings.json` is sha256-identical before and after every scenario (a bundle mutated to call `pi.setModel` changes the digest, which is the no-persist regression proof). The `--model` provenance scenario is asserted and documents a gap: the current senpi release never attaches `initialModelProvenance: "cli"` to `session_start` (its `main.ts` builds the value but does not pass it to `createAgentSessionFromServices`), so the component must treat an absent provenance as explicit user state to leave a `--model` session alone.
+Typed asks keep arming: the keyword at the end of a Korean sentence, `mass ulw research ...`, a short mid-message `..., ulw, and ...`, and a leading `ulw <task>`. Measured over two weeks of local sessions, a third of all arms were relayed reports. A first-or-last-word rule or a slash-only rule would instead have dropped most typed arms, because mid-message is the most common typed form.
 
-## 2026-09-10 — Name curated agents by role, keep the old ids for one release
+Live: `scripts/qa/skill-pointers-e2e.mjs` gains a relayed-report, a quoted-mention and a Korean sentence-ending scenario. It now judges only the session transcript, because the engine's runtime snapshot under the agent dir ships docs containing `<ultrawork-mode>`, which made every whole-dir check pass or fail regardless of the session.
 
-The builtin curated agents `metis` and `momus` are now `plan-consultant` and `plan-reviewer`. The ulw-plan skill works as the Ultrawork Planner instead of a named persona, ulw-execute talks about the "ulw-plan work plan", and docs plus omo.dev describe every agent by what it does rather than by a myth name. The draft/plan frontmatter key `review.momus` becomes `review.plan_reviewer`, and telemetry `delegation_started.name` / `delegation_completed.agent_type` report the new ids, so dashboards that filter on `metis` or `momus` need updating.
+Tests: `ultrawork-arming.test.ts` (relayed and quoted inputs do not arm; four typed forms still arm) and `skill-pointers-suppression.test.ts` (relayed and quoted mentions inject no pointer). Both fail on `dev`, and removing any one of the three masks fails them again.
+## 2026-10-06 - The slash picker lists each bundled skill once (#9648)
 
-The old ids still resolve for one release. `subagent_type: "metis"|"momus"`, `omo.json` `agents.metis|momus` and `allowed_subagents` entries naming them canonicalize through `senpi-task/src/agents/legacy-agent-names.ts` and emit a deprecation notice. That alias window ships in the first tagged publish containing this change (currently 5.0.0-beta.51 per package.json) and is removed in the next tagged publish; a test pins the alias table to exactly those two keys so nothing else slips in.
+`components/skill-commands/autocomplete.ts`: the top-level `/` list showed every bundled skill twice, as its bare alias (#9042) and its `skill:<name>` row. The alias now takes the `skill:<name>` row's place, so each skill is one row and senpi's ranking of everything else is unchanged; an alias whose skill row is not on the page is still offered at the end. A bare `/` is left as senpi lists it (senpi lists no `skill:` rows there). Typing `/skill:` still lists every skill under its `skill:` name. A skill whose bare name a same-named template or command shadows keeps its `skill:<name>` row, the only way left to reach it. Submitting either form is unchanged: the bare form is still rewritten to the `/skill:` form and recorded as a human invocation.
+## 2026-10-05 - Live fallback QA covers process children and a turn near compaction (#9582)
 
-## 2026-09-10 — Hide question tools from task children
+`scripts/qa/task-runtime-fallback-e2e.mjs`:
+- `limit-after-tool` now requires the tool call before the in-session hop on every process runner. The child-process `N/A` is gone now that a process child carries its own chain.
+- New scenario `limit-near-compaction`: the same tool-then-limit turn, but the tool-call response reports a context past the compaction threshold of a 128K window (114K input; senpi refuses to start a session under its start minimum, about 52K here and more where more tools load). The engine's pre-retry compaction therefore runs on the spent model first, and the child must still end on its fallback model with the settings file byte-identical.
+- The driver runs on Windows too: the process table comes from the CIM process list instead of `ps`/`pgrep`, and `senpi` resolves through PATHEXT.
 
-`TASK_CHILD_UI_ONLY_TOOL_NAMES` now lists `request_user_input` and `ask_user_question` next to `memory`, so in-process children do not inherit the parent-only question tools. RPC children get the matching `--no-ask-user` flag from senpi-task.
+`task-runtime-fallback-mock-provider.ts` serves the new model. `task-runtime-fallback-e2e.windows.test.ts` runs the child-process runner through `user-fallback`, `limit-after-tool` and `limit-near-compaction` on Windows, where every task child is a process child.
+## 2026-10-07 - A bundled visualize skill for inline HTML pages (#9700)
 
-## 2026-09-10 — Route user questions in the ultrawork directive through the question tool
+Agents can show a self-contained HTML page inline in a thread (senpi `show_html_page`, the desktop `html_preview` / `html_render`), but nothing told them how to make the page good.
 
-Three sentences in `skills/ultrawork/SKILL.md` told the model to stop, surface, or plainly "ask the user" when only the user could unblock the run: blockers left after two re-reviews, two identical failed attempts at one step, and the goal-waiting paragraph that had no user-decision case at all. With senpi's question tool (`request_user_input` / `ask_user_question`) available, ending the turn or marking the goal blocked is the wrong move. The re-review rule now asks through the question tool with the outstanding blockers as options; the retry rule asks through the question tool and continues on best judgment if the question times out; the goal-waiting paragraph gains one sentence stating that a decision only the user can make is asked through the question tool, waiting for the answer when the run cannot proceed without it, and is never recorded as blocked.
+- `skills/visualize/SKILL.md`: a short router. Figures come from `data-scientist` (DuckDB or Polars, every number traceable to its query, chart choice from its `references/visualization.md`) and design from `frontend`. The skill itself owns only what is particular to an inline page: no network, the host's theme tokens, fluid width, a figure that reads with scripts off, designed empty states, fallbacks for pages opened outside the app, axis labels kept out of a stretched SVG, and render-and-look in both themes at 390 px and the reply width before showing.
+- Registered as a native senpi skill: `plugin/scripts/native-skill-sources.mjs` (+ test), `skills-sync.test.ts` (expected and native names), telemetry `BUILTIN_SKILL_NAMES`, and the skills AGENTS.md tables.
 
-`src/components/ultrawork/generated-directive.ts` is regenerated from the source through `plugin/scripts/embed-directive.mjs`; the `--check` drift gate in `ultrawork.test.ts` failed against the edited source and passes after regeneration. The committed bundle `plugin/extensions/omo.js` is rebuilt on the CI-pinned Bun 1.4.0 so the reload test in `ultrawork-arming.test.ts` sees the same directive from the bundle and from the generated module. Heading count of SKILL.md is unchanged (27). The planned wording `wait_for_answer true` was not used because the embed script rejects any `wait_for` token as a non-senpi harness surface; the sentence says "waiting for the answer" instead.
+## 2026-10-07 - Lost background revival notifies the parent after session start (#9498)
 
-## 2026-09-10 — Export claude-sdk-oauth as a known telemetry provider
+`components/task/completion-bridge.ts` observes the nonterminal-to-`lost` edge
+inside a store mutation, as well as normal terminal transitions. Bounded revival
+retries can exhaust after startup notification recovery has returned; the old
+transition-only bridge would persist `lost` without waking the parent until
+another session start. The normal notifier still owns epoch deduplication and
+delivery. Mutating an already-lost record never sends another notification.
 
-`src/components/telemetry/model-vocabulary.ts` gains a `claude-sdk-oauth` key carrying the same ids as `anthropic`. The builtin Claude rungs in senpi-task now head with that lane (#8051), and without the key every delegated Claude turn on a Claude Pro/Max machine would have exported as `custom`, collapsing the category-model insight on exactly the lane the product routes to. The generated schema block in `docs/reference/senpi-telemetry.md` lists the new provider value; `product-identity.test.ts` pins the mask. The shipped `plugin/extensions/omo.js`, `omo-task.js`, and `omo-init-deep-advisor.js` bundles are regenerated so the plugin carries the new rung order and the model-core tie-break that no longer prefers a shorter provider name.
+`completion-bridge.test.ts` starts a background child and applies the real
+reconciliation loss reducer twice through the observing store. The parent gets
+exactly one lost notification; the pre-fix bridge sends none.
 
-## 2026-09-10 — Stop failing Kibitzer fires for reasons that are not failures
+## 2026-10-07 - Memory maintenance runs write receipts, unrecoverable runs are quarantined, and recovery is kill-tested (#9689)
 
-`Kibitzer gate failed` kept appearing intermittently on beta.51 after the persona prime shipped, from three producers that were not real gate failures (#8052, #7963).
+Reflection and dream runs recorded their outcome only in per-run files, and startup reconciliation had three dead ends: invalid terminal timestamps threw a `TypeError` on every pass, an unreadable ledger kept the reservation forever, and a supervisor that died after its child committed a valid tip failed the run and deleted the worktree.
 
-A judge that answers only through `nudge` and then stops without prose is a completed run. senpi's empty-assistant recovery retries one invisible stop and settles the second as `Model returned an empty response twice`, which the gate reported as `child_failed` even after accepted nudges. The nudge tool result now carries `terminate: true` once the run's `max_items` is reached (also on a rejection at the cap), so the agent loop ends the turn on the tool batch and the model never has to answer with nothing; as the floor for runs that stop below the cap, `classifyJudgeTurn` treats that settled message as `completed` when nudges were accepted and `empty` when none were. Accepted nudges are delivered in both cases.
+- `packages/memory-core/src/receipts/`: `receipts.jsonl` under the identity's runtime dir, appended under its own `receipts` lock. `appendMemoryReceiptOnce` dedupes by `(kind, runId, event, generation)` or `(facts, batchId, event)`. `readMemoryReceipts` returns newest first and counts a partial trailing line. `maybeKillAt(point)` SIGKILLs the process when `OMO_MEMORY_KILL_POINT` names the point (TerminateProcess on win32); it is a test seam only.
+- `components/memory/receipts-port.ts`: `emitMemoryReceipt` writes after the durable artifact and only warns on failure. Emitters cover `launched` (first attempt), settlement (`merged`/`no_changes`/`failed`), abandonment, quarantine, recovery, and every facts terminal write. `final.json` and `abandoned.json` carry `generation`.
+- `worker/run-receipt-backfill.ts`: the reconciliation scan rebuilds a missing receipt from `final.json`, `abandoned.json` or `quarantined.json`. A sentinel's own kind, trigger, origin and generation win, so a pre-ledger sentinel needs no ledger.
+- `worker/run-reconciliation-prelaunch.ts` (moved out of `run-reconciliation.ts`): under a launcher proven dead on this host, four cases quarantine the run:
+  - invalid generation timestamps;
+  - an unreadable ledger with no terminal artifact;
+  - a run dir past the launch window with no prelaunch file;
+  - a terminal claim that cannot be read (`RunTerminalClaimUnrecoverableError`).
 
-Run-dir artifacts (`candidates.json`, `transcript-window.txt`) are auditable output the child never reads; a write that fails now logs `kibitzer gate run artifacts skipped` and the fire continues instead of ending as `session_create_failed`. A persona read that fails at fire time is reported as `persona_unavailable` with the asset filename in the reason. The `#omo-task-runtime` module is primed at memory-component registration beside the four personas (`omo-senpi memory boot asset unavailable` names a module that cannot load), and a fire awaits that same load instead of resolving the specifier against the install tree at fire time.
+  memory-core `reflection/quarantine.ts` writes `reservation.quarantined.json`, then `quarantined.json`. The reservation is released, and no run file is moved or deleted. A launch interrupted before its ledger keeps its run dir. Its worktree is discarded, and a pre-ledger `abandoned.json` (`launch_interrupted`, identity fields copied from the held reservation) is made durable before release; before this, the run dir was `rm`-ed.
+- `worker/run-finalization.ts` `recoverUnpublishedWorktreeTip`: when the supervisor exited without an outcome, a tip that passes `validateCompletion` is published as a success marked `recoveredFromWorktree`, followed by a `recovered` receipt, and then takes the normal merge path. The launcher (`SUPERVISOR_EXIT_PREFIX` errors only) and `reconcileDeadSupervisor` (child dead or absent) both use it. Reconciliation settling another process's matching outcome also writes `recovered` first.
+- Kill points: `runner-execution.ts` (after-reserve, after-worktree), `create-run-worktree.ts` (after-prelaunch), `memory-run-supervisor.ts` (after-child-exit), `run-finalization-git.ts` (after-validate, after-merge), `run-finalization-settlement.ts` (before-receipt).
+- `commands/doctor-receipts.ts`: the `receipts` and `quarantined-runs` checks and their `--json` fields. `abandoned-runs` skips `launch_interrupted`.
+- Tests:
+  - `run-crash-recovery.e2e.test.ts`: a driver child (`__fixtures__/crash-driver.ts`, explicit env) runs the real runner, supervisor and mock model child, is killed at each point, then reconciles in a second child. 11/11 pass, also with the kill point set in the test process's env, and 0/11 on the pre-change source.
+  - `run-quarantine.test.ts`: 9 cases, including a live-launcher control and a finished-run control.
+  - `run-receipts.test.ts`, `facts-receipts.test.ts`, the memory-core receipts tests, and the doctor cases.
 
-The notice policy is unchanged: one notice per session after three consecutive diagnostic failures (PR #8033), which beta users receive with the next release.
+## 2026-10-07 - The memory file list in the prompt is bounded by recency, count and bytes (#9687)
 
-## 2026-09-09 — Pin persona assets to the payload a process started from
+The compiled memory block ends with `<external_projection>`, which named every memory file outside `system/` in name order with no limit. A real long-lived corpus measured 3,281 files and 157,834 bytes (about 39K tokens) on every turn, with 1,962 names on one line.
 
-The memory component read each persona markdown from beside the bundle at child-launch time, so the asset had to still be on disk, under its current name, every time a gate fired. The install tree is mutable while a session runs: a global install replaces it in place and the omob launcher rebuilds and prunes runtime dirs. After the Kibitzer rename shipped, sessions whose process had loaded the pre-rename bundle kept opening `extensions/memorian-persona.md` in the replaced tree and every recall gate died with `session_create_failed` (ENOENT). The same shape hit omob runtime dirs on 2026-09-07 through a prune.
+- `components/memory/prompt.ts`: the handler passes the identity's projection limits into `MemoryBlockCache.compile`. `wiring-static.ts` reads them from the memory settings; `projection-limits.ts` merges a per-agent `agents.<name>.projection` over the base.
+- `commands/doctor-projection.ts`: `/doctor` gains a `projection` line with the names shown and omitted and the byte size against the limits. It is `warn` when names are omitted or no listing fits the byte budget. `doctor-runtime.ts` adds it after `tokens`.
+- Tests:
+  - `prompt.test.ts`: a per-directory limit of 1 shows one name and counts the other two.
+  - `doctor.test.ts`: the in-limits, omitted and overflow lines.
 
-Persona filenames now have one definition (`memory-core/src/personas/manifest.ts`), the loaders read through a process-level cache that serves the content the process started with, and the memory component primes all four personas at registration. A read that fails is reported once, naming the asset and its cause, and is never substituted at runtime: a genuinely incomplete payload is a packaging failure, so the packing validators own it. `plugin-artifacts.ts` derives its persona entries from the manifest and is now the single required-artifact list; `script/build-omo-native.ts` re-exports it instead of keeping a hand-copied mirror, which had drifted and stopped requiring `extensions/omo-task.js`, `extensions/omo-member.js` and the gate persona in the published `omo-ai` payload.
+## 2026-10-07 - The Windows task e2e waits for the child's completion instead of reading once (#9481)
 
-## 2026-09-09 — Rename the memory advisor to Kibitzer
+`scripts/qa/task-rpc-e2e.mjs` checked `completion_push_arrives` by reading the task records once, right after scenario A's parent session returned. On a slow Windows runner the child's completion write can land just after that read, so the check failed with "no completion recorded" while every other check passed (#9222, #9331 twice, #9529, #9655).
 
-Renamed the Memorian implementation, persona asset, packaging references, QA drivers and documentation to Kibitzer. Recall notices now identify Kibitzer instead of the former Aha! wording, and English/Korean model-facing hints name their source.
+- `scripts/qa/task-rpc-e2e-scenarios.mjs`: new `waitForProcessCompletion(stateDir, timeoutMs = 60 s)`. It waits for a process-mode record to reach `completed` through the existing `waitForRecord` (file watchers plus a 250 ms re-read, with a read after the watchers start so a write in between is not missed). Past the deadline it returns the process tasks' last statuses.
+- The driver uses it, and the FAIL reason and facts now carry the last observed status.
+- `task-rpc-e2e-scenarios.test.mjs`:
+  - a record that is still `running` when the check starts and turns `completed` right after: the old single read reports no completion, and the wait reports it;
+  - a child that never completes: the wait fails at its deadline with `lastStatuses: ["running"]`.
 
-New entries use `omo-kibitzer:nudged`, `omo-kibitzer:gate` and `omo-kibitzer:recall`. Legacy `omo-memorian:*` entries remain renderable, and both recall channels are excluded from recall search and transcript ingestion. Existing recall settings, hint validation, scheduling, pending files and the separate `memory.nudge` write reminder retain their behavior. Tracking issue: #7993.
+## 2026-10-06 - The memory nudge no longer walks the whole memory history on every prompt, and the memory repo gets packed (#9667)
 
-## 2026-09-09 — Make thread discovery test paths platform-native
+Every prompt's `before_agent_start` asked git whether this session had saved memory yet, with `git log --grep` over the identity's entire history. Commits set `gc.auto=0`, so the repo was never packed. A long-lived identity measured 11,821 commits and 41,588 loose objects (632 MiB) next to a 3.6 MiB pack. The query took up to 2.2 s per prompt on an idle machine and passed the 30 s git timeout under memory pressure, and the timeout then escaped the extension as a raw `Extension omo.js error: git log ... timed out after 30000ms` stack in the TUI.
 
-`src/components/thread/live-surface.test.ts` builds agent-home fixture paths and expected socket paths with `node:path`. Windows resolves configured directories to drive-qualified paths and uses backslashes; fixed POSIX literals caused three CI failures and made the fake settings-file lookup miss the intended directory. Override priority, canonical/flat/standalone discovery, and unavailable-host assertions are preserved. Runtime code is unchanged.
+- `components/memory/nudge-wiring.ts`: each session keeps the HEAD it last checked and the turn of its newest save. The first check reads only commits since the session began (its header, else its oldest entry, minus one hour), stops after 20 matches and has a 5 s git cap. Every later check reads only `<checked HEAD>..HEAD`. On that same repo the check takes 17-23 ms, against 0.33-2.2 s before.
+- `components/memory/prompt.ts`: a failed or timed-out notice input (the nudge count or the soul notice) gives that turn no such notice and is reported through `onNoticeInputFailed`, which `wiring-static.ts` sends to the component logger as a warning. Nothing is thrown into the extension, so nothing reaches the TUI.
+- `components/memory/memory-maintenance.ts` (new), scheduled from `afterBind` in `wiring.ts`: 30 s after a session binds, one background pass per identity. The pass holds the identity's new `memory-maintenance` lock (`memory-core` `memoryMaintenanceLockPath`), and a session that finds it held skips rather than waits, so many sessions sharing one repo produce one runner. The 12 h stamp (`omo.maintenanceAt` in the repo's own config) is read and written under that lock. The pass is also skipped below 2,000 loose objects or when the repo does not exist yet. The timer is unref'd, and session shutdown calls `dispose()`, which cancels a pending pass and stops a running git (SIGTERM through a new `signal` on the git exec, surfaced as `GitAbortedError`). Failures are logged, never raised. `gc.auto=0` stays, so no commit is held up by a repack.
+- `memory-core` `GitMemoryRepo`: `log()` takes `since` and `timeoutMs`. New `maintain()` runs git's `loose-objects` maintenance task, then `prune-packed`. Both only remove an object that a pack also holds, so concurrent commits are safe. (`incremental-repack` fails on a repo without a multi-pack-index and is not used.) On a copy of the repo above: 41,596 loose objects to 0 in 29.7 s, one 38.9 MiB pack, `git fsck --connectivity-only` clean.
 
-## 2026-09-08 — Regenerate task and member extensions for durable team linkage
+Tests:
+- `prompt.test.ts`: a nudge timeout leaves the turn with its memory block and no nudge, and reports the failure once. A failed soul notice keeps the nudge. Both fail before this change.
+- `nudge-wiring.test.ts`: a resumed session's save from an earlier run still resets the count, and a save buried among 50 commits of another session is seen by the next check.
+- `memory-maintenance.test.ts`: a repo full of loose objects is packed with every commit still readable. A commit made while a pass runs survives. A second process within the interval does not run again. Ten sessions starting together pack once. A lock held by another process means a quiet skip. A session that exits before its pass runs leaves the repo untouched. A loose object no commit references yet (a writer mid-commit) survives the pass. A repo that does not exist yet is a quiet no-op.
 
-Regenerated `plugin/extensions/omo-task.js` and `omo-member.js` with the CI-pinned Bun 1.4.0 build. The shipped extensions now preserve team run, team name, member name, and member role on senpi-task records; the repository's extension freshness check passes.
+## 2026-10-06 - A delivered message tells the receiver who sent it (#9660)
 
-## 2026-09-08 — A bind superseded by session replacement is a skip, not a failure
+The gateway drain now hands the receiving session the sender and the message as written, apart from the provenance header:
+- `deliverySender` in `gateway/provenance.ts` builds the sender: `agent` with the sending session's id and its name at send time, `command_line` for `omo thread send`, or `external` with the platform and author.
+- `drain.ts` passes it with `display_text` to `admitExternalMessage`.
+- `thread_send` and `thread_handoff` give the gateway the caller's current session name (`callerName`, from `pi.getSessionName`). Without it, a live run labelled the message only "Sent by another agent", because the drain had nothing but the session id.
 
-`logBindReconcileFailure` classifies senpi's retired-context error ("This extension ctx is stale after session replacement or reload.") the same way it already classifies reflection-lock contention: a recoverable `info` skip with `reason: "session replaced before the bind completed"`. Bind-time reconcile floats past `session_start` by design, so when the host replaces the session mid-bind it retires the ctx that bind was handed and the replacement session runs its own bind - nothing is lost and nothing needs operator attention. Genuinely unexpected errors keep `warn`.
+The model still reads the `[OMO_GATEWAY v=1 ...]` header. senpi's terminal renders the sender as "Sent by another agent · <name>" or "Sent from the command line" (senpi#2819); a senpi without that support ignores the two fields.
 
-Observed live on omo-desktop (mengmotaHost, packaged runtime under `--mode rpc --multi-session`): every desktop restart that resumed a session logged `memory bind-time reconcile failed` or its downstream `memory reflection launch failed` with that message; the boot with zero resumed sessions was clean until the next session bound.
+Tests (`engine.test.ts`):
+- a named and an unnamed session sender;
+- a command-line sender.
 
-## 2026-09-08 — Run the bundled agent toolkit under Bun mode from the packaged binary
+Dropping the sender, or naming a session by its id, fails them.
 
-`ulw-loop/omo-command.ts` spawns a `.js` toolkit entry through `process.execPath`. Under the packaged runtime (omo-desktop's compiled `omo`, omob) that path IS the omo binary, so without `BUN_BE_BUN` it ran its own embedded entrypoint with the toolkit path as a prompt: `ulw-loop status` exited 1 with `Unknown option: --json`, the hook logged `omo-senpi ulw-loop status ignored { reason: "non-zero-exit" }` on every input, and every desktop thread with a plan read as inactive so no continuation fired. The `.js` spawn target now carries `env: { ...process.env, BUN_BE_BUN: "1" }` (the same guard `lsp-daemon` gained in #7916); plain executables keep their inherited env.
+## 2026-10-06 - The thread tools switch a terminal session's model and level and interrupt its turn (#9660)
 
-## 2026-09-07 — Complete a facts child that finishes without assistant prose
+`thread_set_model`, `thread_set_reasoning` and `thread_interrupt` failed with `unsupported` against every terminal session, which is most live sessions. The client refused every command outside a fixed read-mostly list, and the terminal endpoint did not take them either.
 
-Facts extraction records through `record_fact` and often ends the turn with no final assistant text, including when nothing durable was found. The in-process launch now sets `completion: "turn"` so a normally settled turn is success; `stopReason` `error`/`aborted` still fails. Ordinary task children keep the default `final-text` policy.
+**What changed**
+- `live-surface.ts` asks a terminal once for `get_protocol_info` and remembers the `commands` it lists. A command the terminal lists is sent; any other is still refused as `unsupported` before a connection opens. A terminal on an older engine lists none and keeps the old behavior. Its refusal now says the terminal runs an engine from before terminal session controls, and how to get them.
+- `thread_list` rows carry `controls`, from `endpoint-controls.ts`: what a caller can do to that thread (`send`, `read`, `rename`, `set_model`, `set_reasoning`, `interrupt`). A host takes all six; an older terminal takes the first three.
 
-## 2026-09-07 — Flush the journal before shutdown cleanup
+**Tests** (`live-surface-tui.test.ts`, against a terminal endpoint that answers as senpi's does):
+- a model switch, a supported and an unsupported level, an unknown model, an interrupt mid-turn and one on an idle session;
+- each row's `controls`, next to an older terminal and a host;
+- reverting to the fixed command list fails the test.
 
-The session shutdown path now flushes the transcript journal before awaiting memory cleanup, gate cancellation, and facts cancellation, so the fixed 1500 ms shutdown budget cannot skip the durable journal step. Journal-flush budget exhaustion is emitted as an error-level alarm with the session and step details, while optional work keeps its existing informational message. Memorian gate runs now stop promptly when the child reports a terminal upstream 503, `auth_unavailable`, or overloaded provider error; silent children still use the deadline backstop.
+## 2026-10-05 - An idle gateway store no longer keeps its worker thread alive
 
-## 2026-09-05 — Name `tool.monitor` in the ultrawork directive and drop the polling loop
+Every session that touches the gateway store (each terminal with a control endpoint, and every sender) started one store worker thread and kept it until the session ended. A measured idle worker retains 2.94 MB: an empty Bun worker plus the bundled store code and SQLite. That put the terminal control endpoint's idle cost at about 4.1 MB against the 3 MB budget.
 
-The Waiting discipline section of `skills/ultrawork/SKILL.md` told the model that
-`monitor` is "the first tool you reach for", but in every session with `eval`
-the direct tool list carries neither `monitor` nor `bash` (senpi withholds both
-since 2026-09-03); the only callable form is `tool.monitor(...)` inside a cell.
-The 2026-09-05 `gpt-6-astra-fast` session traces show the result: a
-subscription appeared only in sessions whose request itself named the CI run or
-the async work, one orchestrator polled `task_output` 35 times with
-`TASK STILL ACTIVE` demands, and another blocked inside eval cells on
-`Bun.spawn` + `setTimeout(kill, 580-880 s)` for installs and test runs. A
-sandboxed backtest against the real model with this directive attached
-(`/tmp/ulw-astra-monitor/monitor-run.ts`, eval-only tool shape) reproduced it:
-no first response registered a subscription across three wait-shaped requests.
+`store.ts` now retires the worker after `GATEWAY_STORE_IDLE_RETIRE_MS` (60 s) with no store call in flight. The worker is detached first, so a call made from that moment starts a fresh worker instead of posting to the closing one. Only then is its database closed and the thread terminated. A call holds the worker from its entry to its settle, the open included, so a worker with a request in flight never retires and no request is failed or replayed by a retire. The next call pays one open, about 12 ms, and the fresh worker gets the extension registrations restored as after a crash.
 
-Three edits, each at the source of a defect and none appended on top. Waiting
-discipline now names the two call shapes (`tool.monitor({ description, command,
-filter })` for a command or an `until ...; printf 'READY\n'` gate,
-`tool.monitor({ description, path, event })` for a file), states the eval-only
-fact once, lists the conditions (a build, install, or test run finishing; a CI
-check or PR turning green; a deploy landing; a log line; a file appearing; a
-port opening; another session's pane or a remote machine changing state),
-states that the subscription is the whole cost of a wait - `sleep`, timed
-retries, re-polls, a cell that awaits a `--watch` or a spawned process, and a
-child spawned to watch are the forbidden forms, because the multi-round
-backtest showed the model awaiting `gh pr checks --watch` inside a cell or
-handing the wait to a child task once plain polling was ruled out - and keeps
-the unprompted-arming rule, whose duplicate list and the duplicate "register
-before the wait exists" sentence are gone along with the "blocking waits are
-gone" and "every wait is a subscription" restatements. Parallel
-execution scopes `Bun.$` to a command that finishes inside the cell and routes
-anything that can outlive one reply through `tool.monitor`, which is what
-turned the awaited-spawn blocking pattern into a directive-compliant one. Child
-execution loses the "peek once ... after four silent or ack-only checks" loop
-that contradicted the single-midpoint-peek rule and the senpi-task delivery
-contract; a running child is alive, its completion wakes the session, and the
-turn ends instead of polling. `generated-directive.ts` is regenerated by
-`embed-directive.mjs` (forbidden-token guard passed) and `ultrawork.test.ts`
-gains one sentinel: the shipped directive contains `tool.monitor(`, RED on
-`021aaf8cf` and GREEN after. o200k tokens for the directive: 7318 -> 7451.
+Tests (`store-idle-retire.test.ts`; the last one in `component.test.ts`):
+- after the idle interval the worker thread exits, and the next write lands on a fresh worker that keeps the registrations;
+- writes made before, during and after a retire each commit exactly once, in the order they were made. A retire that terminates without detaching first fails this;
+- a peer's send to a session whose worker retired is `started` and applied;
+- `dispose()` called while a worker is retiring resolves only after that worker has exited, so a caller that removes the agent directory next never races an open database handle;
+- an unreadable legacy mailbox is retried at every store open, and now that the store reopens after each idle minute, its warning is logged once per session rather than at each reopen.
 
-## 2026-08-29 — Teach "mass ulw research" the mass path
+## 2026-10-04 - Package-local test runs get the hermetic home (#9578)
 
-A combined mass + research invocation collected at team scale instead of mass
-scale, and two of its spellings never loaded the research skill at all.
+`bunfig.toml` preloads `../senpi-task/test-support/warm-lazy-runtime.ts`, so `bun test` from inside `packages/omo-senpi` gets the same hermetic home, agent dir and warmed lazy barrels as a repo-root run. Before, a package-local run had no preload at all: it used the real home and failed 17 entry-renderer tests on the unwarmed pi-tui barrel.
 
-`mass-ulw/references/planning.md` sent every `ulw-research` request to the team
-path and reserved the dag for "independent harvest stages only", so the
-composite invocation could never reach mass fan-out. That routing now splits: a
-plain research request still goes to the team, while a MASS research request
-runs collection as chained dags and keeps a team only for debate rounds. A new
-"Mass research" section states the scale the mode means — a 60+ node opening
-wave covering every angle, routed across `quick` / `unspecified-low` /
-`unspecified-high` / `deep` in one graph, each wave's EXPAND leads defining the
-next wave's nodes until convergence, and a synthesis that reduces through
-several parallel `architect` nodes into one `architect` reducer, with
-`ultrabrain` substituting where the config defines no `architect` category.
-Both `ulw-research` copies (senpi-native and shared) gained the matching branch
-at their Phase 1 roster decision, so the mode is reachable from either skill.
+## 2026-10-04 - ulw-plan no longer names a delegation category that does not exist (#9561)
 
-`skill-pointers` extracts the mass alias group into a shared `MASS_ALIAS`
-constant and lets it stand in for the `ulw` half of the research pattern. The
-aliases carrying no literal "ulw" (`mulw`, `meth`) and the reversed `ulw mass`
-previously matched mass-ulw alone, so "mulw research" armed dag orchestration
-with no research doctrine behind it; those spellings now inject both pointers,
-exactly like "mass ulw research". Near-miss guards (`method`, `promethean`,
-`ulw massive`) are unchanged.
+The `ulw-plan` skill's delegation-router row listed a `git` category that no edition ships (`SKILL.md`), and its reference copy (`references/full-workflow.md`) also still listed `deep`, which was split into `deep-low` and `deep-high`. A plan that followed either name sent `task(category: ...)` to a category the user's session does not have. Both rows now list exactly the built-in categories.
 
-## 2026-08-28 — Align the Senpi adapter with 2026.8.28
+## 2026-10-04 - The committed gateway rules sidecar is no longer an ignored path
 
-`packages/omo-senpi/package.json` now requires the exact published
-`@code-yeongyu/senpi` `2026.8.28` release for both its optional peer and
-development dependency, matching the native runtime pin. The engine release
-repairs the beta.23 shared interactive host regressions (thinking-level
-cycling, duplicate user-message rendering, and resume of host-held sessions)
-and restores the compiled eval kernels.
+`packages/omo-senpi/.gitignore` ignores `/plugin/extensions/*` and re-admits each committed bundle with a `!` line. The `gateway_rules` store-extension sidecar (`gateway-rules-extension.mjs`, from #9540) was committed without its `!` line, so `script/tracked-ignored-paths-audit.test.ts` failed on `dev` and on the v5.1.17 release-state PR. A local `git add` of a fresh regen would also silently skip that file. Added the negation next to its sibling `gateway-store-worker.mjs`.
 
-## 2026-08-27 — Align the Senpi adapter with 2026.8.27
+## 2026-10-04 - A runtime advisory no longer makes a failed reflection child look like a provider outage (#9553)
 
-`packages/omo-senpi/package.json` now requires the exact published
-`@code-yeongyu/senpi` `2026.8.27` release for both its optional peer and
-development dependency. Keep the peer, dev dependency, root patched-dependency
-key, and generated lockfile aligned with the native runtime pin.
+On Windows every failed memory reflection child was recorded as "refused by its provider", and automatic reflection parked for hours. `worker/model-miss.ts` `providerFailureDetail` took the first stderr line as the provider's answer. On a Bun host on win32 that line is Bun's `child reaper unavailable under Bun on win32: ...` advisory, printed once per terminated worker thread before anything the child says. The shared retryable-error classifier matches the bare word `unavailable`, so any failure became `provider_unavailable`, the real cause was hidden, and every candidate in the chain was marked as refused.
 
-## 2026-08-27 — Allow the mailbox durability stress test to finish on Windows
+The detail is now the first line that is not an advisory: a runtime reporting on its own host (`... under Bun/Node/Deno ...`), or a line that announces itself with a log-level prefix (`note:`, `info:`, `warning:`, ...). The first real line still decides, which matters because senpi prints the provider's answer first and a stack (`Error: ...`) may follow it.
 
-The mailbox cap-and-restart test now has a 15-second per-test budget. It performs
-128 durable atomic queue writes plus a second byte-cap queue on Windows, where
-filesystem write and rename latency can exceed Bun's default five-second test
-budget even though the queue contract completes correctly. This changes only the
-test deadline; mailbox bounds, ordering, persistence, and production retry
-behavior remain unchanged.
+Tests (`model-miss.test.ts`, the exact advisory text):
+- advisory then an unrelated error: the child's own failure;
+- advisory then a real 429: a provider outage named by the provider's line;
+- advisory alone: no outage;
+- an unknown `note:` advisory saying "temporarily unavailable" then a real error: the error decides;
+- a provider sentence then a stack `Error:` line: the provider's sentence decides.
 
-## 2026-08-27 — Preserve the full Windows model-admission test budget
+**Known limit:** an advisory with neither a runtime marker nor a log-level prefix, and nothing after it, is still taken as the detail. There is no better line to report then.
 
-The task RPC model-admission parity tests now pass their calculated timeout
-through Bun's supported timeout option object. This preserves the intended
-`PROBE_TIMEOUT_MS * 3 + 20_000` budget on Windows instead of allowing the
-legacy numeric argument form to be capped by the runner's default test
-deadline. Production probe behavior is unchanged.
+## 2026-10-04 - Gateway operating-rules injection into lead and bound sessions (#9190)
 
-## 2026-08-27 — Keep thread persistence and DAP portable on Windows
+- New `components/gateway`: the scope lead and every session with an active binding get the scope's compiled behavioral rules as one `<operating-rules version="<rules sha>">` block in the system prompt through `before_agent_start`, rendered beside the memory block. The component lazily connects only when the `gateway.scopes` config is non-empty and the store database exists; every other session's prompt passes through byte-identical. Rules are computed by the gateway package; omo owns only the `gateway_rules` store extension (a `gateway_rules_blocks` table plus the `rulesCommitted`/`blockForSession` ops) and the exactly-once `rules_changed` fanout per session and version. `plugin/scripts/build-extension-core.mjs` emits the ops module as `extensions/gateway-rules-extension.mjs` beside `omo.js`, covered by the build freshness check.
 
-The thread mailbox and durable receipt stores now use the shared atomic-write
-implementation, which opens a writable temporary file, tolerates the Windows
-filesystem's allowed `fsync` limitations, and avoids directory `fsync` where
-Windows rejects directory handles. The DAP client now distinguishes a real
-`host:port` adapter endpoint from a Windows drive-letter script path, so the
-fixture adapter launches instead of attempting a socket connection to drive
-`C:`. The existing POSIX durability behavior remains unchanged.
+## 2026-10-04 - Escape untrusted gateway rule text and add `sessionsWithRules`
 
-## 2026-08-27 — Regenerate both Senpi extension entry points after merge
+- Behavioral rule lines, scope and version render with `&`, `<` and `>` escaped, so a rule carrying the end sentinel or the closing tag can neither break the byte-identical turn guarantee nor close the block early; the `rules_changed` delivery text escapes scope and version the same way. New `sessionsWithRules({scope})` op lists a scope's `gateway_rules_blocks` rows ordered by session id so the gateway can clear sessions whose binding ended while the connector was down.
 
-The generated `omo.js` and `omo-task.js` entry points are refreshed from the
-current source after the post-beta.23 merges. This removes conflict-marker
-content that had remained in `omo-task.js` and keeps both tracked entry points
-aligned with the source component set consumed by the release build.
+## 2026-10-04 - Live QA: a task child's fallback after a tool call, and the user's settings untouched (#9512)
 
-## 2026-08-26 — Normalize ULW CLI pointer paths across platforms
+`scripts/qa/task-runtime-fallback-e2e.mjs` gains a `limit-after-tool` scenario. The child's primary model makes a real `bash` tool call, then hits a usage limit on the request carrying the tool result, so the fallback has to happen inside the running turn. Every scenario now also records a sha256 of the sandbox `settings.json` before and after the run, and `limit-after-tool` fails unless they match.
 
-The ulw-loop skill pointer now normalizes the resolved executable path to
-POSIX separators before embedding it in the machine-consumed command sentence.
-Windows Senpi compatibility therefore receives the same canonical path shape as
-POSIX while the actual executable path remains unchanged.
+On the host-session runner the scenario requires the tool call (`tool_execution`) before the in-session hop (`retry_fallback_applied`), and the record's model to end on the fallback. On the per-child process runner the tool check reads `N/A`, because that runner cannot carry a per-session chain and falls back at the manager level instead. `task-runtime-fallback-mock-provider.ts` serves the `limit-after-tool` model.
 
-## 2026-08-25 — Name the executable in the local-launcher brand profile
+## 2026-10-03 - Ultrawork routing item 4 carries a size test before it fans out (#9499)
 
-The sibling-store local launcher now injects `command: "omo"` on the `SENPI_BRAND`
-profile it hands the engine, matching the published omo-ai launcher. Senpi can
-render resume hints with the real executable name instead of guessing; unknown
-fields stay ignored on older engines.
+- `skills/ultrawork/SKILL.md` "Finding things" item 4: "Architecture / flow / blast radius across more files than one wave can read -> parallel explore agents armed with ast-grep, then synthesize; outside-repo research (library/API/docs/web) -> librarian. Run them in background; keep working." replaces the arrow table that sent every architecture question and every "unfamiliar layout" to background agents with no size test. `src/components/ultrawork/generated-directive.ts` is regenerated by `plugin/scripts/embed-directive.mjs` (22 words shorter; no forbidden harness tokens).
 
-## 2026-08-22 — One exception-free keyword table for every ULW skill pointer
+## 2026-10-01 - Legacy state lookup requires persisted state
 
-The mass-ulw and ulw-skill-pointers components were the same mechanism written twice, and the
-detectors carried `ulw(?!-)` lookaheads that silently swallowed overlapping mentions: "mass
-ulw-loop" fired neither mass-ulw nor ultrawork. They are replaced by a single `skill-pointers`
-component holding one uniform target table (mass-ulw with its aliases, ulw-plan, ulw-loop,
-ulw-research) with no cross-keyword exceptions — overlapping keywords all fire, each matched
-skill gets its own hidden pointer, and the ultrawork trigger likewise drops `(?!-)` so any
-`ulw` mention arms it. Typing "mass ulw-loop" now loads ultrawork + mass-ulw + ulw-loop
-together; "ulw plan" loads ultrawork + the ulw-plan skill.
+- The task-engine fixture writes a legacy-state marker before composing the
+  engine. Fresh and explicitly configured stores retain their existing behavior;
+  empty directories left by an observer no longer redirect new runtime state
+  into the project.
 
-CustomTypes stay stable (`omo-mass-ulw:skill-pointer`, `omo-ulw-loop/-research:skill-pointer`;
-new `omo-ulw-plan:skill-pointer`). The per-component flags `omo-senpi-mass-ulw-disabled` and
-`omo-senpi-ulw-skill-pointers-disabled` are replaced by `omo-senpi-skill-pointers-disabled`.
-Only structural dedup remains: extension-source inputs, a raw `/skill:` command for the same
-skill, expanded skill blocks, and the `<ultrawork-mode>` tag-pair guard.
+## 2026-10-01 - Computer permission events reach the root session from every caller (omo-desktop-app#1437)
 
-## 2026-08-22 — Load every skill a composite ULW invocation names
+- Observe typed engine permission denials before direct tools, computer actions or JavaScript/Python eval can serialize them. Emit `omo.computer.permission_required` on the root session's RPC connection with its own session ID.
+- Forward process and daemon child denials through task ownership, including nested and shared in-process task owners. Deduplicate each permission at the root, preserving the latch across reloads and resetting it for a new root session.
+- A session-journal write failure cannot prevent the permission event or replace the caller's original denial; failed marker persistence is reported through the component logger.
+- Keep emitted permissions in a process-lifetime, root-keyed latch so a failed marker write followed by extension reload cannot emit the same permission again. Fresh root sessions remain independent.
+- Keep the latch Map private behind a frozen, versioned claim facade installed as an immutable global property. Ignore incompatible retained state and preserve the native denial with a module-local fallback when that slot cannot be replaced.
+- Real-session tests exercise direct, code-mode and child callers against a protocol-speaking engine fixture. Transport tests reject malformed and foreign-session records without delivering them to existing agent-event listeners.
 
-"mass ulw loop" armed ultrawork and pointed at the mass-ulw skill, but nothing loaded the
-ulw-loop skill the phrase names; "mass ulw research" had the same gap. The new
-`ulw-skill-pointers` component detects `ulw loop` / `ulw-loop` / `ulwloop` and the research
-equivalents (any case) and injects one hidden skill pointer per matched skill, so a composite
-invocation now loads ultrawork, mass-ulw, and the named skill together.
+## 2026-10-01 - In-process task children honor the caller's settings (#9353)
 
-Suppressions mirror mass-ulw per skill — extension-source inputs, a raw `/skill:` command for
-the same skill, and an already-expanded skill block never re-inject — and queued prompts carry
-the pointers appended inside the one message so the group survives senpi's one-at-a-time queue
-drain. Gated by `omo-senpi-ulw-skill-pointers-disabled`.
+- `components/task/runtime-context.ts` captures the parent session's project-trust decision, and `engine-runners.ts` passes it to every in-process child, so the child's settings include the project layer exactly when the parent's do. `plugin/extensions/omo-task.js` regenerated on linux/amd64 (node 24, bun 1.4.2) for the senpi-task change.
 
-## 2026-08-21 — Follow the Senpi 2026.8.21 host contract
+## 2026-10-01 - Windows RPC kills tolerate repeated Bun startup advisories (#9228)
 
-The adapter peer and development dependency now require Senpi `2026.8.21`, and the
-task engine's peer and development pins move with it. The 2026.8.21 host carries
-the settings-lock CPU-spin repair that froze the omo TUI at ~100% CPU under
-provider-error storms: contended settings-lock retries sleep through
-`Atomics.wait` instead of busy-waiting, retry-fallback chain canonicalization is
-memoized per error burst, and the `cursor-cli-oauth` / `claude-sdk-oauth` lanes
-cache their settings loads by mtime+size. It also carries the follow-up that
-makes settings reads lock-free: writers publish through a same-directory temp
-file plus rename, so read-only settings loads take no lock and can never observe
-a torn write. Alongside those, the host refreshes hydrated provider catalog data
-(the vercel-ai-gateway Grok vendor slug moved `xai/` -> `spacexai/`, and opencode
-delisted `deepseek-v4-flash-free`).
+- The task bundle treats any number of known Bun child-reaper advisory lines as advisory-only stderr for Windows code-1/no-signal exits. Any different stderr line remains a crash diagnostic.
 
-The bump covers all four manifest surfaces, the workspace lockfile, the
-`senpi-pin` and package-shape test pins, and the provider-map provenance comment
-(re-verified: `packages/ai/src/providers/all.ts`, which defines
-`builtinProviders()`, is byte-identical between `v2026.8.20-2` and `v2026.8.21`,
-so the builtin provider ids are unchanged).
+## 2026-10-01 - Windows task-child parity regression (#9274, #6709)
 
-## 2026-08-21 — Add mass-ulw trigger aliases
+- The parity regression now reloads the in-process child loader beside the process child's builtin loader policy and pins equal platform-specific builtin names plus `web_search`, avoiding Windows CLI cold starts while the existing surface tests retain shared-parent and session-default coverage.
 
-The mass-ulw keyword detector now also fires on `ulw mass`, `ulwmass`, `mulw`, and
-`meth` (any case, space/hyphen variants), alongside the existing `mass ulw` /
-`massulw` / `mass-ulw` spellings. `MASS_ULW_PATTERN` becomes
-`/\b(?:mass[\s-]*ulw(?!-)|ulw[\s-]*mass|mulw|meth)\b/i`; the `ulw(?!-)` guard,
-all suppressions, and both injection paths are unchanged.
+## 2026-09-30 - Task children keep senpi builtin tools in the default in-process mode (#9274, #6709)
 
-## 2026-08-20 — Render transcript notices in the Senpi notice-box family
-
-Fallback architect announcements, task completion and liveness cards, and memory reflection, health, soul, accepted-turn, and write notices now share the Senpi-canonical padded `customMessageBg` block. Titles retain semantic tone and bold emphasis, body rows stay dim, and diagnostic detail remains expanded-only.
-
-Compact category warnings and normal tool result rows remain unchanged.
-
-## 2026-08-19 — Follow the Senpi 2026.8.19 host contract
-
-**What changed.** The adapter peer and development dependency now require Senpi
-`2026.8.19`, and the task engine's peer and development pins move with it.
-`packages/omo-senpi/package.json`, `packages/senpi-task/package.json`,
-`packages/omo-native/package.json`, the root `package.json` development pin,
-and the workspace `bun.lock` advance together, along with the
-`packages/omo-native/bin/lib/provider-map.json` provenance stamp and the
-`packages/omo-senpi/src/package-shape.test.ts` /
-`packages/omo-native/test/package-shape.test.ts` /
-`packages/omo-native/test/senpi-pin.test.ts` expectations.
-
-**Why.** The 2026.8.19 host stops implicit fallback expansion from routing
-through provider lanes that are guaranteed to refuse: a registered provider can
-declare itself ineligible, and the cursor-cli-oauth lane does so while its
-`--force` acknowledgement is missing or its kill switch is set. It also stops
-auto-compaction from being starved when a provider reports a small context
-while the local transcript keeps growing, and it detects the
-`com.apple.quarantine` attribute on shipped native PTY prebuilds before
-`dlopen()`, so macOS degrades to the pipe fallback instead of blocking the
-process on a Gatekeeper dialog. The release additionally carries the `/loop`
-scheduled-prompt builtin, memory and mass-ulw tip rotation, and the upstream
-`badlogic/pi-mono` main@`59a71b23` sync.
-
-**Why an extension could not handle it.** These are host-version pins. The
-adapter cannot express a required Senpi runtime version from inside an
-extension; the manifests are the contract the installer and the workspace
-resolver read.
-
-**Expected merge conflict zones.** The adapter and task manifests, the
-`omo-native` manifest and its pin tests, the workspace lockfile, package-shape
-expectations, and the provider-map provenance comment.
-
-## 2026-08-18 — Follow the Senpi 2026.8.18-3 host contract
-
-The adapter peer and development dependency now require Senpi `2026.8.18-3`,
-and the task engine's peer and development pins move with it. The 2026.8.18-3
-host repairs the release changelog itself: a merge resolution had left a stray
-conflict marker and duplicated empty headings inside the `[Unreleased]`
-section, which the release stamper would have frozen into an immutable
-released section.
-
-The host release also carries the accumulated post-2026.8.18-2 runtime work:
-active goals resume after a continuation-flooded session load suppressed
-auto-continuation, transient provider stream-start timeouts spend their full
-configured retry budget, Cursor exec-bridge dispatches bind to the run that
-opened their stream, leaked-invoke recovery resolves wire-aliased tool names,
-Cursor context windows track the models.dev first-party catalog, Cursor
-reasoning levels drive both Cursor surfaces, advertised Cursor tool schemas
-are sanitized of JSON-Schema composition keywords, input typed during
-auto-compaction is queued instead of dropped, eval cells with no tool calls
-omit the throughput badge, the packaged codemode sidecar retains its Babel
-dependency closure, and Claude SDK OAuth selects the libc-appropriate binary.
-
-This bump does not add or alter adapter behavior beyond the inherited host
-fixes. The provider registry contract was re-verified: `builtinProviders()` in
-`packages/ai/src/providers/all.ts` is byte-identical to 2026.8.18-2, so the
-42 builtin provider IDs are unchanged and only the provider-map provenance
-stamp moves. Conflict zones are the adapter and task manifests, the workspace
-lockfile, package-shape and senpi-pin expectations, and the provider-map
-provenance comment.
-
-## 2026-08-18 — Follow the Senpi 2026.8.18-2 host contract
-
-The adapter peer and development dependency now require Senpi `2026.8.18-2`,
-and the task engine's peer and development pins move with it. The 2026.8.18-2
-host fixes Cursor exec-bridge recovery: symbol-keyed exec markers survive
-model-recovery snapshot cloning, so side-effecting tool calls are not executed
-twice; late bridge events stay bound to their originating run; and active
-goals re-engage after a settings hot-reload. Cursor CLI OAuth bootstraps
-native credentials by default, and GPT-5.6 Sol/Sol Fast models default to a
-400k-token context window.
-
-This bump does not add or alter adapter behavior beyond the inherited host
-fixes. The provider registry contract was re-verified: builtin provider IDs
-are unchanged between 2026.8.18 and 2026.8.18-2 (senpi-pin and package-shape
-suites green). Conflict zones are the adapter and task manifests, the
-workspace lockfile, package-shape and senpi-pin expectations, and the
-provider-map provenance comment.
-
-## 2026-08-18 — Keep shipped skills on the Senpi task roster
-
-Shared skill copies now translate Oracle review lanes to `unspecified-high`,
-Oracle debugging and plan lanes to `deep`, and omit raw team leads that the
-Senpi harness supplies itself. Native DAG examples use a real category, and
-the compatibility banner no longer advertises the nonexistent `git` category.
-
-The generated skill guard derives valid named agents and categories from the
-runtime registries, so future shared-skill or native-skill drift fails before
-shipping. Shared OpenCode skill sources remain unchanged.
-
-## 2026-08-18 — Keep completed resident team members visible
-
-The below-editor task widget now keeps completed canonical team members while their process-local handles remain resident, so users can still see members that `task_send` can revive. Active rows remain first, the five-row cap still applies afterward, and retained completed rows render as settled compact rows without a live spinner.
-
-Ordinary completed background tasks and stale or non-resident team records remain hidden. This is a presentation-only change; task lifecycle, residency, and messaging behavior are unchanged.
-
-## 2026-08-18 — Follow the Senpi 2026.8.18 host contract
-
-The adapter peer and development dependency now require Senpi `2026.8.18`,
-and the task engine's peer and development pins move with it. The 2026.8.18
-host fixes extension widget stacking order: `setWidget` now replaces the
-component in place, so the adapter's `omo-task` and `omo-dag` belowEditor
-status widgets keep a constant vertical order while both live-refresh.
-
-This bump does not add or alter adapter behavior beyond the inherited host
-fix. The provider registry contract was re-verified: builtin provider IDs
-are unchanged between 2026.8.17 and 2026.8.18. Conflict zones are the
-adapter and task manifests, workspace lockfile, package-shape and senpi-pin
-expectations, and committed extension bundles.
-
-## 2026-08-17 — Follow the Senpi 2026.8.17 host contract
-
-The adapter peer and development dependency now require Senpi `2026.8.17`,
-and the task engine's peer and development pins move with it. Senpi's package
-aliases resolve the matching 2026.8.17 AI, agent-core, TUI, PTY, telemetry,
-and codemode companions; the separate Pi `0.84.2` compatibility line does
-not change.
-
-This bump does not add or alter adapter behavior. The generated plugin is
-rebuilt only to prove the existing extension remains compatible with the new
-host, and the provider registry contract confirms that builtin provider IDs
-are unchanged. Conflict zones are the adapter and task manifests, workspace
-lockfile, package-shape expectations, and committed extension bundles.
-
-## 2026-08-17 — Count eval-internal tools without inventing savings
-
-OmO Native now consumes Senpi 2026.8.16's in-process
-`senpi.eval.execution` event and folds fixed scalar rollups into the existing
-once-per-session `parallelism_summary`. `parallelism_v2` reports event-bus
-coverage, accepted/rejected eval executions, nested tool status and duration
-totals, top-level eval wrappers, and direct non-eval calls from mixed waves.
-
-The existing pure non-eval wave, modeled saving, upper-bound, and saved
-round-trip formulas are unchanged. Eval aggregate keys, arguments, paths, and
-previews never cross the privacy boundary. Nested duration sums do not contain
-enough interval information to infer concurrency or savings, and future
-changes must preserve that distinction.
-
-## 2026-08-16 — Follow the Senpi 2026.8.16 host contract
-
-The adapter peer and development dependency now require Senpi `2026.8.16`,
-and its direct Pi TUI dependency follows the `0.84.2` host line. The task
-engine's optional Senpi and Pi TUI peers move in lockstep so the adapter,
-process children, and generated plugin bundle compile against one host
-contract.
-
-The workspace lockfile and committed plugin artifacts must be regenerated
-with the new engine. The provider-map registry test remains the authority for
-whether Senpi's builtin provider set changed.
-
-The task lifecycle QA now performs `task_output(mode:"tail")` as the immediate
-tool boundary after `task_send`. The old sequence ended the parent turn with
-text first and incorrectly relied on another wake, so both the old and new
-Senpi pins could finish every real task transition while the harness reported
-a false `task_output_peek` failure.
-
-## 2026-08-13 — Follow the Senpi 2026.8.13 host contract
-
-The adapter peer and development dependency now require Senpi `2026.8.13`.
-The workspace lockfile now resolves the matching Senpi package family,
-including the host's telemetry package alias.
-
-Keep the peer and development pins exact and aligned with the root, OMO Native,
-and senpi-task manifests. A pin-only edit without the matching lockfile is not
-a complete adapter update.
-
-## 2026-08-12 — Publish and control native tasks over RPC
-
-The task component now emits every available child-session, result, error, persisted/live run-stat,
-and semantic live-progress field through `omo.task.updated`. It owns one deduplicated child
-subscription per live resident task and releases subscriptions when a task settles, leaves the
-session, or the session shuts down.
-
-Modern Senpi hosts also receive session-scoped `omo.task.output`, `omo.task.send`, and
-`omo.task.cancel` request handlers. These handlers reuse the existing task tool policies, reject
-malformed or foreign-session requests, never enable `all_scope`, and remain an optional no-op on
-older hosts that expose only `pi.rpc.emit`.
-
-Future changes must preserve the single live-subscription owner, semantic snapshot deduplication,
-parent-session scoping, and old-host compatibility.
-
-## 2026-08-06 — Refresh local Senpi installs before activation
-
-Source installs now rebuild every generated OMO Senpi artifact even when the previous bundle is
-complete, and they replace older settings entries whose package manifest is also
-`@code-yeongyu/omo-senpi`. This prevents a copied, stale extension from continuing to run legacy
-task lifecycle code after the source tree has gained crash-revival fixes.
-
-Keep the distinction between source and packed installs: source installs must refresh generated
-artifacts, while packed installs must verify their immutable staged artifacts without attempting a
-build. Do not remove package-identity replacement; loading stale and current OMO package paths
-together can register duplicate components and retain obsolete task behavior.
-
-The parent-restart QA driver proves the integration boundary by SIGKILLing a real Senpi parent,
-reopening the same session and task state, and requiring the original in-process child task to
-continue without becoming `lost`. It also verifies process and temporary sandbox cleanup.
-
-## 2026-08-12 — Fence and bound desktop task RPC
-
-Task RPC controls now remain unavailable until a parent session is attached, detach before a
-session switch, and stay fenced after shutdown. Cancellation accepts exact task ids only, performs
-the current-parent ownership check before the shared cancel path, and redacts foreign-session
-details. Messages, reasons, task collections, terminal results, and errors are bounded with explicit
-snapshot truncation metadata; terminal records prefer durable run stats over retained live trackers.
-
-The packaged extension now lazy-loads the task component through the generated `omo-task.js`
-sidecar. Build freshness and import-purity checks cover both artifacts, while source tests keep the
-normal static component entrypoint. Preserve the `#omo-task-runtime` package import mapping and do
-not fold the task sidecar back into `omo.js`; the main artifact must remain below its fixed
-900,000-byte budget.
-
-## 2026-08-12 — Harden task RPC installation and output boundaries
-
-Packed installs now require both lazy task and member extension artifacts before mutating Senpi
-settings. Task controls cap identifiers and tail requests, return the same generic not-found result
-for foreign and absent task ids, and bound every task snapshot/status string exposed to RPC clients.
-Terminal results, errors, and descriptions carry explicit truncation flags.
-
-Keep authorization checks before the shared name-capable task control paths, and keep the generated
-installer synchronized with `install-senpi.ts`. A missing `omo-task.js` must fail installation rather
-than silently disabling the task component at activation time.
-
-The adapter peer and development dependency now require Senpi `2026.8.11-6`; this is the first
-published host contract with request handler registration and client-side extension requests.
-
-## 2026-08-12 — Anchor task state at the session cwd, not the process launch dir
-
-The task component resolved its project root from `process.cwd()`. In a multi-session host - one
-shared senpi process serving every session, as the OmO desktop rpc child does - that is the process
-LAUNCH directory, not the session's project root. Every session therefore shared a single task
-store, records from unrelated projects interleaved in it, and child artifacts landed where the
-host's per-project readers (`<projectDir>/.omo/senpi-task`) never look.
-
-`register` now takes the cwd the host reports for THIS session (`cwd` on the extension API), and
-falls back to `process.cwd()` only for hosts that predate it. Everything downstream - the record
-store, the `omo.json` load, team runtime dirs and the resumption channels - derives from that one
-value, so they all follow the session.
-
-Keep the fallback until the minimum supported Senpi guarantees `cwd`, and keep resolving the cwd
-ONCE at register: re-reading it later would let a session's store move mid-flight.
+- The task extension bundle now gives in-process children senpi's builtin-only extension surface while continuing to suppress the parent's path-loaded extensions. The parent tool-capture wrapper stops after omo component registration, so builtin factories senpi loads later are not re-injected as raw custom tools. A mock-provider integration test compares the actual in-process and process child tool payloads and requires `web_search`.
+- `plugin/extensions/omo.js` and `omo-task.js` regenerated on linux/amd64 (node 24, bun 1.4.2) for the senpi-task change; the extension freshness checks pass.
+
+## 2026-10-01 - Geeky lanes: Astra at high, GPT-6.1 Sol Fast leads Geeky · Normal (#9372)
+
+- `src/components/model-profile/builtin-profiles.ts`: `geeky-heavy` runs `gpt-6-astra` at `high` (was `xhigh`). `geeky-normal`
+  leads with `gpt-6.1-sol-fast` (medium, `chatgpt-subscription|openai`), then plain `gpt-6.1-sol` (medium, same lanes), then the
+  unchanged `gpt-5.6-sol` (medium, all four GPT lanes). Plain 6.1 Sol stays behind the Fast tier so a registry without
+  `gpt-6.1-sol-fast` still lands on 6.1 Sol rather than dropping to 5.6 Sol.
+- `scripts/qa/model-profile-e2e-scenarios.mjs`: both geeky-heavy scenarios expect thinking `high`; new `geeky-normal-sol-fast`
+  serves 5.6 Sol, 6.1 Sol and 6.1 Sol Fast and expects the Fast tier at medium.
+- Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
+  plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
+
+## 2026-10-01 - session gateway review round 9: recovery bound across overlapping calls (#9222)
+
+- `tools.ts`: the 4,096-key receipt-recovery bound also holds across calls whose admissions overlap. The capacity check
+  counted only the keys already kept, so with one slot left two calls under new keys both passed it before either
+  admission answered, and when both replies were lost the surface kept 4,097 keys. A call now takes its slot before its
+  admission is awaited: the check counts every distinct key whose admission is in flight together with the kept keys,
+  and the slot is released when the store answers or passes to the key's recovery entry when the reply is lost.
+  Overlapping calls under one key share one slot, and a kept key still recovers at capacity without evicting another.
+- `tools/relay-tools.ts`: a replayed completion report whose stored receipt has no `arm_seq` (written by the revision
+  before it existed) no longer arms the tracker with `undefined`, which became a NaN settle watermark and left the
+  completion pending. Only an integer `arm_seq` is taken; an armed receipt without one arms with the session's newest
+  durable arm (`store.latestCompletionArm`), and when the session has none the replay answers `idempotency_uncertain`
+  instead of an `armed` result that would write nothing.
+
+## 2026-10-01 - session gateway review round 8: receipt batch per call, completion arms per run, recovery-key bound (#9222)
+
+- `gateway/store-retention.ts` / `store-relay-ops.ts` / `store-ops.ts`: a call that reuses an expired key deletes at
+  most one batch of receipts in total. The receipt check deletes the expired receipt under the call's own key, and the
+  sweep that follows deleted a full batch besides, so a peer tool call, keyed relay mutation or keyed send could remove
+  `RETENTION_SWEEP_BATCH + 1` receipts. The key's deletion now counts against the sweep's receipt batch, and a batch
+  used up that way still makes the next sweep due at once.
+- `gateway/completion.ts` / `store-relay-ops.ts`: a settling run owns the completion arms up to the newest `arm_seq`
+  the session knew of when it settled (`emitCompletions` `through_arm_seq`, replacing the `armed_through` time). The
+  time cutoff assigned an arm made in the same millisecond as an earlier run's settle to that earlier run, so with an
+  outstanding first write and an equal clock reading the two runs collapsed into one completion with the second text
+  and the first outcome. A later run's arm always has a higher sequence number, so each run's completion lands with
+  its own text and outcome, in run order. `thread_report` now hands the tracker the arm's `arm_seq` (kept out of the
+  tool and SDK results), and a durable arm picked up at startup or on a wake arms with the newest stored sequence
+  (`store.latestCompletionArm`).
+- `tools.ts`: the keys a tool surface keeps for recovering a receipt whose admission reply was lost are bounded. Each
+  key is kept until the receipt it may have left expires (admission time + the 30-day receipt retention), at most
+  `RECEIPT_RECOVERY_MAX_KEYS` (4,096) at once, and disposing the surface clears them; the set grew by one key per
+  failed admission for the surface's lifetime. When it is full, a call under a new key is refused `overloaded`
+  (`details.budget: "receipt_recovery"`) before its admission and runs nothing, so no key that may still need
+  recovering is dropped; a retry of a kept key still recovers.
+
+## 2026-10-01 - session gateway review round 7: receipt retention, completion arms, replay after unbind, lost receipt replies (#9222)
+
+- `gateway/store-relay-ops.ts` `toolReceiptBegin`: a peer tool call's receipt admission runs the bounded retention
+  sweep when one is due, as an enqueue, relay mutation or outbox read does. Since round 6 narrowed the receipt check
+  to its own key, traffic made only of peer tool calls (`thread_list`, `thread_read`, `thread_rename`, ...) never
+  swept, so their expired receipts were kept indefinitely; each admission now deletes at most one batch.
+- `gateway/schema.ts` / `store-relay-ops.ts`: every completion arm is its own `completion_arms` row (`arm_seq`). The
+  table kept one row per session and binding, so when a run settled while its completion write was held and the next
+  run armed the same binding again, the replacement destroyed the earlier run's arm and only the later completion was
+  ever written. Each write now consumes the arms made by its run's settle, so both completions land on the binding in
+  run order with their own text and outcome; two arms of one binding within a run still make one row, the newest text.
+- `gateway/relay.ts` `inbound` / `gateway/store-ops.ts`: a connector event retried after its binding closed is answered
+  through the same receipt classification a retried send uses (`recoverDelivery` over `classifyReceipt`). The closed
+  binding's replay read only completed receipts, so an event the session had applied while both receipt writes failed
+  (the receipt stays `prepared`) was refused `binding_inactive` after an unbind; it now replays the delivered outcome
+  from the durable row and completes the receipt, an undecided one stays `idempotency_in_progress`, and a new or edited
+  event is still `binding_inactive`. `store.completedDelivery` became `store.deliveryReceipt`.
+- `tools.ts`: a receipted thread tool retried after its receipt admission failed without a reply runs the call. The
+  store worker can commit the `prepared` receipt and exit before replying, and every retry of the same key from this
+  process then read that row as `idempotency_in_progress` until it expired, though nothing had run. The facade notes
+  such a key, and a retry that finds this instance's prepared row while no invocation of the facade runs the key takes
+  it up and runs the call once; a call still running under the key keeps the retry `idempotency_in_progress`.
+
+## 2026-10-01 - session gateway review round 6: receipts, questions, retention, bindings snapshot, causes, session facts, identifiers (#9222)
+
+- `tools.ts`: a receipted thread tool whose receipt the store cannot admit answers as data instead of throwing:
+  `overloaded` when another process holds the store's write lock past the wait bound, `internal_error` for any other
+  store failure. Nothing has run at that point, so a retry runs the call once.
+- `component.ts` / `gateway/registration.ts`: a session waiting on a question is in phase `waiting_question`, so a
+  steer into it is refused `not_steerable` as the delivery table says. The phase holds from the `tool_execution_start`
+  of an ask_user call that waits for its answer (`ask_user_question` with `waitForAnswer`, `request_user_input` with
+  `wait_for_answer`) to that call's `tool_execution_end`; `auto` and `follow_up` still queue behind it. The phase was
+  never reported, so such a steer was admitted into the blocked turn. A question that does not wait blocks nothing.
+- `gateway/store-ops.ts`: a retried send whose delivery the target already decided (admitted, applied or refused)
+  replays that outcome and completes the receipt even when this process began the receipt. When both receipt writes
+  of the first call failed (for example at the lock-wait bound), the receipt stayed `prepared` under this store, and
+  every retry answered `idempotency_in_progress` until the receipt expired; an undecided row is still in progress.
+- `gateway/store-retention.ts`: expired receipts are deleted a batch (`RETENTION_SWEEP_BATCH`) at a time like every
+  other table, and a full batch makes the next sweep due at once. The sweep, and the receipt check of every keyed
+  call (`enqueue`, a relay mutation, `toolReceiptBegin`), used to delete every expired receipt in one statement, so a
+  store reopened after a long idle cleared its whole backlog inside one write transaction; a receipt check now clears
+  only the expired receipt under its own key.
+- `gateway/store-ops.ts`: a send continues the causal chain of the delivery its run consumed while that delivery's
+  row is still `admitting`, which is the state the row keeps when the runtime took the message but its outcome write
+  gave up at the lock-wait bound. Such a send was refused `invalid_arguments` (`unknown_cause`) until the drain's
+  retry recorded the outcome; a delivery that is only queued, or addressed to another session, is still refused.
+- `session-facts.ts` `readSessionFacts`: the tail window drops its first line only when the window cut it (the byte
+  before the window is not a newline). A rename line starting exactly at the tail window's first byte was dropped, so
+  the session listed with `name: null`.
+- `gateway/bindings.ts`: a binding identifier carrying a C1 control (U+0080-U+009F, NEL included) or a Unicode line or
+  paragraph separator (U+2028, U+2029) is refused `invalid_arguments`, like a C0 control. NEL passed the check and
+  reached the `actor=` provenance header raw, since the header's whitespace class does not cover it.
+- `gateway/schema.ts`: `bindings` gets an `INTEGER PRIMARY KEY AUTOINCREMENT` key (`seq`, the rowid) with `binding_id`
+  kept `UNIQUE`; schema v1 is unreleased, so the table is defined that way from the start. The `thread_bindings`
+  snapshot watermarks on the rowid, which SQLite reused after retention deleted the newest binding, so a binding made
+  later could appear in a later page of an older snapshot.
+- `gateway/relay.ts` `inbound`: a connector that retries an event the session already took gets the stored result
+  back (`deduplicated: true`) even after the binding was unbound or expired; only a new event, or the same id with
+  other content, is refused `binding_inactive`. The inactive check ran before the receipt replay, so a connector that
+  lost the ACK was told a delivered message was refused. `store.completedDelivery` is the plain read behind it.
+- `gateway/legacy-mailbox.ts`: only the legacy host's exact turn id spelling (`turn-N`, no leading zeros) becomes a
+  migrated steer's epoch. Bare digits (`1`) and leading-zero ids (`turn-01`) were read as that turn too and steered
+  into it; they now stay without an epoch and are refused `turn_conflict`.
+
+## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
+
+- `gateway/legacy-mailbox.ts`: a legacy `steer` keeps its `expected_turn_id`. The host's `turn-N` id becomes the
+  gateway turn epoch `N`, so a migrated steer for the turn the target is still running steers into it and one for an
+  earlier turn is refused `turn_conflict`; the import used to store no epoch, which refused every migrated steer.
+- `live-surface.ts`: the legacy endpoint keeps the session files `host status --all` reports for it, as dev did. When
+  the legacy host stops answering, its threads are listed from disk as `resumable` with an `error_note` and read from
+  their JSONL, instead of disappearing from `thread_list`.
+- `component.ts`: a run's causal cause (`RunContext.cause`, sent as `cause_delivery_id`) is the newest delivery whose
+  message the model consumed (the engine's `message_start`, the same edge `RunContext.consumed` reads), not the newest
+  one admitted. While thread B's message waited behind A's run, a `thread_send` from A's run continued B's causal
+  chain, charging B's hop, cycle and budget guards; it now continues A's, and a send after the engine drains B's
+  follow-up continues B's. The registrant's `onAdmitted` hook, which only fed the cause, is gone.
+- `store-relay-ops.ts` `ackOutbox`: a newer cursor must name one of the binding's own outbox rows. Cursors are global
+  across bindings, and the check used to compare only with the binding's newest cursor, so acking binding A with
+  binding B's cursor marked A's unread rows below it acked. Such a cursor is now `cursor_invalid` and acks nothing.
+- `gateway/registration.ts`: the session's incarnation is recorded before its control endpoint is registered, and a
+  failure to record it fails the registration (`{ status: "failed" }`, logged) with no endpoint exposed. The endpoint
+  used to go live first, so its first drain could run under the previous runtime's incarnation, and a failed record
+  was only logged while the registration still succeeded, which left earlier reply tokens valid after a restart.
+- `gateway/completion.ts`: every settled run's completion is written with that run's outcome. A run that settled while
+  an earlier run's write was outstanding used to be dropped, so only the earlier outcome was recorded; it now waits and
+  is written after it. Each write passes the time its run settled (`emitCompletions` `armed_through`) and consumes only
+  the arms made by then, so a delayed or retried write no longer takes a later run's arm with the earlier outcome.
+
+## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
+
+- `gateway/store.ts`: a failed open is no longer cached. The worker of a rejected `init` is terminated and the open is
+  cleared, and a worker exit clears it too, so the next call starts a fresh worker (in-flight requests fail and are not
+  replayed). Pending requests are tied to the worker they were posted to, so a dying worker never fails its successor's
+  open. `store.test.ts` holds `BEGIN IMMEDIATE` through the first open and terminates a live worker.
+- `component.ts`: production passes `legacyMailboxDirectories: [<thread state dir>/mailbox]`, and `session_start`
+  imports that pre-gateway `thread_send` mailbox once when a `mailbox.jsonl`/`mailbox.json` is on disk (a session
+  without one still creates no database). `store-ops.ts` `migrateLegacyMailboxes` reports an item whose target is not a
+  durable id (`legacy_mailbox_skipped`, logged, and recorded in the directory's `gateway_meta` row) and still marks the
+  directory migrated, because no later open can deliver it; a mailbox that cannot be read is logged and left unmarked,
+  so the next start retries.
+- `gateway/process-identity.ts`: a claimant's start time is recorded as `epoch:<seconds>`, read from `ps -o lstart=`
+  run with `LC_ALL=C` and `TZ=UTC`, so a host started without a locale and a terminal in `fr_FR.UTF-8` (or another
+  time zone) agree on a live process instead of judging it dead and re-queueing its admitted rows. A start time
+  without the prefix (written by a pre-release build of the gateway, in that process's locale) cannot be compared,
+  so it counts as live while its pid exists, like an unreadable one. `process-identity.test.ts` records and checks
+  in two processes with different locales and time zones.
+- `gateway/store-retention.ts` (new): a bounded retention sweep for the tables nothing pruned. Delivered and refused
+  deliveries 30 days after their last change (not while a receipt points at one), causal edges and roots once the root
+  expired, rate buckets idle for a full refill, closed bindings 30 days old with no outbox row, completion arm or open
+  delivery, their `outbox_cursors`, and `session_meta` rows nothing references. At most 256 rows per table per sweep,
+  hourly unless the last sweep hit the bound; it runs at the end of an enqueue, a relay mutation or an outbox read, so
+  opening a current store still takes no write lock. Retention periods: `docs/reference/omo-thread.md` "Retention".
+- `thread_report` without `binding_id`: the default is the binding of the messages the session's CURRENT answer is
+  for (`component.ts` `RunContext.consumed`: the deliveries whose `session_control_delivery` message entered the
+  model's context since its last final answer, read from the engine's `message_start`; cleared at `agent_settled`),
+  carried into the report as `origin_delivery_ids`. It used to be the binding of the newest admitted delivery, so a
+  message from thread B queued mid-run took thread A's report or completion; and a run origin fixed at admission
+  would have sent B's own answer to A, because senpi drains a queued follow-up after the final answer and before
+  `agent_settled`. That drain, or a prompt typed in the terminal after the answer, starts a new group. Messages from
+  two bound threads in one answer (a steer at a tool boundary, or `followUpMode: "all"`) are `invalid_arguments`
+  naming both `binding_ids`. A bound message answered together with a prompt typed in the terminal (a local steer
+  into thread A's run, or the reverse; `RunContext.local`, carried as `origin_local_input`) has two possible origins
+  and is `invalid_arguments` naming the session's active outbound `binding_ids`, where it used to go to A, but only
+  while the session has an outbound binding other than A. With A as its only outbound binding, both inputs can only be
+  answered in A, so the report and the completion go to A: a thread user who answers a non-blocking ask_user question
+  mid-run (senpi steers the answer in as a `user` message, the same shape as a typed prompt) no longer blocks A's
+  implicit report. Without a bound message (a prompt the user typed, `omo thread report`) the session's only
+  active outbound binding is used, and several are `invalid_arguments` naming their `binding_ids`.
+  `report-origin.test.ts` drives two threads through the SDK and the real `thread_report` tool, with the engine's
+  event order (`agent_end`, then the follow-up's `agent_start` and `message_start`, no `agent_settled` between).
+- `sdk.ts` `bind`/`rebind`/`report`/`bindings --session` and the relay tools that name another session resolve it
+  through `tools/internals.ts` `resolveStoredSession` (the offline host view plus `sendAddressBook`), as a send
+  does: with nothing running they no longer fail `host_unavailable` (exit 3, or 5 on a stale socket), and a session
+  known only from its session file resolves by id or name. `offline-address.test.ts` covers the SDK and the tool.
+- Bindings take `notion` and `feishu` as native platform names (`schema.ts` CHECK, `bindings.ts` `BINDING_PLATFORMS`,
+  the `thread_bind` param union), decided before release because widening a column CHECK later needs a table rebuild.
+- `schema.ts` v2: the outbox `question_state` CHECK admits `pending|answered|expired|cancelled`. `expired` and
+  `cancelled` are reserved for question closure (a follow-up writes them from the session's terminal question
+  outcome); nothing writes them here. Widened now because a CHECK change after release needs a table rebuild.
+- `schema.ts`: the outbox `event_kind` CHECK also admits `question_closed`, reserved for question closure (a
+  follow-up writes it when the session's question ends without an answer through the thread); nothing writes it
+  here. The CHECK sits inline in `CREATE TABLE outbox`, so it is widened before release, not rebuilt after.
+- `registration.ts` records the session's incarnation only after senpi registered its control endpoint, and every
+  wake's drain waits for that record. A session senpi answers `unsupported` for (a Windows terminal answers
+  `unsupported_platform`) used to create `gateway/gateway.sqlite`, `gateway/inbox/` and a `session_meta` row first; it
+  now does no gateway I/O. `component.test.ts` and `inbox-drain.test.ts` cover the unsupported start and the wake order.
+- `store-ops.ts` `requeueReleased` (with its `store.ts` method and worker op) is deleted: nothing called it. A released
+  session's dropped deliveries come back through the `session_released` transcript check in `reconcile` on the next
+  owner's side; a second path from `omo daemon adopt` would act from another process without that check.
+- `store-relay-ops.ts`: `readOutbox` and `listBindings` put `ORDER BY ... LIMIT` in the SQL (bindings read one row past
+  the page to know whether another follows) instead of loading every matching row and slicing. `relay.test.ts` pages an
+  outbox; the bindings snapshot-cursor test already pages bindings.
+- `tools/ports.ts` `ThreadToolSurfaceOptions.store` is required and `tools/gateway-services.ts` lost its fallback, which
+  opened a second, separate database under `stateDirectory` when a caller passed no store. The legacy
+  `session-control-qa.mjs` scenario opens its stores explicitly and disposes them at teardown.
+- `live-surface.ts` `releaseReply`: a `release_session` reply counts as released only when it also names a
+  `session_path` string; without one it is `release_failed`, so `omo daemon adopt` never relaunches with
+  `--session undefined`.
+- Docs (`docs/reference/omo-thread.md`, `thread/AGENTS.md`): `omo thread` creates and resumes no session (a connector
+  opens one through the host API and binds it); a completion row carries the armed text, not the model's reply; the
+  per-author rate bucket trusts the connector's author id and stays bounded by the target backlog.
+
+## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
+
+- `session-facts.ts`: the already-capped final record is now validated with `JSON.parse` before its top-level
+  `timestamp` is trusted. Missing values, invalid literals/escapes, malformed nested values and trailing commas all
+  produce unknown activity.
+- `address-book.ts`: degraded/resumable session rows take `updated_at` from `readSessionFacts`, the same bounded
+  freshness policy used by live fallback facts and host-status enrichment. Full-file parsing remains only for
+  name/title metadata.
+- `tools/read-ops.ts`: the final combined public list follows the sorted address book, so known activity is
+  newest-first, unknown activity is last, and equal timestamps use ascending durable ids.
+- Tests cover malformed JSON classes, host-status/degraded-list agreement on one partial file, and mixed live/dead
+  public ordering.
+
+## 2026-09-30 - thread facts: a bounded final-line timestamp or unknown activity (#9222 gate G1)
+
+- `session-facts.ts`: `readSessionFacts` still reads bounded windows, then scans backwards at most 256 KiB to locate
+  the final complete JSONL entry and validates that capped record before extracting its top-level `timestamp`. A partial,
+  malformed or larger final line yields `updated_at: null`; it never publishes an older entry as newest.
+- Thread summaries now allow nullable `updated_at`. Address-book ordering keeps known timestamps newest-first and
+  places unknown activity last. Disk summaries no longer substitute file mtime for an entry timestamp.
+- Tests cover the 160 KiB final-entry regression, truncated and over-cap final lines, normal files, bounded read
+  volume, null sorting, and the omo-native host-status path.
+
+## 2026-09-30 - thread gateway: binding authors, a per-message mode, the outbox wake marker (#9143, review of #9222)
+
+- `gateway/author.ts` (new): `normalizeAuthor` checks an `ExternalAuthor` (`platform_user_id`, `display`, optional
+  `user_id`). Each field must be non-empty and at most 256 characters, and a C0/C1 control, DEL or U+2028/U+2029 is
+  `invalid_arguments`. `ExternalOrigin.author` (optional) keeps it on the delivery's envelope JSON, so the
+  deliveries table did not change.
+- `relay.inbound` takes `author` and `mode`. `mode` defaults to the binding's `inbound_mode`, and `auto` on a
+  `follow_up` binding is refused `invalid_arguments` with `{binding_id, mode, inbound_mode}`, never downgraded;
+  `steer` is refused. `relay.answer` takes `author` and returns `answered_by`.
+- `provenance.ts` renders `author=` / `author_id=` / `author_user_id=` as JSON strings with `[`/`]` escaped, after
+  `actor=`, so the body cannot forge or close header fields.
+- `engine.ts`: a binding sender with an author keys the pair rate bucket by `binding:<id>#author:<platform user id>`
+  (`EnqueueRequest.rate_principal`, read by `store-ops.ts` `takePairToken`); without an author it stays
+  `binding:<id>`. The author joins the receipt's args hash.
+- Schema v4 (additive): `outbox.answered_by TEXT`, NULL on older rows. Claim, confirm and mark-prior-delivered write
+  it, and release clears it. `OutboxRow.answered_by` exposes it.
+- `store-relay-ops.ts` `insertOutbox` rewrites `<agent dir>/gateway/outbox.marker` (temp file + rename, inside the
+  insert's transaction) with `{binding_id, cursor, written_at}`. `paths.ts` `gatewayOutboxMarkerPath`.
+- `sdk.ts`: `send({binding_id, author, mode})`; an author without a binding, a binding `steer` or a binding
+  `expected_turn_id` is `invalid_arguments`. `answer({..., author})`.
+- `extension/thread-sdk.ts` also exports `readSessionFacts`, which `omo host status --all` uses for `last_activity_at`.
+- Tests: `gateway/relay-author-mode.test.ts`, the v3 -> v4 migration in `gateway/store.test.ts`, two `sdk.test.ts`
+  cases. `relay-answer-kinds.test.ts` `downgradeToV2` also drops the v4 column, so its "v2 store" is a real v2 store.
+
+## 2026-09-30 - thread gateway: one clock per store, and cross-process tests that do not wait on fs.watch (#9143)
+
+- `gateway/store.ts`: `GatewayStore` exposes `now`, the clock its rows are stamped and expired against (the
+  `now` option, else `Date.now`). `createInboxDrain`, `createGatewayEngine`, `createGatewayRelay`,
+  `createGatewayServices`, the thread tools and the thread SDK default to `store.now` instead of reading `Date.now`
+  themselves, and the component's completion writes use `store.now()`. Before, a drain or engine built on a store
+  with an injected clock stamped and expired rows by the wall clock, so the two clocks disagreed: on 2026-09-30 the
+  harness rows (stamped 2026-09-29 by the injected clock) read as expired to a drain built without `now`, and three
+  tests failed on every run (`store.test.ts` release_session requeue, `engine.test.ts`
+  lost_ack_and_durable_recovery, `claim-reconciliation.test.ts` "dropped it unwritten"). Production passes no clock,
+  so `store.now` is `Date.now` there and nothing observable changes. `gateway/store-clock.test.ts` puts the store's
+  clock in 2020 and fails on the old defaults whatever the wall clock reads.
+- `gateway/cross-process.test.ts`: the tests learned the delivery id from an `fs.watch` event on the inbox directory.
+  On macOS that watch drops events under load (a probe missed 9 of 60 creates made right after `watch()` and 27 of 60
+  made by a child process), and the test then waited for an event that never came. The store writes the marker before
+  either commit hook runs, so each test now reads it from the directory once the sender has died or printed `PAUSED`.
+  No retries and no longer timeouts.
+
+## 2026-09-30 - claude-code: acquire before the auth check, from the provisioned runtime, with progress (#9276)
+
+- `src/components/claude-code/index.ts`: the component now also runs on `input`, which senpi's `prompt()` emits
+  before `checkAuth` (`emitInput`, then `checkAuth`, then `emitBeforeAgentStart`), so a prompt from a
+  `claude login`-only user downloads the executable before the ambient auth probe needs it. `before_agent_start` stays
+  for turns an extension starts (they skip `input`), registered `previewSafe` and skipping the prompt-cache preview.
+  The pin and cache root come from `claudeCodeRuntimeDir` (`OMO_PACKAGE_DIR`, else `dirname(execPath)`), since the
+  compiled launcher pins the provisioned runtime there while `execPath` can still be the downloaded binary.
+  A progress status (`omo-claude-code`: `Downloading Claude Code <version>: N% of M MB`, every 10%) shows while the
+  tarball streams (`acquire.ts` `onProgress`). New `applyCachedClaudeCode` lets the compiled launcher point the engine
+  at an already-downloaded copy before it starts.
+- Limit: on the launch that downloads, the startup ambient probe may already have cached "not signed in" for 30 s
+  (`availability.ts` `AMBIENT_STATUS_TTL_MS`); the next prompt after that window, and every later launch, resolve it.
+
+## 2026-09-30 - model-profile e2e: lane-beats-recommended-models proves a real recommended-models switch (#9238)
+
+- `scripts/qa/model-profile-e2e-scenarios.mjs`: `lane-beats-recommended-models` serves `mock-1`, `glm-5.3` and
+  `gpt-6-astra` on `chatgpt-subscription` + `opencode-go`, so no provider serves its engine provider default
+  (`gpt-6.1-sol`, `kimi-k3`). The session starts first-available on off-ladder `mock-1`, senpi's recommended-models
+  builtin switches to `chatgpt-subscription/gpt-6-astra`, and Daily · Normal still wins with `opencode-go/glm-5.3` max.
+  The old fixture's
+  only `gpt-6-sol` entry was the engine's initial provider-default record, which senpi#2393 moved to `gpt-6.1-sol`;
+  the builtin never switched there. `gpt-6-astra` keeps its ladder rung across senpi#2394's Sol-slot move.
+- `scripts/qa/model-profile-e2e.mjs`: that scenario's checks skip the initial-model record. `started_off_recommended_ladder`
+  requires the first `model_change` to be `mock-1`, and `recommended_models_switched_first` requires the builtin's
+  `chatgpt-subscription/gpt-6-astra` change to come after it and before the lane's `opencode-go/glm-5.3`.
+
+## 2026-09-30 - model-profile: Recommended leads its GPT-6 Sol slot with gpt-6.1-sol medium, gpt-6-sol behind it (senpi#2394)
+
+- `src/components/model-profile/builtin-profiles.ts`: `recommended` replaces its `gpt-6-sol` (medium) rung with
+  `gpt-6.1-sol` (medium) on `GPT_6_1_PROVIDERS` (`chatgpt-subscription|openai`), immediately followed by `gpt-6-sol`
+  (medium) on the shared `GPT_PROVIDERS` ranking, so Copilot and OpenCode Zen, which do not serve 6.1 Sol, still resolve
+  GPT-6 Sol. senpi#2394 makes the same switch in `RECOMMENDED_DEFAULT_MODELS`; OmO keeps the extra `gpt-6-sol` rung, and
+  the header comment says so. The lanes are unchanged. Telemetry already carries `gpt-6.1-sol` (#9214).
+- Tests: `builtin-profiles.test.ts` pins the seven-rung chain and the providers of both Sol rungs; `resolve.test.ts`
+  resolves `chatgpt-subscription/gpt-6.1-sol` medium when the subscription serves it next to `gpt-6-sol`, and
+  `github-copilot/gpt-6-sol` medium on a Copilot-only registry; `index.test.ts` applies both at session start.
+  `scripts/qa/model-profile-e2e-scenarios.mjs` adds `unset-gpt-6-1-sol` and `unset-copilot-gpt-6-sol`.
+- Docs: the Recommended ladder in `docs/guide/agent-model-matching.md`, `docs/guide/overview.md`,
+  `docs/guide/installation.md` and `docs/reference/omo-json.md`.
+- `plugin/extensions/` bundles regenerated on linux/amd64 (node 24, bun 1.4.2) for the chain change.
+
+## 2026-09-30 - lsp: post-edit install nudges stay inside projects and appear once per server (#9223)
+
+- `components/lsp/post-edit-outcome.ts` (moved out of `index.ts`) turns a daemon `not_installed` availability into the structured post-edit outcome, carrying `serverId`, `installDecisionTool` and a recorded decision.
+- `components/lsp/index.ts` `handlePostEditDiagnosticsToolResult` classifies each edited file against the session cwd and the engine-resolved agent dir (`resolveSessionAgentDir`, else `resolveAgentHome`): files outside a project, in the agent dir, or in a temp dir get no nudge, and each server is nudged once per session (reset on compaction).
+- `plugin/extensions/omo.js` regenerated on linux for the change above.
+
+## 2026-09-30 - memory/kibitzer: connected-first sidecar model order (#9216)
+
+- `components/memory/kibitzer/sidecar-connected-order.ts` (new) `orderKibitzerCandidatesByConnection`: with a known, non-empty availability list the first connected candidate leads and unconnected ones trail; none connected returns the providers to connect.
+- `components/memory/kibitzer/sidecar-model.ts` `resolveKibitzerSidecarModel` applies it to category-sourced resolutions and returns `category_unavailable` when nothing is connected. The `task` tool path is untouched.
+- `plugin/extensions/omo.js` regenerated on linux/amd64 (node 24, bun 1.4.2) for the change above; `build-extension.mjs --check` and `build-install.mjs --check` pass on the regenerated tree.
+
+## 2026-09-30 - model-profile: Geeky · Normal leads with gpt-6.1-sol medium; telemetry knows the 6.1 Sol ids (#9214)
+
+- `src/components/model-profile/builtin-profiles.ts`: `geeky-normal` is `gpt-6.1-sol` (medium) on `chatgpt-subscription|openai`
+  (the new `GPT_6_1_PROVIDERS`: Copilot and OpenCode Zen do not serve 6.1 Sol, and every builtin rung must name a pair the
+  product knows), then `gpt-5.6-sol` (medium) on the shared `GPT_PROVIDERS` ranking. The `recommended` row and every other
+  profile are unchanged.
+- `src/components/telemetry/model-vocabulary.ts`: `gpt-6.1-sol` and `gpt-6.1-sol-fast` join the `chatgpt-subscription`,
+  `openai` and `openai-codex` vocabularies and `gpt-6.1-sol` the `vercel` one, so the new deep-low rungs export as themselves
+  instead of `custom`; `docs/reference/senpi-telemetry.md` is regenerated from the schemas.
+- Tests: `builtin-profiles.test.ts` pins the two-rung chain, `resolve.test.ts` resolves `chatgpt-subscription/gpt-6.1-sol`
+  medium when the subscription serves both, and `index.test.ts` applies it at session start; the Copilot-only and GPT-6-only
+  cases still resolve 5.6 Sol and report unavailable. `scripts/qa/model-profile-e2e-scenarios.mjs` `geeky-normal-sol` serves
+  `gpt-6.1-sol` next to `gpt-5.6-sol` and expects 6.1 Sol.
+- `plugin/extensions/omo.js`, `omo-task.js`, `omo-init-deep-advisor.js` regenerated on linux/amd64 (node 24, bun 1.4.2) for
+  the chain, profile and vocabulary changes; `omo-member.js`, `memory-run-supervisor.mjs` and `omo-computer-use.js` rebuilt
+  byte-identical, so they are unchanged.
+
+## 2026-09-30 - A refused takeover of a question closed elsewhere is delivered with no answer text, not the dead claimant's (#9143)
+
+Gate note N5 on the answer path: an answer that takes over an abandoned claim and is refused with `unknown_extension_ui_request` or `unknown_request` means the session no longer knows the request, which also happens when it was answered locally, timed out or was cancelled. `relay.ts` used to record the dead claimant's text as the delivered answer for all three "no longer waits" codes and say "the session already took an earlier answer". Now only `question_already_resolved` keeps that; for the two `unknown_*` codes the row is marked delivered with a NULL answer (`markPriorDelivered` with `{ answer: null, answered_at: <claim> }`) and the result is `already_answered` with "The session no longer waits for this question (answered or closed elsewhere) (<code>)". A later answer to that row reads the same wording (`claimAnswer` renders a delivered NULL-answer row with `CLOSED_ELSEWHERE`); a row delivered with text still reads "This question was already answered." `relay-answer-closed-elsewhere.test.ts` covers both `unknown_*` codes and the `question_already_resolved` counterpart (one frame, row state and answer text, both messages); keeping the dead answer for `unknown_*`, dropping it for `question_already_resolved`, or reverting the later-answer wording each fails 2 or 3 of the 25 answer-path cases. `docs/reference/omo-thread.md` describes the two outcomes.
+
+## 2026-09-30 - thread_send and thread_handoff always deliver through the session gateway; the mailbox and file receipts are gone (#9143)
+
+With senpi 2026.9.29-4 adopted (wake, admitExternalMessage, terminal control endpoints), the send switch flipped and then went away: `THREAD_SENDS_THROUGH_GATEWAY`, the `sendThroughGateway` option, the mailbox branch and the terminal-unsupported guard in `tools.ts` `deliver` are deleted, and so are `mailbox.ts`, `mailbox-journal.ts`, `mailbox-journal-codec.ts`, the mailbox-era file receipts in `receipts.ts` and their tests. A send is now always a durable gateway row with its own receipt: a terminal target is queued for its own inbox and woken instead of answering `unsupported`, and a send to the caller itself is refused `loop_detected` (`self_send`). The endpoint, terminal and self-resolution tests assert that (queued row, a `wake` to the owning endpoint, no `prompt`/`get_state`). The task-14 QA drivers that exercised only the deleted modules (`queued-resume`, `uncertain-operation` and its child) are retired, and the three cross-surface drivers deliver with the QA-only `deliverAuto` in `scripts/qa/thread-tools/lib/harness.mjs`. `gateway/legacy-mailbox.ts`, which reads a pre-gateway mailbox for the store's import, stays.
+
+## 2026-09-29 - plugin bundles carry the typed launch_spec_insecure start failure (#9208)
+
+- `plugin/extensions/omo-task.js`, `omo-member.js`, `omo.js` (source-digest marker only) and `plugin/runtime/rollback-migrate.js`
+  regenerated on linux/amd64 (node 24, bun 1.4.2) for the senpi-task change: a task host that refuses a group- or
+  world-writable launch spec now fails the start typed `launch_spec_insecure` with the spec path and `chmod 644 <path>`,
+  and rollback strips the new reason like every post-R0 reason. No adapter source changed.
+
+## memory, telemetry: Kibitzer recall runs on a Z.ai-only or Xiaomi-only machine (#9202)
+
+- `memory/kibitzer/sidecar-model.test.ts`: with only `zai` or only `xiaomi` logged in and no quick config, the sidecar
+  resolves `zai/glm-5.3-flash` or `xiaomi/mimo-v2.6-flash` at `low`. On dev both refused with `beyond_category`,
+  because the quick chain had no rung for them. The chain change is in senpi-task.
+- `telemetry/model-vocabulary.ts`: adds `glm-5.3-flash` under `zai` and `zai-coding-cn`, and `mimo-v2.6-flash` under
+  `xiaomi`, so the new rungs export by name. `docs/reference/senpi-telemetry.md` is regenerated.
+
+## thread, task: agent state stays out of the user's repository (#9201, DESKTOP-31)
+
+- `components/thread/live-surface.ts` `defaultThreadStateDirectory`: the thread tools' mailbox and receipts move from
+  `<project>/.omo/thread-tools` to the same per-project folder as the task state
+  (`@oh-my-opencode/senpi-task` `resolveProjectStateDirectory`); a pre-existing in-project folder keeps being used.
+- `components/task/engine-state-dir.test.ts`: a fresh project stays empty after the engine persists task state, a
+  pre-existing `.omo/senpi-task` is kept, and `task.state_dir` wins.
+- Root `test-setup.ts` drops an inherited `OMO_`/`SENPI_`/`PI_CODING_AGENT_DIR`, so a test run started inside a live
+  session resolves agent-dir state under the hermetic HOME, as in CI.
+
+## skill-commands, skills: argument-taking skills wait for their arguments in the slash picker (#9168)
+
+- `skills/{hyperplan,init-deep,mass-ulw,ulw-loop,ulw-plan,ulw-research}/SKILL.md` and the shared-pool
+  `ulw-execute`, `refactor` and `remove-ai-slops` declare `argument-hint`. From senpi#2258 on, the picker reads it
+  (`Skill.argumentHint`) and Enter on a `skill:<name>` row fills `/skill:<name> ` and waits instead of submitting the
+  skill empty. Skills that take no arguments stay hint-less and still submit on one Enter.
+- `components/skill-commands/autocomplete.ts`: a bare alias row mirrors its own `skill:<name>` row on the same page,
+  taking its description (which carries the hint) and `awaitsArguments`, so `/ulw-execute` waits exactly when
+  `/skill:ulw-execute` does. `pi.getCommands()` carries no hint, so the page row is the source. Without the skill row
+  the alias falls back to the command description and submits as before.
+- `components/skill-commands/argument-hints.test.ts` parses every shipped SKILL.md with the engine's own
+  `parseFrontmatter` (native copy over the shared one, as `sync-skills.mjs` ships them) and pins the set of hinted
+  skills.
+
+## computer-use, x-search: a feature skill yields to a loaded same-name skill and honors disabled_skills (#9160)
+
+- `components/bundled-skills/contributed-skill.ts`: `resolveContributedSkill` decides one `resources_discover` pass for a
+  skill a component contributes on its own. `disabled_skills` hides it (`readDisabledSkills`, now shared with the
+  bundled-skills component). A `skill:<name>` entry in `pi.getCommands()` whose `sourceInfo.path` is not ours means
+  senpi already loaded a same-name skill, which wins first-path either way, so ours is withheld instead of becoming a
+  "Skill conflicts" collision. Our own path left over from an earlier pass still contributes.
+- `components/computer-use/index.ts`: the `computer-use` skill goes through it; `/computer status` adds
+  `skill: your own computer-use skill is active in place of the built-in guide (<path>)` when it yielded. New `env`
+  option for the config read.
+- `components/x-search/index.ts`: the conditional `x-search` skill goes through it. Both tools stay registered.
+- `extension/types.ts`: `getCommands()` entries carry the optional `sourceInfo.path` senpi already reports.
+
+## thread: AGENTS documents endpoint kinds, the delivery table, budgets, binding invariants, the outbox contract and completion arms
+
+`src/components/thread/AGENTS.md` gains the `rpc_host`/`tui` endpoint kinds, the 15-cell `decideDelivery` table (the gateway's `auto` queues as a follow-up and never steers, unlike the mailbox path), every fixed budget with its constant (250 ms settle wait, the lock wait that gives up at about 25 s and never past 30 s, the retry on `lock_wait_exceeded`, the loop guards and rate limits), the binding invariants, the outbox contract, the completion arm lifecycle including the settle race, and the QA commands for the CLI, adopt and the built SDK. The live-surface row no longer says `omo daemon attach` sessions live on the legacy socket, and the package `AGENTS.md` names `omo daemon run` and `adopt` for `rpc.sock`. Docs only.
+
+## thread: script-callable SDK (`plugin/runtime/thread-sdk/sdk.js`) for the `omo thread` CLI and connectors
+
+- `components/thread/sdk.ts` (exported from the component barrel): `createThreadSdk({ agentDir, cwd, uid, user,
+  engineStatusAll? })` runs every thread operation without an agent session as `cli:<uid>`: `list`, `read`, `send`
+  (bindingless = the engine's `cli` sender; with `binding_id` = the connector inbound path, the idempotency key as the
+  event id), `bind`/`unbind`/`rebind`/`bindings`/`report`/`outbox`/`ack`/`answer`, `locate` and `release` (senpi
+  `release_session` for `omo daemon adopt`). Refusals and transport failures come back as data.
+- `tools/gateway-services.ts` and `tools/read-ops.ts`: the store/engine/relay composition and the `thread_list` /
+  `thread_read` bodies moved out of `tools.ts`, shared by the tools and the SDK (tool behavior unchanged).
+- `gateway/store.ts`: `workerModuleUrl` option (where the worker sidecar is resolved from outside `omo.js`).
+  Its worker no longer inherits `--input-type` (node refuses it for a file worker), so an inline
+  `node --input-type=module -e` connector script can open the store.
+- `live-surface.ts` takes `resolveTaskHostSocket` from `daemon-contract.ts` and `memory/worker/senpi-command.ts` takes
+  the launcher helpers from `@oh-my-opencode/senpi-task/rpc-spawn`: the standalone SDK bundle no longer pulls the
+  task engine (the full barrel made `bun build --outfile` emit assets and fail).
+- Build: new entry `src/extension/thread-sdk.ts` -> `plugin/runtime/thread-sdk/sdk.js` (node builtins only external),
+  in `--check`, the installer's required artifacts and the omo-ai payload verifier.
+- `sdk.dispose()` cancels the relay's background answer-release retries before closing the store, as the component's
+  `session_shutdown` does.
+- A completion armed from outside the session reaches a running session: after `report` answers `armed: true`, the
+  SDK wakes the session's endpoint (`wake` with no delivery ids, best effort), and the component reads the durable arm
+  on that `wake` command edge (`registration.ts` `onCommandWake`, the same lock-free `pendingCompletionArms` read as
+  the `session_start` pickup) and writes it at the next settle. An ordinary settle still makes no store call.
+
+## thread: chat-thread bindings, report/outbox/answer relay tools, SQLite tool receipts, gateway send path behind a switch
+
+- `components/thread/tools/relay-tools.ts`, `contracts/`, `metadata.ts`: eight new tools - `thread_bind`,
+  `thread_unbind`, `thread_rebind`, `thread_bindings`, `thread_report`, `thread_outbox`, `thread_outbox_ack`,
+  `thread_answer` - over the gateway store. A binding attaches a session to one external conversation thread
+  (`platform` discord|telegram|slack|herdr|custom, `account_id`, `chat_id`, `thread_id`); one thread has at most one
+  active binding (`binding_conflict` names the holder), unbind/rebind are CAS on the revision (`stale_revision`), a
+  rebind never extends the TTL (default one week) and refuses work queued under the old revision (`binding_closed`).
+  `thread_report` writes only through the calling session's own binding (the originating one by default); a question
+  returns an HMAC reply token, and `thread_answer` is refused `binding_mismatch` unless the answer arrives through the
+  binding that asked, `stale_token` after a rebind, expiry or session restart, `already_answered` on a replay.
+  Completions are armed by `thread_report` and written only when the session settles, with the real outcome. A
+  session that armed nothing never opens the gateway store when it settles, and an armed write never holds the settle
+  for more than 250 ms: it finishes in the background, retried with the run's own outcome while another process holds
+  the store's lock, and an arm made before a restart is written at the session's next settle. Relay text is capped at 32 KiB of
+  UTF-8 bytes and refused as `message_too_large`.
+- `components/thread/errors.ts`: six new codes (`binding_conflict`, `binding_mismatch`, `binding_inactive`,
+  `stale_revision`, `stale_token`, `already_answered`); `loop_detected` now tells the model to answer through
+  `thread_read` / `thread_report` / `thread_answer` instead of replying directly.
+- `components/thread/tools.ts`: the tools' idempotency receipts move from files under the thread state directory to
+  the gateway store's `receipts` table, with the same replay / conflict / in-progress / uncertain behavior.
+  `thread_send` / `thread_handoff` can deliver through the gateway engine (results add `delivery_id`,
+  `effective_mode`, `endpoint.kind`; new outcome `queued_offline`); that path stays off
+  (`THREAD_SENDS_THROUGH_GATEWAY = false` in `component.ts`) until the senpi release with `wake` and
+  `admitExternalMessage` is adopted.
+- `components/thread/gateway/drain.ts`, `provenance.ts`: a delivery waiting behind the running turn or the user's
+  draft shows one notice in the session ("remote message from <actor> queued (<delivery_id>)"); the provenance header
+  names the binding and its revision for a delivery that came through one.
+- `components/thread/gateway/schema.ts`, `store-ops.ts`, `store-worker.ts`: schema v2 (additive: session
+  incarnation, outbox question/answer/outcome columns, per-binding ack cursors, completion arms). Opening a current
+  store takes no write lock, and two processes opening a brand-new store at once no longer fail on the WAL switch or
+  apply a migration twice. A store operation waits at most 30 s in total for the write lock, so a suspended process
+  holding it can no longer stall every store call indefinitely; a session's inbox drain that gives up there retries on
+  its own every 5 s until the delivery gets through, and a failed answer hand-off is always returned to pending. A tool
+  call whose receipt could not be recorded answers `idempotency_uncertain` on retry instead of `idempotency_in_progress`.
+
+## thread: address book over terminal endpoints with real names/timestamps; sessions drain their gateway inbox
+
+- `components/thread/endpoint-registry.ts`: new. Reads senpi's endpoint registry
+  (`<agentDir>/rpc-host-daemon/<16hex>/endpoint.json`, layout 2) without writing or connecting: `endpoint_kind`
+  `tui`/`rpc_host` (a record without `registry_version`/`endpoint_kind` reads as `rpc_host`), the directory accepted only
+  when the socket's canonical path hashes to it. Used to classify a socket's kind, and to enumerate when the engine's
+  `host status --all` cannot.
+- `components/thread/live-surface.ts`: `host status --all` rows keep `endpoint_kind`, `alive`/`reason` and a terminal
+  owner's session path. A terminal control endpoint (`t-<16hex>.sock`) is reached with its 32-byte secret first and
+  only with `get_protocol_info`, `list_sessions`, `get_state`, `get_messages`, `set_session_name`, `wake`, `subscribe`,
+  `extension_ui_response`; anything else is refused as `unsupported` before a connection opens, and is answered as
+  data by the tools. A terminal the engine reports not alive is not dialed; it is listed from its session file with
+  `error_note: "live_unresponsive"`. The surface also exposes the gateway's sender port (`wake`, host-only
+  `release_session`, liveness) - a delivery is announced with `wake`, never `prompt`.
+- `components/thread/address-book.ts`, `session-facts.ts`, `tools/internals.ts`: every thread carries `endpoint`
+  (`kind`, `socket`, `routing_id`), `surface` (`tui` | `desktop` | `child` | `daemon`) and `alive`; its name is the
+  session's `/name` (else the first 60 characters of its first user message, never the durable id) and its
+  `created_at`/`updated_at` come from the session header and last entry (read from the first and last 64 KiB of the
+  file) instead of 1970.
+- `components/thread/tools.ts`: `thread_send`/`thread_handoff` to a terminal session answer `unsupported` (a terminal
+  takes messages only through its gateway inbox), as do interrupt, model and reasoning changes.
+- `components/thread/gateway/registration.ts`, `component.ts`: on an engine that exposes `pi.session`
+  (`registerControlEndpoint`, `admissionGate`, `admitExternalMessage`, `listAdmittedDeliveries`, `persistHeaderNow`),
+  the thread component persists the session header and registers the session's control endpoint with the gateway
+  inbox drain; shutdown disposes the endpoint before the store. On today's engine nothing is registered.
+- `components/thread/gateway/store.ts`, `plugin/scripts/build-extension-core.mjs`, `check-extension-current.mjs`,
+  `src/install/plugin-artifacts.ts`: the gateway store's worker thread ships as its own build output,
+  `extensions/gateway-store-worker.mjs`, beside `omo.js` (a bundler cannot inline a `Worker` entry). The store
+  resolves it from its own module location and falls back to `store-worker.ts` in source; `build-extension --check`
+  and the installer's required-artifact list include it. Without it the built extension's inbox drain could not open
+  its store (`MODULE_NOT_FOUND`).
+- `components/thread/gateway/registration.ts`: the store is stamped with `pi.sessionContext.host_instance`, so a host
+  `release_session` settles only its own runtime's claims.
+- `components/thread/live-surface.ts`: a terminal endpoint whose socket is gone is reported `dead` instead of a raw
+  `host_unavailable:<path>`.
+
+## thread: gateway store and delivery engine (SQLite, receipts, causal loop guard)
+
+- `components/thread/gateway/`: new, not wired into the tools yet. One SQLite store at `<agentDir>/gateway/gateway.sqlite`,
+  owned by a worker thread so no store call blocks a session loop, holds every cross-session delivery (`deliveries`),
+  its idempotency receipt, the causal graph and the rate buckets, plus the `bindings`/`outbox` tables the binding
+  tools use. A send writes its row and the target's inbox marker in one `BEGIN IMMEDIATE` transaction; the target's
+  own drain is the only path out of `queued` and marks a row `applied` only after the runtime wrote its transcript
+  entry. Loop guards (cycle refusal per causal root, 4 hops, 8-burst/5 s pair bucket, 16 targets per turn, 64
+  deliveries per root, 7-day roots, 24 h queue TTL) and a lost-ACK rule (`idempotency_uncertain`, never a resend)
+  are enforced in that transaction. The first open migrates a legacy `<cwd>/.omo/thread-tools/mailbox` journal once.
+- `components/thread/errors.ts`: new code `loop_detected`.
+- `components/thread/gateway/store-ops.ts`: a row claimed by a live host that since released the session
+  (`session_released { host_instance, released_at }` in the transcript, naming the claim's own host generation, claimed
+  at or before `released_at`) is settled by the disk-token rule like a dead claimant's, instead of reading
+  `dual_runtime` forever. A claim by any other runtime, or made after the release, stays `dual_runtime`.
+- `components/thread/gateway/adapter.ts`: provisional senpi types aligned with the branches (registration union,
+  `release_session` request/refusal shape, drain result mapping).
+- `omo-native/test/sqlite-import-discipline.test.ts`: covers the gateway; only `store-worker.ts` imports `node:sqlite`,
+  lazily.
+
+## memory: a late Kibitzer verdict no longer steers an extra turn after the final answer
+
+- `components/memory/kibitzer/delivery.ts`: an accepted verdict steers at once only while the running session has a
+  tool call executing. The host reads its steering queue after every turn, so a steer queued once the final answer
+  was streaming or streamed started one more assistant turn after it; a headless `senpi -p` consumer that posts only
+  the last assistant text then lost the real answer (observed as `answer -> omo-kibitzer:recall -> "NO_REPLY"`). Such a
+  verdict is now held for the next `tool_result` steer or the next prompt's drain, like any other held nudge.
+- `components/memory/kibitzer/hooks.ts`: `tool_call` / `tool_result` report the executing call ids to delivery, and a
+  new `turn_end` hook clears them so a call that never reports a result (blocked, aborted) cannot outlive its turn.
+
+## model-profile, task: builtin lanes and the category notice never route to an unlisted gateway (#9146)
+
+- `components/model-profile/resolve.ts`: every builtin rung, in `recommended` and in the `daily-*`/`geeky-*` lanes, is
+  served only by its listed providers, so a lane never lands the session on a gateway's copy of its model
+  (`opengateway/anthropic/claude-opus-5-5`). A lane no listed provider serves is `unavailable` and keeps the session
+  model with the existing one-line notice. A user's bare model id, which names no provider, still matches anywhere.
+  `rankedProvidersOnly` is gone: it was the only builtin that had the listed-only rule, which is now the rule.
+- `components/task/category-unavailable-warning.ts`: when only an unlisted provider serves a hidden category's chain,
+  the one notice per session names it and the exact opt-in line
+  (`categories.<name>.model = "<gateway>/<model>"`); `details.unlisted_provider_model` carries it for remote clients.

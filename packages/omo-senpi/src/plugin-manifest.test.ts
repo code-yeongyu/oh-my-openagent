@@ -104,6 +104,7 @@ describe("OMO Senpi plugin manifest", () => {
       "README.md",
       "NOTICE",
       "LICENSE",
+      "daemon-launch-spec.json",
     ])
   })
 

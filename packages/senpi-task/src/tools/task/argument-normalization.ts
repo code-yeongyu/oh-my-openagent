@@ -32,6 +32,20 @@ function summaryText(value: unknown): string | undefined {
   return clampTaskSummary(typeof value === "string" ? value : undefined)
 }
 
+function isolationArguments(value: Record<PropertyKey, unknown>): Pick<TaskToolParamsStatic, "isolated" | "apply" | "merge"> {
+  const isolated = value.isolated
+  const apply = value.apply
+  const merge = value.merge
+  if (isolated !== undefined && typeof isolated !== "boolean") throw new TypeError("isolated must be a boolean")
+  if (apply !== undefined && typeof apply !== "boolean") throw new TypeError("apply must be a boolean")
+  if (merge !== undefined && merge !== "patch" && merge !== "branch") throw new TypeError("merge must be patch or branch")
+  return {
+    ...(isolated === undefined ? {} : { isolated }),
+    ...(apply === undefined ? {} : { apply }),
+    ...(merge === undefined ? {} : { merge }),
+  }
+}
+
 function taskItem(value: unknown): TaskItem | undefined {
   if (!isRecord(value)) return undefined
   const prompt = nonBlankText(value.prompt)
@@ -48,6 +62,7 @@ function taskItem(value: unknown): TaskItem | undefined {
 
   return {
     prompt,
+    ...isolationArguments(value),
     ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),
@@ -100,6 +115,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
 
   return {
     ...(prompt === undefined ? {} : { prompt }),
+    ...isolationArguments(raw),
     ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),

@@ -7,6 +7,7 @@ import type { ResidencyRegistry } from "../lifecycle/port"
 import { createTaskRecordStore } from "../store"
 import { bounded, fixture, fixtureHandle, poolInput } from "./__fixtures__/admission"
 import type { WorkpoolAggregateMessage, WorkpoolAggregatePort } from "./aggregate"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 function acking(messages: WorkpoolAggregateMessage[]): WorkpoolAggregatePort {
   return { enqueue: (message, receipts) => { messages.push(message); receipts.ack() } }
@@ -19,8 +20,8 @@ function reopen(root: string) {
   const store = createTaskRecordStore({ project_dir: root })
   const concurrency = new TaskConcurrency(config)
   const runner = { start: async (spec: { taskId: string }) => fixtureHandle(spec.taskId).handle }
-  const registry: ResidencyRegistry = { get: () => undefined, entries: () => [], forget: () => undefined, hasPendingSends: () => false, tryClaimEviction: () => false, releaseEviction: () => undefined }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const registry: ResidencyRegistry = { get: () => undefined, entries: () => [], forget: (_taskId, _options) => undefined, hasPendingSends: () => false, tryClaimEviction: () => false, releaseEviction: () => undefined }
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
     planner: spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }), destruction: lifecycle, admit: async () => ({ kind: "admitted" }) })
   return { manager, lifecycle }

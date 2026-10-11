@@ -10,7 +10,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 describe("#given the vendored shared skills #when the de-personalization gate runs", () => {
 	test("#then the cleaned ultimate-browsing + ulw-research tree has zero violations", async () => {
 		// given
-		const scanDirs = [join(here, "skills", "ultimate-browsing"), join(here, "skills", "data-scientist"), join(here, "skills", "ulw-research")];
+		const scanDirs = [
+			join(here, "skills", "browser"),
+			join(here, "skills", "ultimate-browsing"),
+			join(here, "skills", "data-scientist"),
+			join(here, "skills", "ulw-research"),
+		];
 		// when
 		const violations = await runDepersonalizationGate(scanDirs, here);
 		// then
@@ -47,6 +52,32 @@ describe("#given the vendored shared skills #when the de-personalization gate ru
 			expect(labels).toContain("credential-literal:TWITTER_AUTH_TOKEN");
 			expect(labels.some((l) => l.includes("agent-reach-home"))).toBe(true);
 			expect(labels.some((l) => l === "agent-reach")).toBe(false);
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
+	});
+
+	test("#then a secret-sharing link, a token-bearing url and an operator mail address are caught", async () => {
+		// given
+		const dir = await mkdtemp(join(tmpdir(), "dp-gate-"));
+		try {
+			await writeFile(
+				join(dir, "z.md"),
+				[
+					"open https://share.example.com/s#Zm9vYmFyYmF6cXV4MTIzNDU2",
+					"ping operator@example.com if the vault is locked",
+					"credentials live in ~/.config/example/account.env",
+					"https://example.com/docs#installing-the-cli",
+				].join("\n"),
+			);
+			// when
+			const labels = (await runDepersonalizationGate([dir], dir)).map((v) => v.label);
+			// then
+			expect(labels).toContain("share-link");
+			expect(labels).toContain("url-token-fragment");
+			expect(labels).toContain("email-address");
+			expect(labels).toContain("credential-env-path");
+			expect(labels.filter((l) => l === "url-token-fragment")).toHaveLength(1);
 		} finally {
 			await rm(dir, { recursive: true, force: true });
 		}

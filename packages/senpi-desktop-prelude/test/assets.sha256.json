@@ -1,0 +1,8 @@
+{
+	"_comment": "sha256 of each published prelude asset on dev (bc64056efc's unchanged asset sources). Any change to the published bytes must consciously update this fixture (#9113 prelude contingency). COMPUTER_DOCUMENTATION was updated for the experimental facade label (#9124). Updated for the menu.items/menu.select facade (#9651 B2a).",
+	"COMPUTER_PRELUDE_JAVASCRIPT": "dfc16bea900355ea40f04d47798c935aa4fd129ddb74967050280f191ee3db2f",
+	"COMPUTER_PRELUDE_PYTHON": "e2243265c69adfc9fdbd86c1efa24af7919b323b819cd673d4151da66c7f600d",
+	"COMPUTER_DECLARATIONS": "cddb828cc5fceaac5c30d323e6be86f6f532f2221a8f2db54ef0b8ba8e775925",
+	"COMPUTER_DOCUMENTATION": "99828bf3519973e97cb380be95999082a65a0b403ab50305fb2d267127e2e754",
+	"COMPUTER_SAFETY": "0c9f2d6223d92fdff268f1ee1eebc6f33870f5737bc09ab0dadafb96a4f36124"
+}

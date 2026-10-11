@@ -41,10 +41,26 @@ function hasUserModel(config: OmoConfig, category: string): boolean {
   return config.categories?.[category]?.model !== undefined
 }
 
+// When only an unlisted provider (a gateway or custom proxy) serves the chain's models, the notice
+// names that exact model as the opt-in pin: omo never routes a builtin category there itself (#9146).
+export function categoryUnavailableText(
+  category: string,
+  missingProviders: readonly string[],
+  unlistedProviderModel: string | undefined,
+): string {
+  const connect = `Connect one of its providers (${missingProviders.join(", ")}) with /login`
+  if (unlistedProviderModel !== undefined) {
+    const gateway = unlistedProviderModel.slice(0, unlistedProviderModel.indexOf("/"))
+    return `Category "${category}" is unavailable: only ${gateway}, which its chain does not list, serves its models, and omo never bills a builtin category to an unlisted provider. ${connect}, or opt in with categories.${category}.model = "${unlistedProviderModel}" in omo.json.`
+  }
+  return `Category "${category}" has no usable model: none of its fallback-chain providers are connected (${missingProviders.join(", ")}). Connect one with /login, or pin categories.${category}.model in omo.json.`
+}
+
 /**
  * Planner decorator that surfaces dead-chain category failures. On a model_unavailable plan error
  * carrying attempted_chain, once per (session, category): a headless-safe ui notify (auto-bridged
- * to RPC {method:"notify"} by senpi) plus a structured custom message for remote clients. It never
+ * to RPC {method:"notify"} by senpi) plus a structured custom message for remote clients, naming
+ * the unconnected providers and the fix (/login or a categories.<name>.model pin). It never
  * steers or triggers a turn, never fires at tool registration (the planner only runs at spawn,
  * when the registry is captured), and never warns for categories with a user-configured model.
  * Suppression: categories.<name>.warn_unavailable ?? task.warnings.unavailable_categories ?? true.
@@ -61,8 +77,7 @@ export function createCategoryUnavailableWarningPlanner(deps: CategoryUnavailabl
     const sessionId = deps.runtime.sessionId() ?? "unknown-session"
     if (!warned(`${sessionId}:${category}`)) return resolution
 
-    const providers = (error.missing_providers ?? []).join(", ")
-    const text = `Category "${category}" has no usable model: none of its fallback-chain providers are connected (${providers}).`
+    const text = categoryUnavailableText(category, error.missing_providers ?? [], error.unlisted_provider_model)
     deps.runtime.ui()?.notify(text, "info")
     deps.pi.sendMessage(
       {
@@ -74,6 +89,7 @@ export function createCategoryUnavailableWarningPlanner(deps: CategoryUnavailabl
           reason: "no_chain_rung_available",
           attempted_chain: error.attempted_chain,
           missing_providers: error.missing_providers ?? [],
+          ...(error.unlisted_provider_model !== undefined && { unlisted_provider_model: error.unlisted_provider_model }),
           available_categories: error.availableCategories ?? [],
         },
       },

@@ -38,7 +38,7 @@ export interface DagClock {
 export function useDagPlayback(ref: RefObject<HTMLElement | null>, enabled: boolean): DagClock {
   const [visible, setVisible] = useState(false)
   const [shown, setShown] = useState(true)
-  const [clock, setClock] = useState<DagClock>({ clockMs: 0, cycle: 0, playing: false })
+  const [clock, setClock] = useState<Omit<DagClock, "playing">>({ clockMs: 0, cycle: 0 })
   const elapsedRef = useRef(0)
 
   useEffect(() => {
@@ -61,10 +61,7 @@ export function useDagPlayback(ref: RefObject<HTMLElement | null>, enabled: bool
 
   const playing = enabled && visible && shown
   useEffect(() => {
-    if (!playing) {
-      setClock((previous) => (previous.playing ? { ...previous, playing: false } : previous))
-      return
-    }
+    if (!playing) return
     let frame = 0
     let last = performance.now()
     const tick = (now: number) => {
@@ -74,9 +71,7 @@ export function useDagPlayback(ref: RefObject<HTMLElement | null>, enabled: bool
       const cycle = Math.floor(total / LOOP_MS)
       const clockMs = Math.floor((total % LOOP_MS) / 100) * 100
       setClock((previous) =>
-        previous.clockMs === clockMs && previous.cycle === cycle && previous.playing
-          ? previous
-          : { clockMs, cycle, playing: true },
+        previous.clockMs === clockMs && previous.cycle === cycle ? previous : { clockMs, cycle },
       )
       frame = requestAnimationFrame(tick)
     }
@@ -84,5 +79,5 @@ export function useDagPlayback(ref: RefObject<HTMLElement | null>, enabled: bool
     return () => cancelAnimationFrame(frame)
   }, [playing])
 
-  return clock
+  return { clockMs: clock.clockMs, cycle: clock.cycle, playing }
 }

@@ -32,6 +32,8 @@ export function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartRes
         name: start.name,
         status: "error",
         error_message: start.error_message,
+        ...(start.failure_kind === undefined ? {} : { failure_kind: start.failure_kind }),
+        ...(start.failure_reason === undefined ? {} : { failure_reason: start.failure_reason }),
         ...(skills === undefined ? {} : { skills }),
       }
     case "residency_denied":

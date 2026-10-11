@@ -1,0 +1,229 @@
+{
+  "description": "without allowHostRelayOnlyStop a live host relay alone never enables input: click fails StopPathUnavailable before and after stopPath.start.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": false
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "click",
+        "params": {
+          "target": "desktop",
+          "x": 10.0,
+          "y": 10.0
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32014,
+              "message": "StopPathUnavailable",
+              "data": {
+                "code": "StopPathUnavailable",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message",
+            "/error/data/hint"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "desktop",
+              "delivery": "background",
+              "frameId": null,
+              "code": "StopPathUnavailable",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": false,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": false,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "click",
+        "params": {
+          "target": "desktop",
+          "x": 10.0,
+          "y": 10.0
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32014,
+              "message": "StopPathUnavailable",
+              "data": {
+                "code": "StopPathUnavailable",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message",
+            "/error/data/hint"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "desktop",
+              "delivery": "background",
+              "frameId": null,
+              "code": "StopPathUnavailable",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    }
+  ]
+}

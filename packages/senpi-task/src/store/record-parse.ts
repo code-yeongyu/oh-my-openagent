@@ -8,13 +8,23 @@ import {
 import { parseTaskId } from "../state/id"
 import {
   parseNotification,
+  parseOptionalIsolation,
+  parseOptionalHostSession,
   parseOptionalOwner,
   parseOptionalPendingSteering,
   parseOptionalResolvedModel,
   parseOptionalResolvedModelArray,
   parseOptionalSpawnSpec,
+  readOptionalRunnerKind,
+  readOptionalSuspensionReason,
+  validateHostSessionConsistency,
 } from "./record-blocks-parse"
+import {
+  readOptionalTaskStartFailureKind,
+  readOptionalTaskStartFailureReason,
+} from "./start-failure-parse"
 import { parseRunStats } from "./run-stats-parse"
+import { parseOptionalProvisionalExit } from "./provisional-exit-parse"
 import {
   isRecord,
   readNumber,
@@ -48,6 +58,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const hostPid = readOptionalNumber(value, "host_pid")
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
+  const isolation = parseOptionalIsolation(value)
   const errorMessage = readOptionalString(value, "error_message")
   const startedAt = readOptionalString(value, "started_at")
   const terminalAt = readOptionalString(value, "terminal_at")
@@ -58,6 +69,9 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const fallbackModels = parseOptionalResolvedModelArray(value, "fallback_models")
   const fallbackAttempts = parseOptionalResolvedModelArray(value, "fallback_attempts")
   const resolvedModel = parseOptionalResolvedModel(value, "resolved_model")
+  const resolvedTier = isRecord(value["resolved_model"]) ? readOptionalString(value["resolved_model"], "service_tier") : undefined
+  const effectiveModel = parseOptionalResolvedModel(value, "effective_model")
+  const effectiveTier = isRecord(value["effective_model"]) ? readOptionalString(value["effective_model"], "service_tier") : undefined
   const spawnSpec = parseOptionalSpawnSpec(value)
   const owner = parseOptionalOwner(value)
   const pendingSteering = parseOptionalPendingSteering(value, path, warnings)
@@ -66,6 +80,23 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const configGeneration = readOptionalNumber(value, "config_generation")
   const backgroundMode = readOptionalBackgroundMode(value)
   const reviveDeliveryUncertain = parseOptionalReviveDeliveryUncertainty(value)
+  const resumedRunEpoch = readOptionalNumber(value, "resumed_run_epoch")
+  const runStartEpoch = readOptionalNumber(value, "run_start_epoch")
+  const burntEpoch = readOptionalNumber(value, "burnt_epoch")
+  const startQueued = parseOptionalStartQueued(value)
+  const runnerKind = readOptionalRunnerKind(value)
+  const suspensionReason = readOptionalSuspensionReason(value)
+  const revivalDeferredReason = readOptionalString(value, "revival_deferred_reason")
+  const recoveryDeadlineAt = readOptionalNumber(value, "recovery_deadline_at")
+  const failureKind = readOptionalTaskStartFailureKind(value)
+  const failureReason = readOptionalTaskStartFailureReason(value)
+  const hostSession = parseOptionalHostSession(value)
+  validateHostSessionConsistency(runnerKind, hostSession)
+  const fallbackHandoffEpoch = readOptionalNumber(value, "fallback_handoff_epoch")
+  const closingChild = parseOptionalClosingChild(value)
+  const residencyClaim = readOptionalString(value, "residency_claim")
+  const cancelRequested = parseOptionalCancelRequest(value)
+  const provisionalExit = parseOptionalProvisionalExit(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -98,7 +129,12 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(requestedModel === undefined ? {} : { requested_model: requestedModel }),
     ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
     ...(fallbackAttempts === undefined ? {} : { fallback_attempts: fallbackAttempts }),
-    ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
+    ...(resolvedModel === undefined ? {} : {
+      resolved_model: { ...resolvedModel, ...(resolvedTier === undefined ? {} : { service_tier: resolvedTier }) },
+    }),
+    ...(effectiveModel === undefined ? {} : {
+      effective_model: { ...effectiveModel, ...(effectiveTier === undefined ? {} : { service_tier: effectiveTier }) },
+    }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(owner === undefined ? {} : { owner }),
     ...(pendingSteering !== undefined && pendingSteering.length > 0 ? { pending_steering: pendingSteering } : {}),
@@ -106,13 +142,63 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(hostPid === undefined ? {} : { host_pid: hostPid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
+    ...(isolation === undefined ? {} : { isolation }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
+    ...(failureKind === undefined ? {} : { failure_kind: failureKind }),
+    ...(failureReason === undefined ? {} : { failure_reason: failureReason }),
     ...(killed === undefined ? {} : { killed }),
     ...(runStats === undefined ? {} : { run_stats: runStats }),
     ...(taskSeq === undefined ? {} : { task_seq: taskSeq }),
     ...(configGeneration === undefined ? {} : { config_generation: configGeneration }),
     ...(backgroundMode === undefined ? {} : { background_mode: backgroundMode }),
     ...(reviveDeliveryUncertain === undefined ? {} : { revive_delivery_uncertain: reviveDeliveryUncertain }),
+    ...(resumedRunEpoch === undefined ? {} : { resumed_run_epoch: resumedRunEpoch }),
+    ...(runStartEpoch === undefined ? {} : { run_start_epoch: runStartEpoch }),
+    ...(burntEpoch === undefined ? {} : { burnt_epoch: burntEpoch }),
+    ...(startQueued === undefined ? {} : { start_queued: startQueued }),
+    ...(suspensionReason === undefined ? {} : { suspension_reason: suspensionReason }),
+    ...(revivalDeferredReason === undefined ? {} : { revival_deferred_reason: revivalDeferredReason }),
+    ...(recoveryDeadlineAt === undefined ? {} : { recovery_deadline_at: recoveryDeadlineAt }),
+    ...(runnerKind === undefined ? {} : { runner_kind: runnerKind }),
+    ...(hostSession === undefined ? {} : { host_session: hostSession }),
+    ...(fallbackHandoffEpoch === undefined ? {} : { fallback_handoff_epoch: fallbackHandoffEpoch }),
+    ...(closingChild === undefined ? {} : { fallback_closing_child: closingChild }),
+    ...(residencyClaim === undefined ? {} : { residency_claim: residencyClaim }),
+    ...(cancelRequested === undefined ? {} : { cancel_requested: cancelRequested }),
+    ...(provisionalExit === undefined ? {} : { provisional_exit: provisionalExit }),
+  }
+}
+
+function parseOptionalCancelRequest(record: Record<string, unknown>): TaskRecord["cancel_requested"] {
+  const value = record["cancel_requested"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("cancel_requested is not an object")
+  const reason = readOptionalString(value, "reason")
+  return { requested_at: readString(value, "requested_at"), ...(reason === undefined ? {} : { reason }) }
+}
+
+function parseOptionalClosingChild(record: Record<string, unknown>): TaskRecord["fallback_closing_child"] {
+  const value = record["fallback_closing_child"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("fallback_closing_child is not an object")
+  const pid = readOptionalNumber(value, "pid")
+  const hostSession = parseOptionalHostSession(value)
+  const confirmation = readOptionalBoolean(value, "requires_confirmation")
+  return {
+    ...(pid === undefined ? {} : { pid }),
+    ...(hostSession === undefined ? {} : { host_session: hostSession }),
+    ...(confirmation === undefined ? {} : { requires_confirmation: confirmation }),
+  }
+}
+
+function parseOptionalStartQueued(record: Record<string, unknown>): TaskRecord["start_queued"] {
+  const value = record["start_queued"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("start_queued is not an object")
+  return {
+    model: readString(value, "model"),
+    queued_at: readString(value, "queued_at"),
+    queue_position: readNumber(value, "queue_position"),
   }
 }
 

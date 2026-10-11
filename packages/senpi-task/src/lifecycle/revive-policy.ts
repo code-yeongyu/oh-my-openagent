@@ -36,7 +36,15 @@ function assertNever(value: never): never {
 }
 
 export function isColdRevivalCandidate(record: TaskRecord): boolean {
+  if (record.killed === true) return false
+  // A daemon-hosted child is PARKED, not finished: the daemon evicted its session, or the daemon
+  // itself went away mid-turn. Reopening it from its transcript and delivering the message is the
+  // whole point of retaining it, so `running` belongs in the revivable set here - unlike a
+  // child-process child, whose `running` record means a live OS process nobody may talk over.
+  if (record.runner_kind === "host-session" && record.residency_state === "rpc_detached") {
+    return record.status !== "pending" && record.status !== "cancelled" && record.status !== "lost"
+  }
   return ((record.execution_mode === "in-process" && record.residency_state === "persisted_only") ||
     (record.execution_mode === "process" && record.residency_state === "rpc_detached")) &&
-    (record.status === "completed" || record.status === "error" || record.status === "interrupted") && record.killed !== true
+    (record.status === "completed" || record.status === "error" || record.status === "interrupted")
 }

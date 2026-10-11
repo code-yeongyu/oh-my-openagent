@@ -10,12 +10,14 @@ import { createTaskLifecycle } from "../create"
 import type { ReviveDriftPolicy, ReviveGenerationWarning } from "../revive-policy"
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { createConfigGenerationStampingStore } from "../../../../omo-senpi/src/components/task/config-generation-store"
+import { NO_HOST_ENDPOINT } from "../host-session"
 
 export function coldReviveHarness(options: {
   readonly policy?: ReviveDriftPolicy
   readonly generation?: number
   readonly cap?: number
   readonly idleTimeoutMs?: number
+  readonly ttlMs?: number
   readonly now?: () => number
   readonly storeWrapper?: (store: TaskRecordStore) => TaskRecordStore
   readonly resume?: (spec: ManagedStartSpec, path: string, handle: ManagedChildHandle) => Promise<ManagedChildHandle>
@@ -39,17 +41,20 @@ export function coldReviveHarness(options: {
   const fake = makeHandle(record.task_id)
   const resumed: Array<{ spec: ManagedStartSpec; path: string }> = []
   const warnings: ReviveGenerationWarning[] = []
-  const config = settings({ default_concurrency: 1, global_concurrency: 1, residency_max_children: options.cap ?? 4, ...(options.idleTimeoutMs === undefined ? {} : { resident_idle_timeout_ms: options.idleTimeoutMs }) })
+  const config = settings({ default_concurrency: 1, global_concurrency: 1, residency_max_children: options.cap ?? 4, ...(options.idleTimeoutMs === undefined ? {} : { resident_idle_timeout_ms: options.idleTimeoutMs }), ...(options.ttlMs === undefined ? {} : { ttl_ms: options.ttlMs }) })
   const manager = createTaskManager({ store, cwd: project, config, now: options.now,
     planner: () => ({ kind: "resolved", plan: { model: "fixture/model" } }),
     runners: { "in-process": { start: (spec) => new FakeRunner().start(spec), resume: async (spec, path) => {
       resumed.push({ spec, path })
       return options.resume === undefined ? fake.handle : options.resume(spec, path, fake.handle)
     } }, process: new FakeRunner() },
-    destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
+    destruction: {
+      destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause),
+      parkTerminalResident: id => lifecycle.parkTerminalResident(id),
+    },
   })
   const registry = createManagerResidencyRegistry(() => manager)
-  const lifecycle = createTaskLifecycle({ store, registry, config, now: options.now,
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config, now: options.now,
     revivePolicy: { currentGeneration: () => 2, warn: (warning) => warnings.push(warning), ...(options.policy === undefined ? {} : { policy: options.policy }) },
     idleReclaimerScheduler: { setInterval: () => ({}), clearInterval: () => undefined },
   })

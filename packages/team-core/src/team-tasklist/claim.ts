@@ -66,7 +66,7 @@ export async function claimTask(
   }
 
   if (await detectStaleLock(claimLockPath, CLAIM_STALE_AFTER_MS)) {
-    await reapStaleLock(claimLockPath)
+    await reapStaleLock(claimLockPath, CLAIM_STALE_AFTER_MS)
   } else if (await lockExists(claimLockPath)) {
     throw new AlreadyClaimedError()
   }

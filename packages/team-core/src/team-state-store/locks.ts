@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto"
-import { access, open, readFile, rename, rm, unlink } from "node:fs/promises"
-import { dirname } from "node:path"
+import { open, rename, rm } from "node:fs/promises"
 
 import { tolerantFsync } from "../tolerant-fsync"
+import { publishLockRecord } from "./lock-publish"
+import { removeLockRecordIfUnchanged, type LockReclaimDeps, type LockReclaimOutcome } from "./lock-reclaim"
+import { buildLockRecord, isLockRecordStale, markLockRecordReleased, readLockRecord } from "./lock-record"
+
+export { assertRetryableLockOpenError } from "./lock-publish"
+export { lockOwnerInstanceId } from "./lock-record"
 
 type LockOptions = {
   staleAfterMs?: number
@@ -15,23 +20,9 @@ type AtomicWriteDeps = {
   rm?: typeof rm
 }
 
-type LockOpenErrorDeps = {
-  readonly access?: typeof access
-  readonly platform?: NodeJS.Platform
-}
-
-type LockReleaseDeps = {
-  readonly delay?: typeof delay
-  readonly unlink?: typeof unlink
-}
-
 const LOCK_RETRY_MS = 50
 const LOCK_WAIT_TIMEOUT_MS = 15_000
-const LOCK_RELEASE_RETRY_ATTEMPTS = 3
-const LOCK_RELEASE_RETRY_MS = 25
-
-/** Distinguishes this process from a predecessor that reused the same pid. */
-export const lockOwnerInstanceId = randomUUID()
+const DEFAULT_STALE_AFTER_MS = 300_000
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -39,110 +30,19 @@ function delay(ms: number): Promise<void> {
   })
 }
 
-function buildOwnerContent(ownerTag: string): string {
-  return `${ownerTag}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n`
-}
-
-type LockOwnerContent = {
-  readonly ownerPid: number
-  readonly acquiredAtEpochMs: number
-  readonly instanceId: string | null
-}
-
-function parseOwnerContent(content: string): LockOwnerContent | null {
-  const lines = content.split(/\r?\n/).filter((line) => line.length > 0)
-  if (lines.length !== 3 && lines.length !== 4) return null
-
-  const ownerPid = Number.parseInt(lines[1] ?? "", 10)
-  const acquiredAtEpochMs = Number.parseInt(lines[2] ?? "", 10)
-  if (!Number.isInteger(ownerPid) || ownerPid <= 0) return null
-  if (!Number.isInteger(acquiredAtEpochMs) || acquiredAtEpochMs <= 0) return null
-
-  return {
-    ownerPid,
-    acquiredAtEpochMs,
-    instanceId: lines.length === 4 ? (lines[3] ?? null) : null,
-  }
-}
-
-function errorCode(error: unknown): string | null {
-  if (!(error instanceof Error) || !("code" in error)) return null
-  return typeof error.code === "string" ? error.code : null
-}
-
-function isPathAbsenceError(error: unknown): boolean {
-  const code = errorCode(error)
-  return code === "ENOENT" || code === "ENOTDIR"
-}
-
-function isRetryableLockReleaseError(error: unknown): boolean {
-  const code = errorCode(error)
-  return code === "EPERM" || code === "EBUSY"
-}
-
-async function pathMayExist(path: string, deps: LockOpenErrorDeps = {}): Promise<boolean> {
-  const accessPath = deps.access ?? access
-  try {
-    await accessPath(path)
-    return true
-  } catch (error) {
-    if (!(error instanceof Error)) throw error
-    return !isPathAbsenceError(error)
-  }
-}
-
-export async function assertRetryableLockOpenError(
-  lockPath: string,
-  error: unknown,
-  deps?: LockOpenErrorDeps,
-): Promise<void> {
-  const code = errorCode(error)
-  if (code === "EEXIST") return
-  if (code === "EPERM") {
-    if (await pathMayExist(lockPath, deps)) return
-    if ((deps?.platform ?? process.platform) === "win32" && (await pathMayExist(dirname(lockPath), deps))) return
-  }
-  throw error
-}
-
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
-    return false
-  }
-}
-
-async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: number): Promise<void> {
+async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: number): Promise<string> {
   const startedAt = Date.now()
   for (;;) {
     if (Date.now() - startedAt > LOCK_WAIT_TIMEOUT_MS) {
       throw new Error(`Timed out acquiring lock: ${lockPath}`)
     }
 
-    try {
-      const fileHandle = await open(lockPath, "wx")
-      try {
-        await fileHandle.writeFile(buildOwnerContent(ownerTag))
-        await tolerantFsync(fileHandle, `acquireLock:${lockPath}`)
-      } finally {
-        await fileHandle.close()
-      }
-      return
-    } catch (error) {
-      await assertRetryableLockOpenError(lockPath, error)
+    const record = buildLockRecord(ownerTag)
+    if (await publishLockRecord(lockPath, record)) return record
 
-      if (await detectStaleLock(lockPath, staleAfterMs)) {
-        await reapStaleLock(lockPath)
-        continue
-      }
-
-      await delay(LOCK_RETRY_MS)
-    }
+    const outcome = await reapStaleLock(lockPath, staleAfterMs)
+    if (outcome === "removed" || outcome === "absent") continue
+    await delay(LOCK_RETRY_MS)
   }
 }
 
@@ -151,64 +51,35 @@ export async function withLock<T>(
   fn: () => Promise<T>,
   opts?: LockOptions,
 ): Promise<T> {
-  const staleAfterMs = opts?.staleAfterMs ?? 300_000
+  const staleAfterMs = opts?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
   const ownerTag = opts?.ownerTag ?? "owner"
 
-  await acquireLock(lockPath, ownerTag, staleAfterMs)
+  const record = await acquireLock(lockPath, ownerTag, staleAfterMs)
 
   try {
     return await fn()
   } finally {
-    await reapStaleLock(lockPath)
+    // Once released, the record counts as stale for this process, so a failed unlink leaves a
+    // leftover that the next acquire reclaims instead of a lock nobody can ever take again.
+    markLockRecordReleased(record)
+    await removeLockRecordIfUnchanged(lockPath, record, staleAfterMs)
   }
 }
 
 export async function detectStaleLock(lockPath: string, staleAfterMs: number): Promise<boolean> {
-  try {
-    const content = await readFile(lockPath, "utf8")
-    const parsed = parseOwnerContent(content)
-    if (parsed === null) return false
-
-    // A live pid whose instance id is not ours is this process number recycled
-    // after the previous owner died. Same-process waiters share lockOwnerInstanceId
-    // and must still serialize.
-    if (
-      parsed.instanceId !== null
-      && parsed.instanceId !== lockOwnerInstanceId
-      && parsed.ownerPid === process.pid
-    ) {
-      return true
-    }
-
-    if (isPidAlive(parsed.ownerPid)) return false
-
-    // 4-line dead owners are stale immediately. Legacy 3-line keeps the age rule.
-    if (parsed.instanceId !== null) return true
-
-    return Date.now() - parsed.acquiredAtEpochMs > staleAfterMs
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
-    return false
-  }
+  const observed = await readLockRecord(lockPath)
+  return observed !== null && isLockRecordStale(observed, staleAfterMs)
 }
 
-export async function reapStaleLock(lockPath: string, deps: LockReleaseDeps = {}): Promise<void> {
-  const wait = deps.delay ?? delay
-  const unlinkFile = deps.unlink ?? unlink
-
-  for (let attempt = 1; attempt <= LOCK_RELEASE_RETRY_ATTEMPTS; attempt += 1) {
-    try {
-      await unlinkFile(lockPath)
-      return
-    } catch (error) {
-      if (!(error instanceof Error)) return
-      if (isPathAbsenceError(error)) return
-      if (!isRetryableLockReleaseError(error) || attempt === LOCK_RELEASE_RETRY_ATTEMPTS) return
-      await wait(LOCK_RELEASE_RETRY_MS)
-    }
-  }
+export async function reapStaleLock(
+  lockPath: string,
+  staleAfterMs: number = DEFAULT_STALE_AFTER_MS,
+  deps: LockReclaimDeps = {},
+): Promise<LockReclaimOutcome> {
+  const observed = await readLockRecord(lockPath)
+  if (observed === null) return "absent"
+  if (!isLockRecordStale(observed, staleAfterMs)) return "changed"
+  return await removeLockRecordIfUnchanged(lockPath, observed.content, staleAfterMs, deps)
 }
 
 export async function atomicWrite(

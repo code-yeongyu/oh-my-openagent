@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { getProcessStartIdentity } from "../locks"
 
 import { withLocalJournalLock } from "./lock"
+import { removeTreeSync } from "../../../../test-support/remove-tree"
 
 const dirs: string[] = []
 afterEach(() => {
   for (const dir of dirs.splice(0)) {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    removeTreeSync(dir, { maxRetries: 10, retryDelay: 200 })
   }
 })
 

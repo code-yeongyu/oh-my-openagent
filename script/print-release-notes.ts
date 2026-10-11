@@ -2,7 +2,11 @@
 /** Release step: print the GitHub release body for <version>, fail-closed. */
 import { composeReleaseBody, extractReleaseNotes } from "./changelog-release-notes"
 
-const INSTALL_FOOTER = ["\`\`\`bash", "npm i -g omo-ai@beta", "\`\`\`"].join("\n")
+/** The install line for the released channel: bare `omo-ai` for a stable version, `omo-ai@beta` for a prerelease. */
+export function installFooter(version: string): string {
+  const spec = version.includes("-") ? "omo-ai@beta" : "omo-ai"
+  return ["\`\`\`bash", `bun add -g ${spec}`, "\`\`\`"].join("\n")
+}
 
 async function main(): Promise<void> {
   const version = process.argv[2]
@@ -14,7 +18,7 @@ async function main(): Promise<void> {
   const notes = extractReleaseNotes(await Bun.file(path).text(), version)
   const contributorsFile = process.argv[3]
   const contributors = contributorsFile ? await Bun.file(contributorsFile).text() : ""
-  process.stdout.write(composeReleaseBody(notes, contributors, INSTALL_FOOTER))
+  process.stdout.write(composeReleaseBody(notes, contributors, installFooter(version)))
 }
 
 if (import.meta.main) await main()

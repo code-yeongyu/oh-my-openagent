@@ -1,6 +1,6 @@
 # x-search component
 
-Credential-gated `x_search` tool and conditional skill. Searches X (Twitter) posts through xAI's server-side X tools. There is no `omo.json` key and no disable flag: the only gate is a connected xAI credential.
+Credential-gated `x_search` tool and conditional skill. Searches X (Twitter) posts through xAI's server-side X tools. The tool has no `omo.json` key and no disable flag: the only gate is a connected xAI credential. `disabled_skills: ["x-search"]` hides only the conditional skill.
 
 ## Anatomy
 
@@ -24,7 +24,7 @@ Registration runs at **extension load**, not `session_start`. Senpi builtin exte
 - Missing file: `XAI_API_KEY` (trimmed, non-empty) is enough.
 - File present: the `xai` entry's `type` must be `oauth` or `api_key`. Invalid JSON, a missing `xai` object, or any other `type` fails closed **even when `XAI_API_KEY` is set**.
 
-Both outcomes are expected states, so they log on `ctx.logger.debug?.` (`x-search skipped: no xAI credential` / `x-search registered`), never `info`: the default `ComponentLogger` writes `info` to `console.info`, and components register before the TUI takes over stdout, so an `info` line greets the user on every startup. On success it registers the tool and contributes the skill path via `pi.on("resources_discover", () => ({ skillPaths: [...] }))`, so a machine without xAI never pays for the skill in the skills index.
+Both outcomes are expected states, so they log on `ctx.logger.debug?.` (`x-search skipped: no xAI credential` / `x-search registered`), never `info`: the default `ComponentLogger` writes `info` to `console.info`, and components register before the TUI takes over stdout, so an `info` line greets the user on every startup. On success it registers the tool and contributes the skill path on `resources_discover`, so a machine without xAI never pays for the skill in the skills index. `resolveContributedSkill` (`bundled-skills/contributed-skill.ts`) withholds the path when `disabled_skills` names `x-search` or a same-name skill is already loaded; senpi keeps the first skill of a name and would otherwise report ours as a collision (#9160).
 
 `resolveXSearchSkillPath` prefers `plugin/skills-conditional/x-search/SKILL.md` (from the bundled `plugin/extensions/omo.js` URL), falls back to `./skill/SKILL.md` for source-tree runs, and returns `undefined` when neither exists — from the bundle the fallback would be `plugin/extensions/skill/SKILL.md`, which senpi reports as `skill path does not exist`. With no resolvable skill the tool still registers, no `resources_discover` handler is attached, and one `warn` names the broken payload. `plugin/scripts/stage-x-search-skill.mjs` copies the source into `skills-conditional/` (into `$OMO_SENPI_PLUGIN_OUTPUT` for staging builds); that directory is in the plugin `files` list, in the payload allowlists of `script/build-omo-native.ts` and `script/build-omo-binary.ts`, and in the required-artifact lists — but **must not** join `pi.skills`.
 

@@ -50,7 +50,7 @@
   "dependencies": {
     "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "sideEffects": false
 }

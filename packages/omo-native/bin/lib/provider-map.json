@@ -1,13 +1,15 @@
 {
-  "_comment": "Derived from @code-yeongyu/senpi 2026.9.16-3 builtinProviders(). Hosted gateways remain excluded; ollama/radius are dynamic providers without static model modules. Re-derive builtin provider ids and mappings whenever that pin changes.",
+  "_comment": "Derived from @code-yeongyu/senpi 2026.10.10-12 builtinProviders(). builtinProviderIds and oauthProviderIds are the engine registry verbatim; providers maps a source harness id onto the omo provider that serves the same endpoint; oauthLogins maps a source OAuth id onto the omo provider to run /login for. Re-derive all four whenever the senpi pin changes.",
   "builtinProviderIds": [
     "alibaba-token-plan",
     "amazon-bedrock",
     "ant-ling",
     "anthropic",
     "azure-openai-responses",
+    "bai",
     "baseten",
     "cerebras",
+    "chatgpt-subscription",
     "cloudflare-ai-gateway",
     "cloudflare-workers-ai",
     "cursor",
@@ -20,6 +22,7 @@
     "groq",
     "huggingface",
     "kimi-coding",
+    "meta",
     "minimax",
     "minimax-cn",
     "mistral",
@@ -28,7 +31,8 @@
     "nvidia",
     "ollama",
     "openai",
-    "openai-codex",
+    "opencode",
+    "opencode-go",
     "opengateway",
     "openrouter",
     "qwen-token-plan",
@@ -36,6 +40,7 @@
     "qwen-token-plan-individual",
     "radius",
     "together",
+    "typesafe",
     "venice",
     "vercel-ai-gateway",
     "xai",
@@ -46,16 +51,32 @@
     "zai",
     "zai-coding-cn"
   ],
-  "excludedHostedGatewayIds": [
-    "opencode",
-    "opencode-go",
-    "zai-coding-plan"
+  "oauthProviderIds": [
+    "anthropic",
+    "chatgpt-subscription",
+    "cursor",
+    "devin",
+    "github-copilot",
+    "kimi-coding",
+    "meta",
+    "openrouter",
+    "radius",
+    "xai"
   ],
   "providers": {
     "anthropic-api": "anthropic",
     "azure": "azure-openai-responses",
+    "claude-sdk-oauth": "anthropic-subscription",
     "kimi-for-coding": "kimi-coding",
     "moonshot": "moonshotai",
+    "openai-codex": "chatgpt-subscription",
+    "zai-coding-plan": "zai",
     "zhipuai": "zai"
+  },
+  "oauthLogins": {
+    "claude-sdk-oauth": "anthropic-subscription",
+    "kimi-for-coding": "kimi-coding",
+    "openai": "chatgpt-subscription",
+    "openai-codex": "chatgpt-subscription"
   }
 }

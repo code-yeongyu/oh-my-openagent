@@ -44,3 +44,11 @@ export function resolveAgentHome(options: ResolveAgentHomeOptions): string {
 
   return join(homeDir, ".senpi", "agent")
 }
+
+/**
+ * Where the engine keeps session transcripts, as `<encoded session cwd>/<timestamp>_<id>.jsonl`
+ * (older layouts keep them flat at the root).
+ */
+export function resolveAgentSessionsDirectory(options: ResolveAgentHomeOptions): string {
+  return join(resolveAgentHome(options), "sessions")
+}

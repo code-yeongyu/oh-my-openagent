@@ -1,30 +1,9 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { join, relative } from "node:path"
 
 import { describe, expect, test } from "bun:test"
 
 const COMPONENT_ROOT = "packages/omo-senpi/src/components/lsp"
-const REMOVED_ENGINE_PATHS = [
-  "client-wrapper.ts",
-  "client.ts",
-  "connection.ts",
-  "directory-diagnostics.ts",
-  "errors.ts",
-  "infer-extension.ts",
-  "inspector.ts",
-  "manager-default.ts",
-  "manager-lifecycle.ts",
-  "manager-types.ts",
-  "manager-wait.ts",
-  "manager.ts",
-  "process.ts",
-  "server-installation.ts",
-  "server-resolution.ts",
-  "transport.ts",
-  "workspace-edit.ts",
-].map((file) => ["lsp", file].join("/"))
-
-const RETAINED_SOURCE_DIRS = ["adapter", "."] as const
 const FORBIDDEN_ACTIVE_PATTERNS = [
   ["vscode", "jsonrpc"].join("-"),
   ["OMO", "SENPI", "TRUST", "PROJECT", "LSP", "COMMANDS"].join("_"),
@@ -34,7 +13,6 @@ const FORBIDDEN_ACTIVE_PATTERNS = [
 describe("omo-senpi lsp architecture boundary", () => {
   test("#given the daemon-backed adapter #when source shape is audited #then no vendored LSP engine remains", () => {
     // given / when
-    const remainingEnginePaths = REMOVED_ENGINE_PATHS.filter((path) => existsSync(join(COMPONENT_ROOT, path)))
     const sourceFiles = listSourceFiles(COMPONENT_ROOT)
     const activePatternHits = collectPatternHits([
       "packages/omo-senpi/package.json",
@@ -43,7 +21,6 @@ describe("omo-senpi lsp architecture boundary", () => {
     ])
 
     // then
-    expect(remainingEnginePaths).toEqual([])
     expect(activePatternHits).toEqual([])
     expect(sourceFiles.every(isRetainedLspSource)).toBe(true)
   })
@@ -65,8 +42,8 @@ function listSourceFiles(root: string): readonly string[] {
 function isRetainedLspSource(path: string): boolean {
   const relativePath = relative(COMPONENT_ROOT, path)
   if (relativePath.startsWith("adapter/")) return true
-  if (relativePath.includes("/")) return false
-  return RETAINED_SOURCE_DIRS.includes(".")
+  // Top-level adapter files are retained; any other nested directory would be a re-vendored engine.
+  return !relativePath.includes("/")
 }
 
 function collectPatternHits(paths: readonly string[]): readonly string[] {

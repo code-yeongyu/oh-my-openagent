@@ -3,8 +3,9 @@ import { join } from "node:path"
 
 import {
   isOurFilePluginEntry,
-  isNamedTuiPluginEntry,
+  isOmoManagedTuiEntry,
   isServerPluginEntry,
+  tuiPluginSpecName,
 } from "../doctor/checks/tui-plugin-config"
 import {
   LEGACY_PLUGIN_NAME,
@@ -15,7 +16,7 @@ import {
 import { writeFileAtomically } from "../../shared/write-file-atomically"
 
 type ConfigShape = {
-  plugin?: string[]
+  plugin?: unknown
   [key: string]: unknown
 }
 
@@ -46,10 +47,22 @@ function readServerConfig(configDir: string): ConfigShape | null {
   return null
 }
 
-function pluginEntries(config: ConfigShape): string[] {
-  return Array.isArray(config.plugin)
-    ? config.plugin.filter((entry): entry is string => typeof entry === "string")
-    : []
+function pluginEntries(config: ConfigShape): unknown[] {
+  if (Array.isArray(config.plugin)) return config.plugin
+  if (typeof config.plugin === "string") return [config.plugin]
+  return []
+}
+
+function pluginFieldInvalid(config: ConfigShape): boolean {
+  return config.plugin !== undefined && !Array.isArray(config.plugin) && typeof config.plugin !== "string"
+}
+
+function serverPluginEntry(config: ConfigShape): string | undefined {
+  for (const entry of pluginEntries(config)) {
+    const name = tuiPluginSpecName(entry)
+    if (name !== null && isServerPluginEntry(name)) return name
+  }
+  return undefined
 }
 
 function desiredTuiEntry(serverEntry: string): string | null {
@@ -80,7 +93,7 @@ function formatConfig(config: ConfigShape): string {
 export function ensureTuiPluginEntry(opts: { configDir?: string } = {}): EnsureTuiPluginEntryResult {
   const configDir = opts.configDir ?? getOpenCodeConfigDir({ binary: "opencode", version: null })
   const serverConfig = readServerConfig(configDir)
-  const serverEntry = serverConfig ? pluginEntries(serverConfig).find(isServerPluginEntry) : undefined
+  const serverEntry = serverConfig ? serverPluginEntry(serverConfig) : undefined
   if (!serverEntry) {
     return { changed: false, reason: "no-server-entry" }
   }
@@ -92,16 +105,24 @@ export function ensureTuiPluginEntry(opts: { configDir?: string } = {}): EnsureT
 
   const tuiJsonPath = join(configDir, "tui.json")
   const { config, malformed } = readTuiConfig(tuiJsonPath)
-  if (malformed) {
+  if (malformed || pluginFieldInvalid(config)) {
     return { changed: false, reason: "malformed" }
   }
 
-  const plugins = pluginEntries(config).filter((entry) => !isNamedTuiPluginEntry(entry))
-  if (plugins.includes(desiredEntry)) {
+  // Drop every entry that belongs to this plugin, whatever spec it carries, so
+  // an entry an older installer wrote (`<pkg>@latest`, the legacy package name,
+  // the `<pkg>/tui` subpath) cannot survive alongside the one written now and
+  // load the plugin twice. Foreign entries keep their position and shape.
+  const entries = pluginEntries(config)
+  const otherEntries = entries.filter((entry) => !isOmoManagedTuiEntry(entry))
+  const pluginIsArray = Array.isArray(config.plugin)
+  const isOnlyDesiredEntry =
+    pluginIsArray && entries.length === otherEntries.length + 1 && entries.includes(desiredEntry)
+  if (isOnlyDesiredEntry) {
     return { changed: false, reason: "already-present" }
   }
 
   mkdirSync(configDir, { recursive: true })
-  writeFileAtomically(tuiJsonPath, formatConfig({ ...config, plugin: [...plugins, desiredEntry] }))
+  writeFileAtomically(tuiJsonPath, formatConfig({ ...config, plugin: [...otherEntries, desiredEntry] }))
   return { changed: true, reason: "added" }
 }

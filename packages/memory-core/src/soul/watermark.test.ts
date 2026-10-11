@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
-import { consumeSoulNoticeDelta } from "./watermark"
+import { consumeSoulNoticeDelta, SOUL_SCAN_PAGE } from "./watermark"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR: GitCommitAuthor = {
   agentId: "agent-soul-watermark-test",
@@ -18,7 +19,7 @@ const roots: string[] = []
 setDefaultTimeout(WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function fixture(): Promise<{
@@ -111,6 +112,25 @@ describe("consumeSoulNoticeDelta", () => {
     expect(notice).toBeUndefined()
     expect(await readWatermark(noticesDir)).toEqual(established)
   })
+
+  it("#given more in-band soul commits than one page above an older out-of-band one #when consumed #then that older commit is still the notice", async () => {
+    // given — the scan is bounded to a first page for speed; a page that is entirely memory-tool
+    // commits must still fall through to the older out-of-band commit underneath it, exactly as an
+    // unbounded scan did. PAGE + 2 in-band commits guarantees the first page holds none of it.
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
+    await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const soulSha = await commit(repo, "system/persona.md", "out of band\n", "reflection rewrote the persona")
+    for (let index = 0; index < SOUL_SCAN_PAGE + 2; index += 1) {
+      await commit(repo, "system/persona.md", `in-band ${index}\n`, `edit my soul ${index}\n\n${IN_BAND}`)
+    }
+
+    // when
+    const notice = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+
+    // then
+    expect(notice?.sha).toBe(soulSha)
+  }, 120_000)
 
   it("#given an out-of-band commit that touches only non-soul paths #when consumed #then no notice is emitted", async () => {
     // given

@@ -23,6 +23,7 @@ export interface FallbackArchitectNoticeDetails {
 const FRIENDLY_MODEL_NAMES: readonly (readonly [RegExp, string])[] = [
   [/kimi-k3/i, "Kimi K3 (max)"],
   [/claude-fable-5/i, "Fable 5"],
+  [/claude-opus-5[-.]5/i, "Opus 5.5"],
   [/claude-opus-5/i, "Opus 5"],
   [/glm-5/i, "GLM 5.2"],
 ]

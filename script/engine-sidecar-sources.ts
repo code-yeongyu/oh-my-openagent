@@ -4,14 +4,19 @@
 // next to the executable, mapped from the npm layout onto the flattened binary layout.
 
 import { createRequire } from "node:module"
-import { dirname, join, resolve } from "node:path"
-import { existsSync } from "node:fs"
+import { dirname, join, relative, resolve, sep } from "node:path"
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
 export const senpiPackageDir = join(repoRoot, "node_modules", "@code-yeongyu", "senpi")
-const senpiRequire = createRequire(join(senpiPackageDir, "package.json"))
+// Resolve from senpi's REAL path: bun's isolated store links senpi's dependencies beside that
+// path (`.bun/<key>/node_modules`), not beside the `node_modules/@code-yeongyu/senpi` symlink,
+// so a require rooted at the symlink finds nothing once senpi stops bundling its dependencies.
+const senpiRequire = createRequire(
+  join(existsSync(senpiPackageDir) ? realpathSync(senpiPackageDir) : senpiPackageDir, "package.json"),
+)
 
 export interface SidecarSource {
   /** Absolute source path (file or directory). */
@@ -45,6 +50,109 @@ function resolveFromSenpi(specifier: string): string | undefined {
 export function resolvePackageDir(packageName: string): string | undefined {
   const packageJsonPath = resolveFromSenpi(`${packageName}/package.json`)
   return packageJsonPath === undefined ? undefined : dirname(packageJsonPath)
+}
+
+function readPackageDependencies(packageDir: string): readonly string[] {
+  const manifest: unknown = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"))
+  if (typeof manifest !== "object" || manifest === null) {
+    throw new Error(`package manifest is not an object: ${join(packageDir, "package.json")}`)
+  }
+  const dependencies = Reflect.get(manifest, "dependencies")
+  if (dependencies === undefined) return []
+  if (typeof dependencies !== "object" || dependencies === null || Array.isArray(dependencies)) {
+    throw new Error(`package manifest dependencies are not an object: ${join(packageDir, "package.json")}`)
+  }
+  return Object.keys(dependencies).sort()
+}
+
+interface PackageIdentity {
+  readonly name: string
+  readonly version: string
+}
+
+function dependencyManifestPath(packageDir: string, dependencyName: string): string {
+  const packageRequire = createRequire(join(realpathSync(packageDir), "package.json"))
+  return packageRequire.resolve(`${dependencyName}/package.json`)
+}
+
+function readPackageIdentity(manifestPath: string): PackageIdentity {
+  const manifest: unknown = JSON.parse(readFileSync(manifestPath, "utf8"))
+  if (typeof manifest !== "object" || manifest === null) {
+    throw new Error(`package manifest is not an object: ${manifestPath}`)
+  }
+  const name = Reflect.get(manifest, "name")
+  const version = Reflect.get(manifest, "version")
+  if (typeof name !== "string" || typeof version !== "string") {
+    throw new Error(`package manifest has no string name and version: ${manifestPath}`)
+  }
+  return { name, version }
+}
+
+function resolveDependencyIdentity(
+  packageDir: string,
+  dependencyName: string,
+): PackageIdentity | undefined {
+  try {
+    return readPackageIdentity(dependencyManifestPath(packageDir, dependencyName))
+  } catch (error) {
+    if (isUnresolvable(error)) return undefined
+    throw error
+  }
+}
+
+function packageDependencySources(
+  packageDir: string,
+  targetRoot: string,
+  dependencyNames: readonly string[],
+  ancestors: ReadonlySet<string>,
+): SidecarSource[] {
+  const sources: SidecarSource[] = []
+  for (const dependencyName of dependencyNames) {
+    const dependencyManifest = dependencyManifestPath(packageDir, dependencyName)
+    const dependencyDir = dirname(dependencyManifest)
+    const realDependencyDir = realpathSync(dependencyDir)
+    if (ancestors.has(realDependencyDir)) continue
+    const dependencyTarget = `${targetRoot}/node_modules/${dependencyName}`
+    sources.push({ from: dependencyDir, to: dependencyTarget, required: true })
+    for (const entry of readdirSync(dependencyDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".wasm")) continue
+      const from = join(entry.parentPath, entry.name)
+      const assetPath = relative(dependencyDir, from).split(sep).join("/")
+      sources.push({ from, to: `${dependencyTarget}/${assetPath}`, required: true })
+    }
+    sources.push(...packageDependencySources(
+      dependencyDir,
+      dependencyTarget,
+      readPackageDependencies(dependencyDir),
+      new Set([...ancestors, realDependencyDir]),
+    ))
+  }
+  return sources
+}
+
+export function codemodeRuntimeDependencySources(
+  codemodeDir: string,
+  hostPackageDir = senpiPackageDir,
+): SidecarSource[] {
+  const hostDependencies = new Set(readPackageDependencies(hostPackageDir))
+  const externalDependencies = readPackageDependencies(codemodeDir)
+    .filter((dependencyName) => {
+      if (!hostDependencies.has(dependencyName)) return true
+      const codemodeIdentity = resolveDependencyIdentity(codemodeDir, dependencyName)
+      if (codemodeIdentity === undefined) {
+        throw new Error(`codemode dependency is not installed: ${dependencyName}`)
+      }
+      const hostIdentity = resolveDependencyIdentity(hostPackageDir, dependencyName)
+      if (hostIdentity === undefined) return true
+      return codemodeIdentity.name !== hostIdentity.name || codemodeIdentity.version !== hostIdentity.version
+    })
+  const targetRoot = "node_modules/@code-yeongyu/senpi-codemode"
+  return packageDependencySources(
+    codemodeDir,
+    targetRoot,
+    externalDependencies,
+    new Set([realpathSync(codemodeDir)]),
+  )
 }
 
 /**
@@ -86,6 +194,7 @@ export function engineSidecarSources(): SidecarSource[] {
     to: "node_modules/@code-yeongyu/senpi-codemode",
     required: true,
   })
+  sources.push(...codemodeRuntimeDependencySources(codemodeDir))
   const photonDir = resolvePackageDir("@silvia-odwyer/photon-node")
   if (photonDir === undefined) {
     throw new Error("@silvia-odwyer/photon-node is not installed under the senpi package")

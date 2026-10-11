@@ -1,18 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { describe, expect, test } from "bun:test"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
-import {
-  GitMemoryRepo,
-  buildIdentityPaths,
-  consumeSoulNoticeDelta,
-} from "@oh-my-opencode/memory-core"
+import { consumeSoulNoticeDelta } from "@oh-my-opencode/memory-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { createMemoryBinding } from "./binding"
-import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import {
   MEMORY_NUDGE_METADATA_TOKEN,
   MEMORY_PRESSURE_METADATA_TOKEN,
@@ -20,126 +13,21 @@ import {
   MEMORY_SOUL_METADATA_TOKEN,
   createMemoryPromptHandler,
 } from "./prompt"
+import {
+  IDENTITY,
+  fixture,
+  fixtureAtSystemTokens,
+  messageEntry,
+  customEntry,
+  compactionEntry,
+  liveBranch,
+  compactedBranch,
+  eventContext,
+  beforeAgentStart,
+  dispatchEvent,
+  boundHandler,
+} from "./prompt.test-support"
 import { MEMORY_PRESSURE_SOFT_RATIO } from "./status"
-import { realpathSync } from "node:fs"
-import { rmEfaultTolerant } from "./teardown.test-support"
-
-const IDENTITY = "prompt-agent"
-
-const tempDirs: string[] = []
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
-})
-
-class CountingRepo extends GitMemoryRepo {
-  headCalls = 0
-  lsTreeCalls = 0
-  showCalls = 0
-
-  override async head(): Promise<string | null> {
-    this.headCalls += 1
-    return super.head()
-  }
-
-  override async lsTree(revision?: string, path?: string): Promise<string[]> {
-    this.lsTreeCalls += 1
-    return super.lsTree(revision, path)
-  }
-
-  override async show(revision: string, path: string): Promise<string> {
-    this.showCalls += 1
-    return super.show(revision, path)
-  }
-
-  resetCounts(): void {
-    this.headCalls = 0
-    this.lsTreeCalls = 0
-    this.showCalls = 0
-  }
-}
-
-async function fixture(personaBody = "first"): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
-  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-prompt-")))
-  tempDirs.push(dir)
-  const repo = new CountingRepo({ dir: join(dir, "repo"), agentId: IDENTITY })
-  await repo.init({
-    seedFiles: [{ relativePath: "system/persona.md", content: `---\ndescription: Persona\n---\n${personaBody}\n` }],
-  })
-  repo.resetCounts()
-  const context = createMemoryIdentityContext({
-    identity: IDENTITY,
-    identityPaths: buildIdentityPaths(join(dir, "memory"), IDENTITY),
-    binding: createMemoryBinding({ identity: IDENTITY, repoPath: repo.dir, boundAt: 0 }),
-  })
-  return { repo, context }
-}
-
-async function fixtureAtSystemTokens(tokens: number): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
-  const header = "---\ndescription: Persona\n---\n"
-  return fixture("A".repeat(tokens * 4 - Buffer.byteLength(header, "utf8") - 1))
-}
-
-function messageEntry(id: string): Record<string, unknown> {
-  return { type: "message", id, message: { role: "user", content: [{ type: "text", text: `entry ${id}` }] } }
-}
-
-function customEntry(id: string): Record<string, unknown> {
-  return { type: "custom", id, customType: "omo-test:entry" }
-}
-
-function compactionEntry(id: string, firstKeptEntryId: string): Record<string, unknown> {
-  return {
-    type: "compaction",
-    id,
-    parentId: null,
-    timestamp: "2026-09-16T00:00:00.000Z",
-    summary: "summary",
-    firstKeptEntryId,
-    tokensBefore: 4_000,
-  }
-}
-
-/** A branch that never compacted: every one of its messages is still in the live context. */
-function liveBranch(messageCount: number): readonly unknown[] {
-  return Array.from({ length: messageCount }, (_, index) => messageEntry(`m${index + 1}`))
-}
-
-/** A branch whose latest compaction pushed exactly `compactedCount` messages out of the live context. */
-function compactedBranch(compactedCount: number): readonly unknown[] {
-  return [
-    ...Array.from({ length: compactedCount }, (_, index) => messageEntry(`old-${index + 1}`)),
-    compactionEntry("c1", "kept-1"),
-    messageEntry("kept-1"),
-    messageEntry("kept-2"),
-  ]
-}
-
-function eventContext(sessionId: string, branch: readonly unknown[]): unknown {
-  return {
-    sessionManager: {
-      getSessionId: () => sessionId,
-      getBranch: () => branch,
-    },
-  }
-}
-
-function beforeAgentStart(systemPrompt: string): unknown {
-  return { type: "before_agent_start", prompt: "hello", systemPrompt }
-}
-
-async function dispatchEvent(
-  pi: FakeExtensionAPI,
-  payload: unknown,
-  ctx: unknown,
-): Promise<BeforeAgentStartEventResult | undefined> {
-  const results = await pi.dispatch("before_agent_start", payload, ctx)
-  return results[0] as BeforeAgentStartEventResult | undefined
-}
-
-function boundHandler(repo: CountingRepo, context: MemoryIdentityContext) {
-  return createMemoryPromptHandler({ resolveContext: () => context, createRepo: () => repo })
-}
 
 describe("MEMORY_PROMPT_TEMPLATE", () => {
   test("#given the compiled-block cache key #when the template id is read #then it is the v3 stable template", () => {
@@ -353,6 +241,66 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.systemPrompt).toContain("A".repeat(1_000))
   }, 30_000)
 
+  test("#given a system file holding invalid UTF-8 #when the pressure line is compiled #then it counts what the model will be shown, not the stored blob size", async () => {
+    // given - the estimate stands in for what the compiled memory block costs the model, and the
+    // model is shown the DECODED text, where every invalid byte becomes one U+FFFD of three bytes.
+    // Counting git's stored blob size instead makes the advisory read low for exactly the files
+    // whose decoded form is largest.
+    const advisory = 30_000
+    const boundary = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * advisory)
+    const { repo, context } = await fixtureAtSystemTokens(boundary)
+    // 3 invalid bytes -> 9 decoded bytes, a 6-byte gap the stored size cannot see.
+    await writeFile(join(repo.dir, "system", "raw.md"), Buffer.from([0xff, 0xfe, 0x80]))
+    await repo.commitWrite(["system/raw.md"], "add raw", { agentId: IDENTITY, authorName: "Prompt Agent" })
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveCompileWarnTokens: () => advisory,
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))
+
+    // then - decoded is 9 bytes over the boundary's byte budget, stored is 3, and the estimate
+    // divides by 4: 24002 decoded against 24000 stored.
+    const pressureLines = result?.systemPrompt?.split("\n").filter((line) => line.includes(MEMORY_PRESSURE_METADATA_TOKEN)) ?? []
+    expect(pressureLines).toHaveLength(1)
+    expect(pressureLines[0]).toContain("24002/30000")
+  }, 30_000)
+
+  test("#given the estimate's own read fails #when the pressure line is compiled #then the failure surfaces instead of passing for no pressure", async () => {
+    // given - the block compiles from the first listing; only the estimate's own read fails, so this
+    // isolates the estimator from the compile path. Answering 0 here would report "no pressure" for a
+    // repository whose size is simply unknown, which silences the advisory exactly when it cannot be
+    // trusted, and an error is not the same answer as a genuine zero.
+    const advisory = 30_000
+    const { repo, context } = await fixtureAtSystemTokens(Math.floor(MEMORY_PRESSURE_SOFT_RATIO * advisory))
+    let listings = 0
+    const failingAfterCompile = new Proxy(repo, {
+      get(target, property) {
+        if (property === "lsTree") {
+          return (...args: [string?, string?]) => {
+            listings += 1
+            if (listings > 1) return Promise.reject(new Error("tree unreadable"))
+            return target.lsTree(...args)
+          }
+        }
+        const value = Reflect.get(target, property)
+        return typeof value === "function" ? value.bind(target) : value
+      },
+    }) as typeof repo
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => failingAfterCompile,
+      resolveCompileWarnTokens: () => advisory,
+    }))
+
+    // when / then
+    await expect(dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))).rejects.toThrow("tree unreadable")
+  }, 30_000)
+
   test("#given nudge state at the threshold #when before_agent_start compiles #then the late message carries the behavioral nudge token", async () => {
     // given
     const { repo, context } = await fixture()
@@ -371,6 +319,57 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.message?.content).toContain(MEMORY_NUDGE_METADATA_TOKEN)
     expect(result?.message?.content).toMatch(/- 2 user turns since/)
     expect(result?.message?.content).not.toContain("compacted out")
+  }, 30_000)
+
+  test("#given the nudge check times out in git #when before_agent_start compiles #then the turn proceeds with the memory block, no nudge, nothing thrown, and the failure is reported once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const failures: Array<{ input: string; sessionId: string; message: string }> = []
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async () => {
+        throw new Error("git log --fixed-strings --all-match timed out after 5000ms")
+      },
+      onNoticeInputFailed: (input, sessionId, error) => {
+        failures.push({ input, sessionId, message: error instanceof Error ? error.message : String(error) })
+      },
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    expect(result?.systemPrompt).toContain("BASE PROMPT")
+    // The compiled memory block (persona body "first") is still injected.
+    expect(result?.systemPrompt).toContain("first")
+    expect(result?.message?.content ?? "").not.toContain(MEMORY_NUDGE_METADATA_TOKEN)
+    expect(failures).toEqual([{ input: "nudge", sessionId: "session-1", message: "git log --fixed-strings --all-match timed out after 5000ms" }])
+  }, 30_000)
+
+  test("#given the soul notice read fails while the nudge works #when before_agent_start compiles #then the nudge still lands and only the soul notice is dropped", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const failed: string[] = []
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async () => 3,
+      resolveSoulNotice: async () => {
+        throw new Error("notice lock unreadable")
+      },
+      onNoticeInputFailed: (input) => failed.push(input),
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    expect(result?.message?.content).toContain(MEMORY_NUDGE_METADATA_TOKEN)
+    expect(result?.message?.content).not.toContain(MEMORY_SOUL_METADATA_TOKEN)
+    expect(failed).toEqual(["soul"])
   }, 30_000)
 
   test("#given a reflection soul notice #when before_agent_start compiles #then the late message carries the soul token and short sha", async () => {
@@ -463,26 +462,47 @@ describe("createMemoryPromptHandler", () => {
     expect(repo.showCalls).toBe(1)
   }, 30_000)
 
-  test("#given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content", async () => {
-    // given
+  test("#given pressure advisory enabled and an unchanged HEAD #when the handler runs twice #then the tree is listed and the system blobs are read once, not once per prompt", async () => {
+    // given — the production configuration: resolveCompileWarnTokens is wired (wiring-static.ts:85), so the
+    // pressure estimate runs on every prompt. The compiled block is HEAD-cached; the estimate must be too,
+    // or a 2.7k-commit identity pays lsTree + one show per system file on every Enter (measured: 45 git
+    // spawns between Enter and the provider request).
     const { repo, context } = await fixture()
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", boundHandler(repo, context))
-    const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
-    expect(repo.headCalls).toBe(1)
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveCompileWarnTokens: () => 30_000,
+    }))
 
     // when
-    await writeFile(join(repo.dir, "system/persona.md"), "---\ndescription: Persona\n---\nsecond\n")
-    await repo.commitWrite(["system/persona.md"], "update persona", { agentId: IDENTITY, authorName: "Prompt Agent" })
-    const headCallsAfterCommit = repo.headCalls
+    const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
+    const afterFirst = { lsTree: repo.lsTreeCalls, show: repo.showCalls }
     const second = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
 
+    // then — same bytes, and the second prompt added no tree listing and no blob reads
+    expect(second?.systemPrompt).toBe(first?.systemPrompt)
+    expect({ lsTree: repo.lsTreeCalls - afterFirst.lsTree, show: repo.showCalls - afterFirst.show }).toEqual({ lsTree: 0, show: 0 })
+  }, 30_000)
+
+  test("#given a configured per-directory limit #when before_agent_start compiles #then the projection shows that many names and counts the rest", async () => {
+    // given
+    const { repo, context } = await fixture()
+    for (const name of ["a", "b", "c"]) await writeFile(join(repo.dir, `note-${name}.md`), `---\ndescription: ${name}\n---\nx\n`)
+    await repo.commitWrite(["note-a.md", "note-b.md", "note-c.md"], "notes", { agentId: IDENTITY, authorName: "t" })
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveProjectionLimits: () => ({ maxEntriesPerDirectory: 1, maxBytes: 0 }),
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
     // then
-    expect(first?.systemPrompt).toContain("first")
-    expect(first?.systemPrompt).not.toContain("second")
-    expect(second?.systemPrompt).toContain("second")
-    expect(repo.headCalls - headCallsAfterCommit).toBe(1)
-    expect(repo.lsTreeCalls).toBe(2)
+    const line = result?.systemPrompt?.split("\n").find((candidate) => candidate.startsWith("$MEMORY_DIR/: "))
+    expect(line).toBe("$MEMORY_DIR/: note-a.md (+2 more; read $MEMORY_DIR/ to list)")
   }, 30_000)
 
   test("#given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated", async () => {

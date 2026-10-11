@@ -213,6 +213,17 @@ describe("worker senpi prefix args", () => {
     expect(prepared.args.indexOf("--fork")).toBeGreaterThan(prepared.args.indexOf("-p"))
   })
 
+  test("#given an extension-routed candidate #when the quick and fork spawns are prepared #then only the quick child turns omo off", async () => {
+    const base = await root()
+    const input = { ...reflectionInput(base), loadExtensions: true }
+
+    const quick = await prepareReflectionSpawn(input)
+    const fork = await prepareReflectionForkSpawn({ ...input, parentSessionFile: join(base, "parent.jsonl") })
+
+    expect({ quickNoExtensions: quick.args.includes("--no-extensions"), quickOmo: quick.env.OMO_SENPI_DISABLED, forkOmo: fork.env.OMO_SENPI_DISABLED })
+      .toEqual({ quickNoExtensions: false, quickOmo: "1", forkOmo: undefined })
+  })
+
   test("#given runner-style senpiPrefixArgs #when prepareReflectionCandidateSpawn builds the spawn #then the prefix is forwarded onto args", async () => {
     const base = await root()
     const prepared = await prepareReflectionCandidateSpawn({

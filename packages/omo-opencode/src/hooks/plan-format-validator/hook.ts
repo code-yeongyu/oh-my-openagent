@@ -3,7 +3,7 @@ import { resolve } from "node:path"
 
 import type { PluginInput } from "@opencode-ai/plugin"
 
-import { getPlanProgress } from "../../features/boulder-state/storage"
+import { getPlanProgress, isStructuredTaskRow } from "../../features/boulder-state/storage"
 import { log } from "../../shared/logger"
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "write", "edit"])
@@ -11,9 +11,7 @@ const WRITE_TOOLS = new Set(["Write", "Edit", "write", "edit"])
 const SECTION_BOUNDARY_HEADING = /^#{1,2}(?:[ \t]+|$)/
 const HEADING_TODOS = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
 const HEADING_FINAL_WAVE = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
-const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX]?\]/
-const TODO_TASK = /^- \[[ xX]\] [1-9]\d*\. .+$/
-const FINAL_WAVE_TASK = /^- \[[ xX]\] F[1-9]\d*\. .+$/i
+const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX~]?\]/
 const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
 
 /**
@@ -159,8 +157,7 @@ function analyzeStructuredSections(content: string): PlanFormatStats {
     if (section === null || !TOPLEVEL_CHECKBOX.test(line)) continue
 
     section.stats.rawCount += 1
-    const validPattern = section.name === "todo" ? TODO_TASK : FINAL_WAVE_TASK
-    if (validPattern.test(line)) section.stats.validCount += 1
+    if (isStructuredTaskRow(line, section.name)) section.stats.validCount += 1
   }
 
   return {
@@ -208,7 +205,7 @@ function buildWarning(rawCount: number, parsedCount: number, hasEmptySection: bo
       "Those sections will contribute no tasks to `/ulw-execute` progress.",
       "",
       "**Fix**: Every task checkbox under `## TODOs` MUST start with a bare number",
-      "followed by dot + space: `1.`, `2.`, `3.` — NOT `T1.`, `Phase 1:`, `Task-1.` etc.",
+      "followed by dot + space: `1.`, `2.`, `3.` — NOT `Phase 1:`, `Task-1.` etc.",
       "Every Final Verification Wave checkbox MUST start with `F` + number:",
       "`F1.`, `F2.` — NOT `T-F1.`, `F-1.`, `Final-1.` etc.",
       "</plan-format-warning>",
@@ -223,7 +220,7 @@ function buildWarning(rawCount: number, parsedCount: number, hasEmptySection: bo
     `\`/ulw-execute\` will show \"Progress: ${parsedCount} tasks\" — missing ${skipped} task(s).`,
     "",
     "**Fix**: Ensure every skipped task checkbox uses bare-number format:",
-    "  `## TODOs` → `1.`, `2.`, `3.` (NOT `T1.`, `Phase 1:`, `Task-1.`)",
+    "  `## TODOs` → `1.`, `2.`, `3.` (NOT `Phase 1:`, `Task-1.`)",
     "  `## Final Verification Wave` → `F1.`, `F2.`, `F3.` (NOT `T-F1.`, `F-1.`, `Final-1.`)",
     "</plan-format-warning>",
   ].join("\n")

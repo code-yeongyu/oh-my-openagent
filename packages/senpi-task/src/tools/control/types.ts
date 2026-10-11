@@ -53,8 +53,10 @@ export type SendResultDetails =
     }
 
 export type CancelResultDetails =
-  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly status: TaskStatus }
+  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly status: TaskStatus; readonly undelivered_messages?: number }
+  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string; readonly undelivered_messages?: number }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
+  | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus; readonly undelivered_messages?: number }
   | { readonly kind: "not_found"; readonly reason: string }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
 

@@ -22,6 +22,18 @@ import { livenessDetails } from "../../../../omo-senpi/src/components/task/membe
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { runTaskSend } from "../../tools/control/send"
 import type { ColdReviveTrace } from "./cold-revive-trace"
+import { NO_HOST_ENDPOINT } from "../host-session"
+
+// A source-graph Bun child started in a sandbox writes Bun's runtime transpiler cache into a cold
+// location. On Windows those writes block the child for seconds (measured: 13-14 s with ~2.4 s CPU, 2 of 20
+// cold launches), which is what stalled the first member launch (#9029). With the cache off it imports the
+// same graph in 1.2-1.7 s and never blocks (27 of 27 launches).
+const NO_TRANSPILER_CACHE = { BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" } as const
+
+// The daemon-hosted variant of this fixture: same real manager/lifecycle/steering, child on a
+// session of a (fake) daemon instead of its own process. It lives in its own module for the file
+// size ceiling and is re-exported here so both cold revivals are reached through one fixture name.
+export { realColdReviveHostSession, type HostColdReviveResult } from "./real-cold-revive-host"
 
 const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }
 const modelDefinition = { id: "fixture", name: "fixture", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 100000, maxTokens: 1000 } as const
@@ -37,10 +49,12 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
   const requestStarted = Promise.withResolvers<string>()
   const releaseResponse = Promise.withResolvers<void>()
   let calls = 0
+  const providerRequests: string[] = []
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async (request) => {
     calls += 1
     trace?.mark("provider_request", { call: calls })
     const body = await request.text()
+    providerRequests.push(body)
     requestStarted.resolve(body)
     await releaseResponse.promise
     const chunk = { id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta: { content: misleading ? "" : "RESUMED_SENTINEL" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }
@@ -98,7 +112,7 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
   const childTrace = fileURLToPath(new URL("./cold-revive-child-trace.ts", import.meta.url))
   writeFileSync(extension, `${trace === undefined ? "" : `import { markChildStage } from ${JSON.stringify(childTrace)};`} export default function(pi) { pi.registerProvider("omp-fixture", ${JSON.stringify(provider)}); ${trace === undefined ? "" : 'markChildStage("provider_registered"); pi.on("session_start", () => markChildStage("session_start"));'} }`)
   const trustedRespawnLaunch = options.team ? await coldReviveTeam(store, config, record.task_id) : undefined
-  const rpc = new RpcProcessRunner({ ...(trace === undefined ? {} : { spawnProcess: trace.spawnProcess }), modelAdmission: async () => undefined, buildSpawn: (input) => ({ command: process.execPath, args: [...(trace === undefined ? [] : ["--preload", childTrace]), fileURLToPath(import.meta.resolve("@code-yeongyu/senpi/rpc-entry")), "--no-extensions", "--no-skills", "--extension", extension, ...(input.extensions ?? []).flatMap((path) => ["--extension", path]), "--model", "omp-fixture/fixture"], cwd: input.cwd, env: { PATH: process.env.PATH, HOME: root, SENPI_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_TASK_RPC_CHILD: "1", ...input.memberEnv } }) })
+  const rpc = new RpcProcessRunner({ ...(trace === undefined ? {} : { spawnProcess: trace.spawnProcess }), modelAdmission: async () => undefined, buildSpawn: (input) => ({ command: process.execPath, args: [...(trace === undefined ? [] : ["--preload", childTrace]), fileURLToPath(import.meta.resolve("@code-yeongyu/senpi/rpc-entry")), "--no-extensions", "--no-skills", "--extension", extension, ...(input.extensions ?? []).flatMap((path) => ["--extension", path]), "--model", "omp-fixture/fixture"], cwd: input.cwd, env: { PATH: process.env.PATH, HOME: root, ...NO_TRANSPILER_CACHE, SENPI_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_TASK_RPC_CHILD: "1", ...input.memberEnv } }) })
   let now = 1000
   let cadenceMs = 0
   let unrefs = 0
@@ -108,7 +122,7 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     planner: () => { throw new Error("cold revival must not replan") },
     destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
   })
-  const lifecycle = createTaskLifecycle({ store, config, registry: createManagerResidencyRegistry(() => manager), now: () => now,
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, registry: createManagerResidencyRegistry(() => manager), now: () => now,
     idleReclaimerScheduler: { setInterval: (callback, ms) => { tick = callback; cadenceMs = ms; return { unref: () => { unrefs += 1 } } }, clearInterval: () => undefined },
   })
   try {
@@ -179,14 +193,26 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     const pending = [{ id: "pending-ttl", message: "PENDING_SENTINEL", deliver_as: "steer" as const }]
     store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: pending }))
     now += 7
-    assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [])
+    // A finished child's durable queue no longer pins its slot (#9861): idle reclaim parks it, and the
+    // queue stays on the record to be delivered first when the revive below brings it back.
+    assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [record.task_id])
+    assert.notEqual(store.load(record.task_id)?.residency_state, "resident")
     assert.deepEqual(store.load(record.task_id)?.pending_steering, pending)
     // A further revive can acquire at cap=1, proving the previous terminal released its lease.
     trace?.mark("lease_probe_requested")
     const leaseProbe = await runTaskSend(manager, { to: record.task_id, message: "LEASE_PROBE" }, "fixture-parent")
     assert.equal(leaseProbe.details.kind, "revived")
     await manager.waitFor(record.task_id, { signal: AbortSignal.timeout(15000) })
-    return { cadenceMs, unrefs, transitions, parked, earlyParkAfterSend, memberExtensionRestored, messageCount, pendingSteeringPreserved: true, outputReadable: true, mode, source: "real-manager/task_send/AgentSession", result: result.details, status: completed.status, run_epoch: completed.notification.run_epoch, restoredTools: toolSurfaces, transcriptPreserved: readFileSync(sessionPath, "utf8").includes("TRANSCRIPT_SENTINEL"), transcriptBeforeBytes: before.length, leaseReleased: leaseProbe.details.kind === "revived", providerCalls: calls, isolatedAgentDir: agentDir }
+    assert.equal(calls, 2)
+    const queuedRequest = providerRequests[1]
+    assert(queuedRequest !== undefined)
+    const revivedRecord = store.load(record.task_id)
+    assert(revivedRecord)
+    const pendingIndex = queuedRequest.indexOf("PENDING_SENTINEL")
+    const pendingSteeringPreserved = pendingIndex >= 0 && pendingIndex < queuedRequest.indexOf("LEASE_PROBE")
+      && revivedRecord.pending_steering === undefined
+    assert(pendingSteeringPreserved, "revival must deliver the parked queue before the new message and clear it")
+    return { cadenceMs, unrefs, transitions, parked, earlyParkAfterSend, memberExtensionRestored, messageCount, pendingSteeringPreserved, outputReadable: true, mode, source: "real-manager/task_send/AgentSession", result: result.details, status: completed.status, run_epoch: completed.notification.run_epoch, restoredTools: toolSurfaces, transcriptPreserved: readFileSync(sessionPath, "utf8").includes("TRANSCRIPT_SENTINEL"), transcriptBeforeBytes: before.length, leaseReleased: leaseProbe.details.kind === "revived", providerCalls: calls, isolatedAgentDir: agentDir }
   } catch (error) {
     throw trace === undefined ? error : trace.failure("Cold revival failed", error)
   } finally {

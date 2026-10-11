@@ -34,6 +34,8 @@ Verified against `codex-cli 0.140.0` (node, jq, tmux, bun on macOS). Confirm wit
   [references/app-server.md](references/app-server.md).
 - **The captured JSON / pane IS the evidence** — write it under
   `.omo/evidence/<YYYYMMDD>-<slug>/` (no evidence file == the QA did not happen).
+  That directory is gitignored: the files stay local, the PR body carries the
+  summary and decisive excerpts, and nothing under it is ever committed.
 
 ## Setup
 

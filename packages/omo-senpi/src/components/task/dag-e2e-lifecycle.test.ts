@@ -27,6 +27,7 @@ import type {
 } from "./dag-rpc-handlers"
 import { runDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./engine"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
@@ -240,6 +241,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   const widgetCalls: Array<string[] | undefined> = []
   engine.runtime.captureFrom({
     mode: "tui",
+    modelRegistry: createTeamServiceTestModelRegistry(),
     ui: fakeUi(widgetCalls),
     sessionManager: { getSessionId: () => options.sessionId ?? sessionId, getSessionFile: () => options.sessionFile },
     isIdle: () => options.idle ?? false,

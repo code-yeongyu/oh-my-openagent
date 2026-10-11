@@ -6,6 +6,7 @@ import {
   resolveOmoTaskSettings,
   type OmoTaskSettings,
 } from "./task"
+import { OmoConfigSchema } from "./config"
 
 // 0 is the unbounded sentinel for the concurrency/residency caps: the engine already maps it to
 // Infinity (TaskConcurrency.getLimit) and to "admit every child" (residency admission), so the
@@ -73,8 +74,9 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
     expect(parsed.residency_max_children).toBe(0)
   })
 
-  test("#given parallelism 14 #when settings resolve without a residency override #then the bounded default resolves to 16", () => {
-    expect(resolveOmoTaskSettings({}, () => 14).residency_max_children).toBe(16)
+  test("#given any parallelism #when settings resolve without a residency override #then residency is unlimited", () => {
+    expect(resolveOmoTaskSettings({}, () => 14).residency_max_children).toBe("unlimited")
+    expect(resolveOmoTaskSettings({}, () => 2).residency_max_children).toBe("unlimited")
   })
 
   test("#given an explicit zero residency cap #when settings resolve #then the parallelism default never overrides it", () => {
@@ -141,6 +143,35 @@ describe("OmoTaskSettingsSchema resident idle timeout", () => {
     for (const value of [0, -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, "37", "unlimited", null]) {
       expect(OmoTaskSettingsSchema.safeParse({ resident_idle_timeout_ms: value }).success).toBe(false)
       expect(OmoTaskSettingsLayerSchema.safeParse({ resident_idle_timeout_ms: value }).success).toBe(false)
+    }
+  })
+})
+
+describe("OmoTaskSettingsSchema host shard prewarm", () => {
+  test("#given no prewarm override #when task settings parse #then the session's host warms on its first turn", () => {
+    expect(OmoTaskSettingsSchema.parse({}).host_shard_prewarm).toBe("first-turn")
+    expect(OmoTaskSettingsSchema.parse({ host_shard_prewarm: "off" }).host_shard_prewarm).toBe("off")
+    expect(OmoTaskSettingsLayerSchema.parse({})).not.toHaveProperty("host_shard_prewarm")
+  })
+
+  test("#given first-turn prewarm #when task settings parse #then the value is preserved", () => {
+    expect(OmoTaskSettingsSchema.parse({ host_shard_prewarm: "first-turn" }).host_shard_prewarm).toBe("first-turn")
+    expect(OmoTaskSettingsLayerSchema.parse({ host_shard_prewarm: "session-start" })).toEqual({
+      host_shard_prewarm: "session-start",
+    })
+  })
+
+  test("#given invalid prewarm or sharding keys #when task settings parse #then the dotted paths are rejected", () => {
+    const invalidPrewarm = OmoConfigSchema.safeParse({ task: { host_shard_prewarm: "always" } })
+    const invalidSharding = OmoConfigSchema.safeParse({ task: { host_sharding: "off" } })
+
+    expect(invalidPrewarm.success).toBe(false)
+    expect(invalidSharding.success).toBe(false)
+    if (!invalidPrewarm.success && !invalidSharding.success) {
+      expect(invalidPrewarm.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("host_shard_prewarm")
+      expect(invalidSharding.error.issues.map((issue) => `${issue.path.join(".")}:${issue.message}`).join(",")).toContain(
+        "host_sharding",
+      )
     }
   })
 })
@@ -355,3 +386,100 @@ describe("OmoTaskSettingsLayerSchema dag block", () => {
     expect(issue !== undefined && issue.code === "unrecognized_keys" ? issue.keys : []).toEqual(["nope"])
   })
 })
+
+// The shared-daemon knobs (plan senpi-task-daemon-host-runner-v2, todo 34). `process_runner`
+// selects the host-session runner over the per-child one, `host_engine_policy` says how an engine
+// difference on the running daemon is resolved, and `default_execution_mode: "auto"` defers the
+// in-process/process choice to the daemon capability check made once per parent session.
+describe("OmoTaskSettingsSchema shared-daemon keys", () => {
+  test("#given no task block #when task settings parse #then the daemon defaults are host, upgrade and auto", () => {
+    // given / when
+    const parsed = OmoTaskSettingsSchema.parse({})
+
+    // then
+    expect(parsed.process_runner).toBe("host")
+    expect(parsed.host_engine_policy).toBe("upgrade")
+    expect(parsed.default_execution_mode).toBe("auto")
+    expect(parsed.host_idle_exit_ms).toBeUndefined()
+  })
+
+  test("#given every daemon key set #when task settings parse #then the explicit values survive", () => {
+    // given
+    const input = {
+      process_runner: "child-process",
+      host_engine_policy: "fallback",
+      host_idle_exit_ms: 60000,
+      default_execution_mode: "in-process",
+    }
+
+    // when
+    const parsed = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.process_runner).toBe("child-process")
+    expect(parsed.host_engine_policy).toBe("fallback")
+    expect(parsed.host_idle_exit_ms).toBe(60000)
+    expect(parsed.default_execution_mode).toBe("in-process")
+  })
+
+  test("#given process_runner 'daemon' #when task settings parse #then it is rejected naming the two accepted values", () => {
+    // given / when
+    const result = OmoTaskSettingsSchema.safeParse({ process_runner: "daemon" })
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected process_runner 'daemon' to fail")
+    const issue = result.error.issues.find((candidate) => candidate.path.join(".") === "process_runner")
+    expect(issue?.code).toBe("invalid_value")
+    expect(JSON.stringify(issue?.message ?? "")).toContain("host")
+    expect(JSON.stringify(issue?.message ?? "")).toContain("child-process")
+  })
+
+  test("#given a host_socket key #when task settings parse #then the strict schema rejects it as unknown", () => {
+    // given / when
+    const result = OmoTaskSettingsSchema.safeParse({ host_socket: "/tmp/rpc.sock" })
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected host_socket to be rejected")
+    const issue = result.error.issues.find((candidate) => candidate.code === "unrecognized_keys")
+    expect(issue !== undefined && issue.code === "unrecognized_keys" ? issue.keys : []).toEqual(["host_socket"])
+  })
+
+  test("#given a non-positive idle exit #when task settings parse #then it is rejected", () => {
+    expect(OmoTaskSettingsSchema.safeParse({ host_idle_exit_ms: 0 }).success).toBe(false)
+    expect(OmoTaskSettingsSchema.safeParse({ host_idle_exit_ms: 1.5 }).success).toBe(false)
+  })
+
+  test("#given a daemon layer #when the layer parses #then the keys pass through with no defaults injected", () => {
+    // given / when
+    const parsed = OmoTaskSettingsLayerSchema.parse({ process_runner: "host", default_execution_mode: "auto" })
+
+    // then
+    expect(parsed.process_runner).toBe("host")
+    expect(parsed.default_execution_mode).toBe("auto")
+    expect(parsed).not.toHaveProperty("host_engine_policy")
+  })
+
+  test("#given the generated json schema #when the daemon keys are looked up #then auto and the runner enum are published", async () => {
+    // given
+    const schema: unknown = JSON.parse(await Bun.file("assets/omo.schema.json").text())
+
+    // when
+    const task = taskProperties(schema)
+
+    // then
+    expect(task["process_runner"]).toMatchObject({ enum: ["host", "child-process"], default: "host" })
+    expect(task["host_engine_policy"]).toMatchObject({ enum: ["upgrade", "fallback"], default: "upgrade" })
+    expect(task["default_execution_mode"]).toMatchObject({ enum: ["auto", "in-process", "process"], default: "auto" })
+    expect(task["host_idle_exit_ms"]).toBeDefined()
+  })
+})
+
+function taskProperties(schema: unknown): Record<string, unknown> {
+  const definitions = (schema as { $defs?: Record<string, unknown>; properties?: Record<string, unknown> })
+  const task = definitions.properties?.["task"]
+  const properties = (task as { properties?: Record<string, unknown> } | undefined)?.properties
+  if (properties === undefined) throw new Error("assets/omo.schema.json has no task properties block")
+  return properties
+}

@@ -2,7 +2,17 @@ import { Type, type Static } from "typebox"
 
 import { TASK_SUMMARY_MAX_LENGTH } from "../../task-summary"
 
-export const MAX_TASK_BATCH_ITEMS = 16
+const isolationParams = {
+  isolated: Type.Optional(Type.Boolean({
+    description: "Run the child in a copy-on-write clone of the checkout and merge its changes back on completion; defaults to task.isolation.enabled.",
+  })),
+  apply: Type.Optional(Type.Boolean({
+    description: "Merge the child's changes into this checkout when it completes; false keeps the patch/branch artifacts only.",
+  })),
+  merge: Type.Optional(Type.Union([Type.Literal("patch"), Type.Literal("branch")], {
+    description: "Merge strategy for an isolated child; defaults to task.isolation.merge.",
+  })),
+}
 
 export const TaskToolParams = Type.Object({
   prompt: Type.Optional(
@@ -26,6 +36,7 @@ export const TaskToolParams = Type.Object({
   run_in_background: Type.Optional(
     Type.Boolean({ description: "true (the standard spawn) returns the task id now and delivers the child's result later as a message; false blocks this turn until the child finishes. Omitted counts as false." }),
   ),
+  ...isolationParams,
   name: Type.Optional(Type.String({ description: "Optional stable name for this task within the current session; must be unique within the session." })),
   model: Type.Optional(Type.String({ description: "Explicit model override, e.g. anthropic/claude-opus-4. Only valid with subagent_type; mutually exclusive with category — category-routed tasks take their model from omo.json (categories.<name>.models)." })),
   load_skills: Type.Optional(
@@ -49,6 +60,7 @@ export const TaskToolParams = Type.Object({
           }),
         ),
         description: Type.Optional(Type.String({ description: "Short human label for this task." })),
+        ...isolationParams,
         category: Type.Optional(Type.String({ description: "Category name for this task." })),
         subagent_type: Type.Optional(Type.String({ description: "Direct agent name for this task. Must name an agent, never a category." })),
         name: Type.Optional(Type.String({ description: "Optional stable name for this task." })),
@@ -61,8 +73,7 @@ export const TaskToolParams = Type.Object({
         ),
       }),
       {
-        maxItems: MAX_TASK_BATCH_ITEMS,
-        description: "Batch of up to 16 child tasks to spawn in one call. Empty provider padding is normalized before validation. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them. An item whose effective target is a category must not carry a model (own or inherited). run_in_background is batch-wide: set it once at the top level; item-level copies must agree.",
+        description: "Batch of child tasks to spawn in one call. Empty provider padding is normalized before validation. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them. An item whose effective target is a category must not carry a model (own or inherited). run_in_background is batch-wide: set it once at the top level; item-level copies must agree.",
       },
     ),
   ),

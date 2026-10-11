@@ -42,6 +42,23 @@ describe("resolveVariant", () => {
     expect(resolveVariant({ modelID: "kimi-k2-6", variants: orderedVariants })).toBe("kimi")
   })
 
+  test("#given Kimi K2.8 and the Kimi Code rolling ids #then they share the kimi-k2-7 variant", () => {
+    const orderedVariants = {
+      "kimi-k2-7": promptSource("/prompts/kimi-k2-7"),
+      kimi: promptSource("/prompts/kimi"),
+      default: promptSource("/prompts/default"),
+    } satisfies VariantTable
+
+    expect(resolveVariant({ modelID: "kimi-k2.8", variants: orderedVariants })).toBe("kimi-k2-7")
+    expect(resolveVariant({ modelID: "kimi-for-coding/k2p8", variants: orderedVariants })).toBe("kimi-k2-7")
+    expect(resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding", variants: orderedVariants })).toBe(
+      "kimi-k2-7",
+    )
+    expect(
+      resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding-highspeed", variants: orderedVariants }),
+    ).toBe("kimi-k2-7")
+  })
+
   test("#given a kimi-k3 variant ordered before kimi #then K3 wins and K2.x stays on its own variants", () => {
     const orderedVariants = {
       "kimi-k3": promptSource("/prompts/kimi-k3"),

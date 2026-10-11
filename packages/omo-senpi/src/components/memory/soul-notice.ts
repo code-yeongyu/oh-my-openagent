@@ -29,7 +29,7 @@ export const renderSoulUpdatedEntry: EntryRenderer<SoulUpdatedRecord> = (entry, 
   return noticeComponent(
     {
       glyph: "●",
-      title: joinFields(["Memory soul updated", sha.slice(0, 7)]),
+      title: joinFields(["Remembered", "about myself"]),
       tone: "accent",
       why: soulWhy(paths),
       extra: paths.map((path) => ({ text: path, tone: "dim" as const })),

@@ -27,8 +27,8 @@ type GitMasterSettingKey = keyof OmoGitMasterSettings
 type GitMasterSettingPath = `git_master.${GitMasterSettingKey}`
 
 export const GIT_MASTER_HARNESS_SUPPORT: Record<GitMasterSettingPath, readonly OmoHarnessId[]> = {
-  "git_master.commit_footer": ["senpi"],
-  "git_master.include_co_authored_by": ["senpi"],
+  "git_master.commit_footer": ["native"],
+  "git_master.include_co_authored_by": ["native"],
 } as const
 
 /** Resolve the effective git-master attribution settings, applying defaults when the section is absent. */

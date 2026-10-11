@@ -94,15 +94,15 @@ describe("memory run supervisor IC-8 containment", () => {
     expect(existsSync(runDir)).toBe(false)
   })
 
-  test("#given taskkill returns nonzero #when a Windows process group is terminated #then cleanup fails closed", () => {
-    expect(() =>
+  test("#given taskkill returns nonzero #when a Windows process group is terminated #then cleanup fails closed", async () => {
+    await expect(
       terminateProcessGroup(123, {
         platform: "win32",
-        runTaskkill: () => ({ status: 1 }),
+        runTaskkill: async () => ({ status: 1 }),
         killGroup: () => {},
         probeGroup: () => {},
       }),
-    ).toThrow("taskkill failed with exit code 1")
+    ).rejects.toThrow("taskkill failed with exit code 1")
   })
 
   test("#given injected Windows and a child that exits during grace #when the hard deadline arrives #then the supervisor cancels forced taskkill", async () => {

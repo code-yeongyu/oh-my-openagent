@@ -3,6 +3,8 @@ import type { TaskRecord } from "../../state"
 import type { TaskToolContext } from "./types"
 
 const PROMPT_CACHE_SAFE_WAIT_ENV = "PI_PROMPT_CACHE_SAFE_WAIT_SECONDS"
+// A 15-minute bound on how long a parent turn blocks on a foreground task, whatever the cache TTL allows.
+export const MAX_FOREGROUND_WAIT_SECONDS = 900
 
 export type ScheduleDeadline = (callback: () => void, delayMs: number) => () => void
 
@@ -42,7 +44,9 @@ export function resolvePromptCacheSafeWaitSeconds(
 }
 
 export async function waitForForegroundTask(input: ForegroundWaitInput): Promise<ForegroundWaitResult> {
-  const budgetSeconds = resolvePromptCacheSafeWaitSeconds(input.ctx, input.env ?? process.env)
+  const cacheSafeSeconds = resolvePromptCacheSafeWaitSeconds(input.ctx, input.env ?? process.env)
+  const budgetSeconds =
+    cacheSafeSeconds === undefined ? undefined : Math.min(cacheSafeSeconds, MAX_FOREGROUND_WAIT_SECONDS)
   const waiting = input.manager
     .waitFor(input.taskId, { signal: input.signal })
     .then((record): ForegroundWaitResult => ({ kind: "completed", record }))

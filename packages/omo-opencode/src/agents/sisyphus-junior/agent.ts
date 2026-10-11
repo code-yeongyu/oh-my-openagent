@@ -16,7 +16,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel, isGeminiModel, isKimiK2Model, isKimiK27Model, isKimiK3Model, buildClaudeThinkingConfig } from "../types"
+import { isGlmModel, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel, isGeminiModel, isKimiK2CodeModel, isKimiK2Model, isKimiK3Model, buildClaudeThinkingConfig } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -58,7 +58,7 @@ export type SisyphusJuniorPromptSource =
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
   if (model && isKimiK3Model(model)) return "kimi-k3"
-  if (model && isKimiK27Model(model)) return "kimi-k2-7"
+  if (model && isKimiK2CodeModel(model)) return "kimi-k2-7"
   if (model && isKimiK2Model(model)) return "kimi-k2"
   if (model && isGptModel(model)) {
     if (isGpt5_5Model(model) || isGpt5_6Model(model) || isGpt6Model(model)) return "gpt-5-5"

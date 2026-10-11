@@ -2,15 +2,18 @@ import * as z from "zod"
 
 import { OmoAgentsConfigSchema } from "./agent"
 import { OmoCategoriesConfigSchema } from "./category"
+import { OmoComputerSettingsLayerSchema, OmoComputerSettingsSchema } from "./computer"
 import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./git-master"
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
 import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catalog"
 import { OmoModelProfilesLayerSchema, OmoModelProfilesSchema } from "./model-profile"
+import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./side-panel"
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
+import { OmoGatewaySectionSchema } from "./gateway"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -25,6 +28,7 @@ export const OmoDisabledSkillsSchema = z.array(z.string())
 
 export const OmoTypedHarnessConfigSchema = z.object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewaySectionSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -35,6 +39,8 @@ export const OmoTypedHarnessConfigSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
 }).strict()
 
@@ -50,14 +56,18 @@ export const OmoConfigProfileSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
 }).strict()
 
 export const OmoConfigSchema = z.object({
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
+  gateway: OmoGatewaySectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -69,8 +79,11 @@ export const OmoConfigSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  side_panel: OmoSidePanelSettingsSchema.optional(),
+  computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
   profiles: z.record(z.string(), OmoConfigProfileSchema).default({}),
@@ -80,6 +93,7 @@ export const OmoConfigSchema = z.object({
 
 export const OmoConfigLayerSchema = z.object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewaySectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -91,8 +105,11 @@ export const OmoConfigLayerSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
   profiles: z.record(z.string(), OmoConfigProfileSchema).optional(),

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile } from "node:fs/promises"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -10,6 +10,7 @@ import { MAX_DESCRIPTION_LENGTH } from "../memfs/frontmatter-validation"
 import { runMemoryApplyPatch } from "./memory-apply-patch"
 import { runMemoryTool, type MemoryToolLock, type MemoryToolParams } from "./memory"
 import { MemoryToolError } from "./tool-errors"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR: GitCommitAuthor = {
   agentId: "agent-description-rules",
@@ -20,7 +21,7 @@ const LEAKED = 'STANDING RULE: verify identity</description> <parameter name="fi
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 10000)
@@ -60,6 +61,48 @@ describe("memory tool description rules", () => {
     await expect(attempt).rejects.toBeInstanceOf(MemoryToolError)
     await expect(attempt).rejects.toThrow(/create: .*<\/description>.*malformed/s)
     expect(await setup.repo.head()).toBe(head)
+  })
+
+  it("#given a create whose file_text leaked into description #when it runs #then the intended description and body are written and the model is told", async () => {
+    // #given
+    const setup = await fixture()
+    const body = `# Deploy notes\n\n${"- a line of the note\n".repeat(120)}`
+    const description = `One-line summary of the note</description>\n<parameter name="file_text">${body}`
+
+    // #when
+    const result = await run(setup, { command: "create", reason: "leaked", file_path: "reference/deploy.md", description })
+
+    // #then
+    const written = parseMemoryFile(await readFile(join(setup.repo.dir, "reference/deploy.md"), "utf8"))
+    expect(written.frontmatter.description).toBe("One-line summary of the note")
+    expect(written.body).toContain("# Deploy notes")
+    expect(written.body).not.toContain("<parameter")
+    expect(result.commit?.affectedPaths).toEqual(["reference/deploy.md"])
+    expect(result.message).toContain("'file_text' arrived inside 'description'")
+  })
+
+  it("#given a leaked body over the length limit while file_text was also sent #when create runs #then the scaffolding is named, not the length", async () => {
+    // #given
+    const setup = await fixture()
+    const description = `Summary</description>\n<parameter name="file_text">${"x".repeat(MAX_DESCRIPTION_LENGTH * 3)}`
+
+    // #when
+    const attempt = run(setup, { command: "create", reason: "ambiguous", file_path: "reference/a.md", description, file_text: "other body" })
+
+    // #then
+    await expect(attempt).rejects.toThrow(/create: 'description' contains tool-call scaffolding/)
+  })
+
+  it("#given scaffolding naming an argument the memory tool does not have #when create runs #then it is refused as malformed", async () => {
+    // #given
+    const setup = await fixture()
+    const description = 'Summary</description>\n<parameter name="body"># Body'
+
+    // #when
+    const attempt = run(setup, { command: "create", reason: "unknown", file_path: "reference/a.md", description })
+
+    // #then
+    await expect(attempt).rejects.toThrow(/malformed/)
   })
 
   it("#given a description over the skill loader limit #when update_description runs #then the limit is named", async () => {

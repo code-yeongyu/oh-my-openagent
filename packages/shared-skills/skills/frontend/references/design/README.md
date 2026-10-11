@@ -202,7 +202,7 @@ Triggers: an animated, shader, particle, or grid background; a hero that must fe
 ## Anti-patterns — do not do these
 
 - **Don't load nothing and just freestyle.** That produces the exact "generic AI SaaS slop" — purple-blue gradient backgrounds, rounded-2xl-on-everything, three feature cards in a grid, generic Inter font, lorem ipsum. The skills exist precisely to prevent this.
-- **Don't load five files "to be safe".** That blows context and creates contradictory rules. Pick deliberately.
+- **Don't mark state with a coloured accent border.** `border-l-2 border-primary` on the selected row, a primary outline on the focused card — on a rounded surface that is the generic AI tell. State is ink-alpha washes, a glyph for selection, tonal layering for focus; `focus-visible` rings are the only coloured edge. Includes pre-existing instances on surfaces you touch.
 - **Don't ignore the user's named brand.** If they say "Linear-style" and you build something that doesn't match Linear's actual aesthetic (purple, ultra-tight spacing, mono accents, etc.), you have failed the routing.
 - **Don't apply a Layer B brand verbatim if the project is not that brand.** The DESIGN.md captures *inspiration* — extract the tokens (palette, type scale, component patterns) and apply them to the project's own content. Do not copy logos or trademarked imagery.
 - **Don't use imagegen skills to write code.** They are explicitly image-only. The agent has been observed trying to "describe" the image as React code — that is the wrong skill, switch to `image-to-code-skill.md` instead.
@@ -221,7 +221,7 @@ Once references are loaded, before writing any UI code:
 7. **Match the project's existing patterns FIRST.** If the codebase already uses CSS Modules, don't introduce Tailwind. If it uses styled-components, don't introduce CSS-in-JS variants. The references guide *style*, not *infrastructure*.
 8. **All tokens trace back to `DESIGN.md`.** No orphan hex codes, no magic px values. If you need a new token, update `DESIGN.md` first.
 9. **New reusable patterns (used 2+ times) get documented back into `DESIGN.md` Section 5.**
-10. **No generic-default drift (expressive briefs).** The shipped CSS must use the `DESIGN.md` material, not the model's priors. Load the declared fonts (do not silently fall back to Inter or system fonts), build elevated surfaces from the declared multi-layer recipe (not a lone `backdrop-filter: blur`), and color from the ramp stops (not one tint at varied opacity). Grep your styles before QA: finding `Inter`, a single blur on "glass", or one brand hex reused everywhere means you regressed to priors — fix it before declaring done.
+10. **No generic-default drift (expressive briefs).** The shipped CSS must use the `DESIGN.md` material, not the model's priors. Load the declared fonts (do not silently fall back to Inter or system fonts), build elevated surfaces from the declared multi-layer recipe (not a lone `backdrop-filter: blur`), and color from the ramp stops (not one tint at varied opacity). Grep your styles before QA: finding `Inter`, a single blur on "glass", one brand hex reused everywhere, or a coloured accent border marking selected/focused state (`border-l-2 border-primary` et al) means you regressed to priors — fix it before declaring done.
 
 ## Quick lookup table — most common requests
 
@@ -246,14 +246,11 @@ Once references are loaded, before writing any UI code:
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 
-Before declaring the task done, verify the rendered UI. **The verification authority is `/visual-qa`, not a hand-rolled checklist here.** Run `/visual-qa`: it captures every page and breakpoint (375 / 768 / 1280px) on fresh evidence, drives and inspects interaction states (hover/focus/active) and motion (transitions, scroll-triggered, load), runs the dual-oracle pass, and loops until an independent reviewer passes. For a concrete reference or clone, run it in reference-fidelity mode.
+Before declaring the task done, verify the rendered UI. **The verification authority is `/visual-qa`, not a hand-rolled checklist here.** Run `/visual-qa`: its HIG-based checklist (layout, hierarchy, text, targets, themes, consistency, motion, states, keyboard, platform - including the slop-animation and accent-border-state rules this skill builds against) is judged on its capture matrix (every page and every sibling surface, phone and desktop, light and dark, scrolled-end, motion driven and inspected) by the dual-oracle pass, looping until an independent reviewer passes on fresh evidence. For a concrete reference or clone, run it in reference-fidelity mode.
 
-This skill adds only the design-taste judgments `/visual-qa` cannot make for you:
+This skill adds the one design-taste judgment `/visual-qa` cannot make for you. **Two kinds of failure count equally — fix both, then re-check.** Defects are what `/visual-qa` reports. Flatness is a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color a real perceptual ramp (multiple stops / OKLCH, not one tint at varied opacity), render the hero focal object as real dimensional material (a generated bitmap, or real light/shadow/gradient/depth — never flat geometric primitives), and add the one signature moment. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work.
 
-1. **Two kinds of failure count equally — fix both, then re-check.** Defects: clipping, wrong font, missing state, jank. Flatness: a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color a real perceptual ramp (multiple stops / OKLCH, not one tint at varied opacity), render the hero focal object as real dimensional material (a generated bitmap, or real light/shadow/gradient/depth — never flat geometric primitives), and add the one signature moment. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work.
-2. **Motion serves meaning; slop animation is forbidden.** Every interactive element must communicate its affordance and state changes — but a hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop. Do not add it, and treat any you find as a defect. The hero may carry one signature moment; the rest of the surface earns motion only where it signals interaction or state.
-
-Report "done" only when `/visual-qa` has passed on fresh evidence AND neither a visual bug nor a floor-level or slop-laden surface remains.
+Report "done" only when `/visual-qa` has passed on fresh evidence AND no floor-level surface remains.
 
 
 ## Final notes

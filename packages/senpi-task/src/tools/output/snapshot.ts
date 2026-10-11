@@ -1,26 +1,28 @@
+import { isolationDetails } from "../../isolation/details"
 import type { TaskRecord } from "../../state"
+import { recoveryPresentation } from "../../state/recovery-presentation"
 import { childSessionDir } from "./transcript"
-import type { LostBreadcrumbs, SuspendedDetails, TaskSnapshot } from "./types"
+import type { LostBreadcrumbs, TaskSnapshot } from "./types"
 
 const LOST_EXPLANATION =
   "The task was marked lost: its process disappeared before a terminal result was recorded (crash, host restart, or an evicted resident child). Inspect the pid and session dir below; no result was captured."
-
-const SUSPENDED_EXPLANATION = "suspended (resumes with session)"
-
-const SUSPENDED_RESIDENCIES: ReadonlySet<TaskRecord["residency_state"]> = new Set(["persisted_only", "rpc_detached"])
 
 // Record snapshot for task_output status view (pi-task task-status result fields). For a `lost` task
 // it attaches read-only breadcrumbs (pid + the child's session dir) so the caller can investigate
 // without task_output ever reviving or touching child state.
 export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: number): TaskSnapshot {
+  const isolation = isolationDetails(record)
+  const recovery = recoveryPresentation(record)
   return {
     task_id: record.task_id,
     status: record.status,
     residency_state: record.residency_state,
-    ...(isSuspended(record) ? { suspended: { explanation: SUSPENDED_EXPLANATION } } : {}),
+    ...(recovery === undefined ? {} : { suspended: { explanation: recovery.text } }),
+    ...(record.status === "running" && record.start_queued !== undefined ? { start_queued: record.start_queued } : {}),
     execution_mode: record.execution_mode,
     model: record.model,
     ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
+    ...(record.effective_model !== undefined ? { effective_model: record.effective_model } : {}),
     parent_session_id: record.parent_session_id,
     root_session_id: record.root_session_id,
     age_ms: ageMs(record, now),
@@ -34,12 +36,9 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     ...(record.final_response !== undefined ? { final_response: record.final_response } : {}),
     ...(record.error_message !== undefined ? { error_message: record.error_message } : {}),
     ...(record.run_stats !== undefined ? { run_stats: record.run_stats } : {}),
+    ...(isolation === undefined ? {} : { isolation }),
     ...(record.status === "lost" ? { lost: lostBreadcrumbs(record, stateDir) } : {}),
   }
-}
-
-function isSuspended(record: TaskRecord): boolean {
-  return SUSPENDED_RESIDENCIES.has(record.residency_state)
 }
 
 function lostBreadcrumbs(record: TaskRecord, stateDir: string): LostBreadcrumbs {

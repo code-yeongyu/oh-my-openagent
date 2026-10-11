@@ -5,6 +5,23 @@ import type { TaskTargetErrorCode } from "../tools/task/validation"
 export type DagRunId = string & { readonly __brand: "DagRunId" }
 export type DagNodeId = string & { readonly __brand: "DagNodeId" }
 
+// A run id or node id is used verbatim as ONE path segment under the DAG state directory
+// (<stateDir>/dag/results/<runId>/<nodeId>.txt), so it must not be empty, a traversal segment
+// ("." / ".."), or contain a separator, a NUL byte, or ":" (an NTFS alternate-data-stream
+// separator on Windows). This is the single owner of that contract: the graph compiler rejects an
+// unsafe node id at the boundary, and the store refuses one at the sink so no caller can
+// reintroduce the write/read primitive by bypassing the checked accessors. The store also adds a
+// containment check after the join, so the rule does not rest on this deny-list alone.
+export function isSafeDagPathSegment(value: string): boolean {
+  return value.length > 0
+    && value !== "."
+    && value !== ".."
+    && !value.includes("/")
+    && !value.includes("\\")
+    && !value.includes("\0")
+    && !value.includes(":")
+}
+
 export const DAG_RUN_STATUSES = [
   "pending",
   "running",
@@ -15,6 +32,15 @@ export const DAG_RUN_STATUSES = [
 ] as const
 
 export type DagRunStatus = (typeof DAG_RUN_STATUSES)[number]
+
+// A run in one of these statuses holds no scheduler or lease and does not count against the session's
+// active-run cap; it waits for retention. `send` may still revive a child of a failed run.
+export const TERMINAL_DAG_RUN_STATUSES: ReadonlySet<string> = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
+
+/** True for a persisted status string naming a terminal run; unknown or missing statuses are not terminal. */
+export function isTerminalDagRunStatus(status: string | undefined): boolean {
+  return status !== undefined && TERMINAL_DAG_RUN_STATUSES.has(status)
+}
 
 export const DAG_NODE_STATES = [
   "pending",
@@ -100,6 +126,7 @@ export const DAG_NODE_ERROR_CODES = [
   "task_lost",
   "task_cancelled",
   "resume_task_missing",
+  "resume_task_orphaned",
   "journal_corrupt",
 ] as const
 
@@ -156,7 +183,26 @@ export type DagNode = {
   readonly createdAt: string
   readonly startedAt?: string
   readonly completedAt?: string
+  // Terminal node's final child text, bounded to DAG_NODE_OUTPUT_PREVIEW_CHARS. `outputBytes` is
+  // always the FULL persisted size, so a shorter `output` means the preview was truncated and a
+  // completed node reading `outputBytes: 0` is durable evidence the child returned nothing. Without
+  // this the only surface carrying node output was the blocking wait, which the detached midpoint
+  // peek never reaches (#8674).
+  readonly output?: string
+  readonly outputBytes?: number
+  // When the backing child last wrote a transcript event. Present only while the node is running,
+  // because it describes a LIVE child: a node running with no recent activity is either
+  // finished-but-unreaped or genuinely stalled, and `running` alone cannot tell those apart (#8674).
+  readonly lastActivityAt?: string
 }
+
+// Per-node output budget in the checkpoint. A node's final message is normally far shorter; the cap
+// only stops one pathological child from dominating every checkpoint rewrite for the whole run.
+export const DAG_NODE_OUTPUT_PREVIEW_CHARS = 2000
+
+// How long a running node's child may write nothing before a status surface calls the silence out.
+// It is a reporting threshold, never an execution one: nothing is cancelled or failed by it.
+export const DAG_NODE_QUIET_AFTER_MS = 600_000
 
 export type DagEdge = {
   readonly from: DagNodeId

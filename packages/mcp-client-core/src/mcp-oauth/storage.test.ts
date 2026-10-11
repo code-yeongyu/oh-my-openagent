@@ -27,10 +27,10 @@ describe("mcp-oauth storage", () => {
 
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    // Create this test's dir before pointing the env at it: pointing it at the previous test's
+    // removed dir made the first token write recreate that dir, which no teardown owned (#9766).
+    TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mcp-oauth-test-"))
     process.env.OPENCODE_CONFIG_DIR = TEST_CONFIG_DIR
-    if (!existsSync(TEST_CONFIG_DIR)) {
-      TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mcp-oauth-test-"))
-    }
   })
 
   afterEach(() => {

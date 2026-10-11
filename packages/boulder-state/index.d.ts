@@ -36,6 +36,7 @@ export interface BoulderWorkState {
   ended_at?: string
   elapsed_ms?: number
   updated_at?: string
+  stale_since?: string
   session_ids: string[]
   session_origins?: Record<string, BoulderSessionOrigin>
   agent?: string
@@ -92,6 +93,24 @@ export interface TopLevelTaskRef {
   title: string
 }
 
+export interface ReconcileStaleWorksOptions {
+  readonly now?: number
+  readonly thresholdMs?: number
+  readonly sessionsDirectory?: string
+  readonly env?: Readonly<Record<string, string | undefined>>
+}
+
+export interface StaleWorkDemotion {
+  readonly work_id: string
+  readonly stale_since: string
+  readonly last_activity_at: string | null
+}
+
+export interface StaleWorkReconcileResult {
+  readonly demoted: readonly StaleWorkDemotion[]
+  readonly written: boolean
+}
+
 export interface BoulderWorkInput {
   planPath: string
   sessionId: string
@@ -116,6 +135,7 @@ export interface TaskTimerInput extends TaskSessionInput {
 export declare function readCurrentTopLevelTask(planPath: string): TopLevelTaskRef | null
 export declare function getPlanChecklist(planPath: string): PlanChecklist
 export declare function parsePlanChecklist(markdown: string): PlanChecklist
+export declare function isStructuredTaskRow(line: string, section: "todo" | "final-wave"): boolean
 export declare function addBoulderWork(directory: string, input: BoulderWorkInput): BoulderState | null
 export declare function appendSessionId(
   directory: string,
@@ -160,6 +180,18 @@ export declare function getWorkForSession(directory: string, sessionId: string):
 export declare function getWorkResumeOptions(directory: string): BoulderWorkResumeOption[]
 export declare function normalizeSessionId(sessionId: string, platform?: "codex" | "opencode" | "senpi"): string
 export declare function readBoulderState(directory: string): BoulderState | null
+export declare const DEFAULT_STALE_WORK_THRESHOLD_MS: number
+export declare const STALE_WORK_THRESHOLD_ENV_KEY: "OMO_BOULDER_STALE_WORK_THRESHOLD_MS"
+export declare function isWorkStale(input: {
+  lastActivityMs: number | null
+  nowMs: number
+  thresholdMs: number
+}): boolean
+export declare function reconcileStaleWorks(
+  directory: string,
+  options?: ReconcileStaleWorksOptions,
+): StaleWorkReconcileResult
+export declare function resolveStaleWorkThresholdMs(env?: Readonly<Record<string, string | undefined>>): number
 export declare function resolveBoulderPlanPath(
   directory: string,
   state: Pick<BoulderState, "active_plan" | "worktree_path">,

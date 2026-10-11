@@ -1,0 +1,37 @@
+[package]
+name = "senpi-desktop-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+flume.workspace = true
+image.workspace = true
+parking_lot.workspace = true
+senpi-desktop-backend-fake = { path = "../senpi-desktop-backend-fake" }
+senpi-desktop-core = { path = "../senpi-desktop-core" }
+senpi-desktop-safety = { path = "../senpi-desktop-safety" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["time"] }
+ulid.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+senpi-desktop-backend-macos = { path = "../senpi-desktop-backend-macos" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+senpi-desktop-backend-wayland = { path = "../senpi-desktop-backend-wayland" }
+senpi-desktop-backend-x11 = { path = "../senpi-desktop-backend-x11" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+senpi-desktop-backend-win32 = { path = "../senpi-desktop-backend-win32" }
+
+[dev-dependencies]
+senpi-desktop-safety = { path = "../senpi-desktop-safety", features = ["test-support"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "time"] }

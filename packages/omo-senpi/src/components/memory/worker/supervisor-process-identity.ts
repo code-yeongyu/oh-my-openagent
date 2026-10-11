@@ -111,6 +111,11 @@ function testCommand(name: string): readonly string[] | undefined {
 function spawnTerminationCommand(command: readonly string[], args: readonly string[], synchronous: boolean): void {
   const [executable, ...prefix] = command
   if (executable === undefined) throw new TypeError("termination command is required")
+  // taskkill runs from the console-less supervisor, so both forms need the same hidden creation flag.
+  // Containment from `process.once("exit")` blocks: that handler cannot await, and an async child's
+  // "error" event is queued on a loop that never turns again, so a taskkill that could not even be
+  // spawned would leave the child tree alive with nothing written anywhere. Every other caller runs
+  // on a live loop and stays async, so the supervisor never blocks on a termination child.
   if (synchronous) {
     const result = spawnSync(executable, [...prefix, ...args], {
       env: process.env,
@@ -120,7 +125,6 @@ function spawnTerminationCommand(command: readonly string[], args: readonly stri
     if (result.error !== undefined) throw result.error
     return
   }
-  // taskkill runs from the console-less supervisor, so it needs the same hidden creation flag.
   const child = spawn(executable, [...prefix, ...args], {
     env: process.env,
     stdio: "ignore",

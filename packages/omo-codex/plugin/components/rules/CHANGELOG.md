@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Align the Hephaestus GPT-6 rule's delegation paragraph with the senpi GPT-6 preset (oh-my-openagent#9499): reading, lookups and own-change checks stay in the session however many calls they take; a subagent is for a track that runs beside the session's own and lands the task sooner.
 - Restrict the default `PostToolUse` hook matcher to Codex's canonical `apply_patch` tool name.
 - Add opt-in `NODE_DEBUG=codex-rules` phase timing logs for `PostToolUse` debugging.
 - Harden dynamic hook coverage for additional-context JSON output, disabled/static modes, failed tool responses, and duplicate suppression.

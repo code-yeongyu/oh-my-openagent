@@ -15,13 +15,15 @@ const HEADER_LINE_RE = /^([A-Za-z0-9_-]+):(?:[ \t]+(.*?))?[ \t]*$/
 
 export function describeDescriptionViolation(description: string): string | null {
   if (description.trim().length === 0) return "'description' must not be empty"
-  if (/[\r\n]/.test(description)) return "'description' must be a single line"
-  if (description.length > MAX_DESCRIPTION_LENGTH) {
-    return `'description' exceeds ${MAX_DESCRIPTION_LENGTH} characters (${description.length})`
-  }
+  // A leaked sibling argument makes the description long and multi-line as a side effect; naming
+  // either symptom instead sends the model to trim a summary that was never the problem.
   const scaffolding = TOOL_CALL_SCAFFOLDING_RE.exec(description)
   if (scaffolding !== null) {
     return `'description' contains tool-call scaffolding ("${scaffolding[0]}"); the arguments of this call were malformed and split incorrectly - resend it with a one-line description and the body in file_text`
+  }
+  if (/[\r\n]/.test(description)) return "'description' must be a single line"
+  if (description.length > MAX_DESCRIPTION_LENGTH) {
+    return `'description' exceeds ${MAX_DESCRIPTION_LENGTH} characters (${description.length})`
   }
   return null
 }

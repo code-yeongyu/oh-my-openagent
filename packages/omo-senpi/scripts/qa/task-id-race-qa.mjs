@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from "node:os"
 import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const COLLISION_TEXT = "Task record already exists"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -76,7 +77,11 @@ async function runAttempt(input) {
   const root = mkdtempSync(join(tmpdir(), "omo-senpi-task-id-race-"))
   const projectDir = join(root, "project")
   seedProject(projectDir)
-  const parents = ["parent-a", "parent-b"].map((name) => createParent(root, name, projectDir, input.timeoutMs))
+  // Both parents share ONE agent dir, as two sessions on one machine share ~/.omo/agent: the task
+  // store now lives in the agent dir, so separate agent dirs would give each parent its own store and
+  // there would be no shared record namespace left to race on.
+  const agentDir = join(root, "agent")
+  const parents = ["parent-a", "parent-b"].map((name) => createParent(root, name, projectDir, agentDir, input.timeoutMs))
   const runs = []
   let cleanup = { pids: [], terminated: [], verified_dead: [], sandbox_removed: false }
   let before = ""
@@ -85,14 +90,14 @@ async function runAttempt(input) {
   let taskIds = []
   const reasons = []
   try {
-    before = lsTasks(projectDir)
+    before = lsTasks(projectDir, agentDir)
     for (const parent of parents) runs.push(startSenpi(input.senpiBin, parent, projectDir, input.timeoutMs))
     await Promise.all(parents.map((parent) => waitForFile(parent.readyFile, input.timeoutMs)))
     buckets.before = Math.floor(Date.now() / 65_536)
     for (const parent of parents) writeFileSync(parent.goFile, "go\n", { flag: "wx" })
     const completions = await Promise.all(runs.map((run) => waitForCompletion(run, input.timeoutMs, attemptDir, "post-go")))
     buckets.after = Math.floor(Date.now() / 65_536)
-    after = lsTasks(projectDir)
+    after = lsTasks(projectDir, agentDir)
     taskIds = taskIdsFromListing(after)
     for (let index = 0; index < completions.length; index += 1) {
       writeFileSync(join(attemptDir, `${parents[index].name}.stdout.jsonl`), completions[index].stdout)
@@ -114,7 +119,7 @@ async function runAttempt(input) {
     reasons.push(message)
     writeFileSync(join(attemptDir, "driver-error.log"), `${message}\n`)
     writeFileSync(join(attemptDir, "tasks-before.ls.txt"), before)
-    writeFileSync(join(attemptDir, "tasks-after.ls.txt"), after || lsTasks(projectDir))
+    writeFileSync(join(attemptDir, "tasks-after.ls.txt"), after || lsTasks(projectDir, agentDir))
   } finally {
     cleanup = await cleanupRuns(runs, root, input.timeoutMs, attemptDir)
     writeJson(join(attemptDir, "cleanup-receipt.json"), cleanup)
@@ -123,10 +128,9 @@ async function runAttempt(input) {
   return { attempt: input.attempt, bucketStable: buckets.before !== null && buckets.before === buckets.after, buckets, taskIds, reasons }
 }
 
-function createParent(root, name, projectDir, timeoutMs) {
+function createParent(root, name, projectDir, agentDir, timeoutMs) {
   const parentRoot = join(root, name)
   const home = join(parentRoot, "home")
-  const agentDir = join(parentRoot, "agent")
   const sessionDir = join(parentRoot, "sessions")
   const gates = join(parentRoot, "gates")
   mkdirSync(home, { recursive: true })
@@ -170,7 +174,7 @@ function startSenpi(senpiBin, parent, projectDir, timeoutMs) {
   ], {
     cwd: projectDir,
     env: {
-      ...process.env,
+      ...isolatedChildEnv(process.env, parent.agentDir),
       HOME: parent.home,
       SENPI_CODING_AGENT_DIR: parent.agentDir,
       SENPI_CODING_AGENT_SESSION_DIR: parent.sessionDir,
@@ -263,8 +267,10 @@ function isMissingProcess(error) {
   return error instanceof Error && "code" in error && error.code === "ESRCH"
 }
 
-function lsTasks(projectDir) {
-  const tasksDir = join(projectDir, ".omo", "senpi-task", "tasks")
+// The engine keys the store by its own cwd, which the OS reports canonicalized (darwin tmpdir is a
+// /var -> /private/var symlink), so the listing resolves from the canonical project path too.
+function lsTasks(projectDir, agentDir) {
+  const tasksDir = join(sandboxStateDir({ cwd: realpathSync(projectDir), agentDir }), "tasks")
   if (!existsSync(tasksDir)) return "<absent>\n"
   const result = spawnSync("ls", ["-la", tasksDir], { encoding: "utf8", timeout: 30_000 })
   return `${result.stdout}${result.stderr}`

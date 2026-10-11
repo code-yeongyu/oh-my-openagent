@@ -10,6 +10,7 @@ import {
   tempStore,
   type CallLog,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -31,7 +32,7 @@ describe("suspendOnSessionShutdown", () => {
     const order: CallLog = []
     const registry = new OrderRegistry(order)
     registry.add(fakeHandle("st_000000f4", "in-process", order))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     const summary = await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
@@ -60,7 +61,7 @@ describe("suspendOnSessionShutdown", () => {
     const order: CallLog = []
     const registry = new OrderRegistry(order)
     registry.add(fakeHandle("st_000000f8", "in-process", order))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     const summary = await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
@@ -97,6 +98,7 @@ describe("suspendOnSessionShutdown", () => {
     const registry = new OrderRegistry(order)
     registry.add(fakeHandle("st_000000f9", "in-process", order))
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry,
       config: settings({ resume_children: false }),
@@ -142,7 +144,7 @@ describe("suspendOnSessionShutdown", () => {
     const registry = new OrderRegistry(order)
     registry.add(fakeHandle("st_000000fb", "in-process", order, { disposeRejects: true }))
     registry.add(fakeHandle("st_000000fc", "in-process", order))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     const summary = await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
@@ -174,7 +176,7 @@ describe("suspendOnSessionShutdown", () => {
     const registry = new OrderRegistry(order)
     const handle = fakeHandle("st_000000fd", "in-process", order, { abortRejects: true })
     registry.add(handle)
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     const summary = await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })

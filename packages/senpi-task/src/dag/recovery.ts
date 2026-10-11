@@ -68,6 +68,9 @@ export type DagRecoveryOptions = {
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly stopAdmission?: (runId: DagRunId) => void
   readonly reattach?: (runId: DagRunId, taskId: string) => void
+  // The recovering session's own task depth: resumed nodes spawn one level below it, exactly like
+  // a fresh run's nodes (scheduler `ancestry`), so a child session's workflow cannot reset depth.
+  readonly ancestry?: { readonly depth: number }
 }
 
 export type DagRecovery = {
@@ -84,6 +87,7 @@ type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager"
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
   readonly stopAdmission?: (runId: DagRunId) => void
   readonly reattach?: (runId: DagRunId, taskId: string) => void
+  readonly ancestry?: { readonly depth: number }
 }
 
 type RecoveryPendingTerminalResult = {
@@ -107,6 +111,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
     ...(options.stopAdmission === undefined ? {} : { stopAdmission: options.stopAdmission }),
     ...(options.reattach === undefined ? {} : { reattach: options.reattach }),
+    ...(options.ancestry === undefined ? {} : { ancestry: options.ancestry }),
   }
 
   return {
@@ -231,6 +236,7 @@ async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRe
       ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
       ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),
       ...(reattachedTasks.size === 0 ? {} : { preAttachedTasks: reattachedTasks }),
+      ...(context.ancestry === undefined ? {} : { ancestry: context.ancestry }),
       now: context.now,
     })
     const record = await scheduler.run()
@@ -248,6 +254,9 @@ async function reconcileNodes(
   pendingTerminalResults: Map<DagNodeId, RecoveryPendingTerminalResult>,
   reattachedTasks: Map<DagNodeId, string>,
 ): Promise<void> {
+  // Children this pass just spawned are live by construction: admission can return them queued
+  // (`pending`, no resident handle yet), and their handle appears at launch.
+  const startedHere = new Set<string>()
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
       const result = readDagNodeResult({ store: context.store, runId: journal.snapshot().runId, nodeId: observed.id })
@@ -274,7 +283,7 @@ async function reconcileNodes(
 
     if (task === undefined && observed.state === "scheduled" && observed.taskId === undefined) {
       const result = await context.taskManager.startOwned(
-        startSpec(journal.snapshot(), observed.id),
+        startSpec(journal.snapshot(), observed.id, context.ancestry?.depth ?? 0),
         taskOwner(journal.snapshot(), observed.id),
       )
       if (result.kind === "residency_denied") {
@@ -287,7 +296,10 @@ async function reconcileNodes(
         continue
       }
       task = attachStartedOrFail(journal, observed.id, result, context.now, pendingErrors)
-      if (task === undefined && result.kind === "started") task = context.taskManager.get(result.task_id)
+      if (task === undefined && result.kind === "started") {
+        startedHere.add(result.task_id)
+        task = context.taskManager.get(result.task_id)
+      }
     }
 
     if (task === undefined) {
@@ -317,6 +329,11 @@ async function reconcileNodes(
     // as long as the slowest child ran, withholding `dag.run.resumed`, the reuse events of every
     // node ordered after it, and every operator lever that refuses on an active run.
     if (task.status === "pending" || task.status === "running") {
+      const orphaned = startedHere.has(task.task_id) ? undefined : orphanedTaskReason(context, task)
+      if (orphaned !== undefined) {
+        failNode(journal, observed.id, "resume_task_orphaned", orphaned, context.now, pendingErrors)
+        continue
+      }
       context.reattach?.(journal.snapshot().runId, task.task_id)
       if (observed.state !== "running") {
         transition(journal, observed.id, "running", pendingErrors)
@@ -344,6 +361,28 @@ async function reconcileNodes(
     }
     foldTaskOutcome(context, journal, observed.id, task, pendingErrors, pendingTerminalResults)
   }
+}
+
+// A re-adopted node folds only when `TaskManager.waitFor` settles, and that resolves from this
+// process's own waiter map (or an already-terminal stored record) - never from a child some other
+// process holds. So `status` alone cannot decide re-adoption: a daemon-hosted child parked at
+// `rpc_detached` keeps `running` by design so it can be revived from its transcript later, and a
+// record frozen `resident` under a foreign pid is left untouched by lifecycle reconcile. Re-adopting
+// either one pins its node at `running` in every future checkpoint, across arbitrarily many
+// restarts. Liveness is therefore "this host holds the child" - the same resident-handle map that
+// feeds those waiters - and never a pid probe: a pid can be alive while the session it hosted is
+// gone. Session-start lifecycle reconcile runs before DAG recovery, so a revivable child already
+// carries a handle here and an unrevivable one never will.
+function orphanedTaskReason(context: RecoveryContext, task: TaskRecord): string | undefined {
+  if (context.taskManager.getResidentHandle(task.task_id) !== undefined) return undefined
+  const residency = [
+    `residency_state=${task.residency_state}`,
+    ...(task.suspension_reason === undefined ? [] : [`suspension_reason=${task.suspension_reason}`]),
+    ...(task.runner_kind === undefined ? [] : [`runner_kind=${task.runner_kind}`]),
+    ...(task.host_pid === undefined ? [] : [`host_pid=${task.host_pid}`]),
+  ].join(", ")
+  return `task ${task.task_id} still reads ${task.status} but no child of this host backs it ` +
+    `(${residency}); its settlement can never be observed here. Retry or send revives the node.`
 }
 
 function attachStartedOrFail(
@@ -476,7 +515,7 @@ function listRunRecords(store: DagFileStore): readonly RecoverableRecord[] {
     .filter((record): record is RecoverableRecord => record !== null)
 }
 
-function startSpec(record: DagRunRecordV1, nodeId: DagNodeId): ManagerStartSpec {
+function startSpec(record: DagRunRecordV1, nodeId: DagNodeId, sessionDepth: number): ManagerStartSpec {
   const node = nodeById(record, nodeId)
   const persisted = persistedNode(record, nodeId)
   return {
@@ -484,7 +523,7 @@ function startSpec(record: DagRunRecordV1, nodeId: DagNodeId): ManagerStartSpec 
     ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
     parent_session_id: record.parentSessionId,
     root_session_id: record.rootSessionId,
-    depth: 1,
+    depth: sessionDepth + 1,
     ...(node.route.kind === "category"
       ? { category: node.route.category }
       : { subagent_type: node.route.agent, ...(node.route.model === undefined ? {} : { model: node.route.model }) }),

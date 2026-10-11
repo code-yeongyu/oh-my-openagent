@@ -10,7 +10,6 @@ import { WorkpoolError, type WorkpoolCaller, type WorkpoolCreate, type WorkpoolM
 
 export function createWorkpoolStore(stateDir: string) {
   const directory = join(stateDir, "workpools")
-  mkdirSync(directory, { recursive: true })
   const path = (poolId: string): string => join(directory, `${parsePoolId(poolId)}.json`)
   function load(poolId: string): WorkpoolRecord {
     let bytes: string
@@ -28,7 +27,13 @@ export function createWorkpoolStore(stateDir: string) {
     }
   }
   function list(): readonly WorkpoolRecord[] {
-    return readdirSync(directory).filter(name => /^wp_[0-9a-f]{32}\.json$/.test(name)).sort().map(name => load(name.slice(0, -5)))
+    let names: string[]
+    try { names = readdirSync(directory) }
+    catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
+      throw error
+    }
+    return names.filter(name => /^wp_[0-9a-f]{32}\.json$/.test(name)).sort().map(name => load(name.slice(0, -5)))
   }
   function owned(caller: WorkpoolCaller, poolId: string): WorkpoolRecord {
     const record = load(poolId)
@@ -46,12 +51,14 @@ export function createWorkpoolStore(stateDir: string) {
     })
   }
   function create(caller: WorkpoolCaller, input: WorkpoolCreate & { readonly mode: WorkpoolMode }, workerSpec: WorkpoolSpec): WorkpoolRecord {
+    mkdirSync(directory, { recursive: true })
     // The directory lock serializes parent/name creation across hosts, not just this object.
     return withTaskRecordLock(join(directory, "names"), () => {
       const existing = list().find(pool => pool.parent_session_id === caller.sessionId && pool.name === input.name)
       if (existing !== undefined) {
         const same = canonicalJson(z.json().parse(existing.agent)) === canonicalJson(z.json().parse(input.agent)) && existing.mode === input.mode &&
-          canonicalJson(z.json().parse(existing.worker_spec)) === canonicalJson(z.json().parse(workerSpec))
+          canonicalJson(z.json().parse(existing.worker_spec)) === canonicalJson(z.json().parse(workerSpec)) &&
+          sameGrant(existing.kernel_tool_names, input.tools)
         if (!same || existing.status !== "open") throw new WorkpoolError("pool_name_conflict", "Pool name is already in use; choose a new explicit name.")
         return existing
       }
@@ -69,3 +76,10 @@ export function createWorkpoolStore(stateDir: string) {
   return { load, list, owned, mutate, create }
 }
 export type WorkpoolStore = ReturnType<typeof createWorkpoolStore>
+
+// A reused pool keeps the tools it was created with, so a same-name create must ask for exactly that grant.
+function sameGrant(existing: readonly string[] | undefined, requested: readonly string[] | undefined): boolean {
+  const left = [...new Set(existing ?? [])].sort()
+  const right = [...new Set(requested ?? [])].sort()
+  return left.length === right.length && left.every((name, index) => name === right[index])
+}

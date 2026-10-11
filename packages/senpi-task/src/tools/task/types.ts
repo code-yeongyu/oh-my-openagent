@@ -1,10 +1,15 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition, SkillInvocationState } from "../../agents"
+import type { IsolationDetails, IsolationStartedDetails } from "../../isolation/details"
 import type { KernelToolErrorCode } from "../../kernel-tools/contract"
-import type { TaskManager } from "../../manager"
-import type { RunnerFailure } from "../../runners/in-process/child-handle"
-import type { ResolvedModelRecord, TaskRunStats } from "../../state"
+import type { ExecutionModeGate, TaskManager } from "../../manager"
+import type {
+  ResolvedModelRecord,
+  TaskRunStats,
+  TaskStartFailureKind,
+  TaskStartFailureReason,
+} from "../../state"
 import type { TaskToolParamsStatic } from "./params"
 
 // The narrow slice of senpi's ExtensionContext the task tool reads. ExtensionContext satisfies it
@@ -74,11 +79,17 @@ export type TaskToolDeps = {
   // A kernel-tool grant is decided against them before any child exists; absent falls back to the
   // senpi session builtins (runners/in-process/host-tools.ts).
   readonly resolveChildToolNames?: () => readonly string[]
+  // The parent session's ONE resolution of `task.default_execution_mode: "auto"` (the shared-daemon
+  // capability check). Absent -> `auto` reads as in-process and the manager decides at spawn.
+  readonly executionModeGate?: ExecutionModeGate
 }
 
 export type TaskToolMode = "spawn"
 
 type ResolvedSpawnItemBase = {
+  readonly isolated?: boolean
+  readonly apply?: boolean
+  readonly merge?: "patch" | "branch"
   readonly prompt: string
   readonly task_summary?: string
   readonly description?: string
@@ -128,6 +139,8 @@ export type TaskToolItemDetail = {
   readonly resolved_model?: ResolvedModelRecord
   readonly status: string
   readonly error_message?: string
+  readonly failure_kind?: TaskStartFailureKind | "isolation_unavailable"
+  readonly failure_reason?: TaskStartFailureReason
   readonly queue_position?: number
   readonly run_in_background?: boolean
   readonly skills?: TaskSkillSummary
@@ -145,13 +158,19 @@ export type TaskToolDetails = {
   readonly execution_mode?: string
   readonly model?: string
   readonly resolved_model?: ResolvedModelRecord
+  // The model the child actually started on, read from the child itself (#9722).
+  readonly effective_model?: ResolvedModelRecord
   readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly run_in_background?: boolean
   readonly queue_position?: number
   readonly items?: readonly TaskToolItemDetail[]
   // The runner's typed failure kind when a start failed, so the caller can tell a refused parent
   // kernel-tool grant from a generic runner failure without reading prose.
-  readonly failure_kind?: RunnerFailure["kind"]
+  readonly failure_kind?: TaskStartFailureKind | "isolation_unavailable"
+  readonly failure_reason?: TaskStartFailureReason
+  // A settled isolated child reports its merge outcome here; a background start reports only where
+  // the child is working, because the merge has not happened yet.
+  readonly isolation?: IsolationDetails | IsolationStartedDetails
   readonly reason?: string
   readonly run_stats?: TaskRunStats
   readonly skills?: TaskSkillSummary

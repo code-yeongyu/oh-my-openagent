@@ -74,6 +74,35 @@ test.describe("Responsive QA matrix — landing", () => {
     }
   }
 
+  for (const reducedMotion of ["reduce", "no-preference"] as const) {
+    test(`iphone-14-pro skills ticker keeps its rows inside its card (${reducedMotion} motion)`, async ({
+      page,
+    }) => {
+      // given
+      await page.emulateMedia({ reducedMotion })
+      await page.setViewportSize({ width: 393, height: 852 })
+      await page.goto("/")
+
+      // when
+      const ticker = page.locator('[data-section="skills"] .ticker')
+      await ticker.scrollIntoViewIfNeeded()
+      const layout = await ticker.evaluate((node) => {
+        const card = node.getBoundingClientRect()
+        const list = node.querySelector("ul")?.getBoundingClientRect()
+        const next = document.querySelector('[data-section="crafted"]')?.getBoundingClientRect()
+        const clipped = getComputedStyle(node).overflow === "hidden"
+        return {
+          rowsSpillPastCard: !clipped && (list?.bottom ?? 0) - card.bottom > 1,
+          nextSectionOverlap: Math.round(card.bottom - (next?.top ?? Infinity)),
+        }
+      })
+
+      // then
+      expect(layout.rowsSpillPastCard, JSON.stringify(layout)).toBe(false)
+      expect(layout.nextSectionOverlap, JSON.stringify(layout)).toBeLessThanOrEqual(0)
+    })
+  }
+
   /*
    * The /docs page has a known pre-existing horizontal overflow caused by the
    * fixed-width sidebar interacting with code blocks at certain viewport sizes.

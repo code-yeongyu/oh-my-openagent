@@ -340,56 +340,6 @@ function smokeImportComponent(component, event) {
 	}
 }
 
-function writeFakeLspDaemonCli(path) {
-	writeFileSync(
-		path,
-		[
-			"#!/usr/bin/env node",
-			'import { createHash } from "node:crypto";',
-			'import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";',
-			'import { tmpdir } from "node:os";',
-			'import { dirname, join } from "node:path";',
-			'import { createServer } from "node:net";',
-			"",
-			"appendFileSync(process.env.FAKE_LSP_DAEMON_LOG, `${JSON.stringify(process.argv.slice(2))}\\n`);",
-			"const baseDir = process.env.OMO_LSP_DAEMON_DIR;",
-			'const versionDirName = readdirSync(baseDir).find((entry) => entry.startsWith("v")) ?? "v0";',
-			"const version = versionDirName.slice(1);",
-			"const dir = join(baseDir, versionDirName);",
-			'const naturalSocket = join(dir, "daemon.sock");',
-			'const digest = createHash("sha256").update(dir).digest("hex").slice(0, 16);',
-			"const socketPath = process.platform === \"win32\"",
-			"\t? `\\\\\\\\.\\\\pipe\\\\omo-lsp-${version}-${digest}`",
-			"\t: naturalSocket.length < 100 ? naturalSocket : join(tmpdir(), `omo-lsp-${version}-${digest}.sock`);",
-			"if (process.platform !== \"win32\") {",
-			"\tmkdirSync(dirname(socketPath), { recursive: true });",
-			"\ttry { unlinkSync(socketPath); } catch {}",
-			"}",
-			"const server = createServer((socket) => {",
-			'\tlet raw = "";',
-			'\tsocket.setEncoding("utf8");',
-			'\tsocket.on("data", (chunk) => {',
-			"\t\traw += chunk;",
-			'\t\tif (!raw.includes("\\n")) return;',
-			"\t\tconst request = JSON.parse(raw.trim());",
-			"\t\tconst response = {",
-			'\t\t\tjsonrpc: "2.0",',
-			"\t\t\tid: request.id,",
-			"\t\t\tresult: {",
-			'\t\t\t\tcontent: [{ type: "text", text: "error[fake] (1) at 1:1: Missing fake symbol." }],',
-			"\t\t\t},",
-			"\t\t};",
-			'\t\tsocket.end(`${JSON.stringify(response)}\\n`);',
-			"\t\tserver.close(() => process.exit(0));",
-			"\t});",
-			"});",
-			"server.listen(socketPath);",
-			"setTimeout(() => process.exit(1), 10000).unref();",
-			"",
-		].join("\n"),
-	);
-}
-
 async function stopTestDaemons(daemonRoot) {
 	if (!existsSync(daemonRoot)) return;
 	for (const versionDir of readdirSync(daemonRoot)) {

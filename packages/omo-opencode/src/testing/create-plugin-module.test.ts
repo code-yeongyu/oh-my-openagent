@@ -316,6 +316,23 @@ describe("createPluginModule()", () => {
     })
   })
 
+  describe("#given startup completes", () => {
+    it("#then both compaction hooks are registered", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+
+      // when
+      const hooks: Record<string, unknown> = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(typeof hooks["experimental.session.compacting"]).toBe("function")
+      expect(typeof hooks["experimental.compaction.autocontinue"]).toBe("function")
+    })
+  })
+
   describe("#given security-research is disabled", () => {
     it("#then startup still exposes security-review through the runtime skill source", async () => {
       // given

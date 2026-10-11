@@ -2,8 +2,11 @@ import { reportToolHookStatus } from "../../extension/tool-hook-status";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadSenpiOmoConfig } from "../config-resolution";
-import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
+import { classifyPostEditFileLocation, type PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
+import { resolveAgentHome } from "../agent-home/resolve-agent-home";
+import { resolveSessionAgentDir } from "../memory/session-context-resolver";
 import { createFormatterStep } from "../formatter/formatter";
+import { createLazyValue, deferUntilAfterFirstPaint } from "../../extension/startup-deferral";
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types";
 import {
 	lsp_diagnostics,
@@ -25,6 +28,7 @@ import {
 	type LspPostEditSessionState,
 	type ToolResultLike,
 } from "./post-edit-diagnostics.js";
+import { postEditOutcomeFromDaemonResult } from "./post-edit-outcome.js";
 
 const LSP_TOOLS_ENABLED_FLAG = "omo-senpi-lsp-tools-enabled";
 const LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG = "omo-senpi-lsp-post-edit-diagnostics-enabled";
@@ -61,32 +65,40 @@ export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiC
 		register(pi, ctx) {
 			const cwd = pi.cwd ?? process.cwd();
 			const runPostEditDiagnostics = options.postEdit?.runDiagnostics ?? createLspDiagnosticsRunner(cwd, options.callDaemonTool);
-			const formatMutation = options.formatter ?? createFormatterStep({
+			// The formatter reads omo config and the project's formatter markers off disk, and nothing
+			// before the first mutation tool result can observe it: built on first use, so a session
+			// that never edits a file never pays for it.
+			const formatMutation = createLazyValue(() => options.formatter ?? createFormatterStep({
 				config: loadSenpiOmoConfig({ cwd }).config.formatOnMutation,
 				markers: markerCwd => listProjectMarkers(markerCwd),
 				readMarker: (markerCwd, marker) => readProjectMarker(markerCwd, marker),
 				logger: ctx.logger,
-			});
+			}));
 			registerLspFlags(pi);
 			if (ctx.config.getFlag(LSP_TOOLS_ENABLED_FLAG) === false) return;
 
-			for (const notice of getConfigNotices()) {
-				ctx.logger.warn(
-					"omo-senpi ignored project-local LSP commands; move custom commands to the user .pi config",
-					notice,
-				);
-			}
+			// A startup diagnostic, not a precondition: reading both .pi configs is fs work the first
+			// paint should not wait for, and the warning still reaches the same logger one tick later.
+			deferUntilAfterFirstPaint(ctx, "lsp project-config notices", () => {
+				for (const notice of getConfigNotices()) {
+					ctx.logger.warn(
+						"omo-senpi ignored project-local LSP commands; move custom commands to the user .pi config",
+						notice,
+					);
+				}
+			});
 
 			registerLspTools(pi, cwd);
 
 			pi.on("tool_result", async (event, eventCtx) => {
 					const parsed = isToolResultLike(event) ? event : undefined;
 					if (!parsed) return undefined;
-					const formatted = await formatMutation(parsed, pi.cwd ?? process.cwd(), sessionIdFromContext(eventCtx));
+					const formatted = await formatMutation.get()(parsed, pi.cwd ?? process.cwd(), sessionIdFromContext(eventCtx));
 					const afterFormat = formatted.content ? { ...parsed, content: [...parsed.content, ...formatted.content] } : parsed;
 					if (formatted.error) return { content: afterFormat.content, isError: true };
 					if (ctx.config.getFlag(LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG) === false) return formatted.content ? { content: afterFormat.content } : undefined;
-					return handlePostEditDiagnosticsToolResult(afterFormat, eventCtx, runPostEditDiagnostics, postEditState);
+					const diagnosed = await handlePostEditDiagnosticsToolResult(afterFormat, eventCtx, runPostEditDiagnostics, postEditState, pi.cwd ?? process.cwd());
+					return diagnosed ?? (formatted.content ? { content: afterFormat.content } : undefined);
 				});
 			if (ctx.config.getFlag(LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG) !== false) {
 				pi.on("session_start", (_event, eventCtx) => {
@@ -163,12 +175,15 @@ export async function handlePostEditDiagnosticsToolResult(
 	ctx?: unknown,
 	runDiagnostics: DiagnosticsRunner = createLspDiagnosticsRunner(process.cwd()),
 	state: LspPostEditSessionState = DEFAULT_POST_EDIT_SESSION_STATE,
+	cwd: string = process.cwd(),
 ): Promise<ToolResultHandlerResult | undefined> {
 	if (!isToolResultLike(event)) return undefined;
 	if (shouldRunPostEditDiagnostics(event)) {
 		reportToolHookStatus(ctx, "(OmO) Checking LSP Diagnostics");
 	}
-	const result = await appendPostEditDiagnostics(event, runDiagnostics, state.getOrCreate(sessionIdFromContext(ctx)));
+	const agentDirs = [resolveSessionAgentDir(ctx) ?? resolveAgentHome({ env: process.env })];
+	const locateFile = (filePath: string) => classifyPostEditFileLocation(filePath, { cwd, agentDirs });
+	const result = await appendPostEditDiagnostics(event, runDiagnostics, state.getOrCreate(sessionIdFromContext(ctx)), locateFile);
 	syncPostEditDiagnosticsWidget((key, content, options) => {
 		if (isWidgetContext(ctx)) {
 			ctx.ui?.setWidget?.(key, content, options);
@@ -184,27 +199,6 @@ export function createLspDiagnosticsRunner(cwd: string, callDaemonTool: DaemonTo
 		const result = await callDaemonTool("lsp_diagnostics", { filePath, severity: "error" }, { cwd });
 		return postEditOutcomeFromDaemonResult(result);
 	};
-}
-
-function postEditOutcomeFromDaemonResult(result: {
-	readonly content: readonly { readonly type: string; readonly text?: string }[];
-	readonly details?: unknown;
-}): PostEditDiagnosticsOutcome {
-	const availability = notConfiguredAvailability(result.details);
-	if (availability !== undefined) return { kind: "not_configured", extension: availability.extension };
-	return result.content
-		.filter((block) => block.type === "text")
-		.map((block) => block.text)
-		.join("\n");
-}
-
-function notConfiguredAvailability(details: unknown): { readonly extension: string } | undefined {
-	if (!isRecord(details)) return undefined;
-	const availability = details["availability"];
-	if (!isRecord(availability)) return undefined;
-	if (availability["kind"] !== "not_configured") return undefined;
-	const extension = availability["extension"];
-	return typeof extension === "string" && extension.length > 0 ? { extension } : undefined;
 }
 
 function isToolResultLike(value: unknown): value is ToolResultLike {

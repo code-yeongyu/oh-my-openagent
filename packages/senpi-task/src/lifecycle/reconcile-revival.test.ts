@@ -12,6 +12,7 @@ import { acquireSessionAdmissionLease } from "./admission-lease"
 import { createTaskLifecycle } from "./create"
 import type { ProcessSignaller, RespawnResult } from "./port"
 import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -74,6 +75,7 @@ function injectedHarness(options: {
     },
   }
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry,
     config: settings(options.config),
@@ -156,6 +158,34 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // then
     expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
     expect(harness.store.load(record.task_id)).toEqual({ ...record, terminal_at: record.updated_at })
+    expect(harness.signals).toHaveLength(0)
+  })
+
+  test("#given a host-session record with a live daemon pid but no live session #when reconciled #then session liveness decides ownership", async () => {
+    // given
+    const store = tempStore()
+    const record = seedRecord(store, {
+      task_id: "st_1000001c",
+      parent_session_id: parentSessionId,
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "process",
+      runner_kind: "host-session",
+      host_pid: 3333,
+      host_session: {
+        socket: "/tmp/senpi.sock",
+        routing_id: "route-1",
+        session_path: "/tmp/session.jsonl",
+        instance_id: "instance-1",
+      },
+    })
+    const harness = injectedHarness({ store, alive: new Set([3333]) })
+
+    // when
+    const result = await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+    // then
+    expect(result.outcomes.find((entry) => entry.task_id === record.task_id)?.kind).not.toBe("deferred")
     expect(harness.signals).toHaveLength(0)
   })
 
@@ -272,6 +302,29 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(harness.store.load(record.task_id)?.host_pid).toBeUndefined()
   })
 
+  test("#given a resumed session whose revival deferred #when the child is refused #then the refusal names the deferral, not a resume that already happened (omo#9498)", async () => {
+    // given
+    const harness = injectedHarness({
+      onRespawn: async () => ({
+        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+      }),
+    })
+    const record = withV1(harness.store, seedRecord(harness.store, {
+      task_id: "st_10000099", parent_session_id: parentSessionId, status: "running",
+      residency_state: "persisted_only", execution_mode: "in-process",
+    }))
+    persistSession(harness.store, record.task_id)
+
+    // when
+    await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+    // then
+    const after = harness.store.load(record.task_id)
+    if (after === null) throw new Error("record vanished")
+    expect(after.suspension_reason).toBe("revival_deferred")
+    expect(after.revival_deferred_reason).toBe("model_unavailable")
+  })
+
   test("#given retryable respawn failure and rollback lock failure #when reconciled #then the outcome loudly names the failed rollback", async () => {
     // given
     const backing = tempStore()
@@ -375,6 +428,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
     })
     store.replace({ ...withV1(store, seeded, "persisted effective prompt"), pending_steering: queue })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: {
         get: (taskId) => manager.getResidentHandle(taskId) === undefined ? undefined : {
@@ -384,7 +438,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
           terminate: async () => undefined,
         },
         entries: () => [],
-        forget: (taskId) => manager.forget(taskId),
+        forget: (taskId, options) => manager.forget(taskId, options),
         hasPendingSends: () => false,
       },
       config: settings(), hostPid, now,
@@ -610,6 +664,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
     })
     if (held.kind !== "acquired") throw new Error("expected held admission lease")
     const contended = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store: harness.store,
       registry: new FakeRegistry(),
       config: settings(), hostPid, now,

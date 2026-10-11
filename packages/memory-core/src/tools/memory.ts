@@ -7,6 +7,7 @@ import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
 import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
+import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
 
 export type MemoryCommand =
@@ -63,7 +64,8 @@ export interface RunMemoryToolOptions {
 type AppliedCommand = { affectedPaths: string[] }
 
 export async function runMemoryTool(options: RunMemoryToolOptions): Promise<MemoryToolResult> {
-  const { repo, lock, params } = options
+  const { repo, lock } = options
+  const { params, repairs } = repairLeakedArguments(options.params)
   try {
     const reason = required(params.reason, "reason").trim()
     const result = await commitMemoryWrite({
@@ -77,7 +79,7 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
       apply: async () => (await applyCommand(repo.dir, params)).affectedPaths,
     })
     return {
-      message: result.message,
+      message: `${result.message}${describeRepairs(repairs)}`,
       commit: { sha: result.sha, subject: result.subject, affectedPaths: result.affectedPaths },
     }
   } catch (error) {

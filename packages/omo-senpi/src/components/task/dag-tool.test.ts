@@ -46,7 +46,9 @@ function fixture(): {
   return {
     manager,
     store,
-    runFileCount: () => fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length,
+    runFileCount: () => fs.existsSync(store.paths.runs)
+      ? fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length
+      : 0,
   }
 }
 

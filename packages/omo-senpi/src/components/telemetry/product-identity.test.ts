@@ -6,6 +6,12 @@ import { mkdtempSync } from "node:fs"
 import {
   BUILTIN_CATEGORY_NAMES,
   BUILTIN_SKILL_NAMES,
+  COMPUTER_USE_ACTIVATION_SOURCES,
+  COMPUTER_USE_BACKENDS,
+  COMPUTER_USE_ENGINE_ERROR_CODES,
+  COMPUTER_USE_PERMISSIONS,
+  COMPUTER_USE_PERMISSION_SCOPES,
+  COMPUTER_USE_PLATFORMS,
   CURATED_AGENTS,
   KNOWN_MODELS,
   KNOWN_PROVIDERS,
@@ -74,6 +80,7 @@ describe("OmO Native product identity", () => {
     expect(OMO_NATIVE_POSTHOG_API_KEY).not.toBe(UNCONFIGURED_POSTHOG_API_KEY)
     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
+    expect(config.productName).toBe("omo-native")
     expect(config.machineIdPrefix).toBe("omo-senpi:")
     expect(config.packageVersion).toBe(readStampedWorkspaceVersion())
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
@@ -135,11 +142,11 @@ describe("OmO Native product identity", () => {
   })
 
   test("#given the senpi Claude subscription lane #when masked #then it exports as itself with the anthropic vocabulary", () => {
-    // #8051: the builtin Claude rungs head with claude-sdk-oauth, so the category-model insight must
+    // #8051: the builtin Claude rungs head with anthropic-subscription, so the category-model insight must
     // read that provider as itself instead of collapsing the most-routed Claude lane to `custom`.
-    expect(KNOWN_MODELS["claude-sdk-oauth"]).toEqual(KNOWN_MODELS.anthropic)
-    expect(maskProviderAndModel("claude-sdk-oauth", "claude-opus-5")).toEqual({
-      provider: "claude-sdk-oauth",
+    expect(KNOWN_MODELS["anthropic-subscription"]).toEqual(KNOWN_MODELS.anthropic)
+    expect(maskProviderAndModel("anthropic-subscription", "claude-opus-5")).toEqual({
+      provider: "anthropic-subscription",
       model_id: "claude-opus-5",
     })
   })
@@ -231,8 +238,8 @@ describe("OmO Native product identity", () => {
       "token_status", "tool_calls", "total_tokens", "turns",
     ].sort())
     expect(Object.keys(categoryConfig).sort()).toEqual([
-      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep",
-      "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
+      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep_high",
+      "cat_deep_low", "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
       "cat_visual_engineering", "cat_writing", "combo_fingerprint", "config_generation", "source",
       "user_category_count",
     ].sort())
@@ -267,6 +274,30 @@ describe("OmO Native product identity", () => {
 
     // and: session_started now carries the honestly-labeled timezone signal
     expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.timezone).toEqual({ type: "string" })
+  })
+
+  test("#given computer-use telemetry schemas #when inspected #then every property and string value is closed", () => {
+    // given
+    const activation = OMO_NATIVE_EVENT_SCHEMAS.computer_use_activation
+    const permission = OMO_NATIVE_EVENT_SCHEMAS.computer_use_permission_denied
+    const engineError = OMO_NATIVE_EVENT_SCHEMAS.computer_use_engine_error
+
+    // then
+    expect(Object.keys(activation).sort()).toEqual([
+      "$session_id", "active", "backend", "host_platform", "source",
+    ].sort())
+    expect(Object.keys(permission).sort()).toEqual([
+      "$session_id", "backend", "host_platform", "permission", "scope",
+    ].sort())
+    expect(Object.keys(engineError).sort()).toEqual([
+      "$session_id", "backend", "code", "host_platform",
+    ].sort())
+    expect(activation.source.values).toEqual(COMPUTER_USE_ACTIVATION_SOURCES)
+    expect(activation.host_platform.values).toEqual(COMPUTER_USE_PLATFORMS)
+    expect(activation.backend.values).toEqual(COMPUTER_USE_BACKENDS)
+    expect(permission.scope.values).toEqual(COMPUTER_USE_PERMISSION_SCOPES)
+    expect(permission.permission.values).toEqual(COMPUTER_USE_PERMISSIONS)
+    expect(engineError.code.values).toEqual(COMPUTER_USE_ENGINE_ERROR_CODES)
   })
 
   test("#given the shared schema version #when the native clients are configured #then one exported constant carries it", () => {

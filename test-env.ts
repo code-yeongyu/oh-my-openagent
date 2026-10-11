@@ -2,6 +2,7 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { markTestInfrastructureDir } from "./test-temp-root"
 
 // Preloaded ahead of test-setup.ts on purpose.
 //
@@ -15,5 +16,6 @@ import { join } from "node:path"
 // per-process directory means workers no longer share one cache/storage tree and stop
 // deleting each other's fixtures in beforeEach/afterEach.
 const xdgRoot = mkdtempSync(join(tmpdir(), "omo-test-xdg-"))
+markTestInfrastructureDir(xdgRoot)
 process.env.XDG_DATA_HOME = join(xdgRoot, "data")
 process.env.XDG_CACHE_HOME = join(xdgRoot, "cache")

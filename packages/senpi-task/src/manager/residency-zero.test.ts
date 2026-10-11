@@ -13,6 +13,7 @@ import {
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { SpawnAdmission, TaskManager } from "./types"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 afterEach(cleanupProjects)
 
@@ -51,10 +52,10 @@ function makeZeroCapManager(): TaskManager {
       const handle = toResidentHandle(manager().getResidentHandle(taskId))
       return handle === undefined ? [] : [handle]
     }),
-    forget: (taskId) => manager().forget(taskId),
+    forget: (taskId, options) => manager().forget(taskId, options),
     hasPendingSends: () => false,
   }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   managerRef = createTaskManager({
     store,
     runners: { "in-process": runner, process: runner },
@@ -73,10 +74,9 @@ function makeZeroCapManager(): TaskManager {
 }
 
 describe("TaskManager zero residency cap", () => {
-  test("#given a zero residency cap #when sixteen children start #then admits more than the default residency cap", async () => {
+  test("#given a zero residency cap #when sixteen children start #then every child is admitted", async () => {
     // given
     const manager = makeZeroCapManager()
-    expect(settings().residency_max_children).toBe(8)
 
     // when
     const results = await Promise.all(

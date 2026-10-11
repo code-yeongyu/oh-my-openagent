@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { acquireSessionAdmissionLease } from "../lifecycle/admission-lease"
 import { createTaskId } from "../state/id"
-import { messageability, type TaskRecord } from "../state"
+import { messageability, nextRunEpoch, type TaskRecord } from "../state"
 import { oneShotPolicyDenial } from "../steering/engine-policy"
 import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
 import { createWorkpoolStore } from "../workpool/store"
@@ -49,14 +49,25 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
     const decision = decideDepthPolicy({ childDepth: start.depth, maxDepth: plan.maxDepth ?? options.config.max_depth,
       targetAgentType: agent.subagent_type ?? plan.agentType, allowedSubagents: plan.allowedSubagents ?? [] })
     if (!decision.allowed) throw new WorkpoolError("policy_denied", decision.reason)
-    const executionMode = resolveExecutionMode({ agentMode: plan.agentExecutionMode, configMode: options.config.default_execution_mode })
+    // A pool worker follows the same chain as a task child. The `auto` resolution is READ here, not
+    // awaited: pool creation is synchronous by contract, so a pool opened before this session ever
+    // ensured the daemon gets the conservative in-process default.
+    const autoMode = options.executionModeGate?.current()
+    const executionMode = resolveExecutionMode({
+      agentMode: plan.agentExecutionMode,
+      configMode: options.config.default_execution_mode,
+      ...(autoMode === undefined ? {} : { autoMode }),
+    })
     return { start: { ...start, execution_mode: executionMode }, plan }
   }
 
   function request(input: WorkpoolRequest): { cancel(): void } {
     const { pool, item, worker } = input
     const taskId = worker?.task_id ?? item.binding?.task_id ?? createTaskId()
-    const epoch = worker === undefined ? 0 : worker.run_epoch + 1
+    // A reused worker's next turn is its task's next run: one above every epoch the task ever issued, so a turn never
+    // takes an epoch a rollback burnt (#9562).
+    const workerRecord = worker === undefined ? undefined : ports.get(taskId)
+    const epoch = worker === undefined ? 0 : workerRecord === undefined ? worker.run_epoch + 1 : nextRunEpoch(workerRecord)
     const model = pool.worker_spec.plan.model
     const turn = { pool_id: pool.pool_id, generation: pool.generation, task_id: taskId, run_epoch: epoch }
     let cancelled = false
@@ -73,7 +84,7 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
         input.authorize()
         if (worker !== undefined) {
           const record = ports.get(taskId)
-          if (record === undefined || record.parent_session_id !== pool.parent_session_id || record.notification.run_epoch !== worker.run_epoch ||
+          if (record === undefined || record.parent_session_id !== pool.parent_session_id || record.notification.run_epoch !== worker.run_epoch || nextRunEpoch(record) !== epoch ||
             (!isColdRevivalCandidate(record) && messageability(record.status, record.residency_state, record.execution_mode, record.killed) !== "revive") ||
             oneShotPolicyDenial(record) !== undefined || (ports.pending(taskId) && (record.pending_steering ?? []).some(entry => entry.workpool?.pool_id !== pool.pool_id))) {
             throw new WorkpoolError("worker_not_continuable", "Worker is no longer eligible for reuse.")
@@ -103,13 +114,16 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
             if (!acquired.lease.isOwner()) throw new WorkpoolError("admission_refused", "Residency admission lease was displaced.")
             // Grants are resolved AFRESH for every new worker: an existing worker never rebinds.
             const kernelTools = await resolveWorkerKernelTools(pool, ports.kernelToolBindings, options.resolveChildToolNames?.())
+            const processLaunch = pool.worker_spec.start.execution_mode === "process"
+              ? await workpoolProcessLaunch(options.store.stateDir, taskId, options.resolveInheritedExtensions)
+              : undefined
             if (!input.bind(taskId, epoch)) return
             context = prepareWorkpoolLaunch({ options, workerSpec: pool.worker_spec, taskId, hostPid: ports.hostPid,
               taskSeq: ports.nextSequence(pool.parent_session_id),
               spec: { ...pool.worker_spec.start,
                 memberScopedTools: ports.workerTools(taskId),
                 ...(kernelTools === undefined ? {} : { kernelTools }),
-                ...(pool.worker_spec.start.execution_mode === "process" ? workpoolProcessLaunch(options.store.stateDir, taskId) : {}),
+                ...(processLaunch === undefined ? {} : processLaunch),
               },
             })
           } finally { acquired.lease.release() }
@@ -147,7 +161,7 @@ function refusal(outcome: Exclude<SendOutcome, { kind: "revived" }>): WorkpoolEr
       return new WorkpoolError(outcome.kind, outcome.reason)
     case "capacity_deferred": return new WorkpoolError("admission_refused", outcome.reason)
     case "one_shot_agent": return new WorkpoolError("worker_not_continuable", outcome.message)
-    case "not_continuable": case "not_found": return new WorkpoolError("worker_not_continuable", outcome.reason)
+    case "not_continuable": case "not_found": case "stale": return new WorkpoolError("worker_not_continuable", outcome.reason)
     case "queued": case "steered": return new WorkpoolError("delivery_uncertain", "Worker did not acknowledge the expected admitted epoch.")
     default: return assertNever(outcome)
   }

@@ -5,6 +5,7 @@ import type { RunnerOutcome } from "@oh-my-opencode/senpi-task"
 import { OmoMemoryRecallSchema } from "@oh-my-opencode/omo-config-core"
 
 import { resolveKibitzerSidecarSettings } from "./settings"
+import { KibitzerSidecarStartError } from "./sidecar-model"
 import { KIBITZER_RESEED_FRACTION, KIBITZER_SIDECAR_MAX_TOKENS, KIBITZER_WAKE_DEADLINE_MS, KIBITZER_WAKE_TOOL_BUDGET } from "./sidecar"
 import { KIBITZER_WAKE_MAX_TOTAL_MS } from "./sidecar-contract"
 import { candidate, fakeChild, fakeWakeSlot, sidecarHarness, withinMs, type FakeChild, type SidecarHarness } from "./sidecar.test-support"
@@ -430,6 +431,47 @@ describe("KibitzerSidecar lifecycle", () => {
     expect(candidatePathsOf(retry.input.prompt)).toEqual([K8S])
     expect(harness.sidecar.events.size()).toBe(0)
   })
+
+  test("#given the pinned recall category's chain has no connected provider #when the wake is offered #then the refusal is a non-diagnostic configuration state, and a provider connecting mid-session self-heals", async () => {
+    const started: FakeChild[] = []
+    let connected = false
+    const harness = sidecarHarness({
+      startChild: async (input) => {
+        if (!connected) {
+          throw new KibitzerSidecarStartError("category_unavailable", "Kibitzer sidecar model unavailable: quick (category_unavailable)", {
+            category: "quick",
+            missingProviders: ["chatgpt-subscription", "openai"],
+          })
+        }
+        const child = fakeChild(input)
+        started.push(child)
+        return child.handle
+      },
+    })
+    harness.prompt(1, "how do we handle kubernetes rollouts")
+
+    const result = await harness.offer([candidate(K8S)])
+
+    // A permanent configuration state is not a streak failure: nothing here feeds the gate notice,
+    // and the wake record names the dead category and its unconnected providers.
+    expect(result).toEqual({ action: "buffered", reason: "backoff" })
+    expect(harness.outcomes).toHaveLength(1)
+    expect(harness.outcomes[0]).toMatchObject({
+      status: "failed",
+      cause: "start_failed",
+      diagnostic: false,
+      configuration: { category: "quick", cause: "category_unavailable", missingProviders: ["chatgpt-subscription", "openai"] },
+    })
+    expect(harness.children).toHaveLength(0)
+    expect(harness.slot.held()).toBe(0)
+
+    // The refusal is re-resolved against the live registry on the next wake, so a provider connecting
+    // mid-session (or a stale early snapshot catching up) recovers without a restart.
+    connected = true
+    harness.timers.fire()
+    expect(await harness.offer([candidate(K8S)])).toEqual({ action: "seeded", wake: 2 })
+    expect(started).toHaveLength(1)
+  })
 })
 
 describe("KibitzerSidecar wake governance", () => {
@@ -607,6 +649,7 @@ describe("KibitzerSidecar wake governance", () => {
       sidecarMaxTokens: 500,
       maxConcurrentWakes: 1,
       eventCaps: { toolArgs: 400, resultHead: 600, assistant: 1500, prompt: 12 },
+      queryExpansion: false,
     })
     const harness = sidecarHarness({ toolBudget: settings.toolBudget, sidecarMaxTokens: settings.sidecarMaxTokens, eventCaps: settings.eventCaps })
     harness.prompt(1, "how do we handle kubernetes rollouts")

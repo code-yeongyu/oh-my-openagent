@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path"
 
 import { seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 export function seedResumeProject(sandbox, omoConfig) {
   seedSandbox(sandbox)
@@ -33,7 +34,7 @@ export function startResumeRun(input) {
   const child = spawn(input.senpiBin, args, {
     cwd: input.sandbox.cwd,
     env: {
-      ...process.env,
+      ...isolatedChildEnv(process.env, input.sandbox.agentDir),
       SENPI_CODING_AGENT_DIR: input.sandbox.agentDir,
       XDG_CONFIG_HOME: input.sandbox.xdgConfigHome,
       // Same HOME isolation as the team runtime: the omo user-scope config resolves from HOME.
@@ -116,18 +117,20 @@ export function waitForFileCommand(path) {
 
 // AGENT-side bash command blocking until a store record named `name` reaches `status` (the LRU
 // lane uses it to guarantee the first child is a terminal idle resident before the second spawn).
-export function waitForRecordStatusCommand(cwd, name, status) {
-  const dir = join(taskStateDir(cwd), "tasks")
+export function waitForRecordStatusCommand(sandbox, name, status) {
+  const dir = join(taskStateDir(sandbox), "tasks")
   const script = `const fs=require('fs'),path=require('path');const dir=process.argv[1],name=process.argv[2],want=process.argv[3];const until=Date.now()+60000;function hit(){if(!fs.existsSync(dir))return false;for(const f of fs.readdirSync(dir)){if(!f.endsWith('.json'))continue;try{const r=JSON.parse(fs.readFileSync(path.join(dir,f),'utf8'));if(r.name===name&&r.status===want)return true}catch(e){/* mid-write record file: skip and retry on next poll */}}return false}(function poll(){if(hit())process.exit(0);if(Date.now()>until){console.error('timed out waiting for record '+name+' status '+want);process.exit(1)}setTimeout(poll,50)})()`
   return `node -e "${script}" ${JSON.stringify(dir)} ${JSON.stringify(name)} ${JSON.stringify(status)}`
 }
 
-export function taskStateDir(cwd) {
-  return join(cwd, ".omo", "senpi-task")
+// Where the engine of a run started by startResumeRun keeps this sandbox's task state: every child
+// runs on isolatedChildEnv, so its agent-dir lanes all point at sandbox.agentDir.
+export function taskStateDir(sandbox) {
+  return sandboxStateDir(sandbox)
 }
 
-export function readTaskRecords(cwd) {
-  const dir = join(taskStateDir(cwd), "tasks")
+export function readTaskRecords(sandbox) {
+  const dir = join(taskStateDir(sandbox), "tasks")
   if (!existsSync(dir)) return []
   const records = []
   for (const entry of readdirSync(dir)) {
@@ -141,21 +144,21 @@ export function readTaskRecords(cwd) {
   return records
 }
 
-export function findTaskByName(cwd, name) {
-  return readTaskRecords(cwd).find((record) => record?.name === name)
+export function findTaskByName(sandbox, name) {
+  return readTaskRecords(sandbox).find((record) => record?.name === name)
 }
 
-export function recordFileExists(cwd, taskId) {
-  return existsSync(join(taskStateDir(cwd), "tasks", `${taskId}.json`))
+export function recordFileExists(sandbox, taskId) {
+  return existsSync(join(taskStateDir(sandbox), "tasks", `${taskId}.json`))
 }
 
-export function taskEventText(cwd, taskId) {
-  const path = join(taskStateDir(cwd), "logs", `${taskId}.jsonl`)
+export function taskEventText(sandbox, taskId) {
+  const path = join(taskStateDir(sandbox), "logs", `${taskId}.jsonl`)
   return existsSync(path) ? readFileSync(path, "utf8") : ""
 }
 
-export function childSessionText(cwd, taskId) {
-  const dir = join(taskStateDir(cwd), "children", taskId, "sessions", taskId)
+export function childSessionText(sandbox, taskId) {
+  const dir = join(taskStateDir(sandbox), "children", taskId, "sessions", taskId)
   if (!existsSync(dir)) return ""
   return readdirSync(dir)
     .filter((entry) => entry.endsWith(".jsonl"))
@@ -163,8 +166,8 @@ export function childSessionText(cwd, taskId) {
     .join("\n")
 }
 
-export function childSessionHasAssistant(cwd, taskId) {
-  return /"role"\s*:\s*"assistant"/.test(childSessionText(cwd, taskId))
+export function childSessionHasAssistant(sandbox, taskId) {
+  return /"role"\s*:\s*"assistant"/.test(childSessionText(sandbox, taskId))
 }
 
 // Revival proof AFTER the first suspension. The reconcile claim itself is a store.mutate CAS (no

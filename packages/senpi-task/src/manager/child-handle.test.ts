@@ -9,6 +9,7 @@ function fakeInProcessHandle(outcome: RunnerOutcome): InProcessChildHandle {
   return {
     task_id: "st_00000001",
     sessionId: "child-session-1",
+    effectiveModel: () => undefined,
     steer: () => Promise.resolve(),
     followUp: () => Promise.resolve(),
     abort: () => Promise.resolve(),
@@ -79,6 +80,28 @@ describe("adaptInProcessHandle", () => {
 })
 
 describe("adaptRpcHandle", () => {
+  test("#given an rpc handle carrying the host's reported model #when adapted #then the managed handle answers it as its effective model (#9722)", () => {
+    // given
+    const rpc = {
+      ...fakeRpcHandle(),
+      reportedModel: { provider: "vendor-a", id: "opened-model" },
+    }
+
+    // when
+    const managed = adaptRpcHandle(rpc)
+
+    // then
+    expect(managed.effectiveModel?.()).toEqual({ provider: "vendor-a", id: "opened-model" })
+  })
+
+  test("#given an rpc handle with no reported model #when adapted #then the managed handle reports none (#9722)", () => {
+    // given / when
+    const managed = adaptRpcHandle(fakeRpcHandle())
+
+    // then
+    expect(managed.effectiveModel?.()).toBeUndefined()
+  })
+
   test("#given an rpc terminal provider error on a resident process #when adapted #then the outcome is a child-turn error carrying the provider message", async () => {
     // given
     const handle = adaptRpcHandle(
@@ -163,5 +186,18 @@ describe("adaptRpcHandle", () => {
     if (outcome.status !== "error") throw new Error("expected error outcome")
     expect(outcome.failure.kind).toBe("child-prompt-failed")
     expect(outcome.failure.message).toContain("boom")
+  })
+})
+
+describe("adapted handle kind", () => {
+  test("#given each runner's handle #when adapted #then the kind states which runner owns the child", () => {
+    // given / when
+    const inProcess = adaptInProcessHandle(fakeInProcessHandle({ status: "completed", finalResponse: "done" }))
+    const rpc = adaptRpcHandle(fakeRpcHandle())
+    const hostSession = adaptRpcHandle({ ...fakeRpcHandle(), kind: "host-session", pid: undefined } as RpcChildHandle)
+
+    // then - lifecycle teardown branches on this, and a daemon session has no pid to derive it from.
+    expect([inProcess.kind, rpc.kind, hostSession.kind]).toEqual(["in-process", "rpc", "host-session"])
+    expect(hostSession.pid).toBeUndefined()
   })
 })

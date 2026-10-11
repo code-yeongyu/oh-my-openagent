@@ -1,3 +1,6 @@
+import { parseVariantFromModelID } from "./model-string-parser"
+import { isReasoningLevelOrAuto } from "./reasoning-level"
+
 function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model
 }
@@ -5,6 +8,13 @@ function extractModelName(model: string): string {
 export function isGptModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   return modelName.includes("gpt")
+}
+
+export function isGpt6AstraModel(model: string | undefined): boolean {
+  if (!model) return false
+  const { modelID, variant } = parseVariantFromModelID(model.toLowerCase(), { allowMaxSuffix: true })
+  if (variant !== undefined && !isReasoningLevelOrAuto(variant)) return false
+  return /^(?:gpt-6-astra|gpt-6-astra-fast)$/.test(extractModelName(modelID))
 }
 
 export function isClaudeOpus46Model(model: string): boolean {
@@ -69,11 +79,38 @@ export function isKimiK2Model(model: string): boolean {
   return false
 }
 
+/**
+ * Kimi Code addresses its models by rolling product ids that carry no version
+ * signal. Moonshot upgraded `kimi-for-coding` to K2.8 Preview in place on
+ * 2026-09-11 and left `kimi-for-coding-highspeed` on K2.7 Code HighSpeed.
+ * https://www.kimi.com/code/docs/en/kimi-code/models.html (checked 2026-09-18)
+ */
+const KIMI_CODE_K27_MODEL_ID = "kimi-for-coding-highspeed"
+const KIMI_CODE_K28_MODEL_ID = "kimi-for-coding"
+
 export function isKimiK27Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
+  if (modelName === KIMI_CODE_K27_MODEL_ID) return true
   if (/kimi-k2[.\-]?7/.test(modelName)) return true
   if (/k2[-.]?p7/.test(modelName)) return true
   return false
+}
+
+export function isKimiK28Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  if (modelName === KIMI_CODE_K28_MODEL_ID) return true
+  if (/kimi-k2[.\-]?8/.test(modelName)) return true
+  if (/k2[-.]?p8/.test(modelName)) return true
+  return false
+}
+
+/**
+ * K2.7 Code and K2.8 Preview share one prompt. K2.8 is an efficiency and
+ * context upgrade inside the same K2 coding family, not a new prompting
+ * contract, so every prompt-routing site treats the two as one family.
+ */
+export function isKimiK2CodeModel(model: string): boolean {
+  return isKimiK27Model(model) || isKimiK28Model(model)
 }
 
 export function isKimiK3Model(model: string): boolean {
@@ -86,6 +123,23 @@ export function isKimiK3Model(model: string): boolean {
 export function isSWE2Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   return /^swe-2(?:[-.]|$)/.test(modelName)
+}
+
+/**
+ * The SWE-2 lanes Devin's Cascade serves. It answers every other SWE-2 uid - the bare `swe-2`, and
+ * the `swe-2-low` / `swe-2-high-lite` strings that appear only inside the Devin CLI binary - with
+ * `permission_denied`, so a config naming one fails every request.
+ */
+export const DEVIN_SWE2_SERVED_LANES = ["swe-2-medium", "swe-2-high", "swe-2-max"] as const
+
+/** An explicit `devin/` selector naming a SWE-2 id outside {@link DEVIN_SWE2_SERVED_LANES}. */
+export function isUnservedDevinSWE2Selector(selector: string): boolean {
+  const separator = selector.indexOf("/")
+  if (separator <= 0 || selector.slice(0, separator).toLowerCase() !== "devin") return false
+  // A reasoning suffix (`:high`, ` (high)`) rides on the selector, never on the uid Cascade sees.
+  const modelId = selector.slice(separator + 1).trim().toLowerCase().split(/[:\s(]/u)[0] ?? ""
+  if (!isSWE2Model(modelId)) return false
+  return !(DEVIN_SWE2_SERVED_LANES as readonly string[]).includes(modelId)
 }
 
 export function isMiniMaxModel(model: string): boolean {

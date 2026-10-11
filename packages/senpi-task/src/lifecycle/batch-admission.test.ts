@@ -12,6 +12,7 @@ import {
   settings,
   tempStore,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -20,7 +21,7 @@ function iso(offsetMs: number): string {
 }
 
 function contextFor(store: TaskRecordStore, cap: number | "unlimited"): LifecycleContext {
-  return resolveContext({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: cap }) })
+  return resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ residency_max_children: cap }) })
 }
 
 describe("admitSuspendedBatch (capacity-aware batch admission)", () => {

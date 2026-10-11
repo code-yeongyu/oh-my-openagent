@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import * as fs from "node:fs"
 import { relative } from "node:path"
 
-import type { ManagerStartSpec, ResidencyDenied, TaskManager } from "../manager/types"
+import type { ExecutionMode, ManagerStartSpec, ResidencyDenied, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import { resolveDagNodeExecutionMode, type DagExecutionModeSources } from "./execution-mode"
 import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
@@ -24,6 +24,7 @@ import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { OwnedStartResult } from "./owner"
 import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
 import type { DagFileStore } from "./store"
+import { DAG_NODE_OUTPUT_PREVIEW_CHARS } from "./types"
 import type {
   DagNode,
   DagNodeCounts,
@@ -34,6 +35,7 @@ import type {
   DagNodeTransitionReason,
   DagRunEvent,
   DagRunId,
+  DagRoute,
 } from "./types"
 
 // The per-node control verbs live beside the scheduler but keep one public entry point: callers
@@ -337,6 +339,11 @@ export function applyDagSchedulerEvent(
             now: terminalResults.now,
           })
       terminalResults?.pendingTerminalResults.delete(event.nodeId)
+      // The durable copy is written here anyway; carrying a bounded preview of it onto the node
+      // costs no extra IO and is what lets a midpoint snapshot audit the child's claim (#8674).
+      const outputText = terminalResult === undefined
+        ? replayedResult?.output
+        : terminalResult.record.final_response ?? ""
       return {
         ...record,
         nodes: record.nodes.map((node) => {
@@ -351,6 +358,12 @@ export function applyDagSchedulerEvent(
           return {
             ...transitioned,
             resultArtifact: persisted.artifact,
+            ...(outputText === undefined
+              ? {}
+              : {
+                  output: outputText.slice(0, DAG_NODE_OUTPUT_PREVIEW_CHARS),
+                  outputBytes: persisted.artifact.bytes,
+                }),
             ...(terminalResult?.record.run_stats === undefined && replayedResult?.runStats === undefined
               ? {}
               : { runStats: terminalResult?.record.run_stats ?? replayedResult?.runStats }),
@@ -408,7 +421,11 @@ function replayDagNodeResult(
   store: DagFileStore,
   runId: DagRunId,
   nodeId: DagNodeId,
-): { readonly artifact: DagNodeResultArtifact; readonly runStats?: TaskRecord["run_stats"] } | undefined {
+): {
+  readonly artifact: DagNodeResultArtifact
+  readonly output: string
+  readonly runStats?: TaskRecord["run_stats"]
+} | undefined {
   const result = readDagNodeResult({ store, runId, nodeId })
   if (result === null) return undefined
   const outputPath = store.paths.result(runId, nodeId)
@@ -416,6 +433,7 @@ function replayDagNodeResult(
   const statsPath = outputPath.replace(/\.txt$/, ".stats.json")
   const stats = readOptionalArtifact(store, statsPath)
   return {
+    output,
     artifact: {
       ...artifactRef(store, outputPath, output),
       ...(stats === undefined ? {} : { stats }),
@@ -928,6 +946,18 @@ function failNode(context: SchedulerContext, nodeId: DagNodeId, code: DagNodeErr
   context.pendingErrors.delete(nodeId)
 }
 
+// A node names its execution mode only when something already decides it: no mode configuration at
+// all, or an `auto` config the parent session has not resolved yet, both leave the choice to the
+// manager (which awaits that one resolution before it writes the record).
+function dagNodeExecutionMode(
+  context: SchedulerContext,
+  route: DagRoute,
+): { readonly execution_mode?: ExecutionMode } {
+  if (context.executionMode === undefined) return {}
+  const mode = resolveDagNodeExecutionMode({ ...context.executionMode, route })
+  return mode === undefined ? {} : { execution_mode: mode }
+}
+
 function startSpec(context: SchedulerContext, nodeId: DagNodeId): ManagerStartSpec {
   const record = context.journal.snapshot()
   const node = nodeById(record, nodeId)
@@ -939,15 +969,7 @@ function startSpec(context: SchedulerContext, nodeId: DagNodeId): ManagerStartSp
     parent_session_id: record.parentSessionId,
     root_session_id: record.rootSessionId,
     depth: (context.ancestry?.depth ?? 0) + 1,
-    ...(context.executionMode === undefined
-      ? {}
-      : {
-          execution_mode: resolveDagNodeExecutionMode({
-            route: node.route,
-            agents: context.executionMode.agents,
-            config: context.executionMode.config,
-          }),
-        }),
+    ...dagNodeExecutionMode(context, node.route),
     ...(node.route.kind === "category"
       ? { category: node.route.category }
       : { subagent_type: node.route.agent, ...(node.route.model === undefined ? {} : { model: node.route.model }) }),
@@ -1041,6 +1063,8 @@ function clearedTerminalOutcome(node: DagNode): DagNode {
     completedAt: _completedAt,
     runStats: _runStats,
     resultArtifact: _resultArtifact,
+    output: _output,
+    outputBytes: _outputBytes,
     ...cleared
   } = node as DagNodeWithResult
   return cleared

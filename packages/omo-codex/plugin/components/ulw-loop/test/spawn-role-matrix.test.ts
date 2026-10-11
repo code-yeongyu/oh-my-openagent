@@ -11,6 +11,7 @@ beforeEach(async () => {
 	cwd = await mkdtemp(join(tmpdir(), "spawn-role-matrix-"));
 	vi.stubEnv("OMO_AGENT_TOOLKIT_SURFACE", "lazycodex");
 	vi.stubEnv("PLUGIN_DATA", join(cwd, "data"));
+	vi.stubEnv("CODEX_HOME", join(cwd, "codex-home"));
 });
 afterEach(async () => {
 	vi.unstubAllEnvs();
@@ -86,6 +87,22 @@ describe("#given no active plan #when native spawns cross the role boundary", ()
 				}),
 		);
 		expect([...LAZYCODEX_SPAWN_ROLES].sort()).toEqual(names.sort());
+	});
+	it("admits every multi_agent_v1 spawn example the bundled Hephaestus rules teach", async () => {
+		const root = new URL("../../rules/bundled-rules/hephaestus/", import.meta.url);
+		const variants = (await readdir(root)).filter((file) => file.endsWith(".md")).sort();
+		expect(variants.length, "no bundled Hephaestus variant to check").toBeGreaterThan(0);
+		for (const variant of variants) {
+			const content = await readFile(new URL(variant, root), "utf8");
+			const examples = [...content.matchAll(/multi_agent_v1[.]spawn_agent[(]([{][^)]*[}])[)]/g)].map((match) =>
+				String(match[1]).replaceAll("<role>", "explorer"),
+			);
+			expect(examples.length, `${variant} has no multi_agent_v1 spawn example`).toBeGreaterThan(0);
+			for (const example of examples) {
+				const input = JSON.parse(example) as Record<string, unknown>;
+				expect(guard("multi_agent_v1.spawn_agent", input), `${variant}: ${example}`).toBe("");
+			}
+		}
 	});
 	it("still enforces admission breakers after role validation", async () => {
 		await mkdir(join(cwd, "data", "spawn-breaker"), { recursive: true });

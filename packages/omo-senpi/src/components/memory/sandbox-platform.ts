@@ -36,11 +36,11 @@ export interface PathSandboxInput {
    * bwrap smoke probe, which only spawns when the resolved path exists on this machine, so tests
    * that inject a fake `which` keep their existence-only semantics and never spawn bwrap.
    */
-  readonly probe?: (executable: string) => SandboxUsability
+  readonly probe?: (executable: string) => SandboxUsability | Promise<SandboxUsability>
 }
 
 export interface GenericSandboxTransform<T> {
-  (spawnArgs: T): T
+  (spawnArgs: T): T | Promise<T>
   readonly wasSandboxed: boolean
   readonly warning?: string
 }
@@ -64,18 +64,11 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
   }
 
-  if (platform === "linux") {
-    const usability = (input.probe ?? defaultProbe)(executable)
-    if (!usability.usable) {
-      const reason = `bwrap cannot create a sandbox: ${usability.reason}`
-      if (input.policy === "required") {
-        const error = new SandboxUnavailableError(platform, reason)
-        if (input.errorRethrow !== undefined) input.errorRethrow(error)
-        throw error
-      }
-      return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
-    }
-  }
+  // For Linux, check synchronous probes at build time (for tests), but defer async probes to transform time.
+  // This allows async probes (the real default) to not block the event loop while maintaining test compatibility.
+  let linuxProbeError: SandboxUnavailableError | undefined
+  let linuxProbeWarning: string | undefined
+  let deferAsyncProbe = false
 
   const lockPaths = input.lockPaths ?? []
   if (platform !== "darwin" && lockPaths.length > 0) {
@@ -117,7 +110,33 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     }))
   }
 
-  return guardedSandboxedTransform(input.surface, input.command, input.env, (spawnArgs, innerCommand) => ({
+  // Linux with bwrap: check synchronous probes now, defer async probes to transform time
+  if (platform === "linux") {
+    const probeResult = (input.probe ?? defaultProbe)(executable)
+    if (probeResult instanceof Promise) {
+      // Async probe - defer to transform
+      deferAsyncProbe = true
+    } else {
+      // Synchronous probe - check now for early error
+      if (!probeResult.usable) {
+        const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
+        if (input.policy === "required") {
+          linuxProbeError = new SandboxUnavailableError(platform, reason)
+          if (input.errorRethrow !== undefined) input.errorRethrow(linuxProbeError)
+          throw linuxProbeError
+        }
+        linuxProbeWarning = `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`
+      }
+    }
+  }
+
+  // Linux with bwrap: return transform that handles probe (already checked or async)
+  const innerCommand = resolveInnerCommand(input.command, input.env)
+  if (innerCommand === undefined) {
+    return identityTransform(`${input.surface} sandbox unavailable: inner command "${input.command}" is not absolute and could not be resolved; running unsandboxed`)
+  }
+
+  const buildTransform = (spawnArgs: T): T => ({
     ...spawnArgs,
     command: executable,
     args: [
@@ -128,7 +147,59 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
       "--chdir", spawnArgs.cwd,
       "--", innerCommand, ...spawnArgs.args,
     ],
-  }))
+  })
+
+  const linuxTransform = (spawnArgs: T): T | Promise<T> => {
+    // If probe error was detected at build time, throw it now
+    if (linuxProbeError !== undefined) {
+      throw linuxProbeError
+    }
+    // If probe warning was detected at build time, return identity
+    if (linuxProbeWarning !== undefined) {
+      return spawnArgs
+    }
+    // If probe was async, check it now
+    if (deferAsyncProbe) {
+      const probeResult = (input.probe ?? defaultProbe)(executable)
+      if (probeResult instanceof Promise) {
+        return probeResult.then((usability) => {
+          if (!usability.usable) {
+            const reason = `bwrap cannot create a sandbox: ${usability.reason}`
+            if (input.policy === "required") {
+              const error = new SandboxUnavailableError(platform, reason)
+              if (input.errorRethrow !== undefined) input.errorRethrow(error)
+              throw error
+            }
+            // Policy is auto - return unsandboxed
+            return spawnArgs
+          }
+          // Sandbox is usable - apply the bwrap transform
+          return buildTransform(spawnArgs)
+        })
+      } else {
+        // Should not happen - we already checked this at build time
+        // But handle it gracefully
+        if (!probeResult.usable) {
+          const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
+          if (input.policy === "required") {
+            const error = new SandboxUnavailableError(platform, reason)
+            if (input.errorRethrow !== undefined) input.errorRethrow(error)
+            throw error
+          }
+          return spawnArgs
+        }
+        return buildTransform(spawnArgs)
+      }
+    }
+    // Synchronous probe already checked and usable
+    return buildTransform(spawnArgs)
+  }
+
+  const props: { wasSandboxed: boolean; warning?: string } = { wasSandboxed: linuxProbeWarning === undefined }
+  if (linuxProbeWarning !== undefined) {
+    props.warning = linuxProbeWarning
+  }
+  return Object.assign(linuxTransform, props) as GenericSandboxTransform<T>
 }
 
 function buildDarwinProfile(input: {
@@ -165,8 +236,12 @@ function resolveExecutable(
 /**
  * Probes only executables that exist on this machine: a resolved path that is absent here comes
  * from an injected `which` seam, and spawning it would prove nothing while breaking hermeticity.
+ *
+ * The gate itself answers synchronously; only the branch that actually spawns bwrap is async. An
+ * `async` gate would return a Promise for the no-spawn case too, deferring the bwrap rebinding
+ * behind a `.then` for a probe that never runs.
  */
-function defaultProbe(executable: string): SandboxUsability {
+function defaultProbe(executable: string): SandboxUsability | Promise<SandboxUsability> {
   if (!existsSync(executable)) return { usable: true }
   return probeBwrapUsability(executable)
 }

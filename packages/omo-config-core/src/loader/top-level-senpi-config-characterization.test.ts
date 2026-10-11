@@ -68,17 +68,21 @@ const EXPECTED_CONFIG = {
       prompt_append: QUICK_PROMPT_APPEND,
       reasoning: "minimal",
     },
-    deep: {
+    "deep-low": {
       model: "openai-codex/gpt-5.6-terra",
       reasoning: "xhigh",
     },
   },
   task: {
+    isolation: { enabled: false, backend: "auto", apply: true, merge: "patch", commits: "generic" },
     default_concurrency: 5,
     global_concurrency: Math.max(8, availableParallelism() * 2),
-    default_execution_mode: "in-process",
+    default_execution_mode: "auto",
+    process_runner: "host",
+    host_engine_policy: "upgrade",
+    host_shard_prewarm: "first-turn",
     max_depth: 1,
-    residency_max_children: Math.min(16, Math.max(8, availableParallelism() * 2)),
+    residency_max_children: "unlimited",
     resume_children: true,
     resident_idle_timeout_ms: 900000,
     team: {
@@ -100,7 +104,7 @@ const EXPECTED_CONFIG = {
 } satisfies OmoConfig
 
 describe("loadOmoConfig top-level Senpi configuration characterization", () => {
-  test("#given the current top-level-only user config shape #when resolving the senpi view #then category and agent settings are preserved exactly", () => {
+  test("#given the current top-level-only user config shape #when resolving the senpi view #then category and agent settings are preserved exactly, with the retired deep key canonicalized and reported", () => {
     // given
     const root = mkdtempSync(join(tmpdir(), "omo-config-top-level-senpi-"))
     const homeDir = join(root, "home")
@@ -119,7 +123,9 @@ describe("loadOmoConfig top-level Senpi configuration characterization", () => {
       })
 
       // then
-      expect(result.diagnostics).toEqual([])
+      expect(result.diagnostics.map(({ kind, issuePaths }) => ({ kind, issuePaths }))).toEqual([
+        { kind: "deprecated-keys", issuePaths: ["categories.deep"] },
+      ])
       expect(result.config).toEqual(EXPECTED_CONFIG)
     } finally {
       rmSync(root, { force: true, recursive: true })

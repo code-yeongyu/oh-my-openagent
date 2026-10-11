@@ -30,8 +30,10 @@ jobs:
           set -euo pipefail
           scratch=$(mktemp -d)
           trap 'rm -rf "$scratch"' EXIT
-          cp script/senpi-worker-compile.ts script/senpi-worker-compile.test.ts "$scratch/"
-          cd "$scratch"
+          mkdir -p "$scratch/script" "$scratch/test-support"
+          cp script/senpi-worker-compile.ts script/senpi-worker-compile.test.ts "$scratch/script/"
+          cp test-support/remove-tree.ts "$scratch/test-support/"
+          cd "$scratch/script"
           bun --revision
           bun test
       - name: Write job summary

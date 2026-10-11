@@ -5,9 +5,11 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { configureServiceAuthCommands } from "./service-auth/commands"
+import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
 import { configureRuntimeCommands } from "./runtime-commands"
 import { runConfigMigrate } from "./config-migrate"
-import { availableInstallPlatforms, isSenpiPlatformEnabled, SENPI_PLATFORM_ENV_FLAG } from "./senpi-platform-flag"
+import { availableInstallPlatforms } from "./native-dev-platform-flag"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -18,24 +20,6 @@ const VERSION = packageJson.version
 
 const program = new Command()
 
-type InstallCommandOptions = {
-  readonly tui?: boolean
-  readonly claude?: InstallArgs["claude"]
-  readonly openai?: InstallArgs["openai"]
-  readonly gemini?: InstallArgs["gemini"]
-  readonly copilot?: InstallArgs["copilot"]
-  readonly platform?: InstallArgs["platform"]
-  readonly opencodeZen?: InstallArgs["opencodeZen"]
-  readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
-  readonly kimiForCoding?: InstallArgs["kimiForCoding"]
-  readonly opencodeGo?: InstallArgs["opencodeGo"]
-  readonly bailianCodingPlan?: InstallArgs["bailianCodingPlan"]
-  readonly minimaxCnCodingPlan?: InstallArgs["minimaxCnCodingPlan"]
-  readonly minimaxCodingPlan?: InstallArgs["minimaxCodingPlan"]
-  readonly vercelAiGateway?: InstallArgs["vercelAiGateway"]
-  readonly codexAutonomous?: InstallArgs["codexAutonomous"]
-  readonly skipAuth?: boolean
-}
 
 type RootCommandOptions = {
   readonly platform?: InstallArgs["platform"]
@@ -53,38 +37,7 @@ type DoctorCommandOptions = {
   readonly platform?: DoctorOptions["target"]
 }
 
-export function resolveInstallArgs(
-  options: InstallCommandOptions,
-  invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
-): InstallArgs {
-  const defaultPlatform =
-    process.env.OMO_EDITION === "codex" || invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined
-  const platform = options.platform ?? defaultPlatform
-  if (platform === "senpi" && !isSenpiPlatformEnabled()) {
-    throw new Error(
-      `The senpi install platform is not available in this release. Set ${SENPI_PLATFORM_ENV_FLAG}=1 to enable it from a source checkout.`,
-    )
-  }
-
-  return {
-    tui: options.tui !== false,
-    claude: options.claude,
-    openai: options.openai,
-    gemini: options.gemini,
-    copilot: options.copilot,
-    platform,
-    opencodeZen: options.opencodeZen,
-    zaiCodingPlan: options.zaiCodingPlan,
-    kimiForCoding: options.kimiForCoding,
-    opencodeGo: options.opencodeGo,
-    bailianCodingPlan: options.bailianCodingPlan,
-    minimaxCnCodingPlan: options.minimaxCnCodingPlan,
-    minimaxCodingPlan: options.minimaxCodingPlan,
-    vercelAiGateway: options.vercelAiGateway,
-    codexAutonomous: options.codexAutonomous,
-    skipAuth: options.skipAuth ?? false,
-  }
-}
+export { resolveInstallArgs } from "./install-command-options"
 
 export { resolveCleanupPlatform }
 
@@ -277,6 +230,7 @@ program
 configureRuntimeCommands(program)
 
 program.addCommand(createMcpOAuthCommand())
+configureServiceAuthCommands(program)
 
 export function runCli(): void {
   program.parse()

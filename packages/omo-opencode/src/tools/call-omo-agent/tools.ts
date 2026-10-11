@@ -53,6 +53,7 @@ function resolveModelAndFallbackChain(args: {
   const agentCategoryVariant = agentOverride?.category
     ? userCategories?.[agentOverride.category]?.variant
     : undefined
+  const hasExplicitUserModel = Boolean(agentOverride?.model ?? agentCategoryModel)
 
   let model: DelegatedModelConfig | undefined
   if (agentOverride?.model) {
@@ -103,7 +104,8 @@ function resolveModelAndFallbackChain(args: {
 
   return {
     model,
-    fallbackChain: configuredFallbackChain ?? agentRequirement?.fallbackChain,
+    fallbackChain: configuredFallbackChain
+      ?? (hasExplicitUserModel ? undefined : agentRequirement?.fallbackChain),
   }
 }
 
