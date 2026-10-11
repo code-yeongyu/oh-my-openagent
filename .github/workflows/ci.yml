@@ -924,7 +924,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   auto-commit-schema:
-    runs-on: ubuntu-26.04
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
+    runs-on: ubuntu-24.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
@@ -974,7 +975,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   draft-release:
-    runs-on: ubuntu-26.04
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
+    runs-on: ubuntu-24.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&

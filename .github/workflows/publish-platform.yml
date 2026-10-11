@@ -143,7 +143,8 @@ jobs:
   build:
     needs: desktop-engine
     if: github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9945.
+    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-24.04' }}
     defaults:
       run:
         shell: bash
@@ -590,7 +591,8 @@ jobs:
   publish:
     needs: [build, smoke-linux-arm64]
     if: always() && !cancelled() && github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9946.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       # Each matrix leg is an independent OIDC-provenance npm publish with no shared

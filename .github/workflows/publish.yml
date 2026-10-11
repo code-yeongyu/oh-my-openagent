@@ -46,7 +46,8 @@ permissions:
 
 jobs:
   gate-reuse:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9932.
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -151,7 +152,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   preflight-trust:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9933.
+    runs-on: ubuntu-24.04
     needs: [release-metadata]
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     permissions:
@@ -220,7 +222,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   release-metadata:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9934.
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
@@ -333,7 +336,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   prepare-release-state:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9935.
+    runs-on: ubuntu-24.04
     needs: [gate-reuse, preflight-trust, release-metadata]
     if: >-
       always() &&
@@ -648,7 +652,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   dispatch-provenance-safe-publish:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9936.
+    runs-on: ubuntu-24.04
     needs: [release-metadata, prepare-release-state]
     if: >-
       always() &&
@@ -722,7 +727,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-main:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9937.
+    runs-on: ubuntu-24.04
     # post-publish-verify runs the published-package probes in a job that cannot block the release, so the
     # lazycodex publish decision has to cross the job boundary as an output.
     outputs:
@@ -1064,7 +1070,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   verify-release-notes:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9938.
+    runs-on: ubuntu-24.04
     needs: [release-metadata, prepare-release-state]
     # A LazyCodex-only release creates no omo GitHub release, so it has no CHANGELOG section to verify.
     if: >-
@@ -1119,7 +1126,8 @@ jobs:
     secrets: inherit
 
   release:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9939.
+    runs-on: ubuntu-24.04
     needs: [release-metadata, prepare-release-state, publish-main, publish-platform]
     if: >-
       always() &&
@@ -1438,7 +1446,8 @@ jobs:
     secrets: inherit
 
   post-publish-verify:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9940.
+    runs-on: ubuntu-24.04
     # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
     # probe can't hold a runner for GitHub's 6 h default (#9492).
     timeout-minutes: 120

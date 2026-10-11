@@ -15,7 +15,8 @@ concurrency:
 jobs:
   deploy:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9943.
+    runs-on: ubuntu-24.04
     # The Sisyphus Labs account (moved 2026-10-09). The token in this environment can edit Workers scripts and
     # the omo.dev zone's routes; it has NO D1 access, so migrations are applied by a separate reviewed step.
     environment:
