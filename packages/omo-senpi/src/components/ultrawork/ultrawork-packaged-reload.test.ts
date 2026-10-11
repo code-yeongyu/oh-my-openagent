@@ -1,74 +1,44 @@
 import { describe, expect, it, onTestFinished, spyOn } from "bun:test"
 import * as childProcess from "node:child_process"
-import { mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import { cleanUpReloadRun, ownsHostSocket, type ReloadHost } from "./packaged-reload-cleanup.test-support"
 import { dispatchInput, sessionEventCtx } from "./ultrawork.test-support"
 
-describe("omo-senpi ultrawork once-per-session arming", () => {
+describe("omo-senpi ultrawork packaged reload", () => {
   it("#given the packaged extension reloaded uncached #when the same session triggers on the second load #then injects the reminder not the full directive", async () => {
     // The full plugin also prewarms a real task host. Own its short socket/temp root,
     // observe each warmup's directory removal, and retain its spawn handle (#9766).
     const root = mkdtempSync(process.platform === "win32" ? join(tmpdir(), "omo-ulw-reload-") : "/tmp/omo-ulw-reload-")
-    const hosts: Array<{ readonly child: childProcess.ChildProcess; readonly exited: Promise<void> }> = []
+    const hosts: ReloadHost[] = []
     const sessions: FakeExtensionAPI[] = []
-    onTestFinished(async () => {
-      for (const pi of sessions) await pi.dispatch("session_shutdown", {})
-      for (const { child } of hosts) {
-        if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM")
-      }
-      const waitForExit = async (): Promise<void> => {
-        let timer: ReturnType<typeof setTimeout> | undefined
-        try {
-          await Promise.race([
-            Promise.all(hosts.map(({ exited }) => exited)),
-            new Promise<never>((_, reject) => {
-              timer = setTimeout(() => reject(new Error("packaged reload task host did not exit")), 10_000)
-            }),
-          ])
-        } finally {
-          clearTimeout(timer)
-        }
-      }
-      let exited = false
-      try {
-        try {
-          await waitForExit()
-          exited = true
-        } catch (error) {
-          for (const { child } of hosts) {
-            if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
-          }
-          await waitForExit()
-          exited = true
-          throw error
-        }
-        expect(readdirSync(root).filter((name) => name.startsWith("senpi-rpc-host-internal-"))).toEqual([])
-      } finally {
-        if (exited) rmSync(root, { recursive: true, force: true })
-      }
-    })
     const pinned = { TMPDIR: root, TEMP: root, TMP: root, OMO_CODING_AGENT_DIR: join(root, "agent"), OMO_RPC_SHARD_ROOT: join(root, "shards") }
     const previous = Object.fromEntries(Object.keys(pinned).map((name) => [name, process.env[name]]))
-    onTestFinished(() => {
+    const restores: Array<() => void> = [() => {
       for (const [name, value] of Object.entries(previous)) {
         if (value === undefined) delete process.env[name]
         else process.env[name] = value
       }
-    })
+    }]
+    onTestFinished(() => cleanUpReloadRun({
+      root,
+      shutdowns: sessions.map((pi) => () => pi.dispatch("session_shutdown", {})),
+      hosts,
+      restore: () => { for (const restore of restores) restore() },
+    }))
     Object.assign(process.env, pinned)
     const spawn = childProcess.spawn
     const spawnSpy = spyOn(childProcess, "spawn")
-    onTestFinished(() => spawnSpy.mockRestore())
+    restores.push(() => spawnSpy.mockRestore())
     spawnSpy.mockImplementation(new Proxy(spawn, {
       apply(target, thisArg, args) {
         const child: childProcess.ChildProcess = Reflect.apply(target, thisArg, args)
-        const launchArgs: readonly string[] | undefined = args[1]
-        if (launchArgs?.includes("--socket") && launchArgs.some((arg) => arg.startsWith(root))) {
+        if (ownsHostSocket(args[1], root)) {
           const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
           hosts.push({ child, exited })
         }
@@ -79,7 +49,7 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     let completedWarmups = 0
     const remove = fs.rm
     const rmSpy = spyOn(fs, "rm")
-    onTestFinished(() => rmSpy.mockRestore())
+    restores.push(() => rmSpy.mockRestore())
     rmSpy.mockImplementation(async (...args: Parameters<typeof remove>) => {
       await remove(...args)
       const path = args[0]
@@ -91,7 +61,7 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     // A query-suffixed relative import reproduces Senpi's uncached Jiti importer:
     // Bun keys its module cache on the full specifier (a file URL drops the query).
     const loadPackagedExtension = async (reload: number): Promise<(pi: unknown) => Promise<void>> => {
-      const module = await import(`../../../plugin/extensions/omo.js?reload=${reload}`)
+      const module = (await import(`../../../plugin/extensions/omo.js?reload=${reload}`)) as { default: (pi: unknown) => Promise<void> }
       return module.default
     }
     const ctx = { ...sessionEventCtx("session-reload"), cwd: root }
