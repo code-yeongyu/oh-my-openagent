@@ -7,6 +7,7 @@
 
 mod audit;
 mod budget;
+mod grant;
 mod mutate;
 mod pointer;
 mod request;
@@ -23,6 +24,7 @@ mod worker_clipboard;
 mod worker_input;
 mod worker_menus;
 
+pub use grant::ControlSlot;
 pub use mutate::SessionSafety;
 pub use request::{Op, Response};
 pub use selection::{BackendFactory, BackendSelection, SelectionError};

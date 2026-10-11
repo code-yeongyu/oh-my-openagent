@@ -5,8 +5,7 @@
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol::{MethodRejection, RequestId};
 use senpi_desktop_core::protocol_params::{
-    AdvanceClockParams, CancelParams, EmptyParams, StopPathResumeParams, StopPathStartParams,
-    StopPathStopParams,
+    AdvanceClockParams, CancelParams, EmptyParams, StopPathResumeParams, StopPathStartParams, StopPathStopParams,
 };
 use senpi_desktop_core::types::DesktopSessionOptions;
 use senpi_desktop_safety::{Chord, StopPolicy};
@@ -54,6 +53,9 @@ impl Engine {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Session(SessionCall::Close))
             }
+            Method::ControlGrant => op(Op::ControlGrant(parse(params)?)),
+            Method::ControlRevoke => parse::<EmptyParams>(params).and_then(|_| op(Op::ControlRevoke)),
+            Method::ControlState => parse::<EmptyParams>(params).and_then(|_| op(Op::ControlState)),
             Method::Capabilities => {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Immediate(to_result(self.capabilities())))
@@ -86,8 +88,7 @@ impl Engine {
             }
             Method::StopPathStart => {
                 let chord = parse::<StopPathStartParams>(params)?.chord;
-                let chord =
-                    Chord::parse(&chord).map_err(|error| Failure::InvalidParams(error.to_string()))?;
+                let chord = Chord::parse(&chord).map_err(|error| Failure::InvalidParams(error.to_string()))?;
                 Ok(self.stop_path_changed(to_result(self.stop_paths().start(&chord))))
             }
             Method::StopPathHeartbeat => {
