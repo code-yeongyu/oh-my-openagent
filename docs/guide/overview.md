@@ -211,9 +211,9 @@ Override specific categories or curated agents in `omo.json`:
 **GPT models** (explicit reasoning, principle-driven):
 
 - GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (high), with `gpt-6-astra-fast` as the Fast-mode variant
-- GPT-6.1 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.1-sol-fast`, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; its Fast tier is also the first Geeky · Normal rung, with plain GPT-6.1 Sol right behind it
+- GPT-6.1 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.1-sol-fast`, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; it is also the fourth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Geeky · Normal rung, with plain GPT-6.1 Sol right behind it
 - GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max)
-- GPT-5.6 Terra: balanced mid-tier; fourth rung in `unspecified-low`
+- GPT-5.6 Terra: balanced mid-tier; an optional override, not part of any default chain
 - GPT 5.6 Luna Fast: fast and cheap; default for `explore` and `librarian`
 
 **Other families**:

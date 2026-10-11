@@ -33,7 +33,7 @@ export type FallbackRung = {
  * `fallback_closing_child` until the close ends it, so a parent that dies first leaves it an owner.
  */
 export function handOffToNextRung(record: TaskRecord, rung: FallbackRung): TaskRecord {
-  const { pid: closingPid, runner_kind: _closedRunner, host_session: closingSession, ...rest } = record
+  const { pid: closingPid, runner_kind: _closedRunner, host_session: closingSession, provisional_exit: _exit, ...rest } = record
   const runEpoch = nextRunEpoch(record)
   const closing = {
     ...(closingPid === undefined ? {} : { pid: closingPid }),

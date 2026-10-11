@@ -8,9 +8,7 @@ use senpi_desktop_core::ax::{AxBackend, AxRegistry};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::types::{
-    DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target,
-};
+use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
 use crate::mutate::SessionSafety;
@@ -35,6 +33,10 @@ pub(crate) struct Worker {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
     pub(crate) gc: ArtifactGc,
+    /// Identifies this worker as the control slot's owner.
+    pub(crate) instance: u64,
+    /// This session's live foreground control grant, when it holds the slot.
+    pub(crate) control: Option<crate::grant::ControlGrant>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -60,6 +62,8 @@ impl Worker {
             session_id: String::new(),
             run_id: String::new(),
             gc: ArtifactGc::default(),
+            instance: crate::grant::next_instance(),
+            control: None,
         };
         worker.refresh_capabilities();
         worker
@@ -104,6 +108,7 @@ impl Worker {
                 "desktop session is not open; call session.open first",
             ));
         }
+        self.reconcile_grant();
         self.maybe_gc();
         let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
         // Every mutating request goes through `mutate`; reads bypass it.
@@ -132,6 +137,11 @@ impl Worker {
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
+            Op::ControlGrant(params) => self.control_grant(&params),
+            Op::ControlRevoke => self.control_revoke(),
+            Op::ControlState => Ok(Response::ControlState(self.control_state())),
+            Op::MenuItems(params) => self.menu_items(&params),
+            Op::MenusSelect(params) => served(self.menu_select(&params, cancelled)),
         }
     }
 

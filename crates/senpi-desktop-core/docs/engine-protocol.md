@@ -13,6 +13,9 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `engine.hello` | read | no | no | `EmptyParams` | `HelloResult` | `ErrorCode` |
 | `session.open` | exec | yes | no | `DesktopSessionOptions` | `SessionOpenResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `session.close` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.grant` | exec | yes | no | `ControlGrantParams` | `ControlStateResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.revoke` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.state` | read | no | no | `EmptyParams` | `ControlStateResult` | `ErrorCode` |
 | `capabilities` | read | no | no | `EmptyParams` | `DesktopCapabilities` | `ErrorCode` |
 | `displays` | read | no | no | `EmptyParams` | `Vec<DesktopDisplay>` | `ErrorCode` |
 | `windows` | read | no | no | `EmptyParams` | `Vec<DesktopWindow>` | `ErrorCode` |
@@ -24,6 +27,8 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `typeText` | exec | no | no | `TypeTextParams` | `null` | `ErrorCode` |
 | `keyChord` | exec | no | no | `KeyChordParams` | `null` | `ErrorCode` |
 | `raiseWindow` | exec | no | no | `RaiseWindowParams` | `null` | `ErrorCode` |
+| `menus.items` | read | no | no | `MenuPathParams` | `Vec<MenuItem>` | `ErrorCode` |
+| `menus.select` | exec | no | no | `MenuPathParams` | `null` | `ErrorCode` |
 | `clipboard.read` | read | no | no | `EmptyParams` | `ClipboardText` | `ErrorCode` |
 | `clipboard.write` | exec | no | no | `ClipboardText` | `null` | `ErrorCode` |
 | `ax.snapshot` | read | no | no | `AxSnapshotParams` | `AxSnapshot` | `ErrorCode` |
@@ -81,6 +86,8 @@ An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-
 | `CursorRestoreFailed` | `-32018` |
 | `FocusRestoreFailed` | `-32019` |
 | `TransactionFailed` | `-32020` |
+| `InputBusy` | `-32021` |
+| `ControlRequired` | `-32022` |
 
 ## Conformance corpus
 

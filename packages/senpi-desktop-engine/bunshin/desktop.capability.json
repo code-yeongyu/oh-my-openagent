@@ -5,6 +5,7 @@
 	"description": "senpi desktop engine: screenshots, native input, accessibility, and the stop path",
 	"ops": [
 		"desktop.engine.hello",
+		"desktop.control.state",
 		"desktop.capabilities",
 		"desktop.displays",
 		"desktop.windows",
@@ -16,6 +17,8 @@
 		"desktop.typeText",
 		"desktop.keyChord",
 		"desktop.raiseWindow",
+		"desktop.menus.items",
+		"desktop.menus.select",
 		"desktop.clipboard.read",
 		"desktop.clipboard.write",
 		"desktop.ax.snapshot",
@@ -35,6 +38,7 @@
 	],
 	"effects": {
 		"desktop.engine.hello": "read",
+		"desktop.control.state": "read",
 		"desktop.capabilities": "read",
 		"desktop.displays": "read",
 		"desktop.windows": "read",
@@ -46,6 +50,8 @@
 		"desktop.typeText": "mutate",
 		"desktop.keyChord": "mutate",
 		"desktop.raiseWindow": "mutate",
+		"desktop.menus.items": "read",
+		"desktop.menus.select": "mutate",
 		"desktop.clipboard.read": "read",
 		"desktop.clipboard.write": "mutate",
 		"desktop.ax.snapshot": "read",
@@ -65,6 +71,11 @@
 	},
 	"schemas": {
 		"desktop.engine.hello": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.control.state": {
 			"type": "object",
 			"description": "Parameters of a method that takes none: `{}`.",
 			"additionalProperties": false
@@ -639,6 +650,46 @@
 			"required": [
 				"windowId"
 			],
+			"additionalProperties": false
+		},
+		"desktop.menus.items": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				},
+				"path": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": []
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
+			"additionalProperties": false
+		},
+		"desktop.menus.select": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				},
+				"path": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": []
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
 			"additionalProperties": false
 		},
 		"desktop.clipboard.read": {

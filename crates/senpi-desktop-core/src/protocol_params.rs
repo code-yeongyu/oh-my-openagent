@@ -77,6 +77,25 @@ pub struct RaiseWindowParams {
     pub window_id: String,
 }
 
+/// `control.grant`: `confirmationId` is the host's receipt of the human
+/// confirmation it showed; the engine never sees the confirm itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlGrantParams {
+    pub reason: String,
+    pub confirmation_id: String,
+}
+
+/// `menus.items` / `menus.select`: the window whose menu is addressed and the
+/// path inside it (empty lists the menu bar; select requires 1..=32 labels).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuPathParams {
+    pub window_id: String,
+    #[serde(default)]
+    pub path: Vec<String>,
+}
+
 /// `clipboard.write` params and `clipboard.read` result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

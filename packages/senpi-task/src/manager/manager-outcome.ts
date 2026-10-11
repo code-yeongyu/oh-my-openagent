@@ -3,8 +3,10 @@ import { log } from "@oh-my-opencode/utils"
 import type { SuspensionReason, TaskRecord, TaskRunStats, TaskTransition } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
+import type { ForgetOptions } from "./types"
 import { terminalFailureMessage } from "./credential-failure"
 import { nowIso } from "./manager-helpers"
+import { createProvisionalExitTracker, type ExitConfirmationSchedule } from "./provisional-exit"
 
 export type ManagedOutcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
 
@@ -22,13 +24,14 @@ export type ErrorOutcomeInput = {
 // freshest handles and the freshest on-disk record rather than facts captured when the tracking
 // cycle was armed.
 export type OutcomeTrackerPorts = {
+  readonly scheduleExitConfirmation?: ExitConfirmationSchedule
   readonly store: TaskRecordStore
   readonly now: () => number
   readonly liveHandle: (taskId: string) => ManagedChildHandle | undefined
   readonly tryLoad: (taskId: string) => TaskRecord | null
   readonly runStatsSnapshot: (taskId: string) => TaskRunStats | undefined
   readonly releaseSlot: (taskId: string, model: string, epoch: number) => void
-  readonly forget: (taskId: string) => void
+  readonly forget: (taskId: string, options: ForgetOptions) => void
   // `terminal` is supplied only when the store could not persist the terminal state: the on-disk
   // record is then guaranteed non-terminal, so the waiters must be settled from this record instead.
   readonly settleWaiters: (taskId: string, terminal?: TaskRecord) => void
@@ -110,6 +113,7 @@ function errnoField(error: unknown, key: "code" | "syscall" | "path"): string | 
 }
 
 export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker {
+  const provisional = createProvisionalExitTracker(ports)
   // A terminal outcome is never lost to a persistence fault (#8050). When the store cannot write the
   // terminal record (Windows EPERM on the rename after the store's own retries), the run is still
   // settled: the residency is released through forget() and every waiter receives a synthesized
@@ -126,7 +130,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         path: errnoField(error, "path"),
         error: String(error),
       })
-      ports.forget(taskId)
+      ports.forget(taskId, { path: "park" })
       ports.settleWaiters(taskId, {
         ...owned,
         status: "error",
@@ -169,7 +173,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
       return { ...rest, residency_state: "rpc_detached", suspension_reason: reason, updated_at: nowIso(ports.now) }
     })
     ports.store.appendEvent(taskId, { type: "suspended", payload: { reason } })
-    ports.forget(taskId)
+    ports.forget(taskId, { path: "park" })
   }
 
   // One park watch per task, re-armed with every tracked run. It outlives the run's outcome: a child
@@ -177,6 +181,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   const parkWatches = new Map<string, () => void>()
 
   function release(taskId: string): void {
+    provisional.release(taskId)
     parkWatches.get(taskId)?.()
     parkWatches.delete(taskId)
   }
@@ -214,20 +219,17 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         const timestamp = nowIso(ports.now)
         const runStats = ports.runStatsSnapshot(taskId)
         if (outcome.status === "error") {
-          void settleErrorOutcome({
-            taskId,
-            handle,
-            model,
-            epoch,
-            outcome,
-            runStats,
-            timestamp,
-          }).catch((error: unknown) => {
-            log("senpi-task manager error outcome tracking failed", {
-              taskId,
-              error: String(error),
+          const input = { taskId, handle, model, epoch, outcome, runStats, timestamp }
+          const commit = (): void => {
+            const stopped = ports.stopSettlement?.(taskId)
+            const settling = stopped === undefined
+              ? settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
+              : settleStopped(taskId, handle, model, epoch, stopped)
+            void settling.catch((error: unknown) => {
+              log("senpi-task manager error outcome tracking failed", { taskId, error: String(error) })
             })
-          })
+          }
+          if (!provisional.defer(input, owned, commit)) commit()
           return
         }
 

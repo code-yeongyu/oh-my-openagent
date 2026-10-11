@@ -181,9 +181,14 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "xhigh",
       },
       {
+        providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.1-sol",
+        variant: "medium",
+      },
+      {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-terra",
-        variant: "high",
+        model: "gpt-5.6-sol",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],

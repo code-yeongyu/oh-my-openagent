@@ -37,6 +37,39 @@
         "type": "null"
       }
     },
+    "control.grant": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ControlGrantParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
+    "control.revoke": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "control.state": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
     "capabilities": {
       "effect": "read",
       "hostOnly": false,
@@ -159,6 +192,31 @@
       "testOnly": false,
       "params": {
         "$ref": "#/definitions/RaiseWindowParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "menus.items": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuPathParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/MenuItem"
+        }
+      }
+    },
+    "menus.select": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuPathParams"
       },
       "result": {
         "type": "null"
@@ -474,7 +532,9 @@
     "Cancelled": -32017,
     "CursorRestoreFailed": -32018,
     "FocusRestoreFailed": -32019,
-    "TransactionFailed": -32020
+    "TransactionFailed": -32020,
+    "InputBusy": -32021,
+    "ControlRequired": -32022
   },
   "standardErrors": {
     "parseError": -32700,
@@ -748,6 +808,49 @@
         "screenLocked"
       ],
       "description": "Runtime truth about what this host's backend can do right now.\n\nFROZEN field set (IS-2): later todos fill values, never add fields.",
+      "additionalProperties": false
+    },
+    "ControlGrantParams": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "confirmationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "confirmationId"
+      ],
+      "description": "`control.grant`: `confirmationId` is the host's receipt of the human\nconfirmation it showed; the engine never sees the confirm itself.",
+      "additionalProperties": false
+    },
+    "ControlStateResult": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grantedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "RFC 3339 UTC with milliseconds, matching the audit timestamps."
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "description": "`control.grant` and `control.state` reply: this session's live foreground\ncontrol grant. `reason` and `granted_at` are present exactly when\n`active` is true.",
       "additionalProperties": false
     },
     "DesktopDisplay": {
@@ -1243,6 +1346,64 @@
       "required": [
         "windowId"
       ],
+      "additionalProperties": false
+    },
+    "MenuPathParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`menus.items` / `menus.select`: the window whose menu is addressed and the\npath inside it (empty lists the menu bar; select requires 1..=32 labels).",
+      "additionalProperties": false
+    },
+    "MenuItem": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "hasSubmenu": {
+          "type": "boolean"
+        },
+        "shortcut": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "path",
+        "enabled",
+        "checked",
+        "hasSubmenu"
+      ],
+      "description": "One immediate child of a native application menu. `path` holds the native\nlabels, ellipses included; selection accepts normalized labels.",
       "additionalProperties": false
     },
     "ClipboardText": {
@@ -1785,6 +1946,9 @@
         "engine.hello",
         "session.open",
         "session.close",
+        "control.grant",
+        "control.revoke",
+        "control.state",
         "capabilities",
         "displays",
         "windows",
@@ -1796,6 +1960,8 @@
         "typeText",
         "keyChord",
         "raiseWindow",
+        "menus.items",
+        "menus.select",
         "clipboard.read",
         "clipboard.write",
         "ax.snapshot",
@@ -1851,6 +2017,16 @@
           "type": "string",
           "const": "Cancelled",
           "description": "A request aborted by `$/cancel` or a host abort."
+        },
+        {
+          "type": "string",
+          "const": "InputBusy",
+          "description": "Another session holds the foreground control grant. The slot is never\nstolen; the caller can retry after it releases."
+        },
+        {
+          "type": "string",
+          "const": "ControlRequired",
+          "description": "Foreground delivery without this session's live control grant."
         }
       ],
       "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."

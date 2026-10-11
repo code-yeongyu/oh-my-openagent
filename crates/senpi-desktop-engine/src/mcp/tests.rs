@@ -8,10 +8,7 @@ use super::Server;
 
 type Sent = Rc<RefCell<Vec<Value>>>;
 
-fn server(
-    allow_host_relay_only_stop: bool,
-    reply: Value,
-) -> (Server<impl FnMut(&Value) -> io::Result<Value>>, Sent) {
+fn server(allow_host_relay_only_stop: bool, reply: Value) -> (Server<impl FnMut(&Value) -> io::Result<Value>>, Sent) {
     let sent: Sent = Rc::default();
     let log = Rc::clone(&sent);
     let exchange = move |request: &Value| {
@@ -22,17 +19,12 @@ fn server(
 }
 
 fn ask(server: &mut Server<impl FnMut(&Value) -> io::Result<Value>>, request: &Value) -> Value {
-    let line = server
-        .answer(&request.to_string())
-        .expect("a request gets a reply");
+    let line = server.answer(&request.to_string()).expect("a request gets a reply");
     serde_json::from_str(&line).expect("reply is JSON")
 }
 
 fn tool_names(server: &mut Server<impl FnMut(&Value) -> io::Result<Value>>) -> Vec<String> {
-    let reply = ask(
-        server,
-        &json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
-    );
+    let reply = ask(server, &json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }));
     reply["result"]["tools"]
         .as_array()
         .expect("tools array")
@@ -65,17 +57,17 @@ fn tools_are_the_public_methods_plus_stop_and_never_resume_or_host_controls() {
         "desktop_click",
         "desktop_stop",
         "desktop_stopPath_status",
+        "desktop_control_state",
     ] {
-        assert!(
-            names.contains(&present.to_owned()),
-            "{present} missing from {names:?}"
-        );
+        assert!(names.contains(&present.to_owned()), "{present} missing from {names:?}");
     }
     for absent in [
         "desktop_stopPath_resume",
         "desktop_stopPath_start",
         "desktop_session_open",
         "desktop_stopPath_heartbeat",
+        "desktop_control_grant",
+        "desktop_control_revoke",
     ] {
         assert!(!names.contains(&absent.to_owned()), "{absent} must not be listed");
     }
@@ -125,7 +117,8 @@ fn stop_forwards_an_api_stop_to_the_daemon() {
 
 #[test]
 fn an_inline_capture_becomes_an_image_block_and_metadata_without_the_bytes() {
-    let result = json!({ "mode": "inline", "data": "iVBORw0KGgo=", "mimeType": "image/png", "width": 2, "frameId": "f1" });
+    let result =
+        json!({ "mode": "inline", "data": "iVBORw0KGgo=", "mimeType": "image/png", "width": 2, "frameId": "f1" });
     let (mut server, _) = server(false, json!({ "jsonrpc": "2.0", "id": 1, "result": result }));
     let reply = ask(&mut server, &call("desktop_capture", json!({})));
     let content = &reply["result"]["content"];
@@ -139,13 +132,12 @@ fn an_inline_capture_becomes_an_image_block_and_metadata_without_the_bytes() {
 
 #[test]
 fn an_engine_error_is_an_error_tool_result_carrying_the_engine_error_unchanged() {
-    let error =
-        json!({ "code": -32014, "message": "no live stop path", "data": { "code": "StopPathUnavailable" } });
+    let error = json!({ "code": -32014, "message": "no live stop path", "data": { "code": "StopPathUnavailable" } });
     let (mut server, _) = server(false, json!({ "jsonrpc": "2.0", "id": 1, "error": error }));
     let reply = ask(&mut server, &call("desktop_click", json!({ "x": 1, "y": 1 })));
     assert_eq!(reply["result"]["isError"], true);
-    let text: Value = serde_json::from_str(reply["result"]["content"][0]["text"].as_str().expect("text"))
-        .expect("error JSON");
+    let text: Value =
+        serde_json::from_str(reply["result"]["content"][0]["text"].as_str().expect("text")).expect("error JSON");
     assert_eq!(text, error);
 }
 

@@ -20,7 +20,7 @@ export interface AuditRecord {
 	readonly runId: string;
 	readonly action: EngineMethod;
 	readonly target: string;
-	/** `background` or `foreground`. */
+	/** `background`, `foreground`, or `control` (a `control.*` method's own record). */
 	readonly delivery: string;
 	readonly frameId: string | null;
 	/** `null` when the action succeeded. */

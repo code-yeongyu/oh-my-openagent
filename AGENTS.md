@@ -293,7 +293,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 | `dispatchInternalPrompt()` | fn | `packages/utils/src/prompt-async-gate/` | - | ONLY sanctioned internal `session.prompt*` route |
 | `canonicalAgentDir()` | fn | `packages/omo-native/bin/lib/agent-dir.js` | - | Single canonical `~/.omo/agent` resolution |
 | `resolveAgentHome()` | fn | `packages/omo-senpi/src/components/agent-home/` | - | Adapter-side twin of `canonicalAgentDir()` |
-| `buildTaskExecute` | fn | `packages/senpi-task/src/tools/task/` | ~103 | `task` tool factory; batch cap 16 on schema AND execution |
+| `buildTaskExecute` | fn | `packages/senpi-task/src/tools/task/` | ~103 | `task` tool factory; uncapped batch, admission via `TaskConcurrency` |
 | `SCOPE_PRIORITY` | const | `packages/skills-loader-core/src/features/opencode-skill-loader/` | - | Numeric skill precedence across 7 discover* sources |
 | `consumeSoulNoticeDelta()` | fn | `packages/memory-core/src/soul/` | - | Soul-notice watermark consumption |
 

@@ -23,6 +23,8 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"focusedElement",
 	"focusedWindow",
 	"move",
+	"menu.items",
+	"menu.select",
 	"parent",
 	"perform",
 	"press",
