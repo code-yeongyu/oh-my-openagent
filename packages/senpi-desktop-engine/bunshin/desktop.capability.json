@@ -5,6 +5,7 @@
 	"description": "senpi desktop engine: screenshots, native input, accessibility, and the stop path",
 	"ops": [
 		"desktop.engine.hello",
+		"desktop.control.state",
 		"desktop.capabilities",
 		"desktop.displays",
 		"desktop.windows",
@@ -37,6 +38,7 @@
 	],
 	"effects": {
 		"desktop.engine.hello": "read",
+		"desktop.control.state": "read",
 		"desktop.capabilities": "read",
 		"desktop.displays": "read",
 		"desktop.windows": "read",
@@ -69,6 +71,11 @@
 	},
 	"schemas": {
 		"desktop.engine.hello": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.control.state": {
 			"type": "object",
 			"description": "Parameters of a method that takes none: `{}`.",
 			"additionalProperties": false

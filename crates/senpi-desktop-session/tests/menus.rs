@@ -13,7 +13,7 @@ use senpi_desktop_core::protocol_params::MenuPathParams;
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::types::{DesktopSessionOptions, FrontWindow};
 use senpi_desktop_safety::{FakeClock, StopPathId, StopSource, Supervisor};
-use senpi_desktop_session::{BackendFactory, Op, Response, Session, SessionSafety, SessionTimeouts};
+use senpi_desktop_session::{BackendFactory, ControlSlot, Op, Response, Session, SessionSafety, SessionTimeouts};
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -67,6 +67,8 @@ fn start(overlay: &str) -> MenusSession {
     let safety = SessionSafety {
         supervisor: Arc::clone(&supervisor),
         audit: Box::new(move |event| sink.lock().push(event.clone())),
+        // Each test session owns its own control slot (#9651 B5a): no grant leaks between tests.
+        control_slot: ControlSlot::new(),
     };
     let session = Session::start_supervised(factory, SessionTimeouts::default(), safety).expect("session starts");
     MenusSession {
