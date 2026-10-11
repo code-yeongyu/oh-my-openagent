@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { spawn, spawnSync } from "node:child_process"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -15,8 +15,11 @@ function fixture() {
   const outDir = join(root, "out")
   const evidenceRoot = join(root, "retained")
   mkdirSync(outDir)
-  const env = { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR,
-    HOME: root, USERPROFILE: root, TMPDIR: root, TEMP: root, TMP: root, OUT: outDir }
+  // Native Windows process inspection needs its system module locations in a nested driver too.
+  const systemKeys = ["PATH", "SystemRoot", "WINDIR", "ComSpec", "PATHEXT", "PSModulePath", "ProgramFiles",
+    "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "ALLUSERSPROFILE"]
+  const env = { ...Object.fromEntries(systemKeys.map((key) => [key, process.env[key]])),
+    HOME: root, USERPROFILE: root, APPDATA: root, LOCALAPPDATA: root, TMPDIR: root, TEMP: root, TMP: root, OUT: outDir }
   return {
     root, outDir, evidenceRoot, env,
     run: (source: string, overrides: Record<string, unknown> = {}) => runFallbackDriver({
@@ -77,7 +80,7 @@ describe("fallback driver failure evidence", () => {
     try {
       const source = `const fs=require('node:fs'),p=require('node:path');const stateDir=p.join(process.env.TMPDIR,'owned-state');fs.mkdirSync(p.join(stateDir,'tasks'),{recursive:true});fs.mkdirSync(p.join(stateDir,'logs'));fs.writeFileSync(p.join(stateDir,'tasks','bg_fixture.json'),JSON.stringify({task_id:'bg_fixture',status:'running'}));fs.writeFileSync(p.join(stateDir,'logs','bg_fixture.jsonl'),'task-start-event');fs.writeFileSync(p.join(process.env.OUT,'progress.json'),JSON.stringify({scenarios:[{runner:'child-process',scenario:'user-fallback',stateDir,state:'RUNNING'}]}));console.log('driver-pid='+process.pid);setInterval(()=>{},1000)`
       const message = await failure(f.run(source, { timeoutMs: 2_000 }))
-      expect(message).toContain("deadline expired after 2000ms")
+      expect(message, message).toContain("deadline expired after 2000ms")
       const pid = Number(/driver-pid=(\d+)/.exec(message)?.[1])
       expect(pid).toBeGreaterThan(0)
       expect(() => process.kill(pid, 0)).toThrow()
@@ -92,22 +95,37 @@ describe("fallback driver failure evidence", () => {
 
   test("#given a driver exits leaving a pipe-holding child #when its deadline expires #then the owned descendant is stopped", async () => {
     const f = fixture()
-    let unrelatedPid: number | undefined
+    let unrelated: ReturnType<typeof spawn> | undefined
+    let running: Promise<string> | undefined
     try {
-      const source = `const {spawn}=require('node:child_process');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)',process.env.TMPDIR],{stdio:['ignore',process.stdout,process.stderr],detached:process.platform!=='win32'});const unrelated=spawn(process.execPath,['-e','setInterval(()=>{},1000)',process.env.TMPDIR+'-unrelated'],{stdio:'ignore',detached:process.platform!=='win32'});console.log('descendant-pid='+child.pid);console.log('unrelated-pid='+unrelated.pid);process.exit(0)`
-      const message = await failure(f.run(source, { timeoutMs: 2_000 }))
-      unrelatedPid = Number(/unrelated-pid=(\d+)/.exec(message)?.[1])
-      expect(message).toContain("deadline expired after 2000ms")
+      const source = `const {spawn}=require('node:child_process');const fs=require('node:fs'),p=require('node:path');const ready=p.join(process.env.OUT,'child-ready');const child=spawn(process.execPath,['-e',"require('node:fs').writeFileSync(process.argv[1],'ready');setInterval(()=>{},1000)",ready,process.env.TMPDIR],{stdio:['ignore','inherit','inherit'],detached:true});child.once('error',e=>{console.error(e);process.exit(1)});console.log('descendant-pid='+child.pid);const wait=setInterval(()=>{if(fs.existsSync(ready)){clearInterval(wait);process.exit(0)}},10)`
+      running = failure(f.run(source, { timeoutMs: 2_000 }))
+      const sandbox = readdirSync(f.outDir).find((name) => name.startsWith("driver-sandboxes-"))!
+      // A sibling owned by the test, not by the driver's Windows process tree, is truly unrelated.
+      unrelated = spawn("node", ["-e", "setInterval(()=>{},1000)", `${join(realpathSync.native(f.outDir), sandbox)}-unrelated`], {
+        cwd: f.root, env: f.env, stdio: "ignore",
+      })
+      await new Promise<void>((resolve, reject) => { unrelated!.once("spawn", resolve); unrelated!.once("error", reject) })
+      const message = await running
+      expect(message, message).toContain("deadline expired after 2000ms")
       const pid = Number(/descendant-pid=(\d+)/.exec(message)?.[1])
       expect(pid).toBeGreaterThan(0)
       expect(() => process.kill(pid, 0)).toThrow()
       expect(message).not.toContain("driver did not close after termination")
       expect(message).not.toContain("driver cleanup failed")
-      expect(unrelatedPid).toBeGreaterThan(0)
-      expect(() => process.kill(unrelatedPid!, 0)).not.toThrow()
+      expect(unrelated.pid).toBeGreaterThan(0)
+      expect(() => process.kill(unrelated!.pid!, 0)).not.toThrow()
     } finally {
-      if (unrelatedPid !== undefined && unrelatedPid > 0) process.kill(unrelatedPid, "SIGKILL")
-      f.cleanup()
+      try {
+        if (unrelated?.pid !== undefined && unrelated.exitCode === null && unrelated.signalCode === null) {
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error("unrelated fixture did not close")), 5_000)
+            unrelated!.once("close", () => { clearTimeout(timer); resolve() })
+            try { unrelated!.kill("SIGKILL") }
+            catch (error) { clearTimeout(timer); reject(error) }
+          })
+        }
+      } finally { try { await running } finally { f.cleanup() } }
     }
   }, 40_000)
 
@@ -183,14 +201,14 @@ describe("fallback driver failure evidence", () => {
     const f = fixture()
     try {
       // This drives the actual script with a missing binary, without loading a plugin or contacting a provider.
-      const result = spawnSync(process.execPath, [fileURLToPath(new URL("./task-runtime-fallback-e2e.mjs", import.meta.url))], {
+      const result = spawnSync("node", [fileURLToPath(new URL("./task-runtime-fallback-e2e.mjs", import.meta.url))], {
         cwd: f.root, env: { ...f.env, SENPI_BIN: join(f.root, "missing-senpi"), TASK_RUNTIME_FALLBACK_OUT_DIR: f.outDir,
           TASK_RUNTIME_FALLBACK_RUNNERS: "child-process", TASK_RUNTIME_FALLBACK_SCENARIOS: "user-fallback" },
         encoding: "utf8", timeout: 15_000,
       })
       expect(result.status, result.stderr).toBe(1)
       const progress = JSON.parse(readFileSync(join(f.outDir, "progress.json"), "utf8"))
-      expect(progress.state).toBe("FAIL")
+      expect(progress.state, `${result.stderr}\n${JSON.stringify(progress)}`).toBe("FAIL")
       expect(progress.active).toBeNull()
       expect(progress.scenarios).toEqual([{ ...expected[0], state: "FAIL", stateDir: expect.any(String), checks: expect.objectContaining({ exit_zero: "FAIL", cleanup: "PASS" }),
         process: { code: null, signal: null, error: expect.stringContaining("ENOENT"), deadline: false } }])

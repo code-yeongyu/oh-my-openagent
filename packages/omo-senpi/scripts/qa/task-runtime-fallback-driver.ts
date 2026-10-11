@@ -90,7 +90,9 @@ export async function runFallbackDriver(options: DriverOptions): Promise<readonl
   let stderr = ""
   // This unique root also identifies detached scenario processes after the driver has exited.
   if (lstatSync(options.outDir).isSymbolicLink()) throw new Error("symlink evidence root excluded")
-  const sandboxRoot = realpathSync.native(mkdtempSync(join(options.outDir, "driver-sandboxes-")))
+  // Windows tmpdir may use an 8.3 alias while realpath expands the sandbox. Keep one spelling.
+  const outDir = realpathSync.native(options.outDir)
+  const sandboxRoot = realpathSync.native(mkdtempSync(join(outDir, "driver-sandboxes-")))
   Object.assign(env, { TMPDIR: sandboxRoot, TEMP: sandboxRoot, TMP: sandboxRoot })
   const exit: DriverExit = { code: null, signal: null, deadline: false }
   let child: ChildProcess | undefined
@@ -144,17 +146,17 @@ export async function runFallbackDriver(options: DriverOptions): Promise<readonl
     await terminate()
   }
 
-  recoverFallbackEvidence(options.outDir, sandboxRoot, options.expected)
+  recoverFallbackEvidence(outDir, sandboxRoot, options.expected)
   const failures: string[] = []
   if (exit.deadline) failures.push(`fallback driver deadline expired after ${options.timeoutMs}ms`)
   if (exit.error) failures.push(`fallback driver spawn/process error: ${exit.error}`)
   if (exit.code !== 0 || exit.signal !== null) failures.push(`fallback driver exit code=${exit.code} signal=${exit.signal}`)
   if (exit.terminationError) failures.push(`driver cleanup failed: ${exit.terminationError}`)
   let scenarios: ScenarioVerdict[] = []
-  try { scenarios = parseVerdict(options.outDir, options.expected) }
+  try { scenarios = parseVerdict(outDir, options.expected) }
   catch (error) { failures.push(String(error)) }
   if (failures.length === 0) {
-    rmSync(options.outDir, { recursive: true, force: true })
+    rmSync(outDir, { recursive: true, force: true })
     return scenarios
   }
 
@@ -163,19 +165,19 @@ export async function runFallbackDriver(options: DriverOptions): Promise<readonl
     `driver: ${JSON.stringify(exit)}`,
     `stdout tail:\n${stdout}`,
     `stderr tail:\n${stderr}`,
-    `progress:\n${readEvidence(options.outDir, "progress.json").slice(-OUTPUT_TAIL_CHARS)}`,
+    `progress:\n${readEvidence(outDir, "progress.json").slice(-OUTPUT_TAIL_CHARS)}`,
     ...options.expected.map(({ runner, scenario }) => {
       const dir = join(runner, scenario)
-      return [`--- ${runner}/${scenario}`, `task: ${readEvidence(options.outDir, join(dir, "task.json")).slice(-1500)}`,
-        `events tail: ${readEvidence(options.outDir, join(dir, "task.jsonl.log")).slice(-1500)}`,
-        `stderr tail: ${readEvidence(options.outDir, join(dir, "stderr.log")).slice(-1500)}`].join("\n")
+      return [`--- ${runner}/${scenario}`, `task: ${readEvidence(outDir, join(dir, "task.json")).slice(-1500)}`,
+        `events tail: ${readEvidence(outDir, join(dir, "task.jsonl.log")).slice(-1500)}`,
+        `stderr tail: ${readEvidence(outDir, join(dir, "stderr.log")).slice(-1500)}`].join("\n")
     }),
   ].join("\n"))
   let evidence: string
   try {
-    evidence = retainFallbackEvidence(options.outDir, options.evidenceRoot, options.expected, diagnostics, redact)
+    evidence = retainFallbackEvidence(outDir, options.evidenceRoot, options.expected, diagnostics, redact)
   } catch (error) {
-    evidence = `could not stage evidence (${String(error)}); original directory preserved at ${options.outDir}`
+    evidence = `could not stage evidence (${String(error)}); original directory preserved at ${outDir}`
   }
   throw new Error(`${diagnostics}\nRetained fallback evidence: ${evidence}`)
 }

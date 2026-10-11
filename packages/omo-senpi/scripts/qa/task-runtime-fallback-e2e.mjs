@@ -333,7 +333,11 @@ async function runScenario(scenario, runner, outDir, onProgress) {
       console.error(`Could not save fallback scenario artifacts: ${String(error)}`)
     } finally {
       try {
-        processes = await stopSandboxProcesses(sandbox)
+        // An ENOENT launch with no PID never created a process tree to inspect.
+        // Keep the sweep for every actual or uncertain launch, including deadline failures.
+        if (!(runResult?.error?.code === "ENOENT" && !runResult.pid)) {
+          processes = await stopSandboxProcesses(sandbox)
+        }
         rmSync(sandbox.root, { recursive: true, force: true })
         cleanup = existsSync(sandbox.root) || processes.survivors.length > 0 ? "FAIL" : "PASS"
       } catch (error) { cleanupError = error }
