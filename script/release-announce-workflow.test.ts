@@ -1,9 +1,14 @@
 import { expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { z } from "zod"
 
 test("#given release automation #when parsed #then published events, safe dispatch defaults, and publisher provenance are wired", async () => {
   const step = z.object({
     name: z.string().optional(),
+    id: z.string().optional(),
     run: z.string().optional(),
     env: z.record(z.string(), z.unknown()).optional(),
   }).passthrough()
@@ -49,15 +54,66 @@ test("#given release automation #when parsed #then published events, safe dispat
     with: z.record(z.string(), z.unknown()).optional(),
     secrets: z.union([z.literal("inherit"), z.record(z.string(), z.string())]).optional(),
     permissions: z.object({ contents: z.string() }).optional(),
+    outputs: z.record(z.string(), z.string()).optional(),
   }).passthrough()) }).parse(Bun.YAML.parse(await Bun.file(".github/workflows/publish.yml").text()))
   const createRelease = Object.values(publisher.jobs).flatMap((job) => job.steps ?? [])
     .find((item) => item.run?.includes('gh release create "v${VERSION}"') && !item.run.includes("--repo code-yeongyu/lazycodex"))
   expect(createRelease?.env?.GH_TOKEN).toBe("${{ secrets.GITHUB_TOKEN }}")
+  expect(createRelease?.id).toBe("github-release")
+  expect(publisher.jobs.release?.outputs?.created).toBe("${{ steps.github-release.outputs.created }}")
   const caller = publisher.jobs["release-announce"]
   expect(caller?.needs).toEqual(["release-metadata", "release"])
-  expect(caller?.if).toBe("inputs.lazycodex_only != true && inputs.prepared_release_sha != ''")
+  expect(caller?.if).toBe("inputs.lazycodex_only != true && inputs.prepared_release_sha != '' && needs.release.outputs.created == 'true'")
   expect(caller?.uses).toBe("./.github/workflows/release-announce.yml")
   expect(caller?.with).toEqual({ tag: "v${{ needs.release-metadata.outputs.version }}" })
   expect(caller?.secrets).toEqual({ DISCORD_OMO_RELEASES_WEBHOOK_URL: "${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}" })
   expect(caller?.permissions).toEqual({ contents: "read" })
+})
+
+test.each([
+  { view: 0, create: 0, status: 0, output: "created=false\n", calls: "" },
+  { view: 1, create: 0, status: 0, output: "created=true\n", calls: "create\n" },
+  { view: 1, create: 9, status: 9, output: "", calls: "create\n" },
+])("#given release CLI results %p #when the actual workflow step runs #then created reflects successful creation only", ({ view, create, status, output, calls }) => {
+  const publisher = z.object({ jobs: z.object({ release: z.object({
+    steps: z.array(z.object({ id: z.string().optional(), run: z.string().optional() }).passthrough()),
+  }).passthrough() }).passthrough() }).parse(Bun.YAML.parse(readFileSync(".github/workflows/publish.yml", "utf8")))
+  const run = publisher.jobs.release.steps.find((step) => step.id === "github-release")?.run
+  if (!run) throw new Error("Missing GitHub release creation step")
+  const directory = mkdtempSync(join(tmpdir(), "omo-release-announce-"))
+  const outputFile = join(directory, "output")
+  const callsFile = join(directory, "calls")
+  writeFileSync(outputFile, "")
+  writeFileSync(callsFile, "")
+  const commands = `
+gh() {
+  case "$1 $2" in
+    "release list") printf 'v5.1.28\\n' ;;
+    "release view") return "$VIEW_STATUS" ;;
+    "release create") printf 'create\\n' >> "$CALLS_FILE"; return "$CREATE_STATUS" ;;
+    *) return 99 ;;
+  esac
+}
+bun() { printf '%s' '--latest'; }
+`
+  try {
+    const result = spawnSync("bash", ["-c", commands + run], {
+      encoding: "utf8",
+      timeout: 5000,
+      env: {
+        ...process.env,
+        VERSION: "5.1.29",
+        VIEW_STATUS: String(view),
+        CREATE_STATUS: String(create),
+        GITHUB_OUTPUT: outputFile,
+        CALLS_FILE: callsFile,
+      },
+    })
+    expect(result.error).toBeUndefined()
+    expect(result.status).toBe(status)
+    expect(readFileSync(outputFile, "utf8")).toBe(output)
+    expect(readFileSync(callsFile, "utf8")).toBe(calls)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })

@@ -1121,6 +1121,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: [release-metadata, prepare-release-state, publish-main, publish-platform]
+    outputs:
+      created: ${{ steps.github-release.outputs.created }}
     if: >-
       always() &&
       inputs.prepared_release_sha != '' &&
@@ -1272,6 +1274,7 @@ jobs:
             gh release create "v${VERSION}" "$LATEST_FLAG" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
 
       - name: Create GitHub release
+        id: github-release
         # Always a full release, never `--prerelease`, on every channel: the npm
         # dist-tag (beta/next) already carries the channel semantics, and every
         # shipping version is `5.0.0-beta.N`.
@@ -1294,8 +1297,12 @@ jobs:
           set -euo pipefail
 
           LATEST_FLAG="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
-          gh release view "v${VERSION}" >/dev/null 2>&1 || \
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
             gh release create "v${VERSION}" "$LATEST_FLAG" --title "v${VERSION}" --notes-file /tmp/changelog.md
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download release-binary artifacts
         if: inputs.skip_platform != true && inputs.lazycodex_only != true
@@ -1419,7 +1426,7 @@ jobs:
 
   release-announce:
     needs: [release-metadata, release]
-    if: inputs.lazycodex_only != true && inputs.prepared_release_sha != ''
+    if: inputs.lazycodex_only != true && inputs.prepared_release_sha != '' && needs.release.outputs.created == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/release-announce.yml

@@ -12,8 +12,10 @@ fail the job with a tag-specific error.
 
 The publish workflow creates the omo GitHub release with `GITHUB_TOKEN` and then
 calls `release-announce.yml` as a reusable workflow with the required string
-input `tag`. The caller waits for the `release` job, skips LazyCodex-only and
-preparation runs, and passes only the Discord webhook secret. A failed
+input `tag`. The caller waits for the `release` job and runs only when its
+`created` output is `true`: this run successfully created the release, rather
+than finding it already published. It skips LazyCodex-only and preparation
+runs and passes only the Discord webhook secret. A failed
 announcement makes the publish run itself red; no PAT is needed for this path.
 The reusable job has read-only contents permission.
 
@@ -51,7 +53,22 @@ announcement for an already-announced version to prove this workflow.
 
 The publisher invokes announcements directly; only person-authored `published`
 events also trigger announcements, not `edited` or bot-authored release events.
+Rerunning the publisher finds an existing release, outputs `created=false`, and
+skips its announcement job. It never implicitly retries a failed post.
 A webhook cannot list channel history, so there is no channel-history
 deduplication guard. Rerunning a published-event job or dispatching with both
 `dry_run=false` and `probe=false`, or rerunning the publisher's announcement job,
 posts again. Use dry-run or probe for checks.
+
+## Recover a missing announcement
+
+Recovery is explicit: after confirming the post is missing, dispatch that one
+tag with `dry_run=false` (leave `probe` at its default `false`):
+
+```sh
+gh workflow run release-announce.yml -f tag=v5.1.29 -f dry_run=false
+```
+
+The separate 30-minute release-with-no-post watch alerts when a published
+version has no announcement. This workflow does not replace that watch or
+automatically re-announce old versions.
