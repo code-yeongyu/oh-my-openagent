@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { getFallbackModelsForSession } from "./fallback-models"
+import { detectAgentFromSession, resolveAgentForSession } from "./agent-resolver"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -196,10 +197,34 @@ describe("runtime-fallback fallback-models", () => {
       },
     })
 
-    //#when — agent name passed directly (as resolved by resolveAgentForSession)
-    const result = getFallbackModelsForSession("ses_any_session", "general", pluginConfig)
+    //#when
+    const sessionID = "ses_any_session"
+    const agent = resolveAgentForSession(sessionID, "general")
+    const result = getFallbackModelsForSession(sessionID, agent, pluginConfig)
 
     //#then
     expect(result).toEqual(["openai/gpt-5.5"])
+  })
+
+  test("does not infer general from an opaque session ID substring", () => {
+    //#given
+    const sessionID = "ses_abcdefgeneral012345"
+
+    //#when
+    const agent = detectAgentFromSession(sessionID)
+
+    //#then
+    expect(agent).toBeUndefined()
+  })
+
+  test("explicit agent takes precedence over a general token in the session ID", () => {
+    //#given
+    const sessionID = "ses-general-storage"
+
+    //#when
+    const agent = resolveAgentForSession(sessionID, "oracle")
+
+    //#then
+    expect(agent).toBe("oracle")
   })
 })
