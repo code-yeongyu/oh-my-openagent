@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe("onboarding claim lifecycle", () => {
   for (const stopReason of ["aborted", "error"]) {
-    test(`#given the onboarding turn #when ${stopReason} #then release and reinject next time`, async () => {
+    test(`#given the onboarding turn #when ${stopReason} then retried #then reclaim with one context in every request`, async () => {
       const h = harness()
       await h.prompt()
       expect(isOnboardingComplete(h.dir)).toBe(true)
@@ -26,7 +26,16 @@ describe("onboarding claim lifecycle", () => {
       await h.end(stopReason, { aborted: stopReason === "aborted" })
       await h.settle()
       expect(isOnboardingComplete(h.dir)).toBe(false)
-      expect((await h.prompt()).filter(Boolean)).toHaveLength(1)
+      expect(await h.prompt()).toEqual([undefined])
+      expect(isOnboardingComplete(h.dir)).toBe(true)
+      await h.agentStart()
+      await h.end()
+      await h.settle()
+      await h.prompt()
+      await h.agentStart()
+      expect(h.requests.map((messages) => messages.filter(
+        (message) => message.customType === "omo-onboarding:context",
+      ).length)).toEqual([1, 1, 1])
     })
   }
 

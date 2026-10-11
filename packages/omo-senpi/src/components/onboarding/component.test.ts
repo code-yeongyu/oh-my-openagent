@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 import { createOnboardingHarness } from "./test-harness"
-import { claimOnboarding, isOnboardingComplete } from "./state"
+import { claimOnboarding, isOnboardingComplete, releaseOnboarding } from "./state"
+import { createOnboardingComponent } from "./component"
 
 const dirs: string[] = []
 function freshDir(): string {
@@ -70,7 +71,7 @@ describe("onboarding entry", () => {
   test("#given an externally created marker and sidecar #when normal lifecycle events fire #then both stay untouched", async () => {
     const dir = freshDir()
     const marker = join(dir, "onboarding-completed")
-    const sidecar = join(dir, "opaque-desktop-sidecar")
+    const sidecar = join(dir, "onboarding-completed.desktop-stopgap")
     writeFileSync(marker, "")
     writeFileSync(sidecar, "opaque fixture; not interpreted by onboarding")
     for (const mode of ["rpc", "tui"]) {
@@ -148,4 +149,43 @@ describe("onboarding entry", () => {
     expect(h.pi.messages).toEqual([])
     expect((await h.prompt()).filter(Boolean)).toHaveLength(1)
   })
+
+  for (const mode of ["tui", "rpc"]) {
+    test(`#given --onboard in ${mode} #when new resume and fork register runtimes #then force injects only once per process`, async () => {
+      const dir = freshDir()
+      claimOnboarding(dir)
+      const component = createOnboardingComponent({
+        claimOnboarding: () => claimOnboarding(dir),
+        isOnboardingComplete: () => isOnboardingComplete(dir),
+        releaseOnboarding: () => releaseOnboarding(dir),
+      })
+      const tours: number[] = []
+      for (const reason of ["startup", "new", "resume", "fork"]) {
+        const h = createOnboardingHarness(dir, reason, mode, component)
+        h.pi.setFlag("onboard", true)
+        await h.start()
+        const results = await h.prompt()
+        tours.push(h.pi.messages.length + results.filter(Boolean).length)
+        await h.agentStart()
+        await h.end()
+        await h.settle()
+      }
+      expect(tours).toEqual([1, 0, 0, 0])
+    })
+  }
+
+  for (const entry of ["context", "forced-rpc", "bootstrap"]) {
+    test(`#given ${entry} onboarding #when its skill pointer is resolved #then the actual skill file exists`, async () => {
+      const h = createOnboardingHarness(freshDir(), entry, entry === "bootstrap" ? "tui" : "rpc")
+      h.pi.setFlag("onboard", entry !== "context")
+      await h.start()
+      const results = await h.prompt()
+      const message = entry === "bootstrap" ? h.pi.messages[0]?.message
+        : (results[0] as { message: { content: unknown } }).message
+      expect(typeof message?.content).toBe("string")
+      const path = String(message?.content).match(/\S+\/onboarding\/SKILL\.md/)?.[0]
+      expect(path).toBeDefined()
+      expect(existsSync(resolve(path!))).toBe(true)
+    })
+  }
 })
