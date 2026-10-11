@@ -2,7 +2,9 @@ import { expect, test } from "bun:test"
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { probeComputerUseEngine } from "./engine-probe"
+import { EventEmitter } from "node:events"
+import { PassThrough, Writable } from "node:stream"
+import { probeComputerUseEngine, type EngineLauncher } from "./engine-probe"
 
 const HELLO = { protocolVersion: "x", engineVersion: "x", buildSha: "x", abi: "x" }
 
@@ -36,24 +38,32 @@ test.skipIf(process.platform === "win32")(
   10_000,
 )
 
-test.skipIf(process.platform === "win32")(
+test(
   "#given an engine that answers hello but never capabilities #when the probe deadline expires #then the timeout names that phase",
   async () => {
-    // given
-    const engine = writeEngine(`createInterface({ input: process.stdin }).on("line", (line) => {
-  const request = JSON.parse(line);
-  if (request.method === "engine.hello") process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: ${JSON.stringify(HELLO)} }) + "\\n");
-});`)
-    try {
-      // when
-      const result = await probeComputerUseEngine(engine.path, {}, 300)
+    // given: an in-process engine that answers engine.hello in the same tick the request is written,
+    // so the phase reached before the deadline never depends on how fast a real process starts.
+    const stdout = new PassThrough()
+    const stdin = new Writable({
+      write(chunk: Buffer, _encoding, done) {
+        for (const line of chunk.toString("utf8").split("\n").filter(Boolean)) {
+          const request = JSON.parse(line) as { id: number; method: string }
+          if (request.method === "engine.hello") stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, result: HELLO })}\n`)
+        }
+        done()
+      },
+    })
+    const child = Object.assign(new EventEmitter(), {
+      stdin, stdout, stderr: new PassThrough(), pid: undefined, unref: () => {}, kill: () => true,
+    })
+    const launch: EngineLauncher = () => child as unknown as ReturnType<EngineLauncher>
 
-      // then
-      expect(result).toMatchObject({ ok: false, code: "timeout" })
-      expect(result.ok ? "" : result.message).toContain("phase: engine.hello answered, awaiting capabilities")
-    } finally {
-      engine.cleanup()
-    }
+    // when
+    const result = await probeComputerUseEngine("in-process-engine", {}, 300, launch)
+
+    // then
+    expect(result).toMatchObject({ ok: false, code: "timeout" })
+    expect(result.ok ? "" : result.message).toContain("phase: engine.hello answered, awaiting capabilities")
   },
   10_000,
 )
