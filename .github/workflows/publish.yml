@@ -724,8 +724,10 @@ jobs:
   publish-main:
     runs-on: ubuntu-latest
     # post-publish-verify runs the published-package probes in a job that cannot block the release, so the
-    # lazycodex publish decision has to cross the job boundary as an output.
+    # per-package publish decisions have to cross the job boundary as outputs.
     outputs:
+      opencode_publish_skipped: ${{ steps.check.outputs.skip }}
+      openagent_publish_skipped: ${{ steps.check-openagent.outputs.skip }}
       lazycodex_publish_skipped: ${{ steps.check-lazycodex.outputs.skip }}
     needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, publish-platform]
     if: >-
@@ -1439,8 +1441,8 @@ jobs:
 
   post-publish-verify:
     runs-on: ubuntu-latest
-    # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
-    # probe can't hold a runner for GitHub's 6 h default (#9492).
+    # Registry probes share a 60-minute deadline; leave room for the subsequent live install and smoke.
+    # Bound the whole job so a stuck install cannot hold a runner for GitHub's 6 h default (#9492).
     timeout-minutes: 120
     needs: [release-metadata, prepare-release-state, publish-main, release]
     # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
@@ -1464,51 +1466,116 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Wait for omo-ai registry readiness
-        if: inputs.lazycodex_only != true
+      - name: Wait for main package registry readiness
         env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
           OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
           ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
+          RELEASE_SHA: ${{ needs.prepare-release-state.outputs.release_sha }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
+          OPENCODE_PUBLISH_SKIPPED: ${{ needs.publish-main.outputs.opencode_publish_skipped }}
+          OPENAGENT_PUBLISH_SKIPPED: ${{ needs.publish-main.outputs.openagent_publish_skipped }}
+          LAZYCODEX_PUBLISH_SKIPPED: ${{ needs.publish-main.outputs.lazycodex_publish_skipped }}
         run: |
           set -euo pipefail
 
-          # npm publish returns before the registry serves the new version: its own output says
-          # "Your package is being processed and may take a few minutes to become available", and
-          # omo-ai 5.0.0-0.beta.42 (2026-09-04) took ~5 minutes. The previous 5 x 15 s = 60 s budget
-          # therefore failed the run AFTER a successful publish. Size the wait to the registry's stated
-          # contract and read with --prefer-online so a cached "not found" cannot mask a landed version.
+          # A skipped publish only proves metadata exists. Still verify its immutable payload and
+          # source, but allow a later release to have moved its mutable dist-tag on a rerun.
+          PENDING=()
+          if [ "$LAZYCODEX_ONLY" != "true" ]; then
+            PENDING+=("omo-ai|$OMO_AI_VERSION|$OMO_AI_DIST_TAG|$ALREADY_PUBLISHED")
+            PENDING+=("oh-my-opencode|$VERSION|${DIST_TAG:-latest}|$OPENCODE_PUBLISH_SKIPPED")
+            PENDING+=("oh-my-openagent|$VERSION|${DIST_TAG:-latest}|$OPENAGENT_PUBLISH_SKIPPED")
+          fi
+          if [ "$PUBLISH_LAZYCODEX" = "true" ]; then
+            PENDING+=("lazycodex-ai|$VERSION|${DIST_TAG:-latest}|$LAZYCODEX_PUBLISH_SKIPPED")
+          fi
+          if [ "${#PENDING[@]}" -eq 0 ]; then
+            echo "No main packages selected for registry verification"
+            exit 0
+          fi
+          : "${RELEASE_SHA:?Missing prepared release SHA}"
+
+          # npm can acknowledge a publish before serving it; omo-ai@5.1.13 took ~55 minutes (#9492).
+          # All packages share the full window, including probe time, rather than waiting an hour each.
           READINESS_INTERVAL_SECONDS=15
-          READINESS_ATTEMPTS=240  # 240 x 15 s = 60 minutes; npm took ~55 minutes to serve omo-ai@5.1.13 (#9492)
+          READINESS_ATTEMPTS=240
+          READINESS_BUDGET_SECONDS=3600
+          DEADLINE=$(($(date +%s) + READINESS_BUDGET_SECONDS))
+          probe() {
+            local remaining=$(($DEADLINE - $(date +%s)))
+            [ "$remaining" -gt 0 ] || return 1
+            [ "$remaining" -le 15 ] || remaining=15
+            timeout "$remaining" "$@"
+          }
+          npm_view() {
+            probe npm view --prefer-online --fetch-retries=0 --fetch-timeout=10000 "$@"
+          }
+
+          FAILURES=()
           for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
-            IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
-            TARBALL_URL=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball 2>/dev/null || true)
-            TAG_READY=true
-            if [ "$ALREADY_PUBLISHED" != "true" ]; then
-              TAGGED_VERSION=$(npm view --prefer-online omo-ai "dist-tags.$OMO_AI_DIST_TAG" 2>/dev/null || true)
-              [ "$TAGGED_VERSION" = "$OMO_AI_VERSION" ] || TAG_READY=false
-            fi
+            # A final sleep can consume the deadline; retain the last observed failures.
+            [ "$(date +%s)" -lt "$DEADLINE" ] || break
+            STILL_PENDING=()
+            LAST_FAILURES=("${FAILURES[@]-}")
+            FAILURES=()
+            for index in "${!PENDING[@]}"; do
+              target="${PENDING[$index]}"
+              IFS='|' read -r PACKAGE EXPECTED_VERSION TAG PUBLISH_SKIPPED <<< "$target"
+              IMMUTABLE_VERSION=$(npm_view "$PACKAGE@$EXPECTED_VERSION" version 2>/dev/null || true)
+              TARBALL_URL=$(npm_view "$PACKAGE@$EXPECTED_VERSION" dist.tarball 2>/dev/null || true)
+              GIT_HEAD=$(npm_view "$PACKAGE@$EXPECTED_VERSION" gitHead 2>/dev/null || true)
+              TAG_READY=true
+              TAGGED_VERSION=not-checked-on-rerun
+              if [ "$PUBLISH_SKIPPED" != "true" ]; then
+                TAGGED_VERSION=$(npm_view "$PACKAGE" "dist-tags.$TAG" 2>/dev/null || true)
+                [ "$TAGGED_VERSION" = "$EXPECTED_VERSION" ] || TAG_READY=false
+              fi
 
-            TARBALL_READY=false
-            if [ -n "$TARBALL_URL" ] &&
-               curl --fail --silent --location --connect-timeout 10 --max-time 15 --head --output /dev/null "$TARBALL_URL"; then
-              TARBALL_READY=true
-            fi
+              TARBALL_READY=false
+              TARBALL_STATUS=missing
+              if [ -n "$TARBALL_URL" ] &&
+                 TARBALL_STATUS=$(probe curl --fail --silent --location --connect-timeout 10 --max-time 15 --head --output /dev/null --write-out '%{http_code}' "$TARBALL_URL"); then
+                [ "$TARBALL_STATUS" = "200" ] && TARBALL_READY=true
+              fi
 
-            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] &&
-               [ "$TAG_READY" = "true" ] &&
-               [ "$TARBALL_READY" = "true" ]; then
-              echo "omo-ai@$OMO_AI_VERSION metadata and tarball are ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
+              if [ "$IMMUTABLE_VERSION" = "$EXPECTED_VERSION" ] &&
+                 [ "$GIT_HEAD" = "$RELEASE_SHA" ] &&
+                 [ "$TAG_READY" = "true" ] &&
+                 [ "$TARBALL_READY" = "true" ]; then
+                echo "$PACKAGE@$EXPECTED_VERSION metadata, gitHead and tarball are ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
+              else
+                STILL_PENDING+=("$target")
+                if [ "$(date +%s)" -ge "$DEADLINE" ] && [ -n "${LAST_FAILURES[$index]:-}" ]; then
+                  FAILURES+=("${LAST_FAILURES[$index]}")
+                else
+                  FAILURES+=("$PACKAGE@$EXPECTED_VERSION: version=${IMMUTABLE_VERSION:-missing}, $TAG=${TAGGED_VERSION:-missing}, gitHead=${GIT_HEAD:-missing} (expected $RELEASE_SHA), tarball HTTP=${TARBALL_STATUS:-unavailable}")
+                fi
+              fi
+            done
+
+            if [ "${#STILL_PENDING[@]}" -eq 0 ]; then
+              echo "All selected main packages are ready"
+              exit 0
+            fi
+            PENDING=("${STILL_PENDING[@]}")
+            REMAINING_SECONDS=$(($DEADLINE - $(date +%s)))
+            if [ "$attempt" -eq "$READINESS_ATTEMPTS" ] || [ "$REMAINING_SECONDS" -le 0 ]; then
               break
             fi
-
-            if [ "$attempt" = "$READINESS_ATTEMPTS" ]; then
-              echo "::error::omo-ai@$OMO_AI_VERSION metadata and tarball did not become ready within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION version' and the dist.tarball URL's tarball availability before re-running anything."
-              exit 1
-            fi
-            echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/${READINESS_ATTEMPTS}, ${READINESS_INTERVAL_SECONDS}s)"
-            sleep "$READINESS_INTERVAL_SECONDS"
+            DELAY=$READINESS_INTERVAL_SECONDS
+            [ "$REMAINING_SECONDS" -ge "$DELAY" ] || DELAY=$REMAINING_SECONDS
+            echo "Waiting for ${#PENDING[@]} main package(s) (attempt ${attempt}/${READINESS_ATTEMPTS}, ${DELAY}s)"
+            sleep "$DELAY"
           done
+          for failure in "${FAILURES[@]}"; do
+            echo "::error::$failure"
+          done
+          echo "::error::Main package verification did not complete within the ${READINESS_BUDGET_SECONDS}s registry readiness budget. Check propagation, dist-tags, source gitHead and tarball availability before re-running anything; npm acceptance alone does not prove readiness."
+          exit 1
 
       - name: Guard omo-ai dist-tags
         if: inputs.lazycodex_only != true
@@ -1748,7 +1815,7 @@ jobs:
           JOB_SUMMARY_TITLE: Post-publish verification
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Waits for omo-ai registry readiness and guards its dist-tags.
+            - Verifies all selected main packages' registry metadata, release gitHead and tarballs; guards omo-ai dist-tags.
             - Verifies the omo-ai live install and smoke-tests the published LazyCodex package.
             - Runs after the GitHub release so propagation delays cannot strand a published release.
           JOB_SUMMARY_NEXT: Investigate the failing registry probe; the release itself already exists.
