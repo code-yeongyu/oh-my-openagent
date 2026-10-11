@@ -79,6 +79,40 @@ describe("cleanUpReloadRun", () => {
     expect(signals).toEqual(["SIGTERM", "SIGKILL"])
     expect(restored).toBe(1)
   })
+  it("#given a host that never exits even after SIGKILL #when both waits time out #then the state is still restored and the root is kept", async () => {
+    // given
+    const root = tempRoot()
+    const signals: NodeJS.Signals[] = []
+    const child = {
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill(signal: NodeJS.Signals) {
+        signals.push(signal)
+        return true
+      },
+    }
+    let restored = 0
+
+    // when
+    const cleanup = cleanUpReloadRun({
+      root,
+      shutdowns: [],
+      hosts: [{ child, exited: new Promise<void>(() => {}) }],
+      restore: () => { restored += 1 },
+      exitTimeoutMs: 1,
+    })
+
+    // then
+    const failure = await cleanup.then(() => undefined, (error: unknown) => error)
+    expect(failure).toBeInstanceOf(AggregateError)
+    expect((failure as AggregateError).errors.map((error: Error) => error.message)).toEqual([
+      "packaged reload task host did not exit",
+      "packaged reload task host did not exit",
+    ])
+    expect(signals).toEqual(["SIGTERM", "SIGKILL"])
+    expect(restored).toBe(1)
+    expect(existsSync(root)).toBe(true)
+  })
 })
 
 describe("ownsHostSocket", () => {
