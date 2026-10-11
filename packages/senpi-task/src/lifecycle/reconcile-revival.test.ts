@@ -438,7 +438,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
           terminate: async () => undefined,
         },
         entries: () => [],
-        forget: (taskId) => manager.forget(taskId),
+        forget: (taskId, options) => manager.forget(taskId, options),
         hasPendingSends: () => false,
       },
       config: settings(), hostPid, now,
