@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use senpi_desktop_core::error::{DesktopError, ErrorCode};
+use senpi_desktop_core::error::{DesktopError, ErrorCode, TccPermission};
 
 use super::{gate, FrameContext, FrameId, GateError, LockState, PermissionGate, StopPathReason};
 use crate::{
@@ -188,7 +188,7 @@ fn missing_permission_rejects() {
     // When / Then
     assert_eq!(
         scene.run(MutatingAction::MoveMouse, None),
-        Err(GateError::PermissionDenied)
+        Err(GateError::PermissionDenied { permission: TccPermission::Accessibility })
     );
 }
 
@@ -263,7 +263,7 @@ fn gate_order_peels_one_failing_check_at_a_time() {
         [
             stop_path_unavailable(StopPathReason::NoGlobalListener),
             Err(GateError::ScreenLocked),
-            Err(GateError::PermissionDenied),
+            Err(GateError::PermissionDenied { permission: TccPermission::Accessibility }),
             Err(GateError::InvalidCoordinateFrame),
         ]
     );

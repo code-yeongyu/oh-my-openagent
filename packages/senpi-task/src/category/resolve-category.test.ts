@@ -36,7 +36,7 @@ const gpt56CategoryCases = [
     category: "ultrabrain",
     modelId: "gpt-5.6-sol",
     nativeVariant: "max",
-    mixedWinner: { provider: "vercel", modelId: "openai/gpt-5.6-sol", variant: "max" },
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "max" },
     copilotVariant: "max",
     copilotFallbackEntry: { providers: ["github-copilot"] as string[], model: "gpt-5.6-sol", variant: "max" },
   },
@@ -54,14 +54,14 @@ const gpt56CategoryCases = [
   },
   {
     category: "unspecified-low",
-    modelId: "gpt-5.6-terra",
-    nativeVariant: "high",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-terra", variant: "high" },
-    copilotVariant: "high",
+    modelId: "gpt-5.6-sol",
+    nativeVariant: "medium",
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
+    copilotVariant: "medium",
     copilotFallbackEntry: {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
-      model: "gpt-5.6-terra",
-      variant: "high",
+      model: "gpt-5.6-sol",
+      variant: "medium",
     },
   },
 ] as const
@@ -331,20 +331,15 @@ describe("resolveCategory", () => {
     })
   })
 
-  test("#given only transformed Vercel GPT models #when deep categories resolve #then each keeps its native top rung", () => {
-    for (const { category, modelId, nativeVariant } of gpt56CategoryCases) {
-      const gatewayModelId = `openai/${modelId}`
-      const result = expectResolved(resolveCategory(category, {}, registry([model("vercel", gatewayModelId)])))
+  test("#given only an unlisted Vercel gateway re-publishing the GPT models #when deep categories resolve #then none resolves on it", () => {
+    for (const { category, modelId } of gpt56CategoryCases) {
+      const result = resolveCategory(category, {}, registry([model("vercel", `openai/${modelId}`)]))
 
-      expect(result.spec.provider).toBe("vercel")
-      expect(result.spec.modelId).toBe(gatewayModelId)
-      expect(result.spec.variant).toBe(nativeVariant)
-      expect(result.modelSelection.fallbackEntry?.model).toBe(modelId)
-      expect(result.modelSelection.fallbackEntry?.variant).toBe(nativeVariant)
+      expect(result.kind).toBe("model_unavailable")
     }
   })
 
-  test("#given transformed Vercel and Copilot GPT models #when deep categories resolve #then the first available rung provider wins", () => {
+  test("#given an unlisted Vercel gateway and Copilot GPT models #when deep categories resolve #then the listed Copilot rung wins", () => {
     for (const { category, modelId, mixedWinner } of gpt56CategoryCases) {
       const gatewayModelId = `openai/${modelId}`
       const models = registry([
@@ -480,10 +475,10 @@ describe("builtin category defaults", () => {
       ["visual-engineering", "anthropic/claude-fable-5-1", "max"],
       ["artistry", "anthropic/claude-fable-5-1", "max"],
       ["ultrabrain", "chatgpt-subscription/gpt-6-astra", "max"],
-      ["deep-low", "chatgpt-subscription/gpt-5.6-sol-fast", "medium"],
-      ["deep-high", "chatgpt-subscription/gpt-6-astra", "xhigh"],
+      ["deep-low", "chatgpt-subscription/gpt-6.1-sol", "medium"],
+      ["deep-high", "chatgpt-subscription/gpt-6-astra", "high"],
       ["quick", "chatgpt-subscription/gpt-6-luna-fast", "low"],
-      ["unspecified-low", "xiaomi/mimo-v2.6-pro", "max"],
+      ["unspecified-low", "anthropic/claude-sonnet-5-5", "medium"],
       ["unspecified-high", "anthropic/claude-opus-5-5", "medium"],
       ["architect", "anthropic/claude-fable-5-1", "max"],
       ["writing", "anthropic/claude-opus-5-5", "low"],
@@ -493,7 +488,7 @@ describe("builtin category defaults", () => {
     expect(BUILTIN_CATEGORY_REQUIRES_MODEL).toEqual({
       architect: ["claude-fable-5-1"],
       ultrabrain: ["gpt-6-astra", "gpt-5.6-sol"],
-      "deep-low": ["gpt-5.6-sol-fast", "gpt-5.6-sol"],
+      "deep-low": ["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol-fast", "gpt-5.6-sol"],
       "deep-high": ["gpt-6-astra"],
     })
   })

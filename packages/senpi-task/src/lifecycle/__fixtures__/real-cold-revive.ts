@@ -22,6 +22,7 @@ import { livenessDetails } from "../../../../omo-senpi/src/components/task/membe
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { runTaskSend } from "../../tools/control/send"
 import type { ColdReviveTrace } from "./cold-revive-trace"
+import { NO_HOST_ENDPOINT } from "../host-session"
 
 // A source-graph Bun child started in a sandbox writes Bun's runtime transpiler cache into a cold
 // location. On Windows those writes block the child for seconds (measured: 13-14 s with ~2.4 s CPU, 2 of 20
@@ -48,10 +49,12 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
   const requestStarted = Promise.withResolvers<string>()
   const releaseResponse = Promise.withResolvers<void>()
   let calls = 0
+  const providerRequests: string[] = []
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async (request) => {
     calls += 1
     trace?.mark("provider_request", { call: calls })
     const body = await request.text()
+    providerRequests.push(body)
     requestStarted.resolve(body)
     await releaseResponse.promise
     const chunk = { id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta: { content: misleading ? "" : "RESUMED_SENTINEL" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }
@@ -119,7 +122,7 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     planner: () => { throw new Error("cold revival must not replan") },
     destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
   })
-  const lifecycle = createTaskLifecycle({ store, config, registry: createManagerResidencyRegistry(() => manager), now: () => now,
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, registry: createManagerResidencyRegistry(() => manager), now: () => now,
     idleReclaimerScheduler: { setInterval: (callback, ms) => { tick = callback; cadenceMs = ms; return { unref: () => { unrefs += 1 } } }, clearInterval: () => undefined },
   })
   try {
@@ -190,14 +193,26 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     const pending = [{ id: "pending-ttl", message: "PENDING_SENTINEL", deliver_as: "steer" as const }]
     store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: pending }))
     now += 7
-    assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [])
+    // A finished child's durable queue no longer pins its slot (#9861): idle reclaim parks it, and the
+    // queue stays on the record to be delivered first when the revive below brings it back.
+    assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [record.task_id])
+    assert.notEqual(store.load(record.task_id)?.residency_state, "resident")
     assert.deepEqual(store.load(record.task_id)?.pending_steering, pending)
     // A further revive can acquire at cap=1, proving the previous terminal released its lease.
     trace?.mark("lease_probe_requested")
     const leaseProbe = await runTaskSend(manager, { to: record.task_id, message: "LEASE_PROBE" }, "fixture-parent")
     assert.equal(leaseProbe.details.kind, "revived")
     await manager.waitFor(record.task_id, { signal: AbortSignal.timeout(15000) })
-    return { cadenceMs, unrefs, transitions, parked, earlyParkAfterSend, memberExtensionRestored, messageCount, pendingSteeringPreserved: true, outputReadable: true, mode, source: "real-manager/task_send/AgentSession", result: result.details, status: completed.status, run_epoch: completed.notification.run_epoch, restoredTools: toolSurfaces, transcriptPreserved: readFileSync(sessionPath, "utf8").includes("TRANSCRIPT_SENTINEL"), transcriptBeforeBytes: before.length, leaseReleased: leaseProbe.details.kind === "revived", providerCalls: calls, isolatedAgentDir: agentDir }
+    assert.equal(calls, 2)
+    const queuedRequest = providerRequests[1]
+    assert(queuedRequest !== undefined)
+    const revivedRecord = store.load(record.task_id)
+    assert(revivedRecord)
+    const pendingIndex = queuedRequest.indexOf("PENDING_SENTINEL")
+    const pendingSteeringPreserved = pendingIndex >= 0 && pendingIndex < queuedRequest.indexOf("LEASE_PROBE")
+      && revivedRecord.pending_steering === undefined
+    assert(pendingSteeringPreserved, "revival must deliver the parked queue before the new message and clear it")
+    return { cadenceMs, unrefs, transitions, parked, earlyParkAfterSend, memberExtensionRestored, messageCount, pendingSteeringPreserved, outputReadable: true, mode, source: "real-manager/task_send/AgentSession", result: result.details, status: completed.status, run_epoch: completed.notification.run_epoch, restoredTools: toolSurfaces, transcriptPreserved: readFileSync(sessionPath, "utf8").includes("TRANSCRIPT_SENTINEL"), transcriptBeforeBytes: before.length, leaseReleased: leaseProbe.details.kind === "revived", providerCalls: calls, isolatedAgentDir: agentDir }
   } catch (error) {
     throw trace === undefined ? error : trace.failure("Cold revival failed", error)
   } finally {

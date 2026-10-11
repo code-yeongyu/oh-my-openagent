@@ -22,6 +22,7 @@ import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 const cleanupRoots: string[] = []
 const TERMINAL_TASK_STATUSES = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
@@ -197,7 +198,7 @@ class RecoveryTaskManager implements TaskManager {
   interruptTask(): Promise<never> { throw new Error("not implemented") }
   cancelTask(): Promise<never> { throw new Error("not implemented") }
   list(): readonly [] { return [] }
-  forget(): void {}
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   // The real manager settles `waitFor` only for a child it holds resident, so this fake answers
   // "held" from the same map its completions come from: a task it can still complete is held here.
   getResidentHandle(taskId: string): ManagedChildHandle | undefined {
@@ -618,6 +619,7 @@ describe("DAG crash recovery", () => {
       planner: categoryPlanner(), config, cwd: project, hostPid: 101, now,
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store: taskStore, registry: new FakeRegistry(), config, hostPid: 101, now,
       signaller: { isAlive: () => false, signal: () => { throw new Error("unexpected signal") } },
     })
@@ -673,7 +675,7 @@ describe("DAG crash recovery", () => {
       store: taskStore, runners: { "in-process": runner, process: runner },
       planner: categoryPlanner(), config, cwd: project, hostPid: 101, now,
     })
-    const lifecycle = createTaskLifecycle({ store: taskStore, registry: new FakeRegistry(), config, hostPid: 101, now })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: taskStore, registry: new FakeRegistry(), config, hostPid: 101, now })
     const revived = await lifecycle.reconcileOnSessionStart(parentSessionId)
     lifecycle.dispose?.()
     expect(revived.outcomes).toContainEqual(expect.objectContaining({ task_id: pending.task_id, kind: "resumed" }))

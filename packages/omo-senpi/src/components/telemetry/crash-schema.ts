@@ -15,6 +15,13 @@ export const CRASH_SIGNALS = [
   "SIGQUIT", "SIGSYS", "other", "none", "unknown",
 ] as const
 export const UPTIME_BUCKETS = ["lt_1m", "1_10m", "10_60m", "1_6h", "6_24h", "24h_plus"] as const
+/**
+ * Which kind of RPC host crashed: a per-parent-session shard (`p`), a Desktop per-thread shard (`i`),
+ * the legacy machine-wide endpoint or no host at all (`none`), or an endpoint directory that names no
+ * socket of its own (`unknown`). Never the shard key, the socket or the owner id.
+ */
+export const SHARD_KINDS = ["p", "i", "none", "unknown"] as const
+export type CrashShardKind = (typeof SHARD_KINDS)[number]
 
 /**
  * Privacy schema for `process_crashed`: how a process died and on which runtime, nothing else. No
@@ -30,6 +37,7 @@ export const PROCESS_CRASHED_SCHEMA = Object.freeze({
   detection: enumProperty(CRASH_DETECTIONS),
   exit_code: NUMBER_PROPERTY,
   process_kind: enumProperty(PROCESS_KINDS),
+  shard_kind: enumProperty(SHARD_KINDS),
   signal: enumProperty(CRASH_SIGNALS),
   uptime_bucket: enumProperty(UPTIME_BUCKETS),
   uptime_ms: NUMBER_PROPERTY,

@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -77,6 +77,25 @@ describe("dependencies check", () => {
       const result = deps.findCommentCheckerPackageBinary(testDir)
 
       //#then returns the vendor path
+      expect(result).toBe(expected)
+    })
+
+    it("#given the per-platform package is installed beside the package #when resolving package binary #then returns the platform package binary", () => {
+      //#given node_modules/@code-yeongyu/comment-checker plus its matching platform package
+      const scopeDir = join(realpathSync(testDir), "node_modules", "@code-yeongyu")
+      const packageDir = join(scopeDir, "comment-checker")
+      const platformDir = join(scopeDir, `comment-checker-${platformKey}`)
+      mkdirSync(packageDir, { recursive: true })
+      mkdirSync(join(platformDir, "bin"), { recursive: true })
+      writeFileSync(join(packageDir, "package.json"), "{}")
+      writeFileSync(join(platformDir, "package.json"), "{}")
+      const expected = join(platformDir, "bin", binaryName)
+      writeFileSync(expected, "")
+
+      //#when resolving through the package.json resolver
+      const result = deps.findCommentCheckerPackageBinary(undefined, () => join(packageDir, "package.json"))
+
+      //#then returns the platform package binary
       expect(result).toBe(expected)
     })
 

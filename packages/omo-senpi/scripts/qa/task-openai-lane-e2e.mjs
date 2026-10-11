@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
 import { parseJsonEvents } from "./task-e2e-analysis.mjs"
-import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-openai-lane-mock-provider.ts")
@@ -126,7 +126,7 @@ function runScenario(scenario, outDir) {
         maxBuffer: 64 * 1024 * 1024,
       },
     )
-    artifacts = readTaskArtifacts(join(sandbox.cwd, ".omo", "senpi-task"))
+    artifacts = readTaskArtifacts(sandboxStateDir(sandbox))
   } finally {
     writeFileSync(join(scenarioOutDir, "stdout.json.log"), runResult?.stdout ?? "")
     writeFileSync(join(scenarioOutDir, "stderr.log"), runResult?.stderr ?? "")

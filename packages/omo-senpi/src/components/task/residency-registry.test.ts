@@ -68,7 +68,7 @@ function registryFor(handle: ManagedChildHandle, pendingSteering: readonly unkno
   const manager = {
     getResidentHandle: (taskId: string) => (taskId === handle.task_id ? handle : undefined),
     residentTaskIds: () => [handle.task_id],
-    forget: () => undefined,
+    forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) => undefined,
     hasPendingSends: (taskId: string) => taskId === handle.task_id && pendingSteering.length > 0,
     get: () => undefined,
   }
@@ -87,7 +87,7 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
     } finally { await h.dispose() }
   })
 
-  it("#given an otherwise eligible old resident #when a durable send is pending #then teardown is blocked until the queue is resolved", async () => {
+  it("#given a finished resident with a durable queue #when idle reclaim runs #then it parks, frees its slot and keeps the queue", async () => {
     let now = 1000
     let disposals = 0
     const h = coldReviveHarness({ now: () => now, idleTimeoutMs: 37,
@@ -101,22 +101,21 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
       await terminal
       h.store.mutate(h.record.task_id, (record) => ({ ...record, pending_steering: pending }))
       now += 37
-      expect(h.store.load(h.record.task_id)?.residency_state).toBe("resident")
+      // The queue is still durable work for the next revival (#9861)...
       expect(h.registry.hasPendingSends(h.record.task_id)).toBe(true)
-      expect(await h.lifecycle.reclaimIdleResidents?.()).toEqual([])
-      expect(disposals).toBe(0)
-      expect(h.registry.get(h.record.task_id)).toBeDefined()
-      expect(h.store.load(h.record.task_id)?.pending_steering).toEqual(pending)
-      h.store.mutate(h.record.task_id, (record) => ({ ...record, pending_steering: [] }))
+      // ...but it no longer pins a finished child's slot: the child parks and its handle is released.
       expect(await h.lifecycle.reclaimIdleResidents?.()).toEqual([h.record.task_id])
       expect(disposals).toBe(1)
+      expect(h.registry.get(h.record.task_id)).toBeUndefined()
       expect(h.store.load(h.record.task_id)?.residency_state).toBe("persisted_only")
+      expect(h.store.load(h.record.task_id)?.pending_steering).toEqual(pending)
     } finally { await h.dispose() }
   })
 
   it("#given a resident with a queued steering message #when pending sends are checked #then the registry reports true", () => {
     const resident = registryFor(rpcHandle({ abort: 0, terminate: 0 }, true), [{ message: "queued" }])
     expect(resident.hasPendingSends("st_rpc")).toBe(true)
+    expect(resident.hasInFlightSends?.("st_rpc")).toBe(true)
   })
 
   it("#given an rpc resident #when lifecycle terminates it #then process termination runs without aborting the turn", async () => {
@@ -163,5 +162,29 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
     // when / then
     await expect(resident.terminate()).rejects.toThrow("rpc resident st_rpc has no terminate port")
     expect(calls).toEqual({ abort: 0, terminate: 0 })
+  })
+})
+
+describe("createManagerResidencyRegistry ownership (#9785)", () => {
+  const manager = { forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) => undefined, get: () => undefined, getResidentHandle: () => undefined, hasPendingSends: () => false, residentTaskIds: () => [] }
+
+  it("#given an engine serving one session #when asked about records #then only that session's own records are owned", () => {
+    // given
+    let current = "session-a"
+    const registry = createManagerResidencyRegistry(() => manager, () => current)
+
+    // when / then
+    expect(registry.ownsRecord?.({ parent_session_id: "session-a" })).toBe(true)
+    expect(registry.ownsRecord?.({ parent_session_id: "session-b" })).toBe(false)
+    current = "session-b"
+    expect(registry.ownsRecord?.({ parent_session_id: "session-b" })).toBe(true)
+  })
+
+  it("#given no session accessor #when asked #then nothing is owned", () => {
+    // given
+    const registry = createManagerResidencyRegistry(() => manager)
+
+    // when / then
+    expect(registry.ownsRecord?.({ parent_session_id: "session-a" })).toBe(false)
   })
 })

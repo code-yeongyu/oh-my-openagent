@@ -76,7 +76,11 @@ export function startMockCompletionsServer({ steps, onRequest, requestLogPath, c
     ready: new Promise((resolve) => {
       server.on("listening", () => resolve(`http://127.0.0.1:${server.address().port}`))
     }),
-    close: () => server.close(),
+    abortConnections: () => server.closeAllConnections?.(),
+    close: () => {
+      server.closeAllConnections?.()
+      server.close()
+    },
   }
 }
 

@@ -27,7 +27,8 @@ import {
   flag,
   installCleanupHooks,
   liveAddressBook,
-  mailboxPortFor,
+  deliverAuto,
+  deliveryPortFor,
   makeScratch,
   startFakeModelServer,
   threadComponent,
@@ -52,7 +53,6 @@ const Stream = await desktopDependency("effect/Stream")
 let scratchDir
 let socketPath
 let shell
-let mailbox
 try {
   const scratch = makeScratch("t13-desktop-to-cli")
   scratchDir = scratch.dir
@@ -61,7 +61,7 @@ try {
 
   const binaryPath = writeCliShim(scratch)
   socketPath = join(scratch.dir, "rpc", "rpc.sock")
-  const managedHost = trackDesktopManagedHost(scratch.agentDir, socketPath)
+  const managedHost = trackDesktopManagedHost(socketPath)
 
   const desktopCwd = join(scratch.dir, "desktop-project")
   mkdirSync(desktopCwd, { recursive: true })
@@ -71,7 +71,6 @@ try {
   const { makeOmoSharedProcess } = await desktopModule("apps/server/src/provider/Layers/OmoSharedProcess.ts")
   const { OrchestrationEngineService } = shell
   const { resolveTarget } = await threadComponent("addressing")
-  const { createOrderedDeliveryMailbox } = await threadComponent("mailbox")
 
   const scenario = Effect.gen(function* () {
     // ---- the desktop side owns the host and creates the session ----
@@ -80,9 +79,10 @@ try {
       cwd: scratch.cwd,
       socketPath,
       env: { ...isolatedChildEnv(scratch.env, scratch.agentDir), SENPI_CODING_AGENT_DIR: scratch.agentDir, OMO_CODING_AGENT_DIR: scratch.agentDir },
+      onHostEnsured: (host) => Effect.sync(() => managedHost.observe(host)),
     })
     yield* shared.request({ type: "get_protocol_info" })
-    report.log(`desktop-managed host pid=${managedHost.pid()} socket=${socketPath}`)
+    report.assert("engine-reported-host-pid", typeof managedHost.pid() === "number", `pid=${managedHost.pid()} socket=${socketPath}`)
 
     const opened = yield* shared.request({
       type: "open_session",
@@ -93,6 +93,21 @@ try {
     const durableId = opened.data.state.sessionId
     yield* shared.request({ type: "set_session_name", sessionId: routingId, name: "desktop-owned" })
     report.log(`desktop routing=${routingId} durable=${durableId}`)
+
+    // The mirror creates a row only for a session that holds a conversation (desktop
+    // `sessionHasConversation`: an empty session is a probe, not a user), so the desktop user
+    // says something first. The settle subscription is opened before the prompt is sent.
+    const firstTurnSettled = yield* Effect.forkChild(
+      Stream.runHead(
+        Stream.filter(
+          shared.records,
+          (event) => event.record.type === "agent_settled" && event.record.sessionId === routingId,
+        ),
+      ).pipe(Effect.timeout("60 seconds")),
+    )
+    yield* Effect.yieldNow
+    yield* shared.request({ type: "prompt", sessionId: routingId, message: "t13d-desktop-first-turn" })
+    yield* Fiber.join(firstTurnSettled)
 
     // The desktop's own thread row, so both surfaces are provably describing one session.
     const engine = yield* Effect.service(OrchestrationEngineService)
@@ -136,13 +151,7 @@ try {
     )
 
     // ---- the CLI addresses it for real: a send that lands in the transcript ----
-    mailbox = createOrderedDeliveryMailbox({
-      directory: join(scratch.dir, "mailbox"),
-      portFor: (target) => (target === routingId ? mailboxPortFor(cli, routingId) : undefined),
-    })
-    const sendResult = yield* Effect.promise(() =>
-      mailbox.accept(routingId, SEND_NEEDLE, { delivery: "auto" }),
-    )
+    const sendResult = yield* Effect.promise(() => deliverAuto(deliveryPortFor(cli, routingId), SEND_NEEDLE))
     // Read the transcript back through the DESKTOP client: one session, both surfaces.
     const desktopView = (yield* shared.request({ type: "get_messages", sessionId: routingId })).data.messages
     report.assert(
@@ -185,7 +194,6 @@ try {
   )
   process.exitCode = 1
 } finally {
-  mailbox?.close()
   await shell?.dispose()
   await cleanupAllAndWait()
   verifyCleanup(report, { scratchDir, socketPaths: socketPath === undefined ? [] : [socketPath] })

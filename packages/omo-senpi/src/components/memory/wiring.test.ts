@@ -622,8 +622,10 @@ async function liveFooterHarness(): Promise<{
 }
 
 describe("facts shutdown wiring", () => {
-  test("#given an active facts launch #when the session shuts down #then facts cancellation runs before the shutdown drain", async () => {
-    // given
+  const FIXED_NOW = 10_000
+  const fixedClock = () => FIXED_NOW
+
+  async function factsShutdownFixture() {
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-facts-shutdown-")))
     roots.push(root)
     const sessionId = "session-facts-shutdown"
@@ -646,17 +648,39 @@ describe("facts shutdown wiring", () => {
       }),
     })
     wiring.registerShutdownEvaluator(async () => { sequence.push("drain") })
+    return { wiring, sessionId, sequence }
+  }
+
+  test("#given an active facts launch #when the session shuts down within its budget #then facts cancellation runs before the shutdown drain", async () => {
+    // given
+    const { wiring, sessionId, sequence } = await factsShutdownFixture()
 
     // when
     await wiring.onSessionShutdown({
       reason: "quit",
       sessionId,
-      deadlineAt: Date.now() + 1_000,
-      now: () => Date.now(),
+      deadlineAt: FIXED_NOW + 60_000,
+      now: fixedClock,
     })
 
     // then
-    expect(sequence.indexOf("cancel")).toBeLessThan(sequence.indexOf("drain"))
+    expect(sequence).toEqual(["cancel", "drain"])
+  })
+
+  test("#given an active facts launch #when the session shuts down past its deadline #then facts cancellation still runs and the shutdown drain is skipped", async () => {
+    // given
+    const { wiring, sessionId, sequence } = await factsShutdownFixture()
+
+    // when
+    await wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId,
+      deadlineAt: FIXED_NOW - 1,
+      now: fixedClock,
+    })
+
+    // then
+    expect(sequence).toEqual(["cancel"])
   })
 })
 

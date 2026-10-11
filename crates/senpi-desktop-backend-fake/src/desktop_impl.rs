@@ -121,6 +121,21 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
+    fn clipboard_read(&mut self) -> CoreResult<String> {
+        self.begin(FakeMethod::ClipboardRead)?;
+        Ok(self.clipboard.clone())
+    }
+
+    fn clipboard_write(&mut self, text: &str) -> CoreResult<()> {
+        self.begin(FakeMethod::ClipboardWrite)?;
+        self.clipboard.clear();
+        self.clipboard.push_str(text);
+        self.record(SinkOp::ClipboardWrite {
+            text: text.to_owned(),
+        });
+        Ok(())
+    }
+
     fn type_text_interruptible(
         &mut self,
         target: &Target,
@@ -165,6 +180,23 @@ impl Backend for FakeBackend {
         self.focus_window(id);
         self.record(SinkOp::RaiseWindow { id: id.to_string() });
         Ok(())
+    }
+
+    fn menu_items(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+    ) -> CoreResult<Vec<senpi_desktop_core::menus::MenuItem>> {
+        self.menu_items_impl(window, path)
+    }
+
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        self.menu_select_impl(window, path, check_stop)
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {

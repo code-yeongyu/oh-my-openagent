@@ -185,12 +185,12 @@ describe.skipIf(NON_POSIX_HOST)("bun global node_modules/.bin shim", () => {
   describe("#given the launch context rules the repair out", () => {
     test("#then a skipped launch reports no entries at all", () => {
       // given
-      const { options } = baseInput(scriptPath, { versions: { bun: "1.4.0" } })
+      const { options } = baseInput("/usr/local/lib/node_modules/omo-ai/bin/omo.js")
       const fs = recorder()
       // when
       const result = ensureBunBinShim({ ...options, ...fs })
       // then
-      expect(result.action).toBe("skipped-runtime")
+      expect(result.action).toBe("skipped-install")
       expect(result.entries).toEqual([])
     })
   })

@@ -106,7 +106,10 @@ fn reports_tcc_identity_when_screen_recording_is_denied() {
     let error = capture.capture(&Target::Desktop).unwrap_err();
     println!("code={} message={}", error.code.as_str(), error.message);
     assert_eq!(error.code, ErrorCode::PermissionDenied);
-    assert!(error.message.contains("TCC identity: executable="));
+    assert!(
+        error.message.contains("TCC identity: responsible=")
+            || error.message.contains("TCC identity: unresolved (engine executable=")
+    );
 }
 
 #[test]

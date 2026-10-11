@@ -23,8 +23,6 @@ export type ModelProfileRung = {
 export type ModelProfileDefinition = {
   readonly profile: ModelProfileSummary
   readonly models: readonly ModelProfileRung[]
-  /** Builtin `recommended`: a rung is served only by its listed providers (no cross-provider step). */
-  readonly rankedProvidersOnly?: boolean
 }
 
 export type ResolveModelProfileInput = {
@@ -104,7 +102,6 @@ export function mergeModelProfiles(
         ...(builtin.tier !== undefined ? { tier: builtin.tier } : {}),
       },
       models: builtin.models.map(builtinRung),
-      ...(builtin.rankedProvidersOnly === true ? { rankedProvidersOnly: true } : {}),
     })
   }
   for (const [id, entry] of Object.entries(profiles ?? {})) {
@@ -140,11 +137,14 @@ function unknownProfileMessage(name: string, known: readonly string[]): string {
 // (`packages/delegate-core/src/model-selection.ts`, via `senpi-task/src/category/resolver.ts`), one
 // rung at a time, so a profile and a category can never disagree on provider spelling or on which
 // registry id counts as "that model". The deps pin it to the availability branch: an empty registry
-// is answered here, above, instead of letting the cold-cache branch guess a provider.
+// is answered here, above, instead of letting the cold-cache branch guess a provider. A rung that
+// lists providers is served only by them, so a builtin lane never lands the session on a gateway's
+// copy of its model (#9146); only a user's bare model id, which names no provider, matches anywhere.
 function matchRung(rung: ModelProfileRung, availableModels: ReadonlySet<string>): RungMatch | undefined {
   const selection = resolveModelForDelegateTask(
     {
       fallbackChain: [{ providers: [...rung.providers], model: rung.model }],
+      allowUnlistedProviders: rung.providers.length === 0,
       availableModels,
     },
     { connectedProviders: null, hasProviderModelsCache: true, hasConnectedProvidersCache: true },
@@ -172,14 +172,6 @@ function matchScopedUserRung(rung: ModelProfileRung, availableModels: ReadonlySe
   return undefined
 }
 
-// The builtin matcher, fed only the rung's own providers: the cross-provider step inside it then
-// has nothing outside the ranking to reach, so a gateway's vendor-prefixed copy never matches.
-function matchRankedRung(rung: ModelProfileRung, availableModels: ReadonlySet<string>): RungMatch | undefined {
-  const providers = new Set(rung.providers)
-  const ranked = new Set([...availableModels].filter((model) => providers.has(model.split("/")[0] ?? "")))
-  return ranked.size === 0 ? undefined : matchRung(rung, ranked)
-}
-
 function matchProfileRung(
   rung: ModelProfileRung,
   availableModels: ReadonlySet<string>,
@@ -187,9 +179,6 @@ function matchProfileRung(
 ): RungMatch | undefined {
   if (definition.profile.source === "user" && rung.providers.length > 0) {
     return matchScopedUserRung(rung, availableModels)
-  }
-  if (definition.rankedProvidersOnly === true) {
-    return matchRankedRung(rung, availableModels)
   }
   return matchRung(rung, availableModels)
 }

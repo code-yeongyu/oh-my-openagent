@@ -73,11 +73,17 @@ export interface KibitzerObservabilityOptions {
   readonly logger?: ComponentLogger
 }
 
+/** The session's recall settings the gate notice names beside the failing model. */
+export interface KibitzerWakeRecall {
+  /** `memory.recall.category`: the category the sidecar is pinned to. */
+  readonly category: string
+}
+
 export interface KibitzerObservability {
   /** A session's sidecar exists from now on: its directory is owned - never pruned - until shutdown. */
   own(sessionId: string, context: MemoryIdentityContext): void
   /** One settled wake: one ndjson line, then the diagnostic streak. Synchronous, never throws. */
-  onWake(outcome: KibitzerWakeOutcome, context: MemoryIdentityContext): void
+  onWake(outcome: KibitzerWakeOutcome, context: MemoryIdentityContext, recall?: KibitzerWakeRecall): void
   /**
    * Makes the session's queued records durable, releases its directory, forgets its streak and
    * sweeps the identity's aged sidecar directories (detached; `whenIdle` covers it).
@@ -171,7 +177,7 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
     }
   }
 
-  function onWake(outcome: KibitzerWakeOutcome, context: MemoryIdentityContext): void {
+  function onWake(outcome: KibitzerWakeOutcome, context: MemoryIdentityContext, recall?: KibitzerWakeRecall): void {
     const line = `${JSON.stringify(kibitzerWakeRecord(outcome, now()))}\n`
     const previous = writers.get(outcome.sessionId) ?? Promise.resolve()
     const next = track(previous.then(() => appendWake(context, outcome.sessionId, line)))
@@ -183,7 +189,7 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
       noticeConfiguration(outcome)
       return
     }
-    observeStreak(outcome)
+    observeStreak(outcome, recall)
   }
 
   // ---- the configuration notice ---------------------------------------------------------------------
@@ -211,7 +217,7 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
 
   // ---- the diagnostic streak -----------------------------------------------------------------------
 
-  function observeStreak(outcome: KibitzerWakeOutcome): void {
+  function observeStreak(outcome: KibitzerWakeOutcome, recall: KibitzerWakeRecall | undefined): void {
     if (!outcome.diagnostic) {
       streaks.delete(outcome.sessionId)
       return
@@ -227,6 +233,7 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
       status: "failed",
       cause: outcome.cause ?? "child_failed",
       ...(outcome.model === undefined ? {} : { model: capped(redactKibitzerEventText(outcome.model), WAKE_MODEL_MAX_CHARS) }),
+      ...(recall === undefined ? {} : { category: capped(redactKibitzerEventText(recall.category), WAKE_MODEL_MAX_CHARS) }),
       candidateCount: outcome.candidateCount,
       ...(reason === undefined ? {} : { reason }),
       consecutiveFailures: streak.count,

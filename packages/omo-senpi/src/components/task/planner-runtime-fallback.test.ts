@@ -114,7 +114,6 @@ describe("createTaskChildPlanner runtime fallback", () => {
           source: "category",
           provider: "opencode-go",
           model_id: "minimax-m3",
-          variant: "max",
         },
       ],
     })
@@ -159,7 +158,6 @@ describe("createTaskChildPlanner runtime fallback", () => {
         provider: "opencode-go",
         model_id: "minimax-m3",
         display: "opencode-go/minimax-m3",
-        variant: "max",
       },
     ])
   })

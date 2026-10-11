@@ -13,6 +13,7 @@ import {
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { abortWithTimeout } from "./abort-with-timeout"
 import { ensureCurrentAttempt, scheduleRetryAttempt } from "./attempt-lifecycle"
+import { filterProvidersServingModel } from "./fallback-provider-model-filter"
 
 export class TeamModeFallbackError extends Error {
   constructor(message: string) {
@@ -106,8 +107,24 @@ export async function tryFallbackRetry(args: {
       })
       continue
     }
+    const servingProviders = filterProvidersServingModel({
+      providers: candidate.providers,
+      model: candidate.model,
+      connectedSet,
+      modelsByProvider: providerModelsCache?.models,
+      transformModelForProvider: deps.transformModelForProvider,
+    })
+    if (!isReachable({ ...candidate, providers: servingProviders })) {
+      deps.log("[background-agent] Skipping fallback no connected provider serves:", {
+        taskId: task.id,
+        source,
+        model: candidate.model,
+        providers: candidate.providers,
+      })
+      continue
+    }
     const candidateProviderID = deps.selectFallbackProvider(
-      candidate.providers,
+      servingProviders,
       task.model?.providerID,
     )
     const candidateModelID = deps.transformModelForProvider(candidateProviderID, candidate.model)

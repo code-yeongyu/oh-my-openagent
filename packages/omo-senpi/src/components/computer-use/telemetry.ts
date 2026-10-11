@@ -1,16 +1,10 @@
-import { DesktopEngineAbiMismatchError } from "@oh-my-opencode/senpi-desktop-engine"
 import type { DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol"
-import {
-  DesktopEngineRpcError,
-  DesktopEngineUnavailableError,
-  DesktopServiceError,
-} from "@oh-my-opencode/senpi-desktop-service"
 import {
   COMPUTER_ACTIONS_TOOL_NAME,
   COMPUTER_TOOL_NAME,
   computerActionsPermissionParser,
   computerPermissionParser,
-} from "@oh-my-opencode/senpi-desktop-tool"
+} from "@oh-my-opencode/senpi-desktop-tool/registration"
 
 import {
   computerUseBackend,
@@ -30,10 +24,10 @@ export interface ComputerUseTelemetry {
     readonly source: ComputerUseActivationSource
     readonly backend: unknown
   }): void
-  engineError(context: unknown, error: Error, backend: unknown): void
+  /** `code` is `engineErrorCode(error)`, classified by the runtime that owns the error classes. */
+  engineError(context: unknown, code: ComputerUseEngineErrorCode, backend: unknown): void
   osPermissions(context: unknown, capabilities: DesktopCapabilities): void
-  permissionRequested(toolName: string, input: Record<string, unknown>): void
-  toolCall(payload: unknown): boolean
+  toolExecutionStarted(payload: unknown): boolean
   permissionTierDenied(payload: unknown, context: unknown, backend: unknown): void
 }
 
@@ -43,7 +37,6 @@ export function createComputerUseTelemetry(options: {
 }): ComputerUseTelemetry {
   const platform = computerUsePlatform(options.platform)
   const observers = options.observers ?? sharedComputerUseTelemetryObservers()
-  const requestedPermissions = new Map<string, ComputerUsePermission[]>()
   const pendingPermissions = new Map<string, ComputerUsePermission>()
 
   return {
@@ -59,13 +52,13 @@ export function createComputerUseTelemetry(options: {
         backend: computerUseBackend(input.backend),
       })
     },
-    engineError(context, error, backend) {
+    engineError(context, code, backend) {
       const sessionId = computerUseSessionId(context)
       if (sessionId === undefined) return
       observers.publish({
         kind: "engine_error",
         sessionId,
-        code: engineErrorCode(error),
+        code,
         platform,
         backend: computerUseBackend(backend),
       })
@@ -82,29 +75,16 @@ export function createComputerUseTelemetry(options: {
       if (!capabilities.input) observers.publish({ kind: "permission_denied", ...runtime, scope: "os", permission: "input" })
       if (!capabilities.ax) observers.publish({ kind: "permission_denied", ...runtime, scope: "os", permission: "ax" })
     },
-    permissionRequested(toolName, input) {
-      const permission = permissionForTool(toolName, input)
-      if (permission === undefined) return
-      const key = normalizedComputerToolName(toolName)
-      if (key === undefined) return
-      const queue = requestedPermissions.get(key) ?? []
-      queue.push(permission)
-      requestedPermissions.set(key, queue)
-    },
-    toolCall(payload) {
+    toolExecutionStarted(payload) {
       const request = permissionRequest(payload)
       if (request === undefined) return false
-      pendingPermissions.set(
-        request.toolCallId,
-        takeRequestedPermission(request.toolName, requestedPermissions) ?? request.permission,
-      )
+      pendingPermissions.set(request.toolCallId, request.permission)
       return true
     },
     permissionTierDenied(payload, context, backend) {
       const event = deniedToolExecution(payload)
       if (event === undefined) return
-      const permission = pendingPermissions.get(event.toolCallId) ??
-        (event.denied ? takeRequestedPermission(event.toolName, requestedPermissions) : undefined)
+      const permission = pendingPermissions.get(event.toolCallId)
       if (event.denied || event.final) pendingPermissions.delete(event.toolCallId)
       const sessionId = computerUseSessionId(context)
       if (!event.denied || permission === undefined || sessionId === undefined) return
@@ -120,26 +100,16 @@ export function createComputerUseTelemetry(options: {
   }
 }
 
-export function engineErrorCode(error: Error): ComputerUseEngineErrorCode {
-  if (error instanceof DesktopEngineUnavailableError) return error.diagnostic.code
-  if (error instanceof DesktopEngineAbiMismatchError) return "abi-mismatch"
-  if (error instanceof DesktopEngineRpcError) {
-    return error.data !== null && "code" in error.data ? error.data.code : "other"
-  }
-  if (error instanceof DesktopServiceError) return error.code
-  return "other"
-}
-
 function permissionRequest(value: unknown): {
   readonly toolCallId: string
   readonly toolName: string
   readonly permission: ComputerUsePermission
 } | undefined {
-  if (!isRecord(value) || value.type !== "tool_call") return undefined
-  if (typeof value.toolCallId !== "string" || typeof value.toolName !== "string" || !isRecord(value.input)) {
+  if (!isRecord(value) || value.type !== "tool_execution_start") return undefined
+  if (typeof value.toolCallId !== "string" || typeof value.toolName !== "string" || !isRecord(value.args)) {
     return undefined
   }
-  const permission = permissionForTool(value.toolName, value.input)
+  const permission = permissionForTool(value.toolName, value.args)
   return permission === undefined
     ? undefined
     : { toolCallId: value.toolCallId, toolName: value.toolName, permission }
@@ -202,24 +172,6 @@ function permissionForTool(
     return permissionFrom(computerActionsPermissionParser(COMPUTER_ACTIONS_TOOL_NAME, input, ""))
   }
   return undefined
-}
-
-function normalizedComputerToolName(toolName: string): string | undefined {
-  if (matchesToolName(toolName, COMPUTER_TOOL_NAME)) return COMPUTER_TOOL_NAME
-  if (matchesToolName(toolName, COMPUTER_ACTIONS_TOOL_NAME)) return COMPUTER_ACTIONS_TOOL_NAME
-  return undefined
-}
-
-function takeRequestedPermission(
-  toolName: string,
-  requested: Map<string, ComputerUsePermission[]>,
-): ComputerUsePermission | undefined {
-  const key = normalizedComputerToolName(toolName)
-  if (key === undefined) return undefined
-  const queue = requested.get(key)
-  const permission = queue?.shift()
-  if (queue?.length === 0) requested.delete(key)
-  return permission
 }
 
 function isPermissionPolicyFailure(result: Record<string, unknown>): boolean {

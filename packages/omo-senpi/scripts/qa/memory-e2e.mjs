@@ -275,6 +275,9 @@ async function scenario3And4() {
   const bundleModule = await import("../../src/extension/index.ts")
   const { MemoryFakeExtensionAPI } = await import("../../src/components/memory/memory.test-support.ts")
   const pi = new MemoryFakeExtensionAPI()
+  // An inherited OMO_/PI_CODING_AGENT_DIR outranks SENPI_CODING_AGENT_DIR in the in-process extension.
+  delete process.env.OMO_CODING_AGENT_DIR
+  delete process.env.PI_CODING_AGENT_DIR
   process.env.SENPI_CODING_AGENT_DIR = sandbox.agentDir
   process.env.OMO_MEMORY_HOME = join(sandbox.root, "memory")
   process.env.XDG_CONFIG_HOME = sandbox.xdgConfigHome

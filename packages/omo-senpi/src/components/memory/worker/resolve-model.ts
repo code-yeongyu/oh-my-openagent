@@ -1,5 +1,6 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
+  builtinCategoryChainCandidates,
   resolveCategory,
   type SenpiModelPort,
   type SenpiModelRegistryPort,
@@ -18,6 +19,8 @@ export type ReflectionThinkingLevel = "off" | "minimal" | "low" | "medium" | "hi
 export type ReflectionModelCandidate = {
   readonly model: string
   readonly thinking?: ReflectionThinkingLevel
+  /** Set by the preflight when only an extension-loading child can see the model (#9175). */
+  readonly loadExtensions?: true
 }
 
 export type ReflectionModelSource = "registry_fallback" | "session_inherit"
@@ -74,7 +77,7 @@ export function resolveReflectionModel(
         // An explicitly pinned user model is authoritative over the availability snapshot, which
         // is refreshed asynchronously and is routinely stale when a first-turn (step_count=1)
         // reflection triggers before extension-provider registration finishes refreshing.
-        return { kind: "resolved", category, model: pinnedSelector, fallbacks: [] }
+        return { kind: "resolved", category, model: pinnedSelector, fallbacks: builtinChainFallbacks(category, registry, pinnedSelector) }
       }
     }
     // An explicit categories.<name>.disable=true keeps its meaning: no silent fallback model.
@@ -117,7 +120,12 @@ export function resolveReflectionModel(
     registry,
     `${resolution.spec.provider}/${resolution.spec.modelId}`,
   )
-  const fallbacks = deduplicateCandidates([...resolvedFallbacks, ...configuredFallbacks])
+  const selectedModel = `${resolution.spec.provider}/${resolution.spec.modelId}`
+  const fallbacks = deduplicateCandidates([
+    ...resolvedFallbacks,
+    ...configuredFallbacks,
+    ...builtinChainFallbacks(category, registry, selectedModel),
+  ])
   return {
     kind: "resolved",
     category: resolution.category,
@@ -171,6 +179,23 @@ function sessionCandidate(
     ...(session.thinking === undefined ? {} : { thinking: session.thinking }),
     ...(cost === undefined ? {} : { cost }),
   }
+}
+
+// A memory child has nobody to answer a refused model: a user pin outside the category's builtin
+// chain (`resolveCategory` leaves such a pin's chain untouched) would leave it with no rung at all,
+// so a provider that refuses the pin (Devin answers an unserved lane with permission_denied) fails
+// every wake. The builtin chain's connected rungs stay reachable after the user's own rungs; they
+// are the category's chain, never the beyond-category ladder the advisor refuses.
+function builtinChainFallbacks(
+  category: string,
+  registry: SenpiModelRegistryPort<SenpiModelPort>,
+  selectedModel: string,
+): readonly ReflectionModelCandidate[] {
+  return builtinCategoryChainCandidates(category, registry).flatMap((candidate): readonly ReflectionModelCandidate[] => {
+    if (candidate.model === selectedModel) return []
+    const thinking = normalizeThinking(candidate.variant)
+    return [{ model: candidate.model, ...(thinking === undefined ? {} : { thinking }) }]
+  })
 }
 
 function configuredFallbackModels(

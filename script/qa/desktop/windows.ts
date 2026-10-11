@@ -14,6 +14,9 @@ import { parseArgs } from "node:util"
 
 import { QaWorkspace } from "./windows/fixtures"
 import { SABOTAGE_MODES, type Sabotage, type Scenario, type ScenarioOutcome } from "./windows/scenario-kit"
+import { desktopMoveLands } from "./windows/scenarios-cursor"
+import { foregroundClickLandsInTarget, foregroundDragSelectsInTarget } from "./windows/scenarios-pointer"
+import { foregroundScrollMovesTarget, foregroundScrollSameRect } from "./windows/scenarios-pointer-scroll"
 import {
   backgroundPostMessageNotepad,
   backgroundPostMessageWpf,
@@ -21,11 +24,17 @@ import {
 } from "./windows/scenarios-delivery"
 import { elevatedWindowRefused, hotkeyLatches } from "./windows/scenarios-guard"
 import { capturePrimary, uiaSnapshotNotepad } from "./windows/scenarios-read"
+import { scrollDirectionBackground, scrollDirectionForeground } from "./windows/scenarios-scroll"
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 const DEFAULT_ENGINE = join(REPO_ROOT, "target", "x86_64-pc-windows-msvc", "release", "senpi-desktop-engine.exe")
 
 const SCENARIOS: readonly Scenario[] = [
+  desktopMoveLands,
+  foregroundClickLandsInTarget,
+  foregroundDragSelectsInTarget,
+  foregroundScrollMovesTarget,
+  foregroundScrollSameRect,
   capturePrimary,
   foregroundTypeRestoresFront,
   backgroundPostMessageNotepad,
@@ -33,6 +42,8 @@ const SCENARIOS: readonly Scenario[] = [
   elevatedWindowRefused,
   uiaSnapshotNotepad,
   hotkeyLatches,
+  scrollDirectionBackground,
+  scrollDirectionForeground,
 ]
 
 const USAGE = `usage: windows.ts (--all | --scenario <name>...) [--json] [--engine <exe>] [--out <file>] [--sabotage <mode>]

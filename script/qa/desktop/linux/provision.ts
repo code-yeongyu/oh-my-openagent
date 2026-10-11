@@ -5,12 +5,12 @@ import { join } from "node:path";
 
 import { exists, type Processes } from "./procs.ts";
 
-/** xterm + xclip for the X11 targets and their paste observer, sway for the headless Wayland
- * compositor, systemd for `busctl`. */
-export const PACKAGES: readonly string[] = ["xterm", "xclip", "sway", "systemd"];
-const BINARIES: readonly string[] = ["xterm", "xclip", "sway", "busctl"];
+/** xterm + xclip for the X11 targets and their paste observer, tk (`wish`) for the scroll fixture,
+ * sway for the headless Wayland compositor, systemd for `busctl`. */
+export const PACKAGES: readonly string[] = ["xterm", "xclip", "tk", "sway", "systemd"];
+const BINARIES: readonly string[] = ["xterm", "xclip", "wish", "sway", "busctl"];
 
-export const X11_TOOLS: readonly string[] = ["Xvfb", "xfwm4", "xprop", "xwininfo", "xdotool", "xterm", "xclip"];
+export const X11_TOOLS: readonly string[] = ["Xvfb", "xfwm4", "xprop", "xwininfo", "xdotool", "xterm", "xclip", "wish"];
 export const WAYLAND_TOOLS: readonly string[] = ["dbus-daemon", "sway", "busctl"];
 
 export function multiarch(): string {

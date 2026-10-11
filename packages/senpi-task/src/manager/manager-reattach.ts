@@ -1,10 +1,10 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { ReattachResult } from "../lifecycle/port"
-import type { TaskRecord } from "../state"
+import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { discardManagedHandle, releaseSupersededHandle, type ManagedChildHandle } from "./child-handle"
-import { isTerminalRecord, nowIso, recordSpawnedRunner } from "./manager-helpers"
+import { childIdentityOf, hasChildIdentity, isTerminalRecord, nowIso, recordSpawnedRunner } from "./manager-helpers"
 
 /**
  * A handle rejected because someone else owns the task now. A revived daemon child reattaches to the
@@ -35,7 +35,7 @@ export async function reattachManagedTask(input: {
   readonly armOutcome: (record: TaskRecord, handle: ManagedChildHandle, epoch: number) => void
 }): Promise<ReattachResult> {
   const fresh = input.store.load(input.record.task_id)
-  if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident") {
+  if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident" || fresh.killed === true) {
     await letGoOfRejected(input.handle)
     return { ok: false, kind: "failed", reason: "task ownership claim is not held by this host" }
   }
@@ -62,14 +62,13 @@ export async function reattachManagedTask(input: {
     unsubscribe = input.attachLive(fresh, input.handle)
     attached = true
     if (isTerminalRecord(fresh)) {
-      const pid = input.handle.pid
+      // The result stays, but the child now lives behind THIS handle: a daemon session reopened on a
+      // newer generation answers under a new instance and routing id, so its identity is restamped.
+      const identity = childIdentityOf(input.handle)
       const sessionId = input.handle.sessionId
-      if (pid !== undefined || (sessionId !== undefined && sessionId.length > 0)) {
-        input.store.mutate(fresh.task_id, (current) => ({
-          ...current,
-          ...(pid === undefined ? {} : { pid }),
-          ...(sessionId === undefined || sessionId.length === 0 ? {} : { child_session_id: sessionId }),
-        }))
+      const childSession = sessionId === undefined || sessionId.length === 0 ? {} : { child_session_id: sessionId }
+      if (hasChildIdentity(identity) || childSession.child_session_id !== undefined) {
+        input.store.mutate(fresh.task_id, (current) => ({ ...current, ...identity, ...childSession }))
       }
       return { ok: true }
     }
@@ -80,9 +79,10 @@ export async function reattachManagedTask(input: {
       final_response: _final,
       killed: _killed,
       fallback_handoff_epoch: _handoff,
+      provisional_exit: _provisionalExit,
       ...rest
     } = fresh
-    const epoch = fresh.notification.run_epoch + 1
+    const epoch = nextRunEpoch(fresh)
     const timestamp = nowIso(input.now)
     const sessionId = input.handle.sessionId
     // A revived daemon child is identified by its session, exactly as a fresh spawn stamps it.

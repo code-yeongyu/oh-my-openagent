@@ -13,7 +13,7 @@ import type {
 } from "@oh-my-opencode/telemetry-core"
 
 import type { OmoSenpiComponent } from "../../extension/types"
-import { resolveStateDir } from "@oh-my-opencode/senpi-task"
+import { isHostWarmupSession, resolveStateDir } from "@oh-my-opencode/senpi-task"
 
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "../task/terminal-observers"
 import {
@@ -74,6 +74,10 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
   return {
     name: "telemetry",
     register(pi, ctx) {
+      // The throwaway session that warms a fresh task host is no session of anyone's: it must not be
+      // counted as one, nor report the crashes and daily activity the real session reports.
+      if (isHostWarmupSession(pi)) return
+
       // Must precede the session component: its `session_shutdown` handler shuts the client down,
       // which clears `state.capture`, after which `parallelism_summary` would capture nothing.
       registerOmoNativeParallelSummary(pi, {

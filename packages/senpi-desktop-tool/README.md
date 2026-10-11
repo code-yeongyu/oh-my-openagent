@@ -6,13 +6,18 @@ Defines the senpi `computer` tool: its permission tiers, settings, the `/compute
 
 - `createComputerTool({handle, executeTool})` returns the `computer` `ToolDefinition`. It has `exposure: "search"` and `searchGroup: "desktop"`. The `searchText` and `searchKeywords` include `cua`, `computer use`, `screenshot`, and `accessibility`. The `promptGuidelines` are the safety bullets from `@oh-my-opencode/senpi-desktop-prelude`. `executionMode` is `"sequential"`.
 - `kernelPrelude` is `computerPreludeAssets`, whose `exports` is `["computer"]`. codemode installs the `computer` global for the next eval cell while the tool is active. Nothing is passed to codemode.
-- The parameters are `ComputerParams`, a TypeBox union:
+- The published parameters are `ComputerParams`: one root object with an `action` enum and every action's fields as optional, because providers reject a root-union schema (Anthropic `input_schema` needs `type: "object"`, OpenAI strict functions a root object, Gemini no root `anyOf`). `execute` narrows the arguments with `parseComputerParams` against `ComputerActionShape`, the exact per-action union, and throws `ComputerArgumentsError` (`COMPUTER_INVALID_ARGUMENTS`, naming the action and the offending field) before anything runs. The actions:
   - `{action: "call", chain}`: one desktop helper, optionally followed by one call on the window or element it returns.
   - `{action: "run", code, read_only?, timeout?}`: `timeout` is in seconds (1-600, default 60).
   - `{action: "capabilities"}`.
   - `{action: "close"}`: the prelude's `computer.close()`.
   - There is no `resume` action. Only the user resumes.
 - `execute` classifies a `call` chain with the protocol tier tables before anything else runs. An unknown or unchainable method (for example `userReset`) throws `ComputerCallError` before an engine starts. A read-tier chain runs read-only. Both `call` and `run` go through `runComputerCode` from `-service`, so one facade serves both. `run` code reaches host tools through the injected `executeTool` (`pi.executeTool`). `details.value` is the value the eval facade returns.
+
+## `computer_actions`
+
+- `createComputerActionsTool({handle, executeTool})` returns the `computer_actions` tool: OpenAI computer-use actions (`screenshot`, `click`, `double_click`, `move`, `drag`, `scroll`, `type`, `keypress`, `wait`), or `batch` over them, run through the same `computer` run path.
+- The published `ComputerActionsParams` is one root object: the `action` enum, every action's fields as optional (each description names the actions that take it), and `actions` for a batch, whose items use the same flat fields. `execute` narrows the arguments with `parseComputerActions`, checking every batch item. It answers a mismatch with an `isError` result carrying `COMPUTER_INVALID_ARGUMENTS`, the action (or `actions[i]`) and the offending field, before any engine starts.
 
 ## Permissions
 

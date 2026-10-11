@@ -16,6 +16,7 @@ import {
   createTaskLifecycle,
   createTaskManager,
   createTaskRecordStore,
+  NO_HOST_ENDPOINT,
   type ChildPlanner,
   type ManagedChildHandle,
   type ManagedRunner,
@@ -161,10 +162,10 @@ try {
       const handle = toResidentHandle(manager().getResidentHandle(taskId))
       return handle === undefined ? [] : [handle]
     }),
-    forget: (taskId) => manager().forget(taskId),
+    forget: (taskId, options) => manager().forget(taskId, options),
     hasPendingSends: (taskId) => manager().hasPendingSends?.(taskId) ?? false,
   }
-  const lifecycle = createTaskLifecycle({ store: taskStore, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: taskStore, registry, config })
   lifecycleDispose = () => lifecycle.dispose?.()
   managerRef = createTaskManager({
     store: taskStore,

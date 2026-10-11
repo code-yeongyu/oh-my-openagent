@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { DesktopEngineUnavailableError } from "@oh-my-opencode/senpi-desktop-service"
 
-import { defaultEngineChild, omoReleaseVersion } from "./engine-source"
+import { defaultEngineChild, describeEngineSource, omoReleaseVersion } from "./engine-source"
 
 const roots: string[] = []
 
@@ -21,6 +22,54 @@ afterEach(() => {
 })
 
 describe("omo release version for engine acquisition", () => {
+  test("#given a sidecar #when described #then status names its source without starting it", () => {
+    const root = packageDir({ name: "omo", version: "5.1.4" })
+    const sidecar = join(root, "bin", "native", "prebuilds", "darwin-arm64", "senpi-desktop-engine")
+    mkdirSync(dirname(sidecar), { recursive: true })
+    writeFileSync(sidecar, "engine")
+    chmodSync(sidecar, 0o755)
+    expect(describeEngineSource(undefined, {}, {
+      platform: "darwin", arch: "arm64", execDir: join(root, "bin"),
+      repoRoot: root, packageDir: root, isQuarantined: () => false,
+    })).toBe(`found ${sidecar} (sidecar)`)
+  })
+
+  test("#given a verified cache and no candidate #when described #then status names the release cache", () => {
+    const root = packageDir({ name: "omo", version: "5.1.4" })
+    const bytes = Buffer.from("cached engine")
+    const digest = createHash("sha256").update(bytes).digest("hex")
+    const generation = join(root, ".omo", "cache", "senpi-desktop-engine", "5.1.4", "darwin-arm64", `${digest}-${randomUUID()}`)
+    mkdirSync(generation, { recursive: true })
+    const cached = join(generation, "senpi-desktop-engine-darwin-arm64")
+    writeFileSync(cached, bytes)
+    chmodSync(cached, 0o755)
+    expect(describeEngineSource(undefined, { HOME: root, OMO_PACKAGE_DIR: root }, {
+      platform: "darwin", arch: "arm64", execDir: join(root, "empty"), repoRoot: root, packageDir: root,
+    })).toBe(`found ${cached} (cache, omo v5.1.4)`)
+  })
+
+  test("#given an empty installation #when described #then status names what first use would download", () => {
+    const root = packageDir({ name: "omo", version: "5.1.4" })
+    expect(describeEngineSource(undefined, { HOME: root, OMO_PACKAGE_DIR: root }, {
+      platform: "darwin", arch: "arm64", execDir: root, repoRoot: root, packageDir: root,
+    })).toBe("would download senpi-desktop-engine-darwin-arm64 from omo v5.1.4 on first use")
+  })
+
+  test.each(["linux", "win32"])("#given no release engine for %s-arm64 #when first use starts #then the diagnostic names the unsupported host", (platform) => {
+    const root = packageDir({})
+    const options = { platform, arch: "arm64", execDir: root, packageDir: root, repoRoot: root, runtimeDir: "" }
+    expect(describeEngineSource(undefined, {}, options)).toBe(`No senpi-desktop-engine is built for ${platform}-arm64; computer use is unavailable on this host.`)
+    const start = defaultEngineChild({}, options)(undefined)
+    try {
+      start()
+      throw new Error("missing engine must fail")
+    } catch (error) {
+      expect(error).toBeInstanceOf(DesktopEngineUnavailableError)
+      if (!(error instanceof DesktopEngineUnavailableError)) throw error
+      expect(error.diagnostic).toMatchObject({ host: `${platform}-arm64`, reason: "no-release-asset" })
+    }
+  })
+
   test("#given the compiled runtime's stamped manifest #when resolved #then its version names the release", () => {
     const runtime = packageDir({ name: "omo", version: "5.0.2" })
     expect(omoReleaseVersion({ OMO_PACKAGE_DIR: runtime })).toBe("5.0.2")

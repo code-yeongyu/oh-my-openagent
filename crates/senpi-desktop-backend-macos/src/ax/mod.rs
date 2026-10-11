@@ -3,17 +3,22 @@
 //! core's `AxRegistry`.
 
 mod actions;
+mod date;
 mod foreground;
+pub(crate) mod menus;
+mod point_owner;
+mod popup;
 pub(crate) mod element;
 mod props;
 mod tree;
 
-use senpi_desktop_core::ax::{AxBackend, AxHandle, AxProps};
+use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::types::DesktopWindow;
 
 pub use self::element::is_trusted;
 pub(crate) use self::foreground::{make_frontmost, prepare_foreground_input};
+pub(crate) use self::point_owner::ensure_points_owned;
 use self::element::{element, handle};
 
 #[derive(Debug, Default)]
@@ -113,6 +118,12 @@ impl AxBackend for MacAx {
 
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>> {
         tree::attributes(element(h)?)
+    }
+
+    /// `AXWindow`'s CGWindowID: the id `windows()` lists.
+    fn owner(&mut self, h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
+        Ok(element::owner_window_id(element(h)?)
+            .map_or(AxOwner::Unknown, |id| AxOwner::Window(id.to_string())))
     }
 }
 

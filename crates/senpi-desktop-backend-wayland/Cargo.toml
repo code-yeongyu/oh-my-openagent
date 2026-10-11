@@ -15,7 +15,7 @@ libloading.workspace = true
 parking_lot.workspace = true
 reis.workspace = true
 senpi-desktop-backend-atspi = { path = "../senpi-desktop-backend-atspi" }
-senpi-desktop-core = { path = "../senpi-desktop-core" }
+senpi-desktop-core = { path = "../senpi-desktop-core", features = ["system-clipboard"] }
 senpi-desktop-safety = { path = "../senpi-desktop-safety" }
 tokio = { workspace = true, features = ["macros", "sync", "time"] }
 xkeysym.workspace = true

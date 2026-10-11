@@ -1,10 +1,17 @@
 /plugin/extensions/*
+!/plugin/extensions/assets.generated.json
 !/plugin/extensions/dream-persona.md
 !/plugin/extensions/facts-persona.md
+!/plugin/extensions/gateway-rules-extension.mjs
+!/plugin/extensions/gateway-store-worker.mjs
 !/plugin/extensions/kibitzer-persona.md
 !/plugin/extensions/memory-run-supervisor.mjs
+!/plugin/extensions/omo-memory-doctor.js
+!/plugin/extensions/omo-memory-memfs.js
+!/plugin/extensions/omo-computer-use.js
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js
+!/plugin/extensions/omo-side-panel.js
 !/plugin/extensions/omo-task.js
 !/plugin/extensions/omo.js
 !/plugin/extensions/reflection-persona.md

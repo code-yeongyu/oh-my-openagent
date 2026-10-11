@@ -19,7 +19,7 @@ pub enum AxPermission {
 
 impl AxPermission {
     /// The permission of a backend's optional AT-SPI half; `None` is what
-    /// `AtSpiAx::new().ok()` yields without a bus.
+    /// `AtSpiAx::new(..).ok()` yields without a bus.
     pub fn of<B: AtSpiBus>(ax: Option<&mut AtSpiAx<B>>) -> Self {
         ax.map_or(Self::BusUnreachable, AtSpiAx::permission)
     }

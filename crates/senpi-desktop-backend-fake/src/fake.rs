@@ -4,11 +4,12 @@ use image::Rgba;
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, Target};
+use std::collections::BTreeMap;
 
 use crate::ax_tree::AxTree;
 use crate::faults::Faults;
 use crate::method::FakeMethod;
-use crate::scenario::{DelayMs, FakeScenario, ResizeWindow};
+use crate::scenario::{DelayMs, FakeMenuNode, FakeScenario, ResizeWindow};
 use crate::sink::{RecordingSink, SinkOp};
 
 /// Scripted headless `Backend` + `AxBackend`: serves a [`FakeScenario`],
@@ -23,10 +24,13 @@ pub struct FakeBackend {
     pub(crate) windows: Vec<DesktopWindow>,
     pub(crate) capabilities: DesktopCapabilities,
     pub(crate) cursor: Option<DesktopPoint>,
+    pub(crate) clipboard: String,
     pub(crate) capture_color: Rgba<u8>,
     delays: DelayMs,
     pub(crate) resize_window: Option<ResizeWindow>,
     pub(crate) ax_tree: AxTree,
+    pub(crate) ax_owner_unknown: bool,
+    pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
     pub(crate) sink: RecordingSink,
     faults: Faults,
 }
@@ -39,10 +43,13 @@ impl FakeBackend {
         }
         Self {
             ax_tree: AxTree::build(&scenario.ax),
+            ax_owner_unknown: scenario.ax_owner_unknown,
+            menus: scenario.menus,
             displays: scenario.displays,
             windows: scenario.windows,
             capabilities: scenario.capabilities,
             cursor: scenario.cursor,
+            clipboard: String::new(),
             capture_color: Rgba(scenario.capture_color),
             delays: scenario.delay_ms,
             resize_window: scenario.resize_window,

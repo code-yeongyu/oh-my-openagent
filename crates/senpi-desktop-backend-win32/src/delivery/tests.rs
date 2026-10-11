@@ -5,6 +5,8 @@ use super::*;
 #[test]
 fn recognizes_real_classes_and_rejects_lookalikes() {
     assert!(is_chromium_class("Chrome_WidgetWin_1"));
+    assert!(is_chromium_class("CefBrowserWindow"));
+    assert!(is_chromium_class("Chrome_RenderWidgetHostHWND"));
     assert!(!is_chromium_class("Chrome_WidgetWin_"));
     assert!(!is_chromium_class("ChromeWidgetWin_1"));
 
@@ -22,15 +24,24 @@ fn recognizes_real_classes_and_rejects_lookalikes() {
 
     assert!(is_gtk_class("gdkSurfaceToplevel"));
     assert!(is_gtk_class("gdkWindowToplevel"));
-    assert!(!is_gtk_class("gdkSurfaceToplevelExtra"));
-    assert!(!is_gtk_class("gdkWindowChild"));
+    assert!(is_gtk_class("gdkSurfaceToplevelExtra"));
+    assert!(is_gtk_class("gdkWindowChild"));
 
     assert!(is_vcl_class("SALFRAME"));
     assert!(!is_vcl_class("SAL"));
     assert!(!is_vcl_class("XSALFRAME"));
 }
 
-fn assert_matrix(class: &str, expected: [bool; 6]) {
+#[test]
+fn classifies_uwp_and_terminal_hosts() {
+    assert!(is_uwp_frame_class("ApplicationFrameWindow"));
+    assert!(is_uwp_frame_class("Windows.UI.Core.CoreWindow"));
+    assert!(is_terminal_class("CASCADIA_HOSTING_WINDOW_CLASS"));
+    assert!(is_terminal_class("ConsoleWindowClass"));
+    assert!(is_terminal_class("mintty"));
+}
+
+fn assert_matrix(target: TargetTraits<'_>, expected: [bool; 6]) {
     let kinds = [
         EventKind::MouseClick,
         EventKind::MouseMove,
@@ -41,34 +52,45 @@ fn assert_matrix(class: &str, expected: [bool; 6]) {
     ];
     for (kind, expected) in kinds.into_iter().zip(expected) {
         assert_eq!(
-            would_be_silently_dropped(class, kind).is_some(),
+            would_be_silently_dropped(target, kind).is_some(),
             expected,
-            "unexpected {class}/{} delivery decision",
+            "unexpected {target:?}/{} delivery decision",
             kind.name(),
         );
     }
 }
 
+const fn background(class: &str) -> TargetTraits<'_> {
+    TargetTraits {
+        class,
+        chromium_descendant: false,
+        foreground: false,
+        xaml_host: false,
+    }
+}
+
 #[test]
 fn covers_the_full_known_silent_drop_matrix() {
-    assert_matrix("Chrome_WidgetWin_1", [true, true, true, true, true, true]);
+    assert_matrix(background("Chrome_WidgetWin_1"), [true; 6]);
+    assert_matrix(background("CefBrowserWindow"), [true; 6]);
+    assert_matrix(background("Chrome_RenderWidgetHostHWND"), [true; 6]);
     assert_matrix(
-        "WinUIDesktopWin32WindowClass",
+        background("WinUIDesktopWin32WindowClass"),
         [true, true, true, false, false, false],
     );
-    assert_matrix("HwndWrapper[App;;abc]", [true, true, false, true, true, true]);
-    assert_matrix("TkTopLevel.1", [false, false, false, true, true, true]);
-    assert_matrix("gdkSurfaceToplevel", [true, false, false, false, false, false]);
-    assert_matrix("gdkWindowToplevel", [true, false, false, false, false, false]);
-    assert_matrix("SALFRAME", [false, false, false, true, true, false]);
-    assert_matrix("Chrome_WidgetWin", [false, false, false, false, false, false]);
-    assert_matrix("HwndWrapperApp;;abc]", [false, false, false, false, false, false]);
-    assert_matrix("TkTopLevelish", [false, false, false, false, false, false]);
+    assert_matrix(background("HwndWrapper[App;;abc]"), [true, true, false, true, true, true]);
+    assert_matrix(background("TkTopLevel.1"), [true, false, false, true, true, true]);
+    assert_matrix(background("gdkSurfaceToplevel"), [true, false, false, false, false, false]);
+    assert_matrix(background("gdkWindowToplevel"), [true, false, false, false, false, false]);
+    assert_matrix(background("SALFRAME"), [false, false, false, true, true, false]);
+    assert_matrix(background("Chrome_WidgetWin"), [false; 6]);
+    assert_matrix(background("HwndWrapperApp;;abc]"), [false; 6]);
+    assert_matrix(background("TkTopLevelish"), [false; 6]);
     assert_matrix(
-        "gdkSurfaceToplevelExtra",
-        [false, false, false, false, false, false],
+        background("gdkSurfaceToplevelExtra"),
+        [true, false, false, false, false, false],
     );
-    assert_matrix("XSALFRAME", [false, false, false, false, false, false]);
+    assert_matrix(background("XSALFRAME"), [false; 6]);
 }
 
 #[test]
@@ -99,4 +121,42 @@ fn only_an_elevated_window_is_refused_as_permission_denied() {
 
     assert_eq!(refused, Err(ErrorCode::PermissionDenied));
     assert!(examined.iter().all(Result::is_ok), "{examined:?}");
+}
+
+#[test]
+fn caption_and_sizing_regions_refuse_posted_drags() {
+    assert_eq!(non_client_drag_region(2), Some("caption"));
+    assert_eq!(non_client_drag_region(4), Some("size box"));
+    for hit in 10..=17 {
+        assert_eq!(non_client_drag_region(hit), Some("resize border"));
+    }
+    for hit in [-2, 0, 1, 3, 8, 18, 20] {
+        assert_eq!(non_client_drag_region(hit), None);
+    }
+}
+
+#[test]
+fn double_click_messages_follow_class_style_and_press_parity() {
+    let presses = |wants_double| (0..4).map(move |index| posts_double_click(index, wants_double));
+    assert!(presses(true).eq([false, true, false, true]));
+    assert!(presses(false).eq([false; 4]));
+}
+
+#[test]
+fn every_line_break_style_becomes_exactly_one_return() {
+    use TextUnit::{Char, Enter};
+
+    assert_eq!(
+        text_units("a\r\nb\nc\rd").collect::<Vec<_>>(),
+        [
+            Char('a'),
+            Enter,
+            Char('b'),
+            Enter,
+            Char('c'),
+            Enter,
+            Char('d')
+        ]
+    );
+    assert_eq!(text_units("\r\r\n\n").collect::<Vec<_>>(), [Enter, Enter, Enter]);
 }

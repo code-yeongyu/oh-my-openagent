@@ -15,6 +15,8 @@ const MAX_WINDOWS: usize = 48;
 const MIN_WINDOW_EDGE: i32 = 16;
 /// Depth guard for the focused-element search.
 const MAX_FOCUS_DEPTH: u8 = 40;
+/// Depth guard for the walk from an element up to its frame.
+const MAX_OWNER_DEPTH: u8 = 64;
 
 /// Every top-level frame of every registered application, in registry order.
 pub(crate) fn windows<B: AtSpiBus>(bus: &mut B) -> CoreResult<Vec<DesktopWindow>> {
@@ -53,7 +55,7 @@ pub(crate) fn windows<B: AtSpiBus>(bus: &mut B) -> CoreResult<Vec<DesktopWindow>
 }
 
 /// The children of `app` that are frames, dialogs, or windows.
-fn frames<B: AtSpiBus>(bus: &mut B, app: &B::Node) -> BusResult<Vec<B::Node>> {
+pub(crate) fn frames<B: AtSpiBus>(bus: &mut B, app: &B::Node) -> BusResult<Vec<B::Node>> {
     let children = bus.children(app)?;
     Ok(children
         .into_iter()
@@ -78,7 +80,7 @@ fn app_for_window<B: AtSpiBus>(bus: &mut B, win: &DesktopWindow) -> BusResult<B:
 }
 
 /// Sum of edge differences between a frame's extents and the window's rect.
-fn bounds_distance(extents: Extents, win: &DesktopWindow) -> u64 {
+pub(crate) fn bounds_distance(extents: Extents, win: &DesktopWindow) -> u64 {
     let gap = |a: i64, b: i64| (a - b).unsigned_abs();
     gap(extents.x.into(), win.x.into())
         + gap(extents.y.into(), win.y.into())
@@ -103,6 +105,24 @@ pub(crate) fn window_root<B: AtSpiBus>(bus: &mut B, win: &DesktopWindow) -> Core
             .ok_or_else(|| format!("no frame or dialog found for '{}'", win.title))
     };
     pick(bus).map_err(|err| DesktopError::ax_failed(format!("AT-SPI window root: {err}")))
+}
+
+/// The top-level frame holding `node`: the ancestor whose parent is its
+/// application, when that ancestor is a frame, dialog, or window.
+pub(crate) fn frame_of<B: AtSpiBus>(bus: &mut B, node: &B::Node) -> CoreResult<Option<B::Node>> {
+    let mut current = node.clone();
+    for _ in 0..MAX_OWNER_DEPTH {
+        let parent = bus.parent(&current).map_err(DesktopError::ax_failed)?;
+        if bus.is_null(&parent) {
+            return Ok(None);
+        }
+        if bus.role(&parent).map_err(DesktopError::ax_failed)? == Role::Application {
+            let role = bus.role(&current).map_err(DesktopError::ax_failed)?;
+            return Ok(matches!(role, Role::Frame | Role::Dialog | Role::Window).then_some(current));
+        }
+        current = parent;
+    }
+    Ok(None)
 }
 
 /// Rounds a global logical coordinate to the nearest screen pixel.

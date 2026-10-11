@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test"
 import { access, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { copyTree } from "./copy-tree"
 
 test("copyTree does not descend into its own destination when it lives inside the source", async () => {
-  const root = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "self-copy-"))
+  const root = await mkdtemp(join(tmpdir(), "self-copy-"))
   const lower = join(root, "repo")
   await mkdir(join(lower, "nested"), { recursive: true })
   await writeFile(join(lower, "nested", "file"), "content")

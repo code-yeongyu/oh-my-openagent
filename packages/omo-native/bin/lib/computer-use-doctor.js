@@ -28,7 +28,8 @@ function readyLines(report) {
       : `${stopLevel} computer use stop path: ${capabilities.stopPath}${stopReason}`
   return [
     baseLine(report),
-    `PASS computer use engine: ${report.enginePath} (version ${report.hello.engineVersion}, ABI ${report.hello.abi}, protocol ${report.hello.protocolVersion})`,
+    `PASS computer use engine: ready (${report.engineSource}) ${report.enginePath} (version ${report.hello.engineVersion}, ABI ${report.hello.abi}, protocol ${report.hello.protocolVersion})`,
+    ...(report.launchedEnginePath ? [`INFO computer use launched executable: ${report.launchedEnginePath}`] : []),
     `${backendLevel} computer use backend: ${capabilities.backend}${displayServer}`,
     `${permissionLevel} computer use permissions: capture=${capabilities.capturePermission} input=${capabilities.inputPermission} accessibility=${capabilities.axPermission}`,
     `${displayLevel} computer use display: count=${capabilities.displayCount} screenLocked=${capabilities.screenLocked}`,
@@ -53,11 +54,19 @@ export function formatComputerUseDoctorLines(report) {
         `FAIL computer use engine: ${report.diagnostic.code}: ${report.diagnostic.message} ${report.diagnostic.cause}`.trimEnd(),
         `INFO computer use engine paths tried: ${report.diagnostic.attemptedPaths.join(", ") || "<none>"}`,
       ]
+    case "not-installed":
+      return [
+        baseLine(report),
+        "INFO computer use engine: not installed yet; it is downloaded the first time computer use starts",
+        `INFO computer use engine paths checked: ${report.attemptedPaths.join(", ") || "<none>"}`,
+      ]
     case "failed":
       return [
         baseLine(report),
         `FAIL computer use engine: ${report.code}: ${report.message}`,
         `INFO computer use engine path: ${report.enginePath}`,
+        `INFO computer use engine source: ${report.engineSource}`,
+        ...(report.launchedEnginePath ? [`INFO computer use launched executable: ${report.launchedEnginePath}`] : []),
       ]
     default:
       throw new TypeError(`unknown computer use doctor report kind: ${String(report.kind)}`)
@@ -70,8 +79,8 @@ export async function doctorComputerUseLines(options = {}) {
     const report = await runtime.computerUseDoctorReport({
       cwd: options.cwd ?? process.cwd(),
       env: options.env ?? process.env,
-      version: packageManifest().version,
-      packageRoot,
+      version: options.version ?? packageManifest().version,
+      packageRoot: options.packageRoot ?? packageRoot,
       platform: options.platform ?? process.platform,
       arch: options.arch ?? process.arch,
       timeoutMs: options.timeoutMs,

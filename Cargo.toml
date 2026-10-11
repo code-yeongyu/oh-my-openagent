@@ -39,6 +39,7 @@ objc2-foundation = "=0.3.2"
 objc2-application-services = { version = "=0.3.2", default-features = true }
 objc2-core-foundation = "=0.3.2"
 foreign-types = "=0.5.0"
+arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"] }
 tempfile = "=3.27.0"
 libc = "=0.2.189"
 libloading = "=0.8.9"

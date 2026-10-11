@@ -1,6 +1,7 @@
 ---
 name: ulw-plan
 description: "Explore-first planning consultant that writes one decision-complete work plan before coding. Use only on an explicit user request for the ulw-plan workflow or a plan before implementation; it never self-activates on a bare ulw run."
+argument-hint: "<planning-request>"
 metadata:
   short-description: Explore-first planning consultant that waits for your okay before planning
 ---
@@ -13,7 +14,7 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 | --- | --- |
 | `call_omo_agent(subagent_type="explore", ...)` | `task` tool with `subagent_type: "explore"` |
 | `call_omo_agent(subagent_type="librarian", ...)` | `task` tool with `subagent_type: "librarian"` |
-| worker/implementation `task(...)` | `task` tool with `category` from the delegation router (`quick`, `unspecified-low`, `unspecified-high`, `deep-low`, `deep-high`, `ultrabrain`, `visual-engineering`, `writing`, `git`); honor the plan's `Recommended task executor category:` line |
+| worker/implementation `task(...)` | `task` tool with `category` from the delegation router (`quick`, `unspecified-low`, `unspecified-high`, `deep-low`, `deep-high`, `ultrabrain`, `visual-engineering`, `writing`); honor the plan's `Recommended task executor category:` line |
 | final-review / gate-reviewer `task(...)` | fresh `task` with `category: "deep-high"` (or `"unspecified-high"`) and an adversarial-verifier prompt; `plan-reviewer`/`plan-consultant` are plan-gated curated reviewers, spawnable only while the plan gate is open |
 | `background_output(task_id="...")` | `task_output` tool with the task id |
 | `team_*(...)` | Lead team tools (`team_create`, `task_create`, ...); send with `task_send`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
@@ -122,7 +123,7 @@ When producing the plan, encode every executable item as a column-zero Markdown 
 
 ## Approval gate
 
-When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **wait for the user's explicit okay**. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
+When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **ask for the user's explicit okay through the question tool, with header `Approval` (`승인` in Korean), `required: true` and the wait flag true on that call**: **Approve**; **Approve, skip review** (only when the review is default-on); **Change approach**. A timed-out, dismissed, or unavailable answer is not approval, even when the tool result says to continue on your best judgment: write no plan, keep the gate open, and end the turn. Channel rules: `references/stance-calibration.md`. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
 
 ## Delegation (OpenCode-native)
 

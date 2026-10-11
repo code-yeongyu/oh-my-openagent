@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { CustomEntry } from "@code-yeongyu/senpi"
+import type { CustomEntry, ThemeColor } from "@code-yeongyu/senpi"
 
 import { Theme } from "../../../senpi-test-runtime"
 import { renderKibitzerGateEntry, renderKibitzerNudgedEntry, renderKibitzerUnavailableEntry, type KibitzerGateRecord, type KibitzerUnavailableRecord } from "./notice"
@@ -77,6 +77,33 @@ describe("kibitzer gate notice", () => {
     const rendered = renderKibitzerGateEntry(entry(legacy as KibitzerGateRecord), { expanded: false }, theme)?.render(120).join("\n")
     expect(rendered).toContain("run run-3")
     expect(rendered).toContain("after 3 consecutive failures")
+  })
+
+  test("#given a persistent failure record naming its model and recall category #when rendered #then it names both and the setting that fixes it", () => {
+    const record: KibitzerGateRecord = {
+      version: 1,
+      status: "failed",
+      cause: "child_failed",
+      model: "devin/swe-2-low",
+      category: "quick",
+      candidateCount: 1,
+      reason: "Devin stream error permission_denied: an internal error occurred",
+      consecutiveFailures: 3,
+      wake: 3,
+    }
+    const rendered = renderKibitzerGateEntry(entry(record), { expanded: false }, theme)?.render(160).join("\n")
+    expect(rendered).toContain("last failed model: devin/swe-2-low (memory recall category \"quick\")")
+    expect(rendered).toContain("after 3 consecutive failures; set categories.quick.model (or memory.recall.category) in omo.json to a model that answers")
+    expect(rendered).not.toContain("check Kibitzer model/provider settings")
+  })
+
+  test("#given a malformed stored category #when rendered #then the notice keeps the generic settings hint instead of a broken fix line", () => {
+    for (const category of ["", "quick\nextra", "x".repeat(129), 42]) {
+      const record = { version: 1, status: "failed", cause: "child_failed", model: "devin/swe-2-low", category, candidateCount: 1, consecutiveFailures: 3 }
+      const rendered = renderKibitzerGateEntry(entry(record as KibitzerGateRecord), { expanded: false }, theme)?.render(160).join("\n")
+      expect(rendered).toContain("last failed model: devin/swe-2-low")
+      expect(rendered).toContain("after 3 consecutive failures; check Kibitzer model/provider settings")
+    }
   })
 
   test("#given a failed record below the notice threshold (an isolated failure) #when rendered #then nothing is drawn", () => {
@@ -198,5 +225,132 @@ describe("kibitzer unavailable notice", () => {
     expect(rendered).toBeDefined()
     expect(rendered).not.toContain("x".repeat(200))
     expect(rendered).not.toContain("p".repeat(200))
+  })
+})
+
+// Renderer cases moved from recall-notice.test.ts, where they stayed after the renderers moved here.
+const PLAIN_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  bg: (_color: "customMessageBg", text: string) => text,
+}
+
+describe("renderKibitzerNudgedEntry", () => {
+  test("#given malformed nudges #when rendered #then nothing is drawn", () => {
+    expect(renderKibitzerNudgedEntry({ data: { version: 1, nudges: [] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: { version: 1, nudges: [{ path: "a", hint: 4 }] } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(renderKibitzerNudgedEntry({ data: null } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+  })
+
+  test.each([
+    "No stored memory clears the bar for this planning step; the transcript already contains the full methodology, QA approach, and rollout.",
+    "This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay.",
+  ])("#given a meta hint %s #when rendered #then nothing is drawn", (hint) => {
+    const record = { version: 1, nudges: [{ path: "memory/a.md", hint }] }
+    expect(renderKibitzerNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+  })
+
+  test.each([
+    "The fix is on senpi main, not the extension.",
+    "senpi monitors have a verified two-flag desync where registry.paused can remain set.",
+    "The regression test does not cover Windows process cleanup.",
+    "The outage is unrelated to the database migration.",
+  ])("#given a factual hint %s #when rendered #then it remains renderable", (hint) => {
+    const record = { version: 1, nudges: [{ path: "memory/a.md", hint }] }
+    expect(renderKibitzerNudgedEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)).toBeDefined()
+  })
+
+  test("#given a multiline hint #when rendered #then nothing is drawn", () => {
+    const multiline = { version: 1, nudges: [{ path: "memory/a.md", hint: "first\nsecond" }] }
+    expect(renderKibitzerNudgedEntry({ data: multiline } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+  })
+
+  test("#given a hint that normalizes to nothing or exceeds the gate budget #when rendered #then nothing is drawn", () => {
+    const blank = { version: 1, nudges: [{ path: "memory/a.md", hint: "   \u001b[31m\t" }] }
+    expect(renderKibitzerNudgedEntry({ data: blank } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    const overlong = { version: 1, nudges: [{ path: "memory/a.md", hint: "x".repeat(201) }] }
+    expect(renderKibitzerNudgedEntry({ data: overlong } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    const atBudget = { version: 1, nudges: [{ path: "memory/a.md", hint: "y".repeat(200) }] }
+    expect(renderKibitzerNudgedEntry({ data: atBudget } as never, { expanded: false }, PLAIN_THEME as never)).toBeDefined()
+  })
+})
+
+describe("renderKibitzerGateEntry", () => {
+  test("#given a skipped gate #when rendered #then it uses the warning notice", () => {
+    const record: KibitzerGateRecord = { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2, consecutiveFailures: 3 }
+    const component = renderKibitzerGateEntry({ data: record } as never, { expanded: false }, PLAIN_THEME as never)
+    expect(component).toBeDefined()
+    expect(component!.render(120).join("\\n")).toContain("Kibitzer gate skipped")
+  })
+
+  test("#given a null or count-malformed gate record #when rendered #then nothing is drawn and nothing throws", () => {
+    for (const data of [
+      null,
+      { version: 1, status: "skipped", cause: "x" },
+      { version: 1, status: "skipped", cause: "x", candidateCount: "2" },
+      { version: 1, status: "skipped", cause: "x", candidateCount: Number.NaN },
+      { version: 1, status: "skipped", cause: "x", candidateCount: Number.POSITIVE_INFINITY },
+      { version: 1, status: "skipped", cause: "x", candidateCount: 1.5 },
+      { version: 1, status: "failed", cause: "x", candidateCount: -1 },
+    ]) {
+      expect(() => renderKibitzerGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)).not.toThrow()
+      expect(renderKibitzerGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    }
+  })
+
+})
+
+describe("renderKibitzerGateEntry reason and runId", () => {
+  const renderGate = (data: unknown, width = 120): string => {
+    const component = renderKibitzerGateEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)
+    expect(component).toBeDefined()
+    return component!.render(width).join("\n")
+  }
+
+  test("#given a failed gate with a valid reason and runId #when rendered #then the dim reason and run lines follow the title", () => {
+    const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "provider failed", runId: "run-123", candidateCount: 2, consecutiveFailures: 3 })
+    expect(output).toContain("Kibitzer gate failed")
+    expect(output).toContain("provider failed")
+    expect(output).toContain("run run-123")
+  })
+
+  test("#given a failed gate whose reason is multiline, overlong or secret-like #when rendered #then the notice is drawn without the reason line", () => {
+    for (const [reason, fragment] of [
+      ["line1\nline2", "line1"],
+      ["x".repeat(161), "x".repeat(161)],
+      ["Authorization: Bearer sk-live-abcdefghijklmnop", "Bearer"],
+    ] as const) {
+      const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 2, consecutiveFailures: 3 })
+      expect(output).toContain("Kibitzer gate failed")
+      expect(output).not.toContain(fragment)
+    }
+  })
+
+  test("#given a persistent skipped gate record without reason #when rendered #then the output includes the actionable settings hint", () => {
+    const component = renderKibitzerGateEntry({ data: { version: 1, status: "skipped", cause: "quick_category_unavailable", candidateCount: 2, consecutiveFailures: 3 } } as never, { expanded: false }, PLAIN_THEME as never)
+    const output = component?.render(120).join("\n")
+    expect(output).toContain("Kibitzer gate skipped")
+    expect(output).toContain("check Kibitzer model/provider settings")
+  })
+
+  test("#given a failed gate with an invalid reason but a valid runId #when rendered #then the title and the run line are drawn and the reason line is absent", () => {
+    const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "line1\nline2", runId: "safe-123", candidateCount: 1, consecutiveFailures: 3 })
+    expect(output).toContain("Kibitzer gate failed")
+    expect(output).toContain("run safe-123")
+    expect(output).not.toContain("line1")
+  })
+
+  test("#given a reason of exactly 160 characters and one of 161 #when rendered #then the first is drawn and the second is omitted", () => {
+    const exact = "x".repeat(160)
+    expect(renderGate({ version: 1, status: "failed", cause: "child_failed", reason: exact, candidateCount: 1, consecutiveFailures: 3 }, 300)).toContain(exact)
+    expect(renderGate({ version: 1, status: "failed", cause: "child_failed", reason: "x".repeat(161), candidateCount: 1, consecutiveFailures: 3 }, 300)).not.toContain("x".repeat(161))
+  })
+
+  test("#given a reason containing CR/LF or a bearer token #when rendered #then the line is omitted while the title remains", () => {
+    for (const reason of ["line1\r\nline2", "Authorization: Bearer sk-live-abcdefghijklmnop"]) {
+      const output = renderGate({ version: 1, status: "failed", cause: "child_failed", reason, candidateCount: 1, consecutiveFailures: 3 })
+      expect(output).toContain("Kibitzer gate failed")
+      expect(output).not.toContain("line1")
+      expect(output).not.toContain("Bearer")
+    }
   })
 })

@@ -41,18 +41,20 @@ const POLL: Duration = Duration::from_millis(1);
 /// `InputFailed` when the sentinel cannot be sent, or a hop is not observed
 /// within the hang guard.
 pub(super) fn delivered(target: Window) -> CoreResult<()> {
-    routed()?;
+    routed(Some(target))?;
     consumed(paint_probe(target))
 }
 
-fn routed() -> CoreResult<()> {
+/// Waits until the raw input thread routed every event sent so far; a
+/// `target` must still own the foreground for the sentinel press.
+pub(super) fn routed(target: Option<Window>) -> CoreResult<()> {
     if system::barrier_key_down() {
-        system::barrier_key(false)?;
+        system::barrier_key(false, None)?;
         wait("the stale barrier key release", || !system::barrier_key_down())?;
     }
-    system::barrier_key(true)?;
+    system::barrier_key(true, target)?;
     let pressed = wait("the barrier key press", system::barrier_key_down);
-    system::barrier_key(false)?;
+    system::barrier_key(false, None)?;
     pressed?;
     wait("the barrier key release", || !system::barrier_key_down())
 }

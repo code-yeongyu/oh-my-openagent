@@ -13,6 +13,7 @@ import {
 import type { TaskCancelInput } from "./cancel"
 import type { MemberScopedTaskSendInput, TaskSendInput, StructuredMessageInput } from "./send-schema"
 import type { CancelResultDetails, SendResultDetails } from "./types"
+import { withDroppedSteeringNotice } from "../../state/queued-steering"
 
 export type ControlRenderTheme = Pick<Theme, "fg" | "italic">
 
@@ -58,7 +59,8 @@ export function renderTaskCancelResult(
   theme: ControlRenderTheme,
 ): RenderComponent {
   const row = taskCancelResultRow(result.details)
-  return linesComponent([theme.fg(row.color, normalizeRendererText(row.text))])
+  const dropped = result.details.kind === "cancelled" || result.details.kind === "cancel_pending" || result.details.kind === "released" ? result.details.undelivered_messages ?? 0 : 0
+  return linesComponent([theme.fg(row.color, normalizeRendererText(withDroppedSteeringNotice(row.text, dropped)))])
 }
 
 function widthComponent(renderLine: (width: number) => string): RenderComponent {
@@ -219,8 +221,12 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
         color: statusThemeColor(details.status),
         text: `task_cancel cancelled ${details.task_id} (${details.previous_status} -> ${details.status})`,
       }
+    case "cancel_pending":
+      return { color: "warning", text: `task_cancel pending ${details.task_id}: ${details.reason}` }
     case "noop":
       return { color: statusThemeColor(details.status), text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}` }
+    case "released":
+      return { color: statusThemeColor(details.status), text: `task_cancel released ${details.task_id} (${details.status}, child stopped)` }
     case "not_found":
       return { color: "error", text: `task_cancel not found: ${details.reason}` }
     case "invalid_arguments":

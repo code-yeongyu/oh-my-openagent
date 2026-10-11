@@ -4,8 +4,10 @@ import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join, resolve } from "node:path"
-import { removeTestTempRoot, writeTestExecutable } from "./omob-test-executable"
+import { removeTempRoot } from "./remove-temp-root"
+import { writeTestExecutable } from "./omob-test-executable"
 import * as builder from "./build-omob"
+import { provenancePath, writeProvenanceMarker } from "./omob-provenance"
 
 describe("omob mainline launcher", () => {
 	test("#given ordinary installation #when defaults are parsed #then the managed launcher is retained", () => {
@@ -48,9 +50,16 @@ describe("omob mainline launcher", () => {
 				const requested = changed ? { ...info, engine: { ...info.engine, commit: "c".repeat(40) } } : info
 				writeFileSync(`${binary}.build.json`, JSON.stringify({ buildInfo: requested }))
 				expect(current(binary, requested, builder.hostTargetFor(process.platform, process.arch))).toBe(!changed)
-				rmSync(binary)
-				expect(current(binary, requested, builder.hostTargetFor(process.platform, process.arch))).toBe(false)
-			} finally { removeTestTempRoot(root) }
+				// A never-created path checks absence without unlinking an executable a Windows scanner may still hold.
+				const missingBinary = join(root, process.platform === "win32" ? "missing-omob.exe" : "missing-omob")
+				// A surviving provenance marker must not make an absent executable current.
+				writeProvenanceMarker(binary, versionLines(requested).join("\n"))
+				const marker = readFileSync(provenancePath(binary), "utf8")
+				writeFileSync(provenancePath(missingBinary), marker)
+				expect(JSON.parse(marker).versionOutput).toBe(versionLines(requested).join("\n"))
+				expect(existsSync(missingBinary)).toBe(false)
+				expect(current(missingBinary, requested, builder.hostTargetFor(process.platform, process.arch))).toBe(false)
+			} finally { removeTempRoot(root) }
 		})
 	}
 

@@ -10,6 +10,7 @@ const COPIED_MS = 2000
 
 export interface CommandBarProps {
   readonly command: string
+  readonly prompt?: string
   readonly className?: string
 }
 
@@ -38,7 +39,7 @@ function useCopy(): { copied: boolean; copy: (text: string) => void } {
  * wash across the cell on `--ease-spring` and blur-swaps the label to a drawn check for 2s;
  * the cell's width never changes. 48px tall, 0px radius, `focus-within` selection ring.
  */
-export function CommandBar({ command, className }: CommandBarProps): JSX.Element {
+export function CommandBar({ command, prompt = "$", className }: CommandBarProps): JSX.Element {
   const t = useTranslations("landing.command")
   const { copied, copy } = useCopy()
 
@@ -54,9 +55,9 @@ export function CommandBar({ command, className }: CommandBarProps): JSX.Element
         aria-hidden="true"
         className="bg-ink-2 text-accent border-line flex w-10 shrink-0 items-center justify-center border-r font-mono text-sm"
       >
-        $
+        {prompt}
       </span>
-      <code className="text-text-hi flex min-w-0 flex-1 scrollbar-none items-center overflow-x-auto px-3 font-mono text-[0.8125rem] leading-[1.55] tracking-[-0.01em] whitespace-nowrap sm:text-sm">
+      <code className="text-text-hi flex w-0 min-w-0 flex-1 scrollbar-none items-center overflow-x-auto px-3 font-mono text-[0.8125rem] leading-[1.55] tracking-[-0.01em] whitespace-nowrap sm:text-sm">
         {command}
       </code>
       <button
@@ -89,8 +90,4 @@ export function CommandBar({ command, className }: CommandBarProps): JSX.Element
       </span>
     </div>
   )
-}
-
-export function InstallCommand(props: CommandBarProps): JSX.Element {
-  return <CommandBar {...props} />
 }

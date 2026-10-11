@@ -9,6 +9,7 @@ declare const process: {
 import registerMockProvider, {
 	createLocalAssistantMessageEventStream,
 	stepToAssistantMessage,
+	streamMockStep,
 } from "./mock-provider/index.ts";
 
 interface Matcher {
@@ -323,6 +324,38 @@ describe("task 13 senpi QA scripts", () => {
 			);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test("#given a scripted tool call #when the mock streams it #then every toolcall event's partial holds that tool call at contentIndex", async () => {
+		const stream = streamMockStep(
+			{
+				type: "tool_call",
+				name: "read",
+				arguments: { path: "hello.txt" },
+				id: "call-9119",
+			},
+			1,
+			"mock-1",
+		);
+		const toolEvents: Array<{
+			type: string;
+			contentIndex: number;
+			partial: { content: Array<{ type?: string; id?: string; name?: string }> };
+		}> = [];
+		for await (const event of stream) {
+			const candidate = event as (typeof toolEvents)[number];
+			if (candidate.type.startsWith("toolcall_")) toolEvents.push(candidate);
+		}
+
+		expect(toolEvents.map((event) => event.type).join(",")).toBe(
+			"toolcall_start,toolcall_delta,toolcall_end",
+		);
+		for (const event of toolEvents) {
+			const block = event.partial.content[event.contentIndex];
+			expect(block?.type).toBe("toolCall");
+			expect(block?.id).toBe("call-9119");
+			expect(block?.name).toBe("read");
 		}
 	});
 

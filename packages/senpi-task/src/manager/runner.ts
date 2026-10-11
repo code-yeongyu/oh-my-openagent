@@ -3,6 +3,7 @@ import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 import type { ChildHandle as InProcessChildHandle } from "../runners/in-process/child-handle"
 import { RunnerError, type ChildSpec } from "../runners/in-process"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
+import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { adaptInProcessHandle, adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
 import type { ManagedRunner, ManagedStartSpec } from "./types"
@@ -11,6 +12,7 @@ import type { ManagedRunner, ManagedStartSpec } from "./types"
 // and the parent's auth/model registry, which the string-typed ManagedStartSpec cannot carry.
 export type InProcessSessionContext = {
   readonly agentDir?: string
+  readonly projectTrusted?: boolean
   readonly authStorage?: CreateAgentSessionOptions["authStorage"]
   readonly modelRegistry?: CreateAgentSessionOptions["modelRegistry"]
   readonly modelRuntime?: ChildSpec["modelRuntime"]
@@ -70,6 +72,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         // provider/modelId so the child resolves the requested model on its own command line.
         ...(spec.model !== undefined ? { model: spec.model } : {}),
         ...(spec.variant !== undefined ? { variant: spec.variant } : {}),
+        ...(spec.fallbackModels !== undefined ? { fallbackModels: spec.fallbackModels.map(modelSelector) } : {}),
         ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
         ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
         depth: spec.depth,
@@ -92,6 +95,7 @@ function toChildSpec(spec: ManagedStartSpec, context: InProcessSessionContext): 
     rootSessionId: spec.rootSessionId,
     prompt: spec.prompt,
     ...(context.agentDir !== undefined ? { agentDir: context.agentDir } : {}),
+    ...(context.projectTrusted !== undefined ? { projectTrusted: context.projectTrusted } : {}),
     ...(context.authStorage !== undefined ? { authStorage: context.authStorage } : {}),
     ...(context.modelRegistry !== undefined ? { modelRegistry: context.modelRegistry } : {}),
     ...(context.modelRuntime !== undefined ? { modelRuntime: context.modelRuntime } : {}),
@@ -105,6 +109,7 @@ function toChildSpec(spec: ManagedStartSpec, context: InProcessSessionContext): 
     ...(spec.instructions !== undefined ? { instructions: spec.instructions } : {}),
     ...(spec.toolAllowlist !== undefined ? { toolAllowlist: spec.toolAllowlist } : {}),
     ...(spec.toolDenylist !== undefined ? { toolDenylist: spec.toolDenylist } : {}),
+    ...(spec.includeTaskTools !== undefined ? { includeTaskTools: spec.includeTaskTools } : {}),
     ...(spec.memberScopedToolNames !== undefined ? { memberScopedToolNames: spec.memberScopedToolNames } : {}),
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
     ...(spec.kernelTools !== undefined ? { kernelTools: spec.kernelTools } : {}),

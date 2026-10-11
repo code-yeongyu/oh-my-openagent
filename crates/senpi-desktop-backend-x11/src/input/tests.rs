@@ -14,6 +14,7 @@ use super::X11Input;
 const TERMINAL: Window = 0x40_0001;
 const GTK_APP: Window = 0x60_0001;
 const EDITOR: Window = 0x80_0001;
+const BROWSER: Window = 0x90_0001;
 
 pub(super) fn input() -> X11Input<FakeInputServer> {
     X11Input::with_server(
@@ -151,6 +152,48 @@ fn foreground_delivery_to_a_filtering_toolkit_uses_xtest() {
         .unwrap();
 
     assert!(input.server.calls().contains(&fake_key(KEY_A, true)));
+}
+
+#[test]
+fn foreground_delivery_without_ewmh_sets_and_confirms_core_focus() {
+    let server = FakeInputServer::new(None)
+        .without_ewmh_activation()
+        .window(TERMINAL, (100, 50), b"xterm\0XTerm\0");
+    let mut input = X11Input::with_server(server);
+    input.server.focus.set(EDITOR);
+
+    input
+        .type_text(&window(TERMINAL), "a", DeliveryMode::Foreground)
+        .unwrap();
+
+    assert_eq!(input.server.focus.get(), EDITOR);
+    assert_eq!(
+        input.server.calls(),
+        [
+            Call::Activate(TERMINAL),
+            Call::Focus(TERMINAL),
+            fake_key(KEY_A, true),
+            fake_key(KEY_A, false),
+            Call::Focus(EDITOR),
+        ]
+    );
+}
+
+#[test]
+fn foreground_delivery_does_not_restore_over_a_newer_user_focus() {
+    let mut input = input();
+    input.server.focus_after_input.set(Some(BROWSER));
+
+    input
+        .pointer(&window(TERMINAL), &click(130.0, 70.0), DeliveryMode::Foreground)
+        .unwrap();
+
+    assert_eq!(input.active_window(), Some(BROWSER));
+    assert_ne!(
+        input.server.calls().last(),
+        Some(&Call::Activate(EDITOR)),
+        "the earlier focus snapshot must not overwrite a newer user choice"
+    );
 }
 
 #[test]

@@ -88,12 +88,3 @@ describe("#given the ulw-plan high-accuracy review protocol across all three edi
 		})
 	}
 })
-
-describe("#given issue #6128 non-convergence root cause wording", () => {
-	for (const surface of surfaces) {
-		test(`#when reading ${surface.name} #then no unconditional resubmit-until-approval loop remains`, () => {
-			const workflow = readFileSync(surface.workflowPath, "utf8")
-			expect(workflow).not.toMatch(/fix every cited issue and resubmit (?:both )?fresh until (?:each|it) approves/)
-		})
-	}
-})

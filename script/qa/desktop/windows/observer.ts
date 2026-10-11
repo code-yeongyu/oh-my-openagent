@@ -13,6 +13,10 @@ export interface WindowObservation {
   readonly class?: string
   readonly pid?: number
   readonly processName?: string | null
+  /** EM_GETFIRSTVISIBLELINE of the window's edit child; -1 when it has none. */
+  readonly firstVisibleLine?: number
+  /** GetWindowRect in physical screen pixels. */
+  readonly rect?: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }
   readonly controlType?: string | null
   readonly text?: string | null
   /** Which read produced `text`: `uia-find`, `uia-walk`, or `win32` (WM_GETTEXT on the Edit child). */
@@ -42,6 +46,16 @@ function optionalString(value: Json | undefined): string | null {
   return typeof value === "string" ? value : String(value)
 }
 
+function parseRect(value: Json): NonNullable<WindowObservation["rect"]> {
+  const rect = asObject(value)
+  return {
+    left: numberField(rect, "left"),
+    top: numberField(rect, "top"),
+    right: numberField(rect, "right"),
+    bottom: numberField(rect, "bottom"),
+  }
+}
+
 function parseWindow(value: Json | undefined): WindowObservation {
   const entry = asObject(value)
   return {
@@ -49,6 +63,8 @@ function parseWindow(value: Json | undefined): WindowObservation {
     ...(typeof entry.class === "string" ? { class: entry.class } : {}),
     ...(typeof entry.pid === "number" ? { pid: entry.pid } : {}),
     processName: optionalString(entry.processName),
+    ...(typeof entry.firstVisibleLine === "number" ? { firstVisibleLine: entry.firstVisibleLine } : {}),
+    ...(entry.rect === undefined ? {} : { rect: parseRect(entry.rect) }),
     controlType: optionalString(entry.controlType),
     text: optionalString(entry.text),
     readVia: optionalString(entry.readVia),
@@ -100,6 +116,11 @@ export function observeUntil(
 
 export function windowText(observation: Observation, id: string): string {
   return observation.windows[id]?.text ?? ""
+}
+
+/** The zero-based top line of window `id`'s edit child; -1 when unknown. */
+export function firstVisibleLine(observation: Observation, id: string): number {
+  return observation.windows[id]?.firstVisibleLine ?? -1
 }
 
 /** The engine's integrity label for a mandatory-label RID, as `integrity.rs` bands them. */

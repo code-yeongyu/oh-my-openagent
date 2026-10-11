@@ -4,9 +4,9 @@
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{
-    AtomEnum, ButtonPressEvent, ClientMessageData, ClientMessageEvent, ConnectionExt as _, EventMask,
-    KeyButMask, KeyPressEvent, Motion, MotionNotifyEvent, Window, BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT,
-    CLIENT_MESSAGE_EVENT, KEY_PRESS_EVENT, KEY_RELEASE_EVENT, MOTION_NOTIFY_EVENT,
+    AtomEnum, ClientMessageData, ClientMessageEvent, ConnectionExt as _, EventMask, InputFocus,
+    Window, BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT, CLIENT_MESSAGE_EVENT, KEY_PRESS_EVENT,
+    KEY_RELEASE_EVENT, MOTION_NOTIFY_EVENT,
 };
 use x11rb::protocol::xtest::ConnectionExt as _;
 use x11rb::rust_connection::RustConnection;
@@ -21,7 +21,6 @@ const MAX_WINDOW_DEPTH: usize = 32;
 pub struct X11InputConnection {
     conn: RustConnection,
     root: Window,
-    keymap: Keymap,
     active_atom: u32,
 }
 
@@ -44,13 +43,6 @@ impl X11InputConnection {
             .map_err(|error| {
                 DesktopError::input_failed(format!("XTEST extension is unavailable: {error}"))
             })?;
-        let (min_keycode, max_keycode) = (conn.setup().min_keycode, conn.setup().max_keycode);
-        let count = max_keycode.saturating_sub(min_keycode).saturating_add(1);
-        let mapping = conn
-            .get_keyboard_mapping(min_keycode, count)
-            .map_err(failed)?
-            .reply()
-            .map_err(failed)?;
         let active_atom = conn
             .intern_atom(false, b"_NET_ACTIVE_WINDOW")
             .map_err(failed)?
@@ -60,11 +52,6 @@ impl X11InputConnection {
         Ok(Self {
             conn,
             root,
-            keymap: Keymap {
-                min_keycode,
-                keysyms_per_keycode: mapping.keysyms_per_keycode,
-                keysyms: mapping.keysyms,
-            },
             active_atom,
         })
     }
@@ -75,8 +62,20 @@ impl InputServer for X11InputConnection {
         self.root
     }
 
-    fn keymap(&self) -> &Keymap {
-        &self.keymap
+    fn keymap(&self) -> CoreResult<Keymap> {
+        let (min_keycode, max_keycode) = (self.conn.setup().min_keycode, self.conn.setup().max_keycode);
+        let count = max_keycode.saturating_sub(min_keycode).saturating_add(1);
+        let mapping = self
+            .conn
+            .get_keyboard_mapping(min_keycode, count)
+            .map_err(failed)?
+            .reply()
+            .map_err(failed)?;
+        Ok(Keymap {
+            min_keycode,
+            keysyms_per_keycode: mapping.keysyms_per_keycode,
+            keysyms: mapping.keysyms,
+        })
     }
 
     fn fake(&self, input: FakeInput) -> CoreResult<()> {
@@ -98,71 +97,7 @@ impl InputServer for X11InputConnection {
     }
 
     fn send(&self, window: Window, event: SentEvent) -> CoreResult<()> {
-        let cookie = match event {
-            SentEvent::Key { code, press, state } => {
-                let event = KeyPressEvent {
-                    response_type: pick(press, KEY_PRESS_EVENT, KEY_RELEASE_EVENT),
-                    detail: code,
-                    sequence: 0,
-                    time: CURRENT_TIME,
-                    root: self.root,
-                    event: window,
-                    child: 0,
-                    root_x: 0,
-                    root_y: 0,
-                    event_x: 0,
-                    event_y: 0,
-                    state: KeyButMask::from(state),
-                    same_screen: true,
-                };
-                let mask = pick(press, EventMask::KEY_PRESS, EventMask::KEY_RELEASE);
-                self.conn.send_event(false, window, mask, event)
-            }
-            SentEvent::Button {
-                detail,
-                press,
-                at,
-                state,
-            } => {
-                let event = ButtonPressEvent {
-                    response_type: pick(press, BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT),
-                    detail,
-                    sequence: 0,
-                    time: CURRENT_TIME,
-                    root: self.root,
-                    event: window,
-                    child: 0,
-                    root_x: at.root.0,
-                    root_y: at.root.1,
-                    event_x: at.local.0,
-                    event_y: at.local.1,
-                    state: KeyButMask::from(state),
-                    same_screen: true,
-                };
-                let mask = pick(press, EventMask::BUTTON_PRESS, EventMask::BUTTON_RELEASE);
-                self.conn.send_event(false, window, mask, event)
-            }
-            SentEvent::Motion { at, state } => {
-                let event = MotionNotifyEvent {
-                    response_type: MOTION_NOTIFY_EVENT,
-                    detail: Motion::NORMAL,
-                    sequence: 0,
-                    time: CURRENT_TIME,
-                    root: self.root,
-                    event: window,
-                    child: 0,
-                    root_x: at.root.0,
-                    root_y: at.root.1,
-                    event_x: at.local.0,
-                    event_y: at.local.1,
-                    state: KeyButMask::from(state),
-                    same_screen: true,
-                };
-                self.conn
-                    .send_event(false, window, EventMask::POINTER_MOTION, event)
-            }
-        };
-        cookie.map_err(failed)?.check().map_err(failed)
+        super::connection_events::send(&self.conn, self.root, window, event)
     }
 
     fn translate(&self, window: Window, x: i16, y: i16) -> CoreResult<(i16, i16)> {
@@ -211,6 +146,14 @@ impl InputServer for X11InputConnection {
         self.flush()
     }
 
+    fn pointer_within(&self, window: Window) -> CoreResult<bool> {
+        super::connection_pointer::within(&self.conn, self.root, window)
+    }
+
+    fn pointer_held(&self) -> CoreResult<bool> {
+        super::connection_pointer::held(&self.conn, self.root)
+    }
+
     fn active_window(&self) -> Option<Window> {
         self.conn
             .get_property(false, self.root, self.active_atom, AtomEnum::WINDOW, 0, 1)
@@ -240,6 +183,35 @@ impl InputServer for X11InputConnection {
         self.flush()
     }
 
+    fn focus_window(&self) -> CoreResult<Window> {
+        self.conn
+            .get_input_focus()
+            .map_err(failed)?
+            .reply()
+            .map(|reply| reply.focus)
+            .map_err(failed)
+    }
+
+    fn set_focus(&self, window: Window) -> CoreResult<()> {
+        self.conn
+            .set_input_focus(InputFocus::PARENT, window, CURRENT_TIME)
+            .map_err(failed)?
+            .check()
+            .map_err(failed)?;
+        self.flush()
+    }
+
+    fn parent(&self, window: Window) -> CoreResult<Option<Window>> {
+        let parent = self
+            .conn
+            .query_tree(window)
+            .map_err(failed)?
+            .reply()
+            .map_err(failed)?
+            .parent;
+        Ok((parent != 0 && parent != window).then_some(parent))
+    }
+
     fn wm_class(&self, window: Window) -> Option<Vec<u8>> {
         let reply = self
             .conn
@@ -255,7 +227,7 @@ impl InputServer for X11InputConnection {
     }
 }
 
-fn pick<T: Copy>(press: bool, down: T, up: T) -> T {
+pub(super) fn pick<T: Copy>(press: bool, down: T, up: T) -> T {
     if press {
         down
     } else {
@@ -263,6 +235,6 @@ fn pick<T: Copy>(press: bool, down: T, up: T) -> T {
     }
 }
 
-fn failed(error: impl std::fmt::Display) -> DesktopError {
+pub(super) fn failed(error: impl std::fmt::Display) -> DesktopError {
     DesktopError::input_failed(format!("X11 input request failed: {error}"))
 }

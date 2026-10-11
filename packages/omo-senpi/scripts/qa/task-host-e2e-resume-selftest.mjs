@@ -1,10 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { reattachedTaskIds, resumeReleaseStep } from "./task-host-e2e-resume-evidence.mjs"
+import { scenarioStateDir } from "./task-host-e2e-sandbox.mjs"
 
 export async function checkResumeReadbacks(root) {
   const cwd = join(root, "resume-readbacks")
-  mkdirSync(join(cwd, ".omo", "senpi-task", "tasks"), { recursive: true })
+  const tasksDir = join(scenarioStateDir(cwd, join(root, "resume-readbacks-agent")), "tasks")
+  mkdirSync(tasksDir, { recursive: true })
+  mkdirSync(join(cwd, ".omo"), { recursive: true })
   const ids = ["st_a", "st_b", "st_c", "st_d"]
   const rows = ids.map((task_id) => ({
     message: { role: "toolResult", toolName: "task_output", details: {
@@ -22,10 +25,10 @@ export async function checkResumeReadbacks(root) {
   }
   const session = join(cwd, "parent.jsonl")
   for (const id of ids) {
-    writeFileSync(join(cwd, ".omo", "senpi-task", "tasks", `${id}.json`), JSON.stringify({ status: "completed" }))
+    writeFileSync(join(tasksDir, `${id}.json`), JSON.stringify({ status: "completed" }))
   }
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
-  const execute = new AsyncFunction(resumeReleaseStep(session, ids, "parent", 0).arguments.code)
+  const execute = new AsyncFunction(resumeReleaseStep(session, ids, "parent", 0, tasksDir).arguments.code)
   const previousCwd = process.cwd()
   try {
     process.chdir(cwd)

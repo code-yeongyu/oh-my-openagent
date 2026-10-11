@@ -35,6 +35,9 @@ enum FrameKind {
         captured_height: u32,
     },
     Identity,
+    /// Pixels only: the capture source did not report the displays' logical
+    /// geometry, so no pixel can be mapped to an input coordinate.
+    PixelsOnly { reason: String },
 }
 
 /// The pixel <-> logical mapping of one capture of one target.
@@ -101,6 +104,28 @@ impl FrameGeometry {
     }
 
     /// Frame for input addressed in global logical coordinates (AX clicks).
+    /// A frame whose logical geometry is unknown (`reason` says why). It can
+    /// be shown, but coordinate input and hit tests against it are refused.
+    pub fn pixels_only(width: u32, height: u32, reason: impl Into<String>) -> Self {
+        Self {
+            width,
+            height,
+            regions: Vec::new(),
+            kind: FrameKind::PixelsOnly { reason: reason.into() },
+        }
+    }
+
+    fn refuse_pixels_only(&self) -> CoreResult<()> {
+        match &self.kind {
+            FrameKind::PixelsOnly { reason } => Err(DesktopError::invalid_coordinate_frame(format!(
+                "the last capture of this target has no known logical geometry ({reason}), so its \
+                 pixels cannot be used as input coordinates; use accessibility actions, or make a \
+                 capture with known geometry available and capture again"
+            ))),
+            _ => Ok(()),
+        }
+    }
+
     pub const fn identity_global() -> Self {
         Self {
             width: u32::MAX,
@@ -131,6 +156,7 @@ impl FrameGeometry {
                 self.width, self.height
             )));
         }
+        self.refuse_pixels_only()?;
         if self.kind == FrameKind::Identity {
             return Ok((x, y));
         }
@@ -162,13 +188,14 @@ impl FrameGeometry {
                 Ok((f64::from(current.x) + local_x, f64::from(current.y) + local_y))
             }
             FrameKind::Desktop => Ok((region.x + local_x, region.y + local_y)),
-            FrameKind::Identity => Ok((x, y)),
+            FrameKind::Identity | FrameKind::PixelsOnly { .. } => Ok((x, y)),
         }
     }
 
     /// Inverse of `map_point` at capture time: expresses a global logical
     /// point (e.g. AX bounds) as a pixel of this frame.
     pub fn map_to_pixel(&self, x: f64, y: f64) -> CoreResult<(f64, f64)> {
+        self.refuse_pixels_only()?;
         if self.kind == FrameKind::Identity {
             return Ok((x, y));
         }

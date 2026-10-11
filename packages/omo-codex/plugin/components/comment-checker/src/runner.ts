@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+
+import { findCommentCheckerPackageBinary } from "@oh-my-opencode/comment-checker-core";
 
 import type { CommentCheckerHookInput } from "./core.js";
 
@@ -108,9 +109,8 @@ function resolvePackageApiBinary(): string | undefined {
 function resolvePackageBinary(binaryName: string): string | undefined {
 	try {
 		const require = createRequire(import.meta.url);
-		const packagePath = require.resolve(`${commentCheckerPackageName()}/package.json`);
-		const binaryPath = join(dirname(packagePath), "bin", binaryName);
-		return existsSync(binaryPath) ? binaryPath : undefined;
+		const packageJsonPath = require.resolve(`${commentCheckerPackageName()}/package.json`);
+		return findCommentCheckerPackageBinary({ packageJsonPath, binaryName, existsSync }) ?? undefined;
 	} catch {
 		return undefined;
 	}

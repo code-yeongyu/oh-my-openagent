@@ -23,14 +23,26 @@ export interface FakeHostOpenFailure {
   readonly data?: unknown
 }
 
+/**
+ * How the host answers `warm` (senpi#2314): a current engine warms, a worker registry answers
+ * `unsupported`, an engine from before the command refuses it (`missing_session_id`: its router
+ * reads any unknown session-less command as a session command), a draining host `host_draining`.
+ */
+export type FakeHostWarmAnswer =
+  | { readonly state: "warmed" | "already_warm" | "unsupported" }
+  | { readonly refuse: string }
+
 export interface FakeHostWirePorts {
   readonly table: FakeSessionTable
+  readonly warm: FakeHostWarmAnswer
   /** Read per line so a handoff's rotated instance answers the very next probe. */
   readonly identity: () => Readonly<Record<string, unknown>>
   readonly openFailure: () => FakeHostOpenFailure | undefined
   /** Mirror the engine: opening at a path whose directory does not exist fails with ENOENT. */
   readonly enforceSessionDir: boolean
   readonly withheld: ReadonlySet<string>
+  /** Commands the host refuses, with the error it answers. */
+  readonly failed: ReadonlyMap<string, string>
   readonly record: (command: FakeHostCommand) => void
 }
 
@@ -46,6 +58,10 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
   const routingId = typeof payload.sessionId === "string" ? payload.sessionId : undefined
   ports.record({ type, sessionId: routingId, payload })
   if (ports.withheld.has(type)) return
+  const failure = ports.failed.get(type)
+  if (failure !== undefined) {
+    return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
+  }
   const ok = (data: unknown): void =>
     writeFrame(socket, { type: "response", id: payload.id, command: type, success: true, data })
   switch (type) {
@@ -66,15 +82,24 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
         ports.table.setStreaming(routingId, true)
       }
       return ok({})
-    case "get_state":
+    case "get_state": {
+      const model = routingId === undefined ? undefined : openedModels.get(ports)?.get(routingId)
       return ok({
         sessionId: `durable-${payload.sessionId}`,
         isStreaming: routingId !== undefined && ports.table.isStreaming(routingId),
+        ...(model === undefined ? {} : { model }),
       })
+    }
     case "get_entries":
       return ok({ entries: [], leafId: null })
+    case "get_available_models":
+      return ok({ models: [] })
     case "switch_session":
       return ok({ cancelled: false })
+    case "warm":
+      return "refuse" in ports.warm
+        ? writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: ports.warm.refuse })
+        : ok({ state: ports.warm.state })
     case "extension_ui_response":
     case "extension_ui_progress":
       return
@@ -103,6 +128,7 @@ function openSession(ports: FakeHostWirePorts, socket: Socket, payload: Readonly
       data: { owner: opened.hold.owner, retry_after_ms: opened.hold.retryAfterMs },
     })
   }
+  rememberOpenedModel(ports, opened.routingId, payload)
   writeFrame(socket, {
     type: "response",
     id: payload.id,
@@ -115,6 +141,19 @@ function openSession(ports: FakeHostWirePorts, socket: Socket, payload: Readonly
       attached: opened.attached,
     },
   })
+}
+
+// The real host's get_state reports the session's model (senpi buildRpcSessionState: `model: session.model`), which an
+// open with provider and modelId sets; a re-joined session keeps the model it already runs.
+const openedModels = new WeakMap<FakeHostWirePorts, Map<string, { readonly provider: string; readonly id: string }>>()
+
+function rememberOpenedModel(ports: FakeHostWirePorts, routingId: string, payload: Readonly<Record<string, unknown>>): void {
+  const models = openedModels.get(ports) ?? new Map<string, { readonly provider: string; readonly id: string }>()
+  openedModels.set(ports, models)
+  if (models.has(routingId)) return
+  if (typeof payload.provider === "string" && typeof payload.modelId === "string") {
+    models.set(routingId, { provider: payload.provider, id: payload.modelId })
+  }
 }
 
 function refuse(socket: Socket, payload: Readonly<Record<string, unknown>>, failure: FakeHostOpenFailure): void {

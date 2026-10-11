@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
-import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = dirname(scriptDir)
@@ -103,8 +103,8 @@ function sessionTranscript(sessionDir) {
   return text
 }
 
-function readRecords(sandboxCwd) {
-  const tasksDir = join(sandboxCwd, ".omo", "senpi-task", "tasks")
+function readRecords(sandbox) {
+  const tasksDir = join(sandboxStateDir(sandbox), "tasks")
   if (!existsSync(tasksDir)) return {}
   const records = {}
   for (const file of readdirSync(tasksDir)) {
@@ -144,7 +144,7 @@ async function run() {
       `tool result leads with the summary: ${transcript.includes(`Started task ${SUMMARY} (`) ? "yes" : "no"}`,
     )
 
-    const records = readRecords(sandbox.cwd)
+    const records = readRecords(sandbox)
     const normal = records["sum-child"]
     check("record-summary", normal?.task_summary === SUMMARY, `sum-child record task_summary=${JSON.stringify(normal?.task_summary)}`)
     const long = records["sum-long"]

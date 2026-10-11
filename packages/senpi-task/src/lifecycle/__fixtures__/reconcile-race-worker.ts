@@ -6,6 +6,7 @@ import type { ManagedChildHandle } from "../../manager/child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { TaskRecordStore } from "../../store"
 import { createTaskLifecycle } from "../create"
+import { NO_HOST_ENDPOINT } from "../host-session"
 
 const [projectDir, parentSessionId, launchLog] = process.argv.slice(2)
 if (projectDir === undefined || parentSessionId === undefined || launchLog === undefined) {
@@ -29,11 +30,12 @@ const store: TaskRecordStore = {
 }
 
 const lifecycle = createTaskLifecycle({
+  hostEndpoint: NO_HOST_ENDPOINT,
   store,
   registry: {
     get: () => undefined,
     entries: () => [],
-    forget: () => undefined,
+    forget: (_taskId, _options) => undefined,
     hasPendingSends: () => false,
   },
   config: OmoTaskSettingsSchema.parse({}),

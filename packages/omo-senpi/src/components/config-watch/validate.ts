@@ -68,6 +68,12 @@ function isAttributableDiagnostic(
   })
 }
 
+// A deprecated key still loads and still applies, so it is a notice, not a reason to reject: renaming
+// one alias rewrites the whole notice, and its new fingerprint would otherwise block the reload.
+function isRejectableDiagnostic(diagnostic: SenpiConfigDiagnostic): boolean {
+  return diagnostic.kind !== "deprecated-keys"
+}
+
 function formatDiagnostic(diagnostic: SenpiConfigDiagnostic): string {
   return diagnostic.message
 }
@@ -83,12 +89,14 @@ export function createOmoConfigValidator(options: CreateOmoConfigValidatorOption
   const platform = options.platform ?? process.platform
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
   const userConfigDirectory = resolveUserOmoConfigDirectory(env)
-  let baseline = new Set(loadConfig({ cwd: options.cwd, env, platform }).diagnostics.map(fingerprintDiagnostic))
+  const loadRejectableDiagnostics = () =>
+    loadConfig({ cwd: options.cwd, env, platform }).diagnostics.filter(isRejectableDiagnostic)
+  let baseline = new Set(loadRejectableDiagnostics().map(fingerprintDiagnostic))
   const unresolvedRejected = new Set<string>()
 
   return {
     validate(changedPaths: readonly string[]): ConfigWatchValidation {
-      const diagnostics = loadConfig({ cwd: options.cwd, env, platform }).diagnostics
+      const diagnostics = loadRejectableDiagnostics()
       const fingerprintedDiagnostics = diagnostics.map(
         (diagnostic): FingerprintedDiagnostic => ({ diagnostic, fingerprint: fingerprintDiagnostic(diagnostic) }),
       )

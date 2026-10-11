@@ -88,6 +88,9 @@ pub enum SinkOp {
         text: String,
         mode: DeliveryMode,
     },
+    ClipboardWrite {
+        text: String,
+    },
     KeyChord {
         target: Target,
         keys: Vec<KeyName>,
@@ -111,6 +114,10 @@ pub enum SinkOp {
     },
     AxFocus {
         node: u64,
+    },
+    MenuSelect {
+        window: String,
+        path: Vec<String>,
     },
 }
 

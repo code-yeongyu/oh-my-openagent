@@ -1,9 +1,11 @@
 // X11 scenarios: capture + click into the target xterm, the foreground focus guard, background
-// `XSendEvent` delivery that leaves `_NET_ACTIVE_WINDOW` alone, and the XI2 stop chord latch.
+// `XSendEvent` delivery that leaves `_NET_ACTIVE_WINDOW` alone, scroll direction in both delivery
+// modes, and the XI2 stop chord latch.
 import { asObject, Engine, type Json, type JsonObject, outcome } from "./engine.ts";
 import { until } from "./procs.ts";
 import { type Context, type Result, result } from "./scenario.ts";
 import { PASTE_TOKEN, type X11Observer, type X11Stage } from "./x11-env.ts";
+import { scrollDirection } from "./x11-scroll.ts";
 
 const PNG_SIGNATURE = "89504e470d0a1a0a";
 
@@ -150,6 +152,8 @@ export const X11_SCENARIOS = [
 	"x11-capture-click-xterm",
 	"x11-focus-guard",
 	"x11-background-keeps-active-window",
+	"x11-scroll-direction-foreground",
+	"x11-scroll-direction-background",
 	"x11-chord-latches",
 ] as const;
 export type X11Scenario = (typeof X11_SCENARIOS)[number];
@@ -162,6 +166,10 @@ export function runX11(name: X11Scenario, ctx: Context, stage: X11Stage, observe
 			return deliveredClick(ctx, stage, observe, "foreground");
 		case "x11-background-keeps-active-window":
 			return deliveredClick(ctx, stage, observe, "background");
+		case "x11-scroll-direction-foreground":
+			return scrollDirection(ctx, stage, observe, "foreground");
+		case "x11-scroll-direction-background":
+			return scrollDirection(ctx, stage, observe, "background");
 		case "x11-chord-latches":
 			return chordLatches(ctx, stage, observe);
 	}

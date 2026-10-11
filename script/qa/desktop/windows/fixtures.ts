@@ -8,10 +8,15 @@ import { createInterface } from "node:readline"
 import { fileURLToPath } from "node:url"
 
 import { asObject, type Engine, type Json } from "./engine"
+import { imageOf, stillTracked } from "./process-identity"
 import { hangGuard, probeUntil } from "./until"
 import { removeTreeSync } from "../../../../test-support/remove-tree"
 
 const WPF_HOST_SCRIPT = fileURLToPath(new URL("./wpf-host.ps1", import.meta.url))
+const SCROLL_HOST_SCRIPT = fileURLToPath(new URL("./scroll-host.ps1", import.meta.url))
+
+/** The scroll host's document: 200 lines, its view opened at zero-based line 100. */
+export const SCROLL_DOCUMENT = { lines: 200, firstVisibleLine: 100 } as const
 
 export interface QaWindow {
   readonly id: string
@@ -22,6 +27,11 @@ export interface QaWindow {
 
 export interface Notepad extends QaWindow {
   readonly content: string
+}
+
+export interface ScrollWindow extends QaWindow {
+  /** The host's wheel/focus/activation event log, one event per line. */
+  readonly eventLog: string
 }
 
 function parseWindow(value: Json): QaWindow {
@@ -50,15 +60,11 @@ async function waitForWindow(engine: Engine, matches: (window: QaWindow) => bool
   return window
 }
 
-function isAlive(pid: number): boolean {
-  const listed = spawnSync("tasklist", ["/FI", `PID eq ${pid}`, "/NH", "/FO", "CSV"], { encoding: "utf8" })
-  return listed.stdout.includes(`"${pid}"`)
-}
-
 export class QaWorkspace {
   readonly dir = mkdtempSync(join(tmpdir(), "omo-desktop-qa-"))
   readonly receipts: string[] = []
-  private readonly pids = new Set<number>()
+  /** Tracked pid -> the image it ran when tracked; a recycled pid is never killed or counted. */
+  private readonly pids = new Map<number, string>()
 
   receipt(line: string): void {
     this.receipts.push(line)
@@ -66,7 +72,13 @@ export class QaWorkspace {
 
   private track(child: ChildProcess, label: string): void {
     if (child.pid === undefined) throw new Error(`could not spawn ${label}`)
-    this.pids.add(child.pid)
+    this.remember(child.pid)
+  }
+
+  /** Records `pid` with its current image; a process that already exited needs no teardown. */
+  private remember(pid: number): void {
+    const image = imageOf(pid)
+    if (image !== undefined) this.pids.set(pid, image)
   }
 
   async notepad(engine: Engine, tag: string): Promise<Notepad> {
@@ -77,25 +89,38 @@ export class QaWorkspace {
     const name = basename(path)
     const window = await waitForWindow(engine, (candidate) => candidate.title.includes(name), `Notepad ${name}`)
     // Packaged Notepad hands the document to a process other than the one spawned.
-    if (window.pid !== null) this.pids.add(window.pid)
+    if (window.pid !== null) this.remember(window.pid)
     return { ...window, content }
   }
 
   async wpfWindow(engine: Engine, tag: string): Promise<QaWindow> {
-    const args = ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File", WPF_HOST_SCRIPT]
-    const child = spawn("powershell.exe", [...args, "-Title", `omo-qa-wpf-${tag}`], {
-      stdio: ["ignore", "pipe", "inherit"],
-    })
-    this.track(child, "wpf-host.ps1")
-    if (child.stdout === null) throw new Error("wpf-host.ps1 has no stdout")
+    return this.hostWindow(engine, WPF_HOST_SCRIPT, ["-Title", `omo-qa-wpf-${tag}`], "WPF window")
+  }
+
+  /** A WinForms window whose multi-line EDIT shows `SCROLL_DOCUMENT` from its middle. */
+  async scrollWindow(engine: Engine, tag: string): Promise<ScrollWindow> {
+    const eventLog = join(this.dir, `omo-qa-scroll-${tag}.log`)
+    writeFileSync(eventLog, "")
+    const args = ["-Title", `omo-qa-scroll-${tag}`, "-EventLog", eventLog, "-Lines", String(SCROLL_DOCUMENT.lines)]
+    args.push("-FirstVisibleLine", String(SCROLL_DOCUMENT.firstVisibleLine))
+    return { ...(await this.hostWindow(engine, SCROLL_HOST_SCRIPT, args, "scroll window")), eventLog }
+  }
+
+  /** Runs a `-STA` PowerShell window host that prints `ready <hwnd>`, and waits for that window. */
+  private async hostWindow(engine: Engine, script: string, scriptArgs: string[], label: string): Promise<QaWindow> {
+    const args = ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File", script]
+    const name = basename(script)
+    const child = spawn("powershell.exe", [...args, ...scriptArgs], { stdio: ["ignore", "pipe", "inherit"] })
+    this.track(child, name)
+    if (child.stdout === null) throw new Error(`${name} has no stdout`)
     const lines = createInterface({ input: child.stdout })
     const ready = await hangGuard(
       new Promise<string>((resolve) => lines.once("line", resolve)),
-      () => "hang guard: wpf-host.ps1 never reported ready",
+      () => `hang guard: ${name} never reported ready`,
     )
     const hwnd = /^ready (\d+)$/.exec(ready.trim())?.[1]
-    if (hwnd === undefined) throw new Error(`wpf-host.ps1: ${ready}`)
-    return waitForWindow(engine, (candidate) => candidate.id === hwnd, `WPF window ${hwnd}`)
+    if (hwnd === undefined) throw new Error(`${name}: ${ready}`)
+    return waitForWindow(engine, (candidate) => candidate.id === hwnd, `${label} ${hwnd}`)
   }
 
   /**
@@ -114,15 +139,20 @@ export class QaWorkspace {
   }
 
   trackEngine(engine: Engine): void {
-    this.pids.add(engine.pid)
+    this.remember(engine.pid)
+  }
+
+  /** Tracks a fixture process a scenario module spawned itself, for the same teardown. */
+  trackProcess(child: ChildProcess, label: string): void {
+    this.track(child, label)
   }
 
   teardown(): string[] {
-    for (const pid of this.pids) {
-      if (isAlive(pid)) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" })
+    for (const [pid, image] of this.pids) {
+      if (stillTracked(pid, image)) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" })
     }
-    const alive = [...this.pids].filter(isAlive)
-    this.receipt(`killed tracked pids ${[...this.pids].join(",") || "(none)"}`)
+    const alive = [...this.pids].filter(([pid, image]) => stillTracked(pid, image)).map(([pid]) => pid)
+    this.receipt(`killed tracked pids ${[...this.pids.keys()].join(",") || "(none)"}`)
     this.receipt(alive.length === 0 ? "procs 0" : `procs ${alive.length} alive: ${alive.join(",")}`)
     // Notepad can hold its file briefly after taskkill; rmSync retries EBUSY on its own.
     removeTreeSync(this.dir, { maxRetries: 10, retryDelay: 200 })

@@ -7,7 +7,13 @@ license.workspace = true
 [lib]
 crate-type = ["rlib"]
 
+[features]
+# The system text clipboard for the native backends; the fake backend and
+# the engine protocol never need it.
+system-clipboard = ["dep:arboard"]
+
 [dependencies]
+arboard = { workspace = true, optional = true }
 flume.workspace = true
 image.workspace = true
 parking_lot.workspace = true

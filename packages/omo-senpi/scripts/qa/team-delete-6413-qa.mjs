@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
 import { startSenpiRun } from "./team-e2e-runtime.mjs"
-import { parseEvents } from "./team-e2e-support.mjs"
+import { parseEvents, runtimeRootDir, taskStateDir } from "./team-e2e-support.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "team-e2e-mock-provider.ts")
@@ -31,11 +31,11 @@ const QA_OMO_CONFIG = {
   },
 }
 
-const WAIT_MEMBER_SOURCE = `import { execFileSync } from "node:child_process"
+const waitMemberSource = (tasksDir) => `import { execFileSync } from "node:child_process"
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-const dir = join(process.cwd(), ".omo", "senpi-task", "tasks")
+const dir = ${JSON.stringify(tasksDir)}
 const deadline = Date.now() + 60000
 
 function errno(error, code) {
@@ -196,7 +196,7 @@ async function main() {
     seedSandbox(sandbox)
     mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
     writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify(QA_OMO_CONFIG, null, 2)}\n`)
-    writeFileSync(join(sandbox.cwd, "wait-member.mjs"), WAIT_MEMBER_SOURCE)
+    writeFileSync(join(sandbox.cwd, "wait-member.mjs"), waitMemberSource(join(taskStateDir(sandbox), "tasks")))
     writeFileSync(join(sandbox.cwd, "verify-dead.mjs"), VERIFY_DEAD_SOURCE)
 
     run = startSenpiRun({
@@ -230,7 +230,7 @@ async function main() {
     writeFileSync(join(evidenceDir, "post-delete-ps.txt"), psRows === "" ? "(no matching rows)\n" : psRows)
     if (psRows !== "") throw new Error(`ps rows survived deletion: ${psRows}`)
 
-    const runtimeDir = join(sandbox.cwd, ".omo", "senpi-task", "teams", "runtime")
+    const runtimeDir = runtimeRootDir(sandbox)
     const remainingTeams = existsSync(runtimeDir) ? readdirSync(runtimeDir) : []
     const summary = { runStatus: result.status, wrapper, children, detached, allExited: true, remainingTeams }
     writeFileSync(join(evidenceDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`)

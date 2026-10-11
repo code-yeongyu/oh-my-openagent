@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process"
 import { dirname, join } from "node:path"
 import { createInterface } from "node:readline"
@@ -93,14 +93,18 @@ function recorder(): {
   }
 }
 
-function register(engineChild: ChildFactory, observers: ComputerUseTelemetryObservers): FakeExtensionAPI {
+function register(
+  engineChild: ChildFactory,
+  observers: ComputerUseTelemetryObservers,
+  block?: Record<string, unknown>,
+): FakeExtensionAPI {
   const pi = new HostApi()
   const logger: ComponentLogger = { info() {}, warn() {}, error() {} }
   const componentContext: ComponentContext = { logger, config: { getFlag: () => undefined } }
   createComputerUseComponent({
     platform: "linux",
     engineChild: () => engineChild,
-    loadSettings: (_cwd, platform) => resolveComputerSettings(undefined, platform),
+    loadSettings: (_cwd, platform) => resolveComputerSettings(block, platform),
     telemetryObservers: observers,
   }).register(pi, componentContext)
   return pi
@@ -116,6 +120,34 @@ async function command(pi: FakeExtensionAPI, args: string): Promise<void> {
 }
 
 describe("computer-use component telemetry", () => {
+  test("#given an inactive engine #when status is requested #then its source is described without spawning", async () => {
+    const pi = new HostApi()
+    let starts = 0
+    createComputerUseComponent({
+      platform: "linux",
+      engineChild: () => () => { starts += 1; throw new Error("status must not spawn") },
+      loadSettings: (_cwd, platform) => resolveComputerSettings({ enginePath: "/task-3/engine" }, platform),
+    }).register(pi, { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } })
+    const messages: string[] = []
+    const printed: string[] = []
+    const registration = pi.commands.find((item) => item.name === "computer")
+    if (registration === undefined) throw new Error("computer command missing")
+    const write = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      printed.push(String(chunk))
+      return true
+    })
+    try {
+      await (registration.options.handler as (args: string, ctx: unknown) => Promise<void>)("status", {
+        ...context(), hasUI: false, ui: { notify: (text: string) => messages.push(text) },
+      })
+    } finally {
+      write.mockRestore()
+    }
+    expect(printed).toEqual([`${messages[0]}\n`])
+    expect(messages.join("\n")).toContain("/task-3/engine: missing")
+    expect(starts).toBe(0)
+  })
+
   test("#given no engine binary #when the tool activates #then native-unavailable is observed", async () => {
     const telemetry = recorder()
     const missing: ChildFactory = () => {
@@ -173,16 +205,44 @@ describe("computer-use component telemetry", () => {
     ])
   })
 
+  test("#given concurrent computer tool promotions #when one inactive handle activates #then activation emits once", async () => {
+    const telemetry = recorder()
+    const engine = fakeEngine()
+    const pi = register(engine.factory, telemetry.observers, { cuaAdapter: true })
+
+    await Promise.all([
+      pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["computer"] }, context()),
+      pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["computer_actions"] }, context()),
+    ])
+
+    expect(telemetry.observations.filter((observation) => observation.kind === "activation")).toHaveLength(1)
+  })
+
+  test("#given concurrent command and tool activation #when one inactive handle activates #then activation emits once", async () => {
+    const telemetry = recorder()
+    const engine = fakeEngine()
+    const pi = register(engine.factory, telemetry.observers)
+
+    await Promise.all([
+      command(pi, "on"),
+      pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["computer"] }, context()),
+    ])
+
+    expect(telemetry.observations.filter((observation) => observation.kind === "activation")).toHaveLength(1)
+  })
+
   test("#given a denied computer call #when its tool result message ends #then the tier denial is observed", async () => {
     const telemetry = recorder()
     const engine = fakeEngine()
     const pi = register(engine.factory, telemetry.observers)
 
     await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context())
-    const computer = pi.tools.find((tool) => tool.name === "computer")
-    const parsePermission = computer?.permissionParser
-    if (typeof parsePermission !== "function") throw new Error("computer permission parser is unavailable")
-    parsePermission({ action: "run", code: "private typed text" }, "/work")
+    await pi.dispatch("tool_execution_start", {
+      type: "tool_execution_start",
+      toolCallId: "call-1",
+      toolName: "computer",
+      args: { action: "run", code: "private typed text" },
+    }, context())
     await pi.dispatch("tool_execution_end", {
       type: "tool_execution_end",
       toolCallId: "call-1",

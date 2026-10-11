@@ -191,6 +191,13 @@ describe("createMemoryComponent", () => {
       entries: [{ type: "custom", customType: MEMORY_BINDING_CUSTOM_TYPE, data: recorded }],
       notifications,
     })
+    const beforeAgentStartHandlers = pi.handlers.filter((registration) => registration.event === "before_agent_start")
+
+    expect(beforeAgentStartHandlers).toHaveLength(4)
+    expect(beforeAgentStartHandlers.every((registration) => registration.options?.previewSafe === true)).toBe(true)
+    await pi.dispatch("before_agent_start", { type: "before_agent_start", preview: true }, resumed)
+    expect(pi.entries).toEqual([])
+    expect(memoryModuleSupervisor.refCount).toBe(before)
 
     await pi.dispatch("before_agent_start", {}, resumed)
     await pi.dispatch("before_agent_start", {}, resumed)

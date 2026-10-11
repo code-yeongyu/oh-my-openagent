@@ -55,11 +55,12 @@ test("#given the parent dies before the failed rung's session closes #when anoth
   const message = { role: "assistant", content: [], stopReason: "error", errorMessage: "500 overloaded" }
   host.emitRecord(original.routingId, { type: "message_end", message })
   host.emitRecord(original.routingId, { type: "agent_end", willRetry: false, messages: [message] })
+  host.emitRecord(original.routingId, { type: "agent_idle" })
   await closing.promise
   const disconnected = host.waitForConnections(0)
   await failedRung?.dispose()
   await disconnected
-  owner.forget(task.task_id)
+  owner.forget(task.task_id, { path: "park" })
   owner.workpools.dispose()
   const sweeper = createTaskManager({
     store,
@@ -89,7 +90,7 @@ test("#given the parent dies before the failed rung's session closes #when anoth
     expect(store.load(task.task_id)?.fallback_closing_child).toBeUndefined()
   } finally {
     await sweeper.getResidentHandle(task.task_id)?.dispose()
-    sweeper.forget(task.task_id)
+    sweeper.forget(task.task_id, { path: "end" })
     sweeper.workpools.dispose()
     lifecycle.dispose?.()
   }

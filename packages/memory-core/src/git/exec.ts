@@ -1,19 +1,23 @@
 import { spawn } from "node:child_process"
 import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
-import { GitNotFoundError, GitTimeoutError } from "./errors"
+import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
 
 export interface GitExecOptions {
   cwd: string
   timeoutMs: number
   env?: NodeJS.ProcessEnv
   stdin?: string | Buffer
+  /** Stops the git process (SIGTERM, so git removes its own lock and temp files) and rejects. */
+  signal?: AbortSignal
 }
 
 export interface GitExecResult {
   code: number
   stdout: string
   stderr: string
+  /** Raw stdout for byte-framed output (`git cat-file --batch`); injected execs may omit it. */
+  stdoutBytes?: Buffer
 }
 
 export interface GitExec {
@@ -96,6 +100,13 @@ function runGitCommand(
       timedOut = true
       child.kill("SIGKILL")
     }, options.timeoutMs)
+    let aborted = false
+    const onAbort = () => {
+      aborted = true
+      child.kill("SIGTERM")
+    }
+    if (options.signal?.aborted === true) onAbort()
+    else options.signal?.addEventListener("abort", onAbort, { once: true })
 
     child.stdout!.on("data", (chunk: Buffer) => stdout.push(chunk))
     child.stderr!.on("data", (chunk: Buffer) => stderr.push(chunk))
@@ -104,6 +115,7 @@ function runGitCommand(
       if (settled) return
       settled = true
       clearTimeout(timer)
+      options.signal?.removeEventListener("abort", onAbort)
       if (error.code === "ENOENT") {
         // spawn reports ENOENT for a missing cwd as much as for a missing git binary. A fresh
         // memory identity has no repo dir yet, and calling that "git not found on PATH" surfaced a
@@ -125,14 +137,21 @@ function runGitCommand(
       if (settled) return
       settled = true
       clearTimeout(timer)
+      options.signal?.removeEventListener("abort", onAbort)
+      if (aborted) {
+        reject(new GitAbortedError(argv))
+        return
+      }
       if (timedOut) {
         reject(new GitTimeoutError(argv, options.timeoutMs))
         return
       }
+      const stdoutBytes = Buffer.concat(stdout)
       resolve({
         code: code ?? 1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
+        stdout: stdoutBytes.toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
+        stdoutBytes,
       })
     })
   })

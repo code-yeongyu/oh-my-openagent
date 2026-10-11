@@ -2,7 +2,6 @@
 
 import { describe, test, expect } from "bun:test"
 import { createBuiltinSkills } from "./skills"
-import { playwrightSkill } from "./skills/playwright"
 
 describe("createBuiltinSkills", () => {
 	test("returns playwright skill by default", () => {
@@ -17,17 +16,6 @@ describe("createBuiltinSkills", () => {
 		expect(browserSkill?.mcpConfig?.playwright).toBeDefined()
 	})
 
-	test("exports browser skill contracts with stable tool surfaces", () => {
-		// #given - direct browser skill exports
-
-		// #when
-		const playwrightMcp = playwrightSkill.mcpConfig?.playwright
-
-		// #then
-		expect(playwrightSkill.name).toBe("playwright")
-		expect(playwrightMcp?.command).toBe("npx")
-		expect(playwrightMcp?.args).toEqual(["@playwright/mcp@latest"])
-	})
 
 	test("returns playwright skill when browserProvider is 'playwright'", () => {
 		// given

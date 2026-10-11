@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -6,7 +6,19 @@ import { join } from "node:path"
 
 import { RunnerError } from "./in-process/runner-error"
 import { RpcHostRunner, type HostSessionChannel } from "./rpc-host"
-import { childSpec } from "./rpc-host.test-support"
+import { childSpec, tempAgentDir, testRouting } from "./rpc-host.test-support"
+
+const agentDirs: string[] = []
+
+afterAll(() => {
+  for (const dir of agentDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
+function routing(socket: string) {
+  const agentDir = tempAgentDir()
+  agentDirs.push(agentDir)
+  return testRouting(socket, agentDir)
+}
 
 describe("RpcHostRunner host failure classification", () => {
   test("#given the daemon transport is unreachable #when a child starts #then the runner raises host_unavailable with a closed reason", async () => {
@@ -17,7 +29,7 @@ describe("RpcHostRunner host failure classification", () => {
     )
     const runner = new RpcHostRunner({
       policy: "upgrade",
-      agentDir: "/tmp/agent",
+      ...routing("/tmp/host.sock"),
       modelAdmission: async () => {},
       ensureDaemon: () => Promise.reject(transportError),
     })
@@ -41,7 +53,7 @@ describe("RpcHostRunner host failure classification", () => {
     const opened: string[] = []
     const runner = new RpcHostRunner({
       policy: "upgrade",
-      agentDir: "/tmp/agent",
+      ...routing("/tmp/host.sock"),
       modelAdmission: async () => {},
       ensureDaemon: () => Promise.resolve({
         action: "reuse",
@@ -81,7 +93,7 @@ describe("RpcHostRunner host failure classification", () => {
     const socket = join(tmpdir(), `omo-8960-absent-${randomUUID()}.sock`)
     const runner = new RpcHostRunner({
       policy: "upgrade",
-      agentDir: "/tmp/agent",
+      ...routing(socket),
       modelAdmission: async () => {},
       ensureDaemon: () => Promise.resolve({
         action: "reuse",

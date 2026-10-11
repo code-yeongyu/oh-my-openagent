@@ -246,6 +246,8 @@ Defaults                   (Zod schema defaults)
 
 Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"`
 
+**Reserved in `~/.omo`:** `desktop/` and `desktop.init-*` belong to the OmO desktop app (its data home: a live SQLite database and worktrees; `OMO_DESKTOP_HOME` is the desktop's variable, code-yeongyu/omo-desktop-app#1829). No omo code may create, reset, archive, flatten, migrate, prune, copy or sync those entries; any code that walks `~/.omo` top-level entries must skip them. A project-scoped path (`<project>/.omo`) is the OmO home when the project directory is `$HOME`, so code that copies, migrates, syncs or walks a project's `.omo` must refuse that case (`legacy-workspace-migration.ts` does) (#9727).
+
 ## THREE-TIER MCP SYSTEM
 
 | Tier | Source | Loader | Mechanism |
@@ -291,7 +293,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 | `dispatchInternalPrompt()` | fn | `packages/utils/src/prompt-async-gate/` | - | ONLY sanctioned internal `session.prompt*` route |
 | `canonicalAgentDir()` | fn | `packages/omo-native/bin/lib/agent-dir.js` | - | Single canonical `~/.omo/agent` resolution |
 | `resolveAgentHome()` | fn | `packages/omo-senpi/src/components/agent-home/` | - | Adapter-side twin of `canonicalAgentDir()` |
-| `buildTaskExecute` | fn | `packages/senpi-task/src/tools/task/` | ~103 | `task` tool factory; batch cap 16 on schema AND execution |
+| `buildTaskExecute` | fn | `packages/senpi-task/src/tools/task/` | ~103 | `task` tool factory; uncapped batch, admission via `TaskConcurrency` |
 | `SCOPE_PRIORITY` | const | `packages/skills-loader-core/src/features/opencode-skill-loader/` | - | Numeric skill precedence across 7 discover* sources |
 | `consumeSoulNoticeDelta()` | fn | `packages/memory-core/src/soul/` | - | Soul-notice watermark consumption |
 
@@ -308,15 +310,16 @@ Digest-verified centrality (refs unmeasured unless noted):
 - Treat every `session.prompt` / `session.promptAsync` call as a write to shared session state. Production code may call them only inside `packages/omo-opencode/src/shared/prompt-async-gate.ts`; all other routes must use `dispatchInternalPrompt({ mode: "async" | "sync", ... })` or a proven equivalent gate.
   - Required gate semantics: reserve per session before dispatch, check active session state, keep a short post-dispatch hold, release only on intentional abort/recovery paths, and restore optimistic task/loop state when dispatch is skipped or fails later.
   - Forbidden patterns: raw prompt calls outside the shared gate, `postDispatchHoldMs: 0`, no-session fallback to raw prompt, and new internal message routes without duplicate-injection regression tests.
-  - Tests must pin both the shared invariant and the route behavior: update the static raw-prompt audit, then add route-specific tests proving concurrent/live/idle/error triggers collapse to one dispatch. Cover background completion wakes, fallback retries, team mailbox live delivery, recovery continuations, CLI run resumes, Claude Code hook injections, and sync/background subagent prompts.
+  - Tests must pin both the shared invariant and the route behavior: update the static raw-prompt audit (kept under the architecture exception), then prove at the shared gate's owner boundary that concurrent/live/idle/error triggers collapse to one dispatch. A new route adds a row to that owner regression, not a new per-route test. The rows cover background completion wakes, fallback retries, team mailbox live delivery, recovery continuations, CLI run resumes, Claude Code hook injections, and sync/background subagent prompts.
 
 ## CONVENTIONS
 
 - **Runtime:** Bun only (1.4.0, pinned identically in CI and `.devcontainer/Dockerfile`). Never npm/yarn/pnpm. (Exceptions: `packages/lsp-tools-mcp` + `packages/lsp-daemon` are Node-targeted, vendored, and built with `npm` + vitest/biome.)
 - **TypeScript:** strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`).
 - **Tests:** Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style — nested `describe` with `#given`/`#when`/`#then` prefixes, or inline `// given` / `// when` / `// then` comments. Never Arrange-Act-Assert comments.
-- **CI tests:** every root-test leg runs the shared serial quarantine (`script/root-test-serial-quarantine.ts`) in one process, then parallelizes the remainder — Linux/macOS via `bunfig.root.parallel.toml`, Windows shard 2 via `bunfig.win2.parallel.toml`. `script/ci-fast-path.mjs` (`classifyCiMode`) runs the full OS matrix only when platform-sensitive paths change or the `ci:full-matrix` label is set. `bun run test:fast` partitions locally (opencode-memory → senpi → root-rest via `bunfig.win2.toml`).
+- **CI tests:** every root-test leg runs the shared serial quarantine (`script/root-test-serial-quarantine.ts`) in one process, then parallelizes the remainder — Linux/macOS via `bunfig.root.parallel.toml`, Windows shard 2 via `bunfig.win2.parallel.windows.toml` after running `packages/senpi-task/src/runners/rpc-host` in its own invocation through `script/bun-panic-retry.ts` (one retry on a Bun crash only, oven-sh/bun#44390). `script/ci-fast-path.mjs` (`classifyCiMode`) runs the full OS matrix for every runtime-touching change (every path except an explicit allowlist of web, prose such as top-level Markdown and README/CHANGELOG/AGENTS-style Markdown outside `packages/*/src`, and listed repository metadata), platform-sensitive paths, or the `ci:full-matrix` label; every OS leg ends with `script/ci-leg-tests-guard.mjs`, which fails a leg that skipped tests the change needed (`tests not run: add ci:full-matrix`) and marks an intended skip as `tests intentionally not run`. `bun run test:fast` partitions locally (opencode-memory → senpi → root-rest via `bunfig.win2.toml`).
 - **Test setup:** `test-setup.ts` preloaded via `bunfig.toml` resets session/cache state between tests.
+- **Test authoring gate:** before adding or changing a test, answer the four questions in `.omo/rules/test-discipline.md` `## AUTHORING GATE`; extend the contract's owner test instead of adding a near-duplicate.
 - **Factory pattern:** `createXXX()` for all tools, hooks, agents.
 - **File naming:** kebab-case for files and directories.
 - **Module structure:** `index.ts` barrel exports, **no catch-all files** (`utils.ts`, `helpers.ts`, `service.ts` banned), 200 LOC soft limit per file.
@@ -347,6 +350,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 - Never em dashes / en dashes / AI filler ("simply", "obviously", "clearly", "moreover", "furthermore") in generated content.
 - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`).
 - Never empty catch blocks `catch(e) {}`.
+- Never let code that copies, migrates, syncs or walks a project's `.omo` run when the project directory is `$HOME` (there `.omo` is the OmO home), and never touch `~/.omo/desktop*`, the desktop app's live data (#9727).
 - Never test with Arrange-Act-Assert comments — use given/when/then.
 - **Prompt/prose contract tests are forbidden.** Never assert authored agent prompt, `SKILL.md`, rule, `AGENTS.md`, or markdown-instruction wording, headings, section order, fragments, snapshots, negative past wording, or authored text length. Test only machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, or observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation. Pure prose has no automated-test seam; review and QA-by-read are the correct verification.
 - Never dump business logic into `index.ts` — barrel exports only.
@@ -399,7 +403,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push/PR to master/dev | `block-master-pr` guard, root `bun test` (fast-path matrix via `script/ci-fast-path.mjs`; full OS matrix only on platform-sensitive paths or `ci:full-matrix` label), typecheck, codex-compatibility (full `bun run test:codex` plus per-component `npm run check` on ubuntu; platform smoke on macos/windows), senpi-compatibility (bundle `--check` + `bun test packages/omo-senpi`), lazycodex-published-smoke, build, omo-ai-payload-check (npm dry-run payload), auto-commit schema on master push, draft "next" release on dev push |
+| `ci.yml` | push/PR to master/dev | `block-master-pr` guard, root `bun test` (fast-path matrix via `script/ci-fast-path.mjs`; full OS matrix on runtime-touching or platform-sensitive paths or the `ci:full-matrix` label; a leg that skipped its tests never reports a plain pass), typecheck, codex-compatibility (full `bun run test:codex` plus per-component `npm run check` on ubuntu; platform smoke on macos/windows), senpi-compatibility (bundle `--check` + `bun test packages/omo-senpi`), lazycodex-published-smoke, build, omo-ai-payload-check (npm dry-run payload), auto-commit schema on master push, draft "next" release on dev push |
 | `publish.yml` | manual dispatch | Test, typecheck, preflight-trust (OIDC verify workspace packages), dual npm publish (`oh-my-opencode` + `oh-my-openagent`) + `lazycodex-ai` npm alias (`publish_lazycodex`, default on) + automatic Codex marketplace sync to `code-yeongyu/lazycodex` on every **stable** release (no toggle; gated on empty `dist_tag`, needs `LAZYCODEX_SYNC_TOKEN`), 12 platform launcher packages, GitHub release, merge to master |
 | `publish-platform.yml` | called by publish.yml | 12 generated Node launcher packages for darwin/linux/windows |
 | `sisyphus-agent.yml` | @mention or manual dispatch | AI agent handles issues/PRs |
@@ -407,7 +411,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 | `cla.yml` | issue_comment / PR | CLA assistant for contributors |
 | `lint-workflows.yml` | push/PR touching `.github/workflows/**` | actionlint only (`shellcheck=""` disables shellcheck) |
 | `web-ci.yml` | push/PR to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself | format-check, lint, type-check, next build, opennextjs-cloudflare build |
-| `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v3` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets) |
+| `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v4` to the Sisyphus Labs account (`omo-production` environment, `CLOUDFLARE_API_TOKEN` scoped to Workers scripts + omo.dev zone routes) |
 | `package-labels.yml` | issues opened/edited + pull_request_target | Auto-applies package labels (`opencode` / `lazycodex` / `lazycodex-generated`) |
 | `stats.yml` | weekly cron (Sun) / dispatch | Runs `script/stats.ts` (npm + GitHub-release download counts) |
 

@@ -20,6 +20,13 @@ export function releaseChannel(version = packageManifest().version) {
   return typeof version === "string" && version.includes("-") ? "beta" : "latest"
 }
 
+/** The version the npm dist-tag of `version`'s channel names, or undefined when the tags lack it. */
+export function channelDistTagVersion(distTags, version = packageManifest().version) {
+  if (distTags === null || distTags === undefined || typeof distTags !== "object") return undefined
+  const value = distTags[releaseChannel(version)]
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
 /** The startup banner line: a prerelease names its beta channel, a stable release does not. */
 export function releaseBanner(version = packageManifest().version) {
   return releaseChannel(version) === "beta" ? `omo (omo-ai beta ${version})` : `omo (omo-ai ${version})`
@@ -38,14 +45,27 @@ function installedVersion(root) {
   }
 }
 
+/**
+ * The package-manager command that updates the install at `root`. `targetVersion` pins the exact
+ * `omo-ai@<version>` spec; without it the channel spec is installed.
+ *
+ * @param {string} [root]
+ * @param {NodeJS.Platform} [platform]
+ * @param {string} [version]
+ * @param {string} [homeDir]
+ * @param {(path: string) => boolean} [exists]
+ * @param {string} [targetVersion]
+ */
 export function updateTarget(
   root = packageRoot,
   platform = process.platform,
   version = installedVersion(root),
   homeDir = process.env.HOME || process.env.USERPROFILE || homedir(),
   exists = existsSync,
+  targetVersion = undefined,
 ) {
-  const spec = channelPackageSpec(version)
+  // A resolved target installs that exact version; without one the channel spec is the only answer.
+  const spec = targetVersion === undefined ? channelPackageSpec(version) : `omo-ai@${targetVersion}`
   const updateCwd = dirname(join(root, "package.json"))
   const normalizedRoot = updateCwd.replaceAll("\\", "/")
   const normalizedHome = homeDir.replaceAll("\\", "/").replace(/\/+$/, "")

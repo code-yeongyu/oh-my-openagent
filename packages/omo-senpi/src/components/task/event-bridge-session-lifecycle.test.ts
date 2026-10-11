@@ -141,6 +141,28 @@ describe("event-bridge session_start recovery chain", () => {
   })
 })
 
+describe("event-bridge before_agent_start", () => {
+  it("#given a preview followed by a real turn #when the usage bridge dispatches #then preview emits nothing and the real turn emits the once-per-session guidance", async () => {
+    // given
+    const { pi, order } = wireHarness("parent-session")
+    const handler = pi.handlers.find((registration) => registration.event === "before_agent_start")
+
+    expect(handler?.options).toEqual({ previewSafe: true })
+
+    // when
+    await pi.dispatch("before_agent_start", { type: "before_agent_start", preview: true }, {})
+    expect(pi.messages).toEqual([])
+    expect(order).toEqual([])
+    await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {})
+
+    // then
+    expect(pi.messages).toEqual([
+      expect.objectContaining({ message: expect.objectContaining({ customType: "senpi-task.usage" }) }),
+    ])
+    expect(order).toEqual(["capture"])
+  })
+})
+
 describe("event-bridge session_shutdown", () => {
   it("#given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason", async () => {
     const { pi, calls, order } = wireHarness("parent-session")

@@ -17,6 +17,7 @@ interface FullMatrixMode {
   readonly webOnly: boolean
   readonly runHeavy: boolean
   readonly fullMatrix: boolean
+  readonly runtimeTouching: boolean
 }
 
 interface ClassifyInput {
@@ -63,15 +64,17 @@ function classify(input: ClassifyInput): FullMatrixMode {
   const webOnly = parsed["webOnly"]
   const runHeavy = parsed["runHeavy"]
   const fullMatrix = parsed["fullMatrix"]
+  const runtimeTouching = parsed["runtimeTouching"]
   if (
     typeof generatedReleasePush !== "boolean" ||
     typeof webOnly !== "boolean" ||
     typeof runHeavy !== "boolean" ||
-    typeof fullMatrix !== "boolean"
+    typeof fullMatrix !== "boolean" ||
+    typeof runtimeTouching !== "boolean"
   ) {
     throw new Error("classifier output must contain boolean CI mode fields including fullMatrix")
   }
-  return { generatedReleasePush, webOnly, runHeavy, fullMatrix }
+  return { generatedReleasePush, webOnly, runHeavy, fullMatrix, runtimeTouching }
 }
 
 function workflowJobs(): Record<string, unknown> {
@@ -91,6 +94,53 @@ function jobSteps(jobName: string): readonly Record<string, unknown>[] {
 }
 
 describe("full-matrix classification", () => {
+  describe("#given a merge group instead of a pull request", () => {
+    test.each([
+      ["runtime", ["packages/utils/src/index.ts"], true],
+      ["repository prose", ["README.md"], true],
+      ["docs-only", ["docs/guide/installation.md"], true],
+      ["web-only", ["packages/web/app/page.tsx"], true],
+      ["unavailable diff", [], false],
+    ])("#then %s always runs heavy validation on the full matrix", (_name, changedPaths, diffAvailable) => {
+      const input = {
+        message: "Merge pull request #6955 from code-yeongyu/release/v5.0.0-beta.8-source-state",
+        changedPaths,
+        diffAvailable,
+        mergeParents: 2,
+      }
+      const queued = classify({ ...input, eventName: "merge_group" })
+      expect(queued.runHeavy).toBe(true)
+      expect(queued.fullMatrix).toBe(true)
+      expect(queued.generatedReleasePush).toBe(false)
+    })
+
+    test.each(["docs/guide/installation.md", "packages/web/app/page.tsx"])(
+      "#then a pull request touching only %s retains the fast path",
+      (path) => {
+        const mode = classify({ eventName: "pull_request", changedPaths: [path] })
+        expect(mode.runHeavy).toBe(false)
+        expect(mode.fullMatrix).toBe(false)
+      },
+    )
+
+    test("#then only a generated-release push takes the release fast path", () => {
+      const input = {
+        message: "Merge pull request #6955 from code-yeongyu/release/v5.0.0-beta.8-source-state",
+        changedPaths: ["package.json"],
+        mergeParents: 2,
+      }
+      expect(classify({ ...input, eventName: "push" })).toEqual({
+        generatedReleasePush: true,
+        webOnly: false,
+        runHeavy: false,
+        fullMatrix: true,
+        runtimeTouching: true,
+      })
+      expect(classify({ ...input, message: "fix: normal push", eventName: "push" }).runHeavy).toBe(true)
+      expect(classify({ ...input, eventName: "merge_group" }).runHeavy).toBe(true)
+    })
+  })
+
   describe("#given a push event", () => {
     test("#then the full matrix always runs", () => {
       // given / when
@@ -101,18 +151,66 @@ describe("full-matrix classification", () => {
     })
   })
 
-  describe("#given an ordinary pull request touching platform-neutral paths", () => {
-    test("#then the full matrix is skipped", () => {
+  describe("#given a pull request that touches code a test can load", () => {
+    test.each([
+      ["a package source file (the #7676 shape)", "packages/omo-config-core/src/display/format-path.ts"],
+      ["a prompt or skill shipped from a package src tree", "packages/omo-opencode/src/agents/prompts/README.md"],
+      ["a package test outside src", "packages/omo-native/test/payload.test.ts"],
+      ["a skill payload outside src", "packages/shared-skills/skills/frontend/SKILL.md"],
+      ["a root script", "script/build.ts"],
+      ["a CI helper script the legs run", ".github/scripts/write-job-summary.sh"],
+      ["the root manifest", "package.json"],
+      ["the lockfile", "bun.lock"],
+      ["a root bunfig", "bunfig.root.toml"],
+      ["the root test preload", "test-setup.ts"],
+      ["an unrecognized top-level folder", "newtool/config.json"],
+      ["an unusual extension at the root", "pipeline.weird"],
+      ["a script named like a doc", "script/agents.ts"],
+      ["a doc-like name with an unknown extension", "packages/utils/README.rst"],
+      ["an unlisted .github file", ".github/actions/setup/action.yml"],
+    ])("#then %s runs every OS leg without a label", (_name, changedPath) => {
+      // given / when
+      const mode = classify({
+        eventName: "pull_request",
+        headRef: "feature/runtime-change",
+        changedPaths: ["README.md", changedPath],
+      })
+
+      // then
+      expect(mode.runtimeTouching).toBe(true)
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.runHeavy).toBe(true)
+    })
+  })
+
+  describe("#given a pull request that touches only documentation or repository metadata", () => {
+    test.each([
+      ["root prose", ["README.md", "README.ko.md", "ROADMAP.md"]],
+      ["the changelog files", ["CHANGELOG.md", "changes.md"]],
+      ["package docs outside src", ["packages/utils/README.md", "packages/omo-codex/AGENTS.md"]],
+      ["another workflow and an issue template", [".github/workflows/stats.yml", ".github/ISSUE_TEMPLATE/bug.yml"]],
+    ])("#then %s keeps the ubuntu-only fast path", (_name, changedPaths) => {
+      // given / when
+      const mode = classify({ eventName: "pull_request", headRef: "feature/tidy-docs", changedPaths })
+
+      // then
+      expect(mode.runtimeTouching).toBe(false)
+      expect(mode.fullMatrix).toBe(false)
+      expect(mode.runHeavy).toBe(true)
+    })
+
+    test("#then a docs-site-only change skips heavy work everywhere", () => {
       // given / when
       const mode = classify({
         eventName: "pull_request",
         headRef: "feature/tidy-docs",
-        changedPaths: ["packages/utils/src/index.ts", "packages/model-core/src/index.ts"],
+        changedPaths: ["docs/guide/installation.md"],
       })
 
       // then
+      expect(mode.runtimeTouching).toBe(false)
       expect(mode.fullMatrix).toBe(false)
-      expect(mode.runHeavy).toBe(true)
+      expect(mode.runHeavy).toBe(false)
     })
   })
 
@@ -139,7 +237,7 @@ describe("full-matrix classification", () => {
       const mode = classify({
         eventName: "pull_request",
         headRef: "feature/tidy-docs",
-        changedPaths: ["packages/utils/src/index.ts"],
+        changedPaths: ["README.md"],
         labels: ["bug", "ci:full-matrix"],
       })
 
@@ -156,6 +254,8 @@ describe("full-matrix classification", () => {
       ["ci workflow", ".github/workflows/ci.yml"],
       ["classifier itself", "script/ci-fast-path.mjs"],
       ["windows shard bunfig", "bunfig.win2.parallel.toml"],
+      ["windows-only shard-2 remainder bunfig", "bunfig.win2.parallel.windows.toml"],
+      ["windows rpc-host panic retry runner", "script/bun-panic-retry.ts"],
       ["shared serial quarantine", "script/root-test-serial-quarantine.ts"],
       ["reply-listener process identity (win32 branch)", "packages/openclaw-core/src/reply-listener-process.ts"],
     ])("#then %s forces the full matrix", (_name, changedPath) => {
@@ -163,7 +263,7 @@ describe("full-matrix classification", () => {
       const mode = classify({
         eventName: "pull_request",
         headRef: "feature/tidy-docs",
-        changedPaths: ["packages/utils/src/index.ts", changedPath],
+        changedPaths: ["README.md", changedPath],
       })
 
       // then

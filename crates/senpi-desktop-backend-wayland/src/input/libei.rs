@@ -2,27 +2,37 @@
 //! emulation burst that is flushed as a whole.
 
 use reis::ei;
-use senpi_desktop_core::backend::{Modifiers, PointerEvent};
+use senpi_desktop_core::backend::PointerEvent;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
 
 use super::burst::Burst;
 use super::keymap;
+use super::preflight;
 use super::{EiDevice, Libei};
 
 fn missing(kind: &str) -> DesktopError {
-    DesktopError::permission_denied(format!("RemoteDesktop portal did not provide a libei {kind}"))
+    DesktopError::permission_denied(format!(
+        "RemoteDesktop portal did not provide a libei {kind}"
+    ))
 }
 
 fn start(devices: &[Option<&EiDevice>], sequence: &mut u32) {
     for device in devices.iter().flatten() {
-        device.device.device().start_emulating(device.serial, *sequence);
+        device
+            .device
+            .device()
+            .start_emulating(device.serial, *sequence);
     }
     *sequence = sequence.wrapping_add(1);
 }
 
 /// Ends the burst on `devices` and sends it; the action's own error wins.
-fn finish(context: &ei::Context, devices: &[Option<&EiDevice>], result: CoreResult<()>) -> CoreResult<()> {
+fn finish(
+    context: &ei::Context,
+    devices: &[Option<&EiDevice>],
+    result: CoreResult<()>,
+) -> CoreResult<()> {
     for device in devices.iter().flatten() {
         device.device.device().stop_emulating(device.serial);
     }
@@ -34,22 +44,29 @@ fn finish(context: &ei::Context, devices: &[Option<&EiDevice>], result: CoreResu
 
 impl Libei {
     pub fn pointer(&mut self, event: PointerEvent) -> CoreResult<()> {
-        let pointer = self.pointer.as_ref().ok_or_else(|| missing("pointer"))?;
-        let chord = match &event {
-            PointerEvent::Click { modifiers, .. } | PointerEvent::Drag { modifiers, .. } => *modifiers,
-            PointerEvent::Move { .. } | PointerEvent::Scroll { .. } => Modifiers::default(),
-        };
-        let keyboard = self.keyboard.as_ref().filter(|_| chord != Modifiers::default());
+        self.refresh_devices()?;
+        let admission = preflight::pointer(&self.devices, &event)?;
+        let pointer = &self.devices[admission.pointer];
+        let keyboard = admission.keyboard.map(|index| &self.devices[index]);
         let devices = [Some(pointer), keyboard];
         start(&devices, &mut self.sequence);
         let mut burst = Burst::new(&mut self.held_keys, &mut self.held_buttons);
-        let result = burst.pointer(pointer, keyboard, event);
+        let result = burst.pointer(pointer, keyboard, event, admission.scroll);
         finish(&self.context, &devices, result)
     }
 
     pub fn key_chord(&mut self, keys: &[KeyName]) -> CoreResult<()> {
-        self.refresh_keyboard_state()?;
-        let keyboard = self.keyboard.as_ref().ok_or_else(|| missing("keyboard"))?;
+        self.refresh_devices()?;
+        let keyboard = self
+            .devices
+            .iter()
+            .find(|device| {
+                device.resumed
+                    && device
+                        .device
+                        .has_capability(reis::event::DeviceCapability::Keyboard)
+            })
+            .ok_or_else(|| missing("keyboard"))?;
         let mut codes = Vec::with_capacity(keys.len());
         for &key in keys {
             let stroke = keymap::key_stroke(keyboard.layout.as_ref(), key)?;
@@ -80,8 +97,17 @@ impl Libei {
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
-        self.refresh_keyboard_state()?;
-        let keyboard = self.keyboard.as_ref().ok_or_else(|| missing("keyboard"))?;
+        self.refresh_devices()?;
+        let keyboard = self
+            .devices
+            .iter()
+            .find(|device| {
+                device.resumed
+                    && device
+                        .device
+                        .has_capability(reis::event::DeviceCapability::Keyboard)
+            })
+            .ok_or_else(|| missing("keyboard"))?;
         let strokes = text
             .chars()
             .map(|character| keymap::char_stroke(keyboard.layout.as_ref(), character))
@@ -110,8 +136,21 @@ impl Libei {
     pub fn release_all(&mut self) -> CoreResult<()> {
         let keys: Vec<u32> = self.held_keys.iter().rev().copied().collect();
         let buttons: Vec<u32> = self.held_buttons.iter().rev().copied().collect();
-        let keyboard = self.keyboard.as_ref().filter(|_| !keys.is_empty());
-        let pointer = self.pointer.as_ref().filter(|_| !buttons.is_empty());
+        self.refresh_devices()?;
+        let keyboard = self.devices.iter().find(|device| {
+            !keys.is_empty()
+                && device.resumed
+                && device
+                    .device
+                    .has_capability(reis::event::DeviceCapability::Keyboard)
+        });
+        let pointer = self.devices.iter().find(|device| {
+            !buttons.is_empty()
+                && device.resumed
+                && device
+                    .device
+                    .has_capability(reis::event::DeviceCapability::Button)
+        });
         if keyboard.is_none() && pointer.is_none() {
             return Ok(());
         }
@@ -120,7 +159,8 @@ impl Libei {
         let mut burst = Burst::new(&mut self.held_keys, &mut self.held_buttons);
         let result = keyboard
             .map_or(Ok(()), |device| {
-                keys.iter().try_for_each(|&code| burst.key(device, code, false))
+                keys.iter()
+                    .try_for_each(|&code| burst.key(device, code, false))
             })
             .and_then(|()| {
                 pointer.map_or(Ok(()), |device| {

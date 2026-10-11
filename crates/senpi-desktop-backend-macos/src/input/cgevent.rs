@@ -65,6 +65,19 @@ pub(super) fn point(x: f64, y: f64) -> CoreResult<CGPoint> {
     ))
 }
 
+/// Quartz wheel deltas `(wheel1, wheel2)` for a scroll of `(dx, dy)`. The engine's
+/// convention on every platform is positive `dy` scrolls down and positive `dx`
+/// scrolls right (X11 buttons 5/7, Windows `WM_MOUSEWHEEL`/`WM_MOUSEHWHEEL`);
+/// Quartz counts a positive vertical wheel as up and a positive horizontal wheel
+/// as left, so both are negated. Synthetic wheel events are not inverted by the
+/// natural-scrolling setting (`com.apple.swipescrolldirection`): the same deltas
+/// moved a TextEdit view the same way with the setting on and off (#9055).
+pub(super) fn quartz_wheel(dx: f64, dy: f64) -> CoreResult<(i32, i32)> {
+    let vertical = finite_i32(dy, "vertical scroll delta")?;
+    let horizontal = finite_i32(dx, "horizontal scroll delta")?;
+    Ok((vertical.saturating_neg(), horizontal.saturating_neg()))
+}
+
 pub(super) fn finite_i32(value: f64, name: &str) -> CoreResult<i32> {
     if !value.is_finite() || value < f64::from(i32::MIN) || value > f64::from(i32::MAX) {
         return Err(DesktopError::input_failed(format!(
@@ -132,6 +145,16 @@ pub(super) fn click_group_id() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn positive_dy_scrolls_down_and_positive_dx_scrolls_right_in_quartz_terms() {
+        // Quartz: a negative vertical wheel scrolls down, a negative horizontal wheel scrolls right.
+        assert_eq!(quartz_wheel(0.0, 300.0).unwrap(), (-300, 0));
+        assert_eq!(quartz_wheel(0.0, -300.0).unwrap(), (300, 0));
+        assert_eq!(quartz_wheel(40.0, 0.0).unwrap(), (0, -40));
+        assert_eq!(quartz_wheel(-40.0, 0.0).unwrap(), (0, 40));
+        assert!(quartz_wheel(f64::NAN, 1.0).is_err());
+    }
 
     #[test]
     fn flags_map_each_modifier() {

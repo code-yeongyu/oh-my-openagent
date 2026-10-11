@@ -1,12 +1,16 @@
 import { DesktopEngineAbiMismatchError } from "@oh-my-opencode/senpi-desktop-engine"
-import type { EngineMethod } from "@oh-my-opencode/senpi-desktop-protocol"
+import type { EngineMethod, PermissionDeniedData, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
 import {
   type CallOptions,
+  DesktopEngineRpcError,
   DesktopEngineUnavailableError,
   DesktopService,
+  DesktopServiceError,
   type DesktopServiceOptions,
   type DesktopSessionOpenParams,
 } from "@oh-my-opencode/senpi-desktop-service"
+
+import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
 
 export type EngineDiagnostic = "native-unavailable" | "quarantined" | "abi-mismatch"
 
@@ -15,6 +19,7 @@ export type EngineState = "not started" | "ready" | EngineDiagnostic
 
 export interface TrackedDesktopServiceOptions extends DesktopServiceOptions {
   readonly onError?: (error: Error) => void
+  readonly onPermissionRequired?: (permission: Pick<PermissionDeniedData, "permission" | "app">) => void
 }
 
 export class ComputerEngineUnavailableError extends Error {
@@ -37,10 +42,12 @@ function diagnosticOf(error: Error): EngineDiagnostic | undefined {
 export class TrackedDesktopService extends DesktopService {
   #engineState: EngineState = "not started"
   readonly #onError: ((error: Error) => void) | undefined
+  readonly #onPermissionRequired: TrackedDesktopServiceOptions["onPermissionRequired"]
 
   constructor(options: TrackedDesktopServiceOptions = {}) {
     super(options)
     this.#onError = options.onError
+    this.#onPermissionRequired = options.onPermissionRequired
   }
 
   get engineState(): EngineState {
@@ -54,7 +61,7 @@ export class TrackedDesktopService extends DesktopService {
       return capabilities
     } catch (error) {
       if (!(error instanceof Error)) throw error
-      this.#onError?.(error)
+      this.#report(error)
       const diagnostic = diagnosticOf(error)
       if (diagnostic === undefined) throw error
       this.#engineState = diagnostic
@@ -63,12 +70,51 @@ export class TrackedDesktopService extends DesktopService {
   }
 
   override async call(method: EngineMethod, params: unknown, options: CallOptions = {}): Promise<unknown> {
+    return this.#observe(super.call(method, params, options))
+  }
+
+  override ensureStopPath(chord: string): Promise<StopPathStatus> {
+    return this.#observe(super.ensureStopPath(chord))
+  }
+
+  override stopPathStatus(): Promise<StopPathStatus> {
+    return this.#observe(super.stopPathStatus())
+  }
+
+  override stop(): Promise<StopPathStatus> {
+    return this.#observe(super.stop())
+  }
+
+  override resume(): Promise<StopPathStatus> {
+    return this.#observe(super.resume())
+  }
+
+  async #observe<T>(operation: Promise<T>): Promise<T> {
     try {
-      return await super.call(method, params, options)
+      return await operation
     } catch (error) {
       if (!(error instanceof Error)) throw error
-      this.#onError?.(error)
+      this.#report(error)
       throw error
     }
   }
+
+  #report(error: Error): void {
+    if (error instanceof DesktopEngineRpcError && error.data !== null && "code" in error.data) {
+      if (error.data.code === "PermissionDenied" && error.data.permission != null) {
+        this.#onPermissionRequired?.(error.data.permission)
+      }
+    }
+    this.#onError?.(error)
+  }
+}
+
+export function engineErrorCode(error: Error): ComputerUseEngineErrorCode {
+  if (error instanceof DesktopEngineUnavailableError) return error.diagnostic.code
+  if (error instanceof DesktopEngineAbiMismatchError) return "abi-mismatch"
+  if (error instanceof DesktopEngineRpcError) {
+    return error.data !== null && "code" in error.data ? error.data.code : "other"
+  }
+  if (error instanceof DesktopServiceError) return error.code
+  return "other"
 }

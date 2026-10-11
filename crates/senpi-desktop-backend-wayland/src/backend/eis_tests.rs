@@ -10,7 +10,7 @@ use senpi_desktop_core::types::Target;
 
 use super::tests::{backend_without_services, FR};
 use super::WaylandBackend;
-use crate::test_support::fake_eis::{EisConfig, FakeEis, Recorded};
+use crate::test_support::fake_eis::{DeviceTopology, EisConfig, FakeEis, Recorded};
 use crate::test_support::{env_lock, LibeiSocketEnv};
 
 const US_FR: &str = include_str!("../../testdata/us-fr.xkb");
@@ -55,20 +55,25 @@ fn typed_keysyms(layout: &str, events: &[Recorded]) -> Vec<&'static str> {
         .collect()
 }
 
-struct Session {
-    eis: FakeEis,
-    backend: WaylandBackend,
+pub(super) struct Session {
+    pub(super) eis: FakeEis,
+    pub(super) backend: WaylandBackend,
     _socket: LibeiSocketEnv,
     _dir: tempfile::TempDir,
 }
 
-fn session(config: EisConfig) -> Session {
+pub(super) fn session(config: EisConfig) -> Session {
+    session_with_topology(config, DeviceTopology::BothSameSeat)
+}
+
+pub(super) fn session_with_topology(config: EisConfig, topology: DeviceTopology) -> Session {
     let dir = tempfile::Builder::new()
         .prefix("senpi-libei-")
         .tempdir()
         .expect("socket dir");
     let socket = dir.path().join("eis-0");
-    let eis = FakeEis::listen(UnixListener::bind(&socket).expect("bind"), config);
+    let eis =
+        FakeEis::listen_with_topology(UnixListener::bind(&socket).expect("bind"), config, topology);
     Session {
         eis,
         backend: backend_without_services(),
@@ -87,13 +92,19 @@ fn type_text(session: &mut Session, text: &str) -> Result<(), ErrorCode> {
 #[test]
 fn hello_with_an_accent_arrives_as_french_keysyms_on_the_fr_keymap() {
     let _env = env_lock();
-    let mut session = session(EisConfig { keymap: FR, group: 0 });
+    let mut session = session(EisConfig {
+        keymap: FR,
+        group: 0,
+    });
 
     let typed = type_text(&mut session, "héllo");
 
     assert_eq!(typed, Ok(()));
     let log = session.eis.wait_for(|log| log.bursts >= 1);
-    assert_eq!(typed_keysyms("fr", &log.events), ["h", "eacute", "l", "l", "o"]);
+    assert_eq!(
+        typed_keysyms("fr", &log.events),
+        ["h", "eacute", "l", "l", "o"]
+    );
 }
 
 #[test]
@@ -108,7 +119,10 @@ fn hello_with_an_accent_arrives_through_the_active_french_group_of_us_fr() {
 
     assert_eq!(typed, Ok(()));
     let log = session.eis.wait_for(|log| log.bursts >= 1);
-    assert_eq!(typed_keysyms("fr", &log.events), ["h", "eacute", "l", "l", "o"]);
+    assert_eq!(
+        typed_keysyms("fr", &log.events),
+        ["h", "eacute", "l", "l", "o"]
+    );
 }
 
 #[test]
@@ -132,7 +146,10 @@ fn the_us_group_refuses_an_accent_it_cannot_type_and_sends_nothing() {
 #[test]
 fn a_click_moves_then_presses_and_releases_the_button() {
     let _env = env_lock();
-    let mut session = session(EisConfig { keymap: FR, group: 0 });
+    let mut session = session(EisConfig {
+        keymap: FR,
+        group: 0,
+    });
     let click = PointerEvent::Click {
         x: 100.0,
         y: 200.0,
@@ -167,11 +184,13 @@ fn a_click_moves_then_presses_and_releases_the_button() {
 }
 
 #[test]
-fn release_all_lifts_the_button_an_interrupted_drag_left_down() {
-    // Given: a drag that fails after pressing (its second point is outside
-    // the device region), leaving the left button down
+fn invalid_later_drag_point_sends_no_input() {
+    // Given: the second drag point is outside the device region
     let _env = env_lock();
-    let mut session = session(EisConfig { keymap: FR, group: 0 });
+    let mut session = session(EisConfig {
+        keymap: FR,
+        group: 0,
+    });
     let drag = PointerEvent::Drag {
         path: vec![(10.0, 10.0), (5000.0, 5000.0)],
         button: MouseButton::Left,
@@ -188,24 +207,12 @@ fn release_all_lifts_the_button_an_interrupted_drag_left_down() {
         .map_err(|error| error.code);
     assert_eq!(dragged, Err(ErrorCode::InputFailed));
 
-    // When
+    // When: cleanup runs after the refusal
     let released = session.backend.release_all();
 
-    // Then: the release is the last event, in its own burst
+    // Then: preflight refused before motion, modifier, or button input
     assert_eq!(released, Ok(()));
-    let log = session.eis.wait_for(|log| log.bursts >= 2);
-    assert_eq!(
-        log.events,
-        [
-            Recorded::Motion { x: 10.0, y: 10.0 },
-            Recorded::Button {
-                code: BTN_LEFT,
-                pressed: true
-            },
-            Recorded::Button {
-                code: BTN_LEFT,
-                pressed: false
-            },
-        ]
-    );
+    let log = session.eis.wait_for(|log| log.connected);
+    assert!(log.events.is_empty(), "{:?}", log.events);
+    assert_eq!(log.bursts, 0);
 }

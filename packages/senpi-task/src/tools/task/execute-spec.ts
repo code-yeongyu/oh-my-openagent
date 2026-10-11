@@ -63,14 +63,34 @@ export function taskExecutionModeFor(
   return resolvedTaskExecutionMode(target, deps) ?? "in-process"
 }
 
+export type TaskTarget = { readonly category: string } | { readonly subagentType: string }
+
 /**
- * The parent session's ONE `auto` resolution, asked only when omo.json really says `auto`: a
- * user-set mode must never make a session ensure the shared daemon. Awaited at the tool's async
- * entry so every synchronous resolution below reads a settled value.
+ * The parent session's ONE `auto` resolution, asked only when omo.json really says `auto` AND this
+ * call has a target the daemon check could still decide: a call whose every target already runs
+ * in-process (an agent configured in-process, e.g. `explore`) never ensures the session's task
+ * host (IS-9). Awaited at the tool's async entry so every synchronous resolution below reads a
+ * settled value; skipping it leaves `auto` unsettled, which reads as the conservative in-process.
  */
-export async function ensureAutoExecutionMode(deps: TaskToolDeps): Promise<ExecutionMode | undefined> {
+export async function ensureAutoExecutionMode(
+  deps: TaskToolDeps,
+  targets: readonly TaskTarget[],
+): Promise<ExecutionMode | undefined> {
   if (deps.omoConfig.task?.default_execution_mode !== "auto") return undefined
+  if (targets.every((target) => modeWithoutDaemonCheck(target, deps) === "in-process")) return undefined
   return await deps.executionModeGate?.ensure()
+}
+
+// The mode a target gets when the `auto` daemon check is left out: undefined while it depends on it.
+function modeWithoutDaemonCheck(target: TaskTarget, deps: TaskToolDeps): ExecutionMode | undefined {
+  const agentMode = resolvedAgentMode(target, deps)
+  const configMode = deps.omoConfig.task?.default_execution_mode
+  if (configMode === "auto" && agentMode === undefined) return undefined
+  return resolveExecutionMode({ ...(agentMode !== undefined && { agentMode }), configMode })
+}
+
+export function taskTargetOf(item: ResolvedSpawnItem): TaskTarget {
+  return item.kind === "category" ? { category: item.category } : { subagentType: item.subagentType }
 }
 
 function toExecutionMode(value: string | undefined): ExecutionMode | undefined {

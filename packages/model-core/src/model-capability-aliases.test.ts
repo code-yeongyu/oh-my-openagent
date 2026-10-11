@@ -145,6 +145,7 @@ describe("model-capability-aliases", () => {
       "gpt-5.6-luna-fast",
       "gpt-6-astra-fast",
       "gpt-6-sol-fast",
+      "gpt-6.1-sol-fast",
       "gpt-6-luna-fast",
     ]
 

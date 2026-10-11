@@ -1,5 +1,6 @@
 import { createRequire } from "node:module"
-import { dirname, join } from "node:path"
+
+import { COMMENT_CHECKER_PACKAGE_NAME, findCommentCheckerPackageBinary, isModuleResolutionMiss } from "./package-binary"
 
 import type {
   CheckResult,
@@ -41,7 +42,7 @@ function killProcessSafely(process: SpawnProcess, signal: SpawnSignal): void {
 }
 
 export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryInput): string | null {
-  const packageName = input.packageName ?? "@code-yeongyu/comment-checker"
+  const packageName = input.packageName ?? COMMENT_CHECKER_PACKAGE_NAME
 
   if (input.cachedBinaryPath !== null && input.existsSync(input.cachedBinaryPath)) {
     return input.cachedBinaryPath
@@ -54,15 +55,14 @@ export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryIn
   try {
     const require = createRequire(input.importMetaUrl)
     const packageJsonPath = require.resolve(`${packageName}/package.json`)
-    const binaryPath = join(dirname(packageJsonPath), "bin", input.binaryName)
-    return input.existsSync(binaryPath) ? binaryPath : null
+    return findCommentCheckerPackageBinary({
+      packageJsonPath,
+      packageName,
+      binaryName: input.binaryName,
+      existsSync: input.existsSync,
+    })
   } catch (error) {
-    // Older embedded Bun runtimes throw ResolveMessage objects, not Error instances.
-    if (error instanceof Error || (
-      typeof error === "object" && error !== null && "name" in error && error.name === "ResolveMessage"
-    )) {
-      return null
-    }
+    if (isModuleResolutionMiss(error)) return null
     throw error
   }
 }

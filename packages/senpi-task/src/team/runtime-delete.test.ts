@@ -32,12 +32,14 @@ describe("deleteTeam", () => {
   async function completedResidentTeam(
     status: "running" | "completed" | "cancelled" = "completed",
     beforeCancelReturn?: (taskId: string, destruction: FakeDestruction) => Promise<void>,
+    releaseFinishedResidentOnCancel = false,
   ) {
     const stateDir = stateDirConfig(tempProjectDir())
     const settings = taskSettings()
     const destruction = new FakeDestruction()
     const manager = new FakeTeamManager({
       defaultBehavior: { kind: "ok", status },
+      releaseFinishedResidentOnCancel,
       ...(beforeCancelReturn !== undefined
         ? { beforeCancelReturn: (taskId) => beforeCancelReturn(taskId, destruction) }
         : {}),
@@ -196,6 +198,18 @@ describe("deleteTeam", () => {
     // then
     expect(result.cancelledTaskIds).toEqual([])
     expect(destruction.calls).toEqual([])
+  })
+
+  test("#given cancel releases a finished resident member (omo#9785) #when the team is deleted #then deletion still destroys it once", async () => {
+    // given
+    const { created, deps, destruction, taskId } = await completedResidentTeam("completed", undefined, true)
+
+    // when
+    const result = await deleteTeam(created.runtimeState.teamRunId, deps)
+
+    // then
+    expect(result.cancelledTaskIds).toEqual([])
+    expect(destruction.calls).toEqual([{ taskId, cause: "cancel" }])
   })
 
   test("#given a completed resident member revives between residency checks #when deleted #then destruction is skipped", async () => {

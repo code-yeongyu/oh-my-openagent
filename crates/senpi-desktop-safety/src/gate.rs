@@ -9,11 +9,11 @@
 
 use std::fmt;
 
-use senpi_desktop_core::error::{DesktopError, ErrorCode};
+use senpi_desktop_core::error::{DesktopError, ErrorCode, TccPermission};
 
 use crate::{
     action::MutatingAction,
-    supervisor::{ActiveStopPath, StopPolicy, Supervisor, SupervisorStatus},
+    supervisor::{ActiveStopPath, StopPathFailure, StopPolicy, Supervisor, SupervisorStatus},
 };
 
 /// Id of a captured frame, as named by a coordinate request's `frameId`.
@@ -68,6 +68,7 @@ pub trait FrameContext {
 /// Why no stop path may authorize input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StopPathReason {
+    AccessibilityDenied,
     /// No stop path is live.
     NoGlobalListener,
     /// A usable stop path is live but its heartbeat is older than
@@ -83,6 +84,7 @@ impl StopPathReason {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::AccessibilityDenied => "accessibility-denied",
             Self::NoGlobalListener => "no-global-listener",
             Self::HeartbeatStale => "heartbeat-stale",
             Self::HostRelayNotAllowed => "host-relay-not-allowed",
@@ -97,9 +99,15 @@ impl SupervisorStatus {
     #[must_use]
     pub const fn stop_path_unavailable(self, policy: &StopPolicy) -> Option<StopPathReason> {
         match (self.stop_path, self.heartbeat_fresh) {
-            (ActiveStopPath::None, _) => Some(StopPathReason::NoGlobalListener),
+            (ActiveStopPath::None, _) => Some(match self.global_failure {
+                Some(StopPathFailure::AccessibilityDenied) => StopPathReason::AccessibilityDenied,
+                _ => StopPathReason::NoGlobalListener,
+            }),
             (ActiveStopPath::HostRelay, _) if !policy.allow_host_relay_only => {
-                Some(StopPathReason::HostRelayNotAllowed)
+                Some(match self.global_failure {
+                    Some(StopPathFailure::AccessibilityDenied) => StopPathReason::AccessibilityDenied,
+                    _ => StopPathReason::HostRelayNotAllowed,
+                })
             }
             (ActiveStopPath::Global | ActiveStopPath::HostRelay, false) => {
                 Some(StopPathReason::HeartbeatStale)
@@ -125,7 +133,7 @@ pub enum GateError {
     #[error("the interactive session is behind the lock screen")]
     ScreenLocked,
     #[error("input permission is not granted")]
-    PermissionDenied,
+    PermissionDenied { permission: TccPermission },
     #[error("the frame is not the target's latest capture; capture it again before coordinate input")]
     InvalidCoordinateFrame,
 }
@@ -137,7 +145,7 @@ impl GateError {
             Self::Suspended => ErrorCode::Suspended,
             Self::StopPathUnavailable { .. } => ErrorCode::StopPathUnavailable,
             Self::ScreenLocked => ErrorCode::ScreenLocked,
-            Self::PermissionDenied => ErrorCode::PermissionDenied,
+            Self::PermissionDenied { .. } => ErrorCode::PermissionDenied,
             Self::InvalidCoordinateFrame => ErrorCode::InvalidCoordinateFrame,
         }
     }
@@ -166,13 +174,16 @@ pub fn gate(
         return Err(GateError::Suspended);
     }
     if let Some(reason) = status.stop_path_unavailable(policy) {
+        if reason == StopPathReason::AccessibilityDenied {
+            return Err(GateError::PermissionDenied { permission: TccPermission::Accessibility });
+        }
         return Err(GateError::StopPathUnavailable { reason });
     }
     if frames.screen_locked().is_locked() {
         return Err(GateError::ScreenLocked);
     }
     if !perms.input_granted() {
-        return Err(GateError::PermissionDenied);
+        return Err(GateError::PermissionDenied { permission: TccPermission::Accessibility });
     }
     if action.is_coordinate() && expected_frame.is_some_and(|expected| !frames.is_latest(&expected)) {
         return Err(GateError::InvalidCoordinateFrame);
@@ -182,3 +193,6 @@ pub fn gate(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod permission_tests;

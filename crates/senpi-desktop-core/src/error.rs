@@ -30,6 +30,11 @@ pub enum ErrorCode {
     CursorRestoreFailed,
     FocusRestoreFailed,
     TransactionFailed,
+    /// Another session holds the foreground control grant. The slot is never
+    /// stolen; the caller can retry after it releases.
+    InputBusy,
+    /// Foreground delivery without this session's live control grant.
+    ControlRequired,
 }
 
 impl ErrorCode {
@@ -56,8 +61,26 @@ impl ErrorCode {
             Self::CursorRestoreFailed => "CursorRestoreFailed",
             Self::FocusRestoreFailed => "FocusRestoreFailed",
             Self::TransactionFailed => "TransactionFailed",
+            Self::InputBusy => "InputBusy",
+            Self::ControlRequired => "ControlRequired",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TccPermission {
+    ScreenRecording,
+    Accessibility,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionDeniedData {
+    pub permission: TccPermission,
+    pub settings_url: String,
+    pub app: String,
+    pub relaunch_required: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize, JsonSchema)]
@@ -66,6 +89,8 @@ impl ErrorCode {
 pub struct DesktopError {
     pub code: ErrorCode,
     pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission: Option<PermissionDeniedData>,
 }
 
 impl DesktopError {
@@ -73,11 +98,19 @@ impl DesktopError {
         Self {
             code,
             message: message.into(),
+            permission: None,
         }
     }
 
     pub fn permission_denied(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::PermissionDenied, message)
+    }
+
+    pub fn permission_denied_with(data: PermissionDeniedData, message: impl Into<String>) -> Self {
+        Self {
+            permission: Some(data),
+            ..Self::permission_denied(message)
+        }
     }
 
     pub fn capture_failed(message: impl Into<String>) -> Self {
@@ -113,10 +146,7 @@ impl DesktopError {
     }
 
     pub fn ax_unsupported() -> Self {
-        Self::new(
-            ErrorCode::AxUnsupported,
-            "accessibility is unavailable on this backend",
-        )
+        Self::new(ErrorCode::AxUnsupported, "accessibility is unavailable on this backend")
     }
 
     pub fn ax_failed(message: impl Into<String>) -> Self {
@@ -125,6 +155,14 @@ impl DesktopError {
 
     pub fn timeout(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::Timeout, message)
+    }
+
+    pub fn input_busy(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InputBusy, message)
+    }
+
+    pub fn control_required(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::ControlRequired, message)
     }
 
     pub fn closed() -> Self {

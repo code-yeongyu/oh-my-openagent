@@ -77,9 +77,8 @@ function hostRunner(
   return {
     start: (spec: RpcRunnerSpec): Promise<RpcChildHandle> => {
       calls.specs.push(spec)
-      const base = makeHandle(spec.task_id).handle
       const handle = {
-        ...base,
+        ...makeHandle(spec.task_id).handle,
         kind: "host-session" as const,
         attached: true,
         openDisposition,
@@ -183,6 +182,35 @@ describe("respawn of a daemon-hosted child", () => {
     expect(result.ok).toBe(true)
     expect(calls.specs.map((spec) => spec.resumeSessionPath)).toEqual([transcript])
     expect(calls.followUps).toHaveLength(1)
+  })
+
+  test("#given a recorded session directory that is gone from disk #when the host reopens rather than re-joins it #then the child fails by itself naming the missing transcript and nothing is resumed", async () => {
+    // given
+    const project = tempProject()
+    const missing = join(project, "deleted", "child.jsonl")
+    const identity: HostSessionIdentity = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routing_id: "routing-missing",
+      session_path: missing,
+      instance_id: "instance-1",
+    }
+    const calls: HostRespawnCalls = { specs: [], switched: [], followUps: [] }
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, identity),
+      sessionPath: missing,
+      stateDir: project,
+      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      rpcRunner: hostRunner(calls, "reopened"),
+    })
+
+    // then
+    expect(result).toMatchObject({ ok: false, disposition: "unrecoverable", code: "session_unavailable" })
+    expect(result.ok ? "" : result.reason).toContain(`recorded session transcript is missing: ${join(project, "deleted")}`)
+    expect(calls.switched).toEqual([])
+    expect(calls.followUps).toEqual([])
   })
 
   test("#given a reopened session whose first continuation is still unanswered #when the same record respawns again #then only one continuation is sent in total", async () => {
@@ -366,6 +394,29 @@ describe("respawn of a daemon-hosted child", () => {
     expect(result.ok).toBe(true)
     const [handle] = started.handles
     expect(handle !== undefined && isHostSessionHandle(handle) ? handle.openDisposition : undefined).toBe("reopened")
+    expect(prompts(host)).toEqual([])
+  })
+
+  test("#given a turn that finished while no parent was attached #when respawn reopens the session #then the child's outcome is that final answer, not a wait for an agent_end that already happened (omo#9069)", async () => {
+    // given
+    const project = tempProject()
+    const transcript = completedTranscript(project)
+    const host = await harness.fakeHost()
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, realIdentity(host, transcript), REAL_MODEL),
+      sessionPath: transcript,
+      stateDir: project,
+      runners: unusedManagedRunners(),
+      rpcRunner: recordingRunner(host),
+    })
+
+    // then
+    if (!result.ok) throw new Error("respawn failed")
+    const settled = await Promise.race([result.handle.waitForOutcome(), Bun.sleep(2_000).then(() => "unsettled" as const)])
+    expect(settled).toEqual({ status: "completed", finalResponse: "done" })
     expect(prompts(host)).toEqual([])
   })
 

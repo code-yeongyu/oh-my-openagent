@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { HOST_TURN_RESUMED_EVENT } from "./manager/host-turn-resumed"
 import { createChildProgress, readToolProgressDetails } from "./progress"
 
 const RESOLVED_MODEL = {
@@ -218,6 +219,20 @@ describe("child task progress before the first successful turn", () => {
     expect(details.progress.activity).toBe("st_00000007 · category:quick · turn 1 · failed 1 · running · 5 tok/s")
     expect(details.turns).toBe(1)
     expect(details.failedTurns).toBe(1)
+  })
+
+  test("#given a turn resumed on a new host generation #when progress is composed before any successful turn #then the row reads running", () => {
+    // given
+    const progress = createChildProgress("st_00000009", { category: "quick" }, 1_000, () => 2_000)
+    expect(progress.details().progress.activity).toBe("st_00000009 · category:quick · starting")
+
+    // when
+    const changed = progress.accept({ type: HOST_TURN_RESUMED_EVENT })
+
+    // then
+    expect(changed).toBe(true)
+    expect(progress.details().progress.activity).toBe("st_00000009 · category:quick · running")
+    expect(progress.details().turns).toBe(0)
   })
 
   test("#given a tool in flight #when progress is composed #then the tool leads the verb even before any turn", () => {

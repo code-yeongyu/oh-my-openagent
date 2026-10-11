@@ -17,11 +17,12 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_safety::{
-    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate,
-    StopPolicy, Supervisor,
+    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate, StopPolicy,
+    Supervisor,
 };
 
 use crate::audit::audit_event;
+use crate::grant::ControlSlot;
 use crate::restore::{Guard, TransactionError};
 use crate::session::guarded;
 use crate::worker::Worker;
@@ -41,6 +42,9 @@ pub struct SessionSafety {
     /// Receives one [`AuditEvent`] per mutating request, success or failure;
     /// the engine forwards it as the `audit` notification.
     pub audit: Box<dyn Fn(&AuditEvent) + Send>,
+    /// Who holds the foreground-control grant. The engine passes
+    /// [`ControlSlot::process_wide`] so its sessions share one slot.
+    pub control_slot: Arc<ControlSlot>,
 }
 
 impl SessionSafety {
@@ -51,6 +55,7 @@ impl SessionSafety {
         Self {
             supervisor: Arc::new(Supervisor::new(Arc::new(MonotonicClock::new()))),
             audit: Box::new(|_| {}),
+            control_slot: ControlSlot::process_wide(),
         }
     }
 }
@@ -146,8 +151,13 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> (Result<T, TransactionError>, Option<bool>) {
+        // The fail-closed gate (stop path, lock, permissions) answers first:
+        // asking the human for a grant is pointless while input cannot run.
         if let Err(refused) = self.gate(mutation) {
-            return (Err(TransactionError::Primary(refused.into())), None);
+            return (Err(TransactionError::Primary(refused)), None);
+        }
+        if let Err(refused) = self.admit_control(mutation) {
+            return (Err(TransactionError::Primary(refused)), None);
         }
         let guard = match Guard::begin(self, mutation.action, mutation.delivery) {
             Ok(guard) => guard,
@@ -203,7 +213,7 @@ impl Worker {
     /// mid-chord fails the request. Any other action fails only on a stop.
     fn after_action<T>(&mut self, mutation: &Mutation<'_>, result: CoreResult<T>) -> CoreResult<T> {
         let stopped = if mutation.action == MutatingAction::KeyChord {
-            self.gate(mutation).err().map(DesktopError::from)
+            self.gate(mutation).err()
         } else {
             self.safety.supervisor.is_suspended().then(|| {
                 DesktopError::new(
@@ -215,7 +225,7 @@ impl Worker {
         stopped.map_or(result, Err)
     }
 
-    fn gate(&mut self, mutation: &Mutation<'_>) -> Result<(), GateError> {
+    fn gate(&mut self, mutation: &Mutation<'_>) -> CoreResult<()> {
         let policy = StopPolicy {
             allow_host_relay_only: self
                 .options
@@ -233,14 +243,18 @@ impl Worker {
             input_granted,
             latest_frame: self.frames.latest_id(&mutation.target).map(str::to_owned),
         };
-        gate(
+        let result = gate(
             &mutation.action,
             &self.safety.supervisor,
             &policy,
             &view,
             &view,
             mutation.frame_id.map(FrameId::new),
-        )
+        );
+        match result {
+            Err(GateError::PermissionDenied { permission }) => Err(self.backend()?.permission_denied(permission)),
+            other => other.map_err(DesktopError::from),
+        }
     }
 }
 
@@ -252,10 +266,12 @@ fn input_may_proceed(input_permission: &str) -> bool {
 }
 
 #[cfg(test)]
+mod grant_tests;
+#[cfg(test)]
 mod permission_tests;
 #[cfg(test)]
 mod stop_tests;
 #[cfg(test)]
-mod typing_tests;
-#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod typing_tests;

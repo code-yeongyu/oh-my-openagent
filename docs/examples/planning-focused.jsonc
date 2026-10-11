@@ -30,7 +30,7 @@
   "categories": {
     "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
-    "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
+    "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
     // High-effort planning tasks: maximum reasoning
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
@@ -45,8 +45,8 @@
     "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
     // Deep research and analysis: the default lane, then the escalation lane
-    "deep-low": { "model": "openai/gpt-6-sol-fast", "reasoning": "medium" },
-    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
+    "deep-low": { "model": "openai/gpt-6.1-sol", "reasoning": "medium" },
+    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
     // Strategic reasoning
     "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },

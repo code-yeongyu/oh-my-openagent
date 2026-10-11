@@ -33,7 +33,7 @@ import {
 } from "./task-e2e-scenarios.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
 import { runTaskResumeScenarios } from "./task-resume-e2e.mjs"
-import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -65,7 +65,7 @@ function seedScenario(script, { withMarker } = {}) {
     mkdirSync(extDir, { recursive: true })
     writeFileSync(join(extDir, "marker.js"), `import { appendFileSync } from "node:fs"\nexport default function () { appendFileSync(${JSON.stringify(markerLog)}, "x\\n") }\n`)
   }
-  return { sandbox, sessionDir, markerLog, stateDir: join(sandbox.cwd, ".omo", "senpi-task") }
+  return { sandbox, sessionDir, markerLog, stateDir: sandboxStateDir(sandbox) }
 }
 
 function driveSenpi(senpiBin, scenario, prompt, pids) {

@@ -258,6 +258,42 @@ describe("omo setup model choices", () => {
     })
   })
 
+  describe("#given OpenCode-edition models for the metis and momus plan agents", () => {
+    test("#when setup is accepted #then they are carried to the native plan-consultant and plan-reviewer", () => {
+      // given
+      const item = sandbox()
+      write(join(item.opencodeDir, "oh-my-openagent.json"), {
+        agents: { metis: { model: "zai-coding-plan/glm-5.2" }, momus: { model: "kimi-for-coding/k3", variant: "high" } },
+      })
+
+      // when
+      const stdout = run(item, ["setup", "--yes"])
+      const loaded = nativeView(item)
+
+      // then
+      expect(loaded.diagnostics).toEqual([])
+      expect(loaded.config.agents?.["plan-consultant"]).toEqual({ model: "zai/glm-5.2" })
+      expect(loaded.config.agents?.["plan-reviewer"]).toEqual({ model: "kimi-coding/k3", reasoning: "high" })
+      expect(loaded.config.agents?.metis).toBeUndefined()
+      expect(loaded.config.agents?.momus).toBeUndefined()
+      expect(stdout).toContain("model-choices-carried: agent plan-consultant, agent plan-reviewer")
+    })
+
+    test("#when the same file also sets the native agent #then the native name wins over its OpenCode-edition alias", () => {
+      // given
+      const item = sandbox()
+      write(join(item.opencodeDir, "oh-my-openagent.json"), {
+        agents: { metis: { model: "zai-coding-plan/glm-5.2" }, "plan-consultant": { model: "opencode-go/glm-5.2" } },
+      })
+
+      // when
+      run(item, ["setup", "--yes"])
+
+      // then
+      expect(nativeView(item).config.agents?.["plan-consultant"]).toEqual({ model: "opencode-go/glm-5.2" })
+    })
+  })
+
   describe("#given the native harness's builtin agents", () => {
     test("#when the names setup may carry are compared #then they are exactly senpi-task's builtins", () => {
       expect([...NATIVE_AGENT_NAMES].sort()).toEqual(Object.keys(BUILTIN_AGENTS).sort())

@@ -10,6 +10,7 @@ export {
 } from "./handshake";
 export {
 	DESKTOP_ENGINE_BINARY,
+	type DesktopEngineLibc,
 	type DesktopEngineLocateDiagnostic,
 	type DesktopEngineLocateDiagnosticCode,
 	type DesktopEngineLocation,
@@ -22,7 +23,7 @@ export {
 	locateDesktopEngine,
 	QUARANTINE_ATTRIBUTE,
 } from "./locator";
-export { acquireDesktopEngine, type AcquireDesktopEngineOptions, type AcquiredDesktopEngine } from "./acquire";
+export { acquireDesktopEngine, launchDesktopEngine, findCachedDesktopEngine, type AcquireDesktopEngineOptions, type AcquiredDesktopEngine } from "./acquire";
 export {
 	DESKTOP_ENGINE_CHECKSUMS_ASSET,
 	DESKTOP_ENGINE_RELEASE_HOSTS,

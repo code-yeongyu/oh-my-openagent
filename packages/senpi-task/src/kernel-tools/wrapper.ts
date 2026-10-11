@@ -14,6 +14,18 @@ export type KernelToolResultDetails = {
   readonly error?: { readonly code: KernelToolErrorCode; readonly message: string }
 }
 
+/**
+ * A child-facing wrapper. Its execute reads only the call id, the arguments and the signal, so its type says
+ * so: it still satisfies ToolDefinition (fewer parameters), and a caller does not have to invent a tool context.
+ */
+export type KernelToolWrapper = Omit<ToolDefinition, "execute"> & {
+  execute(
+    toolCallId: string,
+    args: unknown,
+    signal?: AbortSignal,
+  ): Promise<AgentToolResult<KernelToolResultDetails>>
+}
+
 export type KernelToolWrapperOptions = {
   // Identity gate evaluated on EVERY invocation: a wrapper whose binding is no longer the child's
   // current one must fail closed instead of reaching a parent kernel it no longer belongs to.
@@ -43,7 +55,7 @@ function wrapper(
   descriptor: KernelToolDescriptor,
   grant: KernelToolGrant,
   options: KernelToolWrapperOptions,
-): ToolDefinition {
+): KernelToolWrapper {
   return {
     name: descriptor.name,
     label: descriptor.name,
@@ -89,7 +101,7 @@ function wrapper(
 export function createKernelToolWrappers(
   grant: KernelToolGrant,
   options: KernelToolWrapperOptions = {},
-): ToolDefinition[] {
+): KernelToolWrapper[] {
   return grant.descriptors.map((descriptor) => wrapper(descriptor, grant, options))
 }
 

@@ -36,14 +36,24 @@
       "subcopy": "あなたのトークンを、現実に価値のある成果へ。\n1万を超えるソースのリサーチ。すっと理解できる資料。\n会社の仕事、実験、バックエンド、フロントエンド、コーディング。\nあなたが望むどんな仕事でも。",
       "getStarted": "はじめる",
       "readManifesto": "マニフェストを読む",
-      "installLabel": "コマンドひとつ、ツールひとつ",
-      "installCommand": "bun install -g omo-ai"
+      "installLabel": "コマンドひとつ、ツールひとつ"
     },
     "command": {
       "copy": "コピー",
       "copied": "コピー済み",
       "copyAria": "インストールコマンドをコピー",
       "copiedStatus": "インストールコマンドをコピーしました"
+    },
+    "install": {
+      "tabsLabel": "お使いのシステム向けのインストールコマンド",
+      "windows": "Windows",
+      "tabs": {
+        "unix": "macOS, Linux, WSL",
+        "powershell": "PowerShell",
+        "cmd": "CMD"
+      },
+      "next": "新しいターミナルを開いて omo を実行します。",
+      "onComputer": "Mac、Linux、Windows のコンピューターで実行してください。"
     },
     "proof": {
       "label": "ライブ指標",
@@ -166,8 +176,7 @@
       "title": "コマンドひとつ。そして仕事へ戻る。",
       "subtitle": "OmOをインストールし、プロジェクトを開いて、やることを伝える。セットアップはそれだけです。",
       "installNow": "今すぐインストール",
-      "readTheDocs": "ドキュメントを読む",
-      "installCommand": "bun install -g omo-ai"
+      "readTheDocs": "ドキュメントを読む"
     },
     "dag": {
       "region": "ワークフローグラフを開いた OmO デスクトップ",
@@ -194,7 +203,11 @@
   },
   "docs": {
     "mobileHeader": "OmO ドキュメント",
-    "searchPlaceholder": "ドキュメントを検索..."
+    "searchPlaceholder": "ドキュメントを検索...",
+    "install": {
+      "title": "OmO のインストール",
+      "description": "macOS、Linux、WSL、Windows でコマンドひとつで OmO をインストールします。"
+    }
   },
   "manifesto": {
     "badge": "マニフェスト",

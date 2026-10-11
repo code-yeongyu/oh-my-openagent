@@ -3,7 +3,7 @@ import {
   closeKeySink, type KeySink, openKeySink, openTextEdit, quitTextEdit,
   settle, textEditSelection, textEditText,
 } from "./fixtures"
-import { focusSnapshot, type FocusSnapshot, sameJson, topmostAt } from "./observer"
+import { focusSnapshot, type FocusSnapshot, jxa, sameJson, topmostAt } from "./observer"
 import {
   clickCode, keyLands, onWindow, type RunOptions, type ScenarioResult, toolError, warmUp, withSession,
 } from "./scenario"
@@ -134,4 +134,44 @@ export async function foregroundRestores(options: RunOptions): Promise<ScenarioR
       }
     }),
   )
+}
+
+const SCROLL_DOC = "qa-scroll-once.txt"
+const SCROLL_TEXT = Array.from({ length: 300 }, (_, i) => `line ${String(i + 1).padStart(3, "0")}`).join("\n") + "\n"
+const firstVisible = async (): Promise<number> => {
+  const range = await jxa(`const w = Application('System Events').processes.byName('TextEdit').windows.byName(${JSON.stringify(SCROLL_DOC)});
+JSON.stringify(w.scrollAreas[0].textAreas[0].attributes.byName('AXVisibleCharacterRange').value())`)
+  return Array.isArray(range) && typeof range[0] === "number" ? range[0] : Number.NaN
+}
+
+/** Lines one scroll of `dy` moves a freshly opened document, from its top. */
+async function scrollOnce(session: AgentSession, delivery: string, dy: number): Promise<{ moved: number; error: string | null }> {
+  await quitTextEdit(); await openTextEdit(SCROLL_DOC, SCROLL_TEXT)
+  const before = await firstVisible()
+  const result = await session.call(onWindow(SCROLL_DOC,
+    `await w.scroll(Math.round(s.width / 2), Math.round(s.height / 2), { dy: ${dy}, delivery: "${delivery}" }); return "ok";`))
+  const after = await settle("view moved", firstVisible, (value) => value !== before, 3_000).catch(() => firstVisible())
+  // Each fixture line is 8 characters plus a newline.
+  return { moved: Math.round((after - before) / 9), error: toolError(result) }
+}
+
+/** One background scroll moves the target exactly as far as one foreground scroll of the same delta (#9097). */
+export async function backgroundScrollOnce(options: RunOptions): Promise<ScenarioResult> {
+  return withSession(options, {}, async (session) => {
+    // The sign that moves down from the top is whichever one moves the view; the scenario measures amount, not direction.
+    let dy = 90
+    let foreground = await scrollOnce(session, "foreground", dy)
+    if (foreground.moved === 0) { dy = -90; foreground = await scrollOnce(session, "foreground", dy) }
+    const frontBefore = (await focusSnapshot()).frontmostApp
+    const background = await scrollOnce(session, "background", dy)
+    const frontAfter = (await focusSnapshot()).frontmostApp
+    await quitTextEdit()
+    return {
+      scenario: "background-scroll-once",
+      pass: foreground.error === null && background.error === null && foreground.moved > 0
+        && background.moved === foreground.moved && frontAfter === frontBefore,
+      facts: { dy, foregroundLines: foreground.moved, backgroundLines: background.moved, foregroundError: foreground.error,
+        backgroundError: background.error, frontBefore, frontAfter },
+    }
+  })
 }

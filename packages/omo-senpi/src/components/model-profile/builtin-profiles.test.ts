@@ -45,19 +45,28 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     expect(recommended?.displayName).toBe("Recommended")
     expect(recommended?.family).toBeUndefined()
     expect(recommended?.tier).toBeUndefined()
-    expect(recommended?.rankedProvidersOnly).toBe(true)
   })
 
-  // Mirrors senpi's RECOMMENDED_DEFAULT_MODELS (recommended-models/index.ts, senpi#2074), so the TUI
-  // and the desktop start from one order. Change both together.
-  it("orders recommended opus medium, fable xhigh, kimi max, astra xhigh, sol medium, glm max", () => {
+  // Mirrors senpi's RECOMMENDED_DEFAULT_MODELS (recommended-models/index.ts, senpi#2074; GPT-6.1 Sol
+  // from senpi#2394), so the TUI and the desktop start from one order. Change both together. OmO adds
+  // the gpt-6-sol medium rung behind gpt-6.1-sol for the GPT lanes that do not serve 6.1 Sol.
+  it("orders recommended opus medium, fable xhigh, kimi max, astra xhigh, 6.1 sol medium, 6 sol medium, glm max", () => {
     expect(chainOf("recommended")).toEqual([
       "claude-opus-5-5 medium",
       "claude-fable-5-1 xhigh",
       "kimi-k3 max",
       "gpt-6-astra xhigh",
+      "gpt-6.1-sol medium",
       "gpt-6-sol medium",
       "glm-5.3 max",
+    ])
+  })
+
+  it("serves recommended's gpt-6.1-sol rung on the OpenAI lanes and its gpt-6-sol rung on every GPT lane", () => {
+    const sol = (BUILTIN_MODEL_PROFILES["recommended"]?.models ?? []).filter((rung) => rung.model.includes("-sol"))
+    expect(sol).toEqual([
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-sol", variant: "medium" },
     ])
   })
 
@@ -131,18 +140,20 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     ])
   })
 
-  it("runs geeky-normal as gpt-5.6-sol medium on every GPT lane", () => {
+  it("runs geeky-normal as gpt-6.1-sol-fast then gpt-6.1-sol medium on the OpenAI lanes, then gpt-5.6-sol medium on every GPT lane", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.models).toEqual([
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "medium" },
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
       { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },
     ])
   })
 
-  it("runs geeky-heavy as astra xhigh with the same provider ranking as deep-high", () => {
+  it("runs geeky-heavy as astra high with the same provider ranking as deep-high", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.models).toEqual([
       {
         providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
         model: "gpt-6-astra",
-        variant: "xhigh",
+        variant: "high",
       },
     ])
   })

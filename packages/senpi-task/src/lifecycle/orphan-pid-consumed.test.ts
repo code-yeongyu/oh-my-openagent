@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createTaskLifecycle } from "./create"
 import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -22,6 +23,7 @@ function orphanLifecycle(initiallyAlive: boolean, status: "error" | "lost" = "er
     notified_epoch: 0,
   })
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry: new FakeRegistry(),
     config: settings({ ttl_ms: 1 }),

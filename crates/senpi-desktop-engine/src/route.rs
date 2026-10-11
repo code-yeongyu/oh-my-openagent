@@ -5,8 +5,7 @@
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol::{MethodRejection, RequestId};
 use senpi_desktop_core::protocol_params::{
-    AdvanceClockParams, CancelParams, EmptyParams, StopPathResumeParams, StopPathStartParams,
-    StopPathStopParams,
+    AdvanceClockParams, CancelParams, EmptyParams, StopPathResumeParams, StopPathStartParams, StopPathStopParams,
 };
 use senpi_desktop_core::types::DesktopSessionOptions;
 use senpi_desktop_safety::{Chord, StopPolicy};
@@ -54,6 +53,9 @@ impl Engine {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Session(SessionCall::Close))
             }
+            Method::ControlGrant => op(Op::ControlGrant(parse(params)?)),
+            Method::ControlRevoke => parse::<EmptyParams>(params).and_then(|_| op(Op::ControlRevoke)),
+            Method::ControlState => parse::<EmptyParams>(params).and_then(|_| op(Op::ControlState)),
             Method::Capabilities => {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Immediate(to_result(self.capabilities())))
@@ -86,8 +88,7 @@ impl Engine {
             }
             Method::StopPathStart => {
                 let chord = parse::<StopPathStartParams>(params)?.chord;
-                let chord =
-                    Chord::parse(&chord).map_err(|error| Failure::InvalidParams(error.to_string()))?;
+                let chord = Chord::parse(&chord).map_err(|error| Failure::InvalidParams(error.to_string()))?;
                 Ok(self.stop_path_changed(to_result(self.stop_paths().start(&chord))))
             }
             Method::StopPathHeartbeat => {
@@ -105,8 +106,10 @@ impl Engine {
                 let resumed = self.stop_paths().resume(&token).map_err(Failure::Engine);
                 Ok(self.stop_path_changed(resumed.and_then(to_result)))
             }
-            // Clipboard lands with the backends.
-            Method::ClipboardRead | Method::ClipboardWrite => Err(Failure::not_implemented(method)),
+            Method::ClipboardRead => parse::<EmptyParams>(params).and_then(|_| op(Op::ClipboardRead)),
+            Method::ClipboardWrite => op(Op::ClipboardWrite(parse(params)?)),
+            Method::MenusItems => op(Op::MenuItems(parse(params)?)),
+            Method::MenusSelect => op(Op::MenusSelect(parse(params)?)),
             Method::Cancel => Ok(Route::Cancel(parse::<CancelParams>(params)?.id)),
             Method::TestAdvanceClock => {
                 let Some(clock) = self.fake_clock() else {

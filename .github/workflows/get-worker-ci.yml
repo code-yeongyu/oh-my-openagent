@@ -1,0 +1,196 @@
+name: get.omo.dev CI
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - "packages/get-worker/**"
+      - "script/installer/**"
+      - ".github/workflows/get-worker-ci.yml"
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "packages/get-worker/**"
+      - "script/installer/**"
+      - ".github/workflows/get-worker-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Installs from this workflow are tagged so they stay out of the public download count.
+env:
+  OMO_INSTALL_QA: "1"
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/get-worker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+      - name: Type check
+        run: bun run type-check
+      - name: Unit tests
+        run: bun run test
+      - name: shellcheck install.sh
+        run: shellcheck scripts/install.sh
+      - name: PSScriptAnalyzer install.ps1
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $findings = Invoke-ScriptAnalyzer -Path scripts/install.ps1 -Severity Error
+          $findings | Format-Table -AutoSize
+          if ($findings) { exit 1 }
+      - name: Bundle dry run
+        run: bunx wrangler deploy --dry-run --outdir dist
+      - name: Write job summary
+        if: always()
+        shell: bash
+        working-directory: .
+        env:
+          JOB_SUMMARY_TITLE: get.omo.dev worker checks
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Type-checks and unit-tests the get.omo.dev Worker.
+            - Lints install.sh with shellcheck and install.ps1 with PSScriptAnalyzer.
+            - Bundles the Worker with a wrangler dry run.
+          JOB_SUMMARY_NEXT: Start with the first failing step; the install jobs only run after this one passes.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # Runs the installer from this checkout against the live get.omo.dev, the way users run it.
+  install-unix:
+    needs: worker
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, name: linux-glibc }
+          - { os: ubuntu-24.04-arm, name: linux-arm64 }
+          - { os: macos-latest, name: macos-arm64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install into an isolated HOME, twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(curl -fsSL https://get.omo.dev/channels/latest | tr -d '[:space:]')"
+          HOME="$(mktemp -d)"
+          export HOME SHELL=/bin/bash
+          bash packages/get-worker/scripts/install.sh 2>&1 | tee first.log
+          "$HOME/.local/bin/omo" --version | grep -F "omo ${expected}"
+          bash packages/get-worker/scripts/install.sh 2>&1 | tee second.log
+          grep -F "is already installed" second.log
+          test "$(grep -c 'omo installer >>>' "$HOME/.bashrc" "$HOME/.bash_profile" 2>/dev/null | awk -F: '{s+=$2} END {print s}')" = 1
+          grep -F '"method": "standalone"' "$HOME/.omo/install.json"
+      - name: Unreachable mirror falls back to npm + GitHub
+        if: matrix.name == 'linux-glibc'
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOME="$(mktemp -d)"
+          export HOME
+          OMO_INSTALL_BASE_URL=https://get.omo.invalid bash packages/get-worker/scripts/install.sh 2>&1 | tee fallback.log
+          grep -F "falling back to GitHub releases" fallback.log
+          "$HOME/.local/bin/omo" --version
+      - name: Write job summary
+        if: always()
+        shell: bash
+        working-directory: .
+        env:
+          JOB_SUMMARY_TITLE: get.omo.dev install (${{ matrix.name }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Runs install.sh from this checkout against the live get.omo.dev, twice, in an isolated HOME.
+            - Checks the channel version, idempotence, one PATH block and the receipt.
+            - On linux-glibc also forces the unreachable-mirror fallback to npm and GitHub.
+          JOB_SUMMARY_NEXT: Compare the install log with get.omo.dev/channels/latest; a 302 to GitHub means the version is not mirrored yet.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  install-alpine:
+    needs: worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install on Alpine (musl) as a non-root user
+        run: |
+          docker run --rm -v "$PWD/packages/get-worker/scripts:/scripts:ro" alpine:3.21 sh -euc '
+            apk add --no-cache bash curl libstdc++ libgcc >/dev/null
+            adduser -D qa
+            su qa -c "OMO_INSTALL_QA=1 bash /scripts/install.sh" 2>&1 | tee /tmp/install.log
+            grep -F "(omo-linux-x64-musl" /tmp/install.log
+            su qa -c "/home/qa/.local/bin/omo --version"
+          '
+      - name: Write job summary
+        if: always()
+        shell: bash
+        working-directory: .
+        env:
+          JOB_SUMMARY_TITLE: get.omo.dev install (Alpine musl)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Installs as a non-root user in alpine:3.21 and checks the musl asset was chosen.
+          JOB_SUMMARY_NEXT: Check the asset line in the log; musl detection lives in detect_asset().
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  install-windows:
+    needs: worker
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [pwsh, powershell]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      # windows-latest runners are elevated; the installer refuses that unless told otherwise.
+      OMO_INSTALL_ALLOW_SUDO: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install into an isolated profile, twice
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = (Invoke-RestMethod https://get.omo.dev/channels/latest).Trim()
+          $env:OMO_INSTALL_DIR = Join-Path $env:RUNNER_TEMP "omo-$env:GITHUB_RUN_ID-${{ matrix.shell }}"
+          & ./packages/get-worker/scripts/install.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $version = & (Join-Path $env:OMO_INSTALL_DIR 'omo.exe') --version
+          Write-Output $version
+          if ("$version" -notlike "omo $expected*") { throw "expected omo $expected, got $version" }
+          & ./packages/get-worker/scripts/install.ps1 *>&1 | Tee-Object -Variable second
+          if ("$second" -notmatch 'already installed') { throw 'second run was not idempotent' }
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (($userPath -split ';' | Where-Object { $_ -eq $env:OMO_INSTALL_DIR }).Count -ne 1) { throw 'user PATH entry missing or duplicated' }
+      # The exact Windows CMD line omo.dev and docs/guide/install.md show, against the live get.omo.dev.
+      - name: The CMD one-liner from omo.dev installs
+        if: matrix.shell == 'powershell'
+        shell: cmd
+        run: |
+          set "OMO_INSTALL_DIR=%RUNNER_TEMP%\omo-%GITHUB_RUN_ID%-cmd"
+          powershell -ExecutionPolicy Bypass -c "irm https://get.omo.dev/install.ps1 | iex"
+          if errorlevel 1 exit /b 1
+          "%OMO_INSTALL_DIR%\omo.exe" --version
+          if errorlevel 1 exit /b 1
+      - name: Write job summary
+        if: always()
+        shell: bash
+        working-directory: .
+        env:
+          JOB_SUMMARY_TITLE: get.omo.dev install (Windows ${{ matrix.shell }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Runs install.ps1 twice under the matrix shell into an isolated directory.
+            - Checks the channel version, idempotence and one user PATH entry.
+          JOB_SUMMARY_NEXT: Read the install.ps1 output; the runner is elevated, so OMO_INSTALL_ALLOW_SUDO=1 is set.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

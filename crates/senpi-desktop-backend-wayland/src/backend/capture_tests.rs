@@ -91,13 +91,17 @@ fn a_portal_screenshot_arrives_as_rgba_and_its_file_is_removed() {
         .capture(&Target::Desktop, &CaptureCaps::default())
         .expect("portal screenshot");
 
-    // Then: the PNG decoded to RGBA as one scale-1 display, non-interactively
+    // Then: the PNG decoded to RGBA non-interactively, and the frame refuses
+    // coordinate input because the portal reports no scale or layout (#8957)
     assert_eq!(image.dimensions(), (64, 48));
     assert_eq!(*image.get_pixel(0, 0), CORNER);
-    assert_eq!(frame.map_point(63.0, 47.0, None), Ok((63.0, 47.0)));
+    assert_eq!(
+        frame.map_point(63.0, 47.0, None).map_err(|e| e.code),
+        Err(ErrorCode::InvalidCoordinateFrame)
+    );
     assert!(
         frame.map_point(64.0, 0.0, None).is_err(),
-        "the frame is the image"
+        "no point maps through a pixels-only frame"
     );
     let displays = backend.displays().expect("displays");
     let display = displays.first().expect("the portal display");

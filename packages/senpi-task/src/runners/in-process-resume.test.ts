@@ -41,8 +41,8 @@ function createFakeSession(sessionId = "resume-session-1"): FakeSessionControls 
         settle = resolve
       })
     },
-    async steer() {},
-    async followUp() {},
+    async steer() { return "handled" },
+    async followUp() { return "handled" },
     async abort() {},
     subscribe(_listener: ChildSessionListener) {
       return () => {}
@@ -70,8 +70,8 @@ function immediateSession(onPrompt?: () => void): ChildSession {
       lastText.value = "done"
       return Promise.resolve()
     },
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe: () => () => {},
     getLastAssistantText: () => lastText.value,

@@ -32,6 +32,7 @@ export {
 	type JsonRpcVersion,
 	type MethodRejection,
 	type MethodRejectionData,
+	type PermissionDeniedData,
 	type RequestId,
 	STANDARD_RPC_ERRORS,
 } from "./json-rpc";

@@ -7,7 +7,7 @@ import type { QaWindow } from "./fixtures"
 import { type Observation, observe, observeUntil, windowText } from "./observer"
 import { marker, type Scenario, type ScenarioContext, verdict, withEngine } from "./scenario-kit"
 
-async function bringToFront(engine: Engine, front: QaWindow, others: readonly string[]): Promise<Observation> {
+export async function bringToFront(engine: Engine, front: QaWindow, others: readonly string[]): Promise<Observation> {
   await engine.exec("raiseWindow", { windowId: front.id })
   return observeUntil([...others, front.id], (observation) => String(observation.foreground) === front.id)
 }

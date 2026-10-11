@@ -18,8 +18,8 @@ async function effectiveOpacity(page: Page, selector: string): Promise<number> {
 const HERO_CONTENT = [
   "#hero-title",
   '[data-testid="hero-tagline"]',
-  '[data-section="hero"] [data-testid="command-bar"]',
-  '[data-section="hero"] a[href$="/docs#installation"]',
+  '[data-section="hero"] [data-install-tabs]',
+  '[data-section="hero"] a[href$="/docs/install"]',
   '[data-testid="hero-dag"]',
 ] as const
 

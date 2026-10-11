@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { acquireDesktopEngine, type AcquireDesktopEngineOptions } from "../src/acquire";
-import { getDesktopEngineFileName } from "../src/locator";
+import { getDesktopEngineFileName, getDesktopEngineHost } from "../src/locator";
 import { DESKTOP_ENGINE_CHECKSUMS_ASSET, desktopEngineReleaseAssetName } from "../src/release-assets";
 
 const version = "5.0.0-beta.123";
@@ -258,6 +258,26 @@ describe("acquireDesktopEngine", () => {
 
 		expect(absent.path).toBeNull();
 		expect(requests).toEqual([]);
+	});
+
+	it.each(["x64", "arm64"])("never fetches the glibc engine on a musl Linux %s host", async (arch) => {
+		const musl = getDesktopEngineHost("linux", arch, "musl");
+		const { fetch, requests } = releaseFetch();
+		const packageDir = join(cacheDir, "empty-package");
+
+		const result = await acquire({ version, host: musl, cacheDir, fetch, locatorOptions: { packageDir } });
+
+		expect(musl).toBe(`linux-${arch}-musl`);
+		expect(requests).toEqual([]);
+		if (result.path !== null) throw new Error("a musl host has no release engine");
+		expect(result.diagnostic).toMatchObject({
+			code: "native-unavailable",
+			host: musl,
+			message: `No senpi-desktop-engine is built for ${musl}; computer use is unavailable on this host.`,
+			reason: "no-release-asset",
+		});
+		expect(result.diagnostic.attemptedPaths).toContain(join(packageDir, "native", "prebuilds", musl, "senpi-desktop-engine"));
+		expect(existsSync(join(cacheDir, version, musl))).toBe(false);
 	});
 
 	it("never fetches an unsafe version", async () => {

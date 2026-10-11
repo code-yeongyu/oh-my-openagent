@@ -10,6 +10,7 @@ import { join } from "node:path"
 import { readRow, readRows } from "./sqlite-rows.js"
 import { credentialGuidance } from "./setup-guidance.js"
 import { literalConfigValue, readAuthStore, writeAuthStore } from "./auth-store.js"
+import providerMap from "./provider-map.json" with { type: "json" }
 
 export const API_KEY_TYPE_ACCEPTLIST = new Set(["api_key"])
 const SQLITE_STORES = [
@@ -22,7 +23,7 @@ function sorted(values) {
 }
 
 function readProviderMap() {
-  return JSON.parse(readFileSync(new URL("./provider-map.json", import.meta.url), "utf8"))
+  return providerMap
 }
 
 function targetProvider(provider, providerMap) {

@@ -8,6 +8,7 @@ import { createManagerResidencyRegistry } from "../../../omo-senpi/src/component
 import { createTaskRecordStore } from "../store"
 import { baseSpec, cleanupProjects, FakeRunner, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 afterEach(cleanupProjects)
 
@@ -129,7 +130,7 @@ describe("runtime fallback of a daemon-session child", () => {
       planner: () => ({ kind: "resolved", plan: plan() }),
       destruction: { destroyResidentTask: (taskId, cause) => ownerLifecycle.destroyResidentTask(taskId, cause) },
     })
-    const ownerLifecycle = createTaskLifecycle({ store, config, hostPid: OWNER_PID, registry: createManagerResidencyRegistry(() => owner) })
+    const ownerLifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, hostPid: OWNER_PID, registry: createManagerResidencyRegistry(() => owner) })
     const daemonSide = hostLifecycleDeps({ store, hostPid: OWNER_PID + 1, isAlive: (pid) => pid === OWNER_PID })
     const task = await owner.start(baseSpec({ execution_mode: "process" }))
     if (task.kind !== "started") throw new Error("expected the task to start")
@@ -157,7 +158,7 @@ describe("runtime fallback of a daemon-session child", () => {
       runner.finishClose.resolve()
       ownerLifecycle.dispose?.()
       owner.workpools.dispose()
-      owner.forget(task.task_id)
+      owner.forget(task.task_id, { path: "end" })
     }
   })
 })

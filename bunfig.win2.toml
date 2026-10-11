@@ -3,6 +3,7 @@ preload = ["./test-env.ts", "./test-setup.ts"]
 pathIgnorePatterns = [
   "dist/**",
   "packages/web/**",
+  "packages/get-worker/**",
   "packages/lsp-tools-mcp/**",
   "packages/lsp-daemon/**",
   "packages/senpi-desktop-*/**",

@@ -8,6 +8,7 @@ export const SCENARIOS = [
   "background-type-sole-window",
   "background-type-multiwindow-refused",
   "foreground-restores",
+  "background-scroll-once",
   "killswitch-real-hid",
   "tcc-diagnostic",
   "screenshot-budget",

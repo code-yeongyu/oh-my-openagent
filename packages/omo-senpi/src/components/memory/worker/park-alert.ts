@@ -96,7 +96,7 @@ export async function emitReflectionParkAlert(
   safeNotify(
     live,
     joinFields([
-      `Automatic memory reflection paused after ${park.streak} failures`,
+      `Automatic memory reflection paused after ${park.streak} failure${park.streak === 1 ? "" : "s"}`,
       cause ?? failure?.reason,
       recommendation,
       `next automatic probe ${nextProbeAt}; run /reflect to retry now`,

@@ -3,7 +3,8 @@
 //!
 //! - `Target::Desktop`: enigo for keys and text, `SendInput` for the pointer.
 //! - `Target::Window` + foreground: the `SetForegroundWindow` focus guard
-//!   around `SendInput`.
+//!   around `SendInput`; pointer input first waits for the compositor to
+//!   present the raised window ([`compositor`]).
 //! - `Target::Window` + background: `PostMessageW` when the toolkit class
 //!   matrix accepts the event, else `BackgroundUnavailable` - never a silent
 //!   fallback to the foreground.
@@ -19,7 +20,8 @@ use senpi_desktop_core::types::{DesktopPoint, Target};
 use super::held::{Held, HeldKey, Route};
 use super::keys::{chord_virtual_keys, named_virtual_key, Stroke, VK_MENU};
 use super::native::{self, Window};
-use super::{background, system};
+use super::{background, compositor, system};
+use crate::ax::Win32Ax;
 use crate::capture::{all_displays, logical_bounds, physical_point, PhysicalRect};
 use crate::integrity::IntegrityRid;
 
@@ -27,14 +29,14 @@ use crate::integrity::IntegrityRid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Via {
     Enigo,
-    SendInput,
+    SendInput(Option<Window>),
     Post(Window),
 }
 
 impl Via {
     const fn route(self) -> Route {
         match self {
-            Self::Enigo | Self::SendInput => Route::System,
+            Self::Enigo | Self::SendInput(_) => Route::System,
             Self::Post(window) => Route::Window(window.address()),
         }
     }
@@ -44,6 +46,7 @@ pub(crate) struct Win32Input {
     pub(super) enigo: Enigo,
     pub(super) held: Held,
     pub(super) integrity: IntegrityRid,
+    pub(super) last_takeover_target: Option<Window>,
 }
 
 impl Win32Input {
@@ -61,21 +64,26 @@ impl Win32Input {
             enigo,
             held: Held::default(),
             integrity,
+            last_takeover_target: None,
         })
     }
 
     pub(crate) fn pointer(
         &mut self,
+        ax: &mut Win32Ax,
         target: &Target,
         event: &PointerEvent,
         mode: DeliveryMode,
     ) -> CoreResult<()> {
         match (target, mode) {
-            (Target::Desktop, _) => self.system_pointer(event),
+            (Target::Desktop, _) => self.system_pointer(event, None),
             (Target::Window(id), DeliveryMode::Foreground) => {
-                self.with_foreground(id, |this| this.system_pointer(event))
+                self.with_foreground(id, |this, target| {
+                    compositor::await_next_present();
+                    this.system_pointer(event, Some(target))
+                })
             }
-            (Target::Window(id), DeliveryMode::Background) => self.post_pointer(id, event),
+            (Target::Window(id), DeliveryMode::Background) => self.post_pointer(ax, id, event),
         }
     }
 
@@ -96,7 +104,9 @@ impl Win32Input {
         match (target, mode) {
             (Target::Desktop, _) => self.holding(Via::Enigo, &vks, |_| Ok(())),
             (Target::Window(id), DeliveryMode::Foreground) => {
-                self.with_foreground(id, |this| this.holding(Via::SendInput, &vks, |_| Ok(())))
+                self.with_foreground(id, |this, target| {
+                    this.holding(Via::SendInput(Some(target)), &vks, |_| Ok(()))
+                })
             }
             (Target::Window(id), DeliveryMode::Background) => {
                 let window = background::key_target(id, self.integrity, keys)?;
@@ -150,7 +160,7 @@ impl Win32Input {
                     .key(Key::Other(u32::from(vk)), direction)
                     .map_err(enigo_error)?;
             }
-            Via::SendInput => system::key(vk, down)?,
+            Via::SendInput(target) => system::key(vk, down, target)?,
             Via::Post(window) => {
                 let alt_down = self
                     .held
@@ -175,7 +185,7 @@ impl Win32Input {
         let mut result = Ok(());
         for held in self.held.buttons() {
             let released = match held.route {
-                Route::System => system::button(held.button, false),
+                Route::System => system::button(held.button, false, None),
                 Route::Window(address) if !Window(address).is_live() => Ok(()),
                 Route::Window(address) => background::post_button_up(Window(address), held),
             };
@@ -186,7 +196,7 @@ impl Win32Input {
         }
         for held in self.held.keys() {
             let via = match held.route {
-                Route::System => Via::SendInput,
+                Route::System => Via::SendInput(None),
                 Route::Window(address) if !Window(address).is_live() => {
                     self.held.key_up(held);
                     continue;
@@ -236,16 +246,6 @@ fn char_stroke(key: KeyName) -> CoreResult<Stroke> {
             "{named:?} has no Win32 virtual key"
         ))),
     }
-}
-
-/// The UTF-16 units of `text` as typed: a newline is Enter's carriage return.
-pub(super) fn utf16_units(text: &str) -> impl Iterator<Item = u16> + '_ {
-    text.chars().flat_map(|character| {
-        let character = if character == '\n' { '\r' } else { character };
-        let mut units = [0u16; 2];
-        let count = character.encode_utf16(&mut units).len();
-        units.into_iter().take(count)
-    })
 }
 
 pub(super) fn enigo_error(error: impl std::fmt::Display) -> DesktopError {

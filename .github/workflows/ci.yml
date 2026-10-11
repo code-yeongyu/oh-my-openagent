@@ -7,8 +7,11 @@ on:
     branches: [master, dev]
     # `labeled` lets the ci:full-matrix label retrigger CI; concurrency cancel-in-progress absorbs bot-label churn.
     types: [opened, synchronize, reopened, labeled]
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
+  # Queue refs are unique per group, so unrelated groups never cancel each other.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -23,6 +26,7 @@ jobs:
       web_only: ${{ steps.classify.outputs.web_only }}
       run_heavy: ${{ steps.classify.outputs.run_heavy }}
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
+      runtime_touching: ${{ steps.classify.outputs.runtime_touching }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -32,7 +36,7 @@ jobs:
         id: classify
         shell: bash
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before) }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
@@ -64,7 +68,16 @@ jobs:
           jq -r '"web_only=\(.webOnly)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq -r '"run_heavy=\(.runHeavy)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq -r '"full_matrix=\(.fullMatrix)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          jq -r '"runtime_touching=\(.runtimeTouching)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq . <<< "$MODE_JSON"
+
+      # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
+      - name: Report-only temp-leak list only shrinks
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node script/check-temp-leak-report-only.mjs "$(git merge-base "$BASE_SHA" "$GITHUB_SHA")"
 
       - name: Write job summary
         if: always()
@@ -76,7 +89,8 @@ jobs:
             - Generated release push: `${{ steps.classify.outputs.generated_release_push || 'unknown' }}`.
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
-            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (false keeps heavy work on ubuntu; add the `ci:full-matrix` label to force it).
+            - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (true runs every OS leg; only web, docs, and repository-metadata changes stay ubuntu-only).
+            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (false keeps heavy work on ubuntu and every skipped leg says so; add the `ci:full-matrix` label to force it).
           JOB_SUMMARY_NEXT: Classification failures default to heavy validation on the full matrix; inspect the changed-path diff and event metadata.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
@@ -148,6 +162,9 @@ jobs:
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
+      # merge_group uses these same six required contexts, without PR labels.
+      # Queue commits always run heavy validation on every OS leg, including
+      # docs/web-only groups; the fast path remains a pull-request optimization.
       matrix:
         include:
           - os: ubuntu-latest
@@ -196,6 +213,7 @@ jobs:
       # `build:lsp-daemon` step already runs `npm ci && npm run build` in
       # packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Run vendored lsp-daemon tests
+        id: lsp-daemon-tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: npm test
         working-directory: packages/lsp-daemon
@@ -207,10 +225,12 @@ jobs:
       # preload per file and OOM-kills the 7 GB runners, and --no-isolate leaks
       # module state between files. Job-level sharding is the parallelism.
       - name: Run tests
+        id: root-tests-posix-1
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun test --timeout 20000 packages/omo-opencode packages/memory-core
 
       - name: Run tests with Windows telemetry
+        id: root-tests-windows-1
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         env:
@@ -223,14 +243,16 @@ jobs:
             -TestArguments @("test", "packages/omo-opencode", "packages/memory-core")
 
       - name: Run tests
+        id: root-tests-posix-2
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: |
-          bun test --timeout 20000 packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts packages/senpi-task/src/team/member-extension/residency.test.ts script/omob-refresh.test.ts script/release-version.test.ts
+          bun test --timeout 20000 packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts packages/senpi-task/src/team/member-extension/residency.test.ts script/omob-refresh.test.ts script/release-version.test.ts packages/senpi-task/src/store/record-lock.test.ts packages/senpi-task/src/store/record-lock-reap-window.test.ts packages/senpi-task/src/runners/rpc-host/durable-json.test.ts
           bun --config=bunfig.win2.parallel.toml test --timeout 20000
 
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
       # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
+        id: root-tests-windows-2
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         env:
@@ -240,12 +262,21 @@ jobs:
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
             -Invocation "shard-2-quarantine" `
-            -TestArguments @("test", "packages/senpi-task/src/runners/rpc-process.windows.test.ts", "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts", "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts", "script/codex-installer-version.test.ts", "packages/shared-skills/provenance-gate.test.ts", "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts", "packages/senpi-task/src/dag/scheduler.test.ts", "packages/omo-native/test/payload.test.ts", "script/build-omo-binary.test.ts", "packages/senpi-task/src/team/member-extension/residency.test.ts", "script/omob-refresh.test.ts", "script/release-version.test.ts")
+            -TestArguments @("test", "packages/senpi-task/src/runners/rpc-process.windows.test.ts", "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts", "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts", "script/codex-installer-version.test.ts", "packages/shared-skills/provenance-gate.test.ts", "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts", "packages/senpi-task/src/dag/scheduler.test.ts", "packages/omo-native/test/payload.test.ts", "script/build-omo-binary.test.ts", "packages/senpi-task/src/team/member-extension/residency.test.ts", "script/omob-refresh.test.ts", "script/release-version.test.ts", "packages/senpi-task/src/store/record-lock.test.ts", "packages/senpi-task/src/store/record-lock-reap-window.test.ts", "packages/senpi-task/src/runners/rpc-host/durable-json.test.ts")
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Bun 1.4.2 and 1.4.3-canary.1 intermittently segfault a test worker in the rpc-host suite
+          # (oven-sh/bun#44390, #9219). It runs in its own required invocation, which
+          # script/bun-panic-retry.ts re-runs once only when Bun itself crashed; a second crash or
+          # any real test failure fails this step. The remainder config excludes the directory.
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-2-rpc-host" `
+            -TestArguments @("script/bun-panic-retry.ts", "--config=bunfig.win2.parallel.toml", "test", "--parallel", "./packages/senpi-task/src/runners/rpc-host")
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
             -Invocation "shard-2-remainder" `
-            -TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")
+            -TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")
           exit $LASTEXITCODE
 
       - name: Upload Windows post-test telemetry
@@ -257,6 +288,19 @@ jobs:
           path: ${{ runner.temp }}/windows-root-test-telemetry/*.json
           if-no-files-found: warn
           overwrite: false
+
+      # A leg whose test steps were all skipped must never look like a pass.
+      - name: Check that this leg ran its tests
+        if: always()
+        shell: bash
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ job.status }}
+          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-posix-1.outcome }} ${{ steps.root-tests-windows-1.outcome }} ${{ steps.root-tests-posix-2.outcome }} ${{ steps.root-tests-windows-2.outcome }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX" --runtime-touching "$RUNTIME_TOUCHING"
 
       - name: Write job summary
         if: always()
@@ -319,6 +363,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains all three required compatibility contexts.
       matrix:
         include:
           - os: ubuntu-latest
@@ -351,11 +396,13 @@ jobs:
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Run full Codex compatibility suite
+        id: codex-full-tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run test:codex
 
 
-      - name: Run omo-codex component checks
+      - name: Run omo-codex component checks and tests
+        id: codex-component-tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: bash
         run: |
@@ -365,6 +412,12 @@ jobs:
             if jq -e '.scripts.check' "${component}package.json" > /dev/null 2>&1; then
               echo "::group::Component check: ${component}"
               npm --prefix "$component" run check || status=1
+              echo "::endgroup::"
+            fi
+            # ulw-loop's suite already runs inside test:codex above.
+            if [ "$(basename "$component")" != "ulw-loop" ] && jq -e '.scripts.test' "${component}package.json" > /dev/null 2>&1; then
+              echo "::group::Component test: ${component}"
+              npm --prefix "$component" test || status=1
               echo "::endgroup::"
             fi
           done
@@ -380,6 +433,7 @@ jobs:
           bun run --cwd packages/omo-codex/plugin build
 
       - name: Run Codex platform smoke tests (.mjs via node --test)
+        id: codex-smoke-node-tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: >-
           node --test
@@ -391,8 +445,22 @@ jobs:
           packages/omo-codex/plugin/test/install-time-build-runtime.test.mjs
 
       - name: Run Codex platform smoke tests (.ts via bun test)
+        id: codex-smoke-bun-tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts
+
+      # A leg whose test steps were all skipped must never look like a pass.
+      - name: Check that this leg ran its tests
+        if: always()
+        shell: bash
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ job.status }}
+          TEST_OUTCOMES: ${{ steps.codex-full-tests.outcome }} ${{ steps.codex-component-tests.outcome }} ${{ steps.codex-smoke-node-tests.outcome }} ${{ steps.codex-smoke-bun-tests.outcome }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX" --runtime-touching "$RUNTIME_TOUCHING"
 
       - name: Write job summary
         if: always()
@@ -412,6 +480,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains this matrix, including the required ubuntu context.
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
@@ -455,6 +524,7 @@ jobs:
           node packages/omo-senpi/plugin/scripts/build-install.mjs --check
 
       - name: Run Senpi compatibility tests
+        id: senpi-tests-posix
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: bash
         run: |
@@ -469,6 +539,7 @@ jobs:
           bun test --timeout 20000 packages/omo-senpi
 
       - name: Run Senpi compatibility tests with Windows telemetry
+        id: senpi-tests-windows
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         env:
@@ -502,6 +573,19 @@ jobs:
           path: ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
           if-no-files-found: warn
           overwrite: false
+
+      # A leg whose test steps were all skipped must never look like a pass.
+      - name: Check that this leg ran its tests
+        if: always()
+        shell: bash
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ job.status }}
+          TEST_OUTCOMES: ${{ steps.senpi-tests-posix.outcome }} ${{ steps.senpi-tests-windows.outcome }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX" --runtime-touching "$RUNTIME_TOUCHING"
 
       - name: Write job summary
         if: always()
@@ -729,6 +813,111 @@ jobs:
             - Verifies the omo-ai tarball payload whitelist.
             - Runs `npm publish --dry-run` to confirm publishability without publishing.
           JOB_SUMMARY_NEXT: Inspect the failing build, payload verifier, or dry-run publish step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The standalone binary and the npm launcher must behave the same: every tool step, omo doctor and
+  # omo setup. Packaging checks compare the payload with its own source list and cannot see a runtime
+  # dependency that list never named (#9248), so this job drives both through one scripted session.
+  # Both legs start the binary copied alone into an empty download folder (#7485). macOS compares it
+  # with the npm launcher; Windows has no npm leg here and runs the binary twice (first run provisions,
+  # second reuses the runtime), requiring its eval and pty steps to succeed.
+  native-binary-parity:
+    needs: [ci-mode]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: darwin-arm64
+            rust-target: aarch64-apple-darwin
+            binary: omo-darwin-arm64
+            compare-npm: true
+          - os: windows-latest
+            target: windows-x64
+            rust-target: x86_64-pc-windows-msvc
+            binary: omo-windows-x64.exe
+            compare-npm: false
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          bun-version: "1.4.2"
+
+      - uses: actions/cache@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Build the desktop engine the binary embeds
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup default "$toolchain"
+          rustup target add ${{ matrix.rust-target }}
+          cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}
+
+      - name: Build the standalone binary and the npm launcher payload
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: |
+          version=$(jq -r .version packages/omo-native/package.json)
+          bun script/build-omo-binary.ts --target ${{ matrix.target }} --omo-version "$version" --omo-ai-version "$version" --out-dir .omo/parity-binary
+          if [ "${{ matrix.compare-npm }}" = "true" ]; then bun run build:omo-native; fi
+
+      - name: Compare the binary with the npm launcher
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.compare-npm
+        run: |
+          bun script/qa/omo-native-parity-smoke.mjs \
+            --binary .omo/parity-binary/${{ matrix.binary }} \
+            --npm-omo "bun $PWD/packages/omo-native/bin/omo.js" \
+            --evidence-dir .omo/parity-evidence
+
+      - name: Run the binary from an empty download folder twice
+        if: needs.ci-mode.outputs.run_heavy == 'true' && !matrix.compare-npm
+        run: |
+          bun script/qa/omo-native-parity-smoke.mjs \
+            --binary .omo/parity-binary/${{ matrix.binary }} \
+            --evidence-dir .omo/parity-evidence
+
+      - name: Upload parity runs
+        if: failure() && needs.ci-mode.outputs.run_heavy == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-binary-parity-runs-${{ matrix.target }}
+          path: .omo/parity-evidence
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Standalone binary (${{ matrix.target }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the ${{ matrix.target }} standalone binary from this commit and starts it copied alone into an empty download folder.
+            - macOS: drives it and the omo-ai launcher through the same scripted session (eval JS/Python, grep, pty, tool search, webfetch, read, LSP, apply_patch, memory, task), omo doctor and omo setup --dry-run, and fails on any difference that is not a documented distribution line.
+            - Windows: runs that session twice (the first run provisions the runtime, the second reuses it) and fails unless the eval and pty steps succeed with no extension load failure.
+          JOB_SUMMARY_NEXT: Read the listed differences or failures; the uploaded parity-runs.json or binary-runs.json holds the runs.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   auto-commit-schema:

@@ -55,7 +55,7 @@ impl Win32Capture {
             ensure_nonempty(&image, "display", &display.id)?;
             regions.push((display, image));
         }
-        Ok(frame::composite(regions))
+        frame::composite(regions)
     }
 
     fn capture_window(&self, id: &str) -> CoreResult<(RgbaImage, FrameGeometry)> {

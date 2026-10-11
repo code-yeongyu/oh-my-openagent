@@ -58,7 +58,7 @@ export async function scenarioB(run) {
   writeMockScript(sandbox, {
     parentSteps: [
       ...records.map((r) => ({ type: "tool_call", name: "task_output", arguments: { task_id: r.task_id, mode: "status" } })),
-      resumeReleaseStep(session, records.map((record) => record.task_id), sessionId, linesBeforeResume),
+      resumeReleaseStep(session, records.map((record) => record.task_id), sessionId, linesBeforeResume, join(sandbox.stateDir, "tasks")),
       { type: "text", text: resumeMarker },
     ],
     childSteps,

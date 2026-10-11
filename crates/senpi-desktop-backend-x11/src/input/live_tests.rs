@@ -18,7 +18,11 @@ use std::time::Duration;
 use senpi_desktop_core::backend::{DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::types::Target;
-use x11rb::protocol::xproto::Window;
+use x11rb::connection::Connection;
+use x11rb::protocol::xproto::{ConnectionExt, InputFocus, Window};
+use x11rb::rust_connection::RustConnection;
+use x11rb::CURRENT_TIME;
+use xkeysym::Keysym;
 
 use super::{InputServer, X11Input};
 
@@ -27,11 +31,81 @@ const HANG_GUARD: Duration = Duration::from_secs(30);
 /// (+32 = space), as `cat -v` prints it.
 const LEFT_PRESS_REPORT: &str = "^[[M ";
 
+struct MappingRestore {
+    conn: RustConnection,
+    min_keycode: u8,
+    keycode_count: u8,
+    keysyms_per_keycode: u8,
+    keysyms: Vec<u32>,
+}
+
+impl Drop for MappingRestore {
+    fn drop(&mut self) {
+        if let Ok(cookie) = self.conn.change_keyboard_mapping(
+            self.keycode_count,
+            self.min_keycode,
+            self.keysyms_per_keycode,
+            &self.keysyms,
+        ) {
+            let _ = cookie.check();
+        }
+        let _ = self.conn.flush();
+    }
+}
+
 fn window_env(name: &str) -> Window {
     let value = std::env::var(name).unwrap_or_else(|_| panic!("precondition: {name} is set"));
     value
         .parse()
         .unwrap_or_else(|_| panic!("{name}={value} is a decimal XID"))
+}
+
+fn swap_a_and_b() -> MappingRestore {
+    let (conn, _screen) = x11rb::connect(None).expect("control X11 connection");
+    let setup = conn.setup();
+    let min_keycode = setup.min_keycode;
+    let keycode_count = setup
+        .max_keycode
+        .saturating_sub(min_keycode)
+        .saturating_add(1);
+    let original = conn
+        .get_keyboard_mapping(min_keycode, keycode_count)
+        .expect("request current keyboard mapping")
+        .reply()
+        .expect("read current keyboard mapping");
+    let width = usize::from(original.keysyms_per_keycode);
+    let row = |keysym| {
+        original
+            .keysyms
+            .chunks_exact(width)
+            .position(|row| row.contains(&keysym))
+            .expect("fixture key exists in the core mapping")
+    };
+    let (a, b) = (row(Keysym::a.raw()), row(Keysym::b.raw()));
+    let mut swapped = original.keysyms.clone();
+    for column in 0..width {
+        swapped.swap(a * width + column, b * width + column);
+    }
+    conn.change_keyboard_mapping(
+        keycode_count,
+        min_keycode,
+        original.keysyms_per_keycode,
+        &swapped,
+    )
+    .expect("request changed keyboard mapping")
+    .check()
+    .expect("apply changed keyboard mapping");
+    conn.get_input_focus()
+        .expect("mapping round-trip")
+        .reply()
+        .expect("mapping round-trip reply");
+    MappingRestore {
+        conn,
+        min_keycode,
+        keycode_count,
+        keysyms_per_keycode: original.keysyms_per_keycode,
+        keysyms: original.keysyms,
+    }
 }
 
 /// Starts reading the target's FIFO; `cat` opens it for writing only once
@@ -137,4 +211,64 @@ fn background_click_into_a_gtk_window_is_refused() {
         active_after, active_before,
         "a refusal never falls back to the foreground"
     );
+}
+
+#[test]
+#[ignore = "live: needs Xvfb + xfwm4 + the QA target xterm (see the module docs)"]
+fn a_runtime_keyboard_mapping_change_is_used_without_reconnecting() {
+    let target = window_env("SENPI_X11_TARGET");
+    let mut input = X11Input::connect().unwrap();
+    let output = fifo_reader();
+    let _mapping = swap_a_and_b();
+
+    input
+        .type_text(
+            &Target::Window(target.to_string()),
+            "a\n",
+            DeliveryMode::Foreground,
+        )
+        .unwrap();
+
+    let received = output
+        .recv_timeout(HANG_GUARD)
+        .expect("hang guard: no typed line");
+    println!("target={target} received={received:?}");
+    assert_eq!(received.trim(), "a");
+}
+
+#[test]
+#[ignore = "live: needs Xvfb without an EWMH window manager and two QA xterms"]
+fn non_ewmh_foreground_delivery_confirms_core_focus_before_input() {
+    let target = window_env("SENPI_X11_TARGET");
+    let other = window_env("SENPI_X11_OTHER");
+    let output = fifo_reader();
+    let (control, _screen) = x11rb::connect(None).expect("control X11 connection");
+    control
+        .set_input_focus(InputFocus::PARENT, other, CURRENT_TIME)
+        .expect("request initial core focus")
+        .check()
+        .expect("set initial core focus");
+    control.flush().expect("flush initial core focus");
+    let mut input = X11Input::connect().unwrap();
+
+    input
+        .type_text(
+            &Target::Window(target.to_string()),
+            "a\n",
+            DeliveryMode::Foreground,
+        )
+        .unwrap();
+
+    let received = output
+        .recv_timeout(HANG_GUARD)
+        .expect("hang guard: target received no typed line");
+    let focus = control
+        .get_input_focus()
+        .expect("query core focus")
+        .reply()
+        .expect("read core focus")
+        .focus;
+    println!("target={target} other={other} received={received:?} restored_core_focus={focus}");
+    assert_eq!(received.trim(), "a");
+    assert_eq!(focus, other);
 }

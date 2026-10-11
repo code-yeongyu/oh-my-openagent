@@ -6,6 +6,14 @@ import { resetOgDownloadsCacheForTests } from "./downloads"
 import { resetOgStarsCacheForTests } from "./stars"
 
 function upstream(url: string, stars: number, downloadsPerPackage: number): Response {
+  if (url === "https://get.omo.dev/stats/downloads") {
+    return Response.json({ uncountedByGitHub: downloadsPerPackage })
+  }
+  if (url.includes("/releases?")) {
+    return Response.json([
+      { assets: [{ name: "omo-linux-x64", download_count: downloadsPerPackage }] },
+    ])
+  }
   if (url.startsWith("https://api.github.com/repos/")) {
     return Response.json({ stargazers_count: stars })
   }
@@ -145,8 +153,8 @@ test("the download figure changes the rendered PNG", async () => {
   resetOgDownloadsCacheForTests()
   const second = await OpenGraphImage()
 
-  // Then: 4 packages x 2 years are summed and the pixels differ.
-  expect(first.headers.get("x-og-downloads")).toBe(String(3_894_680 * 8))
+  // Then: 4 packages x 2 years, the one release binary and the mirror count are summed and the pixels differ.
+  expect(first.headers.get("x-og-downloads")).toBe(String(3_894_680 * 10))
   expect(second.headers.get("x-og-downloads-source")).toBe("live")
   expect(Bun.hash(firstPng)).not.toBe(Bun.hash(await second.arrayBuffer()))
 })

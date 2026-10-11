@@ -57,6 +57,11 @@ jobs:
         with:
           bun-version: "1.4.2"
 
+      - uses: actions/setup-python@v7
+        if: runner.os == 'Windows'
+        with:
+          python-version: "3.12"
+
       - name: Install display test dependencies
         if: runner.os == 'Linux'
         run: |
@@ -97,7 +102,13 @@ jobs:
       - name: Desktop package tests
         env:
           OMO_PACKAGE_DIR: ${{ runner.temp }}/omo-desktop-ci-engine
+          OMO_DESKTOP_PRELUDE_PYTHON_DIAGNOSTICS: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: bun run test:desktop
+
+      # The runner is disposable, so the live clipboard round-trip may overwrite its clipboard.
+      - name: System clipboard round-trip
+        if: runner.os != 'Linux'
+        run: cargo test -p senpi-desktop-core --features system-clipboard --locked --lib -- --ignored --exact clipboard::live_tests::a_written_text_reads_back_from_the_system_clipboard --nocapture
 
       # Each #[ignore]d display test runs in the environment its module docs name. The X11 input tests need a
       # window manager and QA windows, so they run in the Linux QA driver instead.
@@ -106,6 +117,7 @@ jobs:
         run: |
           xvfb-run -a cargo test -p senpi-desktop-backend-x11 --locked --lib -- --ignored --exact capture::live_tests::captures_root_window stop_path::live_tests::raw_key_chord_latches_supervisor
           env -u DISPLAY cargo test -p senpi-desktop-backend-x11 --locked --lib -- --ignored --exact stop_path::live_tests::start_without_a_display_is_unavailable_and_not_live
+          xvfb-run -a cargo test -p senpi-desktop-core --features system-clipboard --locked --lib -- --ignored --exact clipboard::live_tests::a_written_text_reads_back_from_the_system_clipboard --nocapture
 
       # One fresh session bus per AT-SPI test, as the module docs require.
       - name: AT-SPI display tests

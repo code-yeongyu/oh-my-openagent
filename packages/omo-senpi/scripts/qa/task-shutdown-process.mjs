@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { isolatedEnvironment } from "./agent-toolkit-eval-sdk-qa-support.mjs"
+import { engineStateDir } from "./sandbox-child-env.mjs"
 
 const script = fileURLToPath(import.meta.url)
 const packageRoot = resolve(dirname(script), "../..")
@@ -39,7 +40,8 @@ async function worker(sandbox) {
       cwd, agentDir, settingsManager, resourceLoader: loader, sessionManager: SessionManager.inMemory(cwd),
     }))
     await session.bindExtensions({})
-    const tasksDir = join(cwd, ".omo/senpi-task/tasks")
+    // The engine runs in THIS process, so it resolves its state dir from this worker's env.
+    const tasksDir = join(engineStateDir(cwd, process.env), "tasks")
     mkdirSync(tasksDir, { recursive: true })
     const completed = new Promise((resolveRecord, reject) => {
       const inspect = () => {

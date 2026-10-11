@@ -1,4 +1,4 @@
-use senpi_desktop_core::ax::{AxBackend, AxHandle, AxProps};
+use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::types::DesktopWindow;
 
@@ -72,5 +72,14 @@ impl AxBackend for FakeBackend {
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>> {
         self.begin(FakeMethod::AxAttributes)?;
         self.ax_tree.attributes(node_id(h)?)
+    }
+
+    fn owner(&mut self, h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
+        self.begin(FakeMethod::AxOwner)?;
+        let window = self.ax_tree.window_of(node_id(h)?)?;
+        Ok(match window {
+            Some(id) if !self.ax_owner_unknown => AxOwner::Window(id),
+            _ => AxOwner::Unknown,
+        })
     }
 }

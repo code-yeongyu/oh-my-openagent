@@ -27,6 +27,8 @@ Reading this file is not planning. Before `start`, write the run plan in one bre
 
 **Default shape is fan-out, then fan-in.** N parallel lanes with no dependencies, then one synthesis node that depends on all of them. The synthesis node starts cheap too (`quick` or `unspecified-low`): merging verified pieces is mechanical unless the merge itself needs judgment. A 2-node graph with no dependency between the nodes is not a dag - use plain parallel `task` spawns instead. Reach for `workflow` when ordering itself is the point.
 
+**Join adjacent waves through one review node.** When every node of wave k+1 would depend on every node of wave k, never draw the n x m edges. One review node between them (wave k -> review -> wave k+1, n + m edges) gates the next wave on the verification wave's check (below); a finding re-runs only the producer it names, never the wave. A node that consumes only part of wave k gets its own review on that branch (A1 -> review-A1 -> B) and starts when A1 clears, not when the whole wave does.
+
 **Mass harvests: nodes are not units of work.** When a research or scan wave must cover thousands of sources or files (a 10,000-source harvest is legitimate when the work demands it), shard items INTO nodes instead of one node per item: each `quick` node owns a batch sized by its report contract - collect ~50-200 items and write ONE bounded file report (<= 5k tokens) to a ledger path - so `N_nodes = ceil(total_items / items_per_node)`. Under the default caps that is ~100k items per session before touching a knob; past one run's cap, chain runs with the multi-run composition below and give every run its own aggregator node, so synthesis reads per-run digests, never raw node outputs.
 
 **Split implementation from its test? No.** One node owns one deliverable end to end: the change AND its proof. A node that only writes code and a node that only tests it serialize on the same files and double the coordination cost.
@@ -93,7 +95,7 @@ if (findings.includes("critical")) {
 }
 ```
 
-**Concurrent runs.** Distinct keys run concurrently (default cap: `task.dag.max_runs_per_session` = 16). When two graphs are independent, start both and `Promise.all([sdk.wait(a), sdk.wait(b)])`.
+**Concurrent runs.** Distinct keys run concurrently (default cap: `task.dag.max_runs_per_session` = 16 active runs; finished, failed and cancelled runs do not count). When two graphs are independent, start both and `Promise.all([sdk.wait(a), sdk.wait(b)])`.
 
 **Trigger-launched runs.** A run does not have to start from a user turn: a monitor hit, a goal-loop wake, or a task-completion notification can be the trigger, and the cell that fires on the wake builds and starts the next graph. Conditional pipelines live in your code, never in the definition - the graph itself has no branch construct.
 

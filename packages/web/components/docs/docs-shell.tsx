@@ -4,7 +4,6 @@ import * as React from "react"
 import { ChevronDown } from "lucide-react"
 import { DocsSidebar, type DocsShellSection } from "@/components/docs/docs-sidebar"
 import { useDocsNavigation } from "@/components/docs/use-docs-navigation"
-import type { DocSectionId } from "@/lib/docs-sections"
 import { cn } from "@/lib/utils"
 
 export type { DocsShellSection }
@@ -36,7 +35,11 @@ export function DocsShell({
   const scrollerRef = React.useRef<HTMLDivElement | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
-  const { activeSection, scrollToSection, handleInternalLinkClick } = useDocsNavigation(scrollerRef)
+  const sectionIds = React.useMemo(() => sections.map((section) => section.id), [sections])
+  const { activeSection, scrollToSection, handleInternalLinkClick } = useDocsNavigation(
+    scrollerRef,
+    sectionIds,
+  )
 
   const filteredSections = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -45,7 +48,7 @@ export function DocsShell({
   }, [searchQuery, sections])
 
   const handleSelect = React.useCallback(
-    (id: DocSectionId) => {
+    (id: string) => {
       scrollToSection(id)
       setIsMenuOpen(false)
     },

@@ -24,7 +24,12 @@ impl<S: InputServer> X11Input<S> {
     /// Whether the window manager publishes `_NET_ACTIVE_WINDOW`, so the
     /// focus guard can capture and restore it.
     pub fn focus_guard_available(&self) -> bool {
-        self.server.active_window().is_some()
+        self.server.focus_window().is_ok()
+    }
+
+    pub(crate) fn window_owns_foreground(&self, id: &str) -> CoreResult<bool> {
+        let window = super::parse_window(id)?;
+        self.focus_confirmed(window, self.server.active_window().is_some())
     }
 
     /// Activates `window`, runs `body`, then re-activates the previously
@@ -35,40 +40,81 @@ impl<S: InputServer> X11Input<S> {
         body: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> CoreResult<T> {
         let previous = self.active_window();
+        let previous_focus = self.server.focus_window()?;
         self.activate(window)?;
         let result = body(self);
-        let restored = match previous {
-            Some(previous) if previous != window => self.activate(previous),
-            Some(_) | None => Ok(()),
-        };
+        let restored = self.restore_focus(window, previous, previous_focus);
         let value = result?;
         restored.map(|()| value)
     }
 
-    /// Asks the window manager to activate `window` and waits until it
-    /// reports so. Without an EWMH window manager nothing can confirm it,
-    /// and the request is the whole guarantee.
+    /// Asks the window manager to activate `window` and waits until both its
+    /// active-window state (when published) and core focus confirm it.
     ///
     /// # Errors
     /// `InputFailed` when the request fails or the window manager keeps
     /// another window active past the timeout.
     pub(super) fn activate(&self, window: Window) -> CoreResult<()> {
-        if self.server.active_window() == Some(window) {
+        let tracks_active = self.server.active_window().is_some();
+        if self.focus_confirmed(window, tracks_active)? {
             return Ok(());
         }
         self.server.activate(window)?;
+        if !tracks_active {
+            self.server.set_focus(window)?;
+        }
         let deadline = Instant::now() + ACTIVATION_TIMEOUT;
         loop {
-            match self.server.active_window() {
-                None => return Ok(()),
-                Some(active) if active == window => return Ok(()),
-                Some(active) if Instant::now() >= deadline => {
-                    return Err(DesktopError::input_failed(format!(
-                        "the window manager did not activate window {window} (window {active} stayed active)"
-                    )));
-                }
-                Some(_) => thread::sleep(ACTIVATION_POLL),
+            if self.focus_confirmed(window, tracks_active)? {
+                return Ok(());
             }
+            if Instant::now() >= deadline {
+                return Err(DesktopError::input_failed(format!(
+                    "window {window} did not become active and focused"
+                )));
+            }
+            thread::sleep(ACTIVATION_POLL);
+        }
+    }
+
+    fn focus_confirmed(&self, window: Window, tracks_active: bool) -> CoreResult<bool> {
+        Ok((!tracks_active || self.active_window() == Some(window)) && self.focus_within(window)?)
+    }
+
+    fn focus_within(&self, window: Window) -> CoreResult<bool> {
+        let mut focus = self.server.focus_window()?;
+        for _ in 0..32 {
+            if focus == window {
+                return Ok(true);
+            }
+            if focus == 0 || focus == self.server.root() {
+                return Ok(false);
+            }
+            let Some(parent) = self.server.parent(focus)? else {
+                return Ok(false);
+            };
+            focus = parent;
+        }
+        Ok(false)
+    }
+
+    fn restore_focus(
+        &self,
+        window: Window,
+        previous_active: Option<Window>,
+        previous_focus: Window,
+    ) -> CoreResult<()> {
+        let tracks_active = self.server.active_window().is_some();
+        if !self.focus_confirmed(window, tracks_active)? {
+            return Ok(());
+        }
+        match previous_active {
+            Some(previous) if previous != window => self.activate(previous),
+            Some(_) => Ok(()),
+            None if previous_focus != window && previous_focus != self.server.root() => {
+                self.server.set_focus(previous_focus)
+            }
+            None => Ok(()),
         }
     }
 }

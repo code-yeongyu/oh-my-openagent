@@ -14,6 +14,8 @@ import {
 } from "../tools/task/renderers"
 import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 import type { CompletionDetails, ParentNotifierMessage } from "./types"
+import { defaultTranscriptReader } from "../tools/output/transcript"
+import { renderTranscript } from "../tools/output/render"
 
 export const FINAL_RESPONSE_TRANSPORT_LIMIT = 32_000
 
@@ -46,6 +48,9 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
     final_response: finalResponse.text,
     ...(finalResponse.file === undefined ? {} : { final_response_file: finalResponse.file }),
     continuation_hint: continuationHint(record),
+    ...(record.resumed_run_epoch !== undefined && record.resumed_run_epoch === record.notification.run_epoch
+      ? { resumed_turn: true as const }
+      : {}),
     ...(record.owner?.kind === "dag"
       ? { dag: { run_id: record.owner.runId, node_id: record.owner.nodeId } }
       : {}),
@@ -54,12 +59,15 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
   return tokens === undefined ? base : { ...base, tokens }
 }
 
-export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
+export function buildCompletionMessage(
+  details: readonly CompletionDetails[],
+  verificationDirective = DAG_VERIFICATION_DIRECTIVE,
+): ParentNotifierMessage {
   const body = completionMessageLines(details).join("\n")
   const carriesDag = details.some((detail) => detail.dag !== undefined)
   return {
     customType: "senpi-task.completion",
-    content: carriesDag ? `${body}\n\n${DAG_VERIFICATION_DIRECTIVE}` : body,
+    content: carriesDag ? `${body}\n\n${verificationDirective}` : body,
     display: false,
     details,
   }
@@ -70,7 +78,13 @@ export function completionMessageLines(details: readonly CompletionDetails[], wi
 }
 
 function finalResponseForNotification(record: TaskRecord, stateDir: string | undefined): { readonly text: string; readonly file?: string } {
-  const source = record.final_response ?? record.error_message ?? ""
+  const entries = record.failure_kind === "suspended_unresumable" && stateDir !== undefined
+    ? defaultTranscriptReader({ taskId: record.task_id, stateDir }).entries
+    : []
+  const tail = entries.length === 0 ? undefined : renderTranscript(entries, { mode: "tail", tailLines: 60 }).text
+  const source = record.failure_kind === "suspended_unresumable"
+    ? [record.error_message, record.final_response, tail].filter(Boolean).join("\n\n")
+    : record.final_response ?? record.error_message ?? ""
   if (source.length <= FINAL_RESPONSE_TRANSPORT_LIMIT) return { text: source }
   if (stateDir === undefined) return { text: source.slice(0, FINAL_RESPONSE_TRANSPORT_LIMIT) }
 
@@ -99,7 +113,7 @@ function continuationHint(record: TaskRecord): string {
 
 function completionDetailLines(detail: CompletionDetails, width: number | undefined): readonly string[] {
   const identity = joinRendererTokens([
-    "task completion",
+    detail.resumed_turn === true ? "task completion (resumed turn)" : "task completion",
     `name:${normalizeRendererText(detail.name)}`,
     `id:${normalizeRendererText(detail.task_id)}`,
     formatTargetWithModel({

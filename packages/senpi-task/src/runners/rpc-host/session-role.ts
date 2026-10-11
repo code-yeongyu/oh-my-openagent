@@ -14,6 +14,14 @@ export const SESSION_ROLES = ["child", "dag_child", "member"] as const
 
 export type SessionRole = (typeof SESSION_ROLES)[number]
 
+/** Session-context key of the throwaway session that warms a fresh task host (`host-warmup.ts`). */
+export const HOST_WARMUP_CONTEXT = "host_warmup"
+
+/** A host warm-up session: no user and no task behind it, so nothing may report it as a session. */
+export function isHostWarmupSession(pi: unknown): boolean {
+  return readSessionContext(pi)?.[HOST_WARMUP_CONTEXT] === "1"
+}
+
 /**
  * The per-session labels the opener attached (senpi `open_session.context` -> `pi.sessionContext`).
  * The argument is `unknown` on purpose: the pinned engine's `ExtensionAPI` predates the field, so

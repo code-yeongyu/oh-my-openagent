@@ -17,14 +17,14 @@ use core_graphics::event::CGEvent;
 use core_graphics::geometry::CGPoint;
 use foreign_types::ForeignType;
 use objc2::rc::Retained;
-use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication, NSWorkspace};
+use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
 use self::psn::{
     front_process, post_focus_record, process_psn, FocusMarker, ProcessSerialNumber,
     SET_FRONT_NO_WINDOWS,
 };
-pub(crate) use self::spi::is_available;
+pub(crate) use self::spi::{front_pid, is_available};
 use self::spi::required;
 
 /// Ensures the required background SPI resolved; the error names the missing
@@ -75,6 +75,16 @@ pub(crate) fn stamp_event(
         (spi.set_integer)(ptr, 92, i64::from(wid));
         (spi.set_window_location)(ptr, window_local);
     }
+    Ok(())
+}
+
+/// Posts a pointer event through SkyLight alone: the route for events that
+/// carry a delta, which the public queue would deliver a second time.
+pub(crate) fn post_routed(pid: libc::pid_t, event: &CGEvent) -> CoreResult<()> {
+    let spi = required()?;
+    // SAFETY: `event` remains retained for the synchronous post and
+    // `post_to_pid` was atomically resolved with its exact ABI.
+    unsafe { (spi.post_to_pid)(pid, event_ptr(event)) };
     Ok(())
 }
 
@@ -147,25 +157,29 @@ pub(crate) fn with_foreground<T>(
     pid: libc::pid_t,
     action: impl FnOnce() -> CoreResult<T>,
 ) -> CoreResult<T> {
-    let previous_psn = spi::foreground().and_then(|spi| {
-        let mut record = ProcessSerialNumber::default();
-        // SAFETY: `record` is a writable PSN and the foreground-only function
-        // pointer passed its exact-signature probe.
-        (unsafe { (spi.get_front)(&mut record) } == 0).then_some((spi, record))
-    });
-    let previous_app = NSWorkspace::sharedWorkspace().frontmostApplication();
-    let target = activate_application(pid)?;
-    let result = await_active(&target, pid).and_then(|()| {
+    // The live user-visible front app, not WindowServer's raw front process (an
+    // accessory panel owner, #9084) nor the engine's stale AppKit view.
+    let previous = crate::front_app::current_front_pid();
+    crate::front_app::note_engine_activation(pid);
+    activate_application(pid)?;
+    let result = await_active(pid).and_then(|()| {
         thread::sleep(Duration::from_millis(40));
         action()
     });
     thread::sleep(Duration::from_millis(40));
-    if let Some((spi, previous)) = previous_psn {
-        // SAFETY: The saved PSN came from WindowServer; window id 0 restores
-        // that process after foreground input.
-        unsafe { (spi.set_front)(&previous, 0, SET_FRONT_NO_WINDOWS) };
+    let now_front = crate::front_app::current_front_pid();
+    let reclaim = crate::front_app::restore_step(0, now_front, Some(pid), crate::front_app::is_regular)
+        == crate::front_app::RestoreStep::Reclaim;
+    // Hand the front back only while our own activation (or an accessory panel) holds it; a regular app the
+    // user switched to during the action stays front (#9056).
+    if let Some(previous) = previous.filter(|&previous| previous != pid && reclaim) {
+        if let Some((spi, psn)) = spi::foreground().and_then(|spi| psn_for_pid(spi.psn, previous).map(|psn| (spi, psn))) {
+            // SAFETY: The PSN came from WindowServer for the live front app;
+            // window id 0 restores that process after foreground input.
+            unsafe { (spi.set_front)(&psn, 0, SET_FRONT_NO_WINDOWS) };
+        }
+        let _ = activate_application(previous);
     }
-    reactivate(previous_app);
     result
 }
 
@@ -193,7 +207,11 @@ fn psn_for_pid(lookup: spi::PsnLookup, pid: libc::pid_t) -> Option<ProcessSerial
 /// How long an activated application may take to report itself active.
 const ACTIVE_DEADLINE: Duration = Duration::from_millis(500);
 
-fn activate_application(pid: libc::pid_t) -> CoreResult<Retained<NSRunningApplication>> {
+/// Activates `pid` through accessibility (`AXFrontmost`) and AppKit.
+///
+/// # Errors
+/// `InputFailed` when the process is gone or both requests are refused.
+pub(crate) fn activate_application(pid: libc::pid_t) -> CoreResult<Retained<NSRunningApplication>> {
     let target =
         NSRunningApplication::runningApplicationWithProcessIdentifier(pid).ok_or_else(|| {
             DesktopError::window_not_found(format!(
@@ -216,9 +234,9 @@ fn activate_application(pid: libc::pid_t) -> CoreResult<Retained<NSRunningApplic
     Ok(target)
 }
 
-fn await_active(app: &NSRunningApplication, pid: libc::pid_t) -> CoreResult<()> {
+fn await_active(pid: libc::pid_t) -> CoreResult<()> {
     let started = Instant::now();
-    while !app.isActive() {
+    while crate::front_app::current_front_pid() != Some(pid) {
         if started.elapsed() >= ACTIVE_DEADLINE {
             return Err(DesktopError::input_failed(format!(
                 "process {pid} did not become the active application for foreground input \
@@ -229,17 +247,6 @@ fn await_active(app: &NSRunningApplication, pid: libc::pid_t) -> CoreResult<()> 
         thread::sleep(Duration::from_millis(10));
     }
     Ok(())
-}
-
-fn reactivate(previous: Option<Retained<NSRunningApplication>>) {
-    if let Some(previous) = previous {
-        #[expect(
-            deprecated,
-            reason = "restoring the prior frontmost app requires the same activation option"
-        )]
-        let options = NSApplicationActivationOptions::ActivateIgnoringOtherApps;
-        let _ = previous.activateWithOptions(options);
-    }
 }
 
 #[cfg(test)]

@@ -119,6 +119,20 @@ describe("composeOmoSenpiExtension", () => {
     expect(pi.tools.map((tool) => tool.name)).toEqual(["alpha_tool"])
   })
 
+  it("#given OMO_SENPI_DISABLED=1 in the environment #when composed #then no component registers", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const components: OmoSenpiComponent[] = [
+      { name: "alpha", register(api) { api.registerTool({ name: "alpha_tool" }) } },
+    ]
+
+    // when
+    await composeOmoSenpiExtension(components, { env: { OMO_SENPI_DISABLED: "1" } })(pi)
+
+    // then
+    expect(pi.tools).toEqual([])
+  })
+
   it("#given a component throws #when composed #then logs the error and registers later components", async () => {
     // given
     const pi = new FakeExtensionAPI()

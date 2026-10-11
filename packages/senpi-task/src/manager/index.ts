@@ -15,6 +15,7 @@ export type {
   ProcessRunnerKind,
 } from "./execution-mode"
 export { adaptInProcessHandle, adaptRpcHandle } from "./child-handle"
+export { HOST_TURN_RESUMED_EVENT } from "./host-turn-resumed"
 export type { ManagedChildEvent, ManagedChildHandle, ManagedChildListener } from "./child-handle"
 export {
   TRANSCRIPT_ASSISTANT_EVENT,

@@ -25,8 +25,22 @@ export function markSuspensionReason(context: LifecycleContext, taskId: string, 
 /** A revival that landed clears the marker: the child is reachable again. */
 export function clearSuspensionReason(context: LifecycleContext, taskId: string): void {
   context.store.mutate(taskId, (fresh) => {
-    if (fresh.suspension_reason === undefined) return fresh
-    const { suspension_reason: _reason, ...rest } = fresh
+    if (fresh.suspension_reason === undefined && fresh.revival_deferred_reason === undefined && fresh.recovery_deadline_at === undefined) return fresh
+    const { suspension_reason: _reason, revival_deferred_reason: _deferred, recovery_deadline_at: _deadline, ...rest } = fresh
     return rest
+  })
+}
+
+/**
+ * The owning session was resumed, yet its reconcile deferred this child (omo#9498): record why, so
+ * task_send and task_output state the deferral instead of promising a resume that already happened.
+ * A more specific reason a revival path already recorded (a parked host, a draining generation) wins.
+ */
+export function markRevivalDeferred(context: LifecycleContext, taskId: string, reason: string): void {
+  context.store.mutate(taskId, (fresh) => {
+    if (fresh.residency_state !== "persisted_only" && fresh.residency_state !== "rpc_detached") return fresh
+    if (fresh.suspension_reason !== undefined && fresh.suspension_reason !== "revival_deferred") return fresh
+    if (fresh.suspension_reason === "revival_deferred" && fresh.revival_deferred_reason === reason) return fresh
+    return { ...fresh, suspension_reason: "revival_deferred", revival_deferred_reason: reason }
   })
 }

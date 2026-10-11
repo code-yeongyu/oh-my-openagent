@@ -14,6 +14,7 @@ import type {
   ComputerUseTelemetryObservation,
   ComputerUseTelemetryObservers,
 } from "../telemetry/omo-native-computer-use"
+import { engineErrorCode } from "./engine-status"
 import { createComputerUseTelemetry } from "./telemetry"
 
 function recorder(): {
@@ -118,32 +119,32 @@ describe("computer-use telemetry projection", () => {
     for (const code of ERROR_CODES) {
       telemetry.engineError(
         context(),
-        new DesktopEngineRpcError("capture", {
+        engineErrorCode(new DesktopEngineRpcError("capture", {
           code: -32_000,
           message: "private engine message",
           data: { code, hint: "private recovery hint" },
-        }),
+        })),
         "quartz",
       )
     }
     telemetry.engineError(
       context(),
-      new DesktopEngineUnavailableError({
+      engineErrorCode(new DesktopEngineUnavailableError({
         code: "native-unavailable",
         host: "private-host",
         attemptedPaths: ["/private/path"],
         message: "private missing binary message",
         cause: "private cause",
-      }),
+      })),
       "unavailable",
     )
     telemetry.engineError(
       context(),
-      new DesktopEngineAbiMismatchError("/private/engine", { abi: "private", protocolVersion: "private" }),
+      engineErrorCode(new DesktopEngineAbiMismatchError("/private/engine", { abi: "private", protocolVersion: "private" })),
       "unavailable",
     )
-    telemetry.engineError(context(), new DesktopServiceError("Timeout", "private timeout"), "x11")
-    telemetry.engineError(context(), new Error("private unknown"), "private-backend")
+    telemetry.engineError(context(), engineErrorCode(new DesktopServiceError("Timeout", "private timeout")), "x11")
+    telemetry.engineError(context(), engineErrorCode(new Error("private unknown")), "private-backend")
 
     // then
     expect(recorded.observations.map((observation) => observation.kind === "engine_error" ? observation.code : "")).toEqual([
@@ -165,11 +166,11 @@ describe("computer-use telemetry projection", () => {
     const telemetry = createComputerUseTelemetry({ platform: "win32", observers: recorded.observers })
 
     // when
-    telemetry.toolCall({
-      type: "tool_call",
+    telemetry.toolExecutionStarted({
+      type: "tool_execution_start",
       toolCallId: "call-1",
       toolName: "computer",
-      input: { action: "run", code: "private typed text" },
+      args: { action: "run", code: "private typed text" },
     })
     telemetry.permissionTierDenied({
       type: "tool_execution_end",
@@ -199,11 +200,11 @@ describe("computer-use telemetry projection", () => {
     const telemetry = createComputerUseTelemetry({ platform: "linux", observers: recorded.observers })
 
     // when
-    telemetry.toolCall({
-      type: "tool_call",
+    telemetry.toolExecutionStarted({
+      type: "tool_execution_start",
       toolCallId: "call-2",
       toolName: "computer",
-      input: { action: "run", code: "await desktop.click(1, 1)" },
+      args: { action: "run", code: "await desktop.click(1, 1)" },
     })
     telemetry.permissionTierDenied({
       type: "tool_execution_end",

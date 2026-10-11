@@ -10,7 +10,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
-import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+import { engineStateDir, isolatedChildEnv } from "./sandbox-child-env.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -80,7 +80,7 @@ function main() {
   const elapsedMs = Date.now() - startedAt
 
   const requests = readJsonLines(join(sandbox.cwd, "depth-requests.jsonl"))
-  const records = readTaskRecords(join(sandbox.cwd, ".omo", "senpi-task"))
+  const records = readTaskRecords(engineStateDir(sandbox.cwd, env))
   const pids = [...new Set([run.pid, ...requests.map((request) => request.pid)].filter((pid) => typeof pid === "number"))]
   const limit = maxDepth === undefined ? 1 : Number(maxDepth)
   // The deepest session allowed to exist is the one whose spawn gets refused; at limit 0 that is the root.

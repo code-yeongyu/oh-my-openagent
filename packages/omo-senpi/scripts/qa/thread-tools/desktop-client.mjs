@@ -5,8 +5,8 @@
  * apps/server/src/provider/Layers/OmoSharedProcess.ts - so the argv, env and ensure
  * behavior are the desktop's, not a hand-rolled imitation.
  *
- * The desktop client starts its own host through `ensureOmoSocketHost` (detached, with a
- * `desktop-host.json` pid file); the harness registers that pid so the run stays leak-free.
+ * The desktop client asks the engine CLI to `host ensure` a detached host; the harness records
+ * the pid the engine reports (through `onHostEnsured`) so the run stays leak-free.
  *
  * Assertions read the target session's transcript through the same client
  * (`get_messages`), and address resolution runs through the shipped components against
@@ -22,6 +22,7 @@ import {
   cleanupAllAndWait,
   countUserTurns,
   createReport,
+  deliverAuto,
   desktopDependency,
   desktopModule,
   flag,
@@ -47,6 +48,9 @@ installCleanupHooks()
 const Effect = await desktopDependency("effect/Effect")
 const Fiber = await desktopDependency("effect/Fiber")
 const Stream = await desktopDependency("effect/Stream")
+// makeOmoSharedProcess requires the platform ChildProcessSpawner: the desktop asks the engine CLI to
+// `host ensure` its host instead of spawning one itself, so the scenario runs on the node services.
+const NodeServices = await desktopDependency("@effect/platform-node/NodeServices")
 
 /**
  * Await the Nth matching record on the desktop client's own event stream. Subscribing
@@ -78,7 +82,6 @@ const awaitRecords = (shared, predicate, count = 1, timeoutMs = 120_000) =>
 
 let scratchDir
 let socketPath
-let mailbox
 try {
   const scratch = makeScratch("t13-desktop-client")
   scratchDir = scratch.dir
@@ -94,12 +97,11 @@ try {
   // The desktop resolves its own binary; point it at this senpi checkout.
   const binaryPath = writeCliShim(scratch)
   socketPath = join(scratch.dir, "rpc", "rpc.sock")
-  const managedHost = trackDesktopManagedHost(scratch.agentDir, socketPath)
+  const managedHost = trackDesktopManagedHost(socketPath)
 
   const { makeOmoSharedProcess } = await desktopModule("apps/server/src/provider/Layers/OmoSharedProcess.ts")
   const { resolveTarget } = await threadComponent("addressing")
   const { assembleAddressBook, scanDiskSessions, toThreadAddressEntries } = await threadComponent("address-book")
-  const { createOrderedDeliveryMailbox } = await threadComponent("mailbox")
 
   const program = Effect.gen(function* () {
     const shared = yield* makeOmoSharedProcess({
@@ -111,6 +113,7 @@ try {
         SENPI_CODING_AGENT_DIR: scratch.agentDir,
         OMO_CODING_AGENT_DIR: scratch.agentDir,
       },
+      onHostEnsured: (host) => Effect.sync(() => managedHost.observe(host)),
     })
 
     const info = yield* shared.request({ type: "get_protocol_info" })
@@ -122,7 +125,7 @@ try {
         info.data.capabilities.includes("extension_events"),
       `serverVersion=${info.data?.serverVersion} capabilities=${JSON.stringify(info.data?.capabilities)}`,
     )
-    report.log(`desktop-managed host pid=${managedHost.pid()} socket=${socketPath}`)
+    report.assert("engine-reported-host-pid", typeof managedHost.pid() === "number", `pid=${managedHost.pid()} socket=${socketPath}`)
 
     const messages = (routingId) =>
       shared
@@ -149,14 +152,9 @@ try {
     yield* shared.request({ type: "set_session_name", sessionId: routingId, name: "desktop-peer" })
     report.log(`peer routing=${routingId} durable=${durableId}`)
 
-    // Mailbox port over the DESKTOP transport: snapshot/steer/start all go through
+    // Delivery port over the DESKTOP transport: snapshot/steer/start all go through
     // makeOmoSharedProcess, and the settle is awaited on its record stream.
-    mailbox = createOrderedDeliveryMailbox({
-      directory: join(scratch.dir, "mailbox"),
-      portFor: (target) =>
-        target !== routingId
-          ? undefined
-          : {
+    const desktopPort = {
               snapshot: () =>
                 Effect.runPromise(
                   shared.request({ type: "get_state", sessionId: routingId }).pipe(
@@ -179,8 +177,7 @@ try {
                     return { turn_id: `${routingId}-turn` }
                   }),
                 ),
-            },
-    })
+    }
 
     yield* promptAndSettle(routingId, CREATE_NEEDLE)
     const afterCreate = yield* messages(routingId)
@@ -207,13 +204,9 @@ try {
       `resolution=${resolved.kind === "ok" ? resolved.resolution : JSON.stringify(resolved)} entries=${entries.length}`,
     )
 
-    // ---- thread_send through the shipped ordered-delivery mailbox ----
-    // The mailbox's port is bound to the DESKTOP client, so the same component that serves
-    // the CLI surface drives the desktop transport; its retry loop is also what absorbs the
-    // host's "already processing" window instead of a sleep.
-    const sendResult = yield* Effect.promise(() =>
-      mailbox.accept(routingId, SEND_NEEDLE, { delivery: "auto" }),
-    )
+    // ---- one auto delivery over the DESKTOP transport ----
+    // deliverAuto retries only the host's brief "already processing" answer after a settle.
+    const sendResult = yield* Effect.promise(() => deliverAuto(desktopPort, SEND_NEEDLE))
     const afterSend = yield* messages(routingId)
     report.assert(
       "send-transcript",
@@ -262,7 +255,7 @@ try {
     yield* shared.request({ type: "close_session", sessionId: routingId })
   })
 
-  await Effect.runPromise(Effect.scoped(program))
+  await Effect.runPromise(Effect.scoped(program).pipe(Effect.provide(NodeServices.layer)))
   await fake.stop()
 } catch (error) {
   report.log(
@@ -270,7 +263,6 @@ try {
   )
   process.exitCode = 1
 } finally {
-  mailbox?.close()
   await cleanupAllAndWait()
   verifyCleanup(report, { scratchDir, socketPaths: socketPath === undefined ? [] : [socketPath] })
   const verdict = report.failures === 0 && process.exitCode !== 1

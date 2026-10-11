@@ -308,7 +308,7 @@ Procedure (non-negotiable):
 1. Spawn a reviewer via `task(category="ultrabrain", subagent_type="plan", load_skills=[...], run_in_background=false, prompt="<goal + scenarios + evidence + diff + notepad path>")` — or any high-rigor reviewer agent available.
 2. Verify each reviewer concern yourself. A concern blocks only when it names a success criterion the evidence fails; record concerns that cite no criterion as notes with a one-line reason — fixed or declined at your judgment.
 3. Fix every criterion-cited blocker. Re-run ONLY the scenario QA affected by the fix; capture fresh evidence for the delta. Update notepad.
-4. Re-submit to the SAME reviewer at most twice, passing only the delta diff, the blockers it cited, and the already-approved criteria marked out-of-scope. An approval whose only remaining items are notes counts as approval.
+4. Spawn a NEW reviewer for each re-review, at most twice, passing only the delta diff, the blockers the last one cited, and the already-approved criteria marked out-of-scope. An approval whose only remaining items are notes counts as approval.
 5. On approval, declare done. If criterion-cited blockers remain after two re-reviews, stop and surface them to the user — do not loop further.
 
 ## ZERO TOLERANCE FAILURES

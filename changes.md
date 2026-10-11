@@ -1,3 +1,1089 @@
+## 2026-10-11 - Preserve category reasoning through background launch and resume (#8510)
+
+Category model overrides and `models` chains no longer inherit the builtin category's variant. MoerAI's fix in #9013 is retained, with the background reasoning-lowering correction identified by willowite: resolve canonical reasoning against the selected model before session creation or dispatch. Loaded configuration keeps the precedence `reasoning > reasoningEffort > variant`; a legacy variant supplies reasoning only when no higher-precedence field is set, and a retained `default` remains neutral. Builtin categories preserve their existing variants, including fallback rungs without a variant of their own. Background attempt projection preserves the current model's generation settings, so a resumed task retains effort-only reasoning as well. The regression matrix passes user settings through the config schema and observes session creation, sync and background dispatch, resumed dispatch, and the provider-facing `chat.params` hook. Thanks to pointfish6660 for the per-session evidence.
+
+## 2026-10-11 - Foreground computer use needs the human-confirmed control grant (#9651)
+
+Explicit foreground delivery (`delivery: "foreground"`) now runs only while this session holds the engine's control grant: the host asks the human to confirm, then calls the host-only `control.grant { reason, confirmationId }`. `control.revoke` releases the grant, `session.close` and a stop chord revoke it, and `stopPath.resume` never restores it. At most one session of the process holds it; another session's grant is refused `InputBusy` and never steals the slot. A grant is refused `Suspended` while a stop is latched, admission itself checks the grant against the supervisor's stop epoch, and requests run on one serial queue, so nothing queued before a revoke runs after it (the fence against a human's late "yes" lives in the host). An op already admitted finishes its focus/cursor release and restore. A refused mutation sends no input and captures no focus or cursor, and is audited like any refusal. `control.grant` and `control.revoke` each emit exactly one audit event with the reason hashed by length and digest, like typed text; the raw reason is never logged. `control.state` is public and reports `{ active, reason?, grantedAt? }`. The grant authorizes foreground only - an omitted delivery stays background. `raiseWindow` needs the grant too (refused with "raising a window takes your foreground: approve the grant to allow it"): raising a window is the most visible focus steal, so this is deliberately stricter than upstream, which gates only `takeover` input. The error vocabulary gains `ControlRequired` (foreground without the grant) and `InputBusy` (another session holds it). The host confirmation and facade land in B5b.
+
+The Linux and Windows interactive-desktop QA harnesses take the grant with `control.grant` right after arming the stop paths, standing in for the host after a human confirm, because their foreground scenarios need it. The Windows `hotkey-latches` scenario now also checks that `stopPath.resume` leaves the grant inactive, then grants again before its post-resume input.
+
+## 2026-10-10 - macOS native menu backend for computer use (#9651)
+
+The macOS backend now implements the `Backend` menu hooks over AXUIElement, so `menus.items` and `menus.select` run against a real app's menu bar instead of refusing `AxUnsupported`. `menus.items` resolves the exact AX window root by CGWindowID (refusing `BackgroundUnavailable` when the window id cannot be proven), walks the path from `AXMenuBar` through the shared matcher, and lists each titled `AXMenuItem`/`AXMenuBarItem` child with its native path, enabled, checked (`AXMenuItemMarkChar`), hasSubmenu, and a shortcut rendered from `AXMenuItemCmdChar` plus `AXMenuItemCmdModifiers` (`Ctrl+Alt+Shift+Cmd+K`). `menus.select` refuses an application that owns more than one window (a menu command acts on whichever window the app treats as key, so it shares the background-keystroke rule), then makes the target window key without raising it through the same `MacInput` step keystrokes use (so the session's key-focus restore sees the activation), and verifies the key window is exactly the target. Only then does it walk to the parent menu, match the leaf, require `AXPress`, re-describe the leaf in that key context, verify the key window again, check stop once more, press, and settle 50 ms so AppKit runs the command before focus is handed back. Every level calls the stop check, every element must belong to the same pid, child lists are capped at 4096, submenu detection fails closed (only "no value" or "unsupported" means no submenu), and a second `AXMenu` child is refused. Ported from oh-my-pi's `ax/menus.rs`; the session's key-focus guard (not this backend) restores the user's keyboard context, so upstream's own focus guard is not copied.
+
+
+## 2026-10-10 - Adopt senpi 2026.10.10-12; task shards opt into the caller's lifetime
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-11 to 2026.10.10-12: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The lockfile is refreshed with `bun install --no-cache`. `packages/senpi-task/src/lazy/senpi-barrel.ts` adds `owner?: "caller"` to `EnsureHostInput`, and `packages/senpi-task/src/runners/rpc-host/daemon.ts` sets it when the ensure carries a `p` shard owner, so the engine stops that idle shard shortly after the owning omo process exits (senpi#3044). Unowned ensures are unchanged. The generated `omo.js` and `omo-task.js` bundles are regenerated.
+
+## 2026-10-10 - Cross-platform menu methods for computer use, proven on the fake backend (#9651)
+
+The engine answers `menus.items` and `menus.select`, the cross-platform menu contract, against any backend that implements the two new `Backend` hooks (default: `AxUnsupported`; no native platform code in this PR). `menus.items` (read) lists the immediate children of a window's menu at `path` (empty path = the menu bar): each item carries title, native path, enabled, checked, hasSubmenu and shortcut. `menus.select` (exec) invokes the leaf command `path` names through the shared matcher: a case-insensitive exact title wins over one with a trailing `...` or `…` ignored, each tier must be unique, and an ambiguous label, a disabled item anywhere in the path, a submenu as the leaf, or an untitled separator is refused before anything is dispatched. Selection runs as one background-delivered, gated, audited mutation (new `MutatingAction::MenuSelect`) with the key-focus restore, and every request, an invalid path included, emits exactly one audit event. Backends call a stop/cancel check at every menu level and right before the press, so a stop chord landing mid-walk dispatches nothing. The model facade gains `win.menu.items(path?)` and `win.menu.select(path)` in the JS/Python preludes, declarations, the `WINDOW_METHODS` tier table (items read, select exec, so read-only runs refuse select), and the fake backend serves a scripted per-window menu tree so every rule is exercised headless. Ported from oh-my-pi's `desktop.menus` flow.
+
+## 2026-10-10 - Shared menu-path matching for computer use (#9651)
+
+`senpi-desktop-core` gains `menus`, the platform-independent half of selecting an app command by its menu path. `validate_path` refuses an empty, over-long (more than 32 labels), blank or NUL path before any native access. `match_index` picks the item a label names: a case-insensitive exact title wins over a match with a trailing `...` or `…` ignored, each tier must match exactly one item, and neither menu order nor enabled state breaks a tie. `require_enabled` refuses a disabled item, and backends call it on every submenu they open while walking a path. `require_command` adds the leaf check (no submenu, no untitled separator), and backends call it again right before the native press. A label of just `...` never matches an untitled separator. Nothing calls it yet: the macOS, Windows and Linux menu backends follow in separate PRs. Ported from oh-my-pi `3f000c524c` (`desktop/menus.rs`) with its tests.
+
+## 2026-10-10 - macOS computer use writes ISO-8601 dates to date controls (#9651)
+
+`el.setValue(text)` on a macOS date or time control (an `NSDatePicker`, whose `AXValue` is a `CFDate`) used to write `text` as a `CFString`, which those controls do not take. When the control's current `AXValue` is a `CFDate`, the backend now parses `text` as ISO-8601 and writes a `CFDate` in the system time zone, then reads it back and refuses a mismatch. Accepted forms: `YYYY-MM-DD` (keeps the control's time of day), `YYYY-MM-DDTHH:MM[:SS[.fraction]]` (local wall clock), and a date-time with `Z`, `±HH:MM` or `±HHMM` (that exact instant). The form the accessibility tree prints round-trips. A local time that daylight saving skips or repeats is refused rather than moved or guessed, and the repeated-hour refusal names both offsets. Malformed input is refused with the accepted forms and the control's current value, and nothing is written. Every other element keeps the existing string write. Ported from oh-my-pi `9c7db7e596` and `de1b923bd9`; the parser takes the zone offset as a function, so its tests use a fixed Europe/Berlin rule, and an ignored live test drives a real `NSDatePicker` under `TZ=Europe/Berlin`.
+
+## 2026-10-10 - macOS computer use chooses popup-button options through setValue (#9651)
+
+`el.setValue(text)` on an `AXPopUpButton` used to write `text` as the popup's `AXValue`. AppKit accepts that write and ignores it, so the call reported success while the popup kept its old value. The macOS backend now opens the popup's menu, presses the option whose title equals `text` exactly, and confirms the choice by reading `AXValue` back. When a press shows no options it falls back to `AXShowMenu`. A missing, ambiguous or disabled option is refused with an error that lists the options. A menu the call opened is closed again whenever no choice is made, and the error says so if it will not close. After a confirmed choice the call also waits for AppKit to tear that menu down, cancelling it if it lingers, so the next call or screenshot never sees a dying menu. A menu the user left open is used but never closed. Pull-down popups (`pullsDown`), whose value is a fixed title, are not supported yet: a press on one is reported as not taken. Ported from oh-my-pi `55b3c08f7d` and `850072ad91`; the sequence sits behind a `PopupControl` seam so it is tested without a live accessibility server, and an ignored live test drives a real `NSPopUpButton`.
+
+## 2026-10-10 - DAG node ids are validated before they become result paths (#9869)
+
+A dag node id is used as one path segment under the state directory (`<stateDir>/dag/results/<runId>/<nodeId>.txt`). `compileDag` accepted any string, so an id containing `/` was stored as a nested directory, and an id with `..` could build a result path outside the state directory, where the node's output was written and could be read back. Node ids that are empty, `.`, `..`, or contain `/`, `\`, `:`, or a NUL byte are now rejected at compile time as `invalid_node_id` (`packages/senpi-task/src/dag/graph.ts`), and the store's `paths.result` builder refuses the same ids plus a containment check that keeps every result path under the results directory (`packages/senpi-task/src/dag/store.ts`). A refused persist reports its existing `journal_corrupt` diagnostic and a refused read returns `null`, so the run continues instead of throwing. A run already in flight with an id like `api/build` is not resumable after the upgrade: rename the node id and re-start the run, because its persisted result reads back as empty.
+
+## 2026-10-10 - unspecified-low runs GPT-6.1 Sol on the OpenAI lanes (#9844)
+
+`unspecified-low` had no GPT-6.1 Sol rung, so an OpenAI-only machine (ChatGPT subscription or OpenAI API) ran `gpt-5.6-terra (high)`. `packages/model-core/src/category-model-requirements.ts` and the Senpi mirror in `packages/senpi-task/src/category/fallback-chains.ts` add `gpt-6.1-sol (medium)` on `openai|chatgpt-subscription` directly before the second GPT rung, the effort every other 6.1 Sol default uses. GPT-5.6 Terra leaves the chain entirely (owner direction, 2026-10-10): the second GPT rung is now `gpt-5.6-sol (medium)` on `openai|chatgpt-subscription|github-copilot|opencode`, the same model the deep-low and ultrabrain lanes already use for Copilot and OpenCode Zen, so those setups keep a valid GPT rung and a registry without 6.1 Sol still resolves the lane. The the model 5.5 head (#9144) is unchanged.ged. No other category had a stale GPT-5.6 lead: `quick` leads with GPT-6 Luna Fast, `deep-low` with GPT-6.1 Sol, `deep-high`/`ultrabrain` with GPT-6 Astra. The four chain-pin tests and the docs rows follow; the Senpi extension bundles are regenerated (`build-extension.mjs --check` current).
+
+## 2026-10-10 - Hide console windows on the Bun spawn path (#9840)
+
+`@oh-my-opencode/utils/runtime` `spawn()` / `spawnSync()` prefer `Bun.spawn` / `Bun.spawnSync` under Bun and passed no `windowsHide` there, while the Node fallback already set it on win32. Both Bun calls now go through `createBunSpawnOptions`, which adds `windowsHide: true` (Bun applies it only on Windows). The utils `windows-console-hide` gate now also audits `Bun.spawn*` and runtime-handle `bun.spawn*` calls. An allowlisted call must pass through the options helper its entry names, and the gate asserts that each helper sets the flag.
+
+## 2026-10-10 - Run hook commands without a console window on Windows (#7144)
+
+`executeHookCommand` now spawns every Claude-compatible hook command with `windowsHide: true`, matching the `taskkill` spawn beside it. A console-less host (an IDE- or GUI-launched `opencode serve`) used to get a fresh console per hook: a conhost flash echoing the hook JSON, or, with Windows Terminal as the default terminal, a full terminal window that took focus on every prompt and tool event. The `sg --version` probe in `ast-grep/sg-resolver.ts` and the `where bash` lookup in `runtime/git-bash.ts` had the same gap and now pass the flag too.
+
+`packages/utils/src/windows-console-hide.test.ts` walks the whole utils source tree like the #8501 gates do and fails on any `node:child_process` spawn, exec, execFile or fork call without `windowsHide: true`, unless an allowlist entry names its reason (the `runtime/spawn.ts` Node fallback, whose options helpers set the flag on win32; the gate asserts that too). The flag is inert on posix.
+
+## 2026-10-10 - lazycodex plugin scripts no longer open console windows on Windows (#9838)
+
+Every `node:child_process` call in `packages/omo-codex/plugin/scripts/` now passes `windowsHide: true`. The worst offender was the background auto-update in `auto-update.mjs`, which ran `cmd.exe /c npm.cmd` detached from a Codex hook and so got its own console window on every update. The `auto-update-plan.mjs` version probe and manual-update runner, and the plugin build scripts, had the same gap. `plugin/test/windows-console-hide.test.mjs` walks every plugin script and fails on any spawn, exec, execFile or fork call without the flag (allowlist with a reason per entry, empty today), and refuses namespace, default or `require` imports of `child_process` that it could not audit.
+
+## 2026-10-09 - Warn on logout unless the server revoked the device (#9833)
+
+A refresh refusal during logout suppresses the unconfirmed-revocation warning only when the service guarantees the device is already revoked: `account_deleted`, and `reauth_required`, which the service returns on refresh only after revoking the device for token reuse. `unauthorized` and `invalid_grant` leave the device's slot held, so logout clears locally, makes no revoke attempt, and points to the account's Devices page.
+
+## 2026-10-09 - Finish logout after refresh refusal or interruption (#9833)
+
+Logout uses the normal journal-before-send refresh path. An explicit terminal refresh refusal means the session is already ended: local credentials are cleared without a revoke request, and the unconfirmed-revocation warning is shown unless the refusal is `account_deleted` or `reauth_required` (see the entry above). Other refresh failures and a previously uncertain record clear the complete local item, exit successfully, and warn that server revocation was not confirmed. An uncertain record is cleared without another network attempt.
+
+A real-child crash regression kills the owned logout process while its journaled refresh response is held, then proves fresh logout clears without replay and fresh whoami reports signed out.
+
+## 2026-10-09 - Recover sign-in safely after TLS and browser-launch failures (#9831 follow-up)
+
+Certificate verification failures and explicitly identified connection/handshake failures now preserve a retryable sign-in, since no HTTP credentials were sent. Generic resets and timeouts remain fenced when the send outcome is unknown. Logout refreshes an expired access token only for a non-uncertain record, persists the rotation before revoking the device, and still clears locally on every exit.
+
+A valid loopback callback is no longer discarded when the browser opener subsequently fails. Chooser labels use a directly tested sanitizer mapping. Regression coverage includes real local self-signed TLS, both terminal-refusal message arms, refresh 429 recovery, C1 terminal controls, and deterministic first/last-byte and length-mismatch callback rejection.
+
+If the OS credential store cannot restore a record after a proven not-sent failure, the durable safety marker remains: the client cannot safely tell another process to replay the token without persisting that knowledge. No disk fallback or process-local bypass was added.
+
+## 2026-10-09 - Preserve offline sign-in and prevent uncertain refresh replay (#9831)
+
+Refresh now journals an in-flight rotation in the OS credential record before sending it. Proven connection failures preserve a retryable sign-in. A timeout, lost response, 5xx, invalid reply, or failed rotated-token save retains credentials and device keys but requires a new sign-in instead of resending the possibly consumed refresh token. Reuse has no grace period and can revoke the device, so a later process also honors the journal. Only explicit terminal refusals clear the stored sign-in.
+
+Loopback state comparisons are constant-time. Device polling follows RFC 8628 without the off-contract 401 continuation, strips terminal controls from displayed server strings, and handles 429 with bounded Retry-After backoff until expiry. Logout attempts access-authenticated device revocation and always clears locally, warning when server revocation could not be confirmed. Error objects no longer serialize management credentials or arbitrary server error codes.
+
+Regression coverage includes actual listener binding, ephemeral ports, callback reuse, HTTPS guards, per-failure refresh outcomes, native CLI error output, terminal injection, and offline logout. The native authentication bundle is regenerated from the same source.
+
+## 2026-10-09 - CLI sign-in with OS credential storage (#9829, #9811)
+
+`omo login` supports browser loopback PKCE and headless device authorization (`--device` or `--no-browser`), production origins by default, and explicit API/accounts overrides. Device sign-in shows the verification URI, user code, and matching code, observes the server's expiry and polling interval, and backs off on `slow_down`. At the device limit, interactive users can choose and confirm one device to revoke before retrying; declining changes nothing.
+
+Tokens and Ed25519/X25519 private keys live only in Bun's OS credential store: Keychain on macOS, Secret Service on Linux, and Credential Manager on Windows. Missing or locked stores fail without a plaintext fallback. Refresh reads, rotation, atomic credential replacement, and logout share a cross-process lock; terminal refresh refusals clear credentials. `omo logout` clears the stored sign-in; `omo whoami` reports the device after refreshing if necessary. Default device names strip format/control/separator characters and Hangul fillers before applying the 64-character limit.
+
+The toolkit CLI, native launcher, and compiled native entry share the commands. Native's checked-in command bundle is regenerated by `bun script/build-service-auth.ts` and guarded by a freshness test.
+
+## 2026-10-09 - Adopt senpi 2026.10.10-11
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-10 to 2026.10.10-11: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. `tool_schema("eval:environments")` documents `packages.install` and `environment_install_timeout` in JavaScript and Python cells, while the default eval description and parameters stay byte-identical. Julia, Ruby and Python cells do less fixed work per cell: no globals walk below the memory thresholds, no awaited cwd stat, and leaner Python queue and capture bookkeeping. The lockfile is refreshed with `bun install --no-cache`, the provider map is checked against the pinned engine's `builtinProviders()`, and the generated plugin bundle is regenerated for it.
+
+## 2026-10-09 - Default lineups use Claude Haiku 5.5, right after Luna
+
+Every default chain that used `claude-haiku-4-5` now uses `claude-haiku-5-5` at `medium`, moved up to sit right after `gpt-6-luna-fast`:
+- `quick` (`packages/senpi-task/src/category/fallback-chains.ts`, mirror `packages/model-core/src/category-model-requirements.ts`): Luna (low) -> Haiku 5.5 (medium) -> DeepSeek Flash (off) -> ...; the trailing Haiku 4.5 (off) rung is gone.
+- `explore` and `librarian` (`packages/senpi-task/src/agents/builtin/fallback-chains.ts`, mirror `packages/model-core/src/agent-model-requirements.ts`, parity #8259): Kimi HighSpeed (off) -> Luna (low) -> Haiku 5.5 (medium) -> DeepSeek Flash (max) -> ...; the trailing Haiku 4.5 rung is gone.
+- The Claude Code `haiku` alias maps to `claude-haiku-5-5`; the OpenCode installer's Claude-only `explore` default is `anthropic/claude-haiku-5-5` (medium); the agent-category migration maps both ids to `quick`; telemetry adds the 5.5 id and keeps 4.5.
+
+Providers are the 4.5 rung's, all of which serve the model in the pinned senpi catalog: `anthropic` and `anthropic-subscription` (`claude-haiku-5-5`), `anthropic-api` (an `anthropic` alias), `github-copilot` (`claude-haiku-5.5`, reached by `transformModelForProvider`). The variant is `medium` because Haiku 5.5 has no `off`, and in our evaluation `low` stopped early. The bundled capability snapshot gains the nine `claude-haiku-5-5` entries these rungs need, picked from a fresh models.dev fetch like the Opus 5.5 entries were; the full refresh is the scheduled workflow's job. `.github/workflows/sisyphus-agent.yml` keeps its `claude-haiku-4-5` entry: it is that workflow's own pinned provider definition for its CI agent, not a routing default.
+
+## 2026-10-09 - Adopt senpi 2026.10.10-10
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-9 to 2026.10.10-10: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine keeps a session on one Anthropic Subscription account across transient errors (senpi#2891), stops re-writing the whole conversation to the prompt cache with resume off (senpi#2982), waits for the reader instead of failing a long streamed tool call (senpi#2822), and serves `gpt-6.1-sol-ultrafast` without a local extension (senpi#2975). The generated plugin bundle is regenerated for it on Linux.
+
+## 2026-10-08 - Config migrations edit omo.jsonc only where a value changes (#9777)
+
+The first engine start against an existing `~/.omo/omo.jsonc` runs the `2026-08-reasoning-unification` migration (replace-target, no `shouldRun`). It reformatted every top-level value: nested line and block comments, trailing commas, inline objects and custom indentation were lost. A `.bak` was written first, so nothing was unrecoverable. There were two causes:
+- **Every key was edited:** `prepareTargetReplacement` (`packages/omo-config-core/src/migration/commit.ts`) emitted an edit for every top-level key, changed or not.
+- **Edits reformatted their neighbours:** jsonc-parser's `modify` reformats the neighbouring member's line whenever it inserts or removes a member, and it replaces a whole value's text.
+
+The fix:
+- **Diffing:** replace-target migrations now diff the transformed document against the target (`migration/diff-edits.ts`) and edit only the deepest paths that changed, plus the `_migrations` marker. A migration that changes nothing adds only the marker.
+- **Surgical writes:** the writer (`writer/surgical-edit.ts`) inserts and removes members by hand in the file's own indentation and trailing-comma style. Replacing a value still goes through `modify`, which rewrites only that value. A member that shares its line with another falls back to `modify`.
+
+The same writer serves merge migrations' additions and `omo setup` edits.
+
+Every registered migration was audited: reasoning-unification, category-deep-split, harness-native-rename and subscription-provider-rename (replace-target) and the opencode/config-jsonc merges. They all write through the one writer, so all of them are covered.
+
+## 2026-10-08 - The configuration reference documents the Anthropic 1-hour prompt cache and the cache keep-alive (#9770)
+
+`docs/reference/configuration.md` gains an "Anthropic Prompt Cache Lifetime" section. The engine already supported both settings, but the docs never mentioned them, so users with long gaps between turns paid a full cache rewrite on every turn and asked for a feature that already existed. The section covers:
+- **Two switches:** `PI_CACHE_RETENTION=long` for every Anthropic model, and a per-model `providers.<provider>.modelOverrides.<id>.cacheRetention` in `~/.omo/agent/models.json`, which wins over the variable. A `cacheRetention` set directly on a built-in provider is rejected.
+- **Where it applies:** the 1-hour lifetime is sent only to the Anthropic API base URL.
+- **Cost trade-off:** 1-hour writes cost 2x base input against 1.25x for 5 minutes, and reads cost 0.1x.
+- **`promptCache.keepAlive`** in `settings.json`, with its defaults.
+
+The environment variable table lists `PI_CACHE_RETENTION`.
+
+## 2026-10-08 - Install guide lists the community AUR package (#9584)
+
+`docs/guide/install.md` gains an "Arch Linux: community AUR package" section for `omo-bin`, a package maintained by @sTiKyt outside the OmO team. The section says what it installs (our official release binary for its version, checked against that release's `SHA256SUMS`, as `/usr/bin/omo`), and to update it with the AUR helper, because `omo update` and the install command don't recognize a pacman install yet (#9585). It also says the package can trail the `latest` channel.
+
+## 2026-10-08 - The process-model catalog probe reads the whole catalog under load (#9068)
+
+`senpi --list-models` prints its catalog and calls `process.exit(0)` right away. When the host was too loaded to drain the probe's stdout pipe, every row past the pipe buffer was dropped while the child still exited 0, and because the catalog is sorted by provider the tail (`xai`) went first. Admission then rejected `xai/grok-4.7` as `model_not_in_child_profile`, and the confirming re-probe ran under the same load, so it confirmed the false absence. `probeModelCatalog` (`packages/senpi-task/src/runners/rpc/model-catalog-probe.ts`) now gives the child a temp file as stdout instead of a pipe, reads the last 2 MiB of it once the probe settles (the child closed, or the timeout path terminated it) and removes it; stderr stays piped. A read or cleanup failure is reported in the probe's stderr instead of thrown, so admission always gets a result. A file write never waits on the reader, so the catalog is whole however slowly the host is scheduled.
+
+## 2026-10-08 - OpenCode never migrates `.sisyphus` into the home `~/.omo`; `~/.omo/desktop*` is reserved for the OmO desktop app (#9727)
+
+The OmO desktop app is moving its data home (a live SQLite database and worktrees) to `~/.omo/desktop`, with a transient `~/.omo/desktop.init-*` while it prepares (code-yeongyu/omo-desktop-app#1829). The OpenCode plugin's legacy workspace migration (`packages/omo-opencode/src/shared/legacy-workspace-migration.ts`, run on every plugin load) copied missing entries of `<cwd>/.sisyphus` into `<cwd>/.omo`. When OpenCode started in the home folder, that target was the OmO home itself, so a stray `~/.sisyphus/desktop/` could drop files into the desktop app's database folder. The migration now:
+- **Refuses the home target:** it does nothing when the directory is the user's home, in any of its spellings: `HOME`/`USERPROFILE` (the config loader's user layer), `os.homedir()`, and the account home. `.sisyphus` was always a per-project workspace, and the only home-level legacy entry, `~/.sisyphus/rules`, is still read in place by the rules engine.
+- **Never overwrites:** it decides whether a target exists with `lstat` and copies with `COPYFILE_EXCL`, so an existing file is never overwritten and a dangling symlink at the target is never written through.
+
+The root `AGENTS.md` now reserves `desktop/` and `desktop.init-*` in `~/.omo` for the desktop app. Other operations under `~/.omo` stay scoped as before:
+- the isolation sweep removes only `t<hex10>` entries under `~/.omo/wt`;
+- team cleanup removes only `~/.omo/runtime/<id>`;
+- config migration touches only the omo config files.
+
+The engine's copy-forward into a flat-layout brand dir skips the reserved names in senpi (code-yeongyu/senpi#2898).
+
+## 2026-10-08 - An explicit task model pin is honoured or the spawn fails loudly (#9722)
+
+A task spawn carrying `model: "provider/model:level"` silently ran on the global settings default whenever the default differed from the pin: the planner kept the suffix as part of the model id, the in-process session context dropped the unresolvable id without an error, and senpi substituted the default. The pin is now parsed once with senpi's own model resolver into a canonical `provider/model_id` plus thinking level, resolved against the live registry at plan time, and a pin that does not resolve fails with a typed `model_unavailable` naming the pin and the default route the child would have used. The in-process session context asserts the spec's model instead of filtering it, the RPC process and host runners admit a valid `:level` pin and send the base id plus the level, and after start the child's effective model is checked against the plan (a mismatch fails typed, the session is torn down) and read from the child itself into the record's new `effective_model` - so `task_output` and the `started` result name the model that actually ran.
+
+## 2026-10-07 - Suspended children retry after their parent session resumes (#9498)
+
+A resumed session now retries its own children when revival temporarily cannot
+resolve a model or session, acquire a lock, roll back a claim, obtain capacity,
+or recover ownership. Previously only unreachable or draining daemon sessions
+were retried; other children waited indefinitely for another session start.
+The existing bounded backoffs and ownership-fenced admission remain in use.
+Repeated unowned model/session/rollback/lock failures end as `lost`, with the
+deferral and retry count visible in `task_output` and the normal parent terminal
+notification. Capacity and live-owner deferrals stay suspended until the other
+side moves; daemon-hosted sessions are never marked lost by this fallback.
+
+## 2026-10-07 - Memory masking covers a token glued by an invisible character that also holds one inside (#9717)
+
+When a format character outside the Basic Multilingual Plane glued an ordinary word to a token, and the token itself held a zero-width or control character, memory masking hid only the token's first part (and an AWS access key id in that shape was not detected at all). The scanner now remembers where it dropped an invisible character and retries the token patterns around each such point (also for a token that ends in a hyphen or is glued to a word after it), so the whole token is detected and masked; the extra pass stays linear on adversarial input. Control characters inside a credential key or vendor prefix are now covered by tests, and a facts warning no longer copies a parse error message that can quote the file.
+
+## 2026-10-07 - The per-session workflow cap counts only active runs (#9712)
+
+`task.dag.max_runs_per_session` (default 16) is a cap on runs that are still active, as the `mass-ulw` guidance describes it. The store used to count every run record of the session, including completed, failed and cancelled runs, until the 7-day retention pruned them, so a long session hit `DAG session run limit reached: 16` with nothing running. The capacity check now skips runs whose status is terminal (`TERMINAL_DAG_RUN_STATUSES` in `senpi-task`'s `dag/types.ts`, shared with the wait surface, retention and retry). Because a finished run no longer holds a slot, reviving one (`retry`, or re-entry after an amend) now passes the same check under the session capacity lock before anything is journaled, so a session cannot exceed the cap through retries and a refused retry leaves every node as it was. The error states how many runs are active and the way out: wait for one to finish, cancel one, or raise `task.dag.max_runs_per_session`. Finished runs stay readable until retention, as before. An amend that the cap refuses at re-entry keeps the saved amendment: amend again with the same definition once a slot frees to run it.
+## 2026-10-07 - The parity gate's ast-grep probe waits for the MCP tools to register (#9710)
+
+Since senpi 2026.10.10-6 a first message no longer waits for MCP servers to connect (senpi#2843), so `native-binary-parity`'s tool-search probe counted whatever the bundled ast-grep MCP server had registered by then and failed on timing alone (3 vs 4 tools on macOS, which also stopped the 5.1.23 publish once). `script/qa/omo-native-parity-compare.mjs` now builds the probe as an eval cell that polls `tool_search` until all three ast-grep tools (`mcp__ast_grep_search`, `_rewrite`, `_scan`) are listed, bounded at 45 s, with `on_timeout: "error"` on the step so eval never detaches the cell (an RPC session otherwise detaches a cell after 30 s), and prints one settled line. The search is scoped to `source: "mcp"` so other catalog tools can't crowd the three out of the result cap. A side whose tools never register prints an explicit timeout line, and `compareRuns` reports it as a difference even when both sides agree, so a missing MCP runtime still fails the gate. senpi#2843's behavior is untouched.
+
+## 2026-10-07 - A child that fails to start says why (#9703)
+
+A task child whose first prompt was rejected reported only "Child prompt failed to start." in the task record, the event log and the tool result, so a host timeout, a host refusal, a lost connection and a child that crashed before taking its prompt all looked the same. The start failure now names the cause in one sanitized line: the request that got no answer in time (`request_timeout`), the host's refusal with its error code when the code is a plain identifier (`host_refused`), a lost connection (`transport_lost`), or the child's exit (kind plus code or signal). The event log also carries `cause_class`, `timed_out_command` and `cause_code`. Raw error text, which can carry a stderr tail, still never reaches a record, an event or the tool result, and an unrecognized cause keeps the previous message.
+
+## 2026-10-07 - Memory secret scanning handles format characters outside the BMP; doctor and receipts say when they fall back (#9653, #9689 follow-ups)
+
+The memory secret scanner strips Unicode format characters before matching, but it walked text one UTF-16 code unit at a time, so a format character outside the Basic Multilingual Plane survived the strip and could split a secret-like value past the commit gate and the injection-time masking. The scanner now walks by code point and maps matches back to the exact original span, and it also scans a copy where format characters become a separator, so a format character gluing a word character to a secret no longer hides the secret's word boundary (this also closes the older zero-width-space variant of that gap); a match from that second scan is kept unless the first scan already covers all of it, so a token joined to a following credential by such a character masks both (the split-key pass follows the same rule, so a glued credential whose value holds such a character is masked whole), and control characters gluing a word to a secret are handled the same way. `/doctor` reports when commit times cannot be read and the memory file list falls back to name order, facts receipts that cannot be written because a run's ledger is missing now log a warning instead of skipping silently, and `invalid_generation_timestamps` is removed from the quarantine reasons because nothing writes it. New tests cover the out-of-BMP split, a `/doctor --json` value with a quote next to a credential, the preserved reservation evidence of a quarantine, and a facts run whose ledger is gone.
+
+## 2026-10-09 - Adopt senpi 2026.10.10-9
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-8 to 2026.10.10-9: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine carries the cap on engine-originated turns (senpi#2967), the required ask-user question gate (senpi#2949), the merged `anthropic-beta` header (senpi#2957) and a refreshed model catalog. The generated plugin bundle is regenerated for it on Linux.
+
+## 2026-10-08 - Adopt senpi 2026.10.10-8
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-6 to 2026.10.10-8 (-7 was cancelled before publishing): the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine carries the MCP SDK 1.32.1 issuer binding for saved sign-ins (senpi#2940), the Anthropic subscription auth-block recovery (senpi#2926), required compaction on small windows (senpi#2925), the config-reload loop fix (senpi#2878), print-then-exit output on slow pipes (senpi#2937), `ask_user_question` answers outside the tool result (senpi#2920) and the official Kimi K3 cache-write price. The generated plugin bundle is regenerated for it on Linux.
+
+## 2026-10-07 - Adopt senpi 2026.10.10-6
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-5 to 2026.10.10-6: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine carries the child-spawn fix for "Provider scope is closed" on a busy shared host (senpi#2871), senpi-owned compaction on the subscription lane (senpi#2749), the Anthropic tool-change fix, the cache-first MCP admission and the restored-binding check. The generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-07 - Memory maintenance runs write receipts, unrecoverable runs are quarantined, and recovery is kill-tested (#9689)
+
+Reflection, dream and facts runs now leave an append-only record of what they did:
+`receipts.jsonl` in the identity's runtime directory, one JSON line per event (`launched`,
+`recovered`, `merged`, `no_changes`, `failed`, `abandoned`, `quarantined`, and for facts
+`committed`, `no_facts`, `failed`, `parked`). A receipt is written after the run's own
+terminal file, and the next startup rebuilds a lost one from that file, so each outcome is
+recorded exactly once. Startup reconciliation no longer throws on invalid timestamps or keeps a
+reservation forever behind an unreadable ledger. Under a launcher proven dead, such a run is
+quarantined: its files stay, `quarantined.json` names the reason, and the reservation is
+released so later runs proceed. A supervisor that dies after its child committed a valid result
+no longer loses it: startup validates and merges the tip. A launch interrupted before its run
+started is recorded as `abandoned` instead of being deleted. `/doctor` shows the newest
+receipt per kind and lists quarantined runs. A crash test kills a real process at each of seven
+points and checks that recovery settles every run once with its evidence intact.
+
+## 2026-10-07 - Adopt senpi 2026.10.10-5
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-4 to 2026.10.10-5: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine carries the attach permission-preset fix (senpi#2823), the streaming scroll fix (senpi#2836), the codemode stop/require/name-shadowing and live-row fixes, and the `show_html_page` tool. The generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-07 - The memory file list in the prompt is bounded by recency, count and bytes (#9687)
+
+`<external_projection>`, the list of memory files outside `system/` at the end of the compiled
+memory block, had no limit. A long-lived corpus measured 157,834 bytes (about 39K tokens) on
+every turn. Each directory now lists its most recently committed files first, up to
+`memory.projection.max_entries_per_directory` (default 40). The whole list fits
+`memory.projection.max_bytes` (default 24576), with the largest directory giving up names first.
+Omitted names are counted with a pointer to read the directory. `0` disables a limit, and both
+at `0` reproduce the previous list byte for byte. `/doctor` reports names shown and omitted, the
+byte size, and the overflow when no listing fits the budget. Commit times per path are read incrementally and
+stored in the memory repo's git dir. After the first full read (about 9 s on a 12k-commit
+history), a new commit costs one short `git log` of the new range.
+
+## 2026-10-06 - /doctor audits corpus structure and dream repairs it (#9652)
+
+Memory doctor now reports dangling links, invalid frontmatter, duplicate bodies,
+orphaned paths, unreadable files, and system pressure. `/doctor --json` provides
+the checks, audit findings and counts, and skill repair totals, with secret-like
+string values masked before serialization. Unknown flags, including `--fix`,
+are refused. Dream receives a redacted audit of its own worktree and a structural
+repair phase; reflection does not. The repair pipeline preserves user boundaries
+and evidence, validates the child's committed edits, and merges them normally.
+
+## 2026-10-06 - Adopt senpi 2026.10.10-4
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-3 to 2026.10.10-4: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. `test/provider-map-registry.test.ts` passes against the 10-4 engine, so the provider registry lists are unchanged. The engine carries the terminal session controls and delivery sender labels that omo #9662 and #9664 build on, the concurrent-rebind fix (senpi#2828), the stale extension shim repair and the TUI stdout guard. The generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-06 - Memory refuses secret-like commits and masks injected memory text (#9653)
+
+Memory used to commit whatever it was given and inject it back verbatim, so a token pasted into a conversation could end up in the memory repository and in every later session's prompt. One evasion-resistant scanner now guards both directions. It covers AWS keys, credential assignments, bearer headers, OpenAI-style keys, vendor tokens, PEM blocks and whitespace-split credential keys, and it matches after stripping zero-width characters. Every commit path refuses secret-like file names or content and leaves the repository unchanged: the memory tools, facts extraction, and reflection and dream runs, whose full branch history is checked before merging. A refused facts run parks after one failure, and a refused reflection or dream run counts as non-retryable. The pre-commit hook applies the same classes to hand commits. The compiled memory block, rendered paths, recall hints and memory command output mask any match as `***`, including content committed before this change. Errors name the file and the class, never the secret.
+
+## 2026-10-06 - The release binary ships the browser skill's omowright runtime (#9661)
+
+Since the browser guidance was routed through omowright (#8729, 5.1.11), the published release binary installed the browser skill without its bundled `runtime/omowright`, so `loadOmowright()` and `browser-doctor.mjs` always failed for binary installs while the npm `omo-ai` install worked. The native staging chain (`script/build-omo-native.ts`) runs `build:senpi-plugin:native` with `OMO_SKIP_MATERIALIZE=1`, which skips `stage-omowright-runtime.mjs`, and nothing else staged the gitignored runtime before the plugin payload was copied. The runtime is now a prebuilt native input staged via `build:materialize-frontend` when missing, and `skills/browser/runtime/omowright/index.js` is a required plugin artifact, so a payload without it fails the build instead of shipping. `script/build-omo-native.test.ts` covers both the staging trigger and the required-artifact gate.
+
+## 2026-10-06 - Adopt senpi 2026.10.10-3
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.10-2 to 2026.10.10-3: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine carries the retry-watchdog fix (senpi#2804) that the 5.1.21 hotfix ships, plus codemode's opt-in process-isolated JavaScript kernel. The generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-06 - The frontend skill routes tone and situation to more component catalogs, with licence gates (#9644)
+
+The frontend skill could only source motion from beui.dev and react-bits. A brief whose tone or surface fell outside them (AI-agent UI, charts, landing sections, brutalist or Tailwind-only builds) left the agent writing motion from memory, and nothing told it which other catalogs it may read or copy from. The new project-original `references/design/component-catalogs.md` maps tone and situation to the catalog to read first, lists a seven-step exploration procedure built on each catalog's published `llms.txt` and shadcn registry, records each catalog's licence, terms and robots.txt stance (measured 2026-10-06), and covers charts. Agents fetch only published agent surfaces, never paste source, take free items only, and never fetch styles.refero.design, skiper-ui.com or originkit.dev. It is routed from `SKILL.md` and from both anchors' "no matching pattern" step; component Motion lines in `DESIGN.md` now name a borrowed mechanism's source. `_INDEX.md` now credits Layer B to nexu-io/open-design, which is where the manifest materializes it from.
+
+## 2026-10-05 - Detect stale stylesheet references across web deployments (#9617)
+
+The web deployment-coherence probe retains the stylesheet references from build A's HTML, checks both unchanged-build controls, and requests the retained paths against build B. It covers English and Korean with synthetic mobile Safari and WKWebView user agents and rejects missing CSS, HTML masquerading as CSS, or a broken control. Same-origin absolute references are rebased to B so the check cannot silently fetch the old stylesheet from A and report success. Five HTTP/CLI behavior tests cover these paths.
+
+The static-asset carry-forward engine preserves the current live resource graph on first migration and the entire generated static set on subsequent deployments. It checks downloaded bytes and CSS MIME, preserves inherited deadlines, and retires resources only after the prior HTML lifetime plus deployment overlap. The deployment CLI reads the compiled Next budget, refuses an under-budget document, and blocks on missing advertised, malformed or unreadable history. Next's ISR expiry is bounded to one hour, deployments use their commit identifier, hashed static resources are immutable, and the inventory is not cached.
+
+The Worker deployment workflow now carries the inventory before uploading and uses one cross-branch concurrency group with cancellation disabled and a 30-minute deployment bound. The production CLI's current-only bootstrap passes the actual four-case retained-document A/B probe. Already-gone generations cannot be reconstructed; pre-existing older cached HTML may still lose those resources for its original lifetime, which the new expiry does not shorten retroactively. The deploy owner must adopt/coordinate the lock on older master workflows that do not yet contain it.
+
+## 2026-10-05 - LazyCodex activates the version it just installed (#9631)
+
+The installer left previous plugin versions beside a new cache entry. Codex gives `local` priority over versioned entries, so an old local plugin could keep displaying old hook names while the installer recorded trust for the new payload. Installing now removes obsolete version directories only after the replacement payload validates and is promoted. Other plugins, plugin data, symlinks, and hidden staging directories stay in place; a failed preparation leaves the previous cache intact. Actual Codex app-server checks cover restart and reinstall stability and confirm that genuinely changed hooks still require review.
+
+## 2026-10-05 - Adopt senpi 2026.10.10
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.9 to 2026.10.10: the root devDependency, `omo-native` and its provider map, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine adds code mode's `%bun add` / `%npm add` and opt-in isolated cells and the fixes listed in its release; omo's codemode prompt surface is unchanged (the default eval description renders from the same senpi source in both versions, and omo sets neither `prompt.advertiseHelpers` nor `sandbox.enabled`). The generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-05 - The reply-listener success test no longer races a 500 ms budget on a slow runner (#9607)
+
+`reply-listener-startup.test.ts` ran its success-path test under the production 500 ms startup budget. When a starved Windows runner delayed the fake child's ready write past that deadline, the test failed with `result.success` false. The success path returns as soon as the child reports ready, so the test now sets a 30 s budget. The never-ready test keeps the short budget.
+
+## 2026-10-05 - The manifesto keeps the top three quarters of the screen fully lit (#9591)
+
+On omo.dev's manifesto the reveal fully lit text only down to about two thirds of the viewport (median ~0.66, as low as ~0.61, measured at word tops at 390 / 1440 / 1920 in en and ko), against the 75-80% the reading design asked for (#9537). A word is fully lit once its bottom, plus its in-line stagger, is above `--lit-line - --lit-band`. That line was 78vh - 8vh = 70vh, so the tops of the last fully lit words sat near 66%. `--lit-line` moves to 91vh (`packages/web/app/styles/design-system.css`), putting the full line at 83vh. Measured the same way after the change, the depth is 0.805-0.819 at the median and 0.760-0.772 at worst in every one of those configurations, identical on the scroll-timeline and the fallback path. The reveal order, the reduced-motion path and the lit-at-the-bottom guarantee are unchanged.
+
+The readable-screenful e2e test pinned the old 70% from the CSS, so it could not catch this. It now measures the depth from word geometry on every scroll step (the top of the first visible word that is not fully lit), requires at least 0.72 on every frame and at least 0.75 at the median, and moves into its own file, `packages/web/e2e/manifesto-lit-depth.spec.ts`, with the shared page helpers in `e2e/manifesto-page.ts`.
+
+## 2026-10-04 - Adopt senpi 2026.10.9
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.8 to 2026.10.9: the root devDependency, `omo-native` and its provider map, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine names the tool call a permission prompt approves (senpi#2710), stops requiring a status block on a reply that only answers and drops quote-line reply templates (senpi#2723, senpi#2714), and carries 2026.10.9's code mode work; the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-04 - Test runs keep the engine's agent dir in their temp home (#9578)
+
+`test-setup.ts` pointed `HOME` at a per-process temp dir but DELETED the agent-dir variables (`OMO_CODING_AGENT_DIR`, `SENPI_CODING_AGENT_DIR`, `PI_CODING_AGENT_DIR`). The engine resolves its agent dir from those variables first and from `os.homedir()` otherwise. `os.homedir()` keeps the real home it read at process start, so any test that booted the packaged extension wrote into the developer's (or CI host's) real agent dir. `bun test ./packages/omo-senpi/` left a real task host running there, with its shard meta and daemon dir.
+
+The new `test-hermetic-home.ts` is the one place that sets the hermetic home. Every reader takes the first set name in `OMO_` > `SENPI_` > `PI_` order. It drops the inherited `OMO_` and `SENPI_` values and pins only `PI_CODING_AGENT_DIR`, the lowest-precedence name, to `<temp home>/.omo/agent`. So the engine resolves the temp dir by default, and a test that sets `OMO_` or `SENPI_CODING_AGENT_DIR` for itself or a child still wins as before. A first revision pinned all three, and `omo-native`'s doctor tests, which hand their child only `SENPI_CODING_AGENT_DIR`, then read the temp dir instead of their fixture. When the run ends it stops any process whose command line names this process's own temp home, and it fails the run if this test process registered a host shard under a real agent dir (identified by the shard meta's `created_by_pid`, so a live session's shards are never counted). The root preload and the package-local preloads use it.
+
+## 2026-10-04 - Adopt senpi 2026.10.8
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.7 to 2026.10.8: the root devDependency, `omo-native` and its provider map, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine makes an idle host exit once its sessions are done (senpi#2713) and stops failing a busy cold Python start as a hang (senpi#2718, the cause of omo#9495's Windows flake); the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-04 - Format examples in OmO prompts are no longer markdown quote lines (#9538)
+
+Several prompts OmO ships showed a reply format as a markdown quote line: the Hephaestus routing line and handoff template in the Codex bundled rules (`packages/omo-codex/plugin/components/rules/bundled-rules/hephaestus/gpt-6.md`, `gpt-5.6.md`), the handoff template in the OpenCode Hephaestus GPT-5.6 and Sisyphus Grok 4 prompts, and the `"I detect [...] intent - [reason]. My approach: [...]"` line in the Sisyphus default, Claude Opus 4.7 / 4.8 / 5 and Fable 5 prompts and `sisyphus-dynamic-prompt-role.ts`. The model copies a format example as the shape of its reply, `>` included, so whole answers rendered as blockquotes that read like a paused aside. The same defect in the senpi engine is code-yeongyu/senpi#2714. Each line loses its leading `> `; labels and wording are unchanged. Emphasis blockquotes that are not reply formats stay.
+
+`sisyphus-agent-factory.test.ts` (every routed Sisyphus family), `delegation-table-contract.test.ts` (Hephaestus GPT-5.6) and the Codex rules `hephaestus-model-variant.test.ts` (every shipped bundled rule) fail when a line with `[placeholder]` slots is a quote line; all three fail on `dev`.
+
+## 2026-10-04 - Adopt senpi 2026.10.7
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.6 to 2026.10.7: the root devDependency, `omo-native` and its provider map, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine lets `host handoff` replace an old host still serving the client's own socket with no session open (senpi#2701) and carries 2026.10.7's code mode work; the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-04 - visual-qa carries an Apple HIG checklist, a light/dark phone+desktop capture matrix and a per-item verdict (#9533)
+
+The `visual-qa` shared skill judged a surface only against its reference image, the request text and CJK line breaking, so a screen with no reference - the normal case for our own product UI - passed with a card pinned to the top-left of an empty canvas, a reserved-scrollbar gutter at phone width, a see-through sticky header, a cramped tab bar with the wrong active tab, raw ISO timestamps and engine strings on screen, dark-only captures, a capture browser's chrome inside a screenshot, and a fix proven on one app while a sibling kept the defect.
+
+`packages/shared-skills/skills/visual-qa/SKILL.md` now carries a 67-item checklist distilled from Apple's Human Interface Guidelines (Korean edition: layout, typography, color, dark mode, accessibility, motion, icons, branding, writing, and the component pages for buttons, tab bars, toolbars, sheets, alerts, menus, text fields, progress, onboarding, feedback, loading, privacy, accounts, modality, scroll views, sidebars, windows, lists, toggles, focus, search, settings) and from the `frontend` skill's visually checkable rules, organised by surface concern (A layout, B hierarchy, C text, D targets, E contrast and themes, F consistency and brand, G motion and feedback, H states, I keyboard and accessibility, J macOS desktop and iOS-width web). Every item is PASS, FAIL or N/A with the capture that proves it. The author runs it before dispatch; Pass A re-runs G-J and Pass B re-runs A-F, pasted verbatim into their prompts; Pass A's "code style", "responsive" and "slop animation" items and Pass B's generic "matches the request" item are folded into the checklist. The capture protocol becomes a matrix: every changed page plus every sibling route or app sharing the changed layout or component; 390 with true mobile emulation (`emulate(page, "iphone-14")`: DPR 3, mobile, touch, overlay scrollbars) and 1440, plus 1920 for page layouts; light and dark paired; a scrolled-to-end viewport shot; motion frames plus a reduced-motion pass and an interruption pass; a frame showing browser chrome or the capture tool's UI is rejected as a window grab. The Step 4 report gains a per-item table and any FAIL makes the verdict NEEDS WORK. `references/browser-setup.md` shows the matrix loop with the colour-scheme and reduced-motion emulation for the owned engine and the phone emulation for the attached engine.
+
+The `frontend` skill now points at `visual-qa` for verification instead of keeping its own list: `SKILL.md`'s done axiom and `references/design/README.md`'s Phase Final drop the 375 / 768 / 1280 breakpoints and the two verification rules the checklist now owns (slop animation, accent-border state), keeping only the flatness judgment the verifier cannot make; `clone-from-url.md`, `layout-skill.md`, `design-system-architecture.md` and `aside.md` use the same capture widths. The two mirror copies follow their sources: the `skills-loader-core` builtin wrapper's `visual-qa` description and its checked-in `frontend/SKILL.md` artifact (the extraction test requires byte equality), and the omo.dev landing ticker's `visual-qa` blurb no longer names the retired widths. Prose and copy only; no test pins wording.
+
+## 2026-10-04 - Adopt senpi 2026.10.6
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.5 to 2026.10.6: the root devDependency, `omo-native` and its provider map, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine adds the `auto` permission preset (senpi#2614, senpi#2688) and carries 2026.10.6's fixes; the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-03 - Adopt senpi 2026.10.5
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.3 to 2026.10.5: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests, the engine named in `senpi-task`'s coverage test and `omo-native`'s provider map. The engine makes a failed permission setup refuse tool calls instead of running them unchecked (senpi#2617, senpi#2618) and carries 2026.10.4's and 2026.10.5's fixes; the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-03 - LazyCodex no longer blocks an edit because a language server is not installed (#9509)
+
+On LazyCodex, editing a file whose language server is missing (a `.json` with no biome, say) made the LSP `PostToolUse` hook answer `decision: "block"` with the install guidance, on every edit and even after the user declined the install. `postEditOutcomeFromDaemonResult` in `packages/omo-codex/plugin/components/lsp/src/codex-hook.ts` mapped only the daemon's `not_configured` availability, so a `not_installed` result fell through as plain text, was classified as a diagnostic, and skipped the install-decision handling. The Native edition already mapped it (`packages/omo-senpi/src/components/lsp/post-edit-outcome.ts`); the Codex hook now maps it the same way.
+
+`collectPostEditDiagnostics` (`packages/lsp-core/src/post-edit/orchestration.ts`) marks each entry with `blocking`: real diagnostics are `true`, missing-server guidance is `false`. The Codex hook blocks only when at least one entry is blocking; guidance alone is sent as `hookSpecificOutput.additionalContext` with no `decision`, so the model still reads it but the edit is not blocked. The guidance wording and how often it appears are unchanged, and real diagnostics still block. The Native edition reads the same entries and its output is unchanged.
+
+`codex-hook-not-installed.test.ts` drives the hook through the real daemon-result mapping with only the daemon RPC stubbed: an undecided server, a declined server and a repeated edit no longer block (all three fail on `dev`), and a real type error still blocks, alone or next to a missing server in the same patch. The committed `omo.js` bundle is rebuilt in the Linux container.
+
+## 2026-10-03 - Memory writes survive a Windows rename that a passing file hold refuses (#9471)
+
+On Windows, renaming a temporary file over a target that another handle holds open (a reader, the search indexer, an antivirus scan) fails with EPERM, EBUSY or EACCES, usually for a few milliseconds. The memory stack writes state atomically through that rename, so such a hold lost the write: `memory-core`'s transcript journal logged `memory bind-time reconcile failed` / `memory shutdown drain step failed` and left `state.json.tmp-<id>` behind. In the Windows task e2e, that diagnostic also landed in a killed child's stderr, so the kill classifier correctly read the exit as a crash and recorded `killed=false` (#9471, after #9228/#9387).
+
+`packages/memory-core/src/fs/rename-contention.ts` retries those three codes on win32 only, with a bounded backoff of about 0.8 s in total, and `fs/resilient.ts` routes the memory boundary's `rename` through it. Every atomic memory write gets the retry. POSIX keeps failing at once, because EPERM/EACCES there are real permission errors. `journal/store.ts` now removes the temporary state file when the rename finally fails, and takes an optional `renameFile` so a test can simulate a refused rename. The kill classifier is unchanged.
+
+`fs/rename-contention.test.ts` drives the retry with an injected rename and clock: two refusals then success; a refusal that never clears gives up after the budget; POSIX EPERM fails at once; ENOENT is not retried. `journal/store.test.ts` shows that a refused state rename rejects and leaves no temporary file; it fails on `dev`.
+
+## 2026-10-03 - Task kills are recorded from the runner, not guessed from stderr (#9471)
+
+A killed process-mode task child on Windows could be reported as a crash when its teardown wrote memory diagnostics to stderr. The runner now records the kills it issues itself and never infers a kill from stderr. A Windows child terminated from outside the runner is reported as an unexpected exit (`killed=false`, exit code and stderr kept), because Windows gives no signal that separates it from a crash. Details: `packages/senpi-task/changes.md`.
+
+## 2026-10-03 - The browser skill obeys the session's browser engine and asks before irreversible actions (#9486)
+
+The OmO desktop app lets the user choose which browser an agent drives and passes the choice to the session as `OMO_BROWSER_ENGINE` (senpi#2611). `packages/shared-skills/skills/browser/scripts/omowright.mjs` now returns omowright through `guardOmowright()` (`browser-engine-guard.mjs`) whenever that variable is set; unset (terminal use) returns the library untouched.
+
+- `connected`: only `connectBrowserSkill()`; a missing browser, daemon or extension becomes `BrowserNotConnectedError` ("Connect your browser") and nothing else is launched. `builtin` refuses `connectBrowserSkill()` (use the app's in-app browser tools), `none` refuses browser work, an unknown value is refused rather than read as unset. The owned-engine entry points (`connectPipe`, `connectCloakProfile`) are not touched.
+- State: the wrapper reports `omo.browser.state` (engine, status, tab id/url/title/favicon, action kind, failure reason) when a session starts, around each action, after each navigation or tab change, when it stops and when a connect fails, through the new eval-only `omo_browser_bridge` tool (`packages/omo-senpi/src/components/browser-bridge`) that republishes it as a session `extension_event`. A host or bridge that cannot take events never blocks an action.
+- Policy: `BROWSER_CONFIRMATION_POLICY = "ask-before-irreversible"`. Before a click, Enter or script that sends/posts/publishes, pays/purchases/orders/subscribes, or deletes/removes/cancels a subscription/closes an account, the user is asked through the engine's question tool (`ask_user_question` or `request_user_input`); only an exact "Allow" proceeds, anything else raises `BrowserActionDeclinedError`, and a session with no question tool fails closed. The control is read from the page first (markup for a daemon ref, an element probe for a selector); a control that cannot be read is asked about. `evaluate` that clicks, submits or posts and the daemon's raw `session.tool("click"|"press"|"evaluate"|"fill"|"select")` are covered; `bskSnapshot` reads through the raw session.
+- Closed ways around it (review round 1): the guard returns an allowlisted library, so the owned engine (`connect`, `connectPipe`, `connectCloakProfile`) is refused with `browser_engine_owned_blocked` naming the engine, and any export that can act on a browser and is not on the allowlist is refused with `browser_engine_export_blocked` (setup, doctor, error classes, pure helpers and data pass through). Enter (not Shift+Enter) in a `textarea`, `contenteditable` or `role=textbox` element outside a GET form asks, since it sends in most chat apps. `session.tool()` passes only the read tools (`observe`, `snapshot`, `get_html`, `screenshot`, `tab_list`, `console`, `network`). `sendBeacon` counts as a write, and the label list gains submit, confirm, checkout, transfer, approve, merge, sign-a-document and their Korean forms. This prevents mistakes by a cooperating agent; it is not a boundary against code that imports the raw entry. Side effect: while the variable is set, the visual-qa, debugging and frontend skills cannot launch their own owned browser through this loader.
+- Stop: a daemon `user_aborted`, or the app's `omo.browser.stop` request, makes the next call throw `BrowserUserStoppedError` and blocks new sessions until the user's next message.
+- `SKILL.md` gains Step 0 (engine selection), `references/install.md` notes that inside the app the app installs and starts the daemon, and `references/commands.md` lists the typed errors. `BSK_HOME` / `BSK_BIN` handling is unchanged.
+
+`browser-skill-engine.test.ts` drives the guard against a fake BrowserSkill session and a fake kernel host (60 cases), and `browser-bridge/index.test.ts` covers the bridge tool. The committed `omo.js` bundle is rebuilt in the Linux container.
+
+## 2026-10-03 - The task tool stops describing few-read investigations and small foreground children as delegation targets (#9499)
+
+GPT-6 Astra followed the task tool's wording literally and handed few-call reading, credential lookups and the checks on its own change to subagents on executable lanes, then waited for them: in a 10-day survey of local sessions 86% of its spawns went to executable categories against 30-50% for the Claude and Kimi presets on the same text, nine were read-only investigations, and two were browser-use credential lookups. The sentences that named those as delegation targets are replaced at their source, in both editions where a twin exists. `packages/senpi-task/src/tools/task/description.ts` drops "pass false only for a short child whose result gates your very next call" from the run_in_background guideline (the flag stays documented in the tool description). The deep-low caller guidance in `packages/senpi-task/src/category/openai-categories.ts` and `packages/omo-opencode/src/tools/delegate-task/openai-categories.ts` no longer describes a one-subsystem-plus-callers investigation as the lane's home and its description names the lane as "preferred over deep-high for" the listed work instead of the bold "is routed here". The ultrawork skill's routing item 4 (`packages/omo-senpi/skills/ultrawork/SKILL.md`, embedded into `generated-directive.ts`) sends only work "across more files than one wave can read" to parallel explore agents. The Codex Hephaestus GPT-6 rule (`packages/omo-codex/plugin/components/rules/bundled-rules/hephaestus/gpt-6.md`) carries the same delegation paragraph as the senpi GPT-6 preset after senpi#2630: reading, lookups and own-change checks stay in the session however many calls they take; a subagent is for a track that runs beside the session's own and lands the task sooner. The rendered task tool description and the ultrawork directive both shrink; the omo-senpi plugin bundles are regenerated on Linux.
+
+## 2026-10-03 - Adopt senpi 2026.10.3
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.2 to 2026.10.3: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine fixes MCP tools failing with `MCP server <name> is disabled` once a child session ends (#9461, senpi#2524 and senpi#2608); the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-03 - LazyCodex spawns a project's own registered agent roles (lazycodex#171, lazycodex#164)
+
+Reported by @aconley-vultr. On the LazyCodex surface, `spawnRoleDenial()` (`packages/omo-codex/plugin/components/ulw-loop/src/spawn-role-guard.ts`) accepted only the 12 bundled role names, and `applySpawnGuards()` ran it on every spawn before the plan and budget checks. A project's own roles in `.codex/agents/*.toml`, which Codex offers as valid `agent_type` choices, were denied even with no LazyCodex plan active.
+
+The guard now also accepts an `agent_type` that Codex has a role file for, read the way Codex reads them (`ulw-loop/src/registered-agent-roles.ts`): a standalone `agents/*.toml` keyed by its `name` (else the file name), or an `[agents.<name>]` table in `config.toml`, under `CODEX_HOME` and under the `.codex/` of the working directory and its ancestors. A missing `agent_type`, or a name with no role file, is still denied, so a LazyCodex workflow never falls back to a generic agent (#134). The denial lists the registered roles as well as the bundled ones. Bundled roles are matched before any disk read, and the plan and budget guards are unchanged.
+
+The bundled Hephaestus rule's `multi_agent_v2` `spawn_agent` example (`components/rules/bundled-rules/hephaestus/{gpt-5.5,gpt-5.6,gpt-6}.md`) now passes `"agent_type":"<role>"`, so a session copying it is no longer denied (lazycodex#164). The v1 examples already did. Codex exposes `agent_type` on the v2 `spawn_agent` whenever agent roles are configured, so `plugin/test/aggregate-plugin-fixture.mjs` stops treating the object-form v2 `agent_type` as unsupported (the direct keyword form still is); that rule predated the guard requiring the role.
+
+`ulw-loop/test/spawn-role-registered.test.ts` covers project roles from a nested cwd, keying by declared name, a role file without a name field, `CODEX_HOME` roles in both forms, and the denials (no role file, no `agent_type`, a role registered only in another project). Five of its eight cases fail on `dev`. `spawn-role-matrix.test.ts` now isolates `CODEX_HOME`.
+
+## 2026-10-03 - OpenCode executes tool-argument rewrites on the original object (#9448)
+
+`replaceToolArgs` replaced `output.args` with a shallow clone, but OpenCode executes tools with the argument object it retained before calling `tool.execute.before`. The patch never reached that object, and later plugins edited a detached copy. The helper now merges patches into mutable arguments in place, so both OmO's rewrites and later hooks' edits reach tool execution. All 12 OpenCode call sites are unchanged.
+
+Frozen arguments retain the existing clone behavior to avoid throwing on older hosts. Executing that replacement still requires the host to read `output.args` back; this change does not claim to fix frozen host-held arguments. The helper tests reproduce both mutable-reference failures on the development code and preserve the frozen-object cases.
+## 2026-10-02 - The skill tool lists skills and commands in a stable order (#9432)
+
+Reported by @kimchupa-l10n, with relay captures that pinned the cause. `sortByScopePriority` in `packages/skills-loader-core/src/tools/skill/scope-priority.ts` compared scope priority only, so items in the same scope kept their discovery order, and that order varies between processes. The OpenCode edition's skill tool description (`packages/omo-opencode/src/tools/skill/description-formatter.ts`) is built from that sort, so the tool definition changed from one session to the next and every new session and subagent missed the Anthropic prompt cache.
+
+The sort is now total: scope priority first, then name, compared by UTF-16 code units so the order cannot depend on the machine's locale. Scope precedence is unchanged, and `matchCommandByName` still resolves by exact name with the higher-priority scope winning a shared name. OmO Native does not use this sort: `omo-senpi`, `senpi-task` and `omo-native` never import `skills-loader-core`, Native's tool descriptions are static, and the bundled skills Native contributes are already listed in sorted order (`packages/omo-senpi/src/components/bundled-skills/index.ts:40`).
+
+`description-formatter.order.test.ts` renders the same skills and commands discovered in different orders and requires byte-identical descriptions; both cases fail on `dev` and pass with this change. `skill-matcher.test.ts` covers exact-name command resolution and scope precedence under both discovery orders.
+
+## 2026-10-02 - Adopt senpi 2026.10.2
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.1-3 to 2026.10.2: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. This is the first senpi release carrying the upstream pi v1.0.0 engine sync; the generated plugin bundles are regenerated for it on Linux. No omo source needed changes: the engine's builtin provider registry still matches `provider-map.json`, and the omo-senpi, senpi-task and omo-native suites pass against it.
+
+## 2026-10-02 - omob builds the engine with its own source siblings (#9416)
+
+Since senpi publishes `@code-yeongyu/senpi` with exact `npm:@code-yeongyu/senpi-*` aliases instead of bundled workspaces, `script/build-omob.ts` packed only `packages/coding-agent` and the install resolved `pi-tui`, `pi-ai` and the other lockstep siblings from npm at the same version string. A source commit that used a sibling export newer than the published build then failed `bun build --compile` (`No matching export ... for import "nextRenderRevision"`), and the commit-keyed artifact cache kept serving that install. `packSenpiSiblingTarballs` now packs every workspace in senpi's `scripts/registry-packages.mjs` list from the same checkout and fails when one is missing, and `installSenpiTarball` places each reachable sibling beside the engine through alias, range and peer edges, installs only the remaining external dependencies, and rejects siblings that declare different version specs for one external package. Artifact manifests carry `assembly: "source-siblings-1"`; an older same-commit artifact is rebuilt instead of reused.
+## 2026-10-02 - In-process task children run session_shutdown before they are disposed (#9413)
+
+Since #9343, an in-process task child loads the engine's builtin extensions, codemode included. `packages/senpi-task/src/runners/in-process/child-handle.ts` tore the child down with a bare `session.dispose()`, on both the handle's `dispose()` and `discardUnstartedChildSession()`. That never emits `session_shutdown` (only the engine's `AgentSessionRuntime` does), and codemode closes its per-session bridge HTTP server only on `session_shutdown`. So every in-process child left a listening loopback server and a keep-alive socket behind, and `omo -p` never exited after it delegated a task.
+
+Both teardown paths now go through `shutDownChildSession`: it emits `session_shutdown` (`reason: "quit"`) through the session's own extension runner when the session has handlers for it, then disposes the session in a `finally`. The runner applies the host's per-handler shutdown budget (`sessionShutdownHandlerTimeoutMs`), so a handler that hangs cannot hold teardown. `ChildSession` gains an optional `extensionRunner` (fakes that load no extensions leave it out), the handle's `dispose()` returns a promise, and the manager's in-process adapter awaits it. When handle construction fails and shutting the discarded session down also fails, both errors are kept in an `AggregateError`.
+
+`child-shutdown.integration.test.ts` runs real children with the builtin extensions against a local fake provider. It covers the three acceptance criteria in #9413, plus one budget case: disposing a child closes its codemode bridge; a print run that delegates to a child that succeeds, and one that fails, both exit 0 within the bound; a child discarded before its handle started is shut down the same way; and a hung `session_shutdown` handler is aborted at the budget while the session is still disposed. All five fail on `dev` and pass with this change.
+
+## 2026-10-01 - Adopt senpi 2026.10.1-3
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.1-2 to 2026.10.1-3: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine carries the three desktop permission fixes (senpi#2511, #2512, #2513), event-driven Python readiness for cold Windows starts, and the tool-search, thinking-format and Claude-subscription fixes listed in CHANGELOG.
+
+## 2026-10-01 - A PR's Windows and macOS legs never report green without running their tests (#9245)
+
+On a pull request the Windows and macOS legs of `test`, `codex-compatibility` and `senpi-compatibility` skipped every install and test step unless a changed path looked platform-sensitive or the PR carried `ci:full-matrix`, and the job still concluded success, because GitHub counts a step skipped by its `if` as passing. That let #7676, #9329 and #9243 merge with green Windows checks and turn `dev` red. Two changes close it. `script/ci-fast-path.mjs` now marks a change runtime-touching unless every changed path matches an explicit allowlist of web, prose (top-level Markdown, README/CHANGELOG/AGENTS-style docs outside `packages/*/src`) and repository metadata (other workflows, issue templates, `.github/assets`); anything else, including a new folder or an unknown extension, counts as runtime, and a runtime-touching PR runs every OS leg by itself, with no label and no write token, so fork PRs get it too. Each OS leg also ends with a guard step, `script/ci-leg-tests-guard.mjs`, that always runs and reads the real outcomes of that leg's test steps: if they were all skipped while the change needed them, the check fails with `tests not run: add ci:full-matrix`; if the skip was intended (a docs or metadata change), the leg passes with a `tests intentionally not run` notice and says so in its job summary. The `dev` push still runs the full matrix.
+
+## 2026-10-01 - The copy-tree self-destination test uses the OS temp dir on Windows
+
+`packages/isolation-core/src/backends/copy-tree.test.ts` built its scratch root from `process.env.TMPDIR ?? "/tmp"`, a POSIX-only fallback. Windows runners do not set `TMPDIR`, so the path became `\tmp\self-copy-XXXXXX` and `mkdtemp` failed with `ENOENT`, which turned the required `test (windows-latest, 2/2)` job red on `dev` after #9388 changed which files share that shard's workers. The test passed before only when an earlier test in the same worker had left `TMPDIR` set. It now uses `os.tmpdir()`, which resolves on every platform. Test-only; no product change. The worker env leak that made it pass is tracked separately.
+
+## 2026-10-01 - A Bun crash in the Windows rpc-host tests is contained and retried once (#9219)
+
+Bun 1.4.2 intermittently segfaults a Windows test worker while it runs `packages/senpi-task/src/runners/rpc-host`, and 1.4.3-canary.1 still does (oven-sh/bun#44390). Each crash turned the required `test (windows-latest, 2/2)` job red. That job now runs the rpc-host suite in its own `bun test --parallel` invocation, between the serial quarantine and the remainder, through `script/bun-panic-retry.ts`: when the output carries Bun's crash markers (`Bun has crashed`, `worker crashed: exit code 3`) and nothing else failed, the invocation runs once more and the crash lines are logged as a warning annotation. A second crash fails the job. A real test failure (a `(fail)` line, an unhandled error, or more failures than crashed workers) is never retried, even when the same run also crashed. The suite stays in the required job with no `continue-on-error`. The Windows remainder reads the new `bunfig.win2.parallel.windows.toml`, which adds the directory to `bunfig.win2.parallel.toml`'s ignores so no file runs twice, and the flake soak's `full-shard-2` target follows the same shape without the retry. `script/bun-panic-retry.test.ts` drives the runner against a scripted fake `bun test` and proves that one crash is retried once, a second crash fails, and an assertion failure is not retried.
+
+## 2026-10-01 - Builtin category chains only name thinking levels their models accept (#9378)
+
+Reported by @markshikada, whose byte-compare of 5.1.6 against 5.1.7 and reflection timeline pinned it down. Five Senpi builtin category rungs named a thinking level senpi's model catalog rejects for that model, so every child session start logged a `validation_warning` to `fallback.log` (hundreds of lines in a live session) and the engine then silently clamped the rung to `high`. The entries were never skipped: they ran, just not at the declared level. In `packages/senpi-task/src/category/fallback-chains.ts`, the `quick` lane's opencode-go `minimax-m3` and `minimax-m2.7` rungs now carry no variant, so they run at the `quick` lane's own `low` instead of a clamped `high`. `unspecified-low`'s `mimo-v2.6-pro`, `qwen3.8-max-preview` and `mimo-v2.5-pro` say `high`, the level they already ran at, so their runtime behavior is unchanged and the warning stops. A level the user sets in `omo.json` is untouched: it still warns once, naming the level and the model, and still runs at a level the model accepts. The OpenCode edition's table in `model-core` keeps `max`, because OpenCode derives its own variants. The regression drives a real senpi session over the real model catalog. On the pre-fix chains, the `quick` child started at `high` instead of `low`, and two loads per category on an opencode-go plus xiaomi machine logged four warnings; after the fix it logs none.
+
+## 2026-10-01 - The fake clock no longer calls the deprecated `AtomicU64::fetch_update` (#9383)
+
+Rust 1.99 deprecates `fetch_update` in favour of `try_update`, and `rust-toolchain.toml` follows `stable`, so the desktop engine workflow's `clippy -D warnings` failed on every pull request at `crates/senpi-desktop-backend-fake/src/clock.rs`. `FakeClock::advance` now uses an explicit `compare_exchange_weak` loop with the same saturating result, which compiles without deprecation on older and current stable alike. The existing saturation tests in `tests/scenario.rs` cover it.
+
+`rust-toolchain.toml` now pins `channel = "1.99.0"` instead of `stable`, which every Rust workflow reads, so a new stable release can no longer change the lints that every pull request is checked against. Toolchain upgrades now come as their own pull request, with clippy run on the new version.
+
+## 2026-10-01 - Preserve Windows killed-task classification across repeated Bun advisories (#9228)
+
+Windows RPC exits now accept any positive number of Bun's known child-reaper startup advisory lines as advisory-only stderr. An empty stderr remains an external termination, while any other stderr line still proves a crash. This preserves `status: error` with `killed: true` for externally terminated code-1/no-signal children without weakening crash diagnostics.
+
+## 2026-10-01 - Adopt senpi 2026.10.1-2
+
+Every `@code-yeongyu/senpi` pin moves from 2026.9.30 to 2026.10.1-2: the root devDependency, `omo-native`, the `omo-senpi`
+and `senpi-task` peer and dev pins (with their `@earendil-works/pi-tui` -> `@code-yeongyu/senpi-tui` aliases), the pin
+tests, `provider-map.json` and the engine named in `senpi-task`'s category coverage test. The engine carries the upstream
+v0.99.1 sync, so `provider-map.json` gains the new builtin providers `meta` (OAuth login) and `typesafe`, and the
+`senpi-task` runners follow the upstream disposition and `TranscriptContext` API. It also brings the compiled-engine
+`bun` phantom-turn fix (#9362, senpi#2494) and per-session permission presets (senpi#2461).
+
+
+## 2026-10-01 - Repeat macOS permission denials name the earlier pane (omo-desktop-app#1437)
+
+macOS permission guidance now says the privacy pane has been opened only when the current denial opened it. Repeat denials refer to the pane opened earlier, or tell the user to open it when the initial attempt failed, while retaining the turn-on and fully quit/relaunch instructions and the responsible-process TCC identity.
+
+
+## 2026-10-01 - Keep child tool parity stable on Windows (#9274, #6709)
+
+The builtin tool parity regression now compares the in-process child loader directly with the `DefaultResourceLoader` policy used by process children instead of paying for two full Windows CLI cold starts. Both loaders expose the same platform-specific builtin registrations, including `web_search`; the existing policy tests continue to cover the shared parent and session-default tools that complete the child surface.
+
+## 2026-09-30 - In-process task children receive senpi builtin tools (#9274, #6709)
+
+The default in-process task runner now loads and binds senpi's builtin extensions without loading any parent, user or project extension paths. Its child tool payload matches process mode for the same category policy, including `web_search`, while existing allow/deny rules and the parent-only workflow, team and ask-user surfaces remain intact. The regression drives both runners through a deterministic local provider; it recorded 11 tools in-process versus 27 in process mode before the fix and 27 in both modes after it.
+
+## 2026-10-01 - The curl installer hands pipes from sh to Bash (#9325)
+
+`install.sh` keeps its Bash implementation, but its first block now parses as POSIX sh. When a user pipes the script to `sh` or `dash`, that block writes the Bash body from a quoted here-document to a private temp file and runs it with Bash, preserving arguments and the exit status. Sourcing the script from Bash, as the other-install tests do, still only defines the installer functions. If Bash is unavailable, it exits before any Bash syntax is parsed and prints the single command that uses Bash explicitly. Direct `| bash` installs are unchanged. Tests run the preamble through `sh` and `dash`, prove the complete buffered body and arguments reach Bash, and retain a direct Bash syntax check.
+
+## 2026-10-01 - deep-high and Geeky · Heavy on GPT-6 Astra high, Geeky · Normal on GPT-6.1 Sol Fast medium (#9372)
+
+The owner set new GPT lane defaults. `packages/model-core/src/category-model-requirements.ts` and the OpenCode builtin in `packages/omo-opencode/src/tools/delegate-task/openai-categories.ts` run `deep-high` on `gpt-6-astra` at `high` instead of `xhigh`, matching the Senpi chain in `packages/senpi-task` (see its changes.md). deep-high stays a single Astra rung with no Sol fallback, the 2026-09-20 rule that the deep lanes never substitute each other. `deep-low` already led with plain `gpt-6.1-sol` medium (#9214) and is unchanged. The model-profile change is in `packages/omo-senpi/changes.md`. The docs (`docs/guide/*`, `docs/reference/*`, `docs/examples/*.jsonc`) and the model-core and OpenCode tests that pinned `xhigh` for deep-high now show `high`.
+
+## 2026-10-01 - The macOS tcc-diagnostic QA scenario reads the responsible-process message (#9368)
+
+#9351 changed the permission-denied message to `TCC identity: responsible=<path>[ bundle=<id>], pid=<n>` (or `unresolved (engine executable=...)`), but `script/qa/desktop/macos/tcc.ts` still looked for the old `executable=` text, so the scenario could never pass. Its judgment now lives in `tccIdentityPasses`, which passes only when the denial names the engine itself (compared by real path) as the responsible process, and fails for another responsible process, an unresolved one, or a message with no identity. Five behavior tests cover those cases; with the old parser the two passing cases fail.
+
+## 2026-10-01 - Windows explicit engine paths must name a .exe, and the exec-bit check stays POSIX-only (#9359)
+
+On Windows, `fs.access(..., X_OK)` only proves a file exists: the platform has no exec bit. The parity test's chmod-0644 "not executable" case was therefore accepted on Windows runners, and doctor went on to spawn it. Status and doctor share `explicitPathDiagnostic`, which now refuses a win32 explicit `engine_path` that does not end in `.exe` (the name the locator and the release asset use) with `not executable (expected a .exe file)`. POSIX keeps the X_OK check. The parity test runs the mode-bit case only on hosts that have mode bits and adds a Windows case that runs on every host, with an executable fixture so only the Windows rule can refuse it.
+
+## 2026-09-30 - The recommended installer offers to remove a second omo install (#9324)
+
+After installing the standalone launcher, `install.sh` now verifies other `omo` entries on PATH against their package manifest or the previous standalone receipt. A terminal run asks `Remove the other omo install at <path>? [y/N]`; `--remove-other-installs` gives non-interactive runs an explicit opt-in, while piped and CI runs otherwise delete nothing and print the exact command. Removal is scoped to the verified global package and shim or the one receipt-owned launcher, and a failure leaves the new launcher working with remediation text. `omo doctor` now formats the non-active install's command with its detected Bun root, npm prefix, or quoted standalone path. The installer-channel behavior change is covered in throwaway HOME/prefix fixtures for acceptance, decline, failed-removal and look-alike safety cases.
+
+## 2026-10-01 - Validate computer-use status sources and passively report permissions (#9349)
+
+Status and doctor share installed-engine source selection and explicit-path validation.
+Missing, non-executable and quarantined overrides are no longer reported as found,
+and status retains the location after startup or failure. Before activation, status
+uses the existing bounded hello/capabilities probe on an installed engine: no
+acquisition, session opening, stop listener, input or permission prompt. Absent
+engines and failed probes report unknown permissions rather than claiming a grant.
+The probe deadline resolves independently of inherited pipe EOF and terminates
+the engine process tree, so a silent wrapper cannot leave status or doctor hanging.
+
+## 2026-10-01 - Preserve unsupported computer-use host diagnostics after first use (#9348)
+
+`/computer status` retains the installed-engine diagnostic after activation fails as
+native-unavailable. Unsupported linux-arm64 and win32-arm64 hosts continue naming
+the missing release build instead of losing the explanation after first use.
+Component regressions exercise the real activation failure and confirm status
+does not start another child or acquire an engine.
+
+## 2026-10-01 - the stop-path failure and permission-denied data types describe what they carry (#9338)
+
+Two type comments copied during the computer-use permission work described the wrong data. `StopPathFailure` (`crates/senpi-desktop-safety/src/supervisor.rs`) now says it records why the global stop-chord listener failed to start, which the gate uses to turn an Accessibility miss into a permission error instead of a missing stop path. `PermissionDeniedData` (`packages/senpi-desktop-protocol/src/json-rpc.ts`) now says it carries the missing macOS permission, the Settings pane that grants it, the app to enable and whether that app must be relaunched. These are comment-only changes; the generated extension bundles were refreshed because they embed the protocol package's doc comment.
+
+## 2026-10-01 - Permission errors name the macOS TCC responsible process (#9345)
+
+Screen Recording and Accessibility denial diagnostics resolve the responsible process with the
+macOS responsibility API and report its executable path, optional application bundle identifier,
+and pid. Shell-launched engines report themselves; application-launched engines report the
+responsible application. Failed resolution is explicitly unresolved and labels the engine path
+only as diagnostic context, never as a guessed TCC identity.
+
+## 2026-10-01 - Store extensions survive a worker restart and share the hourly retention sweep (#9331)
+
+Rebased onto the gateway's failed-open recovery and retention sweep. A store handle whose worker
+exits now registers the extensions the previous worker held on the fresh worker before serving
+the next call, instead of answering `extension_unknown_name`; only registrations that worker
+actually held are restored, so a refused downgrade or reserved name stays unregistered. The
+sweep's hourly schedule is kept per connection, so an extension call joining core operations no
+longer sweeps on every call. The sweep never deletes extension rows or a core row an extension
+can still act on; a foreign key from an extension table to a core table is refused on write,
+so none can cascade. Docs state that an operation's time budget equals the writers' lock-wait
+bound, and the CHANGELOG names `gateway_schema_too_new` for core and extension downgrades.
+
+## 2026-10-01 - Refuse extension schema downgrades without changing registration (#9331)
+
+An extension whose stored version exceeds the caller's migration count now returns
+gateway_schema_too_new under the migration lock. Refusal preserves stored rows, metadata,
+ownership and any existing compatible registration; core service remains usable. Other
+migration failures keep the existing lazy-retry behavior. Fresh-handle and replacement
+regressions cover the refusal, unchanged SQLite data version and subsequent valid writes.
+
+## 2026-10-01 - Exercise direct extension guards and document transaction behavior (#9331)
+
+Direct SQLite authorization tests assert the trigger/view create decisions without the
+statement lexer or schema-diff guard masking them. Caught constraint errors must roll back
+prior writes, and table-valued sources remain refused. The SDK smoke uses a real disk-session
+record and exercises clone recovery, shared target resolution and schema-version refusal.
+The reference documents the shipped SDK entry point, owned DDL, deadlines and commit effects.
+
+## 2026-10-01 - Refuse unsupported newer gateway schemas (#9331)
+
+Core schema reads reject versions newer than this binary supports before migration or
+normal operations. Core callers receive a typed gateway_schema_too_new error; extension
+registration and calls receive that code as a refusal. The stored version and rows remain
+unchanged. The check is also performed on the version re-read under the migration lock.
+
+## 2026-10-01 - Normalize SQLite ownership and make namespace overlap symmetric (#9331)
+
+Ownership checks fold identifier and schema-label ASCII case like SQLite, while retaining
+the registry boundary around core and foreign objects. New ownership rows use canonical
+names and schema changes replace legacy mixed-case rows. Overlapping extension namespaces
+can register in either order; only unowned prefixed lookalikes block first registration.
+
+## 2026-10-01 - Tokenize SQL parameters without changing quoted text (#9331)
+
+The statement-free SQLite binder and extension statement guard share a tokenizer for
+strings, quoted identifiers and comments. Literal question marks remain unchanged and
+do not consume parameters. Row queries keep trailing line comments separate from their
+generated wrapper. Regression coverage exercises each quote/comment form through the
+real store worker, including escaped quotes and identifiers containing a question mark.
+
+## 2026-10-01 - Refuse uncloneable extension arguments before posting (#9331)
+
+Extension calls snapshot their arguments before crossing the worker boundary and return
+invalid_arguments when cloning fails. A failed post also removes and rejects its pending
+request rather than leaving an unhandled rejection for disposal. Function and symbol
+arguments now leave the worker alive, preserve its registration and allow core calls.
+
+## 2026-10-01 - Preserve relay validation and committed extension results (#9331)
+
+Extension enqueue resolves its binding target with the relay's shared live-and-disk
+address book over a worker request port. Missing sessions return not_found; receivers
+are still signaled only after commit. Post-commit effects run independently, reporting
+failed markers through extension_error store events without misreporting committed data
+as a refused operation. Pending resolution requests are released on operation completion.
+Tests cover missing/present targets, blocked markers followed by healthy markers, and
+unawaited resolution failures and timeouts without late writes or worker loss.
+
+## 2026-10-01 - Bound extension operations and revoke expired transactions (#9331)
+
+Extension operations and pending helpers share the store's lock-wait budget. On expiry,
+their transaction is revoked and rolled back and the worker accepts the next request.
+Retained transactions raise typed errors; late asynchronous helper calls reject promises
+instead of throwing synchronously. The worker reports an unhandled expired-transaction
+error as a store event without losing core service. Other uncaught errors remain fatal.
+
+## 2026-10-01 - Own automatic indexes through their extension tables (#9331)
+
+Extension migrations now accept SQLite's automatic indexes for TEXT and composite primary
+keys and UNIQUE constraints. Authorization requires the owning table; schema validation
+checks the automatic index's table and records its extension owner atomically. Core
+automatic indexes remain core-owned and inaccessible to extension operations.
+
+## 2026-09-30 - Session gateway extension contract and actor identity (Refs #9143)
+
+Core schema v5 adds `extension_schema` and nullable `deliveries.actor_user_id`, populated from
+`author.user_id` without adding a CLI flag. The exported store-extension types define registration,
+worker operations, namespaced SQL, joined relay transactions and typed refusals. The v4 migration
+preserves existing rows. Registration and calls apply pending steps under the bounded core write
+lock. SQLite authorization and schema-effect checks protect other namespaces and core objects.
+The transaction adapter reuses relay/engine validation and budgets, defers file effects until
+commit, and rolls back both kinds of writes on failure. Object ownership is persisted in
+`extension_objects`, with the core schema captured before any extension runs; matching a prefix
+never grants access. Core-colliding names, triggers and views are refused, and DELETE without a
+WHERE clause is checked against the same ownership registry. The public thread SDK forwards the API.
+Tests cover cross-process ensure, namespace violations, all refusals and continued core service,
+relay parity, rollback, actor attribution, and lock bounds. The v2 fixture now removes v5 additions
+when constructing its historical database. PR #9331 stacks on #9222.
+
+## 2026-10-01 - ultrawork reuses evidence per target, spawns a new reviewer per round, and scopes defects to the blast radius (#9294)
+
+The directive's Constraints bullet ("own every defect met mid-run ... never deferred as a follow-up", from #7674)
+contradicted the engine's base prompt (a pre-existing bug is a follow-up) and the project's delivery rule (only defects
+inside the blast radius belong to this run), and the Codex variant still said "No drive-by refactors"; gate step 4 sent
+fixes back to the SAME reviewer while `review-work` and `ulw-execute` require a fresh one; "re-run the scenarios that
+increment could have affected" had no definition; and the rerun rule was stated three times. `SKILL.md`, `codex.md`,
+`default.md` (gate step only), the `ulw-loop` `add_subgoal` row and the `ulw-execute` discovered-work sentence now
+carry one scope rule (blast radius: request not delivered, regression this change introduces, invalid proof, failing test
+or stale doc of touched code; anything else becomes a tracked issue named in the final message), one rerun rule (evidence
+valid per target with commit and coverage recorded; rerun touched-file tests plus importers, their scenarios, and moved
+dependencies; one full pass before the final message) and a NEW reviewer per re-review (delta diff, cited blockers, at
+most twice). The memory line asks for every regression a check caught and each QA scenario with its invocation. No TDD
+wording returns. Generated copies (`generated-directive.ts`, `directive-content.ts`, `ulw-loop/directive.md`,
+`plugin/extensions/omo.js`) regenerated; `embed-directive.mjs --check` went RED on the edit and GREEN after regen, and
+`ultrawork-arming.test.ts` (packaged extension injects the directive) is the seam that fails on a stale bundle.
+
+## 2026-09-30 - Localized Windows tar month tokens parse during archive entry validation (#9289)
+
+Windows `tar -tvf` output can localize the month column or emit replacement characters when decoded. The tar listing parser now accepts any non-whitespace month token instead of only ASCII word characters, while malformed lines still fail closed and entry path validation remains unchanged. Regression coverage includes ASCII, Cyrillic, replacement-character, and malformed month/listing cases. Thanks @willowite for the report, reproduction, fix, and cases.
+
+## 2026-09-30 - Verify quarantined desktop-engine sidecars inside the launcher install (#9283)
+
+The locator accepts a quarantined executable sidecar only when its canonical path stays inside the
+launcher's native/prebuilds directory and its SHA-256 matches the as-shipped checksum file there.
+Missing, invalid or duplicate checksum entries, digest mismatches and escaping symlinks retain the
+quarantine refusal. Other candidate sources and explicit engine paths remain refused. Release
+acquisition and installed-sidecar verification share the existing checksum grammar; cache paths are
+unchanged.
+
+## 2026-09-30 - Adopt senpi 2026.9.30
+
+Every `@code-yeongyu/senpi` pin moves from 2026.9.29-5 to 2026.9.30: the root devDependency, `omo-native`, the `omo-senpi`
+and `senpi-task` peer and dev pins (with their `@earendil-works/pi-tui` -> `@code-yeongyu/senpi-tui` aliases), the pin
+tests, the version comment in `provider-map.json` and the engine named in `senpi-task`'s category coverage test. The
+engine brings the ask-user resume crash fix (#9268), the `accept-edits` permission preset (senpi#2430), the chat prompt
+surface (senpi#2398) and the terminal control-endpoint answer fix the session gateway needs (senpi#2407).
+
+## 2026-09-30 - Keep signed macOS computer-use engines at one path across updates (#9282)
+
+Signed release engines now launch from `~/.omo/engines/senpi-desktop-engine/<host>/senpi-desktop-engine`,
+so the absolute-path part of a macOS Accessibility or Screen Recording grant does not change on update.
+Every service spawn reacquires its requested release and holds a process-safe exclusive lock through
+atomic replacement, SHA-256 verification and native spawn. Concurrent sessions cannot replace the image
+between another session's verification and spawn. Doctor uses the same transaction and reports that path.
+Explicit overrides, sidecars, development engines, unsigned builds and quarantine diagnostics retain their
+existing behavior; unsigned files never replace the permission-bearing release engine. Other platforms
+retain immutable release generations.
+
+## 2026-09-30 - Computer-use status and doctor report installed sources and unsupported hosts (#9286)
+
+`/computer status` describes the located engine or verified release cache without starting it, or names the release asset that first use would download. Headless print mode emits the same status on stderr instead of losing the UI notification. Doctor now probes verified cached engines without fetching and reports the same source location as status, with a separate launched-executable field when signed launch uses a stable path. Empty unsupported hosts report that no engine is built instead of suggesting a download. The cache scan retains its existing layout, digest, quarantine and executable checks, including attempted paths when a cache read fails. The computer tool and guide require current-session capabilities before an availability claim.
+
+## 2026-09-30 - macOS permission denials identify the app and preserve their cause (#9284)
+
+A failed Accessibility stop listener now stays a permission denial through the supervisor, session,
+engine RPC and computer tool, including the default-policy path where only the host relay is live.
+Input remains refused; suspension and heartbeat precedence and the relay-only opt-in are preserved.
+Denied macOS actions open each permission's Settings pane once per engine process and return the
+launching app, pane URL and relaunch requirement. Capture remains independent of Accessibility.
+
+## 2026-09-30 - The standalone binary gate starts the binary from an empty download folder and runs a Windows leg (#7485)
+
+`native-binary-parity` (#9259) ran the binary where `build-omo-binary.ts` wrote it, and only on macOS, so the Windows
+release exe dying in its download folder (#7485, fixed by #9255) could not fail it. `script/qa/omo-native-parity-smoke.mjs`
+now copies the binary alone into an empty `download/` folder inside its sandbox before every binary run, on every leg.
+`--npm-omo` became optional: without it the script runs the binary session twice in the same sandbox (the first run
+provisions `~/.omo/binary-runtime/<version>/`, the second reuses it) and fails unless the `eval-js` and `pty-bash` steps
+succeed with no extension load failure (`binaryOnlyFailures` in `omo-native-parity-compare.mjs`). The job is now a
+matrix: `macos-15` keeps the binary/npm comparison, `windows-latest` builds the `x86_64-pc-windows-msvc` desktop
+engine and the windows-x64 binary and runs the binary-only pair. Windows has no `ps e`, so the sandbox reaper there
+lists processes whose executable or command line sits under the sandbox through `Win32_Process`. This replaces the
+standalone `windows-standalone-binary.yml` from #9260, so there is one binary gate, not two.
+
+## 2026-09-30 - CI compares the standalone binary with the npm launcher (#9248 class)
+
+Every packaging check the binary build runs is self-referential. `build-omo-binary.ts` compares Bun's embedded files
+with the staged files (`collectStagedFiles`), and `resolveExpectedSidecarRelPaths` derives its expected set from the
+same `engineSidecarSources()` list that stages them, so a runtime dependency the list never names (codemode's
+`@babel/parser`, #9248) passes every check. The release smoke only runs `--version`. The new `native-binary-parity` CI
+job (macos-15, heavy mode) builds the darwin-arm64 binary and the omo-ai launcher from the same commit and runs
+`script/qa/omo-native-parity-smoke.mjs`: both drive one scripted session in isolated sandboxes (eval JS and Python,
+grep, a pty command, tool search, webfetch against a local page, text and image reads, LSP diagnostics, apply_patch,
+memory, task) against a scripted provider (`omo-native-parity-provider.mjs`), then `omo doctor` and
+`omo setup --dry-run`. `omo-native-parity-compare.mjs` fails on any registered-tool, step-result, doctor-section or
+setup-line difference and on any extension load failure; the lines that differ by distribution (engine resolution,
+edition line, embedded vs downloaded desktop engine) are listed with the reason in `DOCTOR_EXPECTED_ONLY`. The driver
+stops every process its sandboxes started (found by the sandbox path in their environment) before removing them.
+
+## 2026-09-30 - The /docs/<slug> guide pages render on omo.dev instead of returning 404 (DESKTOP-62 follow-up)
+
+After #9261 deployed, every `/docs/<slug>` guide page answered 404 on omo.dev (`x-nextjs-prerender: 1`, `x-nextjs-cache: MISS`) while `next start` served them. The route exported `dynamicParams = false`; the Cloudflare Worker's incremental cache holds no prerendered entries, so each request was a cache miss and a closed route refuses to render on a miss. `app/[locale]/docs/[slug]/page.tsx` drops the export, like every other prerendered route in the site (`/manifesto` renders the same way); an unknown slug still ends in `notFound()`.
+
+## 2026-09-30 - omo.dev guide pages for the OmO Desktop help links: workflows, agents, keywords, telemetry, desktop updates (DESKTOP-62)
+
+OmO Desktop's "Learn more" buttons and its telemetry and update links opened raw markdown in this repository or a private releases page, because omo.dev had no page to send them to. `docs/guide/` gains five user-facing pages written for someone who has never read the code: `workflows.md` (what `mass ulw` does and how to follow a run), `agents.md` (delegation and the Agents panel), `keywords.md` (the engine's keyword list, mirrored from `packages/omo-senpi/src/components/ultrawork/index.ts` and `skill-pointers/index.ts`, including the `mulw` / `ulw mass` / `meth` aliases and the rule that code spans and fences are ignored), `telemetry.md` (a plain summary of `docs/reference/senpi-telemetry.md` with the `telemetry.enabled` and environment opt-outs) and `desktop-updates.md` (update flow, release notes, the Stable and Nightly tracks). `packages/web/lib/docs-sections-data.mjs` lists them as `DOC_GUIDE_PAGES_DATA`, so the generator compiles them and rewrites links between them to their routes; the new `app/[locale]/docs/[slug]/page.tsx` serves each one at `/docs/<slug>` with its own title, description and section sidebar, using `splitDocSections` (the widget-free half of `splitDocPage`), and the sitemap lists them. `docs-page.test.ts` checks every guide page splits into a titled lead with unique sections and that cross-page links resolve to site routes; `e2e/docs.spec.ts` opens each route.
+
+## 2026-09-30 - Memory recall reads the memory repo with one git cat-file batch and re-reads only changed blobs (#9251)
+
+`packages/memory-core/src/recall/provider.ts` loaded the recall corpus with one `git show <rev>:<path>` process per memory file, and `RecallCorpusCache` threw every parsed document away whenever HEAD moved. A memory repo with 2,159 recall files and about 17 auto-commits an hour made every live session spawn about 2,160 git processes per commit; with ~40 sessions and RPC hosts on one machine a 25 s sample caught 2,118 distinct `git show` processes (~85/s) at load 220-290, and the exited children waiting to be reaped showed up as a steady population of `<defunct>` git under the RPC hosts. A load is now `ls-tree -r` (new `GitMemoryRepo.lsTreeBlobs`, which keeps each blob id) plus at most one `git cat-file --batch` (new `GitMemoryRepo.readBlobs`, parsed from the raw stdout bytes the exec now also returns, so multibyte UTF-8 splits on byte offsets). The cache keeps the parsed document per path and blob id, so a HEAD move reads only the blobs whose id changed, reuses the unchanged document objects (the haystack, bm25 and CJK memos stay warm), drops deleted files, and reads nothing when the move touched no recall file. The tree and batch parsers live in `git/repo-tree.ts`. Every git child is still awaited on `close` on every path.
+
+RED on dev (the old provider under the new `provider-git-budget.test.ts`): a 40-file load ran `show` once per file, and the one-edit-one-delete HEAD move and the system-only HEAD move each re-read the whole tree (41 extra `show` runs). GREEN: 3/3 in that file. With 200 files and 10 HEAD moves each load ran exactly 3 git processes (`rev-parse`, `ls-tree`, `cat-file`) and the test process had 0 zombie children.
+
+## 2026-09-30 - Config pruning keeps valid siblings across unsafe keys, model aliases and legacy maxTokens (refs #7676)
+
+The per-leaf pruning added by #7676 had three follow-up gaps. First, `constructor`, `prototype` and `__proto__` inside an otherwise valid config could bypass layer validation: `constructor` was then read through an inherited Zod shape member and crashed `unknown-key-diagnostics.ts`, while the other unsafe keys could survive or silently disappear. `layer-validation.ts` now rebuilds every parsed layer from safe own entries, reports each unsafe path through the existing `unknown-keys` diagnostic, and preserves valid siblings; the OpenCode schema walker also reads only shape-owned members. Second, `omo-config-chain.ts` parsed all model-reference input at once, so one invalid OpenCode leaf made it skip every model alias. It now prunes invalid model-input paths before `resolveModelReferences`, while the normal plugin-view warning still names the dropped leaf. Third, legacy `maxTokens` normalization moved even a wrong-typed value to `max_tokens`; the pruner could not find that normalized path in the raw document and removed the whole category. Invalid `maxTokens` now stays at its original path until validation removes only that field, while valid numeric values still normalize to `max_tokens`.
+
+RED on current dev: the focused pipeline run produced four failures: the unsafe-key fixture lost the valid agent, the direct schema walker threw at `schema._zod.def`, the valid alias remained `alias`, and the valid category disappeared. GREEN after the fixes: all 10 focused tests pass, including the three real `validatePluginConfig` scenarios and the direct inherited-shape guard.
+
+## 2026-09-30 - Post-edit LSP install nudges skip files outside a project and repeat at most once per server (#9223)
+
+`@oh-my-opencode/lsp-core/post-edit` passed the daemon's not-installed guidance through for every edited file and every edit: a write to the agent's own config or a scratch temp file got "To install in THIS repository" plus "ACTION REQUIRED — ASK THE USER", which would create a `package.json` in HOME or a temp dir, and a harness without an install-decision tool saw it again on every edit. The diagnostics runner can now return a structured `not_installed` outcome, and `collectPostEditDiagnostics` takes an optional `locateFile` (`post-edit/file-location.ts` `classifyPostEditFileLocation`). An undecided nudge is skipped when the file has no project root (no `WORKSPACE_MARKERS` ancestor, the marker set the out-of-cwd workspace resolver uses), sits in the agent config dir, or sits in the canonical OS temp dir or `/tmp` without its own marked project below the temp root. Without a decision tool a server is nudged once per session cache (`notInstalledServers`, cleared with the not-configured cache). Recorded `declined`/`allowed` decisions and project-root files keep today's text, and `missing-dependency-result.ts` now reports the recorded `decision` in the not-installed availability. Direct `lsp_diagnostics` calls are unchanged. The Codex LSP component builds its per-session post-edit cache with an empty `notInstalledServers` set (`omo-codex/plugin/components/lsp/src/lsp-session-state.ts`); Codex has a decision tool and reports only `not_configured` structurally, so its behavior is unchanged.
+
+RED on dev: the omo-senpi adapter test got the full ASK THE USER nudge for an agent-config file and a no-project scratch file. GREEN: `packages/lsp-core/src/post-edit/not-installed.test.ts` (14 cases) and `missing-dependency-result.test.ts`.
+
+## 2026-09-30 - Adopt senpi 2026.9.29-5: GPT-6.1 Sol in the engine catalog, the OpenAI provider default, the GPT-6 prompt, and four engine fixes (#9214)
+
+Every senpi pin moves from 2026.9.29-4 to 2026.9.29-5 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins including the `@earendil-works/pi-tui` aliases, their pin tests, the version comment in `provider-map.json`, and the engine named in `senpi-task`'s category coverage test). `bun.lock` moves the seven `@code-yeongyu/senpi*` entries. `packages/omo-senpi/plugin/extensions/omo.js` changes only in its embedded provider-map copy (the version comment and the digest); `build-extension.mjs --check` reports the build current. The routing change in this branch (deep-low and Geeky · Normal on `gpt-6.1-sol`) needs this engine, which is the first to carry the `gpt-6.1-sol` and `gpt-6.1-sol-fast` catalog rows on the OpenAI and ChatGPT-subscription lanes (senpi #2390, #2393, #2396).
+
+## 2026-09-30 - Kibitzer's recall sidecar starts on a connected model when the quick pin names only unconnected providers (#9216)
+
+`resolveKibitzerSidecarModel` took the category resolution as is, and category resolution keeps the `task` tool's rule that a user pin wins: when none of `categories.quick.models` is connected, delegate-core returns the first pin anyway and the senpi-task resolver only checks that the catalog knows it. The sidecar child then failed its auth check in milliseconds (`No API key found for <provider>`) and never reached the connected rung it carried as a fallback, so recall stayed off on a machine that had one. The new `kibitzer/sidecar-connected-order.ts` reorders the sidecar's candidates, only when the registry's availability list is known and non-empty: connected candidates lead (pins in pin order, then the builtin chain), unconnected ones stay behind them, and when none is connected the resolution is `category_unavailable` with the unconnected pins' providers first, then the chain's missing providers, so the existing notice names what to connect. An empty availability list (the stale first-turn snapshot) keeps today's resolution, and the `task` tool's resolution is unchanged.
+
+RED on dev: the four new `sidecar-model.test.ts` cases failed (an anthropic-only registry with an openai pin resolved `openai/gpt-5.6-luna-fast`; an unconnected pin led the fallbacks ahead of a connected chain rung; nothing connected still resolved the pin). GREEN on this branch: 11/11 in that file, 643/643 across `kibitzer/` and `worker/`.
+
+## 2026-09-30 - deep-low leads with GPT-6.1 Sol at medium, keeping GPT-5.6 Sol behind it (#9214)
+
+`packages/model-core/src/category-model-requirements.ts` `deep-low` is now `gpt-6.1-sol` (medium) on `openai|chatgpt-subscription`, then `gpt-6.1-sol-fast` (medium) on the same two lanes, then the unchanged `gpt-5.6-sol` (medium, all four GPT lanes) and `gpt-5.6-sol-fast` (medium) rungs, so Copilot, OpenCode Zen and a registry without 6.1 Sol still resolve the lane at the same effort. `packages/omo-opencode/src/tools/delegate-task/openai-categories.ts` moves the builtin default to `openai/gpt-6.1-sol` medium and `DEEP_LOW_GATE_MODELS` to `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `gpt-5.6-sol-fast`, `gpt-5.6-sol`; the installer config writes the three later rungs as `fallback_models`. Every other category is unchanged.
+
+Model capabilities: `model-capabilities/supplemental-entries.ts` adds `gpt-6.1-sol` and `gpt-6.1-sol-fast` (family `gpt`, text and image input, 400K context, 128K output), `model-capability-aliases.ts` maps `gpt-6.1-sol-fast` to `gpt-6.1-sol` through the OpenAI fast service-tier alias, and `model-capability-heuristics.ts` gives 6.1 Sol its own family ahead of `gpt-6` with the `low`..`max` ladder, downgrading `none` and `minimal` to `low` the way Astra does (plain GPT-6 Sol still accepts `none`). The family pattern matches the normalized id `gpt-6-1-sol`, since `detectHeuristicModelFamily` rewrites dotted versions first.
+
+Tests: the chain pins in `model-requirements-categories.test.ts`, `gpt-6-family-routing.test.ts` and `category-routing-policy.test.ts` carry the four-rung chain; the guardrail and fast-alias tests list both 6.1 ids; the new `gpt-6.1-sol.test.ts` covers the effort ladder, the 128K output cap, and deep-low resolving 6.1 Sol over 5.6 Sol, the 6.1 Fast tier before 5.6, and Copilot's 5.6 Sol without 6.1. On the OpenCode side `openai-categories.test.ts`, `tools.test.ts` (the gate opens on each of the four ids) and `generate-omo-config.test.ts` follow. Docs: the deep-low rows in `agent-model-matching.md`, `installation.md` (plus a GPT-6.1 Sol model row), `overview.md`, `configuration.md`, `features.md`, the three `docs/examples` configs and `packages/omo-opencode/src/tools/AGENTS.md`.
+
+## 2026-09-30 - Remove `omo daemon attach` and the shared-host opt-in (#9143)
+
+senpi 2026.9.29-4 (adopted in the entry below) removed the interactive shared-host join, so omo drops its consumers: `omo daemon attach` now exits 2 as an unknown subcommand with nothing on stdout, and nothing in omo sets or reads `OMO_ENABLE_SHARED_HOST` any more. Details in `packages/omo-native/changes.md`; the user-facing note is the `### Removed` entry in `CHANGELOG.md`.
+
+## 2026-09-30 - The RPC serializer test recovers upstream code from the installed engine, not its source map
+
+`packages/omo-native/test/rpc-stream-errors.test.mjs` read the unprepared RPC serializer from `dist/modes/rpc/rpc-mode.js.map`, and senpi 2026.9.29-4 publishes no sourcemaps (senpi #2362), so the file failed at import with `ENOENT ... rpc-mode.js.map`. `bin/lib/rpc-stream-errors.js` now exports `serialization` and `guardedSerialization`, and the test reads the installed `rpc-mode.js` and reverses the one replacement the preparation makes, failing loud if the installed file carries neither shape. Disabling the preparation's write turns 4 of the 13 tests red.
+
+## 2026-09-30 - The binary build resolves senpi's sidecars from senpi's real path (senpi 2026.9.29-4 no longer bundles its dependencies)
+
+`script/engine-sidecar-sources.ts` built its `createRequire` from `node_modules/@code-yeongyu/senpi/package.json`, the symlink bun's isolated linker puts at the repo root. Node walks `node_modules` from the path it is given, so once senpi stopped bundling its dependencies (senpi #2360) the walk from the symlink found neither `@code-yeongyu/senpi-codemode` nor the `senpi-pty` alias, which bun links beside senpi's real path in `node_modules/.bun/<key>/node_modules`. `engineSidecarSources()` threw `codemode sidecar @code-yeongyu/senpi-codemode is not installed` and native prebuild staging fell back to `npm pack` (6 failures in `script/build-omo-binary.test.ts` and `script/engine-sidecar-sources.test.ts`). The require now starts at `realpathSync(senpiPackageDir)`, the same walk `engine-dependency.js` (#9184) uses, and the css-tree trio test's independent oracle resolves from the real path too, because that is where Node resolves the engine from. Reverting the production line brings all 6 failures back.
+
+## 2026-09-30 - Adopt senpi 2026.9.29-4: project trust covers legacy .pi resources, interactive sessions stop joining a shared host, and the Claude 403 fallback fix
+
+Every senpi pin moves from 2026.9.29-3 to 2026.9.29-4 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins including the `@earendil-works/pi-tui` aliases, their pin tests, `bun.lock`, the version comment in `packages/omo-native/bin/lib/provider-map.json`, and the engine version named in `senpi-task`'s category coverage test). `packages/omo-senpi/plugin/extensions/omo.js` embeds the provider-map comment, so its version string and source digest line move; the rest of the bundle is unchanged. `bun.lock` changes more than a usual pin bump because senpi now declares its real dependencies instead of bundling them (senpi #2360, prepared for by #9184). 2026.9.29-4 brings:
+
+- **Breaking**: legacy `.pi/` project resources follow project trust, and a `.pi`-only project asks for trust (senpi #2375). Interactive sessions no longer join a shared RPC host; `pi.sharedHostEnabled`, `experimental.sharedHost` and `rendered_components` are gone (senpi #2347).
+- **Session gateway**: `pi.session.registerControlEndpoint` / `admitExternalMessage`, `release_session` takeover, `wake` on multi-session hosts and kind-aware `host status --all` rows (senpi #2365).
+- **Fixes**: transient Claude 403 retries the same model and a billing-dead fallback never pins the session (senpi #2379), trusted projects load `.agents/skills` again (senpi #2374), atomic session rewrites and consistent failed writes with `transcript_write_failed` (senpi #2367, #2369, #2370), every `extension_ui_response` gets a reply (senpi #2373), Claude answers in the user's language (senpi #2368), smaller installs (senpi #2363, #2364).
+
+## 2026-09-29 - A Z.ai-only or Xiaomi-only machine gets a quick model, so Kibitzer recall runs (#9202)
+
+The `quick` chain had no Z.ai or Xiaomi rung. A machine logged in to only one of them therefore had no quick model: quick delegation was unavailable, and Kibitzer refused with `beyond_category` and stayed off, because its recall sidecar is pinned to `memory.recall.category` (default `quick`). Both chains (`packages/senpi-task/src/category/fallback-chains.ts` and the `packages/model-core/src/category-model-requirements.ts` mirror) now end with `glm-5.3-flash (low)` on `zai|zai-coding-cn` (model-core: `zai-coding-plan`) and `mimo-v2.6-flash (low)` on `xiaomi`. The rungs come after `claude-haiku-4-5`, so every provider set that resolved quick before resolves the same model. Neither flash model can turn thinking off: the engine catalog maps `off` to null for `glm-5.3-flash`, and `mimo-v2.6-flash` declares `supportsDisabledThinking: false`. Both run at `low`, like `qwen3.6-flash`. The telemetry vocabulary adds both model ids, and the doc tables list them. The bundled capability snapshot gains the four entries these rungs resolve through (`glm-5.3-flash`, `zai/glm-5.3-flash`, `mimo-v2.6-flash`, `xiaomi/mimo-v2.6-flash`), taken from a fresh models.dev fetch through the generator's own normalization, so every built-in requirement model stays snapshot-backed. The full refresh belongs to the scheduled refresh-model-capabilities workflow. `omo-native/test/category-coverage.test.ts`, which runs the real engine with only a Z.ai key, now expects `quick` to be usable.
+
+The Desktop's prompt surface is not passed through the environment. A host process keeps the environment of the client that started it. The operator endpoint `rpc.sock` is shared by `omo daemon run`/`attach`, the thread tools of any session, the Desktop's control endpoint and every Desktop thread on Windows. A surface variable set by a Desktop spawn would therefore reach CLI sessions on that host. The surface is carried per session instead, on the RPC session-open commands (senpi#2380).
+
+## 2026-09-29 - Comment-checker resolvers find the npm binary in every layout the package has shipped (#9180)
+
+`@code-yeongyu/comment-checker` is moving from one tarball that bundles five platform binaries under `vendor/<platform>/` (255 MiB per install) to per-platform optional packages `@code-yeongyu/comment-checker-<platform>-<arch>` with the binary in `bin/` (51 MiB; code-yeongyu/go-claude-code-comment-checker#12). Only Native saw both layouts, because it calls the package's own `getBinaryPath()`. The OpenCode hook resolver (`comment-checker-core` `resolveCommentCheckerBinary`) looked only in `bin/`, so it missed every 0.7.1+ npm install, and the doctor (`findCommentCheckerPackageBinary`) knew `vendor/` but not the platform package. `comment-checker-core/src/package-binary.ts` now owns one lookup: the platform package resolved from the root package's own location, then `vendor/<platform>-<arch>/`, then `postinstall`'s `bin/`. The core resolver, the doctor and the LazyCodex component's fallback all use it. Resolution order around it (env override, shared cache, PATH, lazy download) is unchanged.
+
+RED on dev: the resolver matrix against real npm installs of 0.8.0 and of the per-platform packages returned no path from the core resolver for either layout, and none from the doctor for the per-platform layout. The real `doctor --json` reported `Comment checker: no` for the per-platform install. On this branch every surface returns the installed binary for both layouts, and that binary's check exits 2 on a comment. The built LazyCodex `PostToolUse` hook blocks with the checker's message in both layouts.
+
+## 2026-09-29 - One invalid value no longer wipes an omo.json file: only that key is dropped and `omo doctor` names it (#7670)
+
+Before this change a single malformed value in `omo.jsonc` (for example `"task": { "host_engine_policy": "sometimes" }`) made the loader reject the whole file, so every valid key in it silently stopped applying. `packages/omo-config-core/src/loader/layer-validation.ts` now validates a file in three gates: the prototype-tamper guard still rejects the file fail-closed before anything else, unknown keys are still stripped with one `unknown-keys` diagnostic (now also inside array elements, so `teams.alpha.members.0.bogus` is reported as an unknown key by its dotted path, and a diagnostic with an empty key list is never emitted), and every remaining invalid value is pruned by `prune-invalid-leaves.ts`. The pruner walks each zod issue path, drops the smallest failing subtree (the wrong value, or the object that lacks a required key, including inside arrays such as `teams.alpha.members.0.color`), removes containers left empty, and re-validates in bounded passes; an exhausted bound, an issue on the document root, or a file with nothing valid left still rejects the file with its existing `validation` diagnostic. This covers every section of the layer schema: the shared top level, `task`, `agents`, `categories`, `teams`, the `[native]` / `[senpi]` / `[codex]` blocks and `profiles`. Each dropped key is its own `invalid-value` diagnostic whose `path` is the file and whose `issuePaths` names the dotted key. The merged-config fallback follows the same rule: a merged value that fails the full schema is dropped with an `invalid-value` diagnostic at `(merged omo config)` instead of resetting the whole config to defaults. The prune builds on the agents/categories leaf pruning from #7676 (contributed by @mooire733), generalized from `agents.<name>` / `categories.<name>` leaves to every path.
+
+`omo doctor` (native, both the launcher and the compiled binary, through `packages/omo-native/config-doctor-runtime.ts`) prints one `WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)` line per dropped key, one `... ignored (unknown key)` line per stripped key, and one `... not loaded (<reason>)` line per file that contributed nothing, all shared from `omoConfigDiagnosticLines`. In the OpenCode edition, `validatePluginConfig` reports the loader's dropped keys as `warnings` (the file stays valid) and applies the same pruning to the `[opencode]` block against the plugin schema, so one bad field no longer drops the whole `agents` section of that block; its doctor lists each warning as its own issue.
+
+## 2026-09-29 - omo doctor runs the computer-use diagnostic again: omo-ai ships the prelude assets beside the doctor runtime (#9193)
+
+On 5.1.1 every `omo doctor` printed `WARN computer use: diagnostics unavailable: ENOENT ... plugin/runtime/category-coverage/assets.generated.json`, on every OS. `plugin/runtime/category-coverage/index.js` inlines the computer-use doctor, and with it `senpi-desktop-prelude`'s `assets.ts`, which reads `assets.generated.json` from beside the bundle at import time. `build-extension-core.mjs` stages that file beside the extension bundles in `extensions/`, but `script/build-omo-native.ts` never staged it beside the category-coverage bundle, so the published tarball had it only in `plugin/extensions/`.
+
+`buildCategoryCoverageRuntime` now copies the prelude assets next to the bundle it builds, the same beside-the-bundle contract the extensions and personas follow, and `runtime/category-coverage/assets.generated.json` joins the native payload's required artifacts. `script/verify-omo-ai-payload.mjs` pins it too, and it gains a rule that reads every packed `.js`/`.mjs` file: a bundle that reads `join(dirname(fileURLToPath(import.meta.url)), "<file>")` fails the gate unless `<file>` is packed beside it. The rule matches both the bundled and the terser-minified shape of that read, so a future sibling asset a bundle reads but the package does not ship fails packing instead of reaching users.
+
+## 2026-09-29 - Adopt senpi 2026.9.29-3: running sessions survive an update, unknown slash commands stay out of the model, and the web search, MCP and Bedrock fixes
+
+Every senpi pin moves from 2026.9.29 to 2026.9.29-3 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, `bun.lock`, the version comment in `packages/omo-native/bin/lib/provider-map.json`, and the engine version named in `senpi-task`'s category coverage test). 2026.9.29-2 and -3 bring:
+
+- **Running sessions survive `omo update` / `bun install -g`**: each launch runs from its own copy of the engine bundle under `<agentDir>/runtime/`, so a session started before the swap no longer fails every request with `Cannot find module './<chunk>-<hash>.js'` (senpi #2361, fixes senpi #2358).
+- **Unknown slash commands never reach the model by accident**: the TUI returns the text to the editor with a `Did you mean` hint and a second Enter sends it as a message; RPC and app-server answer with a structured `unknown_command` (senpi #2350, fixes senpi #2348; builds on #2258). Picker rows whose command declares an `argument-hint` complete and wait for arguments (senpi #2258, used by #9169).
+- **`~/.pi/agent` edits after the copy are reported** once per change at startup, and `config import-pi` copies them over (senpi #2349, refs #9173).
+- **Web search**: hosted search on the provider's cheaper search model with a session-model retry (senpi #2342), a keyless engine chain with per-engine cooldown and SearXNG (senpi #2344), and only returned pages counted as OpenAI/xAI sources (senpi #2338).
+- **MCP**: skill-declared servers expand `${VAR}` by the declaring skill's trust and remote skill servers stop sending `bearerTokenEnv` (senpi #2346); a non-shared `list_changed` registers the new tool list (senpi #2355).
+- **Providers**: Cursor runs each tool call once (senpi #2336), Bedrock accepts root `anyOf`/`oneOf`/`allOf` tool schemas (senpi #2058), hook-removed tools stay out of `allowed_tools` (senpi #2312), nested Responses WebSocket errors show status and message (senpi #2244), Chat Completions folds adjacent user messages for non-OpenAI hosts (senpi #2148), Claude subscription custom tool schemas keep field descriptions (senpi #2146).
+- **Sessions and extensions**: turns requested during `session_start` begin after every handler (senpi #2326, fixes senpi #1972), initial model provenance is forwarded (senpi #1863), CommonJS mode rules are preserved (senpi #1856).
+
+## 2026-09-29 - The OpenCode plugin installs only what it runs: runtime dependencies are zod, detect-libc and @opentui/solid (#9181)
+
+The root `package.json` listed thirteen build inputs under `dependencies`. `bun build` inlines all of them into `dist`, so every plugin install downloaded their full closure (`@opencode-ai/plugin` alone pulls `effect` 4 beta at 46 MiB) and never imported it. A bare-import census of every `.js/.mjs/.cjs` file in the published 5.1.1 tarball finds only `zod` (`dist/index.js`, the index build's one `--external`), `detect-libc` (`bin/oh-my-opencode.js`, `postinstall.mjs`) and `@opentui/solid` (`dist/tui.js`). Those three stay runtime dependencies. `@clack/prompts`, `@modelcontextprotocol/sdk`, `@opencode-ai/plugin`, `@opencode-ai/sdk`, `@opentui/core`, `@opentui/keymap`, `commander`, `diff`, `js-yaml`, `jsonc-parser`, `picocolors`, `picomatch` and `posthog-node` move to `devDependencies`, and the build is unchanged.
+
+`@opentui/solid` stays a hard dependency rather than an optional peer. OpenCode installs plugins with npm Arborist, which never installs optional peers, and `tui.ts` returns before registering anything when `import("@opentui/solid")` fails. A packed variant with the optional peer, installed the same way, has no `@opentui/solid`, and its TUI loses the `/native` command, the sidebar and btw. The four `@earendil-works/pi-*` 0.84.2 root overrides are deleted: they matched no dependency edge. `omo-opencode` drops a `picomatch` declaration nothing in it imports. `senpi-task` moves `typebox` from 1.3.18 to the repo-wide 1.3.34. `omo-senpi` and `senpi-task` compile and test against `@earendil-works/pi-tui` as `npm:@code-yeongyu/senpi-tui@2026.9.29`, the fork the engine loads at runtime, instead of upstream 0.84.2. `runtime-dependency-resolution.test.ts` learns that an `npm:` alias installs the aliased package's manifest, and `dependency-security.test.ts` checks the ReDoS-safe picomatch pin under `devDependencies`, where the bundled copy now comes from.
+
+## 2026-09-29 - omo resolves senpi's dependencies where senpi resolves them, not inside senpi's package directory (#9184)
+
+Several sources reached into `node_modules/@code-yeongyu/senpi/node_modules/...`, which exists only while senpi publishes with `bundleDependencies`. Once senpi ships its dependencies as ordinary ones (code-yeongyu/senpi#2360), npm hoists them beside senpi and bun's isolated store links them beside senpi's real path, and every one of those paths breaks: the installed-engine preparation (postinstall and every launch) failed with `installed Senpi target is missing`, `omo setup`'s model import with `the engine model catalog is missing`, and the binary build could not resolve its OAuth import.
+
+`packages/omo-native/bin/lib/engine-dependency.js` answers where the engine at a senpi root resolves a dependency: Node's `node_modules` walk from senpi's real path, which covers the bundled, hoisted and bun-store layouts with one rule. `claude-code-floor.js` (the Claude Code UA floor) and `engine-models.js` use it, as do `provider-map-registry.test.ts`, `compile-entry.test.ts` and the `policy-continuation-e2e.mjs` driver. `chain-provider-ids.test.ts` resolves the registry through pi-ai's exports from senpi's real path. The hooks-state legacy-reader fixture resolves and mocks `proper-lockfile` from senpi's entry with `createRequire`. `script/qa/tsconfig.json` takes `typebox` from omo-senpi's own dependency (the same 1.3.34 senpi pins) and `sanitizeTerminalLabel` from senpi's public re-export.
+
+The compiled entry now calls `registerBunRuntimeModules()` from senpi's `./bun-runtime` export instead of importing `pi-ai/dist/bun-oauth.js` by path. The export is bound to the pi-ai senpi itself loads, and besides the OAuth flows it registers the statically bundled Bedrock, Cursor and Devin provider modules, as senpi's own Bun binary does. Before this, the binary answered a Bedrock or Devin model with `Cannot find module './bedrock-converse-stream.js' imported from /$bunfs/...` (#8235); now a Devin model reaches its endpoint and a Bedrock model reaches the AWS SDK. `engine-runtime-modules.ts` imports that export right before the CLI instead of at module scope: registering at module scope cost every launch about 90 ms of CPU, including `--version`. Deferred, the answers omo gives itself stay within about 20 ms of before, and an engine launch pays about 50 ms for the providers. A darwin-arm64 build with the repository's script bundles 4192 modules before and 4193 after (the new module), and the binary grows from 118,318,194 to 119,226,354 bytes. On a synthetic install where senpi has no nested `node_modules` and its dependencies are siblings in a bun store, `dev`'s fixture, compile entry, engine preparation and model catalog all fail to resolve, and this change's versions run, with the bundle taking every pi-ai module from the sibling (0 nested inputs). `senpi-patch.test.ts` covers the hoisted and bun-store layouts and the unresolvable case.
+
+## 2026-09-29 - omo-ai no longer declares @babel/parser (#9182)
+
+#6965 added `@babel/parser@8.0.4` to `omo-ai` because `@code-yeongyu/senpi@2026.8.16` bundled `senpi-codemode` without the parser its `kernels/js/rewrite-imports.ts` imports. `@code-yeongyu/senpi-codemode@2026.9.29` declares `@babel/parser 8.0.4` itself, and in clean global installs of the published `omo-ai@5.1.1` (bun and npm, isolated HOME and cache) the bundled codemode already resolves its own nested copy, `senpi/node_modules/@code-yeongyu/senpi-codemode/node_modules/@babel/parser`, so the omo-ai declaration was never read. `packages/omo-native/package.json` drops it and `test/package-shape.test.ts` pins the single `@code-yeongyu/senpi` dependency. A packed `omo-ai` without the declaration, installed the same two ways, answers `omo --version` and boots an RPC session whose `get_loaded_surfaces` lists the same 55 extensions as the published package, `senpi-codemode` included, with no `Cannot find module '@babel/parser'` warning. The installed tree is unchanged under bun (the parser stays as codemode's own dependency); npm no longer places an unused top-level copy.
+
+## 2026-09-29 - omo.dev recommends the one-line installer for the visitor's OS, with an install page (#9177)
+
+The landing hero and the closing CTA showed `bun install -g omo-ai`, and a browser opening get.omo.dev was sent to `omo.dev/docs/guide/installation`, which returned 404. Both now show `InstallTabs` (`packages/web/components/landing/install-tabs.tsx`): one CommandBar per shell under a `macOS, Linux, WSL` / `Windows PowerShell` / `Windows CMD` tab row. `lib/install-targets.ts` holds the three commands and `detectInstall()`, which reads `navigator.userAgentData.platform` first and the UA string second. Windows gets PowerShell, macOS, Linux and ChromeOS get the shell script, and phones, tablets and unknown agents get the shell script with a "run this on your computer" caption. A script in the root layout's `<head>` marks `<html>` with the detected target before the body is parsed, and CSS picks the panel from it until the visitor chooses a tab, so a Windows visitor never sees the macOS command flash and nothing shifts. Without JavaScript all three commands show. The tabs use a roving tabindex with arrow, Home and End keys.
+
+`/docs/install` is new, built from `docs/guide/install.md`: the three commands (the site swaps the marked block for the tabs), checking the install with `omo --version` in a new terminal, fixing `PATH` per shell, channels and versions, updating, uninstalling, proxies and offline machines, and npm/Bun as the alternative. `scripts/generate-docs-content.mjs` compiles standalone pages listed in `DOC_PAGES_DATA` next to the single-page sections, and `DocsShell` takes each page's own section ids. The hero "Get started", the CTA "Install now" and the nav "Install" link there. get.omo.dev's browser redirect points to it, and `proxy.ts` sends the old `/docs/guide/installation` path there with a 308. The READMEs lead with the one-liner and link the page. `get-worker-ci.yml` runs the exact CMD line against the live get.omo.dev on `windows-latest`.
+
+## 2026-09-29 - Memory reflection reaches models that only an extension-registered provider serves (#9175)
+
+Reflection children start with `--no-extensions`, and the model preflight listed models the same way, so a provider that only an extension registers (a custom gateway declared under `packages` in `settings.json`) never existed in the child: every run failed `model_not_visible`, whichever model was pinned. `worker/model-preflight.ts` still probes the discovery-disabled catalog first. A candidate that catalog omits is looked up in a second catalog listed with extensions loaded (cached separately), and a candidate found only there keeps its place in the chain with `loadExtensions: true`. `spawn-payload.ts` starts that child without `--no-extensions` and with `OMO_SENPI_DISABLED=1`, so the omo plugin loads but registers nothing (its task and thread components would otherwise write `.omo/` into the memory worktree and dirty it; `extension/disable-env.ts`, honored in `compose.ts` like the `--omo-senpi-disabled` flag, which is an unknown option to a child without the plugin). The `SENPI_MEMORY_REFLECTION` sentinel stays set, and fork children keep omo loaded because their cache prefix must match the parent. Core-provider models keep the `--no-extensions` child unchanged.
+
+When no catalog lists any candidate, the reactive attempt now runs in the extension-loading child, so a `model_not_visible` there proves no memory child can see the model. `memory-model-attempts.ts` then leads the detail with `model_unreachable_with_extensions`. `failure-policy.ts` marks that failure definitive, `memory-core` parks automatic reflection on the first definitive failure instead of the third, and the park alert is its one notice (the health alert skips it). The notice points at a core-provider model for `categories.<category>.model` or `memory.reflection.enabled: false`; `docs/reference/omo-json.md` documents it. RED on dev 3f9a6bb6e: the new runner integration test failed with `model_not_visible:extension-only/primary`. Live QA on the real engine with a discovered gateway extension and a localhost stub: reflection merged through the gateway, and after the stub died one failure parked with one notice and two later turns started no run.
+
+## 2026-09-29 - One-line native installer at get.omo.dev: R2 mirror behind the CDN, GitHub fallback, counted downloads (#9166)
+
+`curl -fsSL https://get.omo.dev/install.sh | bash` and `irm https://get.omo.dev/install.ps1 | iex` install the compiled `omo` binary. Both scripts live in `packages/get-worker/scripts/` and pick the asset for the OS, CPU, libc, AVX2 support and Rosetta. They verify it against the release `SHA256SUMS`, install `~/.local/bin/omo` atomically, add a marked PATH block (Windows: user PATH as REG_EXPAND_SZ) and write the receipt `~/.omo/install.json`. They also report an npm `omo-ai` install without removing it, and refuse to run as root. When get.omo.dev is unreachable, the channel resolves from the npm `omo-ai` dist-tags and the bytes come straight from GitHub Releases.
+
+`packages/get-worker` is the Worker `omo-get` on get.omo.dev. It serves the scripts, the channel pointers `/channels/{latest,beta}` (60 s) and `/v/<version>/<asset>` from the private R2 bucket `omo-releases` through the Cache API (immutable, one year), and only allowlisted asset names are served. It answers with a 302 to the GitHub asset (`X-Omo-Source: github`) when the version has no `.complete` marker, the object is missing, or R2 errors. Every download writes one Analytics Engine datapoint, and installs tagged `omo-install-qa` (this repo's CI) are marked so the count leaves them out. An hourly cron rolls whole UTC days into D1 (`downloads_daily`, plus signed `download_adjustments`), and `/stats/downloads` reports `uncountedByGitHub`.
+
+`script/installer/mirror-release-to-r2.ts` (reusable workflow `installer-mirror.yml`, called by `publish.yml` as the last release step) verifies each asset against `SHA256SUMS` and the GitHub digest. It uploads through a SigV4 PUT that signs the payload hash, so R2 refuses altered bytes, then reads every object back and re-hashes it. Only after that does it write `.complete` and move the channel. The channel never moves backwards unless forced, stable versions are kept forever and only the newest 20 betas are kept. `--dry-run` works under a scratch prefix and deletes it afterwards.
+
+`packages/web` adds the mirror's `uncountedByGitHub` to the site total, the `/api/downloads` badge and the OG image; a failing stats reply withholds the figure like a failing npm range. Installs redirected to GitHub are already in the release `download_count`, so they are not added twice. `get-worker-ci.yml` runs the Worker tests, shellcheck, PSScriptAnalyzer and real installs on Linux (glibc, arm64, Alpine musl), macOS and Windows (pwsh and Windows PowerShell 5.1). `get-worker-deploy.yml` applies D1 migrations and deploys. The root `bunfig*.toml` files ignore `packages/get-worker/**` like `packages/web/**`.
+
+## 2026-09-29 - Native's first start reports the OpenCode edition's agent and category models it does not use (#9147, #6794)
+
+A user who moved from the OpenCode edition to OmO Native without running `omo setup` had their per-agent and per-category model choices ignored with no message: the legacy migration deliberately imports only model/provider controls (#7270), and Native reads only the shared base plus `[native]`. Native's startup migration batch now ends with a notice-only in-place plan, `2026-09-opencode-routing-notice` (`omo-senpi/src/components/config-startup/opencode-routing-notice.ts`). It reads the OpenCode edition's `agents` and `categories` from the legacy `oh-my-*` files or the migration backups they were moved into, overlaid by the `[opencode]` block, the same sources `omo setup` reads. Each choice the native view (shared base, `[senpi]`, `[native]`) does not already set is named under its native key through setup's own conversion (`openCodeRoutingGap` in `omo-native/bin/lib/setup-opencode-models.js`): `metis` -> `plan-consultant`, `momus` -> `plan-reviewer` (#9167), Native names win, provider ids through `provider-map.json` (`zai-coding-plan` -> `zai`, `kimi-for-coding` -> `kimi-coding`), `variant` -> `reasoning`. An agent Native has no counterpart for gets the category form; an unknown provider gets a `<provider>/<model>` placeholder. All of it goes into ONE warning at the first `session_start` with "run omo setup to carry them over" and the exact `"[native]": { ... }` member for each. The plan writes nothing but its `_migrations` marker, so later starts are quiet; a config with nothing to report gets no write and no marker. `omo doctor` prints the same line (`INFO`) for as long as the gap exists (`doctor-migration.js` `openCodeRoutingReport`).
+
+Without the engine's model list the startup check validates providers only (against the engine's builtin ids); `omo setup` still validates each model before it writes. `setup-opencode-models.js` reads `provider-map.json` with a JSON import so the omo-senpi bundle carries it, and ships a `.d.ts` for that cross-package import. RED on dev 7737042b7: 5 of the new behavior tests failed (4 startup, 1 doctor) while the no-history and Native-set controls passed.
+
+## 2026-09-29 - X11 foreground clicks and scrolls wait for the window manager to replay each press (#9136)
+
+On X11 a foreground `scroll` sometimes delivered only part of its wheel clicks and still reported success; the Desktop Linux QA scenario `x11-scroll-direction-foreground` failed intermittently with one of three clicks missing. xfwm4 keeps a synchronous passive grab on every client window, so each XTEST press freezes the pointer until the manager replays it. The engine sent the next press, and then the focus restore to the previous window, while earlier presses were still held. A press sent in that window never reached the target, and a late replay could re-focus the target after the restore, which surfaced as `InputFailed: window ... did not become active and focused`.
+
+`crates/senpi-desktop-backend-x11/src/input/settle.rs` now waits on the X server instead of on time. Before the first button it confirms the target is on the chain of windows under the pointer (`QueryPointer` descent from the root), so a covered point gets no button. After each click, and before focus goes back, it waits until no client holds the pointer, probed with a grab that selects no events and is released at once (`AlreadyGrabbed`/`Frozen` means a press is still held or a button is still down). Both waits are bounded by one second. When one runs out, the request fails with `InputFailed` that names the cause (covered point, or delivery unconfirmed) instead of reporting success. Desktop-target input and background (`XSendEvent`) delivery are unchanged, and the scroll contract (`dx`/`dy` pixels, 40 px per click, positive `dy` down) is untouched.
+
+Evidence, on Xvfb + xfwm4 with a Tk window that counts the ButtonPress events it receives: 200 iterations of activate-another-window then a foreground `scroll` of `dy: 120` (3 clicks) lost clicks in 14 iterations with an `ok` reply, plus 17 `InputFailed` replies, on the base engine. The fixed engine had 0 short iterations and 200 `ok` replies. `x11-scroll-direction-foreground` repeated 30 times in one stage passed 30/30, each moving exactly 8 lines and returning to its start. `settle_tests.rs` covers held presses, a pointer that is never released, a permanently covered point and a late restack against the recording fake. Removing either wait fails them.
+
+## 2026-09-29 - Docs: the session gateway, the `omo thread` CLI and `omo daemon adopt`; attach and shared-host prose removed (#9143)
+
+`docs/reference/omo-thread.md` now carries the gateway contract a script or connector depends on: the delivery table (what `auto`, `steer` and `follow_up` do for an idle, mid-turn, question-waiting, compacting or offline session; `auto` never steers through the gateway), the fixed budgets (1 MiB per send and 32 KiB per report or answer, a 128-message / 1 MiB backlog per target, a burst of 8 then one per 5 s per sender and target, 16 sessions per turn, 4 hops / 64 deliveries / 7 days per causal chain, 24 h for an undelivered message), the binding invariants, the outbox cursor and ack rules, and the completion arm lifecycle (opt-in, durable, picked up at start and on wake, 250 ms settle wait, lock waits bounded at about 25 s and retried). The `list` row documents the endpoint fields a live row carries, the connector loop reads the reply token out of the outbox, and `report` documents the originating-binding rule. `docs/reference/omo-daemon.md` drops the `attach` subcommand and every shared-host sentence (the measured tables now name the previous release's one host), and the operator-endpoint row names only `OMO_RPC_SOCKET`. `CHANGELOG.md` [Unreleased] gains the gateway, `omo thread`, bindings/outbox, `omo daemon adopt` and the attach removal. No config key was added, so `assets/omo.schema.json` is unchanged. Every documented `omo thread` and `omo daemon adopt` example was run through the real CLI against a sandbox agent dir with a fake host and terminal endpoint, and each `--json` shape was compared with the real keys.
+
+## 2026-09-29 - `omo thread` drives the session gateway from scripts; `omo daemon adopt` takes a host session into a terminal
+
+`omo thread list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack [--json]` runs every thread operation the agent tools offer without an agent session, as `cli:<uid>`, through the new plugin runtime `runtime/thread-sdk/sdk.js` (importable by connector scripts). `omo daemon adopt <session> [--interrupt] [--force]` asks the session's host to release it and resumes it in the current terminal with `--session <path>`; refusals exit 4 with the reason (`turn_active` -> pass `--interrupt`, `attached` -> pass `--force`, already a terminal session). `omo daemon status` lists terminal endpoints as `tui <name> pid <n> cwd <path>`, and handoff / `stop --all` never act on them. References: `docs/reference/omo-thread.md`, `docs/reference/omo-daemon.md`.
+
+## 2026-09-29 - unspecified-low opens on Claude Sonnet 5.5 (medium), deep-low opens on plain GPT-5.6 Sol (medium) (#9144)
+
+`unspecified-low` opened on `mimo-v2.6-pro (max)`. The chain now opens on `claude-sonnet-5-5 (medium)` behind the provider list of the existing `claude-sonnet-5` rung (`anthropic|anthropic-api|github-copilot|opencode`; the senpi mirror heads it with `anthropic-subscription`), and every earlier rung follows in its previous order, so the chain is 8 rungs. `deep-low` swaps its two rungs: plain `gpt-5.6-sol (medium)` on `openai|chatgpt-subscription|github-copilot|opencode` first, `gpt-5.6-sol-fast (medium)` on the OpenAI lanes second; its gate (either Sol tier) is unchanged. Owner decision; Claude Sonnet 5.5 was released 2026-09-28 and the engine catalog lists it from the next senpi release (code-yeongyu/senpi#2325), so until that adoption OmO Native keeps resolving `unspecified-low` on its MiMo V2.6 Pro rung.
+
+Mirrors moved together: `model-core/category-model-requirements.ts` (source of truth), `senpi-task/category/fallback-chains.ts`, both `openai-categories.ts` builtin configs (`anthropic/claude-sonnet-5-5 medium`; deep-low `openai/gpt-5.6-sol` / `chatgpt-subscription/gpt-5.6-sol` medium), `supplemental-entries.ts` (+`claude-sonnet-5-5`, `anthropic/claude-sonnet-5-5` with the models.dev claude-sonnet shape: 1M context, 128k output, reasoning, no temperature; without them `keeps every built-in OmO requirement model snapshot-backed` read `heuristic-backed`), and the telemetry vocabulary (`model-vocabulary.ts`: +claude-sonnet-5-5 on every provider list that exports claude-sonnet-5) so no shipped rung masks to `custom`.
+
+`unspecified-low-chain.test.ts` resolves the category against a registry serving every rung at once, so the winner proves order: sonnet-5-5 wins, then mimo-v2.6-pro once it is removed, then grok-4.7. RED before the test updates: 20 fails across the pinned chain/default expectations. GREEN on the identifier-scoped gate (model-core, senpi-task category/agents/tools-task, omo-opencode delegate-task + cli, omo-senpi telemetry): 2510 pass / 0 fail across 292 files. `bun run typecheck` exit 0. Extension bundles regenerated on Linux with bun 1.4.2 (the CI pin).
+
+## 2026-09-29 - Adopt senpi 2026.9.29: Claude Sonnet 5.5, a self-updating Claude Code fingerprint, and the Claude continuity fixes
+
+Every senpi pin moves from 2026.9.28-7 to 2026.9.29 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, `bun.lock`, and the version comment in `packages/omo-native/bin/lib/provider-map.json`). The new engine brings:
+
+- **Claude Sonnet 5.5** (`claude-sonnet-5-5`) in the catalog for anthropic, Bedrock, OpenRouter, Vercel AI Gateway, Venice and OpenCode, shaped like Opus 5.5 (adaptive-only thinking, no forced tool choice), with its own prompt preset (senpi #2325, fixes senpi #2321). `senpi-task/src/category/coverage.test.ts` lists it in the pinned anthropic catalog.
+- **The Anthropic OAuth `claude-cli/<version>` fingerprint follows the latest published Claude Code** (floor 2.1.284, six-hour background refresh cached beside models.json, `PI_CLAUDE_CODE_VERSION` pin, one retry at the version a `claude_code_version_too_old` rejection names). The bundled `claude-agent-sdk` is 0.3.284, the first Claude Code that knows Sonnet 5.5 (senpi #2325). omo's launcher floor rewrite (`bin/lib/claude-code-floor.js`, 2.1.280) is a no-op on this engine: the `claudeCodeVersion` declaration it rewrites is still there and already above the floor.
+- **Claude subscription continuity**: a streaming turn survives a thinking-level change and failed turns stop being reported as re-sends (senpi #2322); a detached binding forks at one shared-prefix boundary (senpi #1986); recovery resumes at an earlier verified checkpoint instead of re-sending everything (senpi #2324); a cold seed that overflows the window compacts once and retries instead of killing the session (senpi #2330, fixes senpi #2329, refs #7975).
+- **Ambient cloud credentials never make Bedrock the startup model** over configured providers (senpi #2332, fixes senpi #2327).
+- Changelog completeness for the Together default (now Kimi K3; models.dev retired K2.6 there) and `session.log` keeping `sessionId` (senpi #2333, refs #8759).
+
+## 2026-09-29 - LazyCodex agent sync keeps a user's model and applies `[codex].agents` overrides (#5245)
+
+`packages/omo-codex/src/install/link-cached-plugin-agents.ts` still copies each bundled agent TOML over
+`$CODEX_HOME/agents/<role>.toml`, but now restores a hand-edited `model` the way it already restored
+`model_reasoning_effort` and `service_tier`, then applies `[codex].agents.<role>.model` / `reasoning` from omo.jsonc.
+A per-agent receipt, `agents/.lazycodex-agent-models.json` (`agent-model-overrides.ts`), records the model LazyCodex
+wrote (bundled or override) and any override reasoning: an installed value that differs is a hand edit, one that
+matches follows the next bundled default, so a removed override does not stick. Installs from before the receipt fall
+back to the list of models bundled agents have ever shipped (`managed-agent-model-defaults.ts`).
+`codex-agent-config.ts` (was `codex-default-role-config.ts`) reads only the `[codex]` block and
+`profiles.<P>.[codex]`, never shared base `agents`, whose OpenCode model ids share role names such as `librarian`.
+The installer's agent linking moved to `install-codex-agents.ts`; both the installer and the bootstrap `setup` step warn
+about override names LazyCodex does not manage. `install-dist/install-local.mjs` is regenerated.
+
+## 2026-09-29 - Docs and schema: the task-host pre-warm uses the host's `warm` command, is admitted like a spawn, and warms Desktop threads on intent
+
+`docs/reference/omo-daemon.md` (Pre-warm): the warm registers the session's task store in `rpc/task-stores.json`
+before any host is ensured and does nothing when that fails; it then sends the host's `warm` command instead of opening
+a throwaway session (an engine from before the command still gets the warm-up session); and a session inside a Desktop
+thread host (`i-*`) warms on the first streamed `task`/`task_send` call instead of its first prompt.
+`packages/omo-config-core/src/schema/task.ts`: the `host_shard_prewarm` comment says the same about Desktop threads.
+
+## 2026-09-28 - Docs: engine hosts per session, the price of isolation, migration and rollback (#9003)
+
+`docs/reference/omo-daemon.md` is now "omo daemon - engine hosts per session". It documents how a session's
+task host is named (`<shardRoot>/p-<sha256("p:"+sessionId)[:16]>.sock`, `i-*` for Desktop threads,
+`OMO_RPC_SHARD_ROOT` and the short `/tmp/omo-rpc-*` alternate root), how children inherit their tree's host through
+`tree_key`/`shard_key`, why `OMO_RPC_SOCKET*` never route task children (a process launched through
+`omo daemon attach` still puts its children on its own host), the `.meta.json` sidecar, the per-endpoint `stderr.log`
+and `crashes.jsonl`, the 15-minute idle exit and eviction defaults, and the status/gc/handoff/stop surface including the
+`unknown_identity` row. It adds Migration, a six-step Rollback runbook (quiesce, `stop --drain --all --wait` with exit 0,
+zero reachable endpoints, `rollback-prepare` on this release, then R0), Pre-warm, and the Desktop contract.
+
+The known price of isolation is stated there and in the release notes: with 4 parents x 4 children, per-session hosts
+use 2.7 GB RSS and 0.8 GB physical footprint against 0.78 GB and 0.24 GB for one shared host. Idle memory is judged on
+physical footprint, because RSS counts the supervisor's and the host's shared file-backed pages twice; an idle host
+costs 126 MB of footprint. The measured memory and latency tables come from the shard-cost QA driver
+(`task-host-e2e-shard-cost.mjs`, 20 samples per latency scenario).
+
+User-visible changes of this release now in `CHANGELOG.md` under Unreleased: `thread_read` labels tool results as role
+`tool` on the live path, matching the transcript fallback; the host crash notice names `supervisor pid N`, says
+`1 child` in the singular, and its done line gains `, C cancelled` when children were cancelled; `omo daemon status`
+and `omo doctor` list every host; `omo daemon gc`; `stop --all` and `handoff` cover every endpoint;
+`rollback-prepare`; `omo daemon run --foreground` exits 2 because the engine host always detaches (`--persistent`
+stays accepted). `AGENTS.md` files of `senpi-task`, `omo-senpi`, its `task` and `thread` components, `docs/AGENTS.md`,
+`docs/guide/senpi-task.md` and `docs/reference/omo-json.md` no longer describe one machine-wide host.
+
+## 2026-09-28 - omo adopts senpi 2026.9.28-3: a transient task daemon idle-exits again, and native tool search accepts the deferred computer tool (#9041)
+
+Every `@code-yeongyu/senpi` pin moves from 2026.9.27-4 to 2026.9.28-3: the root devDependency, the `omo-native` dependency, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, and `bun.lock`. The release carries code-yeongyu/senpi#2242, under which `ensureHost()` holds the host for the caller until `release()` (omo releases it after the task daemon's capability probe, #9041), #2243 and #2237 (host teardown and ensure fixes), #2245 (`senpi host status --all`, `senpi host gc`, `memory_pressure`), #1519 (`/sessions` as a `/resume` alias and the thinking-level hints), #2253 (Anthropic native tool search resolves a deferred tool whose parameters are a root union, such as the desktop `computer` tool, instead of failing every request with HTTP 400), #2251 (a bare `/skill` no longer reaches the model), #2250 (`new Bun.WebView()` works in eval cells run by an RPC worker host) and #2257 (GPT-6 prompts stay on the stated goal). `packages/omo-native/bin/lib/provider-map.json` still matches the new engine's `builtinProviders()`, which `provider-map-registry.test.ts` checks against the installed package, so only its version comment changes.
+
+## 2026-09-28 - The parent hears once when its task host crashes, and once when its children are back (#9003)
+
+When a session's task host dies under running background children, every child already reattached on its own (re-ensure the recorded socket, reopen the session, re-prompt an interrupted turn), but the parent was told nothing. The host runner now reports each child's recovery to the session: when its transport was lost (socket, lost host generation, whether a turn was in flight) and how it ended (`attached`, `resumed`, `continued`, `lost`, `host_incompatible`, or `cancelled` when the child itself left during recovery). With the first loss it also names every live child still bound to that socket and generation, because each child's socket-close reaction runs in its own tick, and the supervisor pid it ensured for that generation. The task component coalesces these per socket and lost host generation, never by a time window. The first child that had a turn in flight produces one `host_shard_crash:<key>` line naming the shard, the supervisor pid when it is known, the signal or exit code from the endpoint's newest `crashes.jsonl` record (read once per crash, in the daemon directory the engine's own `createHostDaemonPaths` names), and how many children are reattaching. When the last of those children reports back, one `host_shard_crash_done:<key> <N> reattached: <M> continued mid-turn, <K> lost` line follows, with `, <C> cancelled` appended when a child was cancelled during recovery. Both lines go to the session's notice list, so `task_output` prints them, and to `ui.notify` (warning, then info). A TUI shows them as notice blocks, and a host-attached session forwards them as `notify` UI requests, which the Desktop renders as thread rows. A host that dies with no turn in flight is still re-ensured silently by the next spawn. The continuation prompt, the reattach backoff and the give-up semantics are unchanged, and an observer that throws cannot change recovery.
+
+## 2026-09-28 - Crash reports name the kind of RPC host that crashed (#9003)
+
+With one RPC host per parent session (and, in the Desktop, per thread), a crash no longer lands in one machine-wide endpoint. `process_crashed` already reads every endpoint directory's `crashes.jsonl` under `<agentDir>/rpc-host-daemon/`, and the claim fingerprint includes the endpoint directory. Two hosts' byte-identical records are therefore two reports, and each is still sent once. Each report now carries `shard_kind`: `p` for a per-session task host, `i` for a Desktop per-thread host, `none` for the legacy machine-wide endpoint or a crash outside any host, and `unknown` for an endpoint directory that names no socket. The kind comes from the endpoint's durable `endpoint.json`, or from the boot `settings.json` of a directory that predates it. A name counts only when its socket hashes to that directory. The shard key, socket path and owner session never leave the machine. The field is a flat string because the telemetry client drops object and `null` values.
+
+## 2026-09-29 - Darwin desktop engines build on standard macOS runners, and the x64 engine launches
+
+The two macOS rows of the `publish-platform.yml` desktop-engine matrix ran on the paid `macos-15-xlarge` larger runner; with the Actions spending limit reached, GitHub never started them and the 5.1.0 publish failed before anything reached npm. Both rows now run on the standard `macos-15` (arm64) runner; the x64 engine stays a cross-build, as it already was on the arm64 xlarge runner.
+
+The x64 cross-build was also broken: rustc defaults `x86_64-apple-darwin` to macOS 10.12, so the engine linked the Swift back-deploy libraries through `@rpath` (`libswiftCoreMedia.dylib`) with no `LC_RPATH`, and it aborted in dyld at launch on every Intel Mac (reproduced from tag `v5.1.0` under Rosetta: exit 134). The release never ran its selftest, so nothing caught it. The engine build now sets `MACOSX_DEPLOYMENT_TARGET=11.0` (the arm64 default), which links no Swift dylib, and the x64 leg runs `--selftest` under Rosetta, installing Rosetta on the runner if it is missing.
+
+## 2026-09-29 - `omo app-server` sessions get the OmO plugin (#9117)
+
+`omo app-server` launched the engine without the OmO plugin, so app-server threads had only the engine's builtin tools: no `task`/`task_send`/`task_cancel`/`task_output`, no `workpool`, `memory` or `lsp_*`, and clients never received `omo.task.updated`. The launcher (and the compiled binary) now passes the plugin to `app-server` and to every `app-server daemon` verb, after the subcommand where the engine reads it (senpi #2313); the daemon records it, so `restart` keeps it. Install, auth, config and the other early commands are unchanged.
+
+## 2026-09-28 - The auto-format notice reaches the model when post-edit diagnostics are clean (#9123)
+
+When format-on-mutation rewrote a file after a `write`, `edit` or `apply_patch` and the post-edit LSP diagnostics came back clean, the `(OmO) auto-formatted ... re-read before exact-text edits` notice was dropped: the diagnostics step reported "nothing to add" and the LSP `tool_result` hook returned no replacement, discarding the notice the formatter step had already added. That is the default configuration and the most common outcome, so the model usually kept editing against the pre-format text. The notice now reaches the tool result whenever the formatter changed the file, whether diagnostics report errors, come back clean, or are disabled. A mutation the formatter leaves unchanged still adds nothing.
+
+## 2026-09-29 - Adopt senpi 2026.9.28-7: app-server extensions, the host warm command, and the experimental /computer tip
+
+Every senpi pin moves from 2026.9.28-6 to 2026.9.28-7 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, `bun.lock`, and the version comment in `packages/omo-native/bin/lib/provider-map.json`). The new engine carries:
+
+- **`senpi app-server` loads extensions passed with `--extension <path>`** into every thread, including through `app-server daemon start|restart` (#9117, senpi #2313).
+- **An RPC host can warm its prompt path without opening a session** (senpi #2314, #2318).
+- **The `/computer` introduction tip says computer use is experimental** (senpi #2315, #2316).
+
+## 2026-09-28 - Computer use says it is experimental on every user-facing surface (#9124)
+
+OmO 5.1.0 ships computer use as experimental support, and every surface a user or model reads now says so. Only the wording changes: registration, gating, defaults, permissions and the #9049 root-object parameter schemas are unchanged (`published-parameters.fixture.json` is untouched).
+
+- Settings: `packages/omo-config-core/src/schema/computer.ts` gives the `computer` block and `computer.enabled` a `describe()` text that starts with "Experimental", carried into `assets/omo.schema.json` by `bun run build:omo-schema`. The `enabled` description in `packages/senpi-desktop-tool/src/settings.ts` reads "Register the computer tool (experimental; default: host supported)".
+- Tool: the `computer` description, `searchText` and `promptSnippet` (`packages/senpi-desktop-tool/src/tool-definition.ts`) and the `computer_actions` description and `searchText` (`cua-definition.ts`) say "(experimental)". `/computer` is described as "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)".
+- Skill: the `computer-use` skill description opens with "Experimental computer use.", and its intro says behavior, platform coverage and settings may change between releases. The prelude facade line in `packages/senpi-desktop-prelude/docs/computer.md` reads "host desktop facade, experimental", regenerated into `src/assets.generated.json`; `test/assets.sha256.json` consciously moves only `COMPUTER_DOCUMENTATION` to the new bytes (the other four prelude assets are byte-identical).
+- Docs: the computer-use guide has an experimental notice at the top and in setup, and Known limitations is grouped per OS, each marked experimental, with every earlier fact kept. The computer reference, the features section, the CLI doctor note, the Unreleased CHANGELOG headline and the README links in English, Korean, Japanese, Simplified Chinese and Russian say it too.
+- The committed plugin bundles are regenerated on linux/amd64 with bun 1.4.2.
+
+## 2026-09-28 - Adopt senpi 2026.9.28-6: GitHub Copilot Business and Enterprise requests reach the account's own host (#8662)
+
+Every senpi pin moves from 2026.9.28-5 to 2026.9.28-6 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, `bun.lock`, and the version comment in `packages/omo-native/bin/lib/provider-map.json`). The new engine carries:
+
+- **GitHub Copilot Business and Enterprise accounts no longer get `421 Misdirected Request` (#8662, senpi #2309, #2310).** The API host now comes from the account's own token exchange (`endpoints.api`, then the token's `proxy-ep`, then the GitHub Enterprise domain), with the individual host only as a last resort, for login, refresh, inference, `/btw`, and native web search. A 421 now says what happened and includes the GitHub request id.
+- **Each RPC host supervisor uses about 12 MB less memory (senpi #2311).** The supervisor no longer loads the CLI parser or the provider model catalog.
+- **The Devin model seed and SWE-2 prompt preset list only the lanes Devin serves (senpi #2306, #2308).**
+
+## 2026-09-28 - Computer use loads its implementation on first use, not at every session start (#9113)
+
+Every omo session paid about 20-30 ms of startup CPU for computer use even when it never touched the desktop, because the whole implementation (desktop service, engine client, handle, tool `execute`) was bundled into `extensions/omo.js`, and senpi's extension loader re-transpiles that file on every start. `omo.js` now carries only the registration shell: settings, `/computer`, the `computer` / `computer_actions` definitions (the #9049 root-object parameter schemas, unchanged), the permission parsers, the skill and the telemetry hooks. The implementation is a separate plugin entry, `extensions/omo-computer-use.js` (`#omo-computer-use-runtime`, mapped like `#omo-task-runtime`), imported on the first `/computer`, the first `tool_activated` naming a computer tool, or the first tool call. The ~29 KB of prelude and doc texts (`senpi-desktop-prelude`) moved out of the bundles entirely: they are generated into `assets.generated.json`, read once per process through memoized getters, and staged beside the bundles as `extensions/assets.generated.json` (the persona-asset contract). The published bytes are unchanged and pinned: `senpi-desktop-prelude/test/assets.sha256.json` and the plugin-side assertions in `computer-use-lazy-runtime.test.ts` keep the `computer` global, its Python twin, the declarations, the docs, the safety text, `kernelPrelude`, `promptGuidelines`, and the tool_search surface byte-identical to dev. Measured on the split alone (before the prelude JSON), the senpi importer's cost for computer use fell from +23.4 ms [+8.4, +32.9] (dev vs no-component, paired, CI excludes 0) to +9.8 ms [-0.9, +14.9]; the prelude JSON removes a further 28.6 KB of pre-terser input bytes from `omo.js`.
+
+Every omo session paid about 20-30 ms of startup CPU for computer use even when it never touched the desktop, because the whole implementation (desktop service, engine client, handle, tool `execute`) was bundled into `extensions/omo.js`, and senpi's extension loader re-transpiles that file on every start. `omo.js` now carries only the registration shell: settings, `/computer`, the `computer` / `computer_actions` definitions (the #9049 root-object parameter schemas, unchanged), the permission parsers, the skill and the telemetry hooks. The implementation is a separate plugin entry, `extensions/omo-computer-use.js` (`#omo-computer-use-runtime`, mapped like `#omo-task-runtime`), imported on the first `/computer`, the first `tool_activated` naming a computer tool, or the first tool call. Registration still happens at extension load, so native tool search indexes both tools at `session_start`; activation by a by-name call, `setActiveTools` or `/computer on`, the disabled path, and all user-visible text are unchanged. `@oh-my-opencode/senpi-desktop-tool` gains a `./registration` entry that reaches neither the desktop service nor the engine. The eval-kernel prelude assets stay in `omo.js`: `kernelPrelude` is read synchronously by `getAllTools()` at `session_start` and the skill is written at `resources_discover`. The second `omo.json` read in computer-use registration stays too: config startup keeps no shared cache (it loads from `process.cwd()`, computer use from `pi.cwd`), and it costs about 0.3 ms.
+
+## 2026-09-28 - Adopt senpi 2026.9.28-5: GitHub Copilot recovers from a revoked token instead of failing every model (senpi #2297)
+
+Every senpi pin moves from 2026.9.28-4 to 2026.9.28-5 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, `bun.lock`, and the version comment in `packages/omo-native/bin/lib/provider-map.json`). The new engine carries:
+
+- **GitHub Copilot no longer fails on every model with HTTP 403 after GitHub revokes the cached Copilot token (senpi #2297, #2302).** The token is re-exchanged once and the request re-sent before the reply starts streaming. A session recovers without `/login`, and with two Copilot logins a login that stays refused is blocked and the request moves to the other one. A Copilot 402/403 or 429 `quota_exceeded` now says whether it is a quota or a refusal and carries the GitHub request id.
+- **Copilot models compact before Copilot's own prompt limit (senpi #2299).** The account's `GET /models` prompt and output limits replace the larger native limits, and `model_max_prompt_tokens_exceeded` triggers compact-and-retry.
+- **Copilot turns no longer fail with a bare HTTP 400 when more than 128 tools are exposed (senpi #2298).**
+- **A goal stops on the first persistent provider 401/403 instead of looping to the continuation cap (senpi #2293).**
+- **The built-in OpenCode Go default model is `kimi-k3` (senpi #2295).**
+
+## 2026-09-28 - Wayland captures without display geometry map through the libei layout or refuse coordinate input (#8957)
+
+When the ScreenCast portal is unavailable, Wayland capture falls back to the Screenshot portal, which returns physical pixels and no display scale or layout. The frame was treated as scale 1, so on a scaled output (a 200% display returned 1280x720 pixels for a 640x360 logical desktop) a click at a screenshot pixel landed at the wrong place. A ScreenCast stream that reported no logical size was likewise treated as scale 1.
+
+Both captures now take their geometry from the connected libei input session, whose device regions give the logical layout and per-region scale that input coordinates use. The image is accepted only when it is exactly that layout, either at logical size or at one uniform scale, within one pixel of rounding; a ScreenCast stream without a size takes the size of the region at its position under the same rule. Otherwise the capture is still returned, but coordinate input and hit tests against it are refused with a reason pointing to accessibility actions. Capture never opens an input session to learn the layout: before the first desktop input, such a frame refuses coordinate input. Pointer input through a frame derived this way is refused when the libei layout has changed since the capture.
+
+## 2026-09-28 - Windows foreground scroll reaches the raised window (#9095)
+
+A Windows foreground `scroll` at a point another window covered was lost. The focus guard raised the target, the cursor moved onto the point and the wheel was injected; the request reported success, yet no window received the wheel. Measured on the hosted runner: the raise changes the window order in win32k at once, but DWM's hit-testing of mouse input catches up only with the next frame it presents. A wheel inside that gap reached no window (5 ms after the raise: lost in 6 of 6 runs; 16 ms: 3 of 6), while clicks and drags were delivered. Foreground pointer input now waits for the next DWM present (`DwmFlush`, 6 to 35 ms on the runner) after the raise, which delivered the wheel in 18 of 18 runs. Before any button, drag step or wheel, the engine also reads the cursor back once the raw input thread has routed the move, falls back to `SetCursorPos` when the cursor is not within 1 px of the point, and otherwise fails with `InputFailed` without sending the button or wheel. The Windows QA driver gained foreground click, drag and scroll scenarios into a covered target from a stale cursor, #9062's same-rect scroll, and a check that the engine's desktop move lands.
+
+## 2026-09-28 - Computer use scrolls the same distance on every OS: `dx`/`dy` are pixels (#9101)
+
+The direction of a scroll was the same everywhere (#9055), but its unit was not: `scroll(x, y, { dy: 300 })` moved 300 pixels on macOS, 3 wheel notches on Windows (one notch per 100 units) and 300 wheel clicks on X11 (one click per unit), about a 100x difference between Windows and X11. `dx`/`dy` of every scroll, and `scroll_x`/`scroll_y` of `computer_actions` (the OpenAI computer-use rule), are now pixels on every OS, and one wheel notch stands for 40 px. Windows sends one notch per 40 px and X11 one click per 40 px (rounded half up, at least one for any motion; X11 still caps an axis at 1000 clicks); Wayland sends 3 libei 120ths of a click per pixel (120 per 40 px) instead of 120 per unit. macOS already posted pixel scroll events and is unchanged.
+
+This changes what users see on Windows, X11 and Wayland: `dy: 120` is now 3 notches on Windows (1 before), 3 clicks on X11 (120 before) and 360 libei units on Wayland (14,400 before). A caller that passed small notch-style counts such as `dy: 3` now gets one notch or click instead of three. The declarations, the eval docs, the `computer_actions` schema and the computer-use guide and reference state the unit. The Windows and X11 desktop QA scroll scenarios now scroll by 120 px and assert that the view moved between 60 and 240 px, measured from each fixture's own line height.
+
+## 2026-09-28 - Computer use scrolls the same direction on every OS (#9055)
+
+A positive `dy` scrolled up on macOS but down on X11 and Windows, so the same `scroll(x, y, { dy })` call, and every `computer_actions` scroll from an OpenAI computer-use model (`scroll_y`), went the wrong way on macOS; at the top of a document it did nothing. The macOS backend now negates Quartz's wheel deltas, so on every OS a positive `dy` scrolls down and a positive `dx` scrolls right. The model-facing docs, the declarations and the `computer_actions` schema state the convention. The Windows and Linux (X11) desktop QA jobs now scroll a long document in a task-owned window both ways and read its top line (and on X11 its left column) from the window itself rather than from the engine: X11 with foreground and background delivery, Windows with background delivery. Windows foreground delivery is not in the job yet, because the engine's foreground pointer input never reaches the target on the hosted runner (#9095).
+
+## 2026-09-28 - Adopt senpi 2026.9.28-4: Claude subscription stays signed in across sessions (#8762)
+
+Every senpi pin moves from 2026.9.28-3 to 2026.9.28-4 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, `bun.lock`, and the version comment in `packages/omo-native/bin/lib/provider-map.json`). The committed plugin bundles pass `build-extension.mjs --check` against the new engine unchanged. The new engine carries:
+
+- **Claude subscription no longer ends up "blocked until re-login" when several sessions run (#8762, senpi #2225, #2282, #2223).** A token refresh by any session revoked the token that other sessions' live Claude Code processes were still using; their next turn got `401 OAuth access token has been revoked`, and the account was stamped `auth_error` on its fresh, valid token, which stopped every session until `/login`. Live sessions now resume on the refreshed token, a 401 on a token another session already replaced retries once on the stored token instead of blocking, and each request reports the token it actually sent even when sessions share one process. A session that finds `auth.json` busy while another refreshes keeps its still-valid token or picks up the new one, and a throttled, failing or timed-out token refresh no longer blocks the account; only a rejected login does. `/login` into an existing account name now replaces the revoked token instead of silently keeping it.
+- **First message no longer fails on providers that only accept `tool_choice: "auto"` (#9096, senpi #2218, #2224).** The first-turn `todo` forcing is retried once without the forced choice when the provider refuses it, on both chat completions and responses APIs, and is not forced again for that model; `compat.supportsForcedToolChoice: false` skips it from the start.
+- **One session can no longer stop an RPC host handoff drain (senpi #2288).** Once this ships in an omo release, the production RPC host stopgap guard can be removed.
+- **Runtime error output stays off the interactive TUI screen (senpi #2289).**
+- **Child processes of retired eval workers are collected, and orphans are reaped in every mode (senpi #2278).**
+- **Durable scheduled prompts that also work from `--print` (senpi #2216).**
+
+## 2026-09-28 - macOS foreground actions restore the app the user had in front (#9084)
+
+With another app's floating panel on screen, a macOS foreground action restored the wrong app and still reported `focusRestored: true`. The focus guard captured the "previous front" app from WindowServer's front process (added in #9057), which can be an accessory app that only shows a floating panel, while System Events and the menu bar still name the user's app. It then restored that panel owner, the call returned `Ok`, and the user's app never came back. The engine's in-process `NSWorkspace.frontmostApplication` is also stale (it has no AppKit run loop), and `with_foreground` restored through it.
+
+The user's front app is now read live as the first regular ("Foreground") app in LaunchServices' front-to-back order, the list `lsappinfo visibleProcessList` shows. Without that SPI it falls back to WindowServer's front process when it is a regular app, then to the owner of the front-most on-screen normal window of a regular app. The focus guard's capture, the background hand-back, `with_foreground` and its activation gate all use it. A restore activates the app through accessibility (`AXFrontmost`) and AppKit and counts only once that app has stayed front for 250 ms within 1.5 s, asking again if a later activation takes the front back; otherwise the action reports `FocusRestoreFailed` and `focusRestored: false`.
+## 2026-09-28 - A macOS background scroll moves the requested amount once (#9097)
+
+A background scroll on macOS moved its target twice as far as a foreground scroll of the same delta: `scroll()` posted the wheel event through SkyLight and through the public per-pid queue, and AppKit and WebKit applied both. It now takes the SkyLight route alone, as keyboard events already do. Measured on this change: TextEdit moves 6 lines for both deliveries (13 in background before), and a WKWebView moves 90 px (180 before). The macOS live QA driver gains `background-scroll-once`, which fails when a background scroll moves a different amount from a foreground one.
+
+## 2026-09-28 - omo adopts senpi 2026.9.28-3: a transient task daemon idle-exits again, and native tool search accepts the deferred computer tool (#9041)
+
+Every `@code-yeongyu/senpi` pin moves from 2026.9.27-4 to 2026.9.28-3: the root devDependency, the `omo-native` dependency, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, and `bun.lock`. The release carries code-yeongyu/senpi#2242, under which `ensureHost()` holds the host for the caller until `release()` (omo releases it after the task daemon's capability probe, #9041), #2243 and #2237 (host teardown and ensure fixes), #2245 (`senpi host status --all`, `senpi host gc`, `memory_pressure`), #1519 (`/sessions` as a `/resume` alias and the thinking-level hints), #2253 (Anthropic native tool search resolves a deferred tool whose parameters are a root union, such as the desktop `computer` tool, instead of failing every request with HTTP 400), #2251 (a bare `/skill` no longer reaches the model), #2250 (`new Bun.WebView()` works in eval cells run by an RPC worker host) and #2257 (GPT-6 prompts stay on the stated goal). `packages/omo-native/bin/lib/provider-map.json` still matches the new engine's `builtinProviders()`, which `provider-map-registry.test.ts` checks against the installed package, so only its version comment changes.
+
+## 2026-09-28 - macOS foreground pointer input refuses a covered point (#9079)
+
+A macOS foreground click, move, drag or scroll raised the target window and waited until it was key, but never checked which window was frontmost at the point. A window of another application that stays above normal windows (a floating panel or an always-on-top utility) received the input, and the engine reported success. Before posting, each point the event hits (a drag's first and last point) is now hit-tested through accessibility. If another window covers a point, the target is raised once more; if it stays covered, or the owner at the point cannot be identified, the action is refused and nothing is posted.
+
+## 2026-09-28 - Windows desktop QA teardown no longer kills or reports recycled pids (#9087)
+
+The Windows interactive-desktop QA teardown tracked processes by pid alone. Windows reuses pids quickly, so after a tracked engine exited, an unrelated runner process could take its pid; teardown then reported it as a leftover (`procs 1 alive`, a red job) and ran `taskkill /T /F` on it. Teardown now records each tracked process's image name when it is tracked, and kills or counts a pid only while it still runs that image.
+
+## 2026-09-28 - Computer use names the musl engine host and skips the glibc download (#9076)
+
+On a musl Linux distribution such as Alpine, `getDesktopEngineHost()` returned `linux-x64`, so computer use downloaded and cached the glibc engine, which cannot execute there, and then failed to start without saying why. The host now names the libc on Linux: a musl process resolves to `linux-x64-musl` / `linux-arm64-musl`, the locator searches `native/prebuilds/linux-<arch>-musl/`, and because no musl engine is published the acquisition makes no request and returns the `native-unavailable` diagnostic "No desktop engine release asset exists for linux-<arch>-musl". The libc is read from the running process, not from what is installed: glibc builds of Bun report `process.report.getReport().header.glibcVersionRuntime` and musl builds omit it, and musl additionally requires the musl loader to be mapped in `/proc/self/maps`, so a glibc host with musl-tools installed stays `linux-<arch>`. `getDesktopEngineHost(platform, arch, libc)` takes the libc as an optional third argument and detects it only for the Linux platform the process runs on; an explicit host string passed to `acquireDesktopEngine` keeps its libc. glibc Linux, macOS and Windows hosts are unchanged.
+
+## 2026-09-28 - `omo doctor` no longer fails or downloads for users who never started computer use (#9059)
+
+Computer use is on by default, so `omo doctor` probed its engine for every user. When no engine was installed it downloaded one from GitHub releases, even in offline mode, and when that failed it printed `FAIL computer use engine` and exited 1, although the same doctor exited 0 before computer use existed. Doctor no longer installs anything: with no engine located and no `computer.engine_path`, it reports that the engine is downloaded the first time computer use starts, lists the paths it checked, and leaves the exit code alone. A configured `engine_path` that is missing or not executable, a quarantined binary, and a located engine that fails its handshake still fail doctor.
+
+## 2026-09-28 - `omob` builds the desktop engine it embeds (#9063)
+
+Since compiled binaries embed the Rust desktop engine, `omob` failed at its last step with `missing required desktop engine for <target>`: `build-omo-binary.ts` stages `target/<triple>/release/senpi-desktop-engine`, but only the release workflows ran cargo. `build-omob.ts` now builds it in the omo cache clone with the release flags (`cargo build --release -p senpi-desktop-engine --locked --target <triple>`, output pinned to the clone's `target/` whatever `CARGO_TARGET_DIR` says) when the binary is missing or `crates/`, `Cargo.toml`, `Cargo.lock` or `rust-toolchain.toml` changed since the last engine build. A stamp beside the binary records that tree fingerprint and the binary's size and mtime, so a rebuild with no engine change skips cargo. Without cargo the build stops with one line naming the missing Rust toolchain. Targets that ship no engine, and omo refs that predate it, skip the step. Feature builds (`--name`) take the same path.
+
+## 2026-09-28 - AX coordinate clicks go to the element's own window (#8959)
+
+`ax.click` clicked an element's centre in the first listed window whose rectangle held that point, so a window overlapping the element's own window, or listed before it, could receive the click. The accessibility backends now report an element's owning window (`AxBackend::owner`): macOS reads `AXWindow` and its CGWindowID, Windows walks UI Automation up to the top-level window handle, AT-SPI on Wayland returns the element's frame (Wayland lists frames as windows), and the fake backend returns the window whose tree holds the node. AT-SPI on X11, whose window ids AT-SPI cannot name, joins the element's frame to an X window by its application's pid (`_NET_WM_PID`), then tells that pid's windows apart by exact title and frame geometry (within 160 px of edge difference, and 24 px clearer than the runner-up, as cua does); title and geometry must agree. `owner` receives the live window list for this. The click targets the owner after checking it is still listed and still contains the centre. When the owner cannot be named, `ax.click` refuses with `AxFailed` and points to `ax.perform` or a screenshot-coordinate click; it no longer falls back to geometry. On X11 that happens when the frame's application reports no pid or no listed window carries it, when same-pid windows share a title and sit within the margin (or report no usable extents), and when title and geometry point at different windows. No pointer event is sent on any refusal. Semantic AX actions are unchanged.
+
+## 2026-09-28 - macOS computer use keeps the user's newer front app (#9056)
+
+After a background `type` or `press`, the macOS engine handed key focus back to the application that was front before the action, even when the user had switched to another application in the meantime. It read the front application from `NSWorkspace.frontmostApplication`, which in the engine (no AppKit run loop) can keep reporting an application the user already left. The front application now comes from WindowServer (`_SLPSGetFrontProcess`), with AppKit only as a fallback, and the hand-back leaves the front alone when a third application is front: the user's newer choice wins, as on X11 and Windows. Without a user switch the previous application is still restored.
+
+## 2026-09-28 - Computer use reads and writes the clipboard (#9009)
+
+The `clipboard.read` and `clipboard.write` engine methods were advertised by the SDK and the schema but answered "not implemented". They now reach the session: reading is a read-only request, writing goes through the same gate and single input transaction as other input (suspension, a live stop path, input permission, cancellation) and emits one audit record carrying only the text's length and digest, never the text. The macOS, X11, Wayland and Windows backends share one UTF-8 text clipboard in `senpi-desktop-core` (feature `system-clipboard`); on Linux one clipboard handle lives for the process so the text stays served after the write returns. A clipboard holding no text reads as the empty string. The desktop contract CI runs a live round-trip on the hosted macOS, Windows and Linux (Xvfb) runners.
+
+## 2026-09-28 - `computer_actions` activates with `computer` (#9048)
+
+With `computer.cua_adapter: true`, activating computer use (`/computer on`, a by-name call or a `tool_search` promotion) added only `computer` to the active tool set, and `/computer off` removed only `computer`. A provider without native deferred-tool search declares only active tools in its request, so an OpenAI computer-use model could find `computer_actions` through `tool_search` but never call it. Both tools now join and leave the active set together; without the adapter only `computer` moves, as before. The computer-use QA driver gained a scenario that records the tools each request declares and checks that the request after activation carries `computer_actions`.
+
+## 2026-09-28 - X11 computer use keeps offscreen frames and newer user state (#8974)
+
+Partially offscreen X11 windows now keep a full-size capture frame with transparent pixels for the off-root area, so an unchanged window remains targetable from its screenshot instead of being misclassified as resized. Keyboard text, chords and XTEST modifiers read the current server keymap once per operation, so runtime layout changes no longer require reconnecting.
+
+Foreground delivery now confirms core X focus as well as EWMH active-window state. On a non-EWMH server it uses a core-focus fallback, delivers to the requested window, and restores the previous focus. Both the input-local guard and the shared session restore hooks preserve a newer user focus or pointer choice instead of replaying an older snapshot over it.
+
+Filtering toolkits still receive a truthful background-unavailable refusal. The supported Linux QA stack exposes XInput and XTEST but has no writable `/dev/uinput`, and a bounded Xvfb hierarchy probe did not establish an isolated real-input route; MPX support therefore remains a separate real-Xorg/uinput feature rather than an inferred fallback.
+
+## 2026-09-28 - Computer tools publish a root object schema (#9047)
+
+The `computer` and `computer_actions` tools used to publish a root-union JSON schema. Anthropic native tool search sends a deferred tool's schema as-is, so every request with the `computer` tool deferred failed with `400 tools.N.custom.input_schema.type: Field required` (senpi #2252). OpenAI strict function schemas and Gemini also reject a root union. Both tools now publish one root object with an `action` enum and every action's fields as optional, and each field's description names the actions that take it. `execute` still checks the exact per-action shape, including every batch item, and refuses a missing, extra or mistyped field with `COMPUTER_INVALID_ARGUMENTS`, naming the action and the field, before any engine starts. Valid calls behave as before.
+
 ## 2026-09-28 - Boulder plan progress counts every task format and stops on 0/0 (#9019, #6233)
 
 The plan parser in `packages/boulder-state/src/plan-checklist.ts` now counts `T1.2`, `T6.3a`, `F1` and `H1` task IDs written with a `.`, space, `-` or em-dash separator. When the canonical `## TODOs` / `## Final Verification Wave` sections hold no task rows but checkboxes sit under another heading, it falls back to every top-level checkbox. A `- [~]` row, which the continuation directive uses for a task blocked on the user, counts toward the total as in-progress: it is neither completed nor remaining. Progress no longer reads `1/1` when one of two tasks is blocked, and a plan whose open work is all blocked still ends continuation.

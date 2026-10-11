@@ -12,6 +12,13 @@ import {
 } from "./release-desktop-engine-target"
 import { buildRuntimeManifest, RELEASE_BINARY_TARGETS, resolveExpectedSidecarRelPaths, stageSidecarPayload } from "./build-omo-binary"
 
+// The CLI test spawns three bun children. On 16 windows-latest runs it passed in at most 0.2 s,
+// while cold runners went past Bun's 5 s default (#9386): the per-test budget absorbs those slow
+// cold-runner spawns. It cannot catch a hang, because spawnSync blocks the timer that enforces it,
+// so each spawn carries its own timeout: a hung child is killed and the test fails on its status.
+const SUBPROCESS_TEST_TIMEOUT_MS = 30_000
+const SUBPROCESS_SPAWN_TIMEOUT_MS = 20_000
+
 describe("desktop engine target fixture", () => {
   test("all twelve targets resolve from the fixture with explicit unavailable entries", () => {
     // Given the release fixture and binary matrix.
@@ -51,8 +58,8 @@ describe("desktop engine target fixture", () => {
     // Given the query CLI and target names.
     const cli = join(import.meta.dir, "release-desktop-engine-target.ts")
     // When a workflow queries each target.
-    const baseline = spawnSync("bun", [cli, "--target", "darwin-x64-baseline"], { encoding: "utf8" })
-    const unavailable = spawnSync("bun", [cli, "--target", "linux-arm64"], { encoding: "utf8" })
+    const baseline = spawnSync("bun", [cli, "--target", "darwin-x64-baseline"], { encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
+    const unavailable = spawnSync("bun", [cli, "--target", "linux-arm64"], { encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
 
     // Then the machine-consumed host, asset and Rust source are explicit.
     expect(baseline.status).toBe(0)
@@ -66,8 +73,8 @@ describe("desktop engine target fixture", () => {
     expect(JSON.parse(unavailable.stdout)).toEqual({
       target: "linux-arm64", available: false, host: null, asset: null, source: null, payload: null,
     })
-    expect(spawnSync("bun", [cli, "--target", "surprise"], { encoding: "utf8" }).status).toBe(1)
-  })
+    expect(spawnSync("bun", [cli, "--target", "surprise"], { encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS }).status).toBe(1)
+  }, SUBPROCESS_TEST_TIMEOUT_MS)
 })
 
 describe("compiled desktop engine staging", () => {
@@ -130,10 +137,11 @@ describe("compiled desktop engine staging", () => {
       // When the actual release staging entry point is run.
       const stage = (): void => { stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root) }
 
-      // Then a missing required compiled payload fails closed.
+      // Then a missing required compiled payload fails closed before the plugin build starts (#9857).
       expect(stage).toThrow(/missing required desktop engine for windows-x64:.*x86_64-pc-windows-msvc/)
+      expect(existsSync(join(root, "stage", "plugin"))).toBe(false)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  }, 60_000)
+  })
 })

@@ -129,10 +129,14 @@ fn monitors_composite_at_their_logical_positions_with_their_own_scale() {
         position: (2, 0),
         size: Some((2, 1)),
     };
-    let (canvas, displays) = composite(&[
-        (left, RgbaImage::from_pixel(2, 2, [1, 1, 1, 255].into())),
-        (right, RgbaImage::from_pixel(4, 2, [2, 2, 2, 255].into())),
-    ]);
+    let cast = composite(
+        &[
+            (left, RgbaImage::from_pixel(2, 2, [1, 1, 1, 255].into())),
+            (right, RgbaImage::from_pixel(4, 2, [2, 2, 2, 255].into())),
+        ],
+        None,
+    );
+    let (canvas, displays) = (cast.image, cast.displays);
     assert_eq!((canvas.width(), canvas.height()), (8, 2));
     assert_eq!(
         displays.iter().map(|d| (d.pixel_x, d.scale)).collect::<Vec<_>>(),
@@ -171,31 +175,11 @@ fn hidpi_monitor() -> (RgbaImage, Vec<senpi_desktop_core::types::DesktopDisplay>
         position: (100, 50),
         size: Some((1280, 1440)),
     };
-    let (canvas, mut displays) = composite(&[(monitor, RgbaImage::new(2560, 2880))]);
+    let cast = composite(&[(monitor, RgbaImage::new(2560, 2880))], None);
+    let (canvas, mut displays) = (cast.image, cast.displays);
     displays[0].x = 100;
     displays[0].y = 50;
     (canvas, displays)
-}
-
-#[test]
-fn missing_portal_size_falls_back_to_buffer_scale_one() {
-    let unsized_monitor = MonitorStream {
-        node: 1,
-        position: (0, 0),
-        size: None,
-    };
-    let degenerate = MonitorStream {
-        node: 2,
-        position: (0, 0),
-        size: Some((0, 0)),
-    };
-    for monitor in [unsized_monitor, degenerate] {
-        let (_, displays) = composite(&[(monitor, RgbaImage::new(1920, 1080))]);
-        assert_eq!(
-            (displays[0].width, displays[0].height, displays[0].scale),
-            (1920, 1080, 1.0)
-        );
-    }
 }
 
 #[test]
@@ -205,7 +189,7 @@ fn scaled_monitor_maps_screenshot_pixel_to_logical_point() {
         position: (0, 0),
         size: Some((1280, 1440)),
     };
-    let (_, displays) = composite(&[(monitor, RgbaImage::new(2560, 2880))]);
+    let displays = composite(&[(monitor, RgbaImage::new(2560, 2880))], None).displays;
     let frame = FrameGeometry::for_displays(&displays);
     assert_eq!(frame.map_point(1280.0, 1440.0, None).unwrap(), (640.0, 720.0));
 }

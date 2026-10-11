@@ -2,6 +2,7 @@ import { basename, dirname, join, sep } from "node:path"
 import { readFileSync } from "node:fs"
 import type { RpcSpawnSpec } from "../rpc/spawn"
 import { MEMBER_IDENTITY_ENV, MEMBER_TASK_ID_ENV, MEMBER_TEAM_CONFIG_ENV } from "../../team/member-extension/identity"
+import { SHARD_KEY_CONTEXT, TREE_KEY_CONTEXT } from "./shard-socket"
 
 export interface ChildSessionContext {
   readonly kind: "worker"
@@ -16,7 +17,12 @@ export interface ChildSessionContext {
  * Returns ONLY plain identity strings: no env-looking keys pass through.
  * Forbidden pattern: /^(PATH|.*_API_KEY|SENPI_|OMO_|PI_)/
  */
-export function buildChildContext(spec: RpcSpawnSpec): ChildSessionContext {
+export type ChildContextSpec = RpcSpawnSpec & {
+  readonly treeKey?: string
+  readonly shardKey?: string
+}
+
+export function buildChildContext(spec: ChildContextSpec): ChildSessionContext {
   const role = deriveRole(spec)
   const baseContext: Record<string, string> = {
     role,
@@ -42,6 +48,9 @@ export function buildChildContext(spec: RpcSpawnSpec): ChildSessionContext {
       }
     }
   }
+
+  if (spec.treeKey !== undefined) baseContext[TREE_KEY_CONTEXT] = spec.treeKey
+  if (spec.shardKey !== undefined) baseContext[SHARD_KEY_CONTEXT] = spec.shardKey
 
   return {
     kind: "worker",

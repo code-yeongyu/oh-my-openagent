@@ -13,7 +13,7 @@ const roots: string[] = []
 // A fixture engine is a script, and Windows cannot execute a script as a binary (EFTYPE), so the tests start
 // it through the running runtime; the production launcher executes the located binary directly.
 const runEngineScript: EngineLauncher = (enginePath, args, env) =>
-  spawn(process.execPath, [enginePath, ...args], { stdio: "pipe", windowsHide: true, env })
+  spawn(process.execPath, [enginePath, ...args], { stdio: "pipe", windowsHide: true, detached: true, env })
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -103,6 +103,7 @@ createInterface({ input: process.stdin }).on("line", () => {});
     if (report.kind !== "failed") throw new Error(`expected failed report, got ${report.kind}`)
     expect(report.code).toBe("timeout")
     expect(report.message).toContain("timed out after 25 ms")
+    expect(report.message).toMatch(/\(phase: [^)]+\)$/)
   })
 
   test("#given an unsupported platform #when inspected #then no engine process is needed", async () => {
@@ -123,5 +124,46 @@ createInterface({ input: process.stdin }).on("line", () => {});
       host: "aix-arm64",
       reason: "unsupported",
     })
+  })
+
+  test("#given the default config and no engine installed yet #when inspected #then it is informational, fetches nothing and does not fail doctor", async () => {
+    // given: no computer config, no engine at any located path
+    const root = fixtureRoot()
+    let fetched = 0
+    const realFetch = globalThis.fetch
+    globalThis.fetch = Object.assign(
+      () => {
+        fetched += 1
+        return Promise.reject(new Error("doctor must not download the engine"))
+      },
+      { preconnect: realFetch.preconnect },
+    ) as typeof fetch
+
+    // when
+    let report: Awaited<ReturnType<typeof computerUseDoctorReport>>
+    try {
+      report = await computerUseDoctorReport(input(root))
+    } finally {
+      globalThis.fetch = realFetch
+    }
+    const lines = formatComputerUseDoctorLines(report)
+
+    // then
+    expect(report.kind).toBe("not-installed")
+    expect(fetched).toBe(0)
+    expect(lines.filter((line) => line.startsWith("FAIL"))).toEqual([])
+    expect(lines).toContain("INFO computer use engine: not installed yet; it is downloaded the first time computer use starts")
+  })
+
+  test("#given an explicit engine path that does not exist #when inspected #then it still fails", async () => {
+    // given
+    const root = fixtureRoot()
+    writeConfig(root, join(root, "missing-engine"))
+
+    // when
+    const lines = formatComputerUseDoctorLines(await computerUseDoctorReport(input(root)))
+
+    // then
+    expect(lines.some((line) => line.startsWith("FAIL computer use engine: native-unavailable"))).toBe(true)
   })
 })

@@ -1,4 +1,6 @@
 import type { ChildExitFacts, ChildExitOutcome } from "../types"
+import type { HostParkCause } from "./session-client"
+import { TRANSPORT_LOST_REASON } from "./transport-recovery"
 
 /**
  * How a daemon SESSION ends, mapped onto the same `ChildExitOutcome` vocabulary a child PROCESS
@@ -8,10 +10,13 @@ import type { ChildExitFacts, ChildExitOutcome } from "../types"
  */
 
 /** `session_closed` reasons that SUSPEND a session instead of ending it. */
-const PARKING_REASONS: readonly string[] = ["handoff_parked", "idle_evicted"]
+const PARKING_REASONS: readonly HostParkCause[] = ["handoff_parked", "idle_evicted"]
+
+/** The cause a `session_parked` frame stands for: the host announces only its idle sweep of a retained session that way. */
+export const SESSION_PARKED_CAUSE: HostParkCause = "idle_evicted"
 
 /** The reason a lost connection carries: a session has no stderr of its own. */
-const TRANSPORT_GONE_REASON = "transport_gone"
+const TRANSPORT_GONE_REASON = TRANSPORT_LOST_REASON
 
 /** Placeholder reason for a `session_closed` frame that named none. */
 const UNNAMED_REASON = "session_closed"
@@ -27,18 +32,16 @@ export type SessionCloseIntent = "running" | "closed" | "terminated"
 
 /**
  * A parked session is NOT an exit: the child keeps its record and its status, the manager parks it
- * as `rpc_detached`, and a later turn reopens the session from its JSONL.
+ * as `rpc_detached` with the host's cause, and a later turn reopens the session from its JSONL.
  */
 export type SessionExitClassification =
-  | { readonly disposition: "parked" }
+  | { readonly disposition: "parked"; readonly cause: HostParkCause }
   | { readonly disposition: "exit"; readonly outcome: ChildExitOutcome }
 
 export type SessionExitInput = {
   readonly cause: SessionExitCause
   readonly intent: SessionCloseIntent
 }
-
-const PARKED: SessionExitClassification = { disposition: "parked" }
 
 /** Exit facts for a session: never a pid (the daemon's pid is not this child's), never a signal. */
 export function sessionExitFacts(stderrTail: string): ChildExitFacts {
@@ -49,11 +52,13 @@ export function classifySessionExit(input: SessionExitInput): SessionExitClassif
   const { cause, intent } = input
   switch (cause.kind) {
     case "session_parked":
-      return PARKED
+      return { disposition: "parked", cause: SESSION_PARKED_CAUSE }
     case "session_closed":
       // Parking wins over this client's intent: a session the daemon suspended is reopenable, so
       // calling it an exit would end a child the manager is supposed to park and wake.
-      return isParkingReason(cause.reason) ? PARKED : ended(intent, cause.reason ?? UNNAMED_REASON)
+      return isParkingReason(cause.reason)
+        ? { disposition: "parked", cause: cause.reason }
+        : ended(intent, cause.reason ?? UNNAMED_REASON)
     case "transport_gone":
       return ended(intent, TRANSPORT_GONE_REASON)
     case "open_failed":
@@ -66,8 +71,12 @@ export function classifySessionExit(input: SessionExitInput): SessionExitClassif
   }
 }
 
-function isParkingReason(reason: string | undefined): boolean {
-  return reason !== undefined && PARKING_REASONS.includes(reason)
+export function unreachableSessionExitClassification(value: never): never {
+  throw new Error(`unhandled session exit classification: ${JSON.stringify(value)}`)
+}
+
+function isParkingReason(reason: string | undefined): reason is HostParkCause {
+  return PARKING_REASONS.some((parking) => parking === reason)
 }
 
 function ended(intent: SessionCloseIntent, reason: string): SessionExitClassification {

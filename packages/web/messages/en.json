@@ -36,14 +36,24 @@
       "subcopy": "Turn your tokens into results that matter.\nResearch across ten thousand sources. A deck people actually get.\nCompany work, experiments, backends, frontends, code.\nWhatever you need done.",
       "getStarted": "Get started",
       "readManifesto": "Read the manifesto",
-      "installLabel": "One command, one tool",
-      "installCommand": "bun install -g omo-ai"
+      "installLabel": "One command, one tool"
     },
     "command": {
       "copy": "Copy",
       "copied": "Copied",
       "copyAria": "Copy install command",
       "copiedStatus": "Install command copied"
+    },
+    "install": {
+      "tabsLabel": "Install command for your system",
+      "windows": "Windows",
+      "tabs": {
+        "unix": "macOS, Linux, WSL",
+        "powershell": "PowerShell",
+        "cmd": "CMD"
+      },
+      "next": "Then open a new terminal and run omo.",
+      "onComputer": "Run this on your Mac, Linux or Windows computer."
     },
     "proof": {
       "label": "Live numbers",
@@ -166,8 +176,7 @@
       "title": "One command. Then get back to work.",
       "subtitle": "Install OmO, open your project, describe the job. That's the whole setup.",
       "installNow": "Install now",
-      "readTheDocs": "Read the docs",
-      "installCommand": "bun install -g omo-ai"
+      "readTheDocs": "Read the docs"
     },
     "dag": {
       "region": "OmO desktop with the workflow graph open",
@@ -194,7 +203,11 @@
   },
   "docs": {
     "mobileHeader": "OmO Docs",
-    "searchPlaceholder": "Search docs..."
+    "searchPlaceholder": "Search docs...",
+    "install": {
+      "title": "Install OmO",
+      "description": "Install OmO with one command on macOS, Linux, WSL and Windows."
+    }
   },
   "manifesto": {
     "badge": "Manifesto",

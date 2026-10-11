@@ -14,13 +14,14 @@ senpi-desktop-core = { path = "../senpi-desktop-core" }
 senpi-desktop-safety = { path = "../senpi-desktop-safety" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
+senpi-desktop-core = { path = "../senpi-desktop-core", features = ["system-clipboard"] }
 enigo.workspace = true
 image.workspace = true
 parking_lot.workspace = true
 uiautomation.workspace = true
-windows-sys = { workspace = true, features = ["Win32_UI_HiDpi"] }
+windows-sys = { workspace = true, features = ["Win32_Graphics_Dwm", "Win32_UI_HiDpi"] }
 xcap.workspace = true
 
-# The message-only probe windows of the input tests register a class.
-[target.'cfg(target_os = "windows")'.dev-dependencies]
+# Host tests exercise native INPUT recovery; Windows probes also register a class.
+[dev-dependencies]
 windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader"] }

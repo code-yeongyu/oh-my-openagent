@@ -22,6 +22,27 @@ export async function sessionTailNeedsContinuation(
   }
 }
 
+/**
+ * The final answer of a turn that already ENDED in the transcript: the last conversation message is
+ * an assistant reply that stopped normally with text and no pending tool call. A child whose turn
+ * finished while no parent was attached never delivers that end again, so a revival reads it here.
+ */
+export async function sessionTailFinishedText(sessionPath: string): Promise<string | undefined> {
+  try {
+    const tail = await readConversationTail(sessionPath)
+    const last = tail?.lastMessage
+    if (last === undefined || last.role !== "assistant" || last.stopReason !== "stop") return undefined
+    if (messageNeedsContinuation(last) || !Array.isArray(last.content)) return undefined
+    const text = last.content
+      .filter((part): part is { type: "text"; text: string } => isRecord(part) && part.type === "text" && typeof part.text === "string")
+      .map((part) => part.text)
+      .join("")
+    return text.length > 0 ? text : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function messageNeedsContinuation(message: SessionMessageEntry["message"]): boolean {
   if (message.role === "user") return true
   if (message.role === "toolResult") return true

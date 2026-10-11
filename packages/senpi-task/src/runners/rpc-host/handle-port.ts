@@ -1,4 +1,5 @@
 import type { RunnerOutcome } from "../in-process/child-handle"
+import type { ChildExtensionListener } from "../child-extension-events"
 import type {
   ChildEventListener,
   RpcChildHandle,
@@ -6,8 +7,11 @@ import type {
   RpcSwitchSessionResult,
   RpcTerminalAssistantMessage,
 } from "../types"
+import type { HostShardEvents } from "./handle-reattach"
 import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked } from "./session-client"
+import type { TransportRecoveryOptions } from "./transport-recovery"
+import type { CatalogModelIdentity } from "../pinned-model-equivalence"
 
 /**
  * What a child handle needs FROM a daemon session and what it exposes TO the manager. The seam is
@@ -18,6 +22,14 @@ import type { HostSessionClosed, HostSessionCommand, HostSessionParked } from ".
 export interface HostSessionLiveness {
   readonly sessionId: string
   readonly isStreaming?: boolean
+  readonly isCompacting?: boolean
+  readonly steering?: readonly unknown[]
+  readonly followUp?: readonly unknown[]
+  readonly pendingMessageCount?: number
+  // The host's effective model for this session (senpi's get_state carries it); the post-open pin
+  // check compares it with the requested provider/modelId (#9722).
+  readonly model?: CatalogModelIdentity
+  readonly serviceTier?: string
 }
 
 /** `HostSessionClient` satisfies this structurally. The transport error itself is never read. */
@@ -27,6 +39,7 @@ export interface HostSessionPort {
   send(command: HostSessionCommand): Promise<void>
   getState(): Promise<HostSessionLiveness>
   onEvent(listener: ChildEventListener): () => void
+  onExtensionEvent?(listener: ChildExtensionListener): () => void
   onParked(listener: (event: HostSessionParked) => void): () => void
   onClosed(listener: (event: HostSessionClosed) => void): () => void
   getEntries(since?: string): Promise<RpcEntriesResult>
@@ -63,6 +76,10 @@ export type HostSessionHandleOptions = {
   readonly openDisposition: HostSessionOpenDisposition
   /** Transport recovery. Absent: a lost transport ends the child as crashed(transport_gone). */
   readonly reattach?: HostSessionReattach
+  /** Told when a transport recovery starts and how it ended (the parent's crash notice). */
+  readonly shardEvents?: HostShardEvents
+  /** How long a lost transport may take to come back before the child ends `transport lost`. */
+  readonly transportRecovery?: TransportRecoveryOptions
 }
 
 export type HostSessionChildHandle = RpcChildHandle & {
@@ -81,7 +98,20 @@ export type HostSessionChildHandle = RpcChildHandle & {
   close(): Promise<void>
   /** The daemon suspended the session: no exit, no status change - the record parks. */
   onParked(listener: (event: HostSessionParked) => void): () => void
+  /** A reattach left a turn that was in flight at the loss running on the new port. */
+  onTurnResumed(listener: () => void): () => void
+  onSelfResumed(listener: () => void): () => void
+  adoptFinishedTurn(finalResponse: string): Promise<void>
   startInitialPrompt(text: string): Promise<void>
+  /** The connection is down and being recovered: nothing sent to the child can land yet. */
+  transportRecovering(): boolean
+  /** A cancel was accepted: a recovery that reaches the host ends the session instead of resuming it. */
+  markStopping(): void
+  /**
+   * Stop the child. With its transport down the stop waits for the recovered connection and runs
+   * there before anything else; it resolves once the child has ended on this side.
+   */
+  stopWhenReachable(): Promise<void>
   waitForOutcome(): Promise<RunnerOutcome>
   hasExited(): boolean
   terminalAssistantMessage(): RpcTerminalAssistantMessage | undefined

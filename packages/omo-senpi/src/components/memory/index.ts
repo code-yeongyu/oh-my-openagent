@@ -196,7 +196,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       // binding. Registered after the static handlers so their projection-first result order holds:
       // the memory tool is live on this turn (afterBind marks the session active) and the prompt
       // block follows on the next one.
-      pi.on("before_agent_start", (_payload, eventCtx) => {
+      pi.on("before_agent_start", (payload, eventCtx) => {
+        if (isRecord(payload) && payload.preview === true) return undefined
         const surface = readSessionSurface(eventCtx)
         if (surface.id === "unknown-session") return undefined
         const state = sessions.get(surface.id)
@@ -204,7 +205,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         if (state !== undefined && !state.enabled) return undefined
         bindSession(surface, eventCtx, { existing: state, verifyRepository: true })
         return undefined
-      })
+      }, { previewSafe: true })
       const unregisterReadClassifier = registerMemoryReadClassifier(pi, {
         resolveRepos: function* () {
           for (const state of sessions.values()) {

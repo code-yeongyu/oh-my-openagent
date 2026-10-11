@@ -1,50 +1,57 @@
 import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
-import { defaultEngineChild } from "./engine-source"
 import {
   COMPUTER_ACTIONS_TOOL_NAME,
+  COMPUTER_SKILL_NAME,
   COMPUTER_COMMAND_USAGE,
   COMPUTER_SUBCOMMANDS,
   COMPUTER_TOOL_NAME,
   type ComputerHostContext,
-  ComputerHandle,
   type ComputerSettings,
   computerActionsPermissionParser,
+  computerActionsToolDefinition,
   computerPermissionParser,
-  createComputerActionsTool,
-  createComputerTool,
+  computerToolDefinition,
   isSupportedHost,
   materializeComputerSkill,
   runComputerCommand,
-} from "@oh-my-opencode/senpi-desktop-tool"
+} from "@oh-my-opencode/senpi-desktop-tool/registration"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { type ContributedSkill, readDiscoverCwd, resolveContributedSkill } from "../bundled-skills/contributed-skill"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import type { ComputerUseTelemetryObservers } from "../telemetry/omo-native-computer-use"
-import { TrackedDesktopService } from "./engine-status"
+import {
+  type ComputerHostApi,
+  type ComputerUseRuntime,
+  type ComputerUseRuntimeModule,
+  createComputerRuntimeLoader,
+} from "./runtime-loader"
 import { resolveOmoComputerSettings } from "./settings"
+import { skillStatusLine, toolActivatedNames } from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
+import { wireComputerPermissionEvents } from "./permission-events"
+
+type ComputerExecute = ComputerUseRuntime["computerTool"]["execute"]
+type ComputerActionsExecute = ComputerUseRuntime["computerActionsTool"]["execute"]
 
 export const COMPUTER_USE_COMPONENT_NAME = "computer-use"
 export const COMPUTER_UNAVAILABLE = "Computer use is unavailable in this session."
 
-type ExecuteTool = (toolName: string, params: unknown, options: { readonly signal: AbortSignal }) => Promise<unknown>
-
-interface ComputerHostApi {
-  getActiveTools(): string[]
-  setActiveTools(names: string[]): void
-  executeTool: ExecuteTool
-}
-
 interface CommandContext extends ComputerHostContext {
+  readonly hasUI: boolean
   readonly ui: { notify(message: string, level: "info" | "warning" | "error"): void }
 }
 
 export interface ComputerUseComponentOptions {
   readonly platform?: string
+  /** Environment for reading `disabled_skills`; defaults to `process.env`. */
+  readonly env?: Record<string, string | undefined>
   /** Starts the engine child; `enginePath` is `computer.engine_path` (`undefined`: the located binary). */
   readonly engineChild?: (enginePath: string | undefined) => ChildFactory
   readonly loadSettings?: (cwd: string, platform: string) => ComputerSettings
   readonly telemetryObservers?: ComputerUseTelemetryObservers
+  /** Imports the implementation entry; the default is `#omo-computer-use-runtime`, on first use only. */
+  readonly loadRuntime?: () => Promise<ComputerUseRuntimeModule>
 }
 
 function hostApi(pi: SenpiExtensionAPI): ComputerHostApi | undefined {
@@ -70,32 +77,19 @@ function defaultLoadSettings(cwd: string, platform: string): ComputerSettings {
   return resolveOmoComputerSettings(loadSenpiOmoConfig({ cwd }).config.computer, platform)
 }
 
-function isStatus(args: string): boolean {
-  return (args.trim().toLowerCase() || "status") === "status"
-}
-
-function toolActivatedNames(payload: unknown): readonly string[] {
-  if (typeof payload !== "object" || payload === null) return []
-  const names = (payload as { toolNames?: unknown }).toolNames
-  return Array.isArray(names) ? names.filter((name): name is string => typeof name === "string") : []
-}
-
-function computerToolCall(payload: unknown): boolean {
-  if (typeof payload !== "object" || payload === null) return false
-  const toolName = Reflect.get(payload, "toolName")
-  return toolName === COMPUTER_TOOL_NAME || toolName === COMPUTER_ACTIONS_TOOL_NAME
-}
-
 /**
  * Desktop computer use: the search-exposed `computer` tool (with its `kernelPrelude` and read/exec
  * `permissionParser`), `computer_actions` behind `computer.cua_adapter`, `/computer`, and the skill.
  * Registration happens at extension load so tool_search indexes the tool at session_start; nothing
  * starts until the tool is activated (a by-name call, `setActiveTools`, or `/computer on`).
+ * The implementation (desktop service, engine child, handle, `execute`) is a separate entry imported
+ * on the first `/computer`, tool activation, or tool call, so a session that never uses the desktop
+ * does not load or evaluate it (#9113).
  */
 export function createComputerUseComponent(options: ComputerUseComponentOptions = {}): OmoSenpiComponent {
   const platform = options.platform ?? process.platform
-  const engineChild = options.engineChild ?? defaultEngineChild()
   const loadSettings = options.loadSettings ?? defaultLoadSettings
+  const loadRuntime = options.loadRuntime ?? (() => import("#omo-computer-use-runtime"))
   const telemetry = createComputerUseTelemetry({
     platform,
     ...(options.telemetryObservers === undefined ? {} : { observers: options.telemetryObservers }),
@@ -104,6 +98,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
   return {
     name: COMPUTER_USE_COMPONENT_NAME,
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      const reportPermission = wireComputerPermissionEvents(pi, options.env ?? process.env, ctx.logger)
       const api = hostApi(pi)
       const available = (() => {
         if (!isSupportedHost(platform)) return undefined
@@ -125,15 +120,33 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
         }
       })()
 
-      let session: {
-        handle: ComputerHandle
-        service: TrackedDesktopService
-        host: ComputerHostApi
-        runtime: { backend: string; telemetryContext: unknown }
-      } | undefined
+      const state: {
+        backend: string
+        telemetryContext: unknown
+        activationReported: boolean
+        skill: ContributedSkill | undefined
+      } = {
+        backend: "unavailable",
+        telemetryContext: undefined,
+        activationReported: false,
+        skill: undefined,
+      }
+      const runtime =
+        available === undefined
+          ? undefined
+          : createComputerRuntimeLoader({
+              loadRuntime,
+              host: available.host,
+              settings: available.settings,
+              engineChild: options.engineChild,
+              onPermissionRequired: reportPermission,
+              onEngineError: (code) => {
+                if (state.telemetryContext !== undefined) telemetry.engineError(state.telemetryContext, code, state.backend)
+              },
+            })
 
       pi.registerCommand("computer", {
-        description: "Computer use: on, off, status, stop, or resume (stop and resume are user-only)",
+        description: "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)",
         argumentHint: COMPUTER_SUBCOMMANDS.join("|"),
         getArgumentCompletions: (prefix: string) =>
           COMPUTER_SUBCOMMANDS.filter((name) => name.startsWith(prefix.trim())).map((name) => ({
@@ -141,19 +154,20 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             label: name,
           })),
         handler: async (args: string, commandCtx: CommandContext) => {
-          if (session === undefined) {
+          if (available === undefined || runtime === undefined) {
             commandCtx.ui.notify(COMPUTER_UNAVAILABLE, "warning")
             return
           }
-          const { handle, service } = session
-          const wasActive = handle.active
           const command = args.trim().toLowerCase() || "status"
-          session.runtime.telemetryContext = commandCtx
+          state.telemetryContext = commandCtx
           try {
+            const { handle, service, describeEngineSource, describeEnginePermissions } = await runtime.load()
+            const wasActive = handle.active
             const text = await runComputerCommand(args, handle, commandCtx)
-            if (command === "on" && !wasActive && handle.active) {
+            if (command === "on" && !wasActive && handle.active && !state.activationReported) {
+              state.activationReported = true
               const capabilities = await service.capabilities()
-              session.runtime.backend = capabilities.backend
+              state.backend = capabilities.backend
               telemetry.activation({
                 context: commandCtx,
                 active: true,
@@ -162,19 +176,24 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
               })
               telemetry.osPermissions(commandCtx, capabilities)
             } else if (command === "off" && wasActive && !handle.active) {
+              state.activationReported = false
               telemetry.activation({
                 context: commandCtx,
                 active: false,
                 source: "command_off",
-                backend: session.runtime.backend,
+                backend: state.backend,
               })
             }
-            if (!isStatus(args)) {
+            if (command !== "status") {
               commandCtx.ui.notify(text, text === COMPUTER_COMMAND_USAGE ? "warning" : "info")
               return
             }
-            const prelude = session.host.getActiveTools().includes(COMPUTER_TOOL_NAME) ? "active" : "inactive"
-            commandCtx.ui.notify(`${text}\nengine: ${service.engineState}\nprelude: ${prelude}`, "info")
+            const prelude = available.host.getActiveTools().includes(COMPUTER_TOOL_NAME) ? "active" : "inactive"
+            const source = describeEngineSource(available.settings.enginePath, options.env ?? process.env, { platform })
+            const permissions = handle.running ? "" : `\n${await describeEnginePermissions(available.settings.enginePath, options.env ?? process.env, { platform })}`
+            const status = `${text}\nengine: ${service.engineState}${service.engineState === "not started" ? ` (${source})` : ""}\nprelude: ${prelude}${skillStatusLine(state.skill)}\nengine source: ${source}${permissions}`
+            commandCtx.ui.notify(status, "info")
+            if (commandCtx.hasUI === false) process.stderr.write(`${status}\n`)
           } catch (error) {
             if (!(error instanceof Error)) throw error
             commandCtx.ui.notify(`/computer ${args.trim()}: ${error.message}`, "error")
@@ -182,68 +201,56 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
         },
       })
 
-      if (available === undefined) return
-      const { settings } = available
-      const runtime: { backend: string; telemetryContext: unknown } = {
-        backend: "unavailable",
-        telemetryContext: undefined,
-      }
-      const service = new TrackedDesktopService({
-        createChild: engineChild(settings.enginePath),
-        onError: (error) => {
-          if (runtime.telemetryContext !== undefined) {
-            telemetry.engineError(runtime.telemetryContext, error, runtime.backend)
-          }
-        },
-      })
-      const handle = new ComputerHandle({ service, settings: () => settings })
-      const host = available.host
-      session = { handle, service, host, runtime }
-      handle.onActivationChange((active) => {
-        const current = host.getActiveTools()
-        if (active === current.includes(COMPUTER_TOOL_NAME)) return
-        host.setActiveTools(
-          active ? [...current, COMPUTER_TOOL_NAME] : current.filter((name) => name !== COMPUTER_TOOL_NAME),
-        )
-      })
-      const executeTool = host.executeTool
+      if (available === undefined || runtime === undefined) return
       pi.registerTool({
-        ...createComputerTool({ handle, executeTool }),
-        permissionParser: (input: Record<string, unknown>, cwd: string) => {
-          telemetry.permissionRequested(COMPUTER_TOOL_NAME, input)
-          return computerPermissionParser(COMPUTER_TOOL_NAME, input, cwd)
+        ...computerToolDefinition,
+        async execute(...args: Parameters<ComputerExecute>): ReturnType<ComputerExecute> {
+          return (await runtime.load()).computerTool.execute(...args)
         },
+        permissionParser: (input: Record<string, unknown>, cwd: string) =>
+          computerPermissionParser(COMPUTER_TOOL_NAME, input, cwd),
       })
-      if (settings.cuaAdapter) {
+      if (available.settings.cuaAdapter) {
         pi.registerTool({
-          ...createComputerActionsTool({ handle, executeTool }),
-          permissionParser: (input: Record<string, unknown>, cwd: string) => {
-            telemetry.permissionRequested(COMPUTER_ACTIONS_TOOL_NAME, input)
-            return computerActionsPermissionParser(COMPUTER_ACTIONS_TOOL_NAME, input, cwd)
+          ...computerActionsToolDefinition,
+          async execute(...args: Parameters<ComputerActionsExecute>): ReturnType<ComputerActionsExecute> {
+            return (await runtime.load()).computerActionsTool.execute(...args)
           },
+          permissionParser: (input: Record<string, unknown>, cwd: string) =>
+            computerActionsPermissionParser(COMPUTER_ACTIONS_TOOL_NAME, input, cwd),
         })
       }
 
       pi.on("session_start", (_payload, eventCtx) => {
-        runtime.telemetryContext = eventCtx
+        state.telemetryContext = eventCtx
       })
-      pi.on("resources_discover", () => ({ skillPaths: [materializeComputerSkill()] }))
-      pi.on("tool_call", (payload, eventCtx) => {
-        if (computerToolCall(payload)) runtime.telemetryContext = eventCtx
-        telemetry.toolCall(payload)
+      pi.on("resources_discover", (payload: unknown) => {
+        state.skill = resolveContributedSkill({
+          pi,
+          name: COMPUTER_SKILL_NAME,
+          path: () => materializeComputerSkill(),
+          cwd: readDiscoverCwd(payload) ?? pi.cwd ?? process.cwd(),
+          env: options.env ?? process.env,
+        })
+        return state.skill.kind === "contributed" ? { skillPaths: [state.skill.path] } : undefined
+      })
+      pi.on("tool_execution_start", (payload, eventCtx) => {
+        if (telemetry.toolExecutionStarted(payload)) state.telemetryContext = eventCtx
       })
       pi.on("tool_activated", async (payload, eventCtx) => {
         const activated = toolActivatedNames(payload)
-        if (
-          handle.active ||
-          (!activated.includes(COMPUTER_TOOL_NAME) && !activated.includes(COMPUTER_ACTIONS_TOOL_NAME))
-        ) {
-          return
-        }
-        runtime.telemetryContext = eventCtx
+        if (!activated.includes(COMPUTER_TOOL_NAME) && !activated.includes(COMPUTER_ACTIONS_TOOL_NAME)) return
+        const { handle, service } = await runtime.load()
+        if (handle.active) return
+        state.telemetryContext = eventCtx
         await handle.activate(eventCtx as ComputerHostContext)
-        const capabilities = await service.capabilities()
-        runtime.backend = capabilities.backend
+        if (state.activationReported) return
+        state.activationReported = true
+        const capabilities = await service.capabilities().catch((error: unknown) => {
+          state.activationReported = false
+          throw error
+        })
+        state.backend = capabilities.backend
         telemetry.activation({
           context: eventCtx,
           active: true,
@@ -253,12 +260,16 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
         telemetry.osPermissions(eventCtx, capabilities)
       })
       pi.on("tool_execution_end", (payload, eventCtx) => {
-        telemetry.permissionTierDenied(payload, runtime.telemetryContext ?? eventCtx, runtime.backend)
+        telemetry.permissionTierDenied(payload, state.telemetryContext ?? eventCtx, state.backend)
       })
       pi.on("message_end", (payload, eventCtx) => {
-        telemetry.permissionTierDenied(payload, runtime.telemetryContext ?? eventCtx, runtime.backend)
+        telemetry.permissionTierDenied(payload, state.telemetryContext ?? eventCtx, state.backend)
       })
-      pi.on("session_shutdown", () => handle.close())
+      pi.on("session_shutdown", async () => {
+        // A runtime that never loaded has no engine session to end.
+        const started = runtime.started()
+        if (started !== undefined) await (await started).handle.close()
+      })
     },
   }
 }

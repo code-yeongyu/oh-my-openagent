@@ -1,12 +1,10 @@
 import { join } from "node:path"
 import { runChild } from "./child-process.js"
-import { packageManifest, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
+import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
+import { channelDistTagVersion, channelPackageSpec, packageManifest, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
+import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
 
-const PRINT_ONLY_FLAGS = new Set(["--dry-run", "--print"])
-
-export function isPrintOnlyUpdate(args) {
-  return args.slice(1).some((arg) => PRINT_ONLY_FLAGS.has(arg))
-}
+export { isPrintOnlyUpdate }
 
 export function formatUpdateCommand(update) {
   return `omo is updated via ${update.manager}: ${update.command}`
@@ -27,16 +25,22 @@ export function formatVersionChange(before, after) {
 }
 
 /**
- * Prints and optionally runs the package-manager command `updateTarget()` resolved. `--dry-run`
- * and `--print` keep the print-only answer; anything else streams the spawn, then reports the
- * installed versions. A failed manager run exits non-zero with the same command to retry by hand.
+ * Resolves the version the running build's channel dist-tag names (the lookup `omo doctor` uses for
+ * "Latest"), then prints and optionally runs the package-manager command that installs exactly that
+ * version. `--help`/`-h` print the usage and an unknown flag exits 2, both before the registry lookup,
+ * so neither can install anything (#9207). `--dry-run` and `--print` print the resolved command only.
+ * Already on the target, it says so and installs nothing. After a manager exit 0 it re-reads the installed version: one that did not
+ * reach the target exits non-zero with the retry command, because the manager's own success does not
+ * prove the install moved (#9198). An unreachable registry falls back to the unpinned channel spec.
  * `run` defaults to `runChild` so tests inject a spawn without touching the child-process helper.
  *
  * @typedef {{ omo: string, engine: string }} InstalledVersion
  * @typedef {{ status: number | null, signal: string | null }} ChildResult
  * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv }} RunOptions
+ * @typedef {{ manager: string, command: string, argv: string[], env?: Record<string, string> }} UpdateTarget
  * @typedef {{
- *   update?: { manager: string, command: string, argv: string[], env?: Record<string, string> },
+ *   resolveUpdate?: (targetVersion?: string) => UpdateTarget,
+ *   fetchDistTags?: () => Record<string, unknown> | null,
  *   log?: (line: string) => void,
  *   error?: (line: string) => void,
  *   run?: (command: string, args: string[], options?: RunOptions) => Promise<ChildResult>,
@@ -48,17 +52,39 @@ export function formatVersionChange(before, after) {
  * @returns {Promise<number>}
  */
 export async function runSelfUpdate(args, options = {}) {
-  const update = options.update ?? updateTarget()
+  const resolveUpdate = options.resolveUpdate
+    ?? ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
+  const fetchDistTags = options.fetchDistTags ?? fetchNpmDistTagsSync
   const log = options.log ?? ((line) => console.log(line))
   const error = options.error ?? ((line) => console.error(line))
   const run = options.run ?? runChild
   const readInstalled = options.readInstalled ?? readInstalledVersion
   const env = options.env ?? process.env
 
-  log(formatUpdateCommand(update))
-  if (isPrintOnlyUpdate(args)) return 0
+  const usage = updateUsageAnswer(args)
+  if (usage !== undefined) {
+    ;(usage.stream === "stderr" ? error : log)(usage.text)
+    return usage.exitCode
+  }
 
   const before = readInstalled()
+  const channel = releaseChannel(before.omo)
+  const target = channelDistTagVersion(fetchDistTags(), before.omo)
+  const update = resolveUpdate(target)
+
+  if (target === undefined) {
+    log(`omo: could not confirm the ${channel} omo-ai version from the npm registry; installing the unpinned ${channelPackageSpec(before.omo)}`)
+  }
+  if (isPrintOnlyUpdate(args)) {
+    log(formatUpdateCommand(update))
+    return 0
+  }
+  if (target !== undefined && target === before.omo) {
+    log(`omo ${before.omo} is up to date (omo-ai@${channel} is ${target})`)
+    return 0
+  }
+  log(formatUpdateCommand(update))
+
   const [command, ...argv] = update.argv
   let result
   try {
@@ -77,6 +103,12 @@ export async function runSelfUpdate(args, options = {}) {
     return result.status ?? 1
   }
 
-  log(formatVersionChange(before, readInstalled()))
+  const after = readInstalled()
+  if (target !== undefined && after.omo !== target) {
+    error(`omo is still ${after.omo}; ${target} is published`)
+    error(`omo: update failed; retry with: ${update.command}`)
+    return 1
+  }
+  log(formatVersionChange(before, after))
   return 0
 }

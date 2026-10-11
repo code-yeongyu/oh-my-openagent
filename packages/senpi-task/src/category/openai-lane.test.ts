@@ -3,9 +3,9 @@ import { describe, expect, test } from "bun:test"
 import { resolveCategory } from "./index"
 
 // The `openai` provider is senpi's metered API-key lane; `chatgpt-subscription` is the ChatGPT subscription
-// lane serving the same model ids. Builtin chains list only the subscription lane (#8300), so the
-// API lane is never preferred over it, yet an API-key-only registry still resolves through the
-// resolver's cross-provider fallthrough (the posture vercel-only registries already have).
+// lane serving the same model ids. Builtin GPT rungs list the subscription lane first and the API lane
+// directly after it (#8300, #8734), so the API lane is never preferred over the subscription, yet an
+// API-key-only registry still resolves on its own listed rung.
 
 type FakeModel = {
   readonly provider: string
@@ -31,7 +31,7 @@ function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): 
 
 const GPT_CATEGORY_CASES = [
   { category: "ultrabrain", modelId: "gpt-6-astra", variant: "max" },
-  { category: "deep-high", modelId: "gpt-6-astra", variant: "xhigh" },
+  { category: "deep-high", modelId: "gpt-6-astra", variant: "high" },
   { category: "deep-low", modelId: "gpt-5.6-sol-fast", variant: "medium" },
   { category: "deep-low", modelId: "gpt-5.6-sol", variant: "medium" },
 ] as const
@@ -94,7 +94,7 @@ describe("openai lane policy", () => {
 
   describe("#given only the openai API lane", () => {
     for (const { category, modelId, variant } of GPT_CATEGORY_CASES) {
-      test(`#when ${category} resolves on ${modelId} #then cross-provider fallthrough keeps the API lane usable`, () => {
+      test(`#when ${category} resolves on ${modelId} #then the listed API lane keeps the category usable`, () => {
         // given
         const models = registry([model("openai", modelId)])
 

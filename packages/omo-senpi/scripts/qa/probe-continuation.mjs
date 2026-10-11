@@ -97,8 +97,14 @@ function main() {
       "new-session",
       "-e",
       `PATH=${tmuxPath}`,
+      // A running tmux server hands the session ITS global env, so every agent-dir lane is pinned
+      // here: an inherited OMO_CODING_AGENT_DIR would outrank SENPI_CODING_AGENT_DIR.
+      "-e",
+      `OMO_CODING_AGENT_DIR=${sandbox.agentDir}`,
       "-e",
       `SENPI_CODING_AGENT_DIR=${sandbox.agentDir}`,
+      "-e",
+      `PI_CODING_AGENT_DIR=${sandbox.agentDir}`,
       "-e",
       `SENPI_CODING_AGENT_SESSION_DIR=${sessionDir}`,
       "-d",

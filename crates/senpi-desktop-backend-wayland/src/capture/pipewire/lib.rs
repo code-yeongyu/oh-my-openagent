@@ -96,6 +96,10 @@ impl PipeWire {
 /// libpipewire, loaded and initialized once per process; `Err` explains
 /// why it is unavailable (the Screenshot portal is then the capture path).
 pub fn pipewire() -> Result<&'static PipeWire, &'static str> {
+    #[cfg(test)]
+    if std::env::var_os("SENPI_WAYLAND_TEST_DISABLE_PIPEWIRE").is_some() {
+        return Err("disabled by the live Screenshot fallback test");
+    }
     load_once(SONAME)
 }
 

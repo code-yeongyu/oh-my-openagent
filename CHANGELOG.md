@@ -7,43 +7,845 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+**omo runs on senpi 2026.10.10-12, and a task shard stops soon after the session that owns it exits.** Task shards are now started with senpi's caller-lifetime ownership, so a multi-GB `p-*` shard host no longer stays resident for the full idle window after its owning session quits; peers and running turns still keep it alive. The engine also waits for its host child to really exit before releasing a stopped host, and required compaction no longer wedges on an unsafe newest message. Full engine notes: [senpi 2026.10.10-12](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-12). (code-yeongyu/senpi#3044, code-yeongyu/senpi#3054, code-yeongyu/senpi#3060)
 
-**OmO Native can use your computer.** ([#8893](https://github.com/code-yeongyu/oh-my-openagent/issues/8893)) Agents get a `computer` tool that takes screenshots, lists windows, reads accessibility trees and clicks and types in native applications on macOS, Linux and Windows. Input goes to the target app in the background by default, so your frontmost app, focus and cursor stay where they are. A global stop chord (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape on Linux and Windows) or `/computer stop` suspends it until you run `/computer resume`, and permission rules split looking (`computer:read`) from touching (`computer:exec`). The compiled binary carries the engine; an npm install downloads the checksum-verified engine for its release on first use. On macOS, grant Screen Recording and Accessibility to the app you run OmO from. Setup, settings, safety, privacy and troubleshooting: [Computer use](docs/guide/computer-use.md).
+**Suspended children no longer linger in the task list: each one resumes or ends on its own.** A child that was parked while it could not run is now revived as soon as it can be, or ends within a bounded recovery window with one final result, so it never sits in the task list as suspended. Messages sent to it meanwhile are queued and delivered in order when it resumes; if it can't resume, the parent is told in that one result how many messages were not delivered, and `task_output` then shows `error` rather than the original status. ([#9861](https://github.com/code-yeongyu/oh-my-openagent/issues/9861), [#9868](https://github.com/code-yeongyu/oh-my-openagent/pull/9868))
 
-### Changed
+## [5.1.29] - 2026-10-09
 
-**A parent no longer runs out of room for its task children.** ([#8999](https://github.com/code-yeongyu/oh-my-openagent/issues/8999)) `task.residency_max_children` now defaults to `"unlimited"`. The old default (8 to 16, depending on CPU count) refused the next spawn with a residency error while all of a parent's children were still running, and limited how many suspended children came back when the parent session resumed. Set a number in `omo.json` to keep a bound.
+**Child tasks and Kibitzer wakes of a fast-mode session no longer fail with `model_unavailable`: a `-fast` pin is accepted when the session starts on its paired base model.** Since 5.1.25, a category pinned to a `-fast` catalog variant such as `chatgpt-subscription/gpt-6-luna-fast` was refused after start, because senpi starts a `-fast` pin on its base model with the priority tier. Kibitzer recall wakes failed on every wake, and the built-in fast-first chains (`quick`, `deep-low`, `deep-high`, `ultrabrain`) silently skipped their first model. A run that started on the standard tier instead of priority is now accepted and recorded on the task (`effective_model.service_tier`) instead of refused. ([#9793](https://github.com/code-yeongyu/oh-my-openagent/issues/9793), [#9808](https://github.com/code-yeongyu/oh-my-openagent/pull/9808), [#9812](https://github.com/code-yeongyu/oh-my-openagent/issues/9812), [#9813](https://github.com/code-yeongyu/oh-my-openagent/pull/9813))
 
-**Memory now learns from a very long conversation instead of parking it forever.** ([#8984](https://github.com/code-yeongyu/oh-my-openagent/issues/8984), contributed by @deadcode-walker in [#8985](https://github.com/code-yeongyu/oh-my-openagent/pull/8985)) Facts extraction sends conversations to the model in batches of at most 128 KiB. A single conversation entry larger than that used to be parked and never read, so the facts in it were lost. Now, after all normal batches are done, OmO Native gives one such entry a separate extraction run with a fixed budget:
-
-- the whole entry, up to 512 KiB, never split or trimmed
-- at most 8 model requests, each with at most 4,096 output tokens
-- no retries and no fallback to another model
-
-The run only starts when the memory model's context window is known to fit the whole entry. If the context gets compacted, the output is cut off, or any limit is hit, the run is thrown away and the entry stays queued exactly as before. This means extra model calls, and possibly new memory commits, for people who have such long entries queued. Entries above 512 KiB are still parked; see them with `/facts` and unpark them with `/facts retry`.
+**omo runs on senpi 2026.10.10-11.** `tool_schema("eval:environments")` now documents `packages.install` and its `environment_install_timeout`, so JavaScript and Python cells can discover how to install packages without changing the default eval description or parameters. Julia, Ruby and Python cells do less fixed work per cell: no globals walk below the memory thresholds, no awaited cwd stat, and leaner Python queue and capture bookkeeping. A scheduled prompt created in a desktop thread before the OmO desktop moved that folder now fires, and `--session`, `--resume` and `--continue` find such sessions in the folder's new home. A session another live process already holds is refused with a typed `session_held` error instead of being opened twice. Sessions that share MCP servers but resolve different MCP configs no longer break each other's tools. A goal whose continuation stops also stops its timer. On Windows, stopping a command's process tree can no longer kill an unrelated process that reused a pid. On macOS and Linux, processes a JavaScript eval cell starts get their own process group, so a group kill can't stop the agent, and leftover grandchildren are stopped when the cell ends. Full engine notes: [senpi 2026.10.10-11](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-11). (code-yeongyu/senpi#3003, code-yeongyu/senpi#3028, code-yeongyu/senpi#3033, code-yeongyu/senpi#3034, code-yeongyu/senpi#2990, code-yeongyu/senpi#2951, code-yeongyu/senpi#2597, code-yeongyu/senpi#3007, code-yeongyu/senpi#2999, code-yeongyu/senpi#2995, code-yeongyu/senpi#3020, #9825)
 
 ### Fixed
 
-**A child whose host dies while it opens now says the host was unreachable.** ([#9020](https://github.com/code-yeongyu/oh-my-openagent/issues/9020)) If the shared task host went away while a child's session was being opened, the task failed with a generic "could not open the child session" and no reason. It now reports `host_unreachable`, like every other lost-host start.
+**A background child no longer stays suspended while its parent is running.** A child parked while its parent session was still live was only revisited at the parent's next start, so it could sit suspended for hours and a goal waiting on its result waited forever. It is now revived right away, or ends with one result. ([#9350](https://github.com/code-yeongyu/oh-my-openagent/issues/9350), [#9799](https://github.com/code-yeongyu/oh-my-openagent/pull/9799))
 
-**The comment checker no longer reuses an old binary, and no longer goes quiet when it cannot run.** ([#8850](https://github.com/code-yeongyu/oh-my-openagent/issues/8850), contributed by @cynkai in [#8877](https://github.com/code-yeongyu/oh-my-openagent/pull/8877) and [#8880](https://github.com/code-yeongyu/oh-my-openagent/pull/8880)) OmO Native and the OpenCode edition share one cached comment-checker binary, and a checker an older install left there was reused forever, so the pinned release was never downloaded. The downloader now records the release it installed next to the binary. A cached checker without that record, or recorded at another release, is replaced with the pinned release on the next session; if the download fails, the checker stays off for that session instead of running the old binary. A checker installed before this release is downloaded once more, because it carries no record yet. Separately, a checker that could not run, because it could not be started or exited with a code other than its clean and found-comments codes, used to count as "no comments" on every edit. OmO Native now shows a warning in the session with the checker's path and the reason, and stops running it for the rest of that session; a new session tries again.
+**omo.dev shows its live stats more reliably.** A cold page load whose first stats refresh hit one upstream blip showed the fallback numbers; it now falls back to the last complete set instead. ([#9820](https://github.com/code-yeongyu/oh-my-openagent/issues/9820), [#9821](https://github.com/code-yeongyu/oh-my-openagent/pull/9821))
 
-**A task whose whole fallback chain failed now says so in its transcript.** ([#8301](https://github.com/code-yeongyu/oh-my-openagent/issues/8301), contributed by @MoerAI in [#9022](https://github.com/code-yeongyu/oh-my-openagent/pull/9022)) When a task child's model failed, the child moved to the next model in its fallback chain, and that model failed too, the task correctly ended in error, but its transcript never recorded that the chain had run out: the last entry was just the second provider error. The task log now records one `retry_fallback_exhausted` event with the chain and the last error before the task ends, whether the child ran in the parent session, as its own process, or as a session of the task daemon. A child that already reported exhaustion itself is not recorded twice.
+## [5.1.28] - 2026-10-09
 
-**A delegated task no longer hangs forever when its first model fails.** When a subagent running on the shared daemon (the default on macOS and Linux) failed on one model and moved to the next, the new model's session could briefly mistake the task for an abandoned one and take it over. The real result was then ignored, the task stayed `running`, and `omo -p` never exited. The task now records the switch before the old session closes, so nothing else takes it over. If the parent process dies during the switch, the next session to start revives the task on the next model instead of losing it or reopening the failed attempt, and a subagent session reopened after the daemon dropped it continues its interrupted turn instead of sitting idle.
+**omo runs on senpi 2026.10.10-10.** With several Anthropic Subscription accounts, a session no longer switches accounts on a transient error and back on the next turn; it retries the same account, then stays on whichever account holds its transcript. With `resumeMode: "off"`, the conversation is no longer written to the prompt cache again on every turn. A long streamed tool call on the Anthropic Subscription lane no longer fails with "session stream queue exceeded 256 messages". Full engine notes: [senpi 2026.10.10-10](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-10). ([senpi#2891](https://github.com/code-yeongyu/senpi/issues/2891), [senpi#2982](https://github.com/code-yeongyu/senpi/issues/2982), [senpi#2822](https://github.com/code-yeongyu/senpi/issues/2822), [#9798](https://github.com/code-yeongyu/oh-my-openagent/pull/9798))
 
-**A task child whose host lost its session now picks its interrupted turn back up.** ([#9003](https://github.com/code-yeongyu/oh-my-openagent/issues/9003)) When a background task child ran on the shared task host and that host restarted mid-turn, resuming the parent reopened the child's session from its saved transcript but never told the child to continue, so the child sat idle with its work half done. A reopened child with an unfinished turn now gets one continuation prompt and finishes; a child whose session was still live on the host is left alone, and one whose turn had already completed is not prompted. An unanswered user prompt followed only by `senpi.hooks.stop-state`, `pi-rules.scan`, and `senpi-memory.session-binding` bookkeeping now counts as interrupted and gets exactly one continuation across host reopen and in-process respawn. A turn that was already continued once is never continued again, even if it is interrupted again (by design). Reading a child's transcript or switching its session after the host connection was restored also no longer fails.
+**Search, docs and quick work now run on Claude Haiku 5.5.** The default `explore`, `librarian` and `quick` lineups use `claude-haiku-5-5` at medium reasoning, right after GPT-6 Luna Fast, instead of Claude Haiku 4.5 at the end of the chain. On an Anthropic-only machine, the memory and Kibitzer sidecars run on it too. The Claude Code `haiku` alias now means Haiku 5.5. ([#9802](https://github.com/code-yeongyu/oh-my-openagent/pull/9802))
 
-**A suspended task child no longer keeps its concurrency slot.** ([#8973](https://github.com/code-yeongyu/oh-my-openagent/issues/8973)) When a parent session shut down or its daemon connection was lost, each running child was suspended but the slot it held in its model lane was never freed. After a few restarts the parent's lane was full of slots nobody used, new children queued behind them, and every `task_send` to a suspended child answered `lane_capacity`. Suspending a child now frees its slot, and a late result from the suspended run cannot free a slot a newer child holds.
+**Approval and authorization questions can't be read as permission, whichever model asks them.** ulw-plan's approval gate, its authorization block and mass-ulw's scope, spend and irreversible decisions are asked with `required: true`, so an unanswered gate ends the turn instead of continuing on best judgment. The plugin also sets the flag itself on gating questions, recognized by their pinned headers, for models that leave it out. ([#9735](https://github.com/code-yeongyu/oh-my-openagent/issues/9735), [#9775](https://github.com/code-yeongyu/oh-my-openagent/pull/9775), [#9774](https://github.com/code-yeongyu/oh-my-openagent/issues/9774), [#9782](https://github.com/code-yeongyu/oh-my-openagent/pull/9782))
 
-**Task start failures now say why the child could not start.** ([#8960](https://github.com/code-yeongyu/oh-my-openagent/issues/8960)) A task whose shared host is unreachable, whose daemon ensure times out, or whose child session is refused or takes too long to open now returns a parent-authored explanation with a closed reason code instead of only `Task runner failed to start.`. The same failure class is stored on the task record without copying host or child stderr. Concurrent child starts on one socket share one daemon ensure, memory-pressure wait notes disappear when that admission episode ends, and TTL crash recovery closes a daemon session before deleting its session directory.
+**`chatgpt-subscription/gpt-6.1-sol-ultrafast` is available without a local extension**, with the Ultrafast service tier and default `xhigh` reasoning. Thanks to @audreyt. ([senpi#2975](https://github.com/code-yeongyu/senpi/pull/2975))
 
-**`omo doctor` now diagnoses computer use before you start a desktop session.** ([#8939](https://github.com/code-yeongyu/oh-my-openagent/issues/8939)) OmO Native reports whether computer use is enabled and supported, which desktop engine it selected and whether its ABI matches, the backend's capture/input/Accessibility permissions, and display and screen-lock state; the emergency stop chord is reported as not armed until computer use starts input, which is when the engine arms it. The check uses only the engine's read-only handshake and capabilities requests under a bounded timeout, so it does not open a desktop session, grab input, or request OS permissions.
+### Fixed
 
-**DAG nodes finish when their child task finishes again.** ([#8932](https://github.com/code-yeongyu/oh-my-openagent/issues/8932), reported by @ayalcoh) A DAG child that ran as a session of the shared task daemon could complete while its node stayed `running`, so the nodes that depend on it never started and the run had to be cancelled. The liveness check asked the daemon for its sessions without including worker sessions, so every task child looked gone; the next omo session that started in the same project took the still-running child over, and the run that was waiting on it never heard it finish. The check now sees task children, including in projects reached through a symlink, so a live child stays with the session that started it.
+**A config migration no longer reformats your `omo.jsonc`.** The first start against an existing config rewrote every top-level value, dropping nested comments, trailing commas and your formatting. Migrations now edit only the values they change, in the file's own style. ([#9777](https://github.com/code-yeongyu/oh-my-openagent/issues/9777), [#9783](https://github.com/code-yeongyu/oh-my-openagent/pull/9783))
 
-**Memory dreaming sees which skills and memory files you actually read.** ([#8864](https://github.com/code-yeongyu/oh-my-openagent/issues/8864), reported by @katamana, fixed by @MoerAI in [#8865](https://github.com/code-yeongyu/oh-my-openagent/pull/8865)) The usage ledgers that `dream` reads to find unused skills and to move hot or stale memory files between tiers were never written, so every dream run worked from empty evidence. Reading a `skills/<name>/...` file or a memory file outside `system/` now adds a row to `runtime/skills-usage.json` or `runtime/memory-usage.json` again.
+**A child that won't stop no longer keeps finished children resident.** One child that ignored SIGTERM stalled the idle sweep, so finished process children piled up (about 2 GB each). Every teardown step is now bounded, idle residents are reclaimed one by one, and `task_cancel` releases a finished resident; cancelling a running child that never answers its abort no longer hangs either. Thanks to @lee98www for the report. ([#9785](https://github.com/code-yeongyu/oh-my-openagent/issues/9785), [#9788](https://github.com/code-yeongyu/oh-my-openagent/pull/9788), [#9791](https://github.com/code-yeongyu/oh-my-openagent/issues/9791), [#9792](https://github.com/code-yeongyu/oh-my-openagent/pull/9792))
+
+**Binary downloads validate every archive entry on localized systems.** Tar listings in a non-English locale (localized month names) or from GNU tar were not parsed, so their entries skipped validation; the downloader now lists archives in the C locale, parses both formats, and refuses a listing line it can't parse. Thanks to @MoerAI. ([#9685](https://github.com/code-yeongyu/oh-my-openagent/issues/9685), [#9780](https://github.com/code-yeongyu/oh-my-openagent/issues/9780), [#9779](https://github.com/code-yeongyu/oh-my-openagent/pull/9779))
+
+**A suspended background task no longer looks like it is working.** Its row in the live task widget shows a still mark instead of a spinner and no climbing timer, names why it stopped (for example, the parent session restarted), and offers a message only where sending one would revive it. ([#9350](https://github.com/code-yeongyu/oh-my-openagent/issues/9350), [#9795](https://github.com/code-yeongyu/oh-my-openagent/pull/9795))
+
+**Memory no longer writes empty transcript journals.** A session with nothing to record wrote an empty journal at every start; none is written now, and empty journals left by older builds are removed. ([#9737](https://github.com/code-yeongyu/oh-my-openagent/issues/9737), [#9739](https://github.com/code-yeongyu/oh-my-openagent/pull/9739))
+
+## [5.1.27] - 2026-10-08
+
+**omo runs on senpi 2026.10.10-9, which stops automatic turns from running without bound.** After one message from you, stream-rule nudges, goal continuations and other automatic follow-ups pause after 150 turns, or once 12 automatic turns in a minute do no work, and each stream rule corrects a message at most once. When it pauses, the session says so, and your next message picks it back up. Full engine notes: [senpi 2026.10.10-9](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-9). ([senpi#2967](https://github.com/code-yeongyu/senpi/issues/2967), [senpi#2969](https://github.com/code-yeongyu/senpi/pull/2969), [#9772](https://github.com/code-yeongyu/oh-my-openagent/pull/9772))
+
+**A required question can't be read as permission.** senpi's `ask_user_question` accepts `required: true` for a question that gates an action, such as an approval before an irreversible step: if it times out, is dismissed or can't be shown, the model is told not to take that action. ([senpi#2949](https://github.com/code-yeongyu/senpi/issues/2949), [senpi#2959](https://github.com/code-yeongyu/senpi/pull/2959))
+
+**The configuration guide documents the Anthropic 1-hour prompt cache and the cache keep-alive.** ([#9770](https://github.com/code-yeongyu/oh-my-openagent/issues/9770), [#9771](https://github.com/code-yeongyu/oh-my-openagent/pull/9771))
+
+### Fixed
+
+**Memory locks stop churning on machines with many sessions.** A session waiting on a memory lock no longer republishes a recovery lock on every retry: it reads first, and lock polls back off with jitter instead of a fixed 25 ms. Locks and candidate files left by processes that died are reclaimed, so the lock directory stops growing. ([#9749](https://github.com/code-yeongyu/oh-my-openagent/issues/9749), [#9750](https://github.com/code-yeongyu/oh-my-openagent/pull/9750))
+
+**Single-turn answers no longer carry the progress-ledger block.** Hephaestus and Sisyphus keep the Now/Next ledger for multi-step work tracked in todos; a request finished in one turn gets a plain answer, without lines such as `Next: none`. Thanks to @cynkai. ([#9616](https://github.com/code-yeongyu/oh-my-openagent/issues/9616), [#9676](https://github.com/code-yeongyu/oh-my-openagent/pull/9676))
+
+**A provider that sets its own `anthropic-beta` header keeps the betas a request needs**, so Claude 5.5 models through such a route no longer fail their first call. ([senpi#2957](https://github.com/code-yeongyu/senpi/issues/2957), [senpi#2963](https://github.com/code-yeongyu/senpi/pull/2963))
+
+**Deprecating platform packages for a release that never shipped rechecks the registry before failing**, so a deprecation that is still propagating no longer fails the workflow. ([#9769](https://github.com/code-yeongyu/oh-my-openagent/pull/9769))
+
+## [5.1.26] - 2026-10-08
+
+5.1.25 was not released: its Linux x64 binaries went over the 150 MiB per-binary size budget during publishing, so no `omo-ai`, `lazycodex-ai`, `oh-my-opencode` or `oh-my-openagent` 5.1.25 exists. Everything planned for it ships here. Some 5.1.25 platform packages did reach npm and are deprecated; nothing installs them.
+
+**omo runs on senpi 2026.10.10-8, which keeps a saved MCP sign-in with the authorization server that issued it.** The bundled MCP SDK moves to 1.32.1 (GHSA-6qxp-vccf-f47h), and senpi records which authorization server issued each saved sign-in and refreshes only there. If an MCP server's authorization server changes, you are asked to sign in again instead. MCP servers signed in with very old senpi versions may ask you to sign in again once their access token expires. An MCP HTTP endpoint that redirects to a different origin is no longer followed, and the connect error names both origins and the URL to put in the server's config. Full engine notes: [senpi 2026.10.10-8](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-8). ([senpi#2940](https://github.com/code-yeongyu/senpi/issues/2940), [senpi#2944](https://github.com/code-yeongyu/senpi/pull/2944), [#9757](https://github.com/code-yeongyu/oh-my-openagent/pull/9757))
+
+**A relayed report or a quoted mention no longer turns on ultrawork.** A message that opens with a sender header (`[REPORT]`, `[a -> b]`, `Name (id) to recipient:`), a Markdown block quote, or a double-quoted span is now read as someone else's words, so pasting a report that describes ultrawork into a session no longer arms it there. A skill name inside an identifier, a path, a URL, or a prohibition ("no ultrawork", "do not use mass-ulw") no longer arms ultrawork or a skill pointer either. Typed asks, such as "ulw <task>" or a keyword at the end of your own sentence, still arm. ([#9600](https://github.com/code-yeongyu/oh-my-openagent/issues/9600), [#9606](https://github.com/code-yeongyu/oh-my-openagent/pull/9606), [#9738](https://github.com/code-yeongyu/oh-my-openagent/issues/9738), [#9740](https://github.com/code-yeongyu/oh-my-openagent/issues/9740), [#9744](https://github.com/code-yeongyu/oh-my-openagent/pull/9744))
+
+**An opt-in side panel for the Senpi TUI.** Set `side_panel.enabled: true` in `omo.json` (or pass `--omo-side-panel` for one run) to get a right-hand column with the session, goal, context, subagents, tools, changed files and memory at a glance; the transcript reflows beside it, and clicking a file row opens its diff. Subscription usage is a separate opt-in (`side_panel.sections.usage`) because it is the one section that reads credentials. It is off by default and hides itself on terminals narrower than 120 columns. Thanks to @IvoryKir. ([#8092](https://github.com/code-yeongyu/oh-my-openagent/pull/8092))
+
+**A bundled `visualize` skill renders inline HTML pages.** Charts, tables, diagrams and mockups come back as a self-contained page shown in the session; where the html preview is not available, the skill opens the page file through the browser skill instead. ([#9700](https://github.com/code-yeongyu/oh-my-openagent/issues/9700), [#9702](https://github.com/code-yeongyu/oh-my-openagent/pull/9702))
+
+**Arch Linux users can install OmO from the community AUR package `omo-bin`.** The install guide now documents it: `yay -S omo-bin` (or any AUR helper) installs the official Linux binary from our GitHub releases after checking it against the release's `SHA256SUMS`. It's maintained by @sTiKyt, not the OmO team, so update it with your AUR helper rather than `omo update`. ([#9584](https://github.com/code-yeongyu/oh-my-openagent/issues/9584), [#9610](https://github.com/code-yeongyu/oh-my-openagent/pull/9610))
+
+### Fixed
+
+**The release binary size budget is 160 MiB, and every build reports its headroom.** Linux x64 reached 157.6 MB, over the old 150 MiB budget, which stopped 5.1.25. The budget exists to keep each install and update download small; release builds now print each target's headroom and warn when one is within 5 MiB of the budget. ([#9760](https://github.com/code-yeongyu/oh-my-openagent/pull/9760))
+
+**A task child spawned with an explicit model runs on that model, or the spawn fails and says why.** A pin with a thinking level such as `anthropic/claude-opus-5-5:medium` used to be dropped silently, so the child ran on the default model instead; the pin is now resolved once against the live model registry, and the child's own reported model is checked after it starts. A model that cannot be resolved, or a child that comes up on a different model, fails the spawn with a typed error, and `task_output` shows the model the child actually ran next to the one requested. ([#9722](https://github.com/code-yeongyu/oh-my-openagent/issues/9722), [#9736](https://github.com/code-yeongyu/oh-my-openagent/pull/9736))
+
+**The planner asks its approval question through the question tool.** `ulw-plan` and `mass-ulw` ask owner decisions and the plan-approval gate as a real question instead of chat text, and a dismissed or timed-out approval writes no plan. ([#9735](https://github.com/code-yeongyu/oh-my-openagent/issues/9735), [#9748](https://github.com/code-yeongyu/oh-my-openagent/pull/9748))
+
+**Delegated task children stay out of ultrawork orchestration.** A child spawned to do one piece of work no longer starts orchestrating its own team when its brief mentions ultrawork. Thanks to @Dante-dan. ([#9600](https://github.com/code-yeongyu/oh-my-openagent/issues/9600), [#9602](https://github.com/code-yeongyu/oh-my-openagent/pull/9602))
+
+**A process-runner task child gets its own model fallback chain.** A child running as a separate process now falls back the same way an in-process child does, and its start never waits on that setup: if the chain is refused or not answered within 10 seconds it warns and sends the prompt anyway. ([#9582](https://github.com/code-yeongyu/oh-my-openagent/issues/9582), [#9587](https://github.com/code-yeongyu/oh-my-openagent/pull/9587))
+
+**A suspended task child is revived or ended after its session is resumed.** When a resumed session finds a child it could not revive right away, it retries with backoff, and a child that still cannot be revived is marked lost with the last reason and the retry count, so the parent is notified instead of waiting forever. ([#9498](https://github.com/code-yeongyu/oh-my-openagent/issues/9498), [#9714](https://github.com/code-yeongyu/oh-my-openagent/pull/9714))
+
+**omo sees every model senpi lists.** omo's background check of which models a task child may use read `senpi --list-models` through a pipe that the engine could close before the whole list arrived, so models late in the list (xAI's, for example) could be refused as unknown. The list is now read from a file. ([#9068](https://github.com/code-yeongyu/oh-my-openagent/issues/9068), [#9745](https://github.com/code-yeongyu/oh-my-openagent/pull/9745))
+
+**The slash picker lists each bundled skill once.** The bare alias takes the place of its `skill:<name>` row instead of appearing next to it. ([#9648](https://github.com/code-yeongyu/oh-my-openagent/issues/9648), [#9650](https://github.com/code-yeongyu/oh-my-openagent/pull/9650))
+
+**A session started in your home folder no longer migrates `.sisyphus` into `~/.omo`.** The legacy workspace migration refuses the home target and never overwrites an existing file, so the OmO desktop's data under `~/.omo/desktop` is never touched. ([#9727](https://github.com/code-yeongyu/oh-my-openagent/issues/9727), [#9731](https://github.com/code-yeongyu/oh-my-openagent/pull/9731))
+
+**Engine fixes in senpi 2026.10.10-8.**
+- An Anthropic subscription account blocked by an authentication error recovers on its own when its saved refresh token is still accepted, instead of every request failing with "blocked until re-login". ([senpi#2926](https://github.com/code-yeongyu/senpi/issues/2926))
+- A long, tool-heavy turn on a small context window, such as Claude Haiku 5.5's 100K, no longer ends with "compaction did not complete": the earlier steps of the turn are summarized and the latest one is kept. ([senpi#2925](https://github.com/code-yeongyu/senpi/issues/2925))
+- The reasoning effort you pick for Claude Opus 5 / 5.5, Sonnet 5.5 and Fable 5.1 now reaches Anthropic; it was always sent as `high`. ([senpi#2912](https://github.com/code-yeongyu/senpi/issues/2912))
+- A model picked in the terminal applies to that session only instead of silently changing the default; press Ctrl+S in the picker or type `/model <id> --default` to make it the default. ([senpi#2870](https://github.com/code-yeongyu/senpi/issues/2870))
+- A fallback model whose context window cannot hold the session no longer ends the fallback; the next model in the chain is tried. ([senpi#2894](https://github.com/code-yeongyu/senpi/issues/2894))
+- `senpi --list-models`, `--version`, `--help` and `--export` no longer lose output when their stdout is a slowly read pipe. omo's own model probe was hit by this (fewer models listed than exist). ([senpi#2937](https://github.com/code-yeongyu/senpi/issues/2937), [senpi#2939](https://github.com/code-yeongyu/senpi/pull/2939))
+- An `ask_user_question` answer is no longer put inside the tool result, where models that treat tool results as untrusted (Claude Haiku 5.5) may ignore it; the answer reaches the model as your own message. ([senpi#2920](https://github.com/code-yeongyu/senpi/issues/2920))
+- Children that senpi starts from a script no longer re-run a caller that embeds senpi from `node -e` or `bun -e`. Thanks to @MoerAI. ([senpi#2599](https://github.com/code-yeongyu/senpi/issues/2599), [senpi#2950](https://github.com/code-yeongyu/senpi/pull/2950))
+- Kimi K3 cache writes on Moonshot's API and in the Kimi Coding estimate are priced at the official $3 per million tokens; they were counted as free. ([senpi#2954](https://github.com/code-yeongyu/senpi/pull/2954))
+- A config hot reload no longer loops on omo's `omo.jsonc`. ([senpi#2878](https://github.com/code-yeongyu/senpi/issues/2878))
+- Paths the OmO desktop moved with its data home are refused with their new location instead of being written to. ([senpi#2898](https://github.com/code-yeongyu/senpi/issues/2898))
+- Claude Haiku 5.5 is available on Anthropic, Bedrock, OpenCode, OpenRouter, Vercel AI Gateway and Venice, with its own system prompt. ([senpi#2892](https://github.com/code-yeongyu/senpi/issues/2892), [senpi#2917](https://github.com/code-yeongyu/senpi/issues/2917))
+
+## [5.1.24] - 2026-10-07
+
+**A task child that fails to start now says why.** Instead of only "Child prompt failed to start.", the task record, the event log and the tool result name the cause in one line: the host took too long to answer, the host refused the prompt (with its error code), the connection was lost, or the child exited first (with its exit code or signal). Raw error text still never reaches any of them. ([#9703](https://github.com/code-yeongyu/oh-my-openagent/issues/9703), [#9704](https://github.com/code-yeongyu/oh-my-openagent/pull/9704))
+
+### Fixed
+
+**Memory catches more disguised forms of secret-like text.** The memory secret scanner, which refuses secret-like values in memory commits and masks them wherever memory text is shown, now recognizes more obfuscated forms of those values, and `/doctor` and the maintenance receipts say when a scan had to fall back. ([#9653](https://github.com/code-yeongyu/oh-my-openagent/issues/9653), [#9689](https://github.com/code-yeongyu/oh-my-openagent/issues/9689), [#9707](https://github.com/code-yeongyu/oh-my-openagent/pull/9707), [#9717](https://github.com/code-yeongyu/oh-my-openagent/issues/9717), [#9718](https://github.com/code-yeongyu/oh-my-openagent/pull/9718))
+
+**A long session no longer runs out of background task graphs.** `task.dag.max_runs_per_session` (default 16) now counts only graphs that are still running, as the bundled `mass-ulw` guidance describes it; finished, failed and cancelled ones used to count until they were pruned a week later, so a busy session could be refused with nothing running. The refusal now says how many are active. ([#9712](https://github.com/code-yeongyu/oh-my-openagent/issues/9712), [#9713](https://github.com/code-yeongyu/oh-my-openagent/pull/9713))
+
+## [5.1.23] - 2026-10-07
+
+### Changed
+
+**omo runs on senpi 2026.10.10-6, so a background task no longer fails to start on a busy machine with "Provider scope is closed".** The engine host now acknowledges a child's first prompt as soon as it arrives instead of timing it out after 30 seconds ([senpi#2871](https://github.com/code-yeongyu/senpi/issues/2871)). On the Claude subscription lane, senpi now summarizes a long conversation itself by default, the same way it does on every other provider, and Claude Code's own auto-compact stays off so the two never both rewrite it; `compactionOwner: "sdk"` hands the job back to Claude Code ([senpi#2746](https://github.com/code-yeongyu/senpi/issues/2746), [senpi#2749](https://github.com/code-yeongyu/senpi/pull/2749), thanks @trac3r00). Anthropic sessions no longer fail on every request after a tool change ([senpi#2864](https://github.com/code-yeongyu/senpi/issues/2864)), a first message no longer waits for MCP servers to connect ([senpi#2843](https://github.com/code-yeongyu/senpi/issues/2843)), and a restored subscription session whose last reply was never recorded is rebuilt instead of resumed unchecked ([senpi#2858](https://github.com/code-yeongyu/senpi/issues/2858)). Full list: [senpi 2026.10.10-6](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-6).
+
+## [5.1.22] - 2026-10-07
+
+**An agent or the command line can now steer a terminal session you have open.** Thread tools switch a terminal session's model and thinking level and interrupt its turn, applied exactly as the pane's own `/model`, level selector or Esc would; a terminal on an older engine keeps refusing them. A message delivered by another session or the command line shows up in the receiving terminal under one line naming its sender, with the message as written. ([#9660](https://github.com/code-yeongyu/oh-my-openagent/issues/9660), [#9662](https://github.com/code-yeongyu/oh-my-openagent/pull/9662), [#9664](https://github.com/code-yeongyu/oh-my-openagent/pull/9664))
+
+### Added
+
+**`/doctor` now checks the memory files themselves.** It reports broken links, invalid frontmatter, duplicated notes, files outside the memory folders, unreadable files and an oversized system section, and `/doctor --json` returns the same findings with secret-like text masked. The background memory cleanup now fixes what it finds. ([#9652](https://github.com/code-yeongyu/oh-my-openagent/issues/9652), [#9654](https://github.com/code-yeongyu/oh-my-openagent/pull/9654))
+
+**Secret-like text stays out of memory.** A memory commit that contains a token, API key or PEM block is refused, and memory text injected into a turn is masked. ([#9653](https://github.com/code-yeongyu/oh-my-openagent/issues/9653), [#9655](https://github.com/code-yeongyu/oh-my-openagent/pull/9655))
+
+### Fixed
+
+**A memory maintenance run that dies mid-way no longer blocks the runs after it.** Reflection, dream and facts runs now keep a receipt of each outcome, which `/doctor` shows. A run whose process died is quarantined with its files kept and the reason written down, so later runs proceed. A result the run had already committed before its supervisor died is kept instead of lost. ([#9689](https://github.com/code-yeongyu/oh-my-openagent/issues/9689), [#9691](https://github.com/code-yeongyu/oh-my-openagent/pull/9691))
+
+**Memory no longer slows down every prompt.** The check for whether this session saved memory read the identity's whole history and could take seconds, or time out with a raw error under memory pressure; it is now bounded, its failures stay quiet, and the memory repository is packed in the background. ([#9667](https://github.com/code-yeongyu/oh-my-openagent/issues/9667), [#9671](https://github.com/code-yeongyu/oh-my-openagent/pull/9671))
+
+**The memory file list in every turn stays small.** The list of non-system memory names was measured at about 158 KB (roughly 39K tokens) on a long-lived corpus; it now shows the newest names per directory within a byte budget and says how many it left out. ([#9687](https://github.com/code-yeongyu/oh-my-openagent/issues/9687), [#9688](https://github.com/code-yeongyu/oh-my-openagent/pull/9688))
+
+**The browser skill works in the release binary.** Since 5.1.11 the binary installed the skill without its bundled omowright runtime, so loading it always failed for binary installs. ([#9661](https://github.com/code-yeongyu/oh-my-openagent/issues/9661), [#9665](https://github.com/code-yeongyu/oh-my-openagent/pull/9665))
+
+**GPT-6 Astra stops repeating checks that already passed.** When a child's run already proved a command passes, Astra reuses that result instead of running it again, and its ultrawork instructions are shorter. Thanks to @ashmoonori-afk. ([#9642](https://github.com/code-yeongyu/oh-my-openagent/pull/9642), [#9649](https://github.com/code-yeongyu/oh-my-openagent/pull/9649))
+
+**omo.dev keeps rendering styled pages across deployments.** A page served from a previous build could load without its stylesheet; deploys now carry the previous build's static assets forward. ([#9617](https://github.com/code-yeongyu/oh-my-openagent/issues/9617), [#9623](https://github.com/code-yeongyu/oh-my-openagent/pull/9623))
+
+**Code mode replies always reach the right run.** Replying to or cancelling a running code-mode task through its handle can no longer land on a different, newer run. ([#9562](https://github.com/code-yeongyu/oh-my-openagent/issues/9562), [#9695](https://github.com/code-yeongyu/oh-my-openagent/pull/9695))
+
+### Changed
+
+**omo runs on senpi 2026.10.10-5.** You can scroll back through a long conversation while a reply is still streaming: the terminal no longer jumps back to the top on every update ([senpi#2836](https://github.com/code-yeongyu/senpi/issues/2836)). When an app reopens a thread whose session is still open elsewhere, the thread's current permission mode now applies, so a thread switched from full access to ask starts asking for approval again ([senpi#2823](https://github.com/code-yeongyu/senpi/issues/2823)). In code mode, stopping a JavaScript cell that waits on something that never settles keeps the worker and its globals ([senpi#2788](https://github.com/code-yeongyu/senpi/issues/2788)), live eval rows lead with the cell's summary on one line ([senpi#2802](https://github.com/code-yeongyu/senpi/issues/2802)), cells can call `require` and shadow names the kernel defines ([senpi#2792](https://github.com/code-yeongyu/senpi/issues/2792), [senpi#2793](https://github.com/code-yeongyu/senpi/issues/2793)), and a standalone agent gets a `show_html_page` tool that writes an offline page. Full list: [senpi 2026.10.10-5](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-5).
+
+**omo runs on senpi 2026.10.10-4.** The input box no longer gets pushed off-screen when something writes to the terminal behind the TUI ([senpi#2815](https://github.com/code-yeongyu/senpi/issues/2815)). A default extension shim left behind by an earlier install (for example after switching from npm to bun or to the standalone binary) no longer stops every start with `Cannot find module` ([senpi#2765](https://github.com/code-yeongyu/senpi/issues/2765)). Two processes rebinding the same session no longer fail with `ENOENT` ([senpi#2828](https://github.com/code-yeongyu/senpi/issues/2828)). In code mode, a stopped detached cell shows its output instead of reading as still running, and an isolated cell names QuickJS as its runtime ([senpi#2811](https://github.com/code-yeongyu/senpi/issues/2811)). Full list: [senpi 2026.10.10-4](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-4).
+
+**OmO's test suites got smaller and stricter.** A cleanup across seven repositories (47 merged PRs) removed 61 test files and 393 test cases that couldn't catch a real regression, about 8,100 net lines, plus 380 lines of dead product code. It also repaired 47 tests so they now fail when the code they guard breaks, each one proven by breaking that code on purpose, and nothing that was guarded before is unguarded now. Suites that never ran in CI now do, including the Codex plugin component suites and 146 web end-to-end tests. ([#9285](https://github.com/code-yeongyu/oh-my-openagent/issues/9285), [#9336](https://github.com/code-yeongyu/oh-my-openagent/pull/9336))
+
+## [5.1.21] - 2026-10-06
+
+**5.1.20 was never published.** Its run stopped on a Windows smoke-test failure after the platform packages reached npm but before `omo-ai` did, so 5.1.21 is the first release carrying the changes below. The orphaned `oh-my-opencode-<platform>@5.1.20` packages are not installed by any `omo-ai` or `oh-my-opencode` release, and this release moves their `latest` tag on. ([#9618](https://github.com/code-yeongyu/oh-my-openagent/issues/9618))
+
+**Queued goals resume after stale or failed compaction feedback.** A goal message accepted while compaction was running could remain queued after the summary was rejected. The engine now attempts that continuation through its normal admission checks. Cancelling compaction does not restart work, and required-compaction limits still apply. ([senpi#2778](https://github.com/code-yeongyu/senpi/issues/2778), [senpi#2780](https://github.com/code-yeongyu/senpi/pull/2780))
+
+### Added
+
+**`hideFreeModels: true` keeps a provider's free models out of the picker, so its paid models are quick to find.** Set it on the provider block in `models.json`; without it, nothing changes. Thanks to @Bearmancer. ([senpi#2720](https://github.com/code-yeongyu/senpi/issues/2720), [senpi#2773](https://github.com/code-yeongyu/senpi/pull/2773))
+
+**Keenable can serve web search.** `websearch.json` accepts `keenable`, using its keyed API when an `apiKey` is set and its shared public tier otherwise. It is used only when listed; the default search chain is unchanged. Thanks to @audreyt. ([senpi#2775](https://github.com/code-yeongyu/senpi/pull/2775))
+
+**Code mode can run each JavaScript kernel in its own process.** With `isolation.js: "process"`, a kernel crash (a segfault, out-of-memory, `process.exit`) no longer takes the session down; the next cell starts on a fresh kernel and a notice names the crash. It is off by default and guards against crashes, not hostile code. ([senpi#2752](https://github.com/code-yeongyu/senpi/issues/2752))
+
+**The frontend skill routes tone and situation to more component catalogs.** A new reference tells the agent which catalog to read for AI-agent UI, charts, landing sections, brutalist or Tailwind-only builds and other tones, how to explore a catalog's registry, and which licences and site terms allow what. ([#9644](https://github.com/code-yeongyu/oh-my-openagent/issues/9644))
+
+**`/mcp` opens an interactive server manager in the terminal.** Server rows offer the actions available for their current state: enable or disable, change exposure, test, reconnect, and sign in or out. Tool, detail, and log views are available alongside them. Only trusted global and project servers can be edited, and edits preserve the rest of the config. Imported, extension, skill, and untrusted project servers remain read-only. Non-TUI clients receive status text. Thanks to @wuhaoyujerry. ([senpi#2716](https://github.com/code-yeongyu/senpi/issues/2716), [senpi#2747](https://github.com/code-yeongyu/senpi/pull/2747))
+
+### Fixed
+
+**A long retried request is no longer cut off after 11 minutes.** Once a retried request starts streaming, the retry watchdog stops timing it, so a long answer, tool calls or further turns are no longer aborted at 660 seconds. A retry that never starts still ends, with a message saying so. ([senpi#2804](https://github.com/code-yeongyu/senpi/issues/2804), [senpi#2805](https://github.com/code-yeongyu/senpi/pull/2805))
+
+**The Windows release smoke test tolerates a briefly held checkout.** Moving the checkout's `.omo` aside could fail with `EPERM` while a file scanner still held a handle, which stopped the 5.1.20 release. The smoke now retries that rename for up to about 12 seconds and, if it still fails, names the processes it can see holding the directory. ([#9618](https://github.com/code-yeongyu/oh-my-openagent/issues/9618), [#9657](https://github.com/code-yeongyu/oh-my-openagent/pull/9657))
+
+**A session's first turn no longer stalls when a gateway refuses a forced tool choice.** When an OpenAI-compatible gateway refuses a forced `tool_choice` inside a successful stream, the request is retried once without it, as it already was for the same refusal returned as an error, so you no longer have to type `continue`. ([senpi#2801](https://github.com/code-yeongyu/senpi/issues/2801), [senpi#2806](https://github.com/code-yeongyu/senpi/pull/2806))
+
+**A reload during session startup waits instead of breaking extensions.** A reload requested while startup handlers are still running is deferred, so later handlers no longer fail with `stale extension generation after reload`. Thanks to @Bearmancer. ([senpi#2719](https://github.com/code-yeongyu/senpi/issues/2719), [senpi#2771](https://github.com/code-yeongyu/senpi/pull/2771))
+
+**Codex plugin updates stop selecting stale cached hooks.** Successful installs remove obsolete selectable cache versions, so restarting Codex picks up the requested version and its hook trust. Actual hook changes still require review. ([#9631](https://github.com/code-yeongyu/oh-my-openagent/issues/9631), [#9632](https://github.com/code-yeongyu/oh-my-openagent/pull/9632))
+
+**Wake notices explain why waiting ended and report the elapsed wait.** They distinguish a timer firing from background work ending. Cache figures are labeled cumulative estimates, and compaction logs include the session identity so an event can be attributed when several sessions share an agent directory. ([senpi#2778](https://github.com/code-yeongyu/senpi/issues/2778))
+
+**Code-mode settings that were accepted but ignored now take effect.** `kernelTools.enabled: false` disables JavaScript `tool(fn)` and Python `@tool`. `languages.pyInterpreter` selects the exact Python executable; an unusable path makes Python unavailable with a warning naming the setting. `prompt.advertiseHelpers: true` adds the helper-documentation pointer to the eval description. Unknown settings and fallback-to-default warnings now reach the user. ([senpi#2763](https://github.com/code-yeongyu/senpi/issues/2763), [senpi#2764](https://github.com/code-yeongyu/senpi/pull/2764))
+
+**A project-selected Python executable requires project trust before session startup.** A code-mode config that names an interpreter now follows the same trust boundary as a project MCP config. ([senpi#2772](https://github.com/code-yeongyu/senpi/pull/2772))
+
+**RPC model lists pick up credentials changed by another session.** A fresh model-list request reflects newly connected or removed providers without reopening the session, fixing the empty-list case after connecting a provider. ([senpi#2769](https://github.com/code-yeongyu/senpi/issues/2769), [senpi#2770](https://github.com/code-yeongyu/senpi/pull/2770))
+
+**Model-family fallback requires an explicit selector for OpenGateway and Vercel AI Gateway.** Having credentials for one of these gateways no longer makes an unqualified fallback choose it silently. ([senpi#2774](https://github.com/code-yeongyu/senpi/issues/2774), [senpi#2776](https://github.com/code-yeongyu/senpi/pull/2776))
+
+**`/btw` answers render as Markdown.** Headings, bold text, inline code, lists, and code blocks display in the side panel instead of exposing their raw markup. Thanks to @nahwan-kim. ([senpi#2766](https://github.com/code-yeongyu/senpi/pull/2766))
+
+### Changed
+
+**OmO runs on senpi 2026.10.10-3.** Full engine notes: [senpi 2026.10.10-2](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-2) and [senpi 2026.10.10-3](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10-3).
+
+**GPT-6 Astra gets a shorter goal-continuation prompt.** It now carries only the goal contract (objective, allowed turn endings, the blocked floor); other models keep the full prompt. ([senpi#2796](https://github.com/code-yeongyu/senpi/issues/2796))
+
+## [5.1.19] - 2026-10-05
+
+**Code mode can install JavaScript packages per session.** 5.1.19 runs on senpi 2026.10.10. A cell that is only `%bun add <package ...>` or `%npm add <package ...>` installs packages into the session's own managed environment without restarting the kernel, and the next cell imports them. The project's `package.json` and `node_modules` are untouched and package scripts never run. ([senpi 2026.10.10](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10))
+
+### Added
+
+**A Python cell's `@tool` functions can be granted to a task child**, the same way JavaScript `tool(fn)` tools already were. ([#9529](https://github.com/code-yeongyu/oh-my-openagent/pull/9529))
+
+### Changed
+
+**An idle gateway store gives back its worker thread.** After 60 seconds with no store call in flight, the worker is retired, and the next call starts a fresh one with its registrations restored. That frees about 2.9 MB per terminal control endpoint. ([#9592](https://github.com/code-yeongyu/oh-my-openagent/pull/9592))
+
+**omo runs on senpi 2026.10.10.** It warns when a requested thinking level isn't available instead of dropping it, keeps project rule discovery inside the project on Windows, and keeps the resident Claude subscription session receiving only new messages when `compaction.model` is set. Code mode also gets opt-in isolated cells (`isolate: true` with `sandbox.enabled`). Full list: [senpi 2026.10.10](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.10).
+
+Thanks to @Dante-dan for the manifesto reveal fixes on the site ([#9586](https://github.com/code-yeongyu/oh-my-openagent/pull/9586)) and a test-fixture fix ([#9599](https://github.com/code-yeongyu/oh-my-openagent/pull/9599)).
+
+## [5.1.18] - 2026-10-04
+
+**`omo models discover`, `omo schedule` and the other one-shot engine commands run again instead of opening the TUI.** 5.1.18 runs on senpi 2026.10.9. The launcher passed only a fixed list of commands straight to the engine and put `--extension <plugin>` in front of everything else, so the engine never saw its own command and started an interactive session with the arguments. Every engine command is now handed over unchanged. Thanks to @ushion0a for the report and the repro. ([#9572](https://github.com/code-yeongyu/oh-my-openagent/issues/9572), [#9573](https://github.com/code-yeongyu/oh-my-openagent/pull/9573))
+
+### Fixed
+
+**omo holds every Bun to the 1.4 floor the engine needs.** A `bun add -g` install, or `OMO_RUNTIME=bun`, ran under whatever Bun it found, so on Bun 1.3.x `/computer on` failed with `No such built-in module: node:sqlite`. Now a Bun you chose that is older than 1.4 stops at startup and says to run `bun upgrade`; an older Bun nobody chose hands off to Node, as other installs already did. ([#9563](https://github.com/code-yeongyu/oh-my-openagent/issues/9563), [#9564](https://github.com/code-yeongyu/oh-my-openagent/pull/9564))
+
+**A task child that has its own fallback models falls back through them on the shared task host.** Its category's or agent's chain used to be ignored there, so a child whose model hit a limit failed even with a chain configured. Children without fallback models behave as before. On a host that can't carry the chain (an older engine, or the per-child process runner) the child runs as today and you are warned once instead of losing the chain silently. ([#9512](https://github.com/code-yeongyu/oh-my-openagent/issues/9512), [#9518](https://github.com/code-yeongyu/oh-my-openagent/pull/9518))
+
+**An empty `/tasks` answer says when other sessions have tasks** and that `/tasks --all` lists them. Thanks to @cynkai. ([#9569](https://github.com/code-yeongyu/oh-my-openagent/issues/9569), [#9588](https://github.com/code-yeongyu/oh-my-openagent/pull/9588))
+
+**The `ulw-plan` skill names only delegation categories that exist.** It listed `git` and the retired `deep`, so a plan following it delegated to a category the session didn't have. Thanks to @DevNewbie1826 for the report. ([#9561](https://github.com/code-yeongyu/oh-my-openagent/issues/9561), [#9565](https://github.com/code-yeongyu/oh-my-openagent/pull/9565))
+
+### Added
+
+**Code mode's `wait()` and `handle()` work on omo's own task children and workpools**, not only on engine runs. ([#9541](https://github.com/code-yeongyu/oh-my-openagent/pull/9541))
+
+### Changed
+
+**omo runs on senpi 2026.10.9.** A permission prompt sent to an app names the tool call it approves, so each prompt shows its own call's input; a reply that only answers a question is just the answer, never wrapped in a quote; code mode gets Python `agent(prompt, tools=[...])`, cell-defined tools for `workpool`, `%load <path>` and `%pip install` without a kernel restart. Full list: [senpi 2026.10.9](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.9).
+
+**`/memfs` maintenance commands load on first use**, which trims the plugin bundle by about 8 KB; their output is unchanged. Thanks to @Dante-dan. ([#9526](https://github.com/code-yeongyu/oh-my-openagent/pull/9526))
+
+Thanks also to @Dante-dan ([#9575](https://github.com/code-yeongyu/oh-my-openagent/pull/9575), [#9579](https://github.com/code-yeongyu/oh-my-openagent/pull/9579)) and @MoerAI ([#9589](https://github.com/code-yeongyu/oh-my-openagent/pull/9589)) for test and release-pipeline fixes.
+
+## [5.1.17] - 2026-10-04
+
+**An idle engine host now exits after its idle window once its sessions are done.** 5.1.17 runs on senpi 2026.10.8. Before, a host counted a session busy on every `agent_start` but cleared it only once per run, so any run that retried, continued after compaction or took a follow-up left the host busy forever and it never exited; a session closed mid-run did the same. The host now tracks runs and drops a session when it closes. Thanks to @DevNewbie1826 for the report. ([senpi#2713](https://github.com/code-yeongyu/senpi/issues/2713), [senpi#2717](https://github.com/code-yeongyu/senpi/pull/2717))
+
+### Fixed
+
+**A workpool create that reuses a pool name no longer inherits that pool's tools.** A second `workpool` create with the same name from the same session got the first pool, and the tools it was granted, even when it asked for different tools or none. Now a pool is reused only when the tools asked for match its grant; any other grant is refused as a name conflict. ([#9548](https://github.com/code-yeongyu/oh-my-openagent/issues/9548))
+
+**Replies no longer come back formatted as a quote.** Several bundled prompts showed their reply-format examples (handoff templates, the routing line) as markdown quote lines, and the model copied the `>` into its answer, so whole replies rendered as blockquotes. The examples are now plain lines; the wording is unchanged. ([#9538](https://github.com/code-yeongyu/oh-my-openagent/issues/9538), [#9550](https://github.com/code-yeongyu/oh-my-openagent/pull/9550))
+
+**A cold Python start on a busy machine no longer fails as a hang.** The Python kernel counts CPU use and output during startup as progress, with an absolute ceiling, instead of failing after a fixed silent window. ([senpi#2718](https://github.com/code-yeongyu/senpi/issues/2718), [#9495](https://github.com/code-yeongyu/oh-my-openagent/issues/9495))
+
+**On Windows, memory reflection works again instead of parking itself.** A failed reflection on Windows was recorded as "refused by its provider", so automatic reflection parked after a few runs and stopped saving facts. A build with this fix un-parks on its next successful reflection; run `/reflect` to trigger one now, and use `/facts retry` for facts that were parked while it was stuck. ([#9553](https://github.com/code-yeongyu/oh-my-openagent/issues/9553), [#9554](https://github.com/code-yeongyu/oh-my-openagent/pull/9554))
+
+### Changed
+
+**omo runs on senpi 2026.10.8.** The bundled Claude Agent SDK moves to 0.3.289 (Claude Code 2.1.289); `continue_from_leaf` acknowledges when the continued turn starts, so a long desktop continuation no longer times out; code mode gets Python kernel tools beside a parked cell. Full list: [senpi 2026.10.8](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.8).
+
+**omo can now inject a chat gateway scope's operating rules into bound sessions** as one block in the system prompt; it takes effect once the gateway connector that pushes them ships. Every other session's prompt is unchanged. ([#9540](https://github.com/code-yeongyu/oh-my-openagent/pull/9540))
+
+## [5.1.16] - 2026-10-04
+
+**After an upgrade, the first turn no longer fails with "No provider available" while an old engine host is still around.** 5.1.16 runs on senpi 2026.10.7, where `host handoff` (which the desktop runs when the engine changed) can replace an old host that still serves the client's own socket with no session open, instead of refusing it until the host is drained by hand. A host that holds a session is still refused, with the command that retires it. `host status` also names the right engine build for a generation started by a handoff. ([senpi#2701](https://github.com/code-yeongyu/senpi/issues/2701), [senpi#2698](https://github.com/code-yeongyu/senpi/issues/2698))
+
+### Added
+
+**Code-mode `wait()` and `handle()` now work on omo's own task children and workpools.** An eval cell can wait on several agents and get their values in order, and check, cancel, steer or read the output of a run it started. Every call is fenced to the session that started the run and to that exact run: a handle from before a revive is refused as stale and never touches the new run, while a model fallback inside the same run keeps the handle working. Sending to a finished agent starts a new run, and the reply says so (`revived as epoch N`) with the new handle. Watching a run never delays or duplicates its completion notification.
+
+### Fixed
+
+**A stranded transient memory run is reported once instead of on every memory sweep.** When a transient memory identity can't be promoted because a durable one with the same id already exists, the warning (with the manual fix) is now logged the first time only; one daemon log had held it 621 times. The identity is still counted on every sweep. Thanks to @cynkai. ([#8646](https://github.com/code-yeongyu/oh-my-openagent/issues/8646), [#8869](https://github.com/code-yeongyu/oh-my-openagent/pull/8869))
+
+### Changed
+
+**omo runs on senpi 2026.10.7.** Code mode gets an in-cell `wait()` barrier and `handle()` views in all four kernels, and the JavaScript kernel gains `tool.defined()`, `tool.undefine(name)` and named tools; eval recovers after a cancelled session switch or a failed runtime start instead of staying broken for the rest of the session; the Ruby kernel's memory notice works on Ruby 2.6 again. Full list: [senpi 2026.10.7](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.7).
+
+**The bundled `visual-qa` skill checks UI work against an Apple HIG checklist**, with a light and dark capture matrix at phone and desktop widths and a pass or fail verdict per item. ([#9533](https://github.com/code-yeongyu/oh-my-openagent/issues/9533), [#9536](https://github.com/code-yeongyu/oh-my-openagent/pull/9536))
+
+## [5.1.15] - 2026-10-04
+
+**A new `auto` permission preset approves only what it can prove stays inside your project.** 5.1.15 runs on senpi 2026.10.6, whose `auto` preset approves an action without asking only when it can show the action stays inside the project, judged on the exact file each tool will open; anything it can't pin down still asks, and your own deny and ask rules still win. ([senpi#2614](https://github.com/code-yeongyu/senpi/pull/2614), [senpi#2688](https://github.com/code-yeongyu/senpi/pull/2688))
+
+### Fixed
+
+**A question a session relayed to a chat thread closes when you answer it in the terminal.** Before, a relayed ask_user question answered (or timed out, or dismissed) in the session's own client stayed pending in the gateway store, so a chat connector kept that thread's later replies waiting until someone answered in chat. Outbox rows now also say whether a relayed answer is still being handed to the session (`answer_state`), so a connector waits for a delivered answer instead of treating a claim as settled. Thanks to @effortprogrammer. ([#9506](https://github.com/code-yeongyu/oh-my-openagent/pull/9506))
+
+**Editing your config no longer gets a hot reload rejected over a deprecated-key notice.** Renamed keys such as `deep` -> `deep-low` still load, but any edit that touched one produced a new notice, and the reload was refused. Thanks to @davhdavh for the report and @cynkai for the fix. ([#8555](https://github.com/code-yeongyu/oh-my-openagent/issues/8555), [#8878](https://github.com/code-yeongyu/oh-my-openagent/pull/8878))
+
+**`thread_read` pages forward when given `next_cursor`.** A truncated read returned a cursor, but retrying with it returned the same first window again. Thanks to @cynkai. ([#9435](https://github.com/code-yeongyu/oh-my-openagent/pull/9435))
+
+**A memory usage write that fails after shutdown is logged instead of surfacing as an unhandled rejection.** Thanks to @Dante-dan. ([#9524](https://github.com/code-yeongyu/oh-my-openagent/pull/9524))
+
+### Changed
+
+**omo runs on senpi 2026.10.6.** Besides the `auto` preset above, in that release the startup banner folds into one summary line; a 429 or 5xx from the provider shows as one retry banner instead of raw JSON, while a failed compaction still shows as an error; tool-card diffs read at 7:1 contrast and each edit card shows its change count; the `apply_patch` streaming preview stays bounded; `/files` and `/diff` open on Windows again; a first run with no provider gets the `/login` guidance; Linux x64 gets the native PTY backend. Full list: [senpi 2026.10.6](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.6).
+
+**A finished subagent's card reads as a summary**, for example `ran 2m 14s · 5 tools · $0.4213 (CH: 87%)`, instead of a line of debug tokens. ([senpi#2654](https://github.com/code-yeongyu/senpi/issues/2654), [#9513](https://github.com/code-yeongyu/oh-my-openagent/pull/9513))
+
+**Memory's `/doctor` checks load on first use** instead of with the extension, so startup loads less; the command behaves the same. Thanks to @Dante-dan. ([#9520](https://github.com/code-yeongyu/oh-my-openagent/pull/9520))
+
+
+## [5.1.14] - 2026-10-03
+
+**Permission checks can no longer switch themselves off.** Up to 5.1.13, a failure while the permission system started (a misspelled `permissionPreset` in settings or on the command line, a `null` permission rule, or an unreadable approvals file) left every tool call running with no permission check, and nothing said so. 5.1.14 runs on senpi 2026.10.5, which refuses tool calls with `Permission setup failed: <reason>` until the setting is fixed. If you can't update yet, check that `permissionPreset` names a preset that exists and that no permission rule is `null`. ([senpi#2617](https://github.com/code-yeongyu/senpi/issues/2617), [senpi#2618](https://github.com/code-yeongyu/senpi/pull/2618))
+
+### Fixed
+
+**A first-turn forced tool call that a strict-schema gateway refuses no longer ends the turn.** When a gateway answers 400 and names the forced tool (its `tools.N` position or its quoted name), the request is retried once without forcing; a generic 400, or one naming another tool, still fails as before. Thanks to @rhyme227 for the report. ([#9507](https://github.com/code-yeongyu/oh-my-openagent/issues/9507), [senpi#2648](https://github.com/code-yeongyu/senpi/issues/2648))
+
+**`apply_patch` keeps each file's line endings and no longer drops an indented file section.** CRLF and mixed-ending files are no longer rewritten to LF, and a file header indented in the patch applies instead of being skipped while the tool reported success. ([senpi#2638](https://github.com/code-yeongyu/senpi/issues/2638), [senpi#2636](https://github.com/code-yeongyu/senpi/issues/2636))
+
+**An NVIDIA-only setup starts on a model its catalog still lists.** The previous NVIDIA default was retired upstream; the default is now `nvidia/nemotron-3-ultra-550b-a55b`. ([senpi#2645](https://github.com/code-yeongyu/senpi/issues/2645))
+
+**Codex edition (LazyCodex): a language server that isn't installed no longer blocks every edit.** LazyCodex's post-edit language-server check answered `block` with the install guidance on each edit, even after you declined the install; it now follows your install decision, as the Native edition does. ([#9509](https://github.com/code-yeongyu/oh-my-openagent/issues/9509), [#9510](https://github.com/code-yeongyu/oh-my-openagent/pull/9510))
+
+**A computer-use permission denial is an error in code mode too.** Through a JS or Python eval, a denied computer call came back without the error flag, so a model could miss the denial and keep acting; it now fails the call there as it does on a direct call. ([#9475](https://github.com/code-yeongyu/oh-my-openagent/issues/9475), [#9482](https://github.com/code-yeongyu/oh-my-openagent/pull/9482))
+
+**Windows: a delegated task you kill is reported as killed, not as a crash, and memory no longer loses a state write to a briefly held file.** A kill is now recognised from the runner's own request instead of from the child's stderr, and memory's atomic state rename retries the few-millisecond hold Windows places on an open target. ([#9471](https://github.com/code-yeongyu/oh-my-openagent/issues/9471), [#9501](https://github.com/code-yeongyu/oh-my-openagent/pull/9501), [#9491](https://github.com/code-yeongyu/oh-my-openagent/pull/9491))
+
+**The computer-use doctor check on macOS reports an engine that never replied as a timeout instead of failing with `EPERM`.** Cleaning up the timed-out probe now treats a process group that is already exiting as gone. Thanks to @MoerAI. ([#9422](https://github.com/code-yeongyu/oh-my-openagent/issues/9422), [#9464](https://github.com/code-yeongyu/oh-my-openagent/pull/9464))
+
+Thanks to @MoerAI for moving the task engine's child event channel into `senpi-task`, where the computer-use component now imports it from. ([#9454](https://github.com/code-yeongyu/oh-my-openagent/issues/9454), [#9467](https://github.com/code-yeongyu/oh-my-openagent/pull/9467))
+
+### Changed
+
+**omo runs on senpi 2026.10.5** (through 2026.10.4): the permission fix above; an eval kernel (Python, Ruby or Julia) whose interpreter dies is replaced once instead of failing every later cell; idle shared hosts give their cost back; the Claude Agent SDK moves to 0.3.288; and pasting in terminals without bracketed-paste markers works. Full lists: [senpi 2026.10.4](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.4), [senpi 2026.10.5](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.5).
+
+**The task tool no longer suggests delegating a few reads or small foreground checks.** Its description and the ultrawork routing named those as delegation targets, and GPT-6 Astra followed them literally, waiting on children for work it could do in a few calls. ([#9499](https://github.com/code-yeongyu/oh-my-openagent/issues/9499), [#9500](https://github.com/code-yeongyu/oh-my-openagent/pull/9500))
+
+### Added
+
+**The browser skill follows the browser the OmO desktop app picks for the session.** With a connected browser it uses only that browser and says "Connect your browser" when it's missing; with the in-app browser or none chosen it refuses to drive your own browser. It reports what the browser is doing, and asks before an irreversible action in your own browser. In a terminal nothing changes. ([#9486](https://github.com/code-yeongyu/oh-my-openagent/issues/9486), [#9502](https://github.com/code-yeongyu/oh-my-openagent/pull/9502))
+
+**Chat connectors and other integrations can keep their own state in the session-gateway database** and update it in the same transaction as sending, binding or acknowledging a message. The session-gateway store supports namespaced extensions: compiled operations can update their registered objects and enqueue messages through bindings, bind conversations, or acknowledge outbox rows in one transaction. A persistent ownership registry protects core and other extensions' objects; matching a name prefix never grants access. Core-colliding names, triggers and views are refused. Migrations are coordinated across processes, forbidden schema changes roll back, and a joined enqueue creates its wake marker inside the transaction, so a rollback removes it. Failures return typed refusals without stopping the worker. Core schema v6 adds the extension registry, preserves existing rows and records `author.user_id` as nullable `deliveries.actor_user_id`. ([#9331](https://github.com/code-yeongyu/oh-my-openagent/pull/9331), Refs [#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143))
+
+A session-gateway store or store extension whose schema is newer than the running omo is refused with `gateway_schema_too_new` and left untouched: an older binary neither migrates nor lowers the core `user_version`, and an extension that registers fewer migrations than its stored version keeps its stored version, data and existing registration. ([#9331](https://github.com/code-yeongyu/oh-my-openagent/pull/9331))
+
+## [5.1.13] - 2026-10-03
+
+**MCP tools work again when memory is on.** Since 5.1.10, a finished memory child or delegated task shut the shared MCP servers down for the whole process, so every MCP call failed with `MCP server <name> is disabled`. This release runs on senpi 2026.10.3, which gives each session its own binding to the shared servers; it was verified with the shipped bundle. If you can't update yet, turn memory off until you do: set `"memory": { "enabled": false }` in `~/.omo/omo.json`, or start omo with `--omo-senpi-memory-disabled=true`.
+
+### Fixed
+
+**MCP calls no longer fail with `MCP server <name> is disabled` after a child session ends.** A memory child or a delegated task that finished released the MCP service for every session in the process; now it releases only its own binding, and the shared servers stay up. Thanks to @Tygb99 for the report. ([#9461](https://github.com/code-yeongyu/oh-my-openagent/issues/9461), [senpi#2524](https://github.com/code-yeongyu/senpi/pull/2524))
+
+**Codex edition (LazyCodex): a project's own registered agent roles can be spawned.** The spawn guard accepted only LazyCodex's 12 bundled roles, so a role registered in `.codex/agents` or `$CODEX_HOME/agents` was refused even though Codex offered it; it now accepts any role with a registered role file and still refuses unregistered ones. Thanks to @aconley-vultr for the report. ([lazycodex#171](https://github.com/code-yeongyu/lazycodex/issues/171), [lazycodex#164](https://github.com/code-yeongyu/lazycodex/issues/164), [#9462](https://github.com/code-yeongyu/oh-my-openagent/pull/9462))
+
+**Cancelling a delegated task while its host can't list its sessions keeps the cancel pending** instead of finishing it with the session still open; it completes once the host answers again. ([#9450](https://github.com/code-yeongyu/oh-my-openagent/issues/9450), [#9459](https://github.com/code-yeongyu/oh-my-openagent/pull/9459))
+
+**Skills are listed in a stable order**, so the tool prefix of a prompt stays the same between turns and keeps hitting the prompt cache. ([#9433](https://github.com/code-yeongyu/oh-my-openagent/pull/9433))
+
+**OpenCode edition fixes, thanks to @cynkai:** an explicitly chosen model no longer falls back through the built-in chain ([#8808](https://github.com/code-yeongyu/oh-my-openagent/pull/8808)); a plugin-load telemetry failure no longer prints into the TUI ([#8804](https://github.com/code-yeongyu/oh-my-openagent/pull/8804)); a background task whose session stopped on an error is finalized ([#8814](https://github.com/code-yeongyu/oh-my-openagent/pull/8814)) and skips fallback models no connected provider serves ([#8844](https://github.com/code-yeongyu/oh-my-openagent/pull/8844)); Sisyphus stays available when Hephaestus isn't registered ([#8841](https://github.com/code-yeongyu/oh-my-openagent/pull/8841)); and `omo.schema.json` embeds the `[opencode]` schema once and no longer marks defaulted fields as required ([#8871](https://github.com/code-yeongyu/oh-my-openagent/pull/8871), [#8873](https://github.com/code-yeongyu/oh-my-openagent/pull/8873)). Tool argument rewrites in the OpenCode edition also keep the original arguments object ([#9466](https://github.com/code-yeongyu/oh-my-openagent/pull/9466)).
+
+`omo host status --all` and `omo thread list` no longer show an older session entry as the latest activity when the final JSONL entry is large, partial or invalid. Both surfaces use the same bounded final-record policy, show `null` when freshness cannot be proved, and list known activity newest-first with unknown activity last. ([#9222](https://github.com/code-yeongyu/oh-my-openagent/pull/9222))
+
+A message to a published terminal session that the engine still reports as not answering is kept offline instead of being sent straight to its socket, so `omo thread list`, a send and a steer always agree on whether that session can be reached right now; the message is delivered once a later check lists the session live again. A bound send that names its session no longer pays the same lookup twice. ([#9222](https://github.com/code-yeongyu/oh-my-openagent/pull/9222))
+
+### Changed
+
+**omo runs on senpi 2026.10.3** (the MCP fix above, plus the Bun `-e` host-launch and WebView readiness fixes). Full list: [senpi 2026.10.3](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.3).
+
+**OpenGateway tasks run without a concurrency limit by default.** ([#9427](https://github.com/code-yeongyu/oh-my-openagent/pull/9427))
+
+### Added
+
+_The session gateway entries below are its store foundation; the thread tools become usable with 5.1.14._
+
+**Every session can reach every other one, terminal sessions included.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) Messages between sessions now go through a session gateway: one small database in the agent directory, with no daemon to run and nothing to configure. A terminal session opens a private control socket, so a Desktop thread, a task child or a script can list it, read it and send to it; the thread tools list terminal sessions with their real names and times. A message never interrupts what you are doing: while you are typing, or a submission of yours is on its way, it waits, and the session shows one line saying a remote message is queued. A message to a session that is not running is kept for 24 hours and taken when the session runs again. Fixed limits stop runaway loops: a session cannot message itself or reply straight back into the chain that messaged it, a chain of messages stops after 4 hops or 64 messages, one turn reaches at most 16 sessions, and one sender gets a burst of 8 messages to a session, then one every 5 seconds.
+
+**`omo thread` talks to running sessions from scripts and chat connectors.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) `omo thread list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack` runs the thread tools' operations without an agent session, with `--json` output that is one JSON value (also on failure) and exit codes a script can branch on: 0 done, 1 refused, 2 usage, 3 nothing answering, 4 unsupported here, 5 internal error. JavaScript can import the same operations from the plugin (`runtime/thread-sdk/sdk.js`) without spawning `omo`. It never starts a host. Reference: [`docs/reference/omo-thread.md`](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/reference/omo-thread.md).
+
+**A session can be bound to a chat thread, and report back through it.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) A binding attaches one session to one external thread (any platform; OmO ships no chat connector itself). Messages from the thread arrive with `omo thread send --binding`, admitted once per platform event. The session posts milestones, reports, questions and its completion to the binding's outbox with `thread_report`, and a connector reads them with `omo thread outbox` and acknowledges them. A question carries a reply token that only an answer through the same binding can use. A completion is written only when you ask for one, and survives a restart. At most one active binding holds a thread; unbinding and rebinding name the revision they expect, and a rebind never extends the binding's lifetime.
+
+**A chat connector can say who wrote each message, and how it should land.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) `omo thread send --binding` takes `--author-id` and `--author-name` (and `--author-user-id`). The session sees the author as quoted fields in the message's provenance header, outside the text, so a message cannot pretend to come from someone else. Each author gets their own rate budget in a busy thread. `--mode follow_up` lets one message land more gently than its binding allows, and never more strongly. `answer` takes the same author flags, and the outbox records who answered a question. A connector can watch `<agent dir>/gateway/outbox.marker` to learn about new outbox rows. The reference now spells out that outbox delivery is at-least-once, and that `(binding_id, cursor)` is the key to dedupe by.
+
+**`omo host status --all` shows when each terminal session was last active.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) Every terminal (`tui`) row now carries `last_activity_at`: the time of the newest entry in its session file, the same time `omo thread list` shows, or `null` when it is not known.
+
+**`omo daemon adopt` moves a session from a host into your terminal.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) `omo daemon adopt <session>` asks the host holding a Desktop thread or a background session to hand it over, then resumes it in the current terminal, in the session's own directory. A session in the middle of a turn is refused unless you pass `--interrupt`, and input the interrupt took out of its queue becomes your first prompts. A session a Desktop window has open is refused unless you pass `--force`. `omo daemon status` now lists terminal sessions as `tui` rows, and `handoff` and `stop --all` leave them alone.
+
+### Removed
+
+**`omo daemon attach` and the shared-host opt-in env (`OMO_ENABLE_SHARED_HOST`) are removed; interactive sessions always run standalone.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) A terminal session no longer joins an engine host; it always runs its own session in its own process, and other sessions reach it through the gateway. `OMO_ENABLE_SHARED_HOST` no longer changes anything. To continue a session that lives on a host in a terminal, use `omo daemon adopt`.
+
+## [5.1.12] - 2026-10-03
+
+**The desktop app can now see when computer use is waiting on a system permission, and a cancelled task on Windows no longer shows up as a crash.** This release runs on the senpi 2026.10.2 engine, which carries the upstream pi v1.0.0 changes.
+
+### Added
+
+**A computer-use permission request reaches the root session as an event.** When a computer-use action, an eval cell or a delegated task stops because the system has not granted a permission computer use needs (such as Screen Recording or Accessibility), omo emits `omo.computer.permission_required` on the root session, with that session's id, once per missing permission. The desktop app can show the request instead of a bare tool error, and other failures never turn into permission events. ([#9393](https://github.com/code-yeongyu/oh-my-openagent/pull/9393))
+
+### Changed
+
+**omo runs on senpi 2026.10.2.** Reloading or replacing a session while a monitor or an eval cell is running no longer kills the process, and the engine carries the upstream pi v1.0.0 changes. Full list: [senpi 2026.10.2](https://github.com/code-yeongyu/senpi/releases/tag/v2026.10.2).
+
+### Fixed
+
+**On Windows, a cancelled delegated task is recorded as cancelled, not as a crash.** A killed task child could be recorded as an error carrying Bun's child-reaper message when enough of those messages filled the end of its error output; it now counts as killed, while any real error output still marks a crash. ([#9443](https://github.com/code-yeongyu/oh-my-openagent/pull/9443))
+
+**A platform package is published only if its release binary passed the smoke.** The platform publish uploaded its npm package before the release-binary smoke ran, so a platform whose smoke failed still published its package (5.1.8 published both Windows x64 packages from a run whose smoke failed). The package is now uploaded only after that platform's smoke passes, so a failed smoke stops exactly that platform's publish while the others still publish, and the linux-arm64 smokes now finish before their packages publish. ([#9385](https://github.com/code-yeongyu/oh-my-openagent/issues/9385), [#9439](https://github.com/code-yeongyu/oh-my-openagent/pull/9439))
+
+## [5.1.11] - 2026-10-02
+
+**New tasks no longer queue forever behind a delegated task that lost its connection to the host.** Such a task used to stay suspended with its lane taken until the session restarted; now it reconnects, or ends within a bounded time and frees the lane. This release runs on the senpi 2026.10.1-3 engine.
+
+### Fixed
+
+**A delegated task that loses its connection to the host is reattached, or fails with `transport lost` within a bounded time.** Either way its lane is released and its own processes are cleaned up, so the next task starts instead of waiting. After a host restart, lanes still held by tasks that died are reclaimed. ([#9403](https://github.com/code-yeongyu/oh-my-openagent/issues/9403), [#9407](https://github.com/code-yeongyu/oh-my-openagent/pull/9407))
+
+Cancelling a delegated task finishes only once the host confirms the child closed, a stopped task whose handle was let go still ends as cancelled, and a stopped task is never continued afterwards. ([#9407](https://github.com/code-yeongyu/oh-my-openagent/pull/9407))
+
+**The OpenCode edition's skill tool lists skills and commands in a stable order, so its tool definitions stay cacheable.** Skills and commands in the same scope were listed in discovery order, which varies between processes, so the tool definition changed from session to session and each new session and subagent missed the prompt cache. They are now ordered by scope, then by name. Thanks to @kimchupa-l10n for the report. ([#9432](https://github.com/code-yeongyu/oh-my-openagent/issues/9432))
+
+## [5.1.10] - 2026-10-02
+
+**Hotfix: `omo -p` exits again after a delegated task.** Since 5.1.8, a headless or scripted run whose agent handed work to an in-process task printed its answer and then never exited, so CI jobs, cron entries and wrappers that wait on it hung until killed. Interactive sessions leaked a loopback bridge server and its socket for every such task. This release runs on the senpi 2026.10.1-3 engine.
+
+### Fixed
+
+**`omo -p` exits after an in-process task child finishes, and the child's resources are released.** Since 5.1.8 an in-process child loads the engine's builtin extensions, but its teardown disposed the session without running their `session_shutdown` handlers, so codemode's per-session bridge server stayed listening and kept the process alive. Child teardown now runs those handlers first, within the host's shutdown budget, on both the normal path and the path that discards a child whose handle never started. ([#9413](https://github.com/code-yeongyu/oh-my-openagent/issues/9413), [#9418](https://github.com/code-yeongyu/oh-my-openagent/pull/9418))
+
+A delegated task that the host recovers after a restart is reported as continued only once its continuation prompt is acknowledged; a refused or timed-out prompt is now reported as lost instead of a successful reattach. Thanks to @Dante-dan. ([#9406](https://github.com/code-yeongyu/oh-my-openagent/pull/9406))
+
+## [5.1.9] - 2026-10-02
+
+**In the desktop app's restricted modes, the agent's own tools stop asking for approval, and a bash call from an eval cell no longer hangs.** Files that ship with the app no longer count as outside paths, the first Python cell after a cold start works on Windows x64, and delegated tasks keep your timeout settings and run at thinking levels their models accept. This release runs on the senpi 2026.10.1-3 engine.
+
+### Fixed
+
+In the desktop app's "Work in this project" and "Ask first" modes, senpi's own internal tools (todo, tool search, ask-user, monitor, memory) no longer ask for approval, reading files that ship inside the app no longer counts as an outside path, and a bash call from an eval cell shows its approval prompt instead of hanging. Real commands, outside reads and outside watches still ask. ([senpi#2511](https://github.com/code-yeongyu/senpi/issues/2511), [senpi#2513](https://github.com/code-yeongyu/senpi/issues/2513), [senpi#2512](https://github.com/code-yeongyu/senpi/issues/2512))
+
+On Windows x64, the first Python cell after a cold start no longer fails with "Python kernel did not become ready": Python eval waits on the kernel's own readiness stages instead of a 5-second deadline and names a stalled stage in the error. This was a known issue in 5.1.8.
+
+Tool search keeps working after a reload or session replacement. Thanks to @jerilkuriakose for the report. ([senpi#2509](https://github.com/code-yeongyu/senpi/issues/2509))
+
+Toggle-only reasoning models offer only the thinking states their API accepts. Thanks to @effortprogrammer. ([senpi#891](https://github.com/code-yeongyu/senpi/issues/891))
+
+On a Claude subscription, a long run survives a lost session whose re-sent conversation is rejected as too long, and images the agent read with a tool are no longer re-sent as new attachments (thanks to @willowite). ([senpi#2480](https://github.com/code-yeongyu/senpi/issues/2480), [senpi#2490](https://github.com/code-yeongyu/senpi/issues/2490))
+
+A delegated task that runs in-process now keeps your timeout and retry settings, such as `retry.provider.streamStartTimeoutMs`, instead of the built-in defaults. Thanks to @rhyme227 for the report. ([#9353](https://github.com/code-yeongyu/oh-my-openagent/issues/9353))
+
+Builtin category chains only name thinking levels their models accept, so child sessions no longer flood `fallback.log` with `validation_warning` lines and each rung runs at its declared level instead of a silent clamp. Thanks to @markshikada for the report and the byte-compare that pinned it down. ([#9378](https://github.com/code-yeongyu/oh-my-openagent/issues/9378))
+
+On macOS, a repeated permission denial no longer claims the privacy pane was just opened; it points at the pane opened earlier, or tells you to open it when the first attempt failed.
+
+## [5.1.8] - 2026-10-01
+
+**A packaged install runs Bun itself again when you call `bun` from an eval cell or the bash tool.** Before, it started a second agent and handed back that agent's reply as a passing result. Geeky · Heavy and `deep-high` move to GPT-6 Astra at high, Geeky · Normal to GPT-6.1 Sol Fast at medium, a session opened from the desktop app keeps the permission mode it asked for, and memory recall now matches Chinese and Japanese characters one by one. This release runs on the senpi 2026.10.1-2 engine.
+
+### Added
+
+A session opened from the desktop app or another multi-session client runs with the permission mode it asked for (full access, accept edits or ask first). Before, the mode was recorded but every session ran with the host default. ([senpi#2461](https://github.com/code-yeongyu/senpi/issues/2461))
+
+`web_search` has two hosted routes: a ChatGPT subscription session searches through the subscription's own web search with your ChatGPT login, and Google Search grounding is available as an opt-in entry in `websearch.json`. ([senpi#2341](https://github.com/code-yeongyu/senpi/issues/2341))
+
+Ultrafast can be selected explicitly with a model decorator such as `chatgpt-subscription/gpt-6-astra:xhigh:ultrafast`, in `models.json` or per session. Thanks to @audreyt. ([senpi#2412](https://github.com/code-yeongyu/senpi/issues/2412))
+
+Memory recall also matches Chinese characters and Japanese kanji one by one, so a question worded differently from the note can still find it; a question without any such character gets the same candidates as before. Thanks to [@ashmoonori-afk](https://github.com/ashmoonori-afk). ([#9341](https://github.com/code-yeongyu/oh-my-openagent/pull/9341))
+
+Memory recall can widen its own searches with synonyms, keywords in your other languages and related terms when you set `memory.recall.query_expansion` to `true`; an added term counts for less than the same match on one of the query's own words, a note that holds every word of the query stays first, and with the setting off, the default, nothing changes. Thanks to [@ashmoonori-afk](https://github.com/ashmoonori-afk). ([#9342](https://github.com/code-yeongyu/oh-my-openagent/pull/9342))
+
+### Changed
+
+Geeky · Heavy and the `deep-high` category now run GPT-6 Astra at high reasoning instead of xhigh. Geeky · Normal now starts on GPT-6.1 Sol Fast at medium; without the Fast tier it uses plain GPT-6.1 Sol at medium, and Copilot or OpenCode users still get GPT-5.6 Sol at medium. `deep-low` keeps GPT-6.1 Sol at medium. ([#9372](https://github.com/code-yeongyu/oh-my-openagent/issues/9372))
+
+When a delegated task stops because its model hit a usage limit, the result now says so, says when no other model in the category's chain could take over (as on `deep-high`, which runs GPT-6 Astra only), and how to recover, instead of ending on the provider's raw error. ([#9372](https://github.com/code-yeongyu/oh-my-openagent/issues/9372))
+
+### Fixed
+
+**Hotfix: `eval` and `bash` calls that run `bun` no longer start a phantom agent turn in the packaged engine.** In a compiled engine, a `bun` subprocess ran the engine itself as a second agent instead of the requested script. ([#9362](https://github.com/code-yeongyu/oh-my-openagent/issues/9362), [senpi#2494](https://github.com/code-yeongyu/senpi/pull/2494))
+
+Manual `/compact` on a Claude subscription replaces the resident Claude transcript with the compacted summary, so the next request really uses the smaller context. Thanks to @ayalcoh for the fix and @Tinycute00 for the report. ([senpi#2331](https://github.com/code-yeongyu/senpi/issues/2331))
+
+With two or more logins for one provider, a usage limit reported only in words switches the request to the next account instead of failing it. Thanks to @orientpine. ([senpi#1768](https://github.com/code-yeongyu/senpi/issues/1768))
+
+Package installs and updates no longer flash a console window on Windows. Thanks to @willowite. ([senpi#2450](https://github.com/code-yeongyu/senpi/issues/2450))
+
+Standalone release binaries now run JavaScript, Python, a real file read and cell listing on all nine natively executable targets, including Alpine musl. Seven legs run that smoke before their binary is uploaded; the linux-arm64 and linux-arm64-musl smokes run after the build, in parallel with the npm platform publish, and a failure there fails the platform release workflow's result. All twelve target manifests preserve the same derived codemode sidecars, and required wasm assets fail packaging if missing. ([#9291](https://github.com/code-yeongyu/oh-my-openagent/issues/9291))
+
+Piping the recommended installer to `sh` or `dash` now hands the script to Bash instead of failing on Bash syntax. If Bash is unavailable, the installer prints the exact `curl ... | bash` command to use and exits cleanly. ([#9325](https://github.com/code-yeongyu/oh-my-openagent/issues/9325))
+
+## [5.1.7] - 2026-09-30
+
+**Computer use on macOS says what it needs and where its engine comes from.** A downloaded install trusts the engine shipped inside its own app, a missing Screen Recording or Accessibility grant opens the right System Settings pane, and `/computer status` and `omo doctor` show which engine you have before it starts. This release runs on the senpi 2026.9.30 engine, like 5.1.6.
+
+### Added
+
+`/computer status` and `omo doctor` report where the computer-use engine is and where it came from (the app bundle, the cache or a path you set) without starting it, name hosts it does not support, and give the same answer. `omo doctor` never downloads the engine. ([#9286](https://github.com/code-yeongyu/oh-my-openagent/issues/9286), [#9311](https://github.com/code-yeongyu/oh-my-openagent/pull/9311))
+
+### Changed
+
+Test cleanups from an internal audit, with no change to behavior. ([#9302](https://github.com/code-yeongyu/oh-my-openagent/pull/9302), [#9304](https://github.com/code-yeongyu/oh-my-openagent/pull/9304), [#9310](https://github.com/code-yeongyu/oh-my-openagent/pull/9310), [#9312](https://github.com/code-yeongyu/oh-my-openagent/pull/9312), [#9314](https://github.com/code-yeongyu/oh-my-openagent/pull/9314), [#9315](https://github.com/code-yeongyu/oh-my-openagent/pull/9315), [#9316](https://github.com/code-yeongyu/oh-my-openagent/pull/9316), [#9317](https://github.com/code-yeongyu/oh-my-openagent/pull/9317), [#9318](https://github.com/code-yeongyu/oh-my-openagent/pull/9318), [#9319](https://github.com/code-yeongyu/oh-my-openagent/pull/9319), [#9321](https://github.com/code-yeongyu/oh-my-openagent/pull/9321))
+
+### Fixed
+
+On macOS, an install downloaded from the web trusts the computer-use engine shipped inside its own app when the engine sits inside the install and matches the checksums shipped beside it. Before, the download quarantine made that engine look untrusted. Any other quarantined engine is still refused. ([#9283](https://github.com/code-yeongyu/oh-my-openagent/issues/9283), [#9301](https://github.com/code-yeongyu/oh-my-openagent/pull/9301))
+
+When computer use is missing the Screen Recording or Accessibility grant, it opens that System Settings pane once, names the app to enable, and tells you to quit and relaunch it. A denied Accessibility listener now reads as a permission problem instead of "supervisor not live". ([#9284](https://github.com/code-yeongyu/oh-my-openagent/issues/9284), [#9309](https://github.com/code-yeongyu/oh-my-openagent/pull/9309))
+
+On Windows set to a language other than English, unpacking a download no longer fails when `tar` lists month names outside ASCII. Thanks to @willowite for the report, the reproduction and the fix. ([#9289](https://github.com/code-yeongyu/oh-my-openagent/issues/9289), [#9303](https://github.com/code-yeongyu/oh-my-openagent/pull/9303))
+
+Editing a file with no extension, such as a shebang script or a `Makefile`, no longer returns "LSP errors detected ... please fix" when no language server covers it. Thanks to @MoerAI for the fix and @floweredao for the report. ([#9292](https://github.com/code-yeongyu/oh-my-openagent/issues/9292), [#9296](https://github.com/code-yeongyu/oh-my-openagent/pull/9296))
+
+Your home folder no longer counts as a project by itself, so a dotfiles `.git` or a stray `~/package.json` stops the language-server install prompt from firing for every file in it. A project with its own marker inside your home folder still counts. Thanks to @MoerAI. ([#9227](https://github.com/code-yeongyu/oh-my-openagent/issues/9227), [#9297](https://github.com/code-yeongyu/oh-my-openagent/pull/9297))
+
+On OpenCode, picking a non-GPT model for Hephaestus fails with an error saying Hephaestus needs a GPT model, instead of an opaque `UnknownError`. Thanks to @RaviTharuma. ([#7704](https://github.com/code-yeongyu/oh-my-openagent/issues/7704), [#7707](https://github.com/code-yeongyu/oh-my-openagent/pull/7707))
+
+On OpenCode, `opencode run --agent sisyphus` and the other original config keys pick that agent again after display names are applied. A category or an unknown name passed to `--agent` fails with a clear error instead of quietly running the default agent. Thanks to @RaviTharuma. ([#7701](https://github.com/code-yeongyu/oh-my-openagent/issues/7701), [#7703](https://github.com/code-yeongyu/oh-my-openagent/issues/7703), [#7708](https://github.com/code-yeongyu/oh-my-openagent/pull/7708))
+
+On OpenCode, ordinary chat no longer turns into a goal, and a message containing pause, resume or clear leaves your goal alone. A prompt longer than 2,000 characters no longer fails with `InvalidObjectiveError`. Goals change only through an explicit `/goal` command, or from your first message when `default_mode.goal` is on. Thanks to @RaviTharuma for the fix and @Cle2ment for the report. ([#6391](https://github.com/code-yeongyu/oh-my-openagent/issues/6391), [#7979](https://github.com/code-yeongyu/oh-my-openagent/pull/7979))
+
+On Codex, updating removes the retired `features.child_agents_md` setting that Codex 0.156 rejects at startup, and the bundled rules no longer mention it. Thanks to @LilMGenius. ([#8693](https://github.com/code-yeongyu/oh-my-openagent/pull/8693))
+
+On Codex, the spawn examples in the bundled Hephaestus rule name their `agent_type`, so a session that follows them spawns its subagents instead of being blocked by the spawn guard. Thanks to @LilMGenius. ([#8298](https://github.com/code-yeongyu/oh-my-openagent/pull/8298))
+
+## [5.1.6] - 2026-09-30
+
+**Hotfix: reopening a session with an unanswerable question no longer crashes the TUI.** ([#9268](https://github.com/code-yeongyu/oh-my-openagent/issues/9268)) When a session was resumed with a pending question whose saved arguments no longer formed a valid question set, the question widget showed "0 unanswered" and crashed with `Cannot read properties of undefined (reading 'question')` as soon as you expanded it. The call now settles as lost in a restart, so the model learns the question is gone and can ask again, and clicking a widget whose questions all have answers submits them. Thanks to @copycatcode for the report. This release runs on the senpi 2026.9.30 engine.
+
+### Added
+
+A new `accept-edits` permission preset lets the agent read and edit files in the project without asking, while shell commands, paths outside the project and other tools still wait for your approval. ([senpi#2430](https://github.com/code-yeongyu/senpi/issues/2430))
+
+Chat bridges can ask the engine for a chat prompt surface, which drops the routing line, the handoff block and todo lines from replies meant for people in a conversation. Terminal and app prompts stay as they are. ([senpi#2398](https://github.com/code-yeongyu/senpi/issues/2398))
+
+### Changed
+
+The recommended `curl` installer now offers `Remove the other omo install at <path>? [y/N]` when it verifies a second installation. Non-interactive runs keep both unless `--remove-other-installs` is explicit, and `omo doctor` prints the exact Bun, npm, or standalone removal command for the non-active install. ([#9324](https://github.com/code-yeongyu/oh-my-openagent/issues/9324))
+
+The engine's recommended OpenAI model is GPT-6.1 Sol at medium, one slot below GPT-6 Astra. Models you listed yourself in `recommendedModels` stay as you set them. ([senpi#2390](https://github.com/code-yeongyu/senpi/issues/2390))
+
+ultrawork reuses QA and review evidence per target instead of rerunning everything after each patch, while keeping the nets that catch what the changer cannot see: each artifact records the commit and what it exercised; after an increment the session reruns the tests of every touched file and its importers, the scenarios that exercise them, and anything whose dependencies or environment moved, cites the capture for the rest, and still runs the full set once before the final message. Every re-review spawns a new reviewer with the delta diff and the cited blockers, at most twice. Defects inside the change's blast radius are fixed in the same run to the ideal state; defects outside it get a tracked issue and a line in the final message instead of growing the run. The memory line now also records every regression a check caught and each QA scenario with its invocation. ([#9294](https://github.com/code-yeongyu/oh-my-openagent/issues/9294), [#9298](https://github.com/code-yeongyu/oh-my-openagent/pull/9298))
+
+### Fixed
+
+On a Claude subscription, a `write` or `edit` to a file outside the working directory runs once and returns one result. Before, Claude Code's own read check refused the call while the change still went through, so a retry could apply an edit twice. Thanks to @haamsuk-collab. ([senpi#2401](https://github.com/code-yeongyu/senpi/issues/2401))
+
+A running session keeps working through an update that changes how the engine's dependencies are laid out. Bash, monitor and `eval` used to fail with `ENOENT` until you restarted. The first launch after an update takes 2 to 3 seconds longer once while the engine copies its dependencies. ([senpi#2408](https://github.com/code-yeongyu/senpi/issues/2408), [senpi#2409](https://github.com/code-yeongyu/senpi/issues/2409))
+
+An answer sent to a terminal session's question through its control endpoint reaches the model with its text, and answering such a question no longer triggers the first-turn todo reminder. ([senpi#2407](https://github.com/code-yeongyu/senpi/issues/2407), [senpi#2419](https://github.com/code-yeongyu/senpi/issues/2419))
+
+The prompt-cache keep-alive pings in real sessions again, with the same tool list as the turn it keeps warm. Thanks to @MoerAI. ([senpi#2389](https://github.com/code-yeongyu/senpi/issues/2389))
+
+An `eval` cell's return value reaches the model whole up to the normal output budget instead of stopping after 768 bytes, and any output that is still cut says so. ([senpi#2402](https://github.com/code-yeongyu/senpi/issues/2402))
+
+On macOS, computer use keeps its Accessibility and Screen Recording permissions across updates, because the signed desktop engine now always runs from the same path. ([#9282](https://github.com/code-yeongyu/oh-my-openagent/issues/9282), [#9288](https://github.com/code-yeongyu/oh-my-openagent/pull/9288))
+
+On Windows, killing a running background task marks it as killed instead of reporting a crash. Thanks to @Dante-dan. ([#9228](https://github.com/code-yeongyu/oh-my-openagent/issues/9228), [#9233](https://github.com/code-yeongyu/oh-my-openagent/pull/9233))
+
+## [5.1.5] - 2026-09-30
+
+**Big thanks to [@ashmoonori-afk](https://github.com/ashmoonori-afk), whose [#9209](https://github.com/code-yeongyu/oh-my-openagent/pull/9209) teaches memory recall to find Korean, Japanese and Chinese notes and to pick the right note out of a big memory.**
+
+**Hotfix: `eval` works again in the standalone `omo` binary.** ([#9248](https://github.com/code-yeongyu/oh-my-openagent/issues/9248), [#9250](https://github.com/code-yeongyu/oh-my-openagent/pull/9250)) The 5.1.3 and 5.1.4 binaries from GitHub Releases and get.omo.dev left out `@babel/parser`, which the `eval` tool loads, so JavaScript and Python `eval` were missing on every OS; npm and bun installs were fine. Each release now refuses a binary in which `eval` does not register and run.
+
+### Added
+
+Memory recall finds Korean, Japanese and Chinese notes and picks the right note out of a large memory with nothing to configure, while an English phrase that matches a note word for word still comes first. ([#9209](https://github.com/code-yeongyu/oh-my-openagent/pull/9209))
+
+The Recommended profile tries GPT-6.1 Sol (medium) before GPT-6 Sol on your ChatGPT subscription or the OpenAI API, and GitHub Copilot and OpenCode Zen keep GPT-6 Sol. ([#9237](https://github.com/code-yeongyu/oh-my-openagent/pull/9237))
+
+In the standalone binary, `omo setup` now imports your settings, `omo doctor` prints the same sections as an npm install, and `omo doctor --reap` cleans up the binary's own stale engines. ([#9252](https://github.com/code-yeongyu/oh-my-openagent/issues/9252), [#9253](https://github.com/code-yeongyu/oh-my-openagent/pull/9253), [#9265](https://github.com/code-yeongyu/oh-my-openagent/pull/9265))
+
+omo.dev has guide pages on mass ulw runs, agents, keywords, telemetry and desktop updates under `/docs/`. ([#9261](https://github.com/code-yeongyu/oh-my-openagent/pull/9261), [#9264](https://github.com/code-yeongyu/oh-my-openagent/pull/9264))
+
+### Fixed
+
+OmO no longer slows your machine down with many sessions open, because memory recall reads the memory repository with one git batch per reload instead of one git process per note. ([#9251](https://github.com/code-yeongyu/oh-my-openagent/issues/9251), [#9254](https://github.com/code-yeongyu/oh-my-openagent/pull/9254))
+
+The Windows release `.exe` runs from the folder you downloaded it to instead of failing at startup. ([#7485](https://github.com/code-yeongyu/oh-my-openagent/issues/7485), [#9255](https://github.com/code-yeongyu/oh-my-openagent/pull/9255))
+
+The standalone binary downloads the Claude Code version it is pinned to on your first Claude subscription turn, checks its hash and caches it, so you no longer need `claude` installed yourself, and `omo doctor` shows it. ([#9262](https://github.com/code-yeongyu/oh-my-openagent/issues/9262), [#9266](https://github.com/code-yeongyu/oh-my-openagent/pull/9266), [#9276](https://github.com/code-yeongyu/oh-my-openagent/issues/9276), [#9277](https://github.com/code-yeongyu/oh-my-openagent/pull/9277))
+
+One invalid value in `omo.jsonc` no longer switches off the whole file: only that key is ignored, `omo doctor` prints one warning naming it, and an unsafe key like `__proto__` is dropped without losing its valid neighbors. Thanks to @mooire733. ([#7676](https://github.com/code-yeongyu/oh-my-openagent/pull/7676), [#9249](https://github.com/code-yeongyu/oh-my-openagent/pull/9249))
+
+On Windows those config warnings name the file as `~/.omo/omo.jsonc`. ([#9244](https://github.com/code-yeongyu/oh-my-openagent/pull/9244))
+
+`omo daemon` reads its settings from `~/.omo/omo.jsonc` like the rest of OmO, and a setting left in the old `~/.omo/agent/omo.json` still applies with a warning in `omo doctor`. ([#9192](https://github.com/code-yeongyu/oh-my-openagent/issues/9192), [#9199](https://github.com/code-yeongyu/oh-my-openagent/pull/9199))
+
+A foreground subagent waits at most 15 minutes before it moves to the background, even when a long prompt-cache window would allow an hour. ([#9236](https://github.com/code-yeongyu/oh-my-openagent/pull/9236))
+
+## [5.1.4] - 2026-09-29
+
+### Changed
+
+OmO Native moves from senpi 2026.9.29-4 to senpi 2026.9.29-5, and the engine changes below come with it.
+
+**GPT-6.1 Sol arrives, and `deep-low` and Geeky · Normal lead with it at medium.** ([#9214](https://github.com/code-yeongyu/oh-my-openagent/issues/9214), [senpi#2390](https://github.com/code-yeongyu/senpi/issues/2390)) The engine adds `gpt-6.1-sol` and its Fast tier `gpt-6.1-sol-fast` on the OpenAI API, ChatGPT subscription, Azure, GitHub Copilot, OpenCode Zen, OpenRouter, Venice and Vercel lanes with the documented `low`..`max` efforts, and makes it the implicit default for the OpenAI and ChatGPT-subscription providers where GPT-6 Sol was. It runs on the GPT-6 system prompt, which gains the two writing rules from OpenAI's own GPT-6.1 Sol template. The default deep delegation lane now starts on `gpt-6.1-sol` (medium) from your ChatGPT subscription or the OpenAI API, then `gpt-6.1-sol-fast`, and keeps GPT-5.6 Sol (medium) and GPT-5.6 Sol Fast behind them, so GitHub Copilot, OpenCode Zen and an engine that does not list GPT-6.1 Sol yet still run the lane on GPT-5.6 Sol as before. The `geeky-normal` model profile likewise applies GPT-6.1 Sol (medium) first and GPT-5.6 Sol (medium) when 6.1 Sol is not served. The effort stays medium on every rung. The other categories and model profiles are unchanged.
+
+**A host can give each session the chat-style app prompt.** ([senpi#2377](https://github.com/code-yeongyu/senpi/issues/2377)) With `SENPI_PROMPT_SURFACE=app`, or `open_session.promptSurface: "app"` on a multi-session host, replies drop the terminal routing line and keep tool and hook feedback with the agent unless it changes what you get. Terminal sessions keep today's prompts.
+
+### Fixed
+
+**Editing a file outside a project no longer asks you to install a language server.** ([#9223](https://github.com/code-yeongyu/oh-my-openagent/issues/9223)) After an edit to OmO's own config, a scratch file in a temp folder, or any file with no project around it, the LSP check told the agent to install the missing server "in THIS repository" and to ask you first, which would have created a `package.json` in your home or temp folder, and it came back on every edit. Those files now get no install prompt, and inside a project the prompt for a missing server appears once per session instead of after every edit. Thanks to @haamsuk-collab for the report.
+
+**Kibitzer recall and quick delegation work with a single Z.ai or Xiaomi login.** ([#9202](https://github.com/code-yeongyu/oh-my-openagent/issues/9202)) The `quick` category had no Z.ai or Xiaomi model, so on a machine logged in to only one of them recall stayed off and quick tasks were unavailable. It now falls back to `glm-5.3-flash` (Z.ai) and `mimo-v2.6-flash` (Xiaomi) at low effort, after every model it already used, so machines that had a quick model keep the same one.
+
+**Engine fixes from senpi 2026.9.29-5.** Remote compaction works again on the ChatGPT subscription lane instead of silently falling back to a local summary ([senpi#2378](https://github.com/code-yeongyu/senpi/issues/2378)). A session no longer leaves an empty `.omo/` folder in the project ([senpi#2386](https://github.com/code-yeongyu/senpi/issues/2386)). RPC `get_auth_providers` reports each login method's status separately ([senpi#2384](https://github.com/code-yeongyu/senpi/issues/2384)). The embedded tree-sitter grammars load on Node again ([senpi#2032](https://github.com/code-yeongyu/senpi/issues/2032)).
+
+## [5.1.3] - 2026-09-29
+
+### Changed
+
+- OmO Native moves from senpi 2026.9.29-3 to senpi 2026.9.29-4; the engine changes below come with it.
+
+**Breaking: an untrusted project's legacy `.pi/` resources no longer load.** ([senpi#2375](https://github.com/code-yeongyu/senpi/pull/2375)) Extensions, skills, prompt templates, themes and hooks under a project's `.pi/` now follow project trust like the rest of the project config. A project whose only project resources are in `.pi/` now asks whether you trust it instead of opening as trusted. Trusted projects load them as before.
+
+**Breaking: interactive sessions no longer join a shared engine host.** ([senpi#2328](https://github.com/code-yeongyu/senpi/issues/2328)) Every interactive launch runs on its own local runtime. Extensions lose `pi.sharedHostEnabled`, and the `experimental.sharedHost` setting and the `SENPI_ENABLE_SHARED_HOST` / `SENPI_DISABLE_SHARED_HOST` variables are ignored if set. On first load `experimental.sharedHost` is removed from the global settings file.
+
+**Local sessions can pass messages and whole sessions to each other.** ([senpi#2328](https://github.com/code-yeongyu/senpi/issues/2328)) An extension can open a terminal session to other local sessions with `pi.session.registerControlEndpoint`, and each message delivered that way is admitted once and waits while you are typing. A multi-session host hands a quiet session to your terminal with `release_session`, and with `interrupt: true` it stops the running work first and returns what it took out of the queue. Host status shows each endpoint's kind, whether it answers and who owns it, and a suspended terminal no longer holds the listing for 10 seconds.
+
+**Claude answers in your language.** ([senpi#2366](https://github.com/code-yeongyu/senpi/issues/2366)) With a "reply in Korean" rule, or when you write in Korean, the routing line, the handoff block and todo labels come back in that language. The handoff labels (`Ask`, `For you`, `Now`, `Next`) stay as they are. Thanks to @floweredao for the report.
+
+**The engine installs smaller and faster.** ([senpi#2360](https://github.com/code-yeongyu/senpi/issues/2360), [senpi#2362](https://github.com/code-yeongyu/senpi/issues/2362)) senpi now declares its real dependencies instead of shipping its whole dependency tree inside the tarball, and it no longer ships sourcemaps.
+
+### Fixed
+
+**Memory recall works on a machine whose quick-category pin names only providers you are not logged into.** ([#9216](https://github.com/code-yeongyu/oh-my-openagent/issues/9216)) With `categories.quick.models` pinned to, say, OpenAI while only another provider is connected, Kibitzer started its recall judge on the pinned model, which failed at once with "No API key found", so recalled-memory nudges never arrived. Kibitzer now starts on the first connected model, your pins first and then the category's built-in chain, and when nothing is connected it shows the "Kibitzer unavailable" notice naming the providers to connect. The `task` tool still uses your pin as written.
+
+**Teams and process-mode subagents work again on installs made under `umask 002`.** ([#9208](https://github.com/code-yeongyu/oh-my-openagent/issues/9208)) With the Ubuntu default umask for private-group users, npm installed the task-host launch spec group-writable, the task host refused it, and every `team_create` failed with only "The task host is unavailable." OmO now makes that file private (0644) when it launches, never following a symlink and never touching a file another user owns. When the task host still refuses the spec, the task, the `team_create` error and `omo doctor` name the file and the fix (`chmod 644 <path>`). Reported and diagnosed by @devswha.
+
+**An npm-installed comment checker is found again, in the old and the new package layout.** ([#9180](https://github.com/code-yeongyu/oh-my-openagent/issues/9180)) The OpenCode edition's comment-checker hook looked for `@code-yeongyu/comment-checker` only in the `bin/` folder its install script used to fill, so an npm install of 0.7.1 or later (binaries under `vendor/`) was never used and the hook fell back to downloading its own copy. The hook, `omo doctor` and the LazyCodex fallback now find the binary under `vendor/` and in the per-platform packages the checker is moving to. Those packages cut its install from about 255 MiB to 51 MiB.
+
+**Agent mailbox state no longer lands in your repository.** ([#9201](https://github.com/code-yeongyu/oh-my-openagent/issues/9201)) OmO Native's thread tools kept their mailbox and receipts in `<project>/.omo/thread-tools`. They now live in the same per-project state folder as task state, outside the project. A project that already has the folder keeps using it.
+
+**A Claude `Request not allowed` error no longer strands a session on a fallback model.** ([senpi#2376](https://github.com/code-yeongyu/senpi/issues/2376)) A transient 403 from a Claude subscription is retried on the same model before the session falls back. A fallback target that answers with a billing error no longer pins the session: that provider is skipped for its cooldown, and the next turn returns to your original model with a notice saying why.
+
+**A project you trusted loads its `.agents/skills` again.** ([senpi#2371](https://github.com/code-yeongyu/senpi/issues/2371)) They appear under `/skill:` without launching with `--approve`. An untrusted project no longer picks up resources another session loaded from the same folder as trusted. Thanks to @sorenjuul for the report and the root-cause analysis.
+
+**Session files survive a failed write.** ([senpi#2328](https://github.com/code-yeongyu/senpi/issues/2328)) Opening a session saved by an older version rewrites it through a complete copy, so a full disk or an I/O error keeps the original intact. A write refused for permissions or space no longer leaves the refused entry in the session, and a prompt whose messages could not be saved reports that error. A refused delivery, a half-written first save or the release of a never-saved session no longer leaves a session stuck or ends an engine host.
+
+**Every `extension_ui_response` gets a reply.** ([senpi#2372](https://github.com/code-yeongyu/senpi/issues/2372)) A host or a terminal endpoint that settles one answers with the frame's own id, so a client can tell a delivered answer from a lost one.
+
+**The startup banner is no longer red.** ([#8442](https://github.com/code-yeongyu/oh-my-openagent/issues/8442)) Under Bun, `omo` printed its version banner, the `omo setup` credentials hint and the legacy-settings notice in the error color, so a healthy start looked like a failure. They now print without color; the text and the stream are unchanged. (#8870 by @cynkai)
+
+**`omo update` no longer reports success while leaving the old version installed.** ([#9198](https://github.com/code-yeongyu/oh-my-openagent/issues/9198)) It now looks up the version published on your channel and installs exactly that, for example `bun add -g omo-ai@5.1.2`. If you are already on it, nothing is installed. If the package manager finishes but OmO is still on the old version, `omo update` says `omo is still <old>; <new> is published`, prints the command to retry, and exits with an error. `omo update --dry-run` shows the exact command. When the npm registry can't be reached, it installs the unpinned `omo-ai` as before and tells you it could not confirm the version.
+
+**`omo update --help` shows help instead of updating.** ([#9207](https://github.com/code-yeongyu/oh-my-openagent/issues/9207), reported by @devswha) `omo update --help` and `omo update -h` used to run the install, and so did a mistyped flag. They now print what `omo update` does and its flags. A flag it doesn't know, such as `--forse`, stops with `omo update: unknown option --forse` and installs nothing. The compiled `omo` binary answers the same way.
+
+## [5.1.2] - 2026-09-29
+
+### Added
+
+**A one-line installer at get.omo.dev.** ([#9166](https://github.com/code-yeongyu/oh-my-openagent/issues/9166)) `curl -fsSL https://get.omo.dev/install.sh | bash` on macOS and Linux, or `irm https://get.omo.dev/install.ps1 | iex` in Windows PowerShell, installs the native `omo` binary for your OS and CPU into `~/.local/bin`, after checking it against the release `SHA256SUMS`. When get.omo.dev is unreachable it falls back to the npm registry and GitHub Releases. `bun add -g omo-ai` keeps working. omo.dev now shows the command for your OS and has an install page at `/docs/install` ([#9177](https://github.com/code-yeongyu/oh-my-openagent/issues/9177)).
+
+**`web_search` can use your own SearXNG.** ([senpi#2339](https://github.com/code-yeongyu/senpi/issues/2339)) Add `{ "provider": "searxng", "baseUrl": "http://localhost:8888" }` to `websearch.json`.
+
+### Changed
+
+**An unknown slash command no longer reaches the model by accident.** ([senpi#2348](https://github.com/code-yeongyu/senpi/issues/2348)) A typo like `/ulw-exec` goes back into the editor with a `Did you mean /skill:ulw-execute?` hint instead of being sent as a prompt. A second Enter on the unchanged text sends it as a normal message, and Esc keeps editing.
+
+**Moving from the OpenCode edition, OmO Native tells you which model choices it ignores.** ([#9147](https://github.com/code-yeongyu/oh-my-openagent/issues/9147), [#6794](https://github.com/code-yeongyu/oh-my-openagent/issues/6794)) On its first start, Native lists each agent and category model from your OpenCode edition settings that it ignores, with the `omo setup` step and the `omo.jsonc` key that carries it over. `omo setup` itself now carries the edition's `metis` and `momus` models over to `plan-consultant` and `plan-reviewer`.
+
+**Hosted web search runs on the provider's cheaper search model.** ([senpi#2340](https://github.com/code-yeongyu/senpi/issues/2340)) On the same login, for example `claude-haiku-4-5` on Claude routes, when your model list shows it at a lower price than the session model. If it fails or finds nothing, the search retries on the session model. `"nativeModel": "session"` in `websearch.json` restores the old behavior.
+
+**Without a `websearch.json`, `web_search` tries more than DuckDuckGo.** ([senpi#2339](https://github.com/code-yeongyu/senpi/issues/2339)) It now tries DuckDuckGo, Exa, Startpage, Mojeek, Ecosia and Google in turn and pauses an engine that blocks it, so your queries may reach these services. List only the providers you want in `websearch.json` to keep them away from the rest.
+
+**Remote MCP servers declared by a skill no longer receive your `bearerTokenEnv` token.** ([senpi#2345](https://github.com/code-yeongyu/senpi/issues/2345)) The skill picks the server's URL, so declare that server in your own `mcp.json` to keep its auth. Stdio servers from skills you installed now expand `${VAR}` the way your own `mcp.json` does.
+
+### Fixed
+
+**A running session survives `omo update`.** ([senpi#2358](https://github.com/code-yeongyu/senpi/issues/2358)) `omo update` and `bun install -g` replace the installed package, and a session started earlier used to fail every later request with `Cannot find module './<chunk>-<hash>.js'` until you restarted it. Each launch now runs from its own copy of the engine.
+
+**Config you edit in `~/.pi/agent` is no longer silently ignored.** ([#9173](https://github.com/code-yeongyu/oh-my-openagent/issues/9173)) After OmO copied `~/.pi/agent` to `~/.omo/agent`, edits to the old copy had no effect. The next start now warns once per edited file and names the file OmO reads, `omo doctor` lists the same files, and `omo config import-pi <file>` copies the edit over.
+
+**`omo doctor` no longer fails its computer-use check on every OS.** ([#9193](https://github.com/code-yeongyu/oh-my-openagent/issues/9193)) 5.1.1 shipped without an asset the check reads, so it always reported `ENOENT` for `assets.generated.json`.
+
+**A finished task child no longer stays "running" after its parent's host dies.** ([#9183](https://github.com/code-yeongyu/oh-my-openagent/issues/9183)) The child's record kept its dead owner, so Desktop showed a working agent that no longer existed and task status and DAG waits kept waiting on it.
+
+**Scrolling on X11 delivers every wheel click.** ([#9136](https://github.com/code-yeongyu/oh-my-openagent/issues/9136)) A foreground scroll from computer use sometimes dropped clicks and still reported success.
+
+**Bedrock accepts tool schemas with a root `anyOf`, `oneOf` or `allOf`.** ([senpi#1947](https://github.com/code-yeongyu/senpi/issues/1947)) It also accepts schemas without an object type, which it used to reject.
+
+**Memory reflection works when your only provider comes from an extension.** ([#9175](https://github.com/code-yeongyu/oh-my-openagent/issues/9175)) If that provider disappears you get one notice instead of the same failure on every run.
+
+**Cursor runs each tool call once.** ([senpi#2334](https://github.com/code-yeongyu/senpi/issues/2334)) It used to run every call a second time, and the replayed write could undo a file fix.
+
+**A resumed Claude conversation keeps its resume point.** ([senpi#1972](https://github.com/code-yeongyu/senpi/issues/1972)) When a monitor or goal starts the first turn on restore, the conversation no longer resends its whole history.
+
+**In headless runs, a late Kibitzer verdict no longer replaces the final answer.** ([#9158](https://github.com/code-yeongyu/oh-my-openagent/pull/9158)) It used to add a turn after the answer that ended in `NO_REPLY`.
+
+**An MCP server that changes its tool list mid-session gets the new list registered.** ([senpi#2188](https://github.com/code-yeongyu/senpi/issues/2188)) Added tools now show up and removed ones stay gone.
+
+**Native OpenAI requests with hosted web search no longer fail every turn with `Tool choice 'web_search' not found in 'tools' parameter`.** ([senpi#2234](https://github.com/code-yeongyu/senpi/issues/2234))
+
+**Web search through OpenAI and xAI lists only pages the search returned.** ([senpi#2337](https://github.com/code-yeongyu/senpi/issues/2337)) Links the model wrote on its own are no longer counted as sources.
+
+**A rejected OpenAI Responses WebSocket request shows the provider's message.** ([senpi#2235](https://github.com/code-yeongyu/senpi/issues/2235)) It used to show `Error Code undefined: undefined`.
+
+**Claude subscription sessions keep the field descriptions in custom tool schemas.** ([senpi#2145](https://github.com/code-yeongyu/senpi/issues/2145)) Claude no longer wastes a call on a missing required field.
+
+**The OpenAI-compatible adapter merges back-to-back user messages for non-OpenAI hosts.** ([senpi#2120](https://github.com/code-yeongyu/senpi/issues/2120)) Direct OpenAI requests are unchanged.
+
+**Extensions that depend on sloppy-mode CommonJS packages load again under Bun.** ([senpi#1841](https://github.com/code-yeongyu/senpi/issues/1841))
+
+**Picking a skill that needs input from the slash menu now waits for you to type it.** ([#9168](https://github.com/code-yeongyu/oh-my-openagent/issues/9168)) On OmO Native, choosing `/ulw-execute`, `/ulw-plan`, `/ulw-loop`, `/ulw-research`, `/mass-ulw`, `/hyperplan`, `/init-deep`, `/refactor` or `/remove-ai-slops` from the slash menu with Enter sent it right away with nothing after it, so the skill started without the plan name, request or goal it works on. These skills now declare what they take, and Enter leaves `/ulw-execute ` (or `/skill:ulw-execute `) in the input with the hint shown in the menu; type the arguments and press Enter again to send. Skills that take no input still run on one Enter. The waiting half needs the engine release that reads the hint (code-yeongyu/senpi#2258); until OmO adopts it, the menu behaves as before.
+
+**Your own `computer-use` skill no longer opens every session with a "Skill conflicts" warning.** ([#9160](https://github.com/code-yeongyu/oh-my-openagent/issues/9160)) With computer use on, OmO Native added its built-in `computer-use` skill on every start, even when you already had a skill of that name (Orca CLI ships one), so each session opened with a collision box. The built-in skill now steps aside for a same-name user, project or package skill, which is the one that loads, and `/computer status` says so in one line. The same applies to the `x-search` skill. `disabled_skills` now hides both the way it hides the bundled skills; the `computer` and `x_search` tools stay available either way.
+
+## [5.1.1] - 2026-09-29
+
+### Changed
+
+**The `unspecified-low` category now opens on Claude Sonnet 5.5 at `medium`.** ([#9144](https://github.com/code-yeongyu/oh-my-openagent/issues/9144)) `unspecified-low` is where delegated work lands when no specialist category fits and the job is contained. It led with MiMo V2.6 Pro at `max`; Claude Sonnet 5.5 at `medium` now comes first, on the Claude subscription, Anthropic API, GitHub Copilot and OpenCode lanes. Every earlier rung stays, in the same order, behind it: MiMo V2.6 Pro, Grok 4.7, GPT-5.6 Terra, Claude Sonnet 5, Qwen 3.8 Max Preview, DeepSeek V4 Pro and MiMo V2.5 Pro. OmO Native picks Sonnet 5.5 once the engine release that lists it is adopted; until then the category keeps running on MiMo V2.6 Pro.
+
+**The `deep-low` category now opens on plain GPT-5.6 Sol at `medium`.** ([#9144](https://github.com/code-yeongyu/oh-my-openagent/issues/9144)) `deep-low` led with the GPT-5.6 Sol Fast tier and fell back to plain GPT-5.6 Sol where the Fast tier is not served. The order is now reversed: plain GPT-5.6 Sol at `medium` runs first on every lane that serves it, and the Fast tier is the fallback on the OpenAI lanes. The category still opens when either Sol tier is connected.
+
+**Each session's task children now run on their own host.** ([#9003](https://github.com/code-yeongyu/oh-my-openagent/issues/9003)) On macOS and Linux, background task children used to run as sessions of one engine host shared by every session on the machine, so one crash or one stuck host hit everybody's children. Now every session gets its own host (the Desktop app moves each thread onto its own host in its own release). A crash, idle exit or upgrade of one host leaves the others alone, and a finished session's host exits 15 minutes after its last client leaves. Isolation costs memory. With 4 parent sessions of 4 children each we measured 2.7 GB RSS and 0.8 GB physical footprint, against 0.78 GB and 0.24 GB for one shared host. An idle host costs 126 MB of physical footprint, about what the old shared host cost idle (137 MB). A session's host now starts in the background on its first prompt (`task.host_shard_prewarm`, default `first-turn`; `session-start` and `off` are also available), so the first child no longer waits for a host to boot: 1116 ms p50 / 1678 ms p95 from the `task` call to the child's first model request, against 1666 / 3280 ms without the pre-warm and 979 / 1593 ms on the old shared host when it was already running. Nothing caps the number of hosts. Children started by the previous release stay on the shared host until they finish. Before you downgrade, read the rollback steps in [docs/reference/omo-daemon.md](docs/reference/omo-daemon.md). Skipping them can leave a retained child stuck.
+
+**`omo daemon` and `omo doctor` show every host.** ([#9003](https://github.com/code-yeongyu/oh-my-openagent/issues/9003)) `omo daemon status` (and `--json`) and `omo doctor` list the shared daemon and every per-session host with its pid, sessions, memory and crash count. `omo daemon gc` removes the state of hosts that have provably exited. `omo daemon stop --all` and `omo daemon handoff` act on every host, and `omo daemon stop --drain --all --wait` waits until every host has really stopped. `omo daemon rollback-prepare` moves retained children back to the shared host before a downgrade. `omo daemon run --foreground` now exits 2 because the engine host always runs detached; `--persistent` is still accepted.
+
+**A crashed task host tells its parent once, and says when the children are back.** ([#9003](https://github.com/code-yeongyu/oh-my-openagent/issues/9003)) When a session's task host crashes while a child is working, the session gets one warning naming the host, its supervisor pid ("supervisor pid N") and the cause, and how many children are reattaching ("1 child" or "N children"). A closing line follows when they are all back; it adds ", C cancelled" when some of them were cancelled during recovery.
+
+**`thread_read` labels tool results as `tool`.** A thread read from a live host now marks tool results with role `tool`, the same as a thread read from its transcript file. Models that read `thread_read` output see one role for tool results on both paths.
+
+### Fixed
+
+**LazyCodex keeps the model you picked for a subagent role.** ([#5245](https://github.com/code-yeongyu/oh-my-openagent/issues/5245)) Every reinstall and marketplace auto-update copied the bundled agent files over `~/.codex/agents/` and put `explorer`, `librarian` and the other roles back on the bundled model, even when you had changed it. A model you set in those files now survives updates; a model LazyCodex wrote itself still moves to the new default. For a durable choice, set `[codex].agents.<role>.model` (and `reasoning`) in `~/.omo/omo.jsonc`; each sync applies it, and removing it restores the bundled default.
+
+## [5.1.0] - 2026-09-28
+
+5.1.0 adds computer use to OmO Native as an experimental feature, and fixes Claude subscription logins across many sessions, GitHub Copilot tokens and hosts, goals that looped on a rejected login, and a long list of background task problems. `omo update` installs it, or run:
+
+```bash
+bun add -g omo-ai
+```
+
+### Computer use (experimental)
+
+- **Experimental:** OmO Native agents can now drive your real desktop. They take screenshots, list windows, click, type, scroll, press keys, read the accessibility tree and use the clipboard, through a `computer` tool and a `computer` global in the eval kernels. Behaviour may still change, so please send feedback and bug reports.
+- **Per OS:**
+  - macOS (arm64, x64): background input by default, so your frontmost app, focus and cursor stay put.
+  - Windows x64: background input varies by app, and nothing can reach elevated apps.
+  - Linux x64 on X11: XTEST/XSendEvent plus AT-SPI.
+  - Linux x64 on Wayland: portals and libei, with no single-window capture.
+  - No engine ships yet for Linux arm64 or Windows arm64.
+- **Turning it on:** it is on by default on supported hosts, but its code and native engine load only on first use, so sessions that never use it pay nothing at startup. The agent finds `computer` through tool search, or you run `/computer on`. `/computer status` shows the engine, the stop path and the OS permissions. Set `computer.enabled: false` to remove it entirely. macOS needs Screen Recording and Accessibility.
+- **Scrolling:** `dx`/`dy` are pixels on every OS (one wheel notch is 40 px), and a positive `dy` scrolls down everywhere, macOS included. ([#9101](https://github.com/code-yeongyu/oh-my-openagent/issues/9101), [#9055](https://github.com/code-yeongyu/oh-my-openagent/issues/9055))
+- **Kill switch:** Control+Option+Command+Escape on macOS, or Ctrl+Alt+Shift+Escape on Linux and Windows, stops all computer input at once, including typing already in progress. Input stays stopped until you run `/computer resume`; the agent cannot resume it.
+- **Safety:** screenshots need `computer:read` and input needs `computer:exec`. Before input, OmO checks the stop path, the screen lock, the OS permissions and that the target point is uncovered.
+- **Known limits:** some toolkits ignore synthetic background input; OmO then reports it instead of pretending it worked. X11 background input doesn't reach GTK, Qt or Chromium yet (#9108). Wayland's stop chord needs the GlobalShortcuts portal. Full guide: [`docs/guide/computer-use.md`](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/guide/computer-use.md).
+
+### Added
+
+- `omo app-server` threads load the OmO plugin, so they get `task`, `workpool`, `memory`, `lsp_*` and the other OmO tools, and `app-server daemon restart` keeps it. ([#9117](https://github.com/code-yeongyu/oh-my-openagent/issues/9117), [#9122](https://github.com/code-yeongyu/oh-my-openagent/pull/9122), [senpi#2313](https://github.com/code-yeongyu/senpi/issues/2313))
+- Durable scheduled prompts: the `schedule_prompt` tool stores a reminder, follow-up or recurring prompt, and `schedule run` fires it later, also for `--print` runs. ([senpi#2216](https://github.com/code-yeongyu/senpi/issues/2216))
+- Sessions follow a moved or re-cloned repository: `--session`, `--resume` and `/resume` offer to move them here, keeping their history, goal, loops and monitors. ([senpi#2181](https://github.com/code-yeongyu/senpi/issues/2181), [senpi#2184](https://github.com/code-yeongyu/senpi/issues/2184))
+- `models discover <provider>` fills an OpenAI-compatible provider's model list in `models.json` from its `/models` endpoint, including the reasoning levels it advertises. ([senpi#2196](https://github.com/code-yeongyu/senpi/issues/2196))
+- Eval kernels say when they hold a lot of memory, name the largest globals, and restart once past a ceiling (`memory.noticeMb`, `memory.ceilingMb`). ([senpi#2261](https://github.com/code-yeongyu/senpi/issues/2261))
+- `host status --all` lists every RPC host endpoint, `host gc` clears the state of hosts that are provably gone, and `host status` shows `memory_pressure`. ([senpi#2226](https://github.com/code-yeongyu/senpi/issues/2226), [senpi#2245](https://github.com/code-yeongyu/senpi/issues/2245))
+- A native crash of an interactive or print session leaves one entry in `process-crashes/crashes.jsonl` on the next start. ([senpi#2194](https://github.com/code-yeongyu/senpi/issues/2194))
+
+### Changed
+
+- OmO Native moves from senpi 2026.9.27 to senpi 2026.9.28-7; the engine fixes below come with it.
+- A parent no longer runs out of room for its task children: `task.residency_max_children` defaults to `"unlimited"`. Set a number in `omo.json` to keep a bound. ([#8999](https://github.com/code-yeongyu/oh-my-openagent/issues/8999))
+- Memory extracts facts from one very long conversation entry (up to 512 KiB) in a bounded extra run instead of parking it forever, which can mean extra model calls. ([#8984](https://github.com/code-yeongyu/oh-my-openagent/issues/8984), contributed by @deadcode-walker in [#8985](https://github.com/code-yeongyu/oh-my-openagent/pull/8985))
+- After an account-wide usage limit, a task's fallback tries the next provider's models first and keeps the spent provider as the last resort; a limit on one model or family still moves to the next model in order. ([#8296](https://github.com/code-yeongyu/oh-my-openagent/issues/8296))
+- A fallback-chain model that keeps failing is skipped for a cooldown (60 s, doubling up to 30 minutes) by every session in the process, and a provider's `Retry-After` is honored. ([senpi#2198](https://github.com/code-yeongyu/senpi/issues/2198))
+- GPT-6 Astra, Sol and Luna stay on the stated goal and report unrelated errors in the final message instead of chasing them. ([senpi#2256](https://github.com/code-yeongyu/senpi/issues/2256))
+- OpenCode Go and Fireworks default to `kimi-k3`, since their old Kimi defaults left the catalogs. ([senpi#2295](https://github.com/code-yeongyu/senpi/issues/2295), [senpi#2175](https://github.com/code-yeongyu/senpi/issues/2175))
+
+### Fixed
+
+**Providers and logins**
+
+- Claude subscription sessions no longer hit `401 OAuth access token has been revoked` and end up "blocked until re-login" when several sessions run at once; they pick up the refreshed token instead. ([#8762](https://github.com/code-yeongyu/oh-my-openagent/issues/8762), [senpi#2225](https://github.com/code-yeongyu/senpi/issues/2225), [senpi#2281](https://github.com/code-yeongyu/senpi/issues/2281), [senpi#2282](https://github.com/code-yeongyu/senpi/issues/2282))
+- `/login` into a blocked Claude account now replaces the revoked token instead of keeping it. ([senpi#2222](https://github.com/code-yeongyu/senpi/issues/2222))
+- A Claude subscription turn no longer fails with "pre-replay buffer overflow" while Claude Code runs a background turn of its own. ([senpi#2192](https://github.com/code-yeongyu/senpi/issues/2192))
+- GitHub Copilot recovers when GitHub revokes its cached token: the token is re-exchanged once and the request re-sent, so every model no longer fails with HTTP 403 until `/login`. ([senpi#2297](https://github.com/code-yeongyu/senpi/issues/2297), [senpi#2302](https://github.com/code-yeongyu/senpi/issues/2302))
+- GitHub Copilot Business and Enterprise accounts reach their own API host instead of failing with `421 Misdirected Request`, for chat, `/btw` and web search. ([#8662](https://github.com/code-yeongyu/oh-my-openagent/issues/8662), [senpi#2309](https://github.com/code-yeongyu/senpi/issues/2309), [senpi#2310](https://github.com/code-yeongyu/senpi/issues/2310))
+- Copilot turns no longer fail with a bare HTTP 400 when more than 128 tools are exposed; the extras are left out and you're told how many. ([senpi#2298](https://github.com/code-yeongyu/senpi/issues/2298))
+- Copilot models compact before Copilot's own prompt limit instead of failing the turn. ([senpi#2299](https://github.com/code-yeongyu/senpi/issues/2299))
+- A Copilot 402, 403 or quota 429 says whether it's a quota or a refusal and includes the GitHub request id. ([senpi#2297](https://github.com/code-yeongyu/senpi/issues/2297))
+- A goal stops on the first 401 or 403 a provider keeps returning and tells you what to do (for example `Run /login github-copilot ...`) instead of looping to the continuation cap; your next message resumes it. ([senpi#2293](https://github.com/code-yeongyu/senpi/issues/2293))
+- The first message no longer fails on providers that only accept automatic tool choice, for example Kiro behind a proxy; `compat.supportsForcedToolChoice: false` skips the forced choice entirely. ([#9096](https://github.com/code-yeongyu/oh-my-openagent/issues/9096), [senpi#2218](https://github.com/code-yeongyu/senpi/issues/2218), [senpi#2224](https://github.com/code-yeongyu/senpi/issues/2224))
+- Devin SWE-2 lists only the lanes Devin serves (`swe-2-medium`, `swe-2-high`, `swe-2-max`), `devin/swe-2-medium` gets the SWE-2 prompt preset, and a config naming `swe-2`, `swe-2-low` or `swe-2-high-lite` gets a startup warning. ([#9111](https://github.com/code-yeongyu/oh-my-openagent/issues/9111), [senpi#2306](https://github.com/code-yeongyu/senpi/issues/2306), [senpi#2308](https://github.com/code-yeongyu/senpi/issues/2308))
+
+**Memory**
+
+- Kibitzer and the other memory sidecars fall back to their category's builtin models when a pinned model refuses, instead of failing every wake. ([#9111](https://github.com/code-yeongyu/oh-my-openagent/issues/9111))
+- The Kibitzer failure notice names the model that failed and the `omo.json` setting to change. ([#9111](https://github.com/code-yeongyu/oh-my-openagent/issues/9111))
+- Memory reflection moves to the next model when one hits a spent usage or quota limit, instead of ending the run. ([#8296](https://github.com/code-yeongyu/oh-my-openagent/issues/8296), [#6808](https://github.com/code-yeongyu/oh-my-openagent/issues/6808))
+- Memory dreaming sees which skills and memory files you actually read again. ([#8864](https://github.com/code-yeongyu/oh-my-openagent/issues/8864), reported by @katamana, fixed by @MoerAI in [#8865](https://github.com/code-yeongyu/oh-my-openagent/pull/8865))
+
+**Tasks and subagents**
+
+- Task children wait for a busy task host instead of failing with "Task runner failed to start." within 30 s. ([#9067](https://github.com/code-yeongyu/oh-my-openagent/issues/9067), [senpi#2209](https://github.com/code-yeongyu/senpi/issues/2209))
+- A task child that kept working through a host hiccup or handoff is no longer left "suspended" until the parent restarts. ([#9069](https://github.com/code-yeongyu/oh-my-openagent/issues/9069))
+- A task waiting for a free slot on its fallback model shows as queued with its position, not as running. ([#9069](https://github.com/code-yeongyu/oh-my-openagent/issues/9069))
+- A task's status follows its child: a nudged child no longer shows as failed, and a child that wakes up on its own sends a `task completion (resumed turn)`. ([#9069](https://github.com/code-yeongyu/oh-my-openagent/issues/9069))
+- A delegated task no longer hangs in `running` (and `omo -p` no longer stays open) when its first model fails and it moves to the next one.
+- A task child whose host restarted mid-turn continues its interrupted turn when the parent resumes. ([#9003](https://github.com/code-yeongyu/oh-my-openagent/issues/9003))
+- A suspended task child frees its concurrency slot, so `task_send` no longer answers `lane_capacity` after a few restarts. ([#8973](https://github.com/code-yeongyu/oh-my-openagent/issues/8973))
+- Task start failures say why the child couldn't start instead of only `Task runner failed to start.` ([#8960](https://github.com/code-yeongyu/oh-my-openagent/issues/8960))
+- A child whose host dies while it opens reports `host_unreachable`. ([#9020](https://github.com/code-yeongyu/oh-my-openagent/issues/9020))
+- A re-prompted child on a loaded host no longer prints `Timeout waiting for response to prompt` over the parent's screen. ([#9093](https://github.com/code-yeongyu/oh-my-openagent/issues/9093))
+- A task whose whole fallback chain failed says so in its transcript. ([#8301](https://github.com/code-yeongyu/oh-my-openagent/issues/8301), contributed by @MoerAI in [#9022](https://github.com/code-yeongyu/oh-my-openagent/pull/9022))
+- Live task progress, stats and transcripts keep updating after a child reconnects to its host. ([#8983](https://github.com/code-yeongyu/oh-my-openagent/issues/8983), contributed by @deadcode-walker in [#8978](https://github.com/code-yeongyu/oh-my-openagent/pull/8978))
+- DAG nodes finish when their child task finishes, also in projects reached through a symlink. ([#8932](https://github.com/code-yeongyu/oh-my-openagent/issues/8932), reported by @ayalcoh)
+- A cancel, a cleanup sweep or a reload during a model fallback no longer ends a revived run, loses a lane slot, or starts the next model beside a child that's still closing.
+
+**Task host**
+
+- The shared host keeps opening sessions after a session's directory is deleted, instead of failing every new task child with `ENOENT`. ([senpi#2206](https://github.com/code-yeongyu/senpi/issues/2206))
+- The shared host no longer refuses task children when its memory is high, and it leaves memory pressure once memory is actually freed. ([#8960](https://github.com/code-yeongyu/oh-my-openagent/issues/8960), [senpi#2207](https://github.com/code-yeongyu/senpi/issues/2207), [senpi#2261](https://github.com/code-yeongyu/senpi/issues/2261))
+- A transient task daemon idle-exits again while omo runs, and polling `host status` no longer keeps hosts alive. ([#9041](https://github.com/code-yeongyu/oh-my-openagent/issues/9041), [senpi#2242](https://github.com/code-yeongyu/senpi/issues/2242), [senpi#2227](https://github.com/code-yeongyu/senpi/issues/2227))
+- An old host generation exits after a handoff even when one of its sessions misbehaves, and a handoff no longer inherits the calling session's identity or model. ([senpi#2285](https://github.com/code-yeongyu/senpi/issues/2285), [senpi#2208](https://github.com/code-yeongyu/senpi/issues/2208))
+
+**Commands and sessions**
+
+- `/ulw-execute <plan>` and every bundled skill name work as bare commands, like `/skill:<name>`. ([#9042](https://github.com/code-yeongyu/oh-my-openagent/issues/9042))
+- A bare `/skill` or `/skill:` opens the skill list instead of going to the model. ([senpi#2249](https://github.com/code-yeongyu/senpi/issues/2249), [senpi#2251](https://github.com/code-yeongyu/senpi/issues/2251))
+- `/thinking` works again, `/sessions` opens the session picker, and `/help` says how to change the thinking level and reopen a session. ([senpi#1437](https://github.com/code-yeongyu/senpi/issues/1437))
+- Answering `y` to "Fork this session into current directory?" forks it instead of printing `Aborted.` ([senpi#2180](https://github.com/code-yeongyu/senpi/issues/2180), [senpi#1042](https://github.com/code-yeongyu/senpi/pull/1042) by @beengineer500)
+- Starting omo no longer empties an upstream pi install, and a `~/.pi/agent` an earlier start drained gets its files copied back. ([#8039](https://github.com/code-yeongyu/oh-my-openagent/issues/8039), [senpi#2215](https://github.com/code-yeongyu/senpi/issues/2215))
+- MCP tools register once per session instead of twice. ([senpi#2177](https://github.com/code-yeongyu/senpi/issues/2177))
+- Unhandled errors go to the debug log instead of over the TUI, and a fatal crash prints one line with the log path. ([senpi#2284](https://github.com/code-yeongyu/senpi/issues/2284))
+- ulw plan progress counts `T1.2`, `F1`-style task ids and blocked `- [~]` rows, and a plan with no countable tasks no longer triggers a `0/0` continuation. ([#9019](https://github.com/code-yeongyu/oh-my-openagent/issues/9019), [#6233](https://github.com/code-yeongyu/oh-my-openagent/issues/6233))
+- Session search in the `coding-agent-sessions` skill finds prompts from the middle of a session. ([#9012](https://github.com/code-yeongyu/oh-my-openagent/issues/9012))
+
+**Edits and eval**
+
+- When the formatter rewrites a file after `write`, `edit` or `apply_patch`, the model always gets the "auto-formatted, re-read before exact-text edits" notice, also when diagnostics come back clean. ([#9123](https://github.com/code-yeongyu/oh-my-openagent/issues/9123))
+- The comment checker replaces a stale cached binary with the pinned release, and warns in the session when it can't run instead of going quiet. ([#8850](https://github.com/code-yeongyu/oh-my-openagent/issues/8850), contributed by @cynkai in [#8877](https://github.com/code-yeongyu/oh-my-openagent/pull/8877) and [#8880](https://github.com/code-yeongyu/oh-my-openagent/pull/8880))
+- `new Bun.WebView()` works in eval cells on Windows and Linux, and with `backend: "chrome"` on macOS, and no longer leaves Chrome running. ([senpi#2248](https://github.com/code-yeongyu/senpi/issues/2248), [senpi#2272](https://github.com/code-yeongyu/senpi/issues/2272))
+- Eval memory goes back to the machine without a reset, settled cells no longer pin their images in memory, and retired workers don't leave zombie processes. ([senpi#2259](https://github.com/code-yeongyu/senpi/issues/2259), [senpi#2260](https://github.com/code-yeongyu/senpi/issues/2260), [senpi#2261](https://github.com/code-yeongyu/senpi/issues/2261), [senpi#1962](https://github.com/code-yeongyu/senpi/issues/1962))
+- Eval cells that print a lot of output finish about 4x faster. ([senpi#2262](https://github.com/code-yeongyu/senpi/issues/2262))
+
+**Install, update and doctor**
+
+- `omo update` on a compiled binary picks the newest release on its own channel and the asset it was built as, and prints a command that replaces the running binary; the TUI update notice says `omo update`.
+- `omo doctor` treats a standalone omo binary as an OmO install instead of an unknown file to delete, and warns once when it and omo-ai are both on PATH.
+- On Windows, `omo doctor` and `install --platform=native` recognize a Bun-installed omo, and `omo update` uses `bun add -g` for a legacy Bun home install. ([#8909](https://github.com/code-yeongyu/oh-my-openagent/issues/8909))
+- The computer use engine for Intel Macs starts: it was built for macOS 10.12 and could not load its Swift libraries, and the release now runs its selftest under Rosetta. ([#9139](https://github.com/code-yeongyu/oh-my-openagent/pull/9139))
 
 ## [5.0.1] - 2026-09-27
 

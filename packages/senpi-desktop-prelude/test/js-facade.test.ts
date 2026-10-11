@@ -64,6 +64,19 @@ describe("JavaScript computer facade", () => {
 		await expect(call).rejects.toThrow("Suspended: the user pressed the stop chord");
 	});
 
+	it("throws the COMPUTER_PERMISSION_REQUIRED text when a permission denial comes back as an error", async () => {
+		// Given — the shape a code-mode marshal produces for the denial at omo #9475
+		const text =
+			'COMPUTER_PERMISSION_REQUIRED: accessibility permission is missing. Do not retry until the user says the grant is done and the app was relaunched.';
+		const kernel = loadJsFacade(() => ({ text, details: { value: { code: "COMPUTER_PERMISSION_REQUIRED" }, isError: true }, hasError: true }));
+
+		// When
+		const call = kernel.run("await computer.screenshot();");
+
+		// Then
+		await expect(call).rejects.toThrow("COMPUTER_PERMISSION_REQUIRED");
+	});
+
 	it("drops trailing undefined arguments from a chain step", async () => {
 		// Given
 		const kernel = loadJsFacade(windowResponder);
@@ -144,5 +157,64 @@ describe("JavaScript computer facade", () => {
 
 		// Then
 		expect(kernel.calls).toEqual([{ action: "capabilities" }, { action: "close" }]);
+	});
+
+	it("sends menu.items and menu.select as window-hopped chains with the path forwarded", async () => {
+		// Given
+		const kernel = loadJsFacade(windowResponder);
+
+		// When
+		await kernel.run(`
+			const win = await computer.window({ app: "Code" });
+			await win.menu.items();
+			await win.menu.items(["File"]);
+			await win.menu.select(["File", "Export…", "PDF"]);
+		`);
+
+		// Then
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "window", args: [{ app: "Code" }] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [["File"]] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.select", args: [["File", "Export…", "PDF"]] },
+				],
+			},
+		]);
+	});
+
+	it("returns the items array from win.menu.items", async () => {
+		// Given
+		const menu = [
+			{ title: "File", path: ["File"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },
+		];
+		const kernel = loadJsFacade((args) => {
+			const chain = Array.isArray(args.chain) ? args.chain : [];
+			if (chain.length === 1 && chain[0].method === "window") {
+				return { text: "", details: { value: WINDOW_SNAPSHOT } };
+			}
+			return { text: "", details: { value: menu } };
+		});
+
+		// When
+		const value = await kernel.run(`return (await computer.window("w1")).menu.items(["File"]);`);
+
+		// Then
+		expect(value).toEqual(menu);
 	});
 });

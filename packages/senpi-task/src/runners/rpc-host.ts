@@ -1,26 +1,35 @@
-import { mkdir } from "node:fs/promises"
-import { dirname } from "node:path"
 import { randomUUID } from "node:crypto"
 import { log } from "@oh-my-opencode/utils"
 
 import type { HostEnginePolicy } from "../lazy/senpi-barrel"
 import { RunnerError } from "./in-process/runner-error"
-import { HostUnavailableError, ensureTaskDaemon, type EnsureTaskDaemonInput, type EnsuredTaskDaemon } from "./rpc-host/daemon"
-import { createHostSessionHandle } from "./rpc-host/handle"
-import type { HostSessionChildHandle, HostSessionIdentity, HostSessionPort } from "./rpc-host/handle-port"
-import type { HostSessionReattach, HostSessionReattached } from "./rpc-host/reattach"
+import {
+  admitChildStore,
+  ensureChildEndpoint,
+  isEnsuredEndpoint,
+  recordSidecarStore,
+  resolveChildEndpoint,
+  type ChildEndpointPorts,
+  type EnsureTaskDaemonPort,
+  type ShardResolver,
+} from "./rpc-host/child-endpoint"
+import { HostUnavailableError, ensureTaskDaemon, forgetTaskDaemon } from "./rpc-host/daemon"
+import { recordedEndpointFailure } from "./rpc-host/endpoint-failure"
+import { onceNoticeSink, type HostNoticeSink } from "./rpc-host/host-notice"
+import type { HostShardEvents } from "./rpc-host/handle-reattach"
+import { createLiveHostChildren, type LiveHostChildren } from "./rpc-host/live-children"
+import type { HostSessionChildHandle, HostSessionPort } from "./rpc-host/handle-port"
 import { HostSessionClient, type OpenedHostSession } from "./rpc-host/session-client"
-import { openHostSessionWithAdmission } from "./rpc-host/admission"
-import { openTaskHostSession } from "./rpc-host/open-session"
+import { probeWithEngine, type HostProtocolProbe } from "./rpc-host/session-transport"
+import { waitOutBusyHost } from "./rpc-host/busy-host"
 import { resolveChildSessionPath } from "./rpc-host/session-context"
 import type { HostSessionOpenInput } from "./rpc-host/session-transport"
 import { isHostTransportError } from "./rpc-host/transport-error"
+import { createHostSessionOpener, type HostSessionOpener } from "./rpc-host/session-open"
+import type { TransportRecoveryOptions } from "./rpc-host/transport-recovery"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
-import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
-import type { RpcChildHandle, RpcRunnerSpec, RpcSwitchSessionResult } from "./types"
+import type { RpcChildHandle, RpcRunnerSpec } from "./types"
 
-const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
-const DEFAULT_CLOSE_GRACE_MS = 5_000
 /** Backoff between reattach attempts after a lost transport; the daemon needs a moment to come back. */
 const DEFAULT_REATTACH_DELAYS_MS: readonly number[] = [500, 1_000, 2_000, 4_000, 8_000]
 /** How long a start may wait for a memory-critical host to admit a new worker session. */
@@ -31,7 +40,7 @@ export interface HostSessionChannel extends HostSessionPort {
   open(input: HostSessionOpenInput): Promise<OpenedHostSession>
 }
 
-export type EnsureTaskDaemonPort = (input: EnsureTaskDaemonInput) => Promise<EnsuredTaskDaemon>
+export type { EnsureTaskDaemonPort, ShardResolver } from "./rpc-host/child-endpoint"
 export type CreateHostSessionChannel = (socketPath: string) => HostSessionChannel
 
 /** The per-child runner this one delegates to when the daemon cannot host a child. */
@@ -55,8 +64,30 @@ export type RpcHostRunnerOptions = {
   readonly onWarning?: (message: string) => void | (() => void)
   readonly now?: () => number
   readonly reattachDelaysMs?: readonly number[]
+  // The bound a lost transport's recovery runs under before the child ends `transport lost` (omo#9403).
+  readonly transportRecovery?: TransportRecoveryOptions
   readonly admissionWaitMs?: number
   readonly sleep?: (ms: number) => Promise<void>
+  // WHERE a new child's host listens, asked at EVERY start (the owning session changes on /new).
+  // Required: a task child has no machine-wide default endpoint.
+  readonly shardResolver: ShardResolver
+  // The task store (`resolveStateDir`): registered in the agent-dir store index before every open.
+  readonly storeDir: string
+  // The public socket this session lives behind (`readOwnHostSocket(pi)`); never ensured from inside.
+  readonly ownHostSocket: () => string | undefined
+  // Whether this session runs inside a host (an inherited tree key): with `ownHostSocket` unknown it
+  // may only attach to recorded endpoints, never start a supervisor.
+  readonly insideHost: () => boolean
+  // `host_notice:*` / `host_unavailable:*` tokens, once per token and endpoint.
+  readonly onNotice: HostNoticeSink
+  // Every child's transport recoveries, so the parent hears about a host crash once (todo 10).
+  readonly shardEvents: HostShardEvents
+  // The session's ONE live-child registry over `shardEvents`, when the session builds more than one
+  // runner (spawns and revivals): a crash must name every child it took from that session, not only
+  // the children of the runner whose child reported first. A lone runner gets a private registry.
+  readonly liveChildren?: LiveHostChildren
+  // The attach-only probe for the session's own endpoint; defaults to the engine's `probeHost`.
+  readonly probeHost?: HostProtocolProbe
 }
 
 /** Whether a started child lives on the daemon (a session) or in its own process (the fallback). */
@@ -65,8 +96,9 @@ export function isHostSessionHandle(handle: RpcChildHandle): handle is HostSessi
 }
 
 /**
- * Runs a `process`-mode child as a SESSION of the machine-wide senpi daemon: it attaches to (or
- * creates) that daemon through the engine's own ensure, opens one retained worker session per
+ * Runs a `process`-mode child as a SESSION of its parent session's own task host (the shard the
+ * resolver names): it attaches to (or creates) that host through the engine's own ensure - never the
+ * host this session itself lives on, which is only attached - opens one retained worker session per
  * child, and returns the same steerable handle shape the per-child runner returns. It spawns
  * nothing itself and holds no pid - a session's death is a session record, never a signal.
  *
@@ -75,14 +107,16 @@ export function isHostSessionHandle(handle: RpcChildHandle): handle is HostSessi
  * per-child `RpcProcessRunner` and the reason is warned ONCE per runner. Every other reason fails
  * closed with `host_unavailable`: a refused client must never start a second host beside the daemon.
  *
- * Two refusals are recoveries, not failures (omo#8563). A host above its memory refuse watermark
- * answers `host_memory_pressure` with a retry hint: the start WAITS for it (bounded) and asks
- * again - the one-process rule stands, so this never reaches the fallback. A lost transport under
+ * Two refusals are recoveries, not failures (omo#8563). A host from before senpi#2213 (which removed
+ * the RSS refuse watermark; current hosts never refuse an open for memory) may answer
+ * `host_memory_pressure` with a retry hint: the start WAITS for it (bounded) and asks again - the
+ * one-process rule stands, so this never reaches the fallback. A lost transport under
  * a live child is re-ensured and the same session path reopened with backoff; the handle stays.
+ * A host whose socket accepts but whose loop does not answer is busy, not gone (omo#9067): the
+ * start is attempted again at the same session path within the same bounded window.
  */
 export class RpcHostRunner {
   private readonly options: RpcHostRunnerOptions
-  private readonly ensureDaemon: EnsureTaskDaemonPort
   private readonly createClient: CreateHostSessionChannel
   private readonly modelAdmission: RpcModelAdmission
   private readonly inheritedExtensions: readonly string[]
@@ -92,10 +126,12 @@ export class RpcHostRunner {
   private readonly reattachDelaysMs: readonly number[]
   private readonly admissionWaitMs: number
   private readonly sleep: (ms: number) => Promise<void>
+  private readonly endpoint: ChildEndpointPorts
+  private readonly liveChildren: LiveHostChildren
+  private readonly sessionOpener: HostSessionOpener
 
   constructor(options: RpcHostRunnerOptions) {
     this.options = options
-    this.ensureDaemon = options.ensureDaemon ?? ensureTaskDaemon
     this.createClient = options.createClient ?? ((socketPath) => new HostSessionClient({ socketPath }))
     this.modelAdmission = options.modelAdmission ?? createRpcModelAdmission()
     this.inheritedExtensions = options.inheritedExtensions ?? []
@@ -104,6 +140,33 @@ export class RpcHostRunner {
     this.reattachDelaysMs = options.reattachDelaysMs ?? DEFAULT_REATTACH_DELAYS_MS
     this.admissionWaitMs = options.admissionWaitMs ?? DEFAULT_ADMISSION_WAIT_MS
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
+    this.liveChildren = options.liveChildren ?? createLiveHostChildren(options.shardEvents)
+    this.endpoint = {
+      agentDir: options.agentDir,
+      env: options.env ?? process.env,
+      policy: options.policy,
+      ensureDaemon: this.liveChildren.ensure(options.ensureDaemon ?? ensureTaskDaemon),
+      storeDir: options.storeDir,
+      shardResolver: options.shardResolver,
+      ownHostSocket: options.ownHostSocket,
+      insideHost: options.insideHost,
+      probeHost: options.probeHost ?? probeWithEngine,
+      notice: onceNoticeSink(options.onNotice),
+      now: this.now,
+    }
+    this.sessionOpener = createHostSessionOpener({
+      createClient: this.createClient,
+      endpoint: this.endpoint,
+      liveChildren: this.liveChildren,
+      heartbeatIntervalMs: options.heartbeatIntervalMs,
+      closeGraceMs: options.closeGraceMs,
+      now: this.now,
+      reattachDelaysMs: this.reattachDelaysMs,
+      ...(options.transportRecovery === undefined ? {} : { transportRecovery: options.transportRecovery }),
+      admissionWaitMs: this.admissionWaitMs,
+      sleep: this.sleep,
+      onWarning: this.onWarning,
+    })
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
@@ -112,23 +175,47 @@ export class RpcHostRunner {
         ? { ...specInput, extensions: this.inheritedExtensions }
         : specInput
     await this.modelAdmission(spec)
-    let daemon: EnsuredTaskDaemon
-    try {
-      daemon = await this.ensureDaemon({
-        agentDir: this.options.agentDir,
-        env: this.options.env ?? process.env,
-        policy: this.options.policy,
-      })
-    } catch (error) {
-      if (RunnerError.is(error)) throw error
-      return await this.delegate(error, spec, isHostTransportError(error))
-    }
-    try {
-      return await this.openChild(spec, daemon.socket)
-    } catch (error) {
-      if (RunnerError.is(error)) throw error
-      return await this.delegate(error, spec, false)
-    }
+    const endpoint = resolveChildEndpoint(this.endpoint, spec)
+    const keyed = endpoint.shardKey === undefined ? spec : { ...spec, treeKey: endpoint.shardKey, shardKey: endpoint.shardKey }
+    const sessionPath =
+      spec.resumeSessionPath ??
+      resolveChildSessionPath(spec.state_dir, spec.task_id, new Date(this.now()), randomUUID())
+    await admitChildStore(this.endpoint)
+    return await waitOutBusyHost(async () => {
+      for (let retried = false; ; retried = true) {
+        let socket: string
+        try {
+          socket = await ensureChildEndpoint(this.endpoint, endpoint)
+        } catch (error) {
+          if (RunnerError.is(error)) throw error
+          if (endpoint.recorded) throw recordedEndpointFailure(this.endpoint.notice, error, endpoint.socket)
+          return await this.delegate(error, spec, isHostTransportError(error))
+        }
+        await recordSidecarStore(this.endpoint, socket)
+        try {
+          return await this.sessionOpener.openChild(keyed, socket, sessionPath)
+        } catch (error) {
+          if (RunnerError.is(error)) throw error
+          // A recorded session never falls back to another endpoint, even when this host's
+          // capability refusal would allow a fresh child to start in its own process.
+          if (endpoint.recorded && error instanceof HostUnavailableError) {
+            throw recordedEndpointFailure(this.endpoint.notice, error, endpoint.socket)
+          }
+          // An ensure answered from the cache can vouch for a host that died moments ago: drop it
+          // and ensure this same endpoint once more.
+          if (!retried && isHostGone(error) && isEnsuredEndpoint(this.endpoint, endpoint)) {
+            forgetTaskDaemon(socket)
+            continue
+          }
+          return await this.delegate(error, spec, false)
+        }
+      }
+    }, {
+      now: this.now,
+      sleep: this.sleep,
+      waitMs: this.admissionWaitMs,
+      onWarning: this.onWarning,
+    })
   }
 
   /**
@@ -146,7 +233,10 @@ export class RpcHostRunner {
         kind: "host_unavailable",
         message: error instanceof Error ? error.message : String(error),
         ...(error instanceof HostUnavailableError
-          ? { reason: error.reason }
+          ? {
+              reason: error.reason,
+              ...(error.launchSpecPath === undefined ? {} : { launch_spec_path: error.launchSpecPath }),
+            }
           : hostUnreachable
             ? { reason: "host_unreachable" as const }
             : {}),
@@ -160,114 +250,8 @@ export class RpcHostRunner {
     return await fallback.start(spec)
   }
 
-  private async openChild(spec: RpcRunnerSpec, socket: string): Promise<RpcChildHandle> {
-    const client = this.createClient(socket)
-    const sessionPath =
-      spec.resumeSessionPath ??
-      resolveChildSessionPath(spec.state_dir, spec.task_id, new Date(this.now()), randomUUID())
-    // The daemon lstat()s the JSONL's directory before it opens the session and refuses with
-    // ENOENT when it is missing. A child process used to create that directory for itself; on the
-    // daemon path the client names the path, so the client creates the directory.
-    if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })
-    const opened = await this.openAdmitted(client, spec, sessionPath)
-    const handle = createHostSessionHandle({
-      client,
-      session: { routingId: opened.sessionId, sessionPath, instanceId: opened.instanceId },
-      taskId: spec.task_id,
-      heartbeatIntervalMs: this.options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
-      now: this.now,
-      closeGraceMs: this.options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS,
-      // The host's answer, not connection liveness: respawn continues an interrupted turn only when
-      // the session was reopened from its JSONL.
-      openDisposition: opened.attached ? "attached" : "reopened",
-      reattach: this.reattachPort(spec),
-    })
-    const switchOnPort = handle.switchSession
-    // A resumed child says nothing: an attached session is still mid-turn, and a session reopened
-    // from its JSONL keeps its transcript - replaying the prompt would duplicate the work.
-    if (spec.resumeSessionPath === undefined) await this.startTurn(handle, spec)
-    return Object.assign(handle, {
-      spawnSpec: {
-        cwd: spec.cwd,
-        ...(spec.extensions === undefined ? {} : { extensions: spec.extensions }),
-        ...(spec.memberEnv === undefined ? {} : { memberEnv: spec.memberEnv }),
-      },
-      // The session was opened AT this path, so resuming it is already done; only a different path
-      // is a real switch, and it goes to the handle's CURRENT port (a reattach replaces `client`).
-      switchSession: (target: string): Promise<RpcSwitchSessionResult> =>
-        target === sessionPath ? Promise.resolve({ cancelled: false }) : switchOnPort(target),
-    })
-  }
+}
 
-  /**
-   * Open, waiting out `host_memory_pressure`: the host says when to ask again, the wait is bounded
-   * by `admissionWaitMs`, and the wait note lives only for that admission episode. Every other
-   * refusal is final.
-   */
-  private async openAdmitted(
-    client: HostSessionChannel,
-    spec: RpcRunnerSpec,
-    sessionPath: string,
-  ): Promise<OpenedHostSession> {
-    return openHostSessionWithAdmission({
-      open: () => openTaskHostSession({ client, spec, sessionPath }),
-      now: this.now,
-      sleep: this.sleep,
-      admissionWaitMs: this.admissionWaitMs,
-      onWarning: this.onWarning,
-    })
-  }
-
-  /**
-   * Transport recovery for one child: re-ensure the daemon (it may have died), reopen the SAME
-   * session path through a fresh client, with backoff across attempts. Undefined when exhausted.
-   */
-  private reattachPort(spec: RpcRunnerSpec): HostSessionReattach {
-    return async (lost: HostSessionIdentity): Promise<HostSessionReattached | undefined> => {
-      for (const delayMs of this.reattachDelaysMs) {
-        await this.sleep(delayMs)
-        try {
-          const daemon = await this.ensureDaemon({
-            agentDir: this.options.agentDir,
-            env: this.options.env ?? process.env,
-            policy: this.options.policy,
-          })
-          const client = this.createClient(daemon.socket)
-          const opened = await this.openAdmitted(client, spec, lost.sessionPath)
-          return {
-            client,
-            session: { routingId: opened.sessionId, sessionPath: lost.sessionPath, instanceId: opened.instanceId },
-            attached: opened.attached,
-          }
-        } catch (error) {
-          log("senpi-task host session reattach attempt failed", { taskId: spec.task_id, error: String(error) })
-        }
-      }
-      return undefined
-    }
-  }
-
-  private async startTurn(handle: HostSessionChildHandle, spec: RpcRunnerSpec): Promise<void> {
-    try {
-      await handle.startInitialPrompt(spec.prompt)
-    } catch (error) {
-      // Captured BEFORE cleanup: a rejected prompt can leave the session live, and the teardown
-      // below must never be recorded as the cause of the rejection.
-      const exitOutcome = handle.exitOutcome()
-      try {
-        await discardUnstartedRpcHandle(handle)
-      } catch (cleanupError) {
-        log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
-      }
-      throw new RunnerError({
-        kind: "child-prompt-failed",
-        message: error instanceof Error ? error.message : String(error),
-        cause: error,
-        rejected_while: exitOutcome === undefined ? "alive" : "exited",
-        ...(exitOutcome === undefined
-          ? {}
-          : { exit: { kind: exitOutcome.kind, code: exitOutcome.facts.code, signal: exitOutcome.facts.signal } }),
-      })
-    }
-  }
+function isHostGone(error: unknown): boolean {
+  return error instanceof HostUnavailableError && error.reason === "host_unreachable"
 }

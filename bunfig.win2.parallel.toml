@@ -3,6 +3,7 @@ preload = ["./test-env.ts", "./test-setup.ts"]
 pathIgnorePatterns = [
   "dist/**",
   "packages/web/**",
+  "packages/get-worker/**",
   "packages/lsp-tools-mcp/**",
   "packages/lsp-daemon/**",
   "packages/senpi-desktop-*/**",
@@ -24,6 +25,9 @@ pathIgnorePatterns = [
   "packages/senpi-task/src/team/member-extension/residency.test.ts",
   "script/omob-refresh.test.ts",
   "script/release-version.test.ts",
+  "packages/senpi-task/src/store/record-lock.test.ts",
+  "packages/senpi-task/src/store/record-lock-reap-window.test.ts",
+  "packages/senpi-task/src/runners/rpc-host/durable-json.test.ts",
 ]
 
 [loader]

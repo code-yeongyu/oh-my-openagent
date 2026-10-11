@@ -12,7 +12,7 @@ image.workspace = true
 libc.workspace = true
 parking_lot.workspace = true
 senpi-desktop-backend-atspi = { path = "../senpi-desktop-backend-atspi" }
-senpi-desktop-core = { path = "../senpi-desktop-core" }
+senpi-desktop-core = { path = "../senpi-desktop-core", features = ["system-clipboard"] }
 senpi-desktop-safety = { path = "../senpi-desktop-safety" }
 x11rb.workspace = true
 xkeysym.workspace = true

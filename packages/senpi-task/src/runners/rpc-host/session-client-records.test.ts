@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
-import { isRoutedTo } from "./session-client"
+import { isRoutedTo, type HostSessionParked } from "./session-client"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 
 const harness = sessionClientHarness()
@@ -78,12 +78,12 @@ describe("HostSessionClient records", () => {
     expect((await answered).payload).toMatchObject({ id: "ui-2", cancelled: true })
   })
 
-  test("#given an idle retained session #when the host parks it #then onParked fires and the routing handle is released", async () => {
+  test("#given an idle retained session #when the host parks it #then onParked fires with the idle-sweep cause and the routing handle is released", async () => {
     // given
     const host = await fakeHost()
     const client = hostClient(host)
     const opened = await client.open(childOpenInput("/tmp/sessions/n.jsonl"))
-    const parked: Array<{ readonly sessionId: string; readonly sessionPath: string }> = []
+    const parked: HostSessionParked[] = []
     const seen = new Promise<void>((resolve) => {
       client.onParked((event) => {
         parked.push(event)
@@ -96,7 +96,7 @@ describe("HostSessionClient records", () => {
     await seen
 
     // then
-    expect(parked).toEqual([{ sessionId: opened.sessionId, sessionPath: "/tmp/sessions/n.jsonl" }])
+    expect(parked).toEqual([{ sessionId: opened.sessionId, sessionPath: "/tmp/sessions/n.jsonl", reason: "idle_evicted" }])
     expect(client.sessionId).toBeUndefined()
   })
 

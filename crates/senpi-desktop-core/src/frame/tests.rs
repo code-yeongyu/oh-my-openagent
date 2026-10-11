@@ -102,3 +102,19 @@ proptest! {
         prop_assert!((lx - x).abs() <= 0.5 && (ly - y).abs() <= 0.5, "({x}, {y}) -> ({lx}, {ly})");
     }
 }
+
+#[test]
+fn pixels_only_frame_refuses_coordinate_input_and_hit_tests() {
+    // Given: a 1280x720 capture from a source that reports no logical geometry.
+    let frame = FrameGeometry::pixels_only(1280, 720, "no geometry");
+    // Then: an in-bounds pixel is refused, naming the reason, both ways.
+    let error = frame.map_point(640.0, 360.0, None).unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidCoordinateFrame);
+    assert!(error.message.contains("no geometry"), "{}", error.message);
+    assert_eq!(
+        frame.map_to_pixel(10.0, 10.0).unwrap_err().code,
+        ErrorCode::InvalidCoordinateFrame
+    );
+    // An out-of-frame pixel keeps the ordinary bounds error.
+    assert!(frame.map_point(5000.0, 1.0, None).unwrap_err().message.contains("outside the last capture frame"));
+}

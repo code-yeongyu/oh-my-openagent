@@ -2,7 +2,7 @@ import type { AcquireDesktopEngineOptions, AcquiredDesktopEngine } from "@oh-my-
 import { afterEach, describe, expect, it } from "vitest";
 import { acquiringEngineChildFactory, type ChildFactory, DesktopEngineUnavailableError } from "../src/service/child";
 import { DesktopService } from "../src/service/service";
-import { fakeEngineFactory } from "./harness";
+import { exitOf, fakeEngineFactory } from "./harness";
 
 const services: DesktopService[] = [];
 
@@ -17,7 +17,7 @@ function serviceWith(createChild: ChildFactory): DesktopService {
 }
 
 describe("acquiringEngineChildFactory", () => {
-	it("acquires the release engine once, then opens a session on the acquired binary", async () => {
+	it("reacquires the requested release before every engine spawn", async () => {
 		// Given an acquisition that resolves a path, and a spawn that records it.
 		const log = fakeEngineFactory();
 		const requests: AcquireDesktopEngineOptions[] = [];
@@ -27,7 +27,7 @@ describe("acquiringEngineChildFactory", () => {
 			host: "darwin-arm64",
 			acquire: async (options) => {
 				requests.push(options);
-				return { path: "/cache/5.0.2/darwin-arm64/senpi-desktop-engine" };
+				return { path: `/cache/generation-${requests.length}/senpi-desktop-engine` };
 			},
 			spawnEngine: (enginePath) => {
 				spawned.push(enginePath);
@@ -37,14 +37,20 @@ describe("acquiringEngineChildFactory", () => {
 
 		// When the service opens, and the factory is asked for a second child.
 		const opened = await serviceWith(factory).open({});
-		await factory();
+		const second = await factory();
+		const secondExit = exitOf(second);
+		second.stdin.end();
+		await secondExit;
 
-		// Then the release was acquired once for that version and host, and both spawns used its path.
+		// Then no pathname from an earlier acquisition is reused.
 		expect(opened.backend).toBe("fake");
-		expect(requests).toEqual([{ version: "5.0.2", host: "darwin-arm64" }]);
+		expect(requests).toEqual([
+			{ version: "5.0.2", host: "darwin-arm64" },
+			{ version: "5.0.2", host: "darwin-arm64" },
+		]);
 		expect(spawned).toEqual([
-			"/cache/5.0.2/darwin-arm64/senpi-desktop-engine",
-			"/cache/5.0.2/darwin-arm64/senpi-desktop-engine",
+			"/cache/generation-1/senpi-desktop-engine",
+			"/cache/generation-2/senpi-desktop-engine",
 		]);
 	});
 

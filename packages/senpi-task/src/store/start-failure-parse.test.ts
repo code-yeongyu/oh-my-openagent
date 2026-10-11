@@ -19,7 +19,7 @@ function failedRecord() {
   return transitionTaskRecord(running, {
     type: "fail",
     timestamp: "2026-09-27T00:00:01.000Z",
-    error_message: "The shared host did not finish opening the child session in time (open_timed_out).",
+    error_message: "The task host did not finish opening the child session in time (open_timed_out).",
     failure_kind: "session_unavailable",
     failure_reason: "open_timed_out",
   }).record

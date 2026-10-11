@@ -3,6 +3,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 
+import { sandboxStateDir } from "./sandbox-child-env.mjs"
+
 export const CHILD_FINAL = "omo isolation e2e child done"
 export const PARENT_FINAL = "omo isolation e2e parent done"
 
@@ -61,13 +63,14 @@ export const CONFLICT_SCRIPT = {
 	],
 }
 
-export function stateDir(cwd) {
-	return join(cwd, ".omo", "senpi-task")
+/** The run's task state dir: the child runs on isolatedChildEnv(…, sandbox.agentDir). */
+export function stateDir(sandbox) {
+	return sandboxStateDir(sandbox)
 }
 
 /** Every task record in the sandbox: the store keeps one JSON document per task under `tasks/`. */
-export function readRecords(cwd) {
-	const dir = join(stateDir(cwd), "tasks")
+export function readRecords(sandbox) {
+	const dir = join(stateDir(sandbox), "tasks")
 	if (!existsSync(dir)) return []
 	const records = []
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -82,9 +85,9 @@ export function readRecords(cwd) {
 }
 
 /** The last record carrying an isolation block, which is the settled one. */
-export function latestIsolation(cwd) {
+export function latestIsolation(sandbox) {
 	let latest
-	for (const record of readRecords(cwd)) {
+	for (const record of readRecords(sandbox)) {
 		if (record !== null && typeof record === "object" && typeof record.isolation === "object" && record.isolation !== null) {
 			latest = record
 		}
@@ -111,8 +114,9 @@ function check(name, expected, observed) {
 	return { name, expected, observed, pass: JSON.stringify(expected) === JSON.stringify(observed) }
 }
 
-export function assertApplied(cwd) {
-	const record = latestIsolation(cwd)
+export function assertApplied(sandbox) {
+	const { cwd } = sandbox
+	const record = latestIsolation(sandbox)
 	const helloPath = join(cwd, "hello.txt")
 	const merge = record?.isolation?.merge_result
 	return [
@@ -134,10 +138,10 @@ function retainedSiblings(baseDir) {
 	return readdirSync(parent).filter((name) => name.startsWith(prefix)).map((name) => join(parent, name))
 }
 
-export function assertNotApplied(cwd) {
-	const record = latestIsolation(cwd)
+export function assertNotApplied(sandbox) {
+	const record = latestIsolation(sandbox)
 	const merge = record?.isolation?.merge_result
-	const helloPath = join(cwd, "hello.txt")
+	const helloPath = join(sandbox.cwd, "hello.txt")
 	const patch = typeof merge?.patchPath === "string" ? merge.patchPath : undefined
 	return [
 		check("record carries an isolation block", true, record !== undefined),
@@ -154,10 +158,10 @@ export function assertNotApplied(cwd) {
  * The failure control: a plugin built WITHOUT this change ignores `isolated` entirely - it records no
  * isolation for the same request, so nothing was cloned and nothing was merged back.
  */
-export function assertIsolatedRejected(cwd) {
-	const record = latestIsolation(cwd)
+export function assertIsolatedRejected(sandbox) {
+	const record = latestIsolation(sandbox)
 	return [
 		check("the pre-change plugin records no isolation", undefined, record?.isolation),
-		check("a task record was still produced", true, readRecords(cwd).length > 0),
+		check("a task record was still produced", true, readRecords(sandbox).length > 0),
 	]
 }

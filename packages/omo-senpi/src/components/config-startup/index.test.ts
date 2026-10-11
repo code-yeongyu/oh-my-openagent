@@ -128,6 +128,7 @@ describe("runSenpiStartupMigration", () => {
       "skipped",
       "skipped",
       "skipped",
+      "skipped",
     ])
     expect(parse(fileSystem.readFileSync("/home/alice/.omo/omo.jsonc", "utf-8"))).toMatchObject({
       _migrations: [
@@ -331,6 +332,32 @@ describe("notificationMessages", () => {
 
     // then: the one-release alias window closed, so the keys are plain custom agents
     expect(notices).toEqual([])
+  })
+
+  test("#given category and agent pins naming Devin SWE-2 ids Cascade does not serve #when notices are built #then one warning names each and the served lanes", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: {
+          quick: { model: "devin/swe-2-low" },
+          "deep-low": { models: ["devin/swe-2-max", { model: "devin/swe-2-high-lite" }] },
+          writing: { model: "devin/swe-2-high", fallback_models: ["devin/swe-2"] },
+        },
+        agents: { scout: { model: "devin/swe-2-medium" } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([{
+      message: "OmO Native: Devin does not serve devin/swe-2-low (categories.quick.model), devin/swe-2-high-lite (categories.deep-low.models[1]), devin/swe-2 (categories.writing.fallback_models[0]); SWE-2 runs as devin/swe-2-medium, devin/swe-2-high or devin/swe-2-max",
+      type: "warning",
+    }])
   })
 
   test("#given only canonical and custom agent keys #when notices are built #then no alias-deprecated notice is produced", () => {

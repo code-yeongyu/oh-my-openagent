@@ -7,6 +7,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createRpcChildHandle } from "./handle"
 import type { RpcProtocolClient } from "./protocol-client"
+import { createChildExtensionEvents } from "../child-extension-events"
 
 // oh-my-openagent#8931: a process-mode task child is watched by this parent, so its unexpected death
 // is recorded here, in the crashes.jsonl the OmO telemetry reporter reads.
@@ -20,6 +21,7 @@ function harness(): { readonly agentDir: string; readonly child: EventEmitter; r
   dirs.push(agentDir)
   const child = Object.assign(new EventEmitter(), { pid: undefined, exitCode: null, signalCode: null, kill: () => true })
   const client = {
+    extensionEvents: createChildExtensionEvents(),
     stderrTail: "",
     exited: false,
     send: () => Promise.resolve({ success: true }),

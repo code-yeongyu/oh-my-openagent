@@ -80,6 +80,7 @@ describe("OmO Native product identity", () => {
     expect(OMO_NATIVE_POSTHOG_API_KEY).not.toBe(UNCONFIGURED_POSTHOG_API_KEY)
     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
+    expect(config.productName).toBe("omo-native")
     expect(config.machineIdPrefix).toBe("omo-senpi:")
     expect(config.packageVersion).toBe(readStampedWorkspaceVersion())
     expect(config.productEnvPrefix).toBe("OMO_SENPI")

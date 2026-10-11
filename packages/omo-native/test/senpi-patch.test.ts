@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const PATCH_SCRIPT = join(PACKAGE_ROOT, "bin", "senpi-patch.mjs")
-const BUNDLED_ANTHROPIC_MESSAGES = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
+const PI_AI_ANTHROPIC_MESSAGES = "@earendil-works/pi-ai/dist/api/anthropic-messages.js"
 const ENGINE_BUNDLE = "dist/bundle"
 // Claude Opus 5.5 rejects OAuth requests advertising Claude Code below 2.1.280 (claude_code_version_too_old).
 const FLOOR = "2.1.280"
@@ -32,9 +32,16 @@ function anthropicMessagesSource(claudeCodeVersion: string): string {
   ].join("\n")
 }
 
-function createFixture(claudeCodeVersion: string): Fixture {
-  const root = mkdtempSync(join(tmpdir(), "omo-senpi-patch-"))
-  roots.push(root)
+// Where senpi's pi-ai lives: inside senpi (bundled publish), beside senpi (hoisted npm install), or
+// beside senpi's real path in bun's isolated store while the install links senpi by symlink.
+type Layout = "bundled" | "hoisted" | "bun-store"
+
+function createFixture(claudeCodeVersion: string, layout: Layout = "bundled"): Fixture {
+  const scratch = mkdtempSync(join(tmpdir(), "omo-senpi-patch-"))
+  roots.push(scratch)
+  const installRoot = layout === "bun-store" ? join(scratch, "node_modules", ".bun", "senpi@test") : scratch
+  const root = layout === "bundled" ? scratch : join(installRoot, "node_modules", "@code-yeongyu", "senpi")
+  mkdirSync(root, { recursive: true })
   writeFileSync(join(root, "package.json"), JSON.stringify({
     name: "@code-yeongyu/senpi",
     version: "2026.9.2",
@@ -43,10 +50,14 @@ function createFixture(claudeCodeVersion: string): Fixture {
   const rpcPath = join(root, "dist", "modes", "rpc", "rpc-mode.js")
   mkdirSync(dirname(rpcPath), { recursive: true })
   writeFileSync(rpcPath, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
-  const anthropicMessages = join(root, BUNDLED_ANTHROPIC_MESSAGES)
+  const anthropicMessages = join(layout === "bundled" ? root : installRoot, "node_modules", PI_AI_ANTHROPIC_MESSAGES)
   mkdirSync(dirname(anthropicMessages), { recursive: true })
   writeFileSync(anthropicMessages, anthropicMessagesSource(claudeCodeVersion))
-  return { root, anthropicMessages }
+  if (layout !== "bun-store") return { root, anthropicMessages }
+  const linked = join(scratch, "node_modules", "@code-yeongyu", "senpi")
+  mkdirSync(dirname(linked), { recursive: true })
+  symlinkSync(root, linked, "junction")
+  return { root: linked, anthropicMessages }
 }
 
 function bundledChunkSources(claudeCodeVersion: string): Record<string, string> {
@@ -137,7 +148,33 @@ describe("senpi-patch claudeCodeVersion floor", () => {
         writeFileSync(fixture.anthropicMessages, "export {}\n")
         const result = runPatch(fixture.root)
         expect(result.status).not.toBe(0)
-        expect(result.stderr).toContain(`omo-ai: unsupported Senpi ${BUNDLED_ANTHROPIC_MESSAGES}`)
+        expect(result.stderr).toContain(`omo-ai: unsupported Senpi ${PI_AI_ANTHROPIC_MESSAGES}`)
+      })
+    })
+  })
+
+  for (const layout of ["hoisted", "bun-store"] as const) {
+    describe(`#given a ${layout} install whose pi-ai lives beside senpi instead of inside it`, () => {
+      describe("#when the patch script runs as postinstall does", () => {
+        test("#then the pi-ai senpi resolves is raised to the floor", () => {
+          const fixture = createFixture("2.1.75", layout)
+          const result = runPatch(fixture.root)
+          expect(result.stderr).toBe("")
+          expect(result.status).toBe(0)
+          expect(readFileSync(fixture.anthropicMessages, "utf8")).toBe(anthropicMessagesSource(FLOOR))
+        })
+      })
+    })
+  }
+
+  describe("#given an engine whose pi-ai is not resolvable from senpi at all", () => {
+    describe("#when the patch script runs", () => {
+      test("#then it fails naming the missing pi-ai target", () => {
+        const fixture = createFixture("2.1.75", "hoisted")
+        rmSync(dirname(dirname(dirname(fixture.anthropicMessages))), { recursive: true, force: true })
+        const result = runPatch(fixture.root)
+        expect(result.status).not.toBe(0)
+        expect(result.stderr).toContain(`omo-ai: installed Senpi target is missing: ${PI_AI_ANTHROPIC_MESSAGES}`)
       })
     })
   })

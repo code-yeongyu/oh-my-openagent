@@ -1,8 +1,15 @@
 import { mock } from "bun:test"
 import * as actualFs from "node:fs"
+import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import lockfileModule from "../../node_modules/@code-yeongyu/senpi/node_modules/proper-lockfile/index.js"
+import { fileURLToPath } from "node:url"
+
+// proper-lockfile is senpi's dependency, so it resolves from senpi's real location exactly as
+// trust-storage.js resolves it: inside senpi when bundled, beside it when installed as a sibling.
+const senpiEntry = actualFs.realpathSync(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
+const lockfilePath = createRequire(senpiEntry).resolve("proper-lockfile")
+const { default: lockfileModule } = await import(lockfilePath)
 
 // The legacy writer's remaining work (full snapshot, lock removal) runs inside the
 // reader's first refused lock attempt, so the truncate/write boundary is crossed at
@@ -63,7 +70,7 @@ const lockSync = (file: string, options: Record<string, unknown> | undefined): (
     throw error
   }
 }
-mock.module("../../node_modules/@code-yeongyu/senpi/node_modules/proper-lockfile/index.js", () => ({
+mock.module(lockfilePath, () => ({
   ...realLockfile,
   default: { ...realLockfile, lockSync },
   lockSync,

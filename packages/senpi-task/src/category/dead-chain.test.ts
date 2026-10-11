@@ -37,15 +37,18 @@ describe("dead-chain category disabling", () => {
       expect(result.missing_providers).toEqual([
         "chatgpt-subscription",
         "openai",
+        "anthropic-subscription",
+        "anthropic-api",
+        "github-copilot",
         "deepseek",
         "qwen-token-plan",
         "alibaba-token-plan",
         "bailian-coding-plan",
         "opencode-go",
         "xai",
-        "anthropic-subscription",
-        "anthropic-api",
-        "github-copilot",
+        "zai",
+        "zai-coding-cn",
+        "xiaomi",
       ])
     })
 
@@ -95,9 +98,9 @@ describe("dead-chain category disabling", () => {
   })
 
   describe("#given a Copilot-only registry whose Claude ids use the engine's dotted spelling", () => {
-    test("#when the quick chain's copilot rung is claude-haiku-4-5 #then the transformed id keeps the category alive", () => {
+    test("#when the quick chain's copilot rung is claude-haiku-5-5 medium #then the transformed id keeps the category alive", () => {
       // given
-      const copilotOnly = registry([model("github-copilot", "claude-haiku-4.5")])
+      const copilotOnly = registry([model("github-copilot", "claude-haiku-5.5")])
 
       // when
       const result = resolveCategory("quick", {}, copilotOnly)
@@ -106,7 +109,8 @@ describe("dead-chain category disabling", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("github-copilot")
-      expect(result.spec.modelId).toBe("claude-haiku-4.5")
+      expect(result.spec.modelId).toBe("claude-haiku-5.5")
+      expect(result.spec.variant).toBe("medium")
       expect(result.availableCategories).toContain("quick")
     })
   })
@@ -149,7 +153,7 @@ describe("dead-chain category disabling", () => {
   })
 
   describe("#given a gateway-prefixed registry id", () => {
-    test("#when the unwrapped id matches a rung #then the category stays available", () => {
+    test("#when the gateway is not a rung provider #then its copy keeps the chain dead", () => {
       // given
       const models = registry([model("vercel", "openai/gpt-5.6-sol")])
 
@@ -157,8 +161,8 @@ describe("dead-chain category disabling", () => {
       const result = resolveCategory("deep-low", {}, models)
 
       // then
-      expect(result.kind).toBe("resolved")
-      expect(result.availableCategories).toContain("deep-low")
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("deep-low")
     })
   })
 

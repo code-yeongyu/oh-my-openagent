@@ -112,6 +112,9 @@ export interface HostDecision {
 export interface EnsureHostInput {
   readonly socket: string
   readonly agentDir?: string
+  // senpi #3044: the host stops shortly after this caller exits once no peer or turn remains, instead of
+  // waiting out the idle window. Engine pins before 2026.10.10-12 ignore it.
+  readonly owner?: "caller"
   readonly hostArgs?: readonly string[]
   readonly env?: Readonly<Record<string, string | null>>
   readonly upgrade?: "never" | "if-engine-differs"
@@ -125,6 +128,12 @@ export interface EnsuredSenpiHost {
   readonly instanceId?: string
   readonly generation?: number
   readonly engineVersion?: string
+  /**
+   * Ends the ensure's attach hold (senpi #2242): until then the host counts the ensuring process as an
+   * attached client and a transient host never starts its idle window. Absent on engine pins that
+   * predate the hold, so callers release it when present.
+   */
+  readonly release?: () => void
 }
 
 export type ProbeHostFn = (input: { readonly socket: string }) => Promise<SenpiHostProtocolInfo | undefined>
@@ -208,6 +217,19 @@ export function senpiDecideHostAction(): DecideHostActionFn {
 
 export function senpiEngineBuildIdentity(): EngineBuildIdentityFn {
   return requireHostSymbol<EngineBuildIdentityFn>("engineBuildIdentity")
+}
+
+export type CreateHostDaemonPathsFn = (target: { readonly socket: string; readonly agentDir?: string }) => { readonly dir: string }
+
+/**
+ * The engine's own answer to "which directory holds this endpoint's daemon state". Undefined while
+ * the barrel is not loaded yet or when the pinned engine predates the export: the caller keeps its
+ * own fallback instead of forcing the barrel onto a path that does not otherwise need it.
+ */
+export function senpiCreateHostDaemonPaths(): CreateHostDaemonPathsFn | undefined {
+  if (sharedState().module === undefined) return undefined
+  const value = barrelExports().createHostDaemonPaths
+  return isHostSymbol<CreateHostDaemonPathsFn>(value) ? value : undefined
 }
 
 /** The engine's RPC client constructor, for the per-child session client (one client per child). */

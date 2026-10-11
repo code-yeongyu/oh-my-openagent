@@ -3,7 +3,7 @@ import { spawn } from "node:child_process"
 import { once } from "node:events"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
-import { createTaskLifecycle } from "@oh-my-opencode/senpi-task"
+import { createTaskLifecycle, NO_HOST_ENDPOINT } from "@oh-my-opencode/senpi-task"
 import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
 import { terminateRpcChild } from "../../../../senpi-task/src/runners/rpc/terminate"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -29,6 +29,7 @@ for (const path of ["park", "missing-session", "normal", "missing-session-runnin
     const base = composeTaskEngine({ pi, cwd, omoConfig: loadOmoConfig({ cwd }).config, sharedParentTools: () => [] })
     base.lifecycle.dispose?.()
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store, registry, config: settings(),
       now: () => Date.now() + 86_400_000,
     })

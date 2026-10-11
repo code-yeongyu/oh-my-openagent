@@ -29,6 +29,13 @@ function nodeInterpreter(): string | undefined {
 const NODE = nodeInterpreter()
 const POSIX_ONLY = process.platform === "win32" || !NODE
 
+// The system dirs a node-less PATH keeps (`sh` lives there). A host that ships node in them cannot
+// stage a machine without node, so that case skips instead of passing on the wrong runtime.
+const NODELESS_SYSTEM_DIRS = "/bin"
+const NODELESS_UNAVAILABLE = process.platform === "win32"
+  || !process.versions.bun
+  || spawnSync("/usr/bin/env", ["node", "--version"], { env: { PATH: NODELESS_SYSTEM_DIRS } }).status === 0
+
 type Fixture = {
   root: string
   bunInstall: string
@@ -89,10 +96,12 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   mkdirSync(join(senpiRoot, "dist", "core"), { recursive: true })
   writeFileSync(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   // A stand-in bun that proves it ran; the real bun end to end is QA's job against the real install.
+  // It answers `--version` like a real bun at the engine's floor, because the launcher probes the
+  // bun a bun-global install chose before trusting it (#9563).
   const markerFile = join(root, "fake-bun.marker")
   const bunBinary = join(bunInstall, "bin", "bun")
   mkdirSync(join(bunInstall, "bin"), { recursive: true })
-  writeFileSync(bunBinary, `#!/bin/sh\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
+  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
   symlinkSync(stockLinkTarget(), join(bunInstall, "bin", "omo"))
   mkdirSync(join(root, "home"), { recursive: true })
   return {
@@ -128,6 +137,34 @@ function launchEntry(fixture: Fixture, args: string[], env: Record<string, strin
   })
 }
 
+/**
+ * Turns the fixture into what `bun add -g` leaves behind before it runs the package's own scripts:
+ * the real postinstall line, and an engine tree that postinstall can prepare (the RPC serializer it
+ * patches comes from the installed engine and the pi-ai file it floors is bundled, as in
+ * senpi-patch.test.ts).
+ */
+function stageInstalledPackage(fixture: Fixture): void {
+  const manifestPath = join(fixture.packageRoot, "package.json")
+  const shipped = JSON.parse(readFileSync(join(SOURCE_ROOT, "package.json"), "utf8"))
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
+  writeFileSync(manifestPath, JSON.stringify({ ...manifest, scripts: { postinstall: shipped.scripts.postinstall } }))
+  const senpiRoot = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi")
+  const rpcMode = join(senpiRoot, "dist", "modes", "rpc", "rpc-mode.js")
+  mkdirSync(dirname(rpcMode), { recursive: true })
+  writeFileSync(rpcMode, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
+  const anthropicMessages = join(senpiRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js")
+  mkdirSync(dirname(anthropicMessages), { recursive: true })
+  writeFileSync(anthropicMessages, 'const claudeCodeVersion = "2.1.75";\nexport { claudeCodeVersion }\n')
+}
+
+/** A PATH that reaches bun and the system shell but no node, like a launchd job or a bun-only box. */
+function nodelessEnv(fixture: Fixture): NodeJS.ProcessEnv {
+  const pathDir = join(fixture.root, "nodeless-path")
+  mkdirSync(pathDir, { recursive: true })
+  symlinkSync(process.execPath, join(pathDir, "bun"))
+  return fixtureEnv(fixture, { PATH: `${pathDir}:${NODELESS_SYSTEM_DIRS}` })
+}
+
 function capture(fixture: Fixture): { argv: string[]; env: NodeJS.ProcessEnv; versions: Record<string, string | undefined> } {
   return JSON.parse(readFileSync(fixture.captureFile, "utf8"))
 }
@@ -159,6 +196,24 @@ describe("bun launcher bin shim", () => {
   })
 
   describe.skipIf(NON_POSIX_HOST)("#given a stock bun bin symlink pointing at this install", () => {
+    test("#then a launch running on bun repairs it too (#9293)", () => {
+      // given: bun is the runtime - bun's postinstall on a machine without node, or `bun omo.js`
+      const scriptPath = bunTreePackage(join(POSIX_HOME, ".bun"))
+      const { options, bunRootDir, bunPath } = baseInput(scriptPath, { versions: { bun: "1.4.2" } })
+      const binPath = join(bunRootDir, "bin", "omo")
+      const fs = recorder()
+      fs.markLink(binPath)
+      // when
+      const result = ensureBunBinShim({
+        ...options,
+        realpath: (path: string) => (path === binPath ? scriptPath : path),
+        ...fs,
+      })
+      // then
+      expect(result.action).toBe("repaired")
+      expect(fs.written[0]?.content).toBe(bunBinShimScript(scriptPath, bunPath))
+    })
+
     test("#then it is replaced by an executable shim through an atomic rename", () => {
       // given
       const scriptPath = bunTreePackage(join(POSIX_HOME, ".bun"))
@@ -268,16 +323,6 @@ describe("bun launcher bin shim", () => {
       // must stay exactly what bun/npm linked
       expect(result.action).toBe("skipped-platform")
       expect(fs.written).toHaveLength(0)
-    })
-
-    test("#then a launcher already running on bun skips the check entirely", () => {
-      // given
-      const { options } = baseInput(scriptPath, { versions: { bun: "1.4.0" } })
-      const fs = recorder()
-      // when
-      const result = ensureBunBinShim({ ...options, ...fs })
-      // then - bun arrived through the shim already; the hot path pays nothing
-      expect(result.action).toBe("skipped-runtime")
     })
 
     test("#then an npm-layout install skips the check entirely", () => {
@@ -437,6 +482,34 @@ describe("bun launcher bin shim", () => {
       } finally {
         chmodSync(join(fixture.bunInstall, "bin"), 0o755)
       }
+    })
+  })
+
+  describe("#given a bun add -g update on a machine without node (#9293)", () => {
+    test.skipIf(NODELESS_UNAVAILABLE)("#then bun's postinstall leaves an omo that starts without node", () => {
+      // given: the tree `bun add -g` just linked - its bin is the stock symlink to the entrypoint,
+      // whose `#!/usr/bin/env node` cannot start where node is not on PATH
+      const fixture = createFixture()
+      stageInstalledPackage(fixture)
+      const env = nodelessEnv(fixture)
+      const stock = spawnSync(fixture.binPath, ["--version"], { encoding: "utf8", env })
+      expect(stock.status).toBe(127)
+
+      // when: bun runs the package's postinstall right after linking; with no node on PATH, bun
+      // runs the script's `node` itself
+      const postinstall = spawnSync(process.execPath, ["run", "postinstall"], {
+        cwd: fixture.packageRoot,
+        encoding: "utf8",
+        env,
+      })
+
+      // then: the bin is the shim again, and `omo` starts on bun with the same node-less PATH
+      expect(postinstall.status).toBe(0)
+      expect(lstatSync(fixture.binPath).isSymbolicLink()).toBe(false)
+      expect(readFileSync(fixture.binPath, "utf8")).toBe(bunBinShimScript(fixture.launcher, fixture.bunBinary))
+      const launched = spawnSync(fixture.binPath, ["--version"], { encoding: "utf8", env })
+      expect(launched.status).toBe(42)
+      expect(readFileSync(fixture.markerFile, "utf8")).toBe("fake-bun-ran")
     })
   })
 })

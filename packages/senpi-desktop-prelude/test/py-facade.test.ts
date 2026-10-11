@@ -59,6 +59,24 @@ describe("Python computer facade", () => {
 		expect(run.error).toBe("RuntimeError: PermissionDenied: computer:exec is denied");
 	});
 
+	it("raises RuntimeError with the COMPUTER_PERMISSION_REQUIRED text when a permission denial comes back as an error", () => {
+		// Given — the shape a code-mode marshal produces for the denial at omo #9475
+		const text =
+			"COMPUTER_PERMISSION_REQUIRED: screen recording is not granted. Do not retry until the user says the grant is done and the app was relaunched.";
+		const denial = JSON.stringify({
+			text,
+			details: { value: { code: "COMPUTER_PERMISSION_REQUIRED" }, isError: true },
+			hasError: true,
+			images: [],
+		});
+
+		// When
+		const run = runPythonFacade("computer.screenshot()", { screenshot: denial });
+
+		// Then
+		expect(run.error).toBe(`RuntimeError: ${text}`);
+	});
+
 	it("exposes the resolved window's identity fields on the handle", () => {
 		// When
 		const run = runPythonFacade(
@@ -86,5 +104,38 @@ describe("Python computer facade", () => {
 			error: "TypeError: computer.run() expects a JavaScript code string",
 			calls: [],
 		});
+	});
+
+	it("sends menu.items and menu.select as window-hopped chains with the path forwarded", () => {
+		// When
+		const run = runPythonFacade(
+			"win = computer.window(app='Code')\nwin.menu.items()\nwin.menu.items(['File'])\nwin.menu.select(['File', 'Export…', 'PDF'])",
+		);
+
+		// Then
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "window", args: [{ app: "Code" }] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [["File"]] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.select", args: [["File", "Export…", "PDF"]] },
+				],
+			},
+		]);
 	});
 });

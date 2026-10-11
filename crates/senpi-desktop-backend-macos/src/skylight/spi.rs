@@ -20,6 +20,7 @@ type CGSMainConnectionIDFn = unsafe extern "C" fn() -> u32;
 type SLSGetWindowOwnerFn = unsafe extern "C" fn(u32, u32, *mut u32) -> i32;
 type SLSGetConnectionPSNFn = unsafe extern "C" fn(u32, *mut ProcessSerialNumber) -> i32;
 type GetProcessForPIDFn = unsafe extern "C" fn(libc::pid_t, *mut ProcessSerialNumber) -> i32;
+type GetProcessPIDFn = unsafe extern "C" fn(*const ProcessSerialNumber, *mut libc::pid_t) -> i32;
 type CGEventSetWindowLocationFn = unsafe extern "C" fn(*mut c_void, CGPoint);
 type SLPSSetFrontProcessWithOptionsFn = unsafe extern "C" fn(*const ProcessSerialNumber, u32, u32) -> i32;
 type SLEventSetAuthenticationMessageFn = unsafe extern "C" fn(*mut c_void, *mut c_void);
@@ -49,7 +50,6 @@ pub(super) struct RequiredSpi {
 /// The SPI needed only for foreground delivery and focus restore.
 pub(super) struct ForegroundSpi {
     pub(super) set_front: SLPSSetFrontProcessWithOptionsFn,
-    pub(super) get_front: SLPSGetFrontProcessFn,
     pub(super) psn: PsnLookup,
 }
 
@@ -84,6 +84,31 @@ impl PsnLookup {
 static REQUIRED: LazyLock<Option<RequiredSpi>> = LazyLock::new(resolve_required);
 static FOREGROUND: LazyLock<Option<ForegroundSpi>> = LazyLock::new(resolve_foreground);
 pub(super) static AUTHENTICATION: LazyLock<Option<AuthenticationSpi>> = LazyLock::new(resolve_authentication);
+static FRONT_PID: LazyLock<Option<(SLPSGetFrontProcessFn, GetProcessPIDFn)>> = LazyLock::new(|| {
+    if disabled_by_env() {
+        return None;
+    }
+    ensure_skylight_loaded()?;
+    Some((symbol(c"_SLPSGetFrontProcess")?, symbol(c"GetProcessPID")?))
+});
+
+/// The front process's pid as WindowServer reports it now. Unlike
+/// `NSWorkspace.frontmostApplication`, this does not depend on an AppKit run
+/// loop in this process observing activation changes (the engine has none, so
+/// the AppKit value can stay at whatever application was front when it was
+/// first read).
+pub(crate) fn front_pid() -> Option<libc::pid_t> {
+    let (get_front, get_pid) = (*FRONT_PID)?;
+    let mut psn = ProcessSerialNumber::default();
+    // SAFETY: `psn` is a writable 8-byte PSN, the exact record this SPI fills.
+    if unsafe { get_front(&mut psn) } != 0 {
+        return None;
+    }
+    let mut pid: libc::pid_t = 0;
+    // SAFETY: both pointers are valid for the synchronous lookup and the symbol
+    // has the exact `GetProcessPID` ABI.
+    (unsafe { get_pid(&psn, &mut pid) } == 0 && pid > 0).then_some(pid)
+}
 
 /// Test hook: `SENPI_DESKTOP_DISABLE_SKYLIGHT=1` makes every probe report the
 /// SPI as missing so the no-SkyLight failure paths stay exercisable.
@@ -153,7 +178,6 @@ fn resolve_foreground() -> Option<ForegroundSpi> {
     ensure_skylight_loaded()?;
     Some(ForegroundSpi {
         set_front: symbol(c"_SLPSSetFrontProcessWithOptions")?,
-        get_front: symbol(c"_SLPSGetFrontProcess")?,
         psn: lookup()?,
     })
 }

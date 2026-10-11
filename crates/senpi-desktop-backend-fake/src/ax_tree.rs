@@ -149,6 +149,19 @@ impl AxTree {
             })
     }
 
+    /// The window whose scripted tree holds `id`.
+    pub(crate) fn window_of(&self, id: u64) -> CoreResult<Option<String>> {
+        let mut root = id;
+        while let Some(parent) = self.entry(root)?.parent {
+            root = parent;
+        }
+        Ok(self
+            .roots
+            .iter()
+            .find(|(_, node)| **node == root)
+            .map(|(window, _)| window.clone()))
+    }
+
     pub(crate) fn attributes(&self, id: u64) -> CoreResult<Vec<(String, String)>> {
         let props = &self.entry(id)?.props;
         let optional = [

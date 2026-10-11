@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ASSETS_MODULE_PATH, renderAssetsModule } from "../scripts/generate-assets";
+import { ASSETS_JSON_PATH, renderAssetsJson } from "../scripts/generate-assets";
 import { computerPreludeAssets } from "../src/index";
 import { loadJsFacade, runPythonFacade, windowResponder } from "./harness";
 import { javascriptHelperNames } from "./helper-names";
@@ -10,12 +10,12 @@ function escapeRegExp(text: string): string {
 }
 
 describe("computer prelude assets", () => {
-	it("keeps the committed assets module in sync with the asset files", () => {
+	it("keeps the committed assets JSON in sync with the asset files", () => {
 		// When
-		const rendered = renderAssetsModule();
+		const rendered = renderAssetsJson();
 
 		// Then
-		expect(readFileSync(ASSETS_MODULE_PATH, "utf8")).toBe(rendered);
+		expect(readFileSync(ASSETS_JSON_PATH, "utf8")).toBe(rendered);
 	});
 
 	it("defines every declared export in the JavaScript kernel", async () => {

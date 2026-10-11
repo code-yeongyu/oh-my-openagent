@@ -114,7 +114,7 @@ impl<S: XServer> X11Capture<S> {
         Ok((composite, frame))
     }
 
-    /// The window's on-root area; the frame describes the clipped bounds.
+    /// The full window frame, with off-root pixels transparent.
     fn capture_window(&self, id: &str) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let window = self
             .windows()?
@@ -130,15 +130,15 @@ impl<S: XServer> X11Capture<S> {
         };
         let clipped = clip_to_root(rect, screen.width, screen.height)
             .ok_or_else(|| DesktopError::capture_failed(format!("window {id} has no visible root area")))?;
-        let image = self.capture_rect(clipped)?;
-        let frame_window = DesktopWindow {
-            x: clipped.x,
-            y: clipped.y,
-            width: clipped.width,
-            height: clipped.height,
-            ..window
-        };
-        let frame = FrameGeometry::for_window(&frame_window, image.width(), image.height());
+        let visible = self.capture_rect(clipped)?;
+        let mut image = RgbaImage::new(window.width, window.height);
+        imageops::replace(
+            &mut image,
+            &visible,
+            i64::from(clipped.x.saturating_sub(window.x)),
+            i64::from(clipped.y.saturating_sub(window.y)),
+        );
+        let frame = FrameGeometry::for_window(&window, image.width(), image.height());
         Ok((image, frame))
     }
 

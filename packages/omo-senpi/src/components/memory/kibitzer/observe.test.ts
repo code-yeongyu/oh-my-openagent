@@ -261,6 +261,13 @@ describe("kibitzer diagnostic streak notice", () => {
     expect(f.warnings).toEqual([])
   })
 
+  test("#given the session's recall category #when a failure streak raises the gate notice #then the record names that category beside the model", async () => {
+    const f = await fixture()
+    for (const wake of [1, 2, 3]) f.observe.onWake(outcome({ wake, status: "failed" }), f.context, { category: "quick" })
+    expect(f.gates()).toHaveLength(1)
+    expect(f.gates()[0]).toMatchObject({ model: "omo-mock/mock-1", category: "quick", consecutiveFailures: 3 })
+  })
+
   test("#given three consecutive diagnostic failures (three diagnostic) #when the third settles #then exactly one actionable gate notice is appended, a fourth failure adds nothing, and a normal completion or shutdown starts a fresh streak", async () => {
     const f = await fixture()
     expect(KIBITZER_PERSISTENT_FAILURE_THRESHOLD).toBe(3)

@@ -4,6 +4,7 @@ import type { TaskRecord } from "../state"
 import { nowIso, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ResidentHandle } from "./port"
+import { withinTeardownBudget } from "./teardown-budget"
 import type { SuspendFailure, SuspendInput, SuspendSummary } from "./types"
 
 /**
@@ -86,10 +87,17 @@ export async function suspendOnSessionShutdown(
 // suspended record), then live resources are torn down and the record is parked at its suspended
 // residency. The pre-dispose steps are best-effort so dispose ALWAYS runs.
 export async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
-  context.registry.forget(handle.task_id)
-  await bestEffort(handle.task_id, "abort", () => handle.abort())
-  if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => handle.terminate())
-  await handle.dispose()
+  context.registry.forget(handle.task_id, { path: "park" })
+  const target = { taskId: handle.task_id, pid: handle.pid }
+  await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
+  if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()))
+  try {
+    await withinTeardownBudget(context.teardownStepDeadline, target, "dispose", () => handle.dispose())
+  } catch (error) {
+    context.failedTeardowns.add(handle.task_id)
+    throw error
+  }
+  context.failedTeardowns.delete(handle.task_id)
   context.store.transition(handle.task_id, {
     type: handle.kind === "in-process" ? "persist_only" : "detach_rpc",
     timestamp: nowIso(context),

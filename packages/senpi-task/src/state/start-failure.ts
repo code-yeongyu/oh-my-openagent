@@ -1,4 +1,5 @@
 export const TASK_START_FAILURE_KINDS = [
+  "suspended_unresumable",
   "child-prompt-failed",
   "child-turn-failed",
   "session-create-failed",
@@ -27,6 +28,15 @@ export const HOST_START_FAILURE_REASONS = [
   "host_unreachable",
   "ensure_failed",
   "ensure_timed_out",
+  "shard_socket_too_long",
+  "shard_alt_root_unsafe",
+  "legacy_host",
+  "host_incompatible",
+  "store_index_unavailable",
+  "own_host_unreachable",
+  "shard_identity_missing",
+  "host_busy",
+  "launch_spec_insecure",
 ] as const
 
 export const SESSION_START_FAILURE_REASONS = [

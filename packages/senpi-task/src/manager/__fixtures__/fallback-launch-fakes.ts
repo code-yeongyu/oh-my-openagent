@@ -5,6 +5,7 @@ import type { ManagedChildHandle } from "../child-handle"
 import { createTaskManager } from "../manager"
 import type { ManagedRunner, ManagedStartSpec, ResolvedChildPlan, TaskManager } from "../types"
 import { makeHandle, settings } from "./manager-fakes"
+import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
 
 export const PRIMARY = "vendor/primary"
 export const NEXT = "vendor/next"
@@ -56,7 +57,7 @@ export function managerOver(store: TaskRecordStore, runner: ManagedRunner, proje
     destruction: {
       destroyResidentTask: destroy ?? (async (taskId) => {
         const handle = manager?.getResidentHandle(taskId)
-        manager?.forget(taskId)
+        manager?.forget(taskId, { path: "park" })
         await handle?.dispose()
       }),
     },
@@ -74,6 +75,7 @@ export function managerWithLifecycle(store: TaskRecordStore, runner: ManagedRunn
   const signals: string[] = []
   let manager: TaskManager | undefined
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     config: settings({ default_concurrency: 2, max_depth: 1 }),
     hostPid: HOST_PID,

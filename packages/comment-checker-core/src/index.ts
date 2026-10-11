@@ -17,6 +17,7 @@ export {
 } from "./release"
 export type { CommentCheckerArchiveExtension, CommentCheckerCacheDirInput, CommentCheckerReleaseAsset } from "./release"
 export { COMMENT_CHECKER_VERSION_MARKER, isCachedCommentCheckerCurrent, recordCachedCommentCheckerRelease } from "./cached-release"
+export { COMMENT_CHECKER_PACKAGE_NAME, findCommentCheckerPackageBinary } from "./package-binary"
 export { resolveCommentCheckerBinary, runCommentChecker } from "./runner"
 export { sendAndCloseStdin } from "./stdin-delivery"
 export type {
@@ -29,6 +30,7 @@ export type {
   CommentInfo,
   CommentType,
   FileComments,
+  FindCommentCheckerPackageBinaryInput,
   FilterResult,
   HookInput,
   PendingCall,

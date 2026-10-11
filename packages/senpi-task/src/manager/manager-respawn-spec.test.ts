@@ -173,6 +173,7 @@ describe("buildRespawnManagedSpec", () => {
       instructions: "planner instructions",
       toolAllowlist: ["read", "bash"],
       toolDenylist: ["write", "edit"],
+      includeTaskTools: true,
       memberScopedToolNames: ["alpha_read"],
     })
     expect("memberScopedTools" in rebuilt.spec).toBe(false)

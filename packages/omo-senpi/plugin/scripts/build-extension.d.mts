@@ -4,7 +4,14 @@ export interface BuildExtensionOptions {
   memberOutputPath?: string
   supervisorOutputPath?: string
   advisorRuntimeOutputPath?: string
+  sidePanelRuntimeOutputPath?: string
   toolkitSdkOutputPath?: string
+  rollbackRuntimeOutputPath?: string
+  memoryDoctorOutputPath?: string
+  memoryMemfsOutputPath?: string
+  computerUseOutputPath?: string
+  gatewayStoreWorkerOutputPath?: string
+  threadSdkOutputPath?: string
 }
 export function buildExtension(options?: BuildExtensionOptions): Promise<{
   mainInputs: string[]
@@ -12,8 +19,21 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   memberInputs: string[]
   supervisorInputs: string[]
   advisorRuntimeInputs: string[]
+  sidePanelRuntimeInputs: string[]
+  memoryDoctorInputs: string[]
+  memoryMemfsInputs: string[]
+  computerUseInputs: string[]
   toolkitSdkInputs: string[]
+  rollbackRuntimeInputs: string[]
+  gatewayStoreWorkerInputs: string[]
+  threadSdkInputs: string[]
 }>
+export function checkExtensionCurrent(options?: BuildExtensionOptions): Promise<
+  | { ok: true; output: string; gatewayStoreWorkerOutput: string; threadSdkOutput: string }
+  | { ok: false; reason: "missing-output" | "stale-output"; output: string }
+>
+export const GATEWAY_STORE_WORKER_NAME: "gateway-store-worker.mjs"
+export const THREAD_SDK_RELATIVE_PATH: string
 export const SENPI_LOADER_ALIASES: readonly [
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-agent-core",

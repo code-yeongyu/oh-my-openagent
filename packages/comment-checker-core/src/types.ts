@@ -116,6 +116,15 @@ export interface ResolveCommentCheckerBinaryInput {
   readonly packageName?: string
 }
 
+export interface FindCommentCheckerPackageBinaryInput {
+  readonly packageJsonPath: string
+  readonly binaryName: string
+  readonly existsSync: (path: string) => boolean
+  readonly packageName?: string
+  readonly platform?: string
+  readonly arch?: string
+}
+
 export interface RunCommentCheckerInput {
   readonly hookInput: HookInput
   readonly binaryPath: string | null

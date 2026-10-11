@@ -1,12 +1,15 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { computerPreludeAssets } from "@oh-my-opencode/senpi-desktop-prelude";
 import { Check } from "typebox/value";
 import { describe, expect, it } from "vitest";
 import { ComputerHandle } from "../src/activation";
+import { ComputerArgumentsError } from "../src/action-schema";
 import { ComputerParams } from "../src/params";
 import { resolveComputerSettings } from "../src/settings";
-import { createComputerTool } from "../src/tool";
+import { computerToolDefinition } from "../src/tool-definition";
+import { createComputerTool, parseComputerParams } from "../src/tool";
 import { closedService } from "./fixtures";
 
 const srcDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
@@ -39,6 +42,21 @@ describe("computer ToolDefinition", () => {
 		expect(keywords).toContain("cua");
 	});
 
+	it("keeps the registration shell's search surface and prompt guidelines on dev's bytes (#9113)", () => {
+		// Given: the prelude texts now load from the staged JSON; the published surface must not move.
+		const bullets = computerPreludeAssets.safety
+			.split("\n")
+			.filter((line) => line.startsWith("- "))
+			.map((line) => line.slice(2));
+
+		// When / Then
+		expect(computerToolDefinition.promptGuidelines).toEqual(bullets);
+		expect(computerToolDefinition.searchText).toBe(
+			"Operate the real desktop (experimental): screenshots, clicks, typing, key chords, window list, accessibility tree, clipboard; macOS/Linux/Windows",
+		);
+		expect(computerToolDefinition.kernelPrelude).toBe(computerPreludeAssets);
+	});
+
 	it("contributes exactly the computer global to the eval kernels", () => {
 		// Given
 		const definition = tool();
@@ -50,6 +68,22 @@ describe("computer ToolDefinition", () => {
 		expect(exports).toEqual(["computer"]);
 	});
 
+	it("publishes one root object schema with the action enum, which every provider accepts", () => {
+		// Given
+		const definition = tool();
+
+		// When
+		const schema = JSON.parse(JSON.stringify(definition.parameters));
+
+		// Then
+		expect({ type: schema.type, anyOf: schema.anyOf, oneOf: schema.oneOf, action: schema.properties.action }).toEqual({
+			type: "object",
+			anyOf: undefined,
+			oneOf: undefined,
+			action: expect.objectContaining({ type: "string", enum: ["call", "run", "capabilities", "close"] }),
+		});
+	});
+
 	it.each([
 		{ action: "call", chain: [{ method: "screenshot" }] },
 		{ action: "run", code: "return 1", read_only: true, timeout: 5 },
@@ -58,24 +92,35 @@ describe("computer ToolDefinition", () => {
 	])("accepts the model-facing action %j", (params) => {
 		// Given: a parameter object the prelude facade emits.
 		// When
-		const accepted = Check(ComputerParams, params);
+		const parsed = parseComputerParams(params);
 
 		// Then
-		expect(accepted).toBe(true);
+		expect({ published: Check(ComputerParams, params), parsed }).toEqual({ published: true, parsed: params });
 	});
 
 	it.each([
-		{ action: "resume" },
-		{ action: "stop" },
-		{ action: "capabilities", token: "stolen" },
-		{ action: "run", code: "return 1", timeout: 0 },
-	])("rejects %j at the schema, so resume stays a user-only command", (params) => {
-		// Given: parameters no model-facing action declares.
+		{ params: { action: "resume" }, reason: 'computer: unknown action "resume"; expected one of call, run, capabilities, close' },
+		{ params: { action: "capabilities", token: "stolen" }, reason: 'computer: action "capabilities" does not take token' },
+		{ params: { action: "run", code: "return 1", timeout: 0 }, reason: 'computer: action "run" at /timeout: must be >= 1' },
+		{ params: { action: "call" }, reason: 'computer: action "call": must have required properties chain' },
+		{ params: { action: "close", code: "x" }, reason: 'computer: action "close" does not take code' },
+	])("rejects $params with a typed COMPUTER_INVALID_ARGUMENTS error, so resume stays user-only", ({ params, reason }) => {
+		// Given: arguments no single action accepts.
 		// When
-		const accepted = Check(ComputerParams, params);
+		const error = (() => {
+			try {
+				parseComputerParams(params);
+				return undefined;
+			} catch (caught) {
+				return caught;
+			}
+		})();
 
 		// Then
-		expect(accepted).toBe(false);
+		expect(error instanceof ComputerArgumentsError ? { code: error.code, reason: error.reason } : error).toEqual({
+			code: "COMPUTER_INVALID_ARGUMENTS",
+			reason,
+		});
 	});
 });
 

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use senpi_desktop_core::ax::{snapshot, AxRegistry};
 use senpi_desktop_core::types::{AxSnapshotOptions, DesktopWindow};
 
-use crate::{AtSpiAx, AxPermission, LiveBus};
+use crate::{AtSpiAx, AxPermission, LiveBus, WindowIds};
 
 const TERMINAL: &str = "xfce4-terminal";
 /// Hang guard for the terminal's launch; it registers in well under 5 s.
@@ -73,7 +73,7 @@ fn find_window(ax: &mut AtSpiAx, title: &str) -> Option<DesktopWindow> {
 fn ax_tree_of_xterm_lists_window() {
     let title = format!("senpi-atspi-live-{}", std::process::id());
     let terminal = spawn_terminal(&title, &[]);
-    let mut ax = AtSpiAx::new().unwrap();
+    let mut ax = AtSpiAx::new(WindowIds::AtSpiFrames).unwrap();
     let window = until("the terminal window", || find_window(&mut ax, &title));
     println!("window_id={} app={} pid={:?}", window.id, window.app, window.pid);
     assert_eq!(window.pid, Some(terminal.0.id()));
@@ -97,7 +97,7 @@ fn ax_tree_of_xterm_lists_window() {
 #[test]
 #[ignore = "live: needs a fresh AT-SPI bus with no application registered"]
 fn permission_is_toolkits_silent_until_a_toolkit_publishes() {
-    let mut ax = AtSpiAx::new().unwrap();
+    let mut ax = AtSpiAx::new(WindowIds::AtSpiFrames).unwrap();
     let before = ax.permission();
     println!(
         "ax_permission_before={} ax={}",
@@ -117,7 +117,7 @@ fn permission_is_toolkits_silent_until_a_toolkit_publishes() {
 #[ignore = "live: needs DBUS_SESSION_BUS_ADDRESS pointing at no bus and AT_SPI_BUS_ADDRESS unset"]
 fn no_bus_reports_bus_unreachable() {
     assert!(std::env::var_os("AT_SPI_BUS_ADDRESS").is_none());
-    let error = AtSpiAx::new().err().unwrap();
+    let error = AtSpiAx::new(WindowIds::AtSpiFrames).err().unwrap();
     println!("connect_error={error}");
     let mut ax: Option<AtSpiAx<LiveBus>> = None;
     let permission = AxPermission::of(ax.as_mut());

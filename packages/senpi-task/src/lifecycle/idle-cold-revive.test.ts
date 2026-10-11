@@ -13,6 +13,7 @@ import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { createTaskLifecycle } from "./create"
 import { FakeRegistry } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -188,7 +189,7 @@ describe("idle cold revival", () => {
     const fake = makeHandle(record.task_id)
     const resumed: Array<{ spec: ManagedStartSpec; path: string }> = []
     const manager = createTaskManager({ store, cwd: project, config: settings(), planner: () => { throw new Error("must not replan") }, runners: { "in-process": { start: () => { throw new Error("must not start fresh") }, resume: async (spec, path) => { resumed.push({ spec, path }); return fake.handle } }, process: new FakeRunner() } })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings() })
     try {
       // when
       const result = await manager.sendToTask({ idOrName: record.task_id, callerSessionId: "parent", message: "CONTINUE_SENTINEL" })
@@ -198,6 +199,6 @@ describe("idle cold revival", () => {
       expect(resumed[0]?.path).toBe(path)
       expect(resumed[0]?.spec).toMatchObject({ cwd: project, prompt: "RECORDED_PROMPT", instructions: "RECORDED_INSTRUCTIONS", toolAllowlist: ["read"], toolDenylist: ["write"], model: "fixture/model" })
       expect(fake.followUpCalls).toEqual(["CONTINUE_SENTINEL"])
-    } finally { lifecycle.dispose?.(); manager.forget(record.task_id) }
+    } finally { lifecycle.dispose?.(); manager.forget(record.task_id, { path: "end" }) }
   })
 })

@@ -6,10 +6,16 @@ use std::ffi::c_void;
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use windows_sys::Win32::Foundation::{HWND, POINT};
+use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
+use windows_sys::Win32::UI::HiDpi::{
+    GetWindowDpiAwarenessContext, PhysicalToLogicalPointForPerMonitorDPI, SetThreadDpiAwarenessContext,
+};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{MapVirtualKeyW, VkKeyScanW, MAPVK_VK_TO_VSC};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, IsChild,
-    IsWindow, SetCursorPos, SetForegroundWindow, GUITHREADINFO,
+    ChildWindowFromPointEx, EnumChildWindows, GetAncestor, GetClassLongW, GetClassNameW, GetCursorPos,
+    GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, IsChild, IsWindow, SetCursorPos,
+    SetForegroundWindow, CWP_SKIPDISABLED, CWP_SKIPINVISIBLE, CWP_SKIPTRANSPARENT, GA_ROOT,
+    GA_ROOTOWNER, GCL_STYLE, GUITHREADINFO,
 };
 
 use super::char_sink;
@@ -82,6 +88,129 @@ impl Window {
             Ok(length) if length > 0 => String::from_utf16_lossy(&buffer[..length.min(buffer.len())]),
             Ok(_) | Err(_) => "<unknown>".to_owned(),
         }
+    }
+
+    pub(super) fn root(self) -> Self {
+        // SAFETY: [Category 8 - FFI boundary] Win32 validates the opaque
+        // handle and returns null for a stale one.
+        Self::from_hwnd(unsafe { GetAncestor(self.hwnd(), GA_ROOT) }).unwrap_or(self)
+    }
+
+    pub(super) fn root_owner(self) -> Self {
+        // SAFETY: [Category 8 - FFI boundary] Win32 validates the opaque
+        // handle and returns null for a stale one.
+        Self::from_hwnd(unsafe { GetAncestor(self.hwnd(), GA_ROOTOWNER) }).unwrap_or(self)
+    }
+
+    pub(super) fn owns_foreground(self) -> bool {
+        foreground().is_some_and(|active| active.root() == self.root())
+    }
+
+    pub(super) fn class_wants_double_clicks(self) -> bool {
+        // SAFETY: [Category 8 - FFI boundary] the validated HWND is passed by
+        // value and Win32 returns a scalar class style.
+        (unsafe { GetClassLongW(self.hwnd(), GCL_STYLE) } & 0x0008) != 0
+    }
+
+    pub(super) fn has_chromium_descendant(self) -> bool {
+        unsafe extern "system" fn visit(child: HWND, state: isize) -> i32 {
+            // SAFETY: [Category 11 - Provenance] `state` was produced from
+            // this synchronous call's live `bool` and is used only during it.
+            let found = unsafe {
+                &mut *std::ptr::with_exposed_provenance_mut::<bool>(
+                    usize::try_from(state).unwrap_or_default(),
+                )
+            };
+            *found = Window::from_hwnd(child)
+                .is_some_and(|window| crate::delivery::is_chromium_class(&window.class_name()));
+            i32::from(!*found)
+        }
+
+        let mut found = false;
+        // SAFETY: [Category 11 - Provenance] the callback is synchronous and
+        // receives the exposed address of `found`, which outlives the call.
+        unsafe {
+            EnumChildWindows(
+                self.hwnd(),
+                Some(visit),
+                isize::try_from((&raw mut found).expose_provenance()).unwrap_or_default(),
+            );
+        }
+        found
+    }
+
+    pub(super) fn is_xaml_host(self) -> bool {
+        matches!(
+            self.class_name().as_str(),
+            "ApplicationFrameWindow"
+                | "WinUIDesktopWin32WindowClass"
+                | "Windows.UI.Core.CoreWindow"
+                | "Microsoft.UI.Content.DesktopChildSiteBridge"
+        )
+    }
+
+    pub(super) fn deepest_child(self, screen: POINT) -> Option<(Self, POINT)> {
+        let mut current = self;
+        for _ in 0..32 {
+            let client = current.client_point(screen)?;
+            // SAFETY: [Category 8 - FFI boundary] Win32 validates the HWND and
+            // copies the scalar point and flags.
+            let child = unsafe {
+                ChildWindowFromPointEx(
+                    current.hwnd(),
+                    client,
+                    CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT,
+                )
+            };
+            let child = Self::from_hwnd(child)?;
+            // SAFETY: [Category 8 - FFI boundary] both handles are opaque and
+            // validated by Win32.
+            if child == current || unsafe { IsChild(self.hwnd(), child.hwnd()) } == 0 {
+                return Some((current, client));
+            }
+            current = child;
+        }
+        None
+    }
+
+    pub(super) fn client_point(self, screen: POINT) -> Option<POINT> {
+        struct RestoreDpi(*mut c_void);
+        impl Drop for RestoreDpi {
+            fn drop(&mut self) {
+                // SAFETY: [Category 8 - FFI boundary] this context was
+                // returned by the same thread's successful context change.
+                unsafe { SetThreadDpiAwarenessContext(self.0) };
+            }
+        }
+        // SAFETY: [Category 8 - FFI boundary] Win32 validates the HWND and
+        // returns thread-local DPI context handles.
+        let previous = unsafe {
+            let context = GetWindowDpiAwarenessContext(self.hwnd());
+            if context.is_null() {
+                return None;
+            }
+            SetThreadDpiAwarenessContext(context)
+        };
+        if previous.is_null() {
+            return None;
+        }
+        let _restore = RestoreDpi(previous);
+        let mut client = screen;
+        // SAFETY: [Category 8 - FFI boundary] `client` is writable and the
+        // validated target supplies the required DPI transform.
+        if unsafe { PhysicalToLogicalPointForPerMonitorDPI(self.hwnd(), &mut client) } == 0 {
+            return None;
+        }
+        // SAFETY: [Category 8 - FFI boundary] `client` remains a writable
+        // point and Win32 validates the target handle.
+        (unsafe { ScreenToClient(self.hwnd(), &mut client) } != 0).then_some(client)
+    }
+
+    pub(super) fn logical_screen_point(self, mut screen: POINT) -> Option<POINT> {
+        // SAFETY: [Category 8 - FFI boundary] `screen` is writable and Win32
+        // validates the target handle for its DPI transform.
+        (unsafe { PhysicalToLogicalPointForPerMonitorDPI(self.hwnd(), &mut screen) } != 0)
+            .then_some(screen)
     }
 
     /// The window that receives this window's posted keyboard input (a

@@ -78,12 +78,16 @@ function scrubbedEnv() {
   return Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OMO|SENPI|PI)_/.test(key)))
 }
 
-function runScenario({ name, permission, steps }) {
+function runScenario({ name, permission, steps, computer = {} }) {
   const sandbox = createSandbox()
   try {
     seedSandbox(sandbox)
     mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
-    writeFileSync(join(sandbox.cwd, ".omo", "omo.jsonc"), JSON.stringify({ computer: { engine_path: enginePath, allow_host_relay_only_stop: true } }))
+    writeFileSync(
+      join(sandbox.cwd, ".omo", "omo.jsonc"),
+      JSON.stringify({ computer: { engine_path: enginePath, allow_host_relay_only_stop: true, ...computer } }),
+    )
+    writeFileSync(join(sandbox.cwd, "mock-record-tools"), "")
     writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({ steps }, null, 2)}\n`)
     const args = ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1"]
     if (permission !== undefined) args.push("--permission", permission)
@@ -109,13 +113,15 @@ function runScenario({ name, permission, steps }) {
     })
     const results = toolResults(sandbox.agentDir)
     const methods = auditMethods(sandbox.root)
+    const toolsFile = join(sandbox.cwd, "mock-tools.jsonl")
+    const declaredTools = existsSync(toolsFile) ? jsonLines(toolsFile) : []
     if (evidenceDir !== undefined) {
       writeFileSync(
         join(evidenceDir, `${name}.json`),
-        `${JSON.stringify({ exit: run.status, stdout: run.stdout, stderr: run.stderr.slice(-4000), results, methods }, null, 2)}\n`,
+        `${JSON.stringify({ exit: run.status, stdout: run.stdout, stderr: run.stderr.slice(-4000), results, methods, declaredTools }, null, 2)}\n`,
       )
     }
-    return { exit: run.status, results, methods, stderr: run.stderr }
+    return { exit: run.status, results, methods, declaredTools, stderr: run.stderr }
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
   }
@@ -191,6 +197,22 @@ const scenarios = [
       ["tool_search returns computer", resultText(results.find((r) => r.toolName === "tool_search")).includes("computer")],
       ["the searched tool runs by name", results.find((r) => r.toolName === "computer")?.isError === false],
       ["eval then sees the computer global", resultText(results.find((r) => r.toolName === "eval")).includes("object")],
+    ],
+  },
+  {
+    // Providers without native deferred-tool search reach a tool only once it is active (#9048).
+    name: "cua-adapter-activates-computer-actions",
+    permission: undefined,
+    computer: { cua_adapter: true },
+    steps: [
+      { type: "tool_call", name: "computer", arguments: screenshotChain },
+      { type: "tool_call", name: "computer_actions", arguments: { action: "screenshot" } },
+      { type: "text", text: "done" },
+    ],
+    verify: ({ results, declaredTools }) => [
+      ["computer_actions is not declared before activation", declaredTools[0]?.includes("computer_actions") === false],
+      ["activation declares computer_actions on the next request", declaredTools[1]?.includes("computer_actions") === true],
+      ["the computer_actions call succeeded", results.find((r) => r.toolName === "computer_actions")?.isError === false],
     ],
   },
 ]

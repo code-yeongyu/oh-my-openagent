@@ -1,4 +1,4 @@
-computer → host desktop facade (present while the `computer` tool is active)
+computer → host desktop facade, experimental (present while the `computer` tool is active)
     Drives the REAL desktop: windows, screenshots, native input, OS accessibility (AX), clipboard. Not a browser; no DOM.
     Find it with tool_search ("computer") or call `computer` by name; the global appears in the NEXT cell. The user controls it with `/computer on|off|status|stop|resume`.
     Every helper is one `tool.computer({ action: "call", chain })` call. Permission tiers: inspection needs `computer:read`, input and mutation need `computer:exec`; a denied call throws.
@@ -14,10 +14,16 @@ computer.screenshot({ silent? }?) / win.screenshot({ silent? }?) → { target, f
 computer.click(x, y, { button?, count?, modifiers?, delivery? }?) / win.click(...) → None
 computer.doubleClick(x, y, opts?) / computer.move(x, y) / computer.drag([[x, y], …], { modifiers?, delivery? }?) / computer.scroll(x, y, { dx?, dy?, delivery? }?) → None
     Same helpers on a window handle: win.doubleClick, win.move, win.drag, win.scroll.
+    dx/dy are pixels, the same unit on every OS; one mouse-wheel notch is about 40 px, so dy: 120 scrolls about three notches.
+    Scroll direction is semantic and the same on every OS: positive dy moves the view toward the end of the content (negative toward the start), positive dx toward the right edge; the natural-scrolling setting does not change it.
 computer.type(text, { delivery? }?) / computer.press("cmd+shift+p" | keys[], { delivery? }?) → None
     Same helpers on a window handle: win.type, win.press.
 win.raise() → None
     Brings the window to the front (exec tier). Unavailable on Wayland.
+win.menu.items(path?) → ComputerMenuItem[]
+    Read-only (read tier): lists the immediate children of the window's menu at `path`; no argument lists the menu bar. Item fields: title, path (native labels, ellipses included), enabled, checked, hasSubmenu, shortcut.
+win.menu.select(path) → None
+    Exec tier: invokes the leaf command `path` names. Matching prefers a case-insensitive exact title, otherwise compares titles ignoring a trailing `...` or `…`; each tier must match exactly one item. An ambiguous label, a disabled item anywhere in the path, a submenu as the leaf, or an untitled separator is refused and NOTHING is dispatched; the engine revalidates the command before the press.
 win.ax({ all?, maxDepth? }?) → str
     One formatted TEXT tree, one node per line with `[ref=eN]` tags; NEVER iterate or `.map` it.
 win.find({ role?, title?, value?, limit? }) → ComputerElement[]

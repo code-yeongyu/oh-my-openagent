@@ -156,7 +156,7 @@ bunx oh-my-openagent doctor
 
 - The current minimum OpenCode version check is `>= 1.4.0`.
 - The doctor command warns when legacy plugin registration (`oh-my-opencode`) is still present in `opencode.json`.
-- OmO Native's `doctor` subcommand also reports computer use without opening a desktop session or requesting OS permissions. It prints:
+- OmO Native's `doctor` subcommand also reports computer use (experimental) without opening a desktop session or requesting OS permissions. It prints:
   - whether the effective Native config enables computer use and whether the host is supported;
   - the selected engine path and its version, protocol, and ABI, or the engine-location diagnostic and every path tried;
   - the backend plus capture, input, and accessibility permission state;
@@ -201,6 +201,10 @@ bunx oh-my-openagent run <message>
 1. `--agent`
 2. `OPENCODE_DEFAULT_AGENT`
 3. `default_run_agent` in plugin config
+
+`--agent` accepts config keys (`sisyphus`, `prometheus`) and remapped display names (`Sisyphus - ultraworker`). Builtin categories (`quick`, `deep`, `ultrabrain`, `unspecified-high`, and the others used by `task(category=...)`) are not CLI agents; `oh-my-openagent run --agent quick` errors with the runnable names.
+
+`opencode run --agent` does exact-key lookup in the host. Prefer `oh-my-openagent run --agent`, or pass the remapped display name. Unknown host `--agent` values should fail closed (see the OpenCode CLI).
 
 ---
 

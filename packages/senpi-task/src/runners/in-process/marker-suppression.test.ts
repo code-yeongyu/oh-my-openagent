@@ -8,7 +8,7 @@ import {
   createReadToolDefinition,
   DefaultResourceLoader,
   type CreateAgentSessionOptions,
-  type ExtensionContext,
+  type ExtensionToolContext,
   type ToolDefinition,
 } from "@code-yeongyu/senpi"
 
@@ -89,7 +89,7 @@ describe("in-process child extension suppression", () => {
       const parentTool = (capturedOptions?.customTools ?? []).find((tool) => tool.name === "marker_parent_tool")
       expect(parentTool).toBeDefined()
       // the captured parent tool is the same live closure and still executes inside the child
-      const noopCtx = {} as unknown as ExtensionContext
+      const noopCtx = {} as unknown as ExtensionToolContext
       await parentTool?.execute("call-1", {}, undefined, undefined, noopCtx)
       expect(parentToolRan).toBe(true)
       expect(handle.task_id).toBe("task-marker")

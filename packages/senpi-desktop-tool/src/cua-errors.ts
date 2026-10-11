@@ -1,3 +1,5 @@
+import type { PermissionDeniedData } from "@oh-my-opencode/senpi-desktop-protocol";
+
 // Engine error codes and run failures as gajae-code's `COMPUTER_*` codes, each with its recovery hint.
 const ENGINE_TO_COMPUTER: Readonly<Record<string, string>> = {
 	Suspended: "COMPUTER_SUSPENDED",
@@ -27,7 +29,7 @@ function hint(code: string, stopHotkey: string): string | undefined {
 		case "COMPUTER_CANCELLED":
 			return waitForUser;
 		case "COMPUTER_PERMISSION_REQUIRED":
-			return "Grant Screen Recording and Accessibility to the app that launched senpi, then restart it.";
+			return "Do not retry until the user says the grant is done and the app was relaunched.";
 		case "COMPUTER_PERMISSION_DENIED":
 			return "A permission rule denied this action; do not retry it.";
 		case "COMPUTER_CURSOR_RESTORE_FAILED":
@@ -43,10 +45,23 @@ function hint(code: string, stopHotkey: string): string | undefined {
 export interface ComputerFailure {
 	readonly code: string;
 	readonly message: string;
+	readonly permission?: PermissionDeniedData["permission"];
+	readonly settingsUrl?: string;
+	readonly app?: string;
+	readonly relaunchRequired?: boolean;
 }
 
-export function computerFailure(code: string, reason: string, stopHotkey: string): ComputerFailure {
+export function computerFailure(
+	code: string,
+	reason: string,
+	stopHotkey: string,
+	permission?: PermissionDeniedData | null,
+): ComputerFailure {
 	const mapped = code.startsWith("COMPUTER_") ? code : (ENGINE_TO_COMPUTER[code] ?? "COMPUTER_ERROR");
 	const recovery = hint(mapped, stopHotkey);
-	return { code: mapped, message: `${mapped}: ${reason}${recovery === undefined ? "" : ` ${recovery}`}` };
+	return {
+		code: mapped,
+		message: `${mapped}: ${reason}${recovery === undefined ? "" : ` ${recovery}`}`,
+		...(permission ?? {}),
+	};
 }

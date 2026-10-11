@@ -16,6 +16,8 @@ pub enum FakeMethod {
     Drag,
     Scroll,
     TypeText,
+    ClipboardRead,
+    ClipboardWrite,
     KeyChord,
     RaiseWindow,
     ReleaseAll,
@@ -35,4 +37,7 @@ pub enum FakeMethod {
     AxElementAt,
     AxFocusedElement,
     AxAttributes,
+    AxOwner,
+    MenuItems,
+    MenuSelect,
 }

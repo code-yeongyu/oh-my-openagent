@@ -5,11 +5,12 @@ Finds the `senpi-desktop-engine` binary (`crates/senpi-desktop-engine`) for this
 ## Contract
 
 - `locateDesktopEngine()` returns `{ path, diagnostic: null }` or `{ path: null, diagnostic }`. It checks these paths in order:
+  0. extracted runtime: `OMO_PACKAGE_DIR/native/prebuilds/<platform>-<arch>/senpi-desktop-engine[.exe]` when set
   1. compiled sidecar: `<dirname(process.execPath)>/native/prebuilds/<platform>-<arch>/senpi-desktop-engine[.exe]`
   2. vendored prebuild: `native/prebuilds/<platform>-<arch>/senpi-desktop-engine[.exe]` in this package
   3. dev build: `<repo>/target/release/senpi-desktop-engine[.exe]`
 
-  A candidate that is missing, lacks the executable bit, or carries macOS `com.apple.quarantine` is skipped. The quarantine attribute is detected and never cleared. The diagnostic `code` is `quarantined` when a skipped candidate was quarantined, otherwise `native-unavailable`, and it lists every attempted path.
+  A candidate that is missing or lacks the executable bit is skipped. A candidate carrying macOS `com.apple.quarantine` is also skipped, except for the compiled sidecar: its canonical path must remain inside the launcher's `native/prebuilds/`, and its SHA-256 must match its host asset entry in `<dirname(process.execPath)>/native/prebuilds/senpi-desktop-engine-checksums.txt`. That file carries the engine digest **as shipped**, after any packaging re-sign, not necessarily the upstream release digest. The shared checksum parser requires two-space SHA-256 lines, known release asset names and no duplicates. Extracted-runtime, package-prebuild, dev-build and explicit `computer.engine_path` candidates retain their quarantine refusal. The attribute is never cleared. The diagnostic `code` is `quarantined` when a skipped candidate was quarantined, otherwise `native-unavailable`, and it lists every attempted path.
 - `helloDesktopEngine(path)` spawns the binary with `--stdio`, sends `engine.hello`, and resolves only when `abi === ENGINE_ABI` and `protocolVersion === PROTOCOL_VERSION` from `@oh-my-opencode/senpi-desktop-protocol`. On any other ABI or protocol version it throws `DesktopEngineAbiMismatchError` (`code: "abi-mismatch"`, naming both versions). When no well-formed reply arrives it throws `DesktopEngineHandshakeError` (`code: "handshake-failed"`). This handshake is the ABI sentinel.
 - `./native` resolves only the vendored host prebuild, without spawning it.
 

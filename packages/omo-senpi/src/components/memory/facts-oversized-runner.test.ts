@@ -34,7 +34,7 @@ function childFactory(mode: Mode, captured: CreateAgentSessionOptions[], prompts
         if (mode !== "success") expect(result.isError).toBe(true)
         emit({ type: "message_end", message: { role: "assistant", content: [], stopReason: "stop" } })
       },
-      steer: async () => undefined, followUp: async () => undefined,
+      steer: async () => "handled", followUp: async () => "handled",
       abort: async () => { release?.() },
       subscribe: (listener: ChildSessionListener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
       getLastAssistantText: () => undefined, dispose: () => undefined,

@@ -1,4 +1,3 @@
-import { computerPreludeAssets } from "@oh-my-opencode/senpi-desktop-prelude";
 import {
 	type AuditRecord,
 	type ComputerCallStep,
@@ -6,12 +5,19 @@ import {
 	type ComputerScreenshot,
 	isReadOnlyComputerCall,
 } from "@oh-my-opencode/senpi-desktop-protocol";
-import { type ExecuteTool, runComputerCode } from "@oh-my-opencode/senpi-desktop-service";
+import { DesktopEngineRpcError, type ExecuteTool, runComputerCode } from "@oh-my-opencode/senpi-desktop-service";
 import type { ComputerHandle } from "./activation";
-import { ComputerParams, type ComputerToolParams, DEFAULT_TIMEOUT_SECONDS } from "./params";
+import { Check } from "typebox/value";
+import { actionBranches, argumentsError } from "./action-schema";
+import {
+	ComputerActionBranches,
+	ComputerActionShape,
+	type ComputerToolParams,
+	DEFAULT_TIMEOUT_SECONDS,
+} from "./params";
 import { type ComputerHostContext, runSnapshot } from "./session";
-
-export const COMPUTER_TOOL_NAME = "computer";
+import { computerToolDefinition } from "./tool-definition";
+import { computerFailure } from "./cua-errors";
 
 export interface ComputerToolDeps {
 	readonly handle: ComputerHandle;
@@ -25,45 +31,24 @@ export interface ComputerToolDetails {
 	readonly readOnly?: boolean;
 	readonly screenshots?: readonly ComputerScreenshot[];
 	readonly audit?: readonly AuditRecord[];
+	/** Mirrors the top-level `isError` so a code-mode marshal (which reads `details`) reports the failure. */
+	readonly isError?: boolean;
 }
 
 /** Structurally the agent's `AgentToolResult<ComputerToolDetails>`. */
 export interface ComputerToolResult {
+	isError?: boolean;
 	content: ComputerDisplay[];
 	details: ComputerToolDetails;
 }
 
-const SEARCH_KEYWORDS = [
-	"computer use",
-	"computer-use",
-	"cua",
-	"desktop",
-	"gui",
-	"screenshot",
-	"click",
-	"type",
-	"keyboard",
-	"mouse",
-	"window",
-	"accessibility",
-	"ax",
-	"clipboard",
-	"automation",
-] as const;
+const BRANCHES = actionBranches(ComputerActionBranches);
 
-const DESCRIPTION = [
-	"Drive the user's real desktop: windows, screenshots, native mouse and keyboard input, the OS accessibility (AX) tree, and the clipboard. Not a browser.",
-	'- `{action:"call", chain}` runs one desktop helper, optionally followed by one call on the window/element it returns, e.g. `[{method:"window",args:[{app:"Code"}]},{method:"screenshot"}]`.',
-	'- `{action:"run", code, read_only?, timeout?}` runs a JavaScript async function body with `desktop`, `wait`, `assert`, and `tool` in scope; `read_only: true` blocks input.',
-	'- `{action:"capabilities"}` reports backend, permissions, `stopPath`, and `focusGuard`. `{action:"close"}` ends the desktop session.',
-	"In eval cells prefer the `computer` global, which wraps these actions. Pointer x,y are pixels of the latest screenshot of the same target.",
-].join("\n");
-
-/** Oh-my-pi's `computer-safety.md` bullets, taken from the prelude asset so the rules have one source. */
-const SAFETY_GUIDELINES = computerPreludeAssets.safety
-	.split("\n")
-	.filter((line) => line.startsWith("- "))
-	.map((line) => line.slice(2));
+/** The flat published arguments narrowed to one action's exact shape; `ComputerArgumentsError` otherwise. */
+export function parseComputerParams(input: unknown): ComputerToolParams {
+	if (Check(ComputerActionShape, input)) return input;
+	throw argumentsError(BRANCHES, input, "computer");
+}
 
 /** `desktop.<root>(...)` and at most one handle hop; every name was validated against the tier tables first. */
 function renderCallChain(chain: readonly ComputerCallStep[]): string {
@@ -131,36 +116,25 @@ export function createComputerTool(deps: ComputerToolDeps) {
 	) => runComputer(deps, context, request, signal);
 
 	return {
-		name: COMPUTER_TOOL_NAME,
-		label: "Computer",
-		description: DESCRIPTION,
-		exposure: "search" as const,
-		searchText:
-			"Operate the real desktop: screenshots, clicks, typing, key chords, window list, accessibility tree, clipboard; macOS/Linux/Windows",
-		searchKeywords: SEARCH_KEYWORDS,
-		searchGroup: "desktop",
-		promptSnippet: "Operate the real desktop: screenshots, native input, accessibility tree, clipboard",
-		promptGuidelines: SAFETY_GUIDELINES,
-		kernelPrelude: computerPreludeAssets,
-		parameters: ComputerParams,
-		executionMode: "sequential" as const,
+		...computerToolDefinition,
 		async execute(
 			_toolCallId: string,
-			params: ComputerToolParams,
+			input: Readonly<Record<string, unknown>>,
 			signal: AbortSignal | undefined,
 			_onUpdate: unknown,
 			context: ComputerHostContext,
 		): Promise<ComputerToolResult> {
+			const params = parseComputerParams(input);
 			switch (params.action) {
 				case "call": {
 					// Classifies (and rejects unknown or unchainable methods) before anything reaches the engine.
 					const readOnly = isReadOnlyComputerCall(params.chain);
 					const code = renderCallChain(params.chain);
-					return run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS }, signal);
+					return permissionResult(run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS }, signal), handle);
 				}
 				case "run": {
 					const timeoutSeconds = params.timeout ?? DEFAULT_TIMEOUT_SECONDS;
-					return run(context, { code: params.code, readOnly: params.read_only === true, timeoutSeconds }, signal);
+					return permissionResult(run(context, { code: params.code, readOnly: params.read_only === true, timeoutSeconds }, signal), handle);
 				}
 				case "capabilities":
 					await handle.activate(context);
@@ -173,6 +147,21 @@ export function createComputerTool(deps: ComputerToolDeps) {
 			}
 		},
 	};
+}
+
+async function permissionResult(result: Promise<ComputerToolResult>, handle: ComputerHandle): Promise<ComputerToolResult> {
+	try {
+		return await result;
+	} catch (error) {
+		if (!(error instanceof DesktopEngineRpcError) || error.data === null || !("code" in error.data) ||
+			error.data.code !== "PermissionDenied") throw error;
+		const failure = computerFailure(error.data.code, error.message, handle.settings().stopHotkey, error.data.permission);
+		return {
+			content: [{ type: "text", text: JSON.stringify(failure, null, 2) }],
+			details: { value: failure, isError: true },
+			isError: true,
+		};
+	}
 }
 
 export type ComputerTool = ReturnType<typeof createComputerTool>;

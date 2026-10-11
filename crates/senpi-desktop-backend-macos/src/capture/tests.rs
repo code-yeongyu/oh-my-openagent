@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use image::{Rgba, RgbaImage};
-use senpi_desktop_core::error::ErrorCode;
+use senpi_desktop_core::error::{ErrorCode, TccPermission};
 use senpi_desktop_core::types::{DesktopDisplay, DisplaySelector, Target};
 
 use super::displays::composite;
@@ -13,6 +13,22 @@ use super::MacCapture;
 /// Hang guard for fakes that exit immediately; only the deadline test relies
 /// on expiry, so a loaded host cannot flip these results.
 const DEADLINE: Duration = Duration::from_secs(60);
+
+#[test]
+fn permission_error_names_host_app_pane_and_relaunch() {
+    let error = super::permission_denied();
+    println!("{}", error.message);
+    let app = std::env::var("SENPI_DESKTOP_HOST_APP").ok().filter(|app| !app.trim().is_empty()).unwrap_or_else(|| {
+        "the app that launched OmO (for a terminal launch, that terminal app)".to_owned()
+    });
+    assert_eq!(error.code, ErrorCode::PermissionDenied);
+    let data = error.permission.expect("structured permission payload");
+    assert_eq!(data.app, app);
+    assert_eq!(data.permission, TccPermission::ScreenRecording);
+    assert_eq!(data.settings_url,
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+    assert!(data.relaunch_required);
+}
 
 fn display(id: &str, x: i32, width: u32, height: u32) -> DesktopDisplay {
     DesktopDisplay {
@@ -67,7 +83,8 @@ fn nonzero_exit_without_permission_is_permission_denied_with_tcc_identity() {
     };
     assert_eq!(error.code, ErrorCode::PermissionDenied);
     assert!(
-        error.message.contains("TCC identity: executable="),
+        error.message.contains("TCC identity: responsible=")
+            || error.message.contains("TCC identity: unresolved (engine executable="),
         "{}",
         error.message
     );

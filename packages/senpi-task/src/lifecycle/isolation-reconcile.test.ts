@@ -12,6 +12,7 @@ import { createTaskLifecycle } from "./create"
 import type { ProcessSignaller } from "./port"
 import { FakeRegistry, cleanupProjects, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
 import { cleanupIsolationProjects, tempGitRepo } from "../manager/__fixtures__/isolation-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(() => {
   cleanupProjects()
@@ -41,6 +42,7 @@ function makeLifecycle(store: TaskRecordStore, options: {
   const alive = options.alive ?? new Set<number>()
   const signaller: ProcessSignaller = { isAlive: (pid) => alive.has(pid), signal: (pid) => { alive.delete(pid) } }
   return createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry: new FakeRegistry(),
     config: settings(),

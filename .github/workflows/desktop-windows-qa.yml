@@ -2,7 +2,7 @@ name: Desktop Windows QA
 
 # Live Windows QA of senpi-desktop-engine on a hosted runner, which has an interactive desktop
 # (proven first by the interactive-desktop smoke): the win32 backend's live tests, then the QA
-# driver's seven scenarios against the release engine, each fact read by an independent PowerShell
+# driver's fourteen scenarios against the release engine, each fact read by an independent PowerShell
 # observer, then a sabotaged run that must fail. Pull requests of any base run it, so stacked
 # desktop PRs are covered too.
 on:
@@ -121,7 +121,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Interactive-desktop smoke: SendInput click plus UI Automation read on a WinForms form.
             - Release build of senpi-desktop-engine (msvc x64) and the win32 backend's live tests.
-            - Seven QA driver scenarios (capture, foreground/background delivery, WPF refusal, UIPI refusal, UIA snapshot, stop-chord latch), each checked by an independent PowerShell observer.
+            - Fourteen QA driver scenarios (capture, foreground/background delivery, WPF refusal, UIPI refusal, UIA snapshot, stop-chord latch, background and foreground scroll direction, foreground click/drag/scroll into a covered target from a stale cursor, the engine's desktop move), each checked by an independent PowerShell observer.
             - Sabotage: an invalid stop chord must fail hotkey-latches with reason InvalidKey.
           JOB_SUMMARY_NEXT: Open the desktop-windows-qa-jsonl artifact; each failing line names its first failed check in `reason` and carries the observer's before/after state.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

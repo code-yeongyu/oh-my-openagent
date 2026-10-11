@@ -2,9 +2,8 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { collectDisabledSkills, loadOmoConfig } from "@oh-my-opencode/omo-config-core"
-
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { readDisabledSkills, readDiscoverCwd } from "./contributed-skill"
 
 export const BUNDLED_SKILLS_COMPONENT_NAME = "bundled-skills"
 
@@ -35,14 +34,7 @@ export function createBundledSkillsComponent(options: BundledSkillsComponentOpti
       pi.on("resources_discover", (payload: unknown) => {
         const skillsDir = options.skillsDir ?? resolveBundledSkillsDir()
         if (skillsDir === undefined) return undefined
-        const cwd = readCwd(payload) ?? pi.cwd ?? process.cwd()
-        const env = options.env ?? process.env
-        const loaded = loadOmoConfig({ cwd, env })
-        const disabled = new Set(collectDisabledSkills({
-          harness: "senpi",
-          layers: loaded.layers,
-          ...(loaded.profile === undefined ? {} : { profile: loaded.profile }),
-        }))
+        const disabled = readDisabledSkills(readDiscoverCwd(payload) ?? pi.cwd ?? process.cwd(), options.env ?? process.env)
         const skillPaths: string[] = []
         const hidden: string[] = []
         for (const name of readdirSync(skillsDir).sort()) {
@@ -74,10 +66,4 @@ export function resolveBundledSkillsDir(importerUrl: string = import.meta.url): 
     fileURLToPath(new URL("../../../plugin/skills", importerUrl)),
   ]
   return candidates.find((candidate) => existsSync(candidate))
-}
-
-function readCwd(payload: unknown): string | undefined {
-  if (payload === null || typeof payload !== "object") return undefined
-  const cwd = Reflect.get(payload, "cwd")
-  return typeof cwd === "string" && cwd.length > 0 ? cwd : undefined
 }

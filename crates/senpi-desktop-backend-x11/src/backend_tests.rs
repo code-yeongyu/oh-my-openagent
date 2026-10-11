@@ -2,9 +2,12 @@
 //! server: capabilities measured from what connected, and the focus-guard
 //! hooks the session transaction calls.
 
-use senpi_desktop_core::backend::{Backend, DeliveryMode};
+mod restore_tests;
+
+use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::{DesktopError, ErrorCode};
-use senpi_desktop_core::types::{DisplaySelector, FrontWindow, Target};
+use senpi_desktop_core::frame::FrameGeometry;
+use senpi_desktop_core::types::{DesktopPoint, DisplaySelector, FrontWindow, Target};
 use x11rb::protocol::xproto::AtomEnum;
 
 use crate::capture::fake::{viewable, FakeServer};
@@ -15,6 +18,7 @@ use crate::X11Backend;
 
 const EDITOR: u32 = 0x80_0001;
 const TERMINAL: u32 = 0x40_0001;
+const BROWSER: u32 = 0x90_0001;
 
 fn capture() -> X11Capture<FakeServer> {
     let server = FakeServer::new(1280, 800)
@@ -65,7 +69,7 @@ fn capabilities_advertise_both_delivery_modes_and_the_focus_guard_once_xtest_is_
 }
 
 #[test]
-fn capabilities_withhold_input_without_xtest_and_the_guard_without_ewmh() {
+fn capabilities_withhold_input_without_xtest_and_keep_the_core_focus_guard_without_ewmh() {
     let mut without_xtest = backend(Err(no_xtest()));
     let mut without_wm = backend(Ok(FakeInputServer::new(None)));
 
@@ -83,7 +87,7 @@ fn capabilities_withhold_input_without_xtest_and_the_guard_without_ewmh() {
         (false, "unavailable", false)
     );
     assert!(no_input.delivery_modes.is_empty() && !no_input.focus_guard);
-    assert!(no_guard.input && !no_guard.focus_guard);
+    assert!(no_guard.input && no_guard.focus_guard);
 }
 
 #[test]
@@ -135,18 +139,98 @@ fn the_front_window_is_the_active_window_with_its_pid_and_application() {
 }
 
 #[test]
-fn restoring_the_front_window_reactivates_it() {
+fn foreground_input_restores_the_front_window_without_a_duplicate_restore() {
     let mut backend = backend(Ok(FakeInputServer::new(Some(EDITOR))));
     let front = backend.front_window().unwrap().unwrap();
-    backend.raise_window(&TERMINAL.to_string()).unwrap();
+    let event = PointerEvent::Click {
+        x: 510.0,
+        y: 10.0,
+        button: MouseButton::Left,
+        count: 1,
+        modifiers: Modifiers::default(),
+    };
+    backend
+        .pointer(
+            &Target::Window(TERMINAL.to_string()),
+            event,
+            &FrameGeometry::identity_global(),
+            DeliveryMode::Foreground,
+        )
+        .unwrap();
 
     backend.restore_front_window(&front).unwrap();
 
     let input = backend.input_ref().unwrap();
     assert_eq!(input.active_window(), Some(EDITOR));
-    assert_eq!(
-        input.server().calls(),
-        [Call::Activate(TERMINAL), Call::Activate(EDITOR)]
+    let activations: Vec<_> = input
+        .server()
+        .calls()
+        .into_iter()
+        .filter(|call| matches!(call, Call::Activate(_)))
+        .collect();
+    assert_eq!(activations, [Call::Activate(TERMINAL), Call::Activate(EDITOR)]);
+}
+
+#[test]
+fn restore_front_window_preserves_a_newer_user_focus() {
+    let mut backend = backend(Ok(FakeInputServer::new(Some(EDITOR))));
+    let front = backend.front_window().unwrap().unwrap();
+    let event = PointerEvent::Click {
+        x: 510.0,
+        y: 10.0,
+        button: MouseButton::Left,
+        count: 1,
+        modifiers: Modifiers::default(),
+    };
+    backend
+        .pointer(
+            &Target::Window(TERMINAL.to_string()),
+            event,
+            &FrameGeometry::identity_global(),
+            DeliveryMode::Foreground,
+        )
+        .unwrap();
+    backend.input_ref().unwrap().server().active.set(Some(BROWSER));
+
+    backend.restore_front_window(&front).unwrap();
+
+    assert_eq!(backend.input_ref().unwrap().active_window(), Some(BROWSER));
+}
+
+#[test]
+fn restore_cursor_preserves_a_newer_user_pointer_position() {
+    let mut backend = backend(Ok(FakeInputServer::new(Some(EDITOR))));
+    let event = PointerEvent::Click {
+        x: 510.0,
+        y: 10.0,
+        button: MouseButton::Left,
+        count: 1,
+        modifiers: Modifiers::default(),
+    };
+    backend
+        .pointer(
+            &Target::Window(TERMINAL.to_string()),
+            event,
+            &FrameGeometry::identity_global(),
+            DeliveryMode::Foreground,
+        )
+        .unwrap();
+    let input = backend.input_ref().unwrap();
+    input.server().pointer.set((900, 700));
+    input.server().calls.borrow_mut().clear();
+
+    backend
+        .warp_cursor(DesktopPoint { x: 12.0, y: 34.0 })
+        .unwrap();
+
+    assert_eq!(backend.input_ref().unwrap().server().pointer.get(), (900, 700));
+    assert!(
+        !backend
+            .input_ref()
+            .unwrap()
+            .server()
+            .calls()
+            .contains(&Call::Warp(12, 34))
     );
 }
 

@@ -66,6 +66,11 @@ export function loadDesktopEngineTargets(input: unknown): readonly DesktopEngine
 
 export const DESKTOP_ENGINE_TARGETS = loadDesktopEngineTargets(fixture)
 
+/** The Rust target triple the release workflows build a desktop engine host with. */
+export function desktopEngineRustTarget(host: string): string {
+  return HOST_TARGETS[hostSchema.parse(host)]
+}
+
 export function desktopEngineTarget(target: string): DesktopEngineTarget {
   const entry = DESKTOP_ENGINE_TARGETS.find((candidate) => candidate.target === target)
   if (entry === undefined) throw new Error(`unknown desktop engine target: ${target}`)

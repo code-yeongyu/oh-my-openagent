@@ -2,7 +2,6 @@
 //! objects `{code, message, data}`.
 
 use senpi_desktop_core::error::{DesktopError, ErrorCode};
-use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol::{
     rpc_error_code, EngineErrorData, JsonRpcVersion, MethodRejection, MethodRejectionData, RequestId,
     RpcError, RpcErrorData, RpcFailure, RpcSuccess, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND,
@@ -31,14 +30,6 @@ impl Failure {
         ))
     }
 
-    /// A method of the frozen table whose engine side lands in a later todo.
-    pub fn not_implemented(method: Method) -> Self {
-        Self::Engine(DesktopError::internal(format!(
-            "{} is not implemented by this engine build yet",
-            method.spec().name
-        )))
-    }
-
     fn into_rpc_error(self) -> RpcError {
         match self {
             Self::Engine(error) => RpcError {
@@ -47,6 +38,7 @@ impl Failure {
                 data: Some(RpcErrorData::Engine(EngineErrorData {
                     code: error.code,
                     hint: None,
+                    permission: error.permission,
                 })),
             },
             Self::Rejected(reason) => RpcError {
@@ -113,6 +105,29 @@ mod tests {
 
     fn parsed(line: &str) -> Value {
         serde_json::from_str(line).unwrap()
+    }
+
+    #[test]
+    fn permission_denial_preserves_all_guidance_fields_on_the_wire() {
+        use senpi_desktop_core::error::{PermissionDeniedData, TccPermission};
+        let data = PermissionDeniedData {
+            permission: TccPermission::Accessibility,
+            settings_url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility".into(),
+            app: "QA App".into(),
+            relaunch_required: true,
+        };
+        let error = DesktopError::permission_denied_with(data, "marked backend refusal");
+        let line = reply_line(RequestId::Number(9), Err(Failure::Engine(error)));
+        assert_eq!(parsed(&line)["error"], json!({
+            "code": -32000,
+            "message": "marked backend refusal",
+            "data": {
+                "code": "PermissionDenied", "hint": null,
+                "permission": { "permission": "accessibility",
+                    "settingsUrl": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                    "app": "QA App", "relaunchRequired": true }
+            }
+        }));
     }
 
     #[test]

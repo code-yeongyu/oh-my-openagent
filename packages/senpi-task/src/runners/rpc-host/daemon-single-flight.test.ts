@@ -39,6 +39,7 @@ function delayedHost(
 function ensureInput(host: TaskDaemonHostPort, agentDir: string) {
   return {
     agentDir,
+    socket: join(agentDir, "rpc", "rpc.sock"),
     env: DAEMON_LAUNCH_FIXTURE.parentEnv,
     policy: "upgrade" as const,
     ports: {

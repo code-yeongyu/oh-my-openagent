@@ -11,7 +11,7 @@ use core_graphics::geometry::CGPoint;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::types::DesktopWindow;
 
-use super::cgevent::{click_group_id, finite_i32};
+use super::cgevent::{click_group_id, quartz_wheel};
 use crate::skylight;
 
 /// The window-local point of a stamped event; `(-1, -1)` marks the synthetic
@@ -56,13 +56,14 @@ pub(super) fn scroll(target: ScrollTarget<'_>, x: f64, y: f64, dx: f64, dy: f64)
         CGEventFlags::CGEventFlagNull,
     )?;
     thread::sleep(Duration::from_millis(15));
-    let wheel_x = finite_i32(dx, "horizontal scroll delta")?;
-    let wheel_y = finite_i32(dy, "vertical scroll delta")?;
+    let (wheel_y, wheel_x) = quartz_wheel(dx, dy)?;
     let event = CGEvent::new_scroll_event(source.clone(), ScrollEventUnit::PIXEL, 2, wheel_y, wheel_x, 0)
         .map_err(|()| DesktopError::input_failed("failed to create a Quartz scroll event"))?;
     event.set_location(CGPoint::new(x, y));
     skylight::stamp_event(&event, pid, wid, local_point(window, x, y), 3, 0, 0, group)?;
-    skylight::post_dual(pid, &event)
+    // A wheel event is a delta: posted through both routes, AppKit and WebKit
+    // apply it twice (#9097), so it takes the SkyLight route alone.
+    skylight::post_routed(pid, &event)
 }
 
 /// Posts one stamped pointer event to `(pid, wid)` through SkyLight and the

@@ -73,14 +73,19 @@ export const OmoTaskSettingsSchema = z.object({
   // health at spawn time; an explicit "in-process"/"process" always wins.
   default_execution_mode: z.enum(["auto", "in-process", "process"]).default("auto"),
   // Which runner a `process` child gets: a session of the machine-wide daemon ("host"), or its own
-  // OS process ("child-process", and always so on win32). There is no socket key - one daemon, one
-  // public socket, resolved from the agent dir.
+  // OS process ("child-process", and always so on win32). There is no socket key - the host socket
+  // is derived from the session; `OMO_RPC_SHARD_ROOT` only moves the directory.
   process_runner: z.enum(["host", "child-process"]).default("host"),
   // How an engine difference on the running daemon is resolved: hand the daemon over to the newer
   // build ("upgrade"), or leave it alone and run children as their own processes ("fallback").
   host_engine_policy: z.enum(["upgrade", "fallback"]).default("upgrade"),
   // Idle lifetime handed to a daemon this client starts; omitted keeps the launch spec's tunable.
   host_idle_exit_ms: z.number().int().positive().optional(),
+  // When this session's own task host boots ahead of its first child: "first-turn" (default) overlaps the
+  // boot with the first model call, "session-start" also warms sessions that never prompt, "off" waits for
+  // the first process child. Child sessions and `default_execution_mode: "in-process"` never warm.
+  // Under "first-turn", sessions in a Desktop thread host warm on the first delegation intent instead.
+  host_shard_prewarm: z.enum(["off", "first-turn", "session-start"]).default("first-turn"),
   default_concurrency: z.number().int().nonnegative().default(5),
   global_concurrency: z.number().int().nonnegative().default(8),
   provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
@@ -135,6 +140,7 @@ export const OmoTaskSettingsLayerSchema = z.object({
   process_runner: z.enum(["host", "child-process"]).optional(),
   host_engine_policy: z.enum(["upgrade", "fallback"]).optional(),
   host_idle_exit_ms: z.number().int().positive().optional(),
+  host_shard_prewarm: z.enum(["off", "first-turn", "session-start"]).optional(),
   default_concurrency: z.number().int().nonnegative().optional(),
   global_concurrency: z.number().int().nonnegative().optional(),
   provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),

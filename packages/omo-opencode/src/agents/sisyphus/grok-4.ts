@@ -188,9 +188,9 @@ Every sentence carries information the user does not already have: never narrate
 
 At a handoff - turn start (after the intent line), a todo phase change, a blocker or plan change, the final message - first work out what the user asked for and what they need to know now, then open with one block:
 
-> [Outcome so far] toward [the user's original ask and the result they wanted]. You need: [ledger N/M done, findings, blockers]. Now: [todo task in progress]. Next: [next open task].
+[Outcome so far] toward [the user's original ask and the result they wanted]. You need: [ledger N/M done, findings, blockers]. Now: [todo task in progress]. Next: [next open task].
 
-Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration. Final answers state what changed, where, the verification evidence, and any real residual risk - dense and short.
+Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration. The block is for multi-step work tracked in todos. A request finished in a single turn with no todo list gets a plain answer with no block, and a final message never opens or closes with ledger lines such as \`Next: none\`. Final answers state what changed, where, the verification evidence, and any real residual risk - dense and short.
 </communication>`;
 
   const constraintsBlock = `<constraints>

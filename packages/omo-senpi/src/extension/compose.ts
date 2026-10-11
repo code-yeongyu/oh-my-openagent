@@ -1,6 +1,7 @@
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
+import { isOmoSenpiDisabledByEnv } from "./disable-env"
 import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
@@ -11,6 +12,7 @@ export interface ComposeOmoSenpiExtensionOptions {
   logger?: ComponentLogger
   /** Test seam for the startup deferral; production uses its next-tick scheduler. */
   scheduleStartupWork?: StartupWorkScheduler
+  env?: NodeJS.ProcessEnv
 }
 
 const REQUIRED_CAPABILITIES = [
@@ -103,7 +105,7 @@ export function composeOmoSenpiExtension(
       })
     }
 
-    if (pi.getFlag("omo-senpi-disabled") === true) {
+    if (pi.getFlag("omo-senpi-disabled") === true || isOmoSenpiDisabledByEnv(options.env ?? process.env)) {
       logger.info("omo-senpi disabled by flag")
       return
     }
@@ -145,7 +147,7 @@ export function composeOmoSenpiExtension(
     // as the idle coordinator: a session that ends before the gate opens must not start a
     // half-session's worth of work on a dead API.
     const startupDeferral = createStartupDeferral({
-      schedule: options.scheduleStartupWork ?? createFirstPaintScheduler({ on: (event, handler) => pi.on(event, handler) }),
+      schedule: options.scheduleStartupWork ?? createFirstPaintScheduler({ on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions) }),
       onError: (label, error) => logger.warn("omo-senpi deferred startup work failed", { label, error }),
     })
     pi.on("session_shutdown", () => startupDeferral.retire())
@@ -183,6 +185,10 @@ export function composeOmoSenpiExtension(
         logger.error("omo-senpi component registration failed", { component: component.name, error })
       }
     }
+    // The wrapper exists only to collect omo component tools. Senpi loads builtin factories after
+    // path extensions, so leaving it installed would capture raw builtin definitions (including
+    // freeform eval) and inject them as parent custom tools into every in-process child.
+    captureRegistry.stopCapture()
   }
 }
 

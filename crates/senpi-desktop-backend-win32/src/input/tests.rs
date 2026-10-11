@@ -113,13 +113,15 @@ fn wheel_deltas_ride_in_the_high_word() {
 }
 
 #[test]
-fn scroll_deltas_round_to_at_least_one_notch() {
-    let steps: Vec<i32> = [0.0, 1.0, -1.0, 149.0, 150.0, -250.0]
+fn scroll_pixels_become_notches_of_forty_pixels() {
+    let steps: Vec<i32> = [0.0, 1.0, -1.0, 19.0, 59.0, 60.0, 120.0, -120.0, -100.0, 300.0]
         .into_iter()
         .map(scroll_steps)
         .collect();
 
-    assert_eq!(steps, [0, 1, -1, 1, 2, -3]);
+    // 40 px per notch, rounded half up, never zero for a non-zero delta; the
+    // sign is the caller's (it maps positive `dy` to a negative wheel delta).
+    assert_eq!(steps, [0, 1, -1, 1, 1, 2, 3, -3, -3, 8]);
 }
 
 #[test]

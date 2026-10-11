@@ -7,8 +7,6 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::types::Target;
-use windows_sys::Win32::Foundation::HWND;
-use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse as kbm;
 use windows_sys::Win32::UI::WindowsAndMessaging as wm;
 
@@ -16,6 +14,10 @@ use super::held::{HeldKey, Route};
 use super::{keys, messages, Win32Input};
 use crate::integrity;
 use crate::stop_path::chord;
+
+mod probe;
+mod routing;
+use probe::ProbeWindow;
 
 #[test]
 fn virtual_keys_and_messages_match_windows_sys() {
@@ -42,75 +44,6 @@ fn virtual_keys_and_messages_match_windows_sys() {
     }
 }
 
-/// A message-only window of class `class`, owned by the creating thread;
-/// dropping it destroys the window and unregisters the class.
-struct ProbeWindow {
-    hwnd: HWND,
-    class: Vec<u16>,
-}
-
-impl ProbeWindow {
-    fn new(class: &str) -> Self {
-        let class: Vec<u16> = class.encode_utf16().chain([0]).collect();
-        // SAFETY: [FFI] test-only; a null name selects this executable.
-        let instance = unsafe { GetModuleHandleW(std::ptr::null()) };
-        let registration = wm::WNDCLASSW {
-            lpfnWndProc: Some(wm::DefWindowProcW),
-            hInstance: instance,
-            lpszClassName: class.as_ptr(),
-            ..wm::WNDCLASSW::default()
-        };
-        // SAFETY: [FFI] `registration` and the class name outlive the call.
-        assert_ne!(unsafe { wm::RegisterClassW(&raw const registration) }, 0);
-        // SAFETY: [FFI] the class was just registered; a message-only parent
-        // needs no desktop.
-        let hwnd = unsafe {
-            wm::CreateWindowExW(
-                0,
-                class.as_ptr(),
-                class.as_ptr(),
-                0,
-                0,
-                0,
-                0,
-                0,
-                wm::HWND_MESSAGE,
-                std::ptr::null_mut(),
-                instance,
-                std::ptr::null(),
-            )
-        };
-        assert!(!hwnd.is_null(), "CreateWindowExW failed");
-        Self { hwnd, class }
-    }
-
-    fn id(&self) -> String {
-        self.hwnd.addr().to_string()
-    }
-
-    /// Every queued message of this window, oldest first.
-    fn drain(&self) -> Vec<(u32, usize)> {
-        let mut message = wm::MSG::default();
-        let mut seen = Vec::new();
-        // SAFETY: [FFI] `message` is a valid out slot.
-        while unsafe { wm::PeekMessageW(&raw mut message, self.hwnd, 0, 0, wm::PM_REMOVE) } != 0 {
-            seen.push((message.message, message.wParam));
-        }
-        seen
-    }
-}
-
-impl Drop for ProbeWindow {
-    fn drop(&mut self) {
-        // SAFETY: [FFI] this thread created the window and registered the
-        // class; nothing else refers to either.
-        unsafe {
-            wm::DestroyWindow(self.hwnd);
-            wm::UnregisterClassW(self.class.as_ptr(), GetModuleHandleW(std::ptr::null()));
-        }
-    }
-}
-
 fn input() -> Win32Input {
     Win32Input::new(integrity::current_process().unwrap()).unwrap()
 }
@@ -121,14 +54,25 @@ fn background_text_reaches_an_unlisted_class_window() {
     let window = ProbeWindow::new("SomeCustomClass");
     // When
     let typed = input().type_text(&Target::Window(window.id()), "hi\n", DeliveryMode::Background);
-    // Then: the characters arrive as WM_CHAR, the newline as a carriage return
+    // Then: characters arrive as WM_CHAR and the newline as one Return
+    // transition, never a raw carriage-return character.
     assert_eq!(typed, Ok(()));
-    let chars: Vec<usize> = window
-        .drain()
-        .into_iter()
-        .filter_map(|(message, unit)| (message == wm::WM_CHAR).then_some(unit))
+    let messages = window.drain();
+    let chars: Vec<usize> = messages
+        .iter()
+        .filter_map(|(message, unit)| (*message == wm::WM_CHAR).then_some(unit))
+        .copied()
         .collect();
-    assert_eq!(chars, [usize::from(b'h'), usize::from(b'i'), usize::from(b'\r')]);
+    let returns: Vec<u32> = messages
+        .iter()
+        .filter_map(|(message, unit)| {
+            (*unit == usize::from(keys::VK_RETURN))
+                .then_some(*message)
+                .filter(|message| matches!(*message, wm::WM_KEYDOWN | wm::WM_KEYUP))
+        })
+        .collect();
+    assert_eq!(chars, [usize::from(b'h'), usize::from(b'i')]);
+    assert_eq!(returns, [wm::WM_KEYDOWN, wm::WM_KEYUP]);
 }
 
 #[test]

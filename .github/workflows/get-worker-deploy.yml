@@ -1,0 +1,62 @@
+name: get.omo.dev deploy
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "packages/get-worker/**"
+      - ".github/workflows/get-worker-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: get-worker-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: ubuntu-latest
+    # The Sisyphus Labs account (moved 2026-10-09). The token in this environment can edit Workers scripts and
+    # the omo.dev zone's routes; it has NO D1 access, so migrations are applied by a separate reviewed step.
+    environment:
+      name: omo-production
+      url: https://get.omo.dev
+    defaults:
+      run:
+        working-directory: packages/get-worker
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+      - name: Refuse to deploy over a pending D1 migration
+        run: bash scripts/check-migrations-applied.sh migrations
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 6511ce566bfe27228f536a8fb9448be5
+          workingDirectory: packages/get-worker
+          command: deploy
+      - name: Smoke the live endpoints
+        run: |
+          set -euo pipefail
+          curl -fsS https://get.omo.dev/healthz
+          curl -fsSI https://get.omo.dev/install.sh | grep -i '^cache-control: public, max-age=300'
+          curl -fsS https://get.omo.dev/channels/latest
+      - name: Write job summary
+        if: always()
+        shell: bash
+        working-directory: .
+        env:
+          JOB_SUMMARY_TITLE: get.omo.dev deploy
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Refuses to deploy while a D1 migration is pending, then deploys the omo-get Worker.
+            - Smoke-checks healthz, install.sh caching and the latest channel.
+          JOB_SUMMARY_NEXT: A pending-migration stop means the migration must be applied through the reviewed step first; otherwise check wrangler authentication.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

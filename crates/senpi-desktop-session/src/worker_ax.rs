@@ -1,19 +1,15 @@
 //! Accessibility requests. Refs (`eN`) resolve through the session's
 //! registry; a ref older than the previous snapshot fails `StaleRef`.
 
-use senpi_desktop_core::ax::{self, register_node, AxHandle};
-use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
-use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::frame::FrameGeometry;
-use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxElementAtParams, AxQueryParams, AxSnapshotParams,
-};
+use senpi_desktop_core::ax::{self, register_node};
+use senpi_desktop_core::backend::DeliveryMode;
+use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::protocol_params::{AxElementAtParams, AxQueryParams, AxSnapshotParams};
 use senpi_desktop_core::types::{AxNode, Target};
 
 use senpi_desktop_safety::MutatingAction;
 
 use crate::mutate::Mutation;
-use crate::pointer::ParsedPointerOptions;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
 
@@ -176,51 +172,6 @@ impl Worker {
             Ok(Response::Unit)
         })
     }
-
-    /// Clicks the centre of the element's bounds in the window containing it.
-    pub(crate) fn ax_click(
-        &mut self,
-        params: &AxClickParams,
-        cancelled: &dyn Fn() -> bool,
-    ) -> CoreResult<Audited> {
-        let mode = ParsedPointerOptions::requested_mode(params.opts.as_ref());
-        let mutation = Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
-        self.mutate(&mutation, cancelled, |worker| worker.ax_click_now(params))
-    }
-
-    fn ax_click_now(&mut self, params: &AxClickParams) -> CoreResult<Response> {
-        let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
-        let handle: AxHandle = self.registry.resolve(&params.ref_)?;
-        let bounds = self
-            .ax_parts()?
-            .0
-            .props(&handle)?
-            .bounds
-            .ok_or_else(|| DesktopError::ax_failed(format!("{} has no clickable bounds", params.ref_)))?;
-        let x = bounds.x + bounds.width / 2.0;
-        let y = bounds.y + bounds.height / 2.0;
-        let window = self
-            .backend()?
-            .windows()?
-            .into_iter()
-            .find(|window| {
-                let (left, top) = (f64::from(window.x), f64::from(window.y));
-                (left..left + f64::from(window.width)).contains(&x)
-                    && (top..top + f64::from(window.height)).contains(&y)
-            })
-            .ok_or_else(|| DesktopError::window_not_found(format!("no window contains {}", params.ref_)))?;
-        let event = PointerEvent::Click {
-            x,
-            y,
-            button: options.button,
-            count: options.count,
-            modifiers: options.modifiers,
-        };
-        let target = Target::Window(window.id);
-        self.backend()?
-            .pointer(&target, event, &FrameGeometry::identity_global(), options.mode)?;
-        Ok(Response::Unit)
-    }
 }
 
 fn truncate(value: String) -> String {
@@ -234,3 +185,7 @@ fn truncate(value: String) -> String {
         value
     }
 }
+
+mod click;
+#[cfg(test)]
+mod tests;

@@ -45,7 +45,13 @@ const BUTTON = {
 };
 
 const POINTER_METHODS = new Set(["click", "moveMouse", "drag", "scroll"]);
-const NULL_METHODS = new Set(["typeText", "keyChord", "raiseWindow", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
+const NULL_METHODS = new Set(["typeText", "keyChord", "raiseWindow", "menus.select", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
+
+const MENU_TREE = [
+	{ title: "File", path: ["File"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },
+	{ title: "Edit", path: ["Edit"], enabled: false, checked: false, hasSubmenu: true, shortcut: null },
+	{ title: "View", path: ["View"], enabled: true, checked: true, hasSubmenu: false, shortcut: null },
+];
 
 // rpc code = -32000 - the ErrorCode ordinal (senpi-desktop-core error.rs).
 const INPUT_ERROR_RPC = { PermissionDenied: -32000, StopPathUnavailable: -32014, Suspended: -32015, ScreenLocked: -32016 };
@@ -82,6 +88,14 @@ export function createDesktop() {
 		const target = params?.target;
 		if (inputError !== undefined && (POINTER_METHODS.has(method) || method === "typeText" || method === "keyChord")) {
 			const failure = error(INPUT_ERROR_RPC[inputError] ?? -32013, inputError, `input refused: ${inputError}`);
+			if (inputError === "PermissionDenied") {
+				failure.error.data.permission = {
+					permission: "accessibility",
+					settingsUrl: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+					app: "QA App",
+					relaunchRequired: true,
+				};
+			}
 			return { ...failure, notifications: [audit(method, target ?? "desktop", null, inputError)] };
 		}
 		if (POINTER_METHODS.has(method)) {
@@ -111,6 +125,20 @@ export function createDesktop() {
 			case "clipboard.write":
 				clipboard = params.text;
 				return { result: null };
+			case "menus.items": {
+				if (params?.windowId !== "101") return error(-32004, "WindowNotFound", `no window ${params?.windowId}`);
+				const path = params?.path ?? [];
+				if (path.length > 1 || (path.length === 1 && path[0] !== "File")) {
+					return error(-32010, "AxFailed", `menu item '${path[0]}' was not found`);
+				}
+				if (path.length === 0) return { result: MENU_TREE };
+				return {
+					result: [
+						{ title: "Save", path: ["File", "Save"], enabled: true, checked: false, hasSubmenu: false, shortcut: "Cmd+S" },
+						{ title: "Export…", path: ["File", "Export…"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },
+					],
+				};
+			}
 			case "ax.snapshot":
 				return { result: { text: "button Run [ref=e1]", nodeCount: 1, truncated: false } };
 			case "ax.query":

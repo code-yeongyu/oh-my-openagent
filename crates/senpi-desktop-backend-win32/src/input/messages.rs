@@ -46,13 +46,17 @@ pub const fn modifier_flags(modifiers: Modifiers) -> usize {
     (if modifiers.ctrl { MK_CONTROL } else { 0 }) | (if modifiers.shift { MK_SHIFT } else { 0 })
 }
 
-/// Wheel notches for a pixel-ish delta: 0 for no motion, otherwise at least
-/// one notch per 100 units, rounded half up.
+/// Pixels per wheel notch: scroll deltas are pixels on every OS, and one
+/// notch stands for about 40 of them.
+pub const PIXELS_PER_NOTCH: f64 = 40.0;
+
+/// Wheel notches for a pixel delta: 0 for no motion, otherwise one notch per
+/// `PIXELS_PER_NOTCH` pixels, rounded half up, and at least one notch.
 pub fn scroll_steps(delta: f64) -> i32 {
     if delta.abs() < f64::EPSILON {
         return 0;
     }
-    let magnitude = ((delta.abs() + 50.0) / 100.0)
+    let magnitude = (delta.abs() / PIXELS_PER_NOTCH + 0.5)
         .floor()
         .clamp(1.0, f64::from(i32::MAX));
     // Float-to-int `as` saturates; `magnitude` is already within i32.

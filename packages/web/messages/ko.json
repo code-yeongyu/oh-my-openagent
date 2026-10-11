@@ -36,14 +36,24 @@
       "subcopy": "당신의 토큰을 현실세계의 가치있는 결과물로 바꿔드립니다.\n10000개가 넘는 소스가 필요한 리서치, 이해하기 쉬운 정갈한 발표자료,\n다양한 맥락이 필요한 회사 일, 실험, 백엔드, 프론트엔드, 코딩,\n당신이 원하는 어떤 일이든.",
       "getStarted": "시작하기",
       "readManifesto": "매니페스토 읽기",
-      "installLabel": "명령 하나, 도구 하나",
-      "installCommand": "bun install -g omo-ai"
+      "installLabel": "명령 하나, 도구 하나"
     },
     "command": {
       "copy": "복사",
       "copied": "복사됨",
       "copyAria": "설치 명령 복사",
       "copiedStatus": "설치 명령을 복사했습니다"
+    },
+    "install": {
+      "tabsLabel": "내 시스템에 맞는 설치 명령",
+      "windows": "Windows",
+      "tabs": {
+        "unix": "macOS, Linux, WSL",
+        "powershell": "PowerShell",
+        "cmd": "CMD"
+      },
+      "next": "설치가 끝나면 새 터미널을 열고 omo를 실행하세요.",
+      "onComputer": "Mac, Linux, Windows 컴퓨터에서 실행하세요."
     },
     "proof": {
       "label": "실시간 지표",
@@ -166,8 +176,7 @@
       "title": "명령 하나. 그리고 다시 당신의 일로.",
       "subtitle": "OmO를 설치하고, 프로젝트를 열고, 할 일을 말하세요. 더 설정할 것은 없어요.",
       "installNow": "지금 설치",
-      "readTheDocs": "문서 읽기",
-      "installCommand": "bun install -g omo-ai"
+      "readTheDocs": "문서 읽기"
     },
     "dag": {
       "region": "워크플로우 그래프가 열린 OmO 데스크톱",
@@ -194,7 +203,11 @@
   },
   "docs": {
     "mobileHeader": "OmO 문서",
-    "searchPlaceholder": "문서 검색..."
+    "searchPlaceholder": "문서 검색...",
+    "install": {
+      "title": "OmO 설치",
+      "description": "macOS, Linux, WSL, Windows에서 명령 하나로 OmO를 설치합니다."
+    }
   },
   "manifesto": {
     "badge": "Manifesto",

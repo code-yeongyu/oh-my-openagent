@@ -138,6 +138,7 @@ describe("buildTaskExecute spawn", () => {
             default_execution_mode: "process",
             process_runner: "host",
             host_engine_policy: "upgrade",
+            host_shard_prewarm: "off",
             default_concurrency: 5,
             global_concurrency: 8,
             max_depth: 1,

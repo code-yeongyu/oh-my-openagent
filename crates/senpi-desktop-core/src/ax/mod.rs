@@ -3,7 +3,7 @@
 use std::any::Any;
 use std::rc::Rc;
 
-pub use crate::backend::AxBackend;
+pub use crate::backend::{AxBackend, AxOwner};
 
 mod ops;
 mod registry;

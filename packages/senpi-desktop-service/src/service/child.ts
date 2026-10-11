@@ -6,6 +6,7 @@ import {
 	acquireDesktopEngine,
 	type DesktopEngineLocateDiagnostic,
 	getDesktopEngineHost,
+	launchDesktopEngine,
 	locateDesktopEngine,
 } from "@oh-my-opencode/senpi-desktop-engine";
 
@@ -46,20 +47,20 @@ export interface AcquiringEngineChildOptions {
 }
 
 /**
- * The npm-channel spawn contract: a locally installed engine when one is found, otherwise the verified
- * release download for `version`, acquired once and reused for later spawns.
+ * Each spawn acquires the requested release again and holds its launch lock through spawn.
+ * Local engines retain their original path; signed releases use the stable permission-bearing path.
  */
 export function acquiringEngineChildFactory(options: AcquiringEngineChildOptions): ChildFactory {
 	const acquire = options.acquire ?? acquireDesktopEngine;
 	const start = options.spawnEngine ?? spawnEngine;
-	let acquired: string | undefined;
 	return async () => {
-		if (acquired === undefined) {
-			const result = await acquire({ version: options.version, host: options.host ?? getDesktopEngineHost() });
-			if (result.path === null) throw new DesktopEngineUnavailableError(result.diagnostic);
-			acquired = result.path;
-		}
-		return start(acquired);
+		const result = await launchDesktopEngine(
+			{ version: options.version, host: options.host ?? getDesktopEngineHost() },
+			start,
+			acquire,
+		);
+		if (result.path === null) throw new DesktopEngineUnavailableError(result.diagnostic);
+		return result.value;
 	};
 }
 

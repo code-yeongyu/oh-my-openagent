@@ -1,6 +1,6 @@
 > [!NOTE]
 > **OmO 베타: OmO ❤️ Pi**
-> `bun add -g omo-ai`로 설치하세요. 메모리 시스템, CodeMode, Anthropic 구독까지 전부 지원됩니다.
+> `curl -fsSL https://get.omo.dev/install.sh | bash`로 설치하세요. 메모리 시스템, CodeMode, Anthropic 구독까지 전부 지원됩니다.
 > [![OmO Herdr DAG - live OmO workflow DAGs in a Herdr side pane](./.github/assets/omo-herdr-dag.png)](https://github.com/jc01rho/omo-herdr-dag)
 > *프롬프트에 "mass ulw" 한 줄이면 끝. 당신도 그래프 엔지니어링의 마스터가 됩니다. 멀티 모델 ultracode, 더 나은 메모리 시스템과 함께. (우측의 패널은 [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag) 입니다)*
 
@@ -34,7 +34,7 @@
 **Your tool for real work. But it's an agent.**
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
-[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/omo-ai)
+[![downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fdownloads&style=flat-square)](https://omo.dev)
 [![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
@@ -53,11 +53,11 @@ OmO는 토큰을 끝난 일로 바꿔 주는 `omo` 명령 하나입니다. 만 �
 ## 설치
 
 ```bash
-bun add -g omo-ai
+curl -fsSL https://get.omo.dev/install.sh | bash
 omo
 ```
 
-bun이 없으면 `npm i -g omo-ai`로 설치해도 됩니다. 패키지 이름은 `omo-ai`예요. npm의 `omo` 패키지는 다른 사람이 만든 전혀 다른 물건입니다.
+Windows는 PowerShell에서 `irm https://get.omo.dev/install.ps1 | iex`를 실행하세요. OS와 CPU에 맞는 네이티브 `omo`를 `~/.local/bin`에 설치하고 릴리스 체크섬으로 검증합니다. 패키지 매니저가 편하면 `bun add -g omo-ai`(또는 `npm i -g omo-ai`)로 같은 OmO를 설치할 수 있어요. 패키지 이름은 `omo-ai`예요. npm의 `omo` 패키지는 다른 사람이 만든 전혀 다른 물건입니다. Windows CMD, `PATH` 문제 해결, 업데이트와 삭제는 [omo.dev/docs/install](https://omo.dev/docs/install)에서 다룹니다.
 
 프로젝트를 열고 `omo`를 실행한 다음, 할 일을 말하세요. 설정은 그게 끝.
 
@@ -97,7 +97,7 @@ OpenCode 에디션이나 LazyCodex에서 넘어오셨다면 `omo setup`을 한 �
 - [OpenCode에서 옮겨 오기](docs/guide/migrating-from-opencode.md)
 - [설정 레퍼런스](docs/reference/configuration.md)
 - [기능](docs/reference/features.md)
-- [컴퓨터 사용](docs/guide/computer-use.md)
+- [컴퓨터 사용](docs/guide/computer-use.md) (실험적 기능)
 - [Ultrawork 선언문](docs/manifesto.md)
 
 ## 리뷰

@@ -8,13 +8,27 @@
 pub mod held;
 pub mod keys;
 pub mod messages;
+#[cfg(any(test, target_os = "windows"))]
+mod cursor_placement;
+#[cfg(any(test, target_os = "windows"))]
+mod focus_policy;
+#[cfg(any(test, target_os = "windows"))]
+mod events;
+#[cfg(any(test, target_os = "windows"))]
+mod recovery;
+#[cfg(any(test, target_os = "windows"))]
+mod typing_progress;
 
 #[cfg(target_os = "windows")]
 mod background;
 #[cfg(target_os = "windows")]
+mod background_pointer;
+#[cfg(target_os = "windows")]
 mod barrier;
 #[cfg(target_os = "windows")]
 mod char_sink;
+#[cfg(target_os = "windows")]
+mod compositor;
 #[cfg(target_os = "windows")]
 mod dispatch;
 #[cfg(target_os = "windows")]
@@ -43,3 +57,6 @@ mod win_tests;
 
 #[cfg(all(test, target_os = "windows"))]
 pub(crate) mod live_tests;
+
+#[cfg(all(test, target_os = "windows"))]
+mod live_release_tests;

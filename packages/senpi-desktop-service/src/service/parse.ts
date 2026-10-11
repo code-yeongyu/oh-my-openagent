@@ -5,6 +5,7 @@ import {
 	ERROR_CODES,
 	type JsonRpcErrorData,
 	type MethodRejection,
+	type PermissionDeniedData,
 	type StopPathStatus,
 } from "@oh-my-opencode/senpi-desktop-protocol";
 
@@ -118,7 +119,30 @@ export function parseSessionOpened(value: unknown): SessionOpened | undefined {
 export function parseErrorData(value: unknown): JsonRpcErrorData | null {
 	if (!isRecord(value)) return null;
 	const code = ERROR_CODES.find((name) => name === value.code);
-	if (code !== undefined) return { code, hint: typeof value.hint === "string" ? value.hint : null };
+	if (code !== undefined) {
+		const permission = parsePermission(value.permission);
+		return {
+			code,
+			hint: typeof value.hint === "string" ? value.hint : null,
+			...(permission === undefined ? {} : { permission }),
+		};
+	}
 	const reason = METHOD_REJECTIONS.find((name) => name === value.reason);
 	return reason === undefined ? null : { reason };
+}
+
+function parsePermission(value: unknown): PermissionDeniedData | undefined {
+	if (
+		!isRecord(value) ||
+		(value.permission !== "screen_recording" && value.permission !== "accessibility") ||
+		typeof value.settingsUrl !== "string" ||
+		typeof value.app !== "string" ||
+		typeof value.relaunchRequired !== "boolean"
+	) return undefined;
+	return {
+		permission: value.permission,
+		settingsUrl: value.settingsUrl,
+		app: value.app,
+		relaunchRequired: value.relaunchRequired,
+	};
 }

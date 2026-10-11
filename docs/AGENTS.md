@@ -11,6 +11,7 @@
 | Audience / Task | Location |
 |------|----------|
 | New users — what is this? | [docs/guide/overview.md](guide/overview.md) |
+| Installing OmO with the one-line installer (omo.dev/docs/install) | [docs/guide/install.md](guide/install.md) |
 | Installing the plugin | [docs/guide/installation.md](guide/installation.md) |
 | Installing the compiled binary | [docs/guide/binary-install.md](guide/binary-install.md) |
 | How agents collaborate | [docs/guide/orchestration.md](guide/orchestration.md) |
@@ -19,11 +20,18 @@
 | Senpi task delegation and teams | [docs/guide/senpi-task.md](guide/senpi-task.md) |
 | Desktop computer use setup and safety | [docs/guide/computer-use.md](guide/computer-use.md) |
 | Temporary BTW side conversations | [docs/guide/btw.md](guide/btw.md) |
+| Workflows (mass ulw) for users, omo.dev/docs/workflows | [docs/guide/workflows.md](guide/workflows.md) |
+| Delegated agents and the Desktop Agents panel, omo.dev/docs/agents | [docs/guide/agents.md](guide/agents.md) |
+| Reserved keywords (ulw, ulw loop, ulw plan, ulw research, mass ulw), omo.dev/docs/keywords | [docs/guide/keywords.md](guide/keywords.md) |
+| Telemetry in plain words and how to opt out, omo.dev/docs/telemetry | [docs/guide/telemetry.md](guide/telemetry.md) |
+| OmO Desktop updates, release notes and tracks, omo.dev/docs/desktop-updates | [docs/guide/desktop-updates.md](guide/desktop-updates.md) |
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Native `computer` tool contract | [docs/reference/computer.md](reference/computer.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
+| Engine hosts per session, `omo daemon`, migration and rollback | [docs/reference/omo-daemon.md](reference/omo-daemon.md) |
+| `omo thread` CLI and thread SDK for scripts and connectors (JSON shapes, exit codes) | [docs/reference/omo-thread.md](reference/omo-thread.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](reference/prompt-async-gate-rfc.md) |
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |

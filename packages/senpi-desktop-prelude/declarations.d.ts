@@ -18,7 +18,7 @@ interface ComputerDragOptions extends ComputerDeliveryOptions {
 	modifiers?: string[];
 }
 
-/** Options for wheel scrolling; `dx`/`dy` are scroll units at the pointer position. */
+/** Options for wheel scrolling at the pointer position; `dx`/`dy` are pixels, the same unit on every OS, and one mouse-wheel notch is about 40 px (so `dy: 120` scrolls about three notches). The direction is semantic and the same on every OS: a positive `dy` moves the view toward the end of the content (the content moves up) and a positive `dx` toward its right edge, regardless of the user's natural-scrolling setting. */
 interface ComputerScrollOptions extends ComputerDeliveryOptions {
 	dx?: number;
 	dy?: number;
@@ -56,6 +56,16 @@ interface ComputerBounds {
 	y: number;
 	width: number;
 	height: number;
+}
+
+/** A native menu item snapshot; selection revalidates the command before dispatch. */
+interface ComputerMenuItem {
+	title: string;
+	path: string[];
+	enabled: boolean;
+	checked: boolean;
+	hasSubmenu: boolean;
+	shortcut?: string | null;
 }
 
 /** One capturable top-level window in global logical desktop coordinates. */
@@ -175,6 +185,12 @@ interface ComputerWindow extends ComputerInputTarget {
 	readonly bounds: ComputerBounds;
 	readonly focused: boolean;
 	raise(): Promise<void>;
+	readonly menu: {
+		/** Inspect a menu path without activating the application (empty path = the menu bar). */
+		items(path?: string[]): Promise<ComputerMenuItem[]>;
+		/** Select one unambiguous enabled leaf command using the window's native menu context. */
+		select(path: string[]): Promise<void>;
+	};
 	/** Formatted accessibility tree as one string, one node per line with `[ref=eN]` tags. */
 	ax(options?: ComputerAxOptions): Promise<string>;
 	find(query: ComputerAxQuery): Promise<ComputerElement[]>;

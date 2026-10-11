@@ -1,6 +1,33 @@
 import { spawnSync } from "node:child_process";
 import { computerPreludeAssets } from "../src/index";
 
+export function pythonCommandForPlatform(platform: NodeJS.Platform): string {
+	return platform === "win32" ? "python" : "python3";
+}
+
+const PYTHON_COMMAND = pythonCommandForPlatform(process.platform);
+const PYTHON_DIAGNOSTICS = process.env.OMO_DESKTOP_PRELUDE_PYTHON_DIAGNOSTICS === "1";
+
+if (PYTHON_DIAGNOSTICS) {
+	const lookupCommand = process.platform === "win32" ? "where.exe" : "which";
+	const startedAt = performance.now();
+	const lookup = spawnSync(lookupCommand, [PYTHON_COMMAND], { encoding: "utf8" });
+	console.error(
+		`PYTHON_FACADE_DIAG ${JSON.stringify({
+			phase: "command-lookup",
+			platform: process.platform,
+			processId: process.pid,
+			command: PYTHON_COMMAND,
+			elapsedMs: performance.now() - startedAt,
+			status: lookup.status,
+			signal: lookup.signal,
+			stdout: lookup.stdout.trim().split(/\r?\n/),
+			stderr: lookup.stderr.trim(),
+			errorName: lookup.error?.name ?? null,
+		})}`,
+	);
+}
+
 /** What a kernel's `tool.<name>()` resolves to (codemode `marshalToolResult`). */
 export interface ToolResult {
 	readonly text: string;
@@ -91,6 +118,9 @@ class _Tool:
         calls.append(args)
         chain = args.get("chain") or []
         last = chain[-1]["method"] if chain else None
+        override = payload.get("responders", {}).get(last)
+        if override is not None:
+            return json.loads(override)
         if len(chain) == 1 and last == "window":
             return {"text": "", "details": {"value": WINDOW}, "images": [], "hasError": False}
         if len(chain) == 1 and last == "ref":
@@ -111,15 +141,41 @@ print(json.dumps({"calls": calls, "displayed": displayed, "out": ns.get("out"), 
 `;
 
 /** Runs `script` in a real Python interpreter after the facade was installed; `script` may assign `out`. */
-export function runPythonFacade(script: string): PythonRun {
+export function runPythonFacade(script: string, responders: Readonly<Record<string, string>> = {}): PythonRun {
 	const input = JSON.stringify({
 		prelude: computerPreludeAssets.python,
 		script,
 		window: JSON.stringify(WINDOW_SNAPSHOT),
 		element: JSON.stringify(ELEMENT_SNAPSHOT),
 		image: JSON.stringify(IMAGE),
+		responders,
 	});
-	const result = spawnSync("python3", ["-c", PYTHON_HARNESS], { input, encoding: "utf8", timeout: 30_000 });
-	if (result.status !== 0) throw new Error(`python3 exited ${result.status}: ${result.stderr}`);
+	const startedAt = performance.now();
+	// UTF-8 mode: Windows Python otherwise decodes the piped payload with the ANSI code page (cp1252),
+	// turning non-ASCII labels such as "Export…" into mojibake before the facade sees them.
+	const result = spawnSync(PYTHON_COMMAND, ["-X", "utf8", "-c", PYTHON_HARNESS], {
+		input,
+		encoding: "utf8",
+		timeout: 30_000,
+	});
+	if (PYTHON_DIAGNOSTICS) {
+		console.error(
+			`PYTHON_FACADE_DIAG ${JSON.stringify({
+				phase: "facade-run",
+				platform: process.platform,
+				processId: process.pid,
+				childProcessId: result.pid,
+				command: PYTHON_COMMAND,
+				elapsedMs: performance.now() - startedAt,
+				status: result.status,
+				signal: result.signal,
+				errorName: result.error?.name ?? null,
+				stdoutBytes: result.stdout.length,
+				stderrBytes: result.stderr.length,
+				inputBytes: input.length,
+			})}`,
+		);
+	}
+	if (result.status !== 0) throw new Error(`${PYTHON_COMMAND} exited ${result.status}: ${result.error?.message ?? result.stderr}`);
 	return JSON.parse(result.stdout);
 }

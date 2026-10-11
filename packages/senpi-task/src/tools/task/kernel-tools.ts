@@ -1,7 +1,7 @@
 import { agentToolPolicy } from "../../agents/agent-tool-policy"
 import { readKernelToolsCapability } from "../../kernel-tools/contract"
 import { resolveKernelToolGrant, type KernelToolGrant } from "../../kernel-tools/resolve"
-import { ensureAutoExecutionMode, taskExecutionModeFor } from "./execute-spec"
+import { ensureAutoExecutionMode, taskExecutionModeFor, taskTargetOf } from "./execute-spec"
 import type { ResolvedSpawnItem, TaskKernelToolsDetail, TaskToolContext, TaskToolDeps } from "./types"
 
 export type TaskKernelToolsResolution =
@@ -24,15 +24,16 @@ export async function resolveTaskKernelTools(
 ): Promise<TaskKernelToolsResolution> {
   if (requested === undefined || requested.length === 0) return { kind: "none" }
   // The grant is decided against the mode the child will really run in, so the parent session's
-  // `auto` resolution settles first (it is memoized; this is the same check the spawn makes).
-  await ensureAutoExecutionMode(deps)
+  // `auto` resolution settles first (it is memoized; this is the same check the spawn makes). A call
+  // whose every target runs in-process skips it: unsettled `auto` reads as in-process, never wider.
+  await ensureAutoExecutionMode(deps, items.map(taskTargetOf))
   const capability = readKernelToolsCapability(ctx)
   // The names the child will already carry, so a colliding request and a policy-narrowed child are
   // both refused here rather than at the runner floor (which runs after the record is written).
   const childToolNames = deps.resolveChildToolNames?.()
   let grant: KernelToolGrant | undefined
   for (const item of items) {
-    const target = item.kind === "category" ? { category: item.category } : { subagentType: item.subagentType }
+    const target = taskTargetOf(item)
     // A category target carries no persona, so its child keeps the full shared surface; a named
     // agent's literal allow/deny rules decide the nested-host-scope rule for this grant.
     const agent = item.kind === "subagent_type"

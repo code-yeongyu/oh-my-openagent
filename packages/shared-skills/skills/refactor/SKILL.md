@@ -1,6 +1,7 @@
 ---
 name: refactor
 description: "Guides a refactor, cleanup, or restructure with the right decomposition. Use when the user asks to refactor, simplify, extract, or modernize code."
+argument-hint: "<refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]"
 ---
 
 export const REFACTOR_TEMPLATE = `# Intelligent Refactor Command

@@ -15,6 +15,17 @@ mod fake_eis;
 
 use fake_eis::{EisConfig, FakeEis, Log, Recorded};
 
+#[expect(dead_code, reason = "only the region type is used here; its layout helpers serve the backend")]
+#[path = "../../../../../../crates/senpi-desktop-backend-wayland/src/capture/eis_region.rs"]
+mod eis_region;
+
+/// `fake_eis` names the region type by its backend path, `crate::capture::layout::EisRegion`.
+mod capture {
+    pub mod layout {
+        pub use crate::eis_region::EisRegion;
+    }
+}
+
 /// Read by `fake_eis` as `super::HANG_GUARD`: the bound on every wait.
 const HANG_GUARD: Duration = Duration::from_secs(30);
 

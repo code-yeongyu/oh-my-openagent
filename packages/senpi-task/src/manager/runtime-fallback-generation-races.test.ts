@@ -13,6 +13,7 @@ import { TaskConcurrency } from "./concurrency"
 import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 // Two generations of one task coexist while runtime fallback finishes closing an old rung: a revived
 // newer run, or a second revival racing the first. Each generation owns only its own lease, handle and
@@ -73,7 +74,7 @@ describe("generations of one task during a runtime-fallback close", () => {
           planner: (spec) => ({ kind: "resolved", plan: spec.name === undefined || spec.name === "fallback" ? { model: "test/first", resolved_model: rung("first"), fallback_models: [rung("next")] } : { model: "test/first" } }),
           destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
         })
-        const lifecycle = createTaskLifecycle({ store, config, hostPid: 11_001, registry: createManagerResidencyRegistry(() => manager), signaller: { isAlive: (pid) => pid === 11_001, signal: () => undefined } })
+        const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, hostPid: 11_001, registry: createManagerResidencyRegistry(() => manager), signaller: { isAlive: (pid) => pid === 11_001, signal: () => undefined } })
         const task = await manager.start(baseSpec({ name: "fallback" }))
         if (task.kind !== "started") throw new Error("expected the task to start")
         runner.handles.get(task.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
@@ -112,7 +113,7 @@ describe("generations of one task during a runtime-fallback close", () => {
           runner.finishClose.resolve()
           manager.workpools.dispose()
           lifecycle.dispose?.()
-          for (const id of manager.residentTaskIds()) manager.forget(id)
+          for (const id of manager.residentTaskIds()) manager.forget(id, { path: "end" })
         }
       })
     }
@@ -175,7 +176,7 @@ describe("generations of one task during a runtime-fallback close", () => {
     } finally {
       finishClose.resolve()
       await manager.getResidentHandle(taskId)?.dispose()
-      manager.forget(taskId)
+      manager.forget(taskId, { path: "end" })
       manager.workpools.dispose()
       lifecycle.dispose?.()
     }

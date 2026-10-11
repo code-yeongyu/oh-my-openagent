@@ -1,4 +1,5 @@
-import { DAG_VERIFICATION_DIRECTIVE, type ParentState } from "@oh-my-opencode/senpi-task"
+import { isGpt6AstraModel } from "@oh-my-opencode/model-core"
+import { ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE, DAG_VERIFICATION_DIRECTIVE, type ParentState } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjection } from "../../extension/idle-injection-coordinator"
 
@@ -46,6 +47,7 @@ export interface DagWakeCoordinator {
 export interface DagWakeDeps {
   readonly coordinator: DagWakeCoordinator
   readonly parentState: () => ParentState
+  readonly getReceiverModel?: () => string | undefined
 }
 
 export interface DagWake {
@@ -84,7 +86,7 @@ export function createDagWake(deps: DagWakeDeps): DagWake {
 
   return {
     onRunEvent(run, event) {
-      const injection = buildRunInjection(run, event)
+      const injection = buildRunInjection(run, event, deps.getReceiverModel)
       if (injection === undefined) return
       const parentState = deps.parentState()
       if (parentState.kind === "compacting"
@@ -113,11 +115,37 @@ function terminalStatus(type: string): DagWakeStatus | undefined {
   return TERMINAL_EVENT_STATUSES[type as keyof typeof TERMINAL_EVENT_STATUSES]
 }
 
-function buildRunInjection(run: DagWakeRun, event: DagWakeRunEvent): IdleInjection | undefined {
+function buildRunInjection(
+  run: DagWakeRun,
+  event: DagWakeRunEvent,
+  getReceiverModel: (() => string | undefined) | undefined,
+): IdleInjection | undefined {
   if (event.type === PAUSED_EVENT_TYPE) return buildPausedInjection(run, event.reason)
   const status = terminalStatus(event.type)
   if (status === undefined || event.counts === undefined) return undefined
-  return buildInjection(run, status, event.counts, event.error)
+  const counts = event.counts
+  const firstFailure = event.error
+  return {
+    key: `dag-run:${run.runId}`,
+    source: "dag-run",
+    customType: DAG_WAKE_MESSAGE_TYPE,
+    // Buffering and the coordinator retain this object; select for the receiver when it is flushed.
+    contextScoped: true,
+    get content() {
+      const directive = isGpt6AstraModel(getReceiverModel?.())
+        ? ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE
+        : DAG_VERIFICATION_DIRECTIVE
+      return `${buildSummary(run.name, status, counts, firstFailure)}\n\n${directive}`
+    },
+    display: false,
+    details: {
+      runId: run.runId,
+      name: run.name,
+      status,
+      counts,
+      ...(firstFailure === undefined ? {} : { firstFailure }),
+    },
+  }
 }
 
 function buildPausedInjection(run: DagWakeRun, reason: string | undefined): IdleInjection {
@@ -137,33 +165,6 @@ function buildPausedInjection(run: DagWakeRun, reason: string | undefined): Idle
   }
 }
 
-function buildInjection(
-  run: DagWakeRun,
-  status: DagWakeStatus,
-  counts: DagWakeNodeCounts,
-  firstFailure: DagWakeFailure | undefined,
-): IdleInjection {
-  return {
-    key: `dag-run:${run.runId}`,
-    source: "dag-run",
-    customType: DAG_WAKE_MESSAGE_TYPE,
-    // Terminal runs are the point where the parent decides the DAG is done, so the run summary
-    // carries the same prove-it-yourself directive the per-node completions do. A pause is not a
-    // completion claim and stays directive-free.
-    content: `${buildSummary(run.name, status, counts, firstFailure)}
-
-${DAG_VERIFICATION_DIRECTIVE}`,
-    display: false,
-    details: {
-      runId: run.runId,
-      name: run.name,
-      status,
-      counts,
-      ...(firstFailure === undefined ? {} : { firstFailure }),
-    },
-  }
-}
-
 function buildSummary(
   name: string,
   status: DagWakeStatus,
@@ -175,4 +176,3 @@ function buildSummary(
   const node = firstFailure.nodeId === undefined ? "" : ` at ${firstFailure.nodeId}`
   return `${summary}. First failure${node} [${firstFailure.code}]: ${firstFailure.message}`
 }
-

@@ -41,13 +41,14 @@ export function captureProcessCrashes(input: CaptureProcessCrashesInput): number
 }
 
 export function processCrashedProperties(
-  { record, source }: ClaimedCrashRecord,
+  { record, source, shardKind }: ClaimedCrashRecord,
   osProvider: TelemetryOsProvider,
 ): EventTelemetryProperties {
   const kind = record.kind ?? (source === "rpc-host" ? "rpc-host" : "unknown")
   const detection = record.detection ?? (source === "rpc-host" ? "supervisor" : "unknown")
   return {
     process_kind: oneOf(PROCESS_KINDS, kind, "unknown"),
+    shard_kind: shardKind,
     detection: oneOf(CRASH_DETECTIONS, detection, "unknown"),
     signal: signalName(record.signal, detection),
     ...(record.code === undefined ? {} : { exit_code: record.code }),

@@ -17,6 +17,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{IsIconic, ShowWindow, SW_RESTO
 
 use super::barrier;
 use super::dispatch::Win32Input;
+use super::focus_policy::restore_target;
 use super::native::{self, Window};
 use super::system;
 
@@ -33,18 +34,49 @@ impl Win32Input {
     pub(super) fn with_foreground<T>(
         &mut self,
         id: &str,
-        body: impl FnOnce(&mut Self) -> CoreResult<T>,
+        body: impl FnOnce(&mut Self, Window) -> CoreResult<T>,
     ) -> CoreResult<T> {
         let target = Window::target(id, self.integrity)?;
+        self.last_takeover_target = Some(target);
         let previous = native::foreground();
         activate(id, target)?;
-        let result = body(self);
+        let result = body(self, target);
         let delivered = barrier::delivered(target);
-        if let Some(previous) = previous.filter(|&previous| previous != target) {
+        let current = native::foreground();
+        let owner = current.map(Window::root_owner);
+        let restore = previous
+            .filter(|&previous| previous != target)
+            .and_then(|previous| {
+                restore_target(
+                    previous.address(),
+                    target.address(),
+                    current.map_or(0, Window::address),
+                    owner.map_or(0, Window::address),
+                )
+                .map(Window)
+            });
+        if let Some(previous) = restore {
             // Refused restores are reported by the session's transaction.
             let _restored = native::set_foreground(previous);
         }
         result.and_then(|value| delivered.map(|()| value))
+    }
+
+    pub(crate) fn should_restore_front(&mut self, previous_id: &str) -> CoreResult<bool> {
+        let Some(target) = self.last_takeover_target.take() else {
+            return Ok(true);
+        };
+        let previous = Window::parse(previous_id)?;
+        let Some(current) = native::foreground() else {
+            return Ok(true);
+        };
+        Ok(restore_target(
+            previous.address(),
+            target.address(),
+            current.address(),
+            current.root_owner().address(),
+        )
+        .is_some())
     }
 }
 

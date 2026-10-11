@@ -45,7 +45,7 @@ pub enum SentEvent {
 
 pub trait InputServer {
     fn root(&self) -> Window;
-    fn keymap(&self) -> &Keymap;
+    fn keymap(&self) -> CoreResult<Keymap>;
     fn fake(&self, input: FakeInput) -> CoreResult<()>;
     fn send(&self, window: Window, event: SentEvent) -> CoreResult<()>;
     /// Root `(x, y)` in `window`'s coordinates.
@@ -57,11 +57,19 @@ pub trait InputServer {
     /// The core pointer's root position.
     fn pointer(&self) -> CoreResult<(i16, i16)>;
     fn warp(&self, x: i16, y: i16) -> CoreResult<()>;
+    /// Whether `window` is on the chain of windows under the pointer.
+    fn pointer_within(&self, window: Window) -> CoreResult<bool>;
+    /// Whether another client holds the pointer (an active or implicit grab,
+    /// or a freeze), so input already sent may not be delivered yet.
+    fn pointer_held(&self) -> CoreResult<bool>;
     /// `_NET_ACTIVE_WINDOW`: `None` when the window manager does not publish
     /// it (no EWMH manager), `Some(0)` when no window is active.
     fn active_window(&self) -> Option<Window>;
     /// Asks the window manager to activate `window` (EWMH client message).
     fn activate(&self, window: Window) -> CoreResult<()>;
+    fn focus_window(&self) -> CoreResult<Window>;
+    fn set_focus(&self, window: Window) -> CoreResult<()>;
+    fn parent(&self, window: Window) -> CoreResult<Option<Window>>;
     /// Raw `WM_CLASS` bytes (`instance\0class\0`); `None` when absent.
     fn wm_class(&self, window: Window) -> Option<Vec<u8>>;
     fn flush(&self) -> CoreResult<()>;

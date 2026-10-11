@@ -1,5 +1,7 @@
 # Installation
 
+To install OmO, run `curl -fsSL https://get.omo.dev/install.sh | bash` (Windows PowerShell: `irm https://get.omo.dev/install.ps1 | iex`). [Install OmO](install.md) covers every platform, fixing your `PATH`, updating and uninstalling. This page covers the plugin editions for OpenCode and Codex.
+
 oh-my-openagent ships in **three editions** of the same product: two plugins that load into a host you already run, plus one standalone edition.
 
 - **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. The curated agent roster, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ulw-loop, hashline edits, the works.
@@ -20,7 +22,7 @@ Both `lazycodex-ai` and `lazycodex` are shipped bin aliases that default to the 
 
 - Already use OpenCode, or want the most-tested path? Choose **Ultimate**: `bunx oh-my-openagent install`.
 - Already use Codex CLI? Choose **Light**: `npx lazycodex-ai install`.
-- Want one command without installing a host first? Choose **OmO Native**: `bun add -g omo-ai`.
+- Want one command without installing a host first? Choose **OmO Native**: `curl -fsSL https://get.omo.dev/install.sh | bash` (Windows: `irm https://get.omo.dev/install.ps1 | iex`), or `bun add -g omo-ai`.
 
 Ultimate and Light are plugins that load into a host you already run. OmO Native is standalone: it ships a pinned senpi engine with OMO built in.
 
@@ -264,7 +266,7 @@ Map their answer to:
    - **no** → `--claude=no`
 
 2. **Do you have an OpenAI/ChatGPT Plus Subscription?**
-   - **yes** → `--openai=yes` (enables OpenAI routes; the `ultrabrain` (max) and `deep-high` (xhigh) categories start on GPT-6 Astra, `deep-low` starts on GPT-5.6 Sol Fast (medium), the `quick` category starts on GPT-6 Luna Fast (low), and the Plan Reviewer starts on GPT-6 Astra (xhigh))
+   - **yes** → `--openai=yes` (enables OpenAI routes; the `ultrabrain` (max) and `deep-high` (high) categories start on GPT-6 Astra, `deep-low` starts on GPT-6.1 Sol (medium), the `quick` category starts on GPT-6 Luna Fast (low), and the Plan Reviewer starts on GPT-6 Astra (xhigh))
    - **no** → `--openai=no` (default)
 
 3. **Will you integrate Gemini models?**
@@ -570,8 +572,8 @@ GitHub Copilot is supported as a **fallback provider** when native providers are
 | --------------------- | ---------------------------------------- |
 | **plan-consultant**   | `github-copilot/claude-opus-5-5` (max)     |
 | **plan-reviewer**     | `github-copilot/gpt-6-astra` (high)      |
-| **explore**           | `github-copilot/claude-haiku-4-5`        |
-| **librarian**         | `github-copilot/claude-haiku-4-5`        |
+| **explore**           | `github-copilot/claude-haiku-5-5` (medium) |
+| **librarian**         | `github-copilot/claude-haiku-5-5` (medium) |
 | **deep** (category)   | `github-copilot/gpt-6-astra` (high)      |
 
 Copilot acts as a proxy provider, routing requests to underlying models based on your subscription. The main agent keeps running on whatever session model you picked; Copilot-only installs commonly use `github-copilot/claude-opus-5-5` there.
@@ -614,8 +616,9 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | Model                    | Provider(s)                         | Notes                                                                                       |
 | ------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------- |
 | **Claude Opus 5.5**        | anthropic, github-copilot, opencode | Current best Opus. Dedicated per-agent prompt variants.                                     |
+| **Claude Sonnet 5.5**    | anthropic, github-copilot, opencode | The `unspecified-low` category default (medium).                                            |
 | **Claude Sonnet 5**      | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                                              |
-| **Claude Haiku 4.5**     | anthropic, github-copilot           | Fast and cheap. Good for quick tasks.                                                       |
+| **Claude Haiku 5.5**     | anthropic, github-copilot           | Fast and cheap. Good for quick tasks.                                                       |
 | **Kimi K3**              | opencode-go, kimi-for-coding, moonshotai, opencode | Top recommended Kimi for the main agent when thinking-token cost is acceptable.              |
 | **Kimi K2.7**            | opencode-go (manual choice)         | Restrained Kimi fallback for Claude-like orchestration paths.                               |
 | **Kimi K3 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                                                |
@@ -627,12 +630,13 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Model             | Provider(s)                      | Notes                                                                                                       |
 | ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **GPT-6 Astra**   | openai, chatgpt-subscription, github-copilot, opencode | OpenAI's most capable model and the recommended GPT flagship. Default for the Plan Reviewer (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (xhigh). `gpt-6-astra-fast` is the Fast-mode variant. Manual override option for the main agent and the `architect` category. |
+| **GPT-6 Astra**   | openai, chatgpt-subscription, github-copilot, opencode | OpenAI's most capable model and the recommended GPT flagship. Default for the Plan Reviewer (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (high). `gpt-6-astra-fast` is the Fast-mode variant. Manual override option for the main agent and the `architect` category. |
 | **GPT-6 Sol**     | openai, chatgpt-subscription, github-copilot, opencode | The GPT-6 workhorse tier and the default for Hephaestus (medium), with GPT-5.6 Sol kept as its fallback rung. Accepts reasoning effort `none` through `max`, no temperature, 1.05M context. `gpt-6-sol-fast` is the Fast-mode variant. |
+| **GPT-6.1 Sol**   | openai, chatgpt-subscription | The `deep-low` category model (medium), then its Fast tier `gpt-6.1-sol-fast`, with GPT-5.6 Sol kept behind both. It is also the `unspecified-low` GPT rung (medium, ahead of GPT-5.6 Terra). Its Fast tier leads the Geeky · Normal model profile, with plain GPT-6.1 Sol right behind it. Accepts reasoning effort `low` through `max` (no `none` or `minimal`), no temperature, 400K context. |
 | **GPT-6 Luna**    | openai, chatgpt-subscription             | The GPT-6 light tier. `gpt-6-luna-fast` (low) is the OpenAI rung for `explore`, `librarian` and the `quick` category. Same effort ladder and limits as GPT-6 Sol. |
-| **GPT-5.6 Sol**   | openai, chatgpt-subscription, github-copilot, opencode | The `deep-low` category model (medium), on the Fast tier `gpt-5.6-sol-fast` where the OpenAI lanes serve it. Also the fallback rung under GPT-6 Sol for Hephaestus, and under GPT-6 Astra for `ultrabrain` (max). |
+| **GPT-5.6 Sol**   | openai, chatgpt-subscription, github-copilot, opencode | The `deep-low` fallback under GPT-6.1 Sol (medium), and the only `deep-low` rung GitHub Copilot and OpenCode Zen serve; its Fast tier `gpt-5.6-sol-fast` is the last rung on the OpenAI lanes. Also the fallback rung under GPT-6 Sol for Hephaestus, and under GPT-6 Astra for `ultrabrain` (max). |
 | **GPT-5.6 Terra** | openai, chatgpt-subscription, github-copilot | GPT-5.6 mid-tier. No longer a default for any agent; an optional balanced override.                    |
-| **GPT-5.6 Luna**  | openai, chatgpt-subscription             | GPT-5.6 light tier. Not the `unspecified-low` default: that category starts at `xiaomi\|opencode-go/mimo-v2.6-pro (max)`, then `grok-4.7 (xhigh)`, then `gpt-5.6-terra (high)`. |
+| **GPT-5.6 Luna**  | openai, chatgpt-subscription             | GPT-5.6 light tier. Not the `unspecified-low` default: that category starts at `claude-sonnet-5-5 (medium)`, then `xiaomi\|opencode-go/mimo-v2.6-pro (max)`, then `grok-4.7 (xhigh)`, then `gpt-6.1-sol (medium)` on the OpenAI lanes, then `gpt-5.6-sol (medium)`. |
 | **GPT-5.6 Sol override paths** | openai, chatgpt-subscription, github-copilot, opencode | The first GPT-5.6 Sol-family fallback for the Plan Consultant and `ultrabrain`. |
 | **GPT 5.6 Luna Fast**  | openai, chatgpt-subscription | Fast + strong reasoning. Utility fallback after the Kimi high-speed quick default.                  |
 | **GPT-5-Nano**    | openai, chatgpt-subscription, github-copilot, opencode | Ultra-cheap, fast. Good for simple utility tasks.                                                           |
@@ -653,13 +657,13 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | Model                      | Provider(s)         | Speed          | Notes                                                                          |
 | -------------------------- | ------------------- | -------------- | ------------------------------------------------------------------------------ |
 | **Grok Code Fast 1**       | github-copilot, xai | Very fast      | Optimized for code grep/search. Manual override option — not in the default chains. |
-| **Claude Haiku 4.5**       | anthropic, github-copilot | Fast     | Good balance of speed and intelligence.                                       |
+| **Claude Haiku 5.5**       | anthropic, github-copilot | Fast     | Good balance of speed and intelligence.                                       |
 | **MiniMax M2.7 Highspeed** | opencode            | Very fast      | High-speed MiniMax variant. Manual choice only; not in any built-in chain.    |
 | **GPT-5.3-codex-spark**    | openai              | Extremely fast | Blazing but compacts too aggressively. Not recommended for omo agents.        |
 
 #### What each role does and which model it gets
 
-**The main agent** is the session you are talking to. It runs on your session model; there is no separate agent chain for it. Claude Opus 5.5 is the recommended choice, with GPT-6 Astra or GPT-6 Sol as the recommended GPT configuration. With no `model_profile`, a fresh OmO Native session picks the first model you have connected from the Recommended list (Opus 5.5, Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6 Sol, GLM 5.3). Models with tuned prompt presets are listed in [Agent Model Matching](./agent-model-matching.md).
+**The main agent** is the session you are talking to. It runs on your session model; there is no separate agent chain for it. Claude Opus 5.5 is the recommended choice, with GPT-6 Astra, GPT-6.1 Sol or GPT-6 Sol as the recommended GPT configuration. With no `model_profile`, a fresh OmO Native session picks the first model you have connected from the Recommended list (Opus 5.5, Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol, GLM 5.3). Models with tuned prompt presets are listed in [Agent Model Matching](./agent-model-matching.md).
 
 **Curated agents** (read-only helpers the main agent delegates to through `task(subagent_type: ...)`; chains from `packages/senpi-task/src/agents/builtin/fallback-chains.ts`):
 
@@ -667,7 +671,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | ------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
 | **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max) |
 | **plan-reviewer**   | High-accuracy plan review gate             | openai\|chatgpt-subscription/gpt-6-astra (xhigh) → github-copilot/gpt-6-astra (high) → openai\|chatgpt-subscription\|opencode/gpt-6-astra (high) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → … (full chain in source) |
-| **explore**         | Fast codebase grep                         | kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off) → openai\|chatgpt-subscription/gpt-6-luna-fast (low) → deepseek/deepseek-flash (max) → opencode-go\|bailian-coding-plan/qwen3.7-plus → opencode-go/minimax-m2.7 → anthropic\|github-copilot/claude-haiku-4-5 |
+| **explore**         | Fast codebase grep                         | kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off) → openai\|chatgpt-subscription/gpt-6-luna-fast (low) → anthropic\|github-copilot/claude-haiku-5-5 (medium) → deepseek/deepseek-flash (max) → opencode-go\|bailian-coding-plan/qwen3.7-plus → opencode-go/minimax-m2.7 |
 | **librarian**       | Docs/code search                           | (same chain as `explore`)                                              |
 
 `explore` and `librarian` trade intelligence for speed. Don't "upgrade" them to Opus; it wastes money without improving results.
@@ -782,7 +786,7 @@ Add custom skills under `.opencode/skills/<name>/SKILL.md` (project scope) or `~
 
 After verification, tell the user:
 
-1. **The main agent runs on your session model, and Claude Opus 5.5 is strongly recommended** (GPT-6 Astra or GPT-6 Sol for a GPT setup). Other models may noticeably degrade the experience.
+1. **The main agent runs on your session model, and Claude Opus 5.5 is strongly recommended** (GPT-6 Astra, GPT-6.1 Sol or GPT-6 Sol for a GPT setup). Other models may noticeably degrade the experience.
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. The agent figures out the rest.
 3. **Need precision?** Run `/ulw-plan` to produce a plan under `.omo/plans/`, then run `/ulw-execute` so the main agent executes the verified plan in the same session.
 4. **Your own agent/category setup?** Read [`docs/guide/agent-model-matching.md`](agent-model-matching.md) — the assistant can interview the user and tune the config.

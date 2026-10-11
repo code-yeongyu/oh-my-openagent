@@ -19,7 +19,7 @@ import {
 	parseJsonEvents,
 	snapshotDir,
 } from "./task-e2e-analysis.mjs";
-import { isolatedChildEnv } from "./sandbox-child-env.mjs";
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const mockProvider = join(scriptDir, "curated-agents-e2e-mock-provider.ts");
@@ -49,7 +49,7 @@ function seedScenario() {
 	return {
 		sandbox,
 		sessionDir,
-		stateDir: join(sandbox.cwd, ".omo", "senpi-task"),
+		stateDir: sandboxStateDir(sandbox),
 		childContextsPath: join(sandbox.cwd, childContextsFile),
 	};
 }

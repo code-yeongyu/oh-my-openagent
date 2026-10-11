@@ -14,7 +14,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
 };
@@ -72,6 +72,14 @@ pub struct StopPolicy {
     pub allow_host_relay_only: bool,
 }
 
+/// Why the global stop-chord listener failed to start; the gate turns
+/// `AccessibilityDenied` into a permission error instead of a missing stop path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StopPathFailure {
+    Unavailable,
+    AccessibilityDenied,
+}
+
 /// Snapshot of supervisor state used for gating and status reporting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SupervisorStatus {
@@ -86,6 +94,7 @@ pub struct SupervisorStatus {
     pub stop_path: ActiveStopPath,
     /// The source of the stop that latched suspension.
     pub stopped_by: Option<StopSource>,
+    pub global_failure: Option<StopPathFailure>,
 }
 
 impl SupervisorStatus {
@@ -118,9 +127,12 @@ impl StopPathState {
 /// Kill-switch state shared by the session loop and every stop path.
 pub struct Supervisor {
     suspended: AtomicBool,
+    /// Bumped by every stop, so a control grant granted before one is dead.
+    stop_epoch: AtomicU64,
     /// Guards every write to `suspended` so the flag and its source agree.
     stopped_by: Mutex<Option<StopSource>>,
     stop_paths: Mutex<HashMap<StopPathId, StopPathState>>,
+    global_failure: Mutex<Option<StopPathFailure>>,
     clock: Arc<dyn Clock>,
 }
 
@@ -130,10 +142,17 @@ impl Supervisor {
     pub fn new(clock: Arc<dyn Clock>) -> Self {
         Self {
             suspended: AtomicBool::new(false),
+            stop_epoch: AtomicU64::new(0),
             stopped_by: Mutex::new(None),
             stop_paths: Mutex::new(HashMap::new()),
+            global_failure: Mutex::new(None),
             clock,
         }
+    }
+
+    /// The latest global listener start result; success clears a previous failure.
+    pub fn note_global_failure(&self, failure: Option<StopPathFailure>) {
+        *self.global_failure.lock() = failure;
     }
 
     /// Record that a stop path is live (or not); going live counts as a beat.
@@ -155,9 +174,17 @@ impl Supervisor {
 
     /// Latch suspension. The first source is kept until [`Self::reset`].
     pub fn trigger_stop(&self, source: StopSource) {
+        self.stop_epoch.fetch_add(1, Ordering::SeqCst);
         let mut stopped_by = self.stopped_by.lock();
         stopped_by.get_or_insert(source);
         self.suspended.store(true, Ordering::SeqCst);
+    }
+
+    /// How many stops this supervisor observed; a control grant's epoch at
+    /// grant time is how the session tells a later stop happened.
+    #[must_use]
+    pub fn stop_epoch(&self) -> u64 {
+        self.stop_epoch.load(Ordering::SeqCst)
     }
 
     /// Lift suspension. User-only: the proof comes from the host's resume token.
@@ -170,6 +197,16 @@ impl Supervisor {
     #[must_use]
     pub fn is_suspended(&self) -> bool {
         self.suspended.load(Ordering::SeqCst)
+    }
+
+    /// Lifts suspension without a [`UserReset`], for tests only: compiled
+    /// solely with the `test-support` feature, which only dev-dependencies
+    /// enable, so no production build can call it.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn reset_for_test(&self) {
+        let mut stopped_by = self.stopped_by.lock();
+        *stopped_by = None;
+        self.suspended.store(false, Ordering::SeqCst);
     }
 
     #[must_use]
@@ -202,6 +239,7 @@ impl Supervisor {
             heartbeat_fresh,
             stop_path,
             stopped_by,
+            global_failure: *self.global_failure.lock(),
         }
     }
 

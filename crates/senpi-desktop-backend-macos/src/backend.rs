@@ -5,9 +5,10 @@ use image::RgbaImage;
 use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
 use senpi_desktop_core::ax::AxBackend;
 use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
-use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
     FrontWindow, Target,
@@ -16,6 +17,9 @@ use senpi_desktop_core::types::{
 use crate::ax::{is_trusted, MacAx};
 use crate::capture::{MacCapture, Screencapture};
 use crate::input::{CanaryMode, CanaryResult, MacInput, CANARY_STOP_REASON};
+
+#[path = "permissions.rs"]
+pub(crate) mod permissions;
 
 pub struct MacosBackend {
     capture: MacCapture,
@@ -95,14 +99,16 @@ impl MacosBackend {
         if is_trusted() {
             Ok(())
         } else {
-            Err(DesktopError::permission_denied(
-                "macOS Accessibility permission is required for native input",
-            ))
+            Err(permissions::permission_denied(TccPermission::Accessibility))
         }
     }
 }
 
 impl Backend for MacosBackend {
+    fn permission_denied(&mut self, permission: TccPermission) -> DesktopError {
+        permissions::permission_denied(permission)
+    }
+
     fn capabilities(&mut self) -> DesktopCapabilities {
         MacosBackend::capabilities(self)
     }
@@ -135,6 +141,14 @@ impl Backend for MacosBackend {
         self.input.type_text(target, text, mode, &self.capture)
     }
 
+    fn clipboard_read(&mut self) -> CoreResult<String> {
+        senpi_desktop_core::clipboard::read_text()
+    }
+
+    fn clipboard_write(&mut self, text: &str) -> CoreResult<()> {
+        senpi_desktop_core::clipboard::write_text(text)
+    }
+
     fn type_text_interruptible(
         &mut self,
         target: &Target,
@@ -150,6 +164,24 @@ impl Backend for MacosBackend {
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         Self::require_input_permission()?;
         self.input.key_chord(target, keys, mode, &self.capture)
+    }
+
+    fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+        Self::require_input_permission()?;
+        crate::ax::menus::items(window, path)
+    }
+
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        Self::require_input_permission()?;
+        let (input, capture) = (&mut self.input, &self.capture);
+        crate::ax::menus::select(window, path, check_stop, &mut || {
+            input.make_menu_window_key(window, capture)
+        })
     }
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {

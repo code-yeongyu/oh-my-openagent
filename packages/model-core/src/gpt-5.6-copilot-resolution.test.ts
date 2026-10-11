@@ -7,7 +7,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
   test("ultrabrain and deep-high prefer Copilot Astra when available", () => {
     const availableModels = new Set(["github-copilot/gpt-6-astra", "github-copilot/gpt-5.6-sol"])
     expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-6-astra", variant: "max" })
-    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-6-astra", variant: "xhigh" })
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-6-astra", variant: "high" })
   })
 
   test("unspecified-high never borrows Copilot Astra: it takes the Copilot Opus 5.5 rung, and without it falls to the system default", () => {
@@ -53,13 +53,13 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
       name: "deep-high",
       requirement: CATEGORY_MODEL_REQUIREMENTS["deep-high"],
       expectedModel: "github-copilot/gpt-6-astra",
-      expectedVariant: "xhigh",
+      expectedVariant: "high",
     },
     {
       name: "unspecified-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["unspecified-low"],
-      expectedModel: "github-copilot/gpt-5.6-terra",
-      expectedVariant: "high",
+      expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "medium",
     },
   ] as const
 

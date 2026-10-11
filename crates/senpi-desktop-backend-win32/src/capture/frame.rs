@@ -1,8 +1,7 @@
-//! Pure geometry of the per-monitor-v2 regime: physical monitor and window
-//! rects to global logical coordinates, the composite pixel layout at the
-//! highest monitor scale, and the composite of per-monitor captures.
+//! Pure geometry of the per-monitor-v2 regime. Win32 capture, window, AX and
+//! input coordinates stay in physical desktop pixels end-to-end; monitor DPI
+//! scale is metadata, never a transform of the global atlas.
 
-use image::imageops::FilterType;
 use image::{Rgba, RgbaImage};
 use senpi_desktop_core::ax::AxBounds;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
@@ -32,9 +31,8 @@ pub(crate) struct PhysicalRect {
     pub(crate) height: u32,
 }
 
-/// The selected monitors as logical displays ordered top-to-bottom,
-/// left-to-right, each carrying its pixel rect in the composite rendered at
-/// the highest monitor scale (never below 1.0). `T` travels with its sample.
+/// The selected monitors ordered top-to-bottom, left-to-right in physical
+/// desktop coordinates. `T` travels with its sample.
 pub(crate) fn lay_out<T>(
     samples: Vec<(T, MonitorSample)>,
     selector: &DisplaySelector,
@@ -55,16 +53,13 @@ pub(crate) fn lay_out<T>(
         });
     }
     displays.sort_by(|(_, left), (_, right)| (left.y, left.x, &left.id).cmp(&(right.y, right.x, &right.id)));
-    let render_scale = displays
-        .iter()
-        .fold(1.0f64, |scale, (_, display)| scale.max(display.scale));
     let min_x = displays.iter().map(|(_, display)| display.x).min().unwrap_or(0);
     let min_y = displays.iter().map(|(_, display)| display.y).min().unwrap_or(0);
     for (_, display) in &mut displays {
-        display.pixel_x = scaled(offset(display.x, min_x)?, render_scale);
-        display.pixel_y = scaled(offset(display.y, min_y)?, render_scale);
-        display.pixel_width = scaled(display.width, render_scale).max(1);
-        display.pixel_height = scaled(display.height, render_scale).max(1);
+        display.pixel_x = offset(display.x, min_x)?;
+        display.pixel_y = offset(display.y, min_y)?;
+        display.pixel_width = display.width;
+        display.pixel_height = display.height;
     }
     let (width, height) = extent(displays.iter().map(|(_, display)| display));
     if u64::from(width) * u64::from(height) > MAX_COMPOSITE_PIXELS {
@@ -75,90 +70,71 @@ pub(crate) fn lay_out<T>(
     Ok(displays)
 }
 
-/// A physical window rect in global logical coordinates, divided by the scale
-/// of the display holding its origin (1.0 off every display).
+/// A physical window rect in the same global physical coordinates.
 pub(crate) fn logical_window_rect(rect: PhysicalRect, displays: &[DesktopDisplay]) -> (i32, i32, u32, u32) {
-    let scale = physical_origin_scale(rect, displays);
-    (
-        logical_coordinate(rect.x, scale),
-        logical_coordinate(rect.y, scale),
-        logical_edge(rect.width, scale),
-        logical_edge(rect.height, scale),
-    )
+    let _ = displays;
+    (rect.x, rect.y, rect.width, rect.height)
 }
 
-/// A physical rect as fractional logical bounds (UI Automation element
-/// bounds), divided like [`logical_window_rect`].
+/// A physical rect as fractional AX bounds in physical desktop pixels.
 pub(crate) fn logical_bounds(rect: PhysicalRect, displays: &[DesktopDisplay]) -> AxBounds {
-    let scale = physical_origin_scale(rect, displays);
+    let _ = displays;
     AxBounds {
-        x: f64::from(rect.x) / scale,
-        y: f64::from(rect.y) / scale,
-        width: f64::from(rect.width) / scale,
-        height: f64::from(rect.height) / scale,
+        x: f64::from(rect.x),
+        y: f64::from(rect.y),
+        width: f64::from(rect.width),
+        height: f64::from(rect.height),
     }
 }
 
-/// A global logical point in physical pixels, scaled by the display holding
-/// it (the first display when none does); `None` without displays.
+/// A global physical point, rejected when it falls outside every display.
 pub(crate) fn physical_point(x: f64, y: f64, displays: &[DesktopDisplay]) -> Option<(i32, i32)> {
-    let display = displays
-        .iter()
-        .find(|display| {
-            x >= f64::from(display.x)
-                && x < f64::from(display.x) + f64::from(display.width)
-                && y >= f64::from(display.y)
-                && y < f64::from(display.y) + f64::from(display.height)
+    x.is_finite()
+        .then_some(())
+        .and(y.is_finite().then_some(()))
+        .and_then(|()| {
+            displays
+                .iter()
+                .any(|display| {
+                    x >= f64::from(display.x)
+                        && x < f64::from(display.x) + f64::from(display.width)
+                        && y >= f64::from(display.y)
+                        && y < f64::from(display.y) + f64::from(display.height)
+                })
+                .then(|| (x.round() as i32, y.round() as i32))
         })
-        .or_else(|| displays.first())?;
-    Some((
-        physical_coordinate(x, display.scale),
-        physical_coordinate(y, display.scale),
-    ))
 }
 
-fn physical_origin_scale(rect: PhysicalRect, displays: &[DesktopDisplay]) -> f64 {
-    let (x, y) = (f64::from(rect.x), f64::from(rect.y));
-    displays
-        .iter()
-        .find(|display| {
-            let left = f64::from(display.x) * display.scale;
-            let top = f64::from(display.y) * display.scale;
-            x >= left
-                && x < f64::from(display.width).mul_add(display.scale, left)
-                && y >= top
-                && y < f64::from(display.height).mul_add(display.scale, top)
-        })
-        .map_or(1.0, |display| display.scale)
-        .max(f64::EPSILON)
-}
-
-/// Composites per-display captures at their laid-out pixel rects; a capture
-/// whose size differs from its rect is resampled into it.
-pub(crate) fn composite(regions: Vec<(DesktopDisplay, RgbaImage)>) -> (RgbaImage, FrameGeometry) {
+/// Composites per-display captures only when each still matches the geometry
+/// enumerated before capture.
+pub(crate) fn composite(regions: Vec<(DesktopDisplay, RgbaImage)>) -> CoreResult<(RgbaImage, FrameGeometry)> {
     let (width, height) = extent(regions.iter().map(|(display, _)| display));
     let mut canvas = RgbaImage::from_pixel(width.max(1), height.max(1), Rgba([0, 0, 0, 255]));
     let mut displays = Vec::with_capacity(regions.len());
     for (display, image) in regions {
-        let rendered = if (image.width(), image.height()) == (display.pixel_width, display.pixel_height) {
-            image
-        } else {
-            image::imageops::resize(
-                &image,
+        if !capture_geometry_matches(&display, &image) {
+            return Err(DesktopError::capture_failed(format!(
+                "display '{}' geometry changed during capture: expected {}x{}, got {}x{}",
+                display.id,
                 display.pixel_width,
                 display.pixel_height,
-                FilterType::Triangle,
-            )
-        };
+                image.width(),
+                image.height()
+            )));
+        }
         image::imageops::replace(
             &mut canvas,
-            &rendered,
+            &image,
             i64::from(display.pixel_x),
             i64::from(display.pixel_y),
         );
         displays.push(display);
     }
-    (canvas, FrameGeometry::for_displays(&displays))
+    Ok((canvas, FrameGeometry::for_displays(&displays)))
+}
+
+pub(crate) fn capture_geometry_matches(display: &DesktopDisplay, image: &RgbaImage) -> bool {
+    (image.width(), image.height()) == (display.pixel_width, display.pixel_height)
 }
 
 fn logical_display(sample: MonitorSample) -> CoreResult<DesktopDisplay> {
@@ -170,10 +146,10 @@ fn logical_display(sample: MonitorSample) -> CoreResult<DesktopDisplay> {
         )));
     }
     Ok(DesktopDisplay {
-        x: logical_coordinate(sample.x, scale),
-        y: logical_coordinate(sample.y, scale),
-        width: logical_edge(sample.width, scale),
-        height: logical_edge(sample.height, scale),
+        x: sample.x,
+        y: sample.y,
+        width: sample.width,
+        height: sample.height,
         scale,
         pixel_x: 0,
         pixel_y: 0,
@@ -197,22 +173,4 @@ fn extent<'a>(displays: impl Iterator<Item = &'a DesktopDisplay>) -> (u32, u32) 
 fn offset(value: i32, origin: i32) -> CoreResult<u32> {
     u32::try_from(i64::from(value) - i64::from(origin))
         .map_err(|_| DesktopError::capture_failed("display offset overflow"))
-}
-
-// Float-to-int `as` saturates (NaN and negatives become 0, overflow the
-// maximum): the clamp every caller wants, and the only float-to-int path.
-fn logical_coordinate(physical: i32, scale: f64) -> i32 {
-    (f64::from(physical) / scale).round() as i32
-}
-
-fn physical_coordinate(logical: f64, scale: f64) -> i32 {
-    (logical * scale).round() as i32
-}
-
-fn logical_edge(physical: u32, scale: f64) -> u32 {
-    (f64::from(physical) / scale).round().max(1.0) as u32
-}
-
-fn scaled(logical: u32, scale: f64) -> u32 {
-    (f64::from(logical) * scale).round() as u32
 }

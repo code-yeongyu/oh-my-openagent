@@ -14,8 +14,8 @@ use senpi_desktop_core::protocol_params::StopRequestSource;
 use senpi_desktop_core::protocol_results::{StopPathKind, StopPathStatus};
 use senpi_desktop_core::types::DesktopCapabilities;
 use senpi_desktop_safety::{
-    ActiveStopPath, Chord, HostRelay, ResumeToken, StopPathListener, StopPolicy, StopSource, Supervisor,
-    SupervisorStatus,
+    ActiveStopPath, Chord, HostRelay, ResumeToken, StopPathError, StopPathFailure, StopPathListener,
+    StopPolicy, StopSource, Supervisor, SupervisorStatus,
 };
 use senpi_desktop_session::BackendSelection;
 
@@ -75,6 +75,7 @@ struct Announced {
     global_live: bool,
     host_relay_live: bool,
     stop_path: ActiveStopPath,
+    global_failure: Option<StopPathFailure>,
 }
 
 impl From<SupervisorStatus> for Announced {
@@ -84,6 +85,7 @@ impl From<SupervisorStatus> for Announced {
             global_live: status.global_live,
             host_relay_live: status.host_relay_live,
             stop_path: status.stop_path,
+            global_failure: status.global_failure,
         }
     }
 }
@@ -108,7 +110,9 @@ struct State {
     host_relay: HostRelay,
     global: Option<Listener>,
     /// Why the Global listener failed to start, when it did.
-    global_failure: Option<String>,
+    global_failure: Option<StopPathFailure>,
+    /// Preserve non-permission platform diagnostics such as missing portals.
+    global_failure_reason: Option<String>,
     /// `computer.allowHostRelayOnlyStop` of the latest `session.open`.
     policy: StopPolicy,
     announced: Announced,
@@ -128,6 +132,7 @@ impl StopPaths {
                 host_relay: HostRelay::new(),
                 global: global_listener(selection),
                 global_failure: None,
+                global_failure_reason: None,
                 policy: StopPolicy::default(),
                 announced,
             }),
@@ -148,10 +153,18 @@ impl StopPaths {
     /// arms the host relay.
     pub fn start(&self, chord: &Chord) -> StopPathStatus {
         let mut state = self.state.lock();
-        if let Some(global) = state.global.as_mut().filter(|global| !global.is_live()) {
-            let started = global.start(chord, Arc::clone(&self.supervisor));
-            state.global_failure = started.err().map(|error| error.reason().to_owned());
-        }
+        let failure = state.global.as_mut().and_then(|global| {
+            if global.is_live() { None } else { global.start(chord, Arc::clone(&self.supervisor)).err() }
+        });
+        state.global_failure = failure.as_ref().map(|error| match error {
+            StopPathError::PermissionDenied(_) => StopPathFailure::AccessibilityDenied,
+            StopPathError::InvalidChord(_) | StopPathError::Unavailable { .. } => StopPathFailure::Unavailable,
+        });
+        state.global_failure_reason = failure.map(|error| match error {
+            StopPathError::PermissionDenied(_) => "accessibility-denied".to_owned(),
+            other => other.reason().to_owned(),
+        });
+        self.supervisor.note_global_failure(state.global_failure);
         state.host_relay.arm(Arc::clone(&self.supervisor));
         drop(state);
         self.status()
@@ -215,7 +228,7 @@ impl StopPaths {
             ActiveStopPath::HostRelay | ActiveStopPath::None => Some(
                 self.state
                     .lock()
-                    .global_failure
+                    .global_failure_reason
                     .clone()
                     .unwrap_or_else(|| NO_GLOBAL_LISTENER.to_owned()),
             ),
@@ -238,3 +251,6 @@ impl StopPaths {
         Some(self.status())
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -8,7 +8,7 @@ mod screencapture;
 mod windows;
 
 use image::RgbaImage;
-use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::types::{DesktopDisplay, DesktopWindow, DisplaySelector, Target};
 
@@ -26,15 +26,9 @@ pub(crate) fn capture_permission() -> bool {
     CGPreflightScreenCaptureAccess()
 }
 
-/// `PermissionDenied` naming the executable identity TCC evaluates, since a
-/// grant for Terminal or another launcher does not transfer automatically.
+/// Screen Recording guidance for the launcher whose TCC grant is missing.
 pub(crate) fn permission_denied() -> DesktopError {
-    let executable = std::env::current_exe()
-        .map_or_else(|_| "<unavailable>".to_string(), |path| path.display().to_string());
-    DesktopError::permission_denied(format!(
-        "macOS Screen Recording permission is not granted for this process (TCC identity: executable={executable}, pid={})",
-        std::process::id()
-    ))
+    crate::backend::permissions::permission_denied(TccPermission::ScreenRecording)
 }
 
 #[derive(Debug, Clone)]

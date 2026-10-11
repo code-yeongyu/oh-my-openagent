@@ -8,7 +8,7 @@ import { recordSummary } from "./result-details"
 describe("buildTaskExecute start failures", () => {
   test("#given a typed host-session open timeout #when task executes #then text and details expose only the parent-authored class", async () => {
     // given
-    const message = "The shared host did not finish opening the child session in time (open_timed_out)."
+    const message = "The task host did not finish opening the child session in time (open_timed_out)."
     const manager = createFakeManager({
       start: async (): Promise<StartResult> => ({
         kind: "start_failed",
@@ -58,7 +58,7 @@ describe("buildTaskExecute start failures", () => {
           execution_mode: "process",
           model: "test/model",
           run_in_background: true,
-          error_message: "The shared host did not finish opening the child session in time (open_timed_out).",
+          error_message: "The task host did not finish opening the child session in time (open_timed_out).",
           failure_kind: "session_unavailable",
           failure_reason: "open_timed_out",
         }
@@ -92,7 +92,7 @@ describe("buildTaskExecute start failures", () => {
     // given
     const record = makeRecord({
       status: "error",
-      error_message: "The shared host did not finish opening the child session in time (open_timed_out).",
+      error_message: "The task host did not finish opening the child session in time (open_timed_out).",
       failure_kind: "session_unavailable",
       failure_reason: "open_timed_out",
     })

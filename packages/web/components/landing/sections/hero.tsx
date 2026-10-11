@@ -2,7 +2,7 @@ import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 
 import { MassUlwGraph } from "@/components/landing/dag/mass-ulw-graph"
-import { CommandBar } from "@/components/landing/install-command"
+import { InstallTabs } from "@/components/landing/install-tabs"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
 
@@ -40,10 +40,10 @@ export async function HeroSection(): Promise<JSX.Element> {
               {t("hero.subcopy")}
             </p>
             <p className="eyebrow text-text-lo mt-10">{t("hero.installLabel")}</p>
-            <CommandBar command={t("hero.installCommand")} className="mt-3 max-w-xl" />
+            <InstallTabs className="mt-3 max-w-xl" />
             <div className="mt-8 flex flex-wrap items-center gap-6">
               <Button size="lg" asChild>
-                <Link href="/docs#installation">{t("hero.getStarted")}</Link>
+                <Link href="/docs/install">{t("hero.getStarted")}</Link>
               </Button>
               <Button variant="link" size="md" asChild>
                 <Link href="/manifesto">{t("hero.readManifesto")}</Link>
