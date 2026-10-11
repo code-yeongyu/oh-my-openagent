@@ -120,7 +120,7 @@ test.each([
   { ...published, name: "fresh stable" },
   { ...published, name: "later release failure", release: "failure" },
   { ...published, name: "failed before creation", release: "failure", created: "", mirror: "skipped", expected: false },
-  { ...published, name: "cancelled after creation", release: "cancelled", mirror: "skipped" },
+  { ...published, name: "cancelled after creation", release: "cancelled", mirror: "skipped", expected: false },
   { ...published, name: "skipped platform", platform: "skipped", mirror: "skipped", skipPlatform: true },
   { ...published, name: "failed mirror", mirror: "failure" },
   { ...published, name: "already existed", created: "false", expected: false },

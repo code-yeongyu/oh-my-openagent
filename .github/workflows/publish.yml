@@ -1433,7 +1433,7 @@ jobs:
   release-announce:
     needs: [release-metadata, release, installer-mirror]
     if: >-
-      always() &&
+      !cancelled() &&
       needs.release.outputs.created == 'true' &&
       needs.release-metadata.outputs.dist_tag == '' &&
       inputs.lazycodex_only != true &&
