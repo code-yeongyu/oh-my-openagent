@@ -161,9 +161,23 @@ function todoTool(
     description,
     input: {
       type: "object",
-      properties: {
-        todos: { type: "array" },
-      },
+      properties: name === "todowrite" ? {
+        todos: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              content: { type: "string" },
+              status: { type: "string", enum: ["pending", "in_progress", "completed", "cancelled"] },
+              priority: { type: "string", enum: ["high", "medium", "low"] },
+            },
+            required: ["content", "status", "priority"],
+            additionalProperties: false,
+          },
+        },
+      } : {},
+      ...(name === "todowrite" ? { required: ["todos"] } : {}),
+      additionalProperties: false,
     },
     execute: async (args: unknown, context: { sessionID: string }) => {
       if (name === "todowrite") todos.write(context.sessionID, args)
@@ -179,8 +193,8 @@ async function registerTodoTools(
   await ctx.tool.transform((editor) => {
     const names = new Set(editor.list().map((tool) => tool.name))
     for (const tool of [
-      todoTool("todowrite", "Update the session todo list", todos),
-      todoTool("todoread", "Read the session todo list", todos),
+      todoTool("todowrite", "Create or update this session's todo list for multi-step work, including delegated subagent work. Each call replaces the entire list: send every item every time, or an empty array to clear it. Keep one item in_progress at a time and mark finished items completed. Each item requires content (string), status (pending, in_progress, completed, cancelled), and priority (high, medium, low).", todos),
+      todoTool("todoread", "Read this session's current todo list; takes no arguments. Returns { todos: [...] } with content, status, and priority for each stored item.", todos),
     ]) {
       if (names.has(tool.name)) continue
       editor.add(tool)
