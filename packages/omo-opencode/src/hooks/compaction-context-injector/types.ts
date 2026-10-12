@@ -8,6 +8,7 @@ export interface CompactionContextInjector {
 export type CompactionContextClient = {
   client: {
     session: {
+      get?: (input: { path: { id: string } }) => Promise<unknown>
       messages: (input: { path: { id: string } }) => Promise<unknown>
       promptAsync: (input: {
         path: { id: string }

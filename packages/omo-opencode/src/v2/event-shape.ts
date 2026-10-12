@@ -51,7 +51,7 @@ export function toV1Event(event: unknown): V1Event {
     }
   }
 
-  if (type === "session.step.ended") {
+  if (type === "session.step.started" || type === "session.step.ended") {
     return {
       type: "message.updated",
       properties: {
@@ -64,6 +64,19 @@ export function toV1Event(event: unknown): V1Event {
         },
       },
     }
+  }
+
+  if (type === "session.text.delta" || type === "session.reasoning.delta") {
+    return { type: "message.part.delta", properties: {
+      sessionID, messageID: data.assistantMessageID, field: "text", delta: data.delta,
+    } }
+  }
+  if (type === "session.text.ended" || type === "session.reasoning.ended" || type === "session.tool.called") {
+    return { type: "message.part.updated", properties: { part: {
+      sessionID, messageID: data.assistantMessageID,
+      type: type === "session.tool.called" ? "tool" : type === "session.reasoning.ended" ? "reasoning" : "text",
+      text: data.text,
+    } } }
   }
 
   return { type, properties: { ...data } }

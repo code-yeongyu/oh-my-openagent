@@ -31,9 +31,10 @@ export function createRecoveryLogic(
   ctx: CompactionContextClient | undefined,
   getTailState: (sessionID: string) => TailMonitorState,
 ) {
-  const recoverCheckpointedAgentConfig = async (
+  const attemptRecovery = async (
     sessionID: string,
     reason: "compaction.autocontinue" | "session.compacted" | "no-text-tail",
+    recovery: NonNullable<TailMonitorState["recovery"]>,
   ): Promise<boolean> => {
     if (!ctx) {
       return false
@@ -78,11 +79,10 @@ export function createRecoveryLogic(
     const model = expectedPromptConfig.model
     const tools = expectedPromptConfig.tools
 
-    if (reason === "compaction.autocontinue" || reason === "session.compacted") {
-      const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
-      if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
-        return false
-      }
+    const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
+    if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
+      recovery.completed = true
+      return false
     }
 
     try {
@@ -107,6 +107,7 @@ export function createRecoveryLogic(
       if (!isInternalPromptDispatchAccepted(promptResult)) {
         if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
           tailState.lastRecoveryAt = now
+          recovery.completed = true
         }
         log(`[compaction-context-injector] Recovery skipped by promptAsync gate`, {
           sessionID,
@@ -116,6 +117,10 @@ export function createRecoveryLogic(
         return false
       }
       tailState.lastRecoveryAt = now
+      // Dispatch acceptance is once-only for this checkpoint even if the read
+      // projection lags. Replaying the control message cannot verify recovery.
+      recovery.completed = true
+      log("[compaction-context-injector] compaction-recovery-once accepted", { sessionID, reason })
 
       const recoveredPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (!isPromptConfigRecovered(recoveredPromptConfig, expectedPromptConfig)) {
@@ -139,6 +144,7 @@ export function createRecoveryLogic(
       }
 
       tailState.consecutiveNoTextMessages = 0
+      recovery.completed = true
 
       log(`[compaction-context-injector] Re-injected checkpointed agent config`, {
         sessionID,
@@ -155,6 +161,21 @@ export function createRecoveryLogic(
         error: String(error),
       })
       return false
+    }
+  }
+
+  const recoverCheckpointedAgentConfig = async (
+    sessionID: string,
+    reason: "compaction.autocontinue" | "session.compacted" | "no-text-tail",
+  ): Promise<boolean> => {
+    const state = getTailState(sessionID)
+    const recovery = state.recovery ??= {}
+    if (recovery.completed || recovery.inFlight) return false
+    recovery.inFlight = true
+    try {
+      return await attemptRecovery(sessionID, reason, recovery)
+    } finally {
+      recovery.inFlight = false
     }
   }
 

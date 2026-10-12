@@ -1,6 +1,7 @@
 import { storedMessagesToV1 } from "./message-shape"
 import type { AdapterState } from "./adapter-state"
 import { SessionHttpError } from "./serve-http"
+import { AGENT_RECOVERY_PROMPT } from "../hooks/compaction-context-injector/constants"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -67,7 +68,7 @@ type SessionApi = {
   interrupt: (input: { sessionID: string }) => Promise<unknown>
   switchAgent: (input: { sessionID: string; agent: string }) => Promise<unknown>
   switchModel: (input: { sessionID: string; model: { id: string; providerID: string; variant?: string } }) => Promise<unknown>
-  synthetic: (input: { sessionID: string; text: string }) => Promise<unknown>
+  synthetic: (input: { sessionID: string; text: string; resume?: boolean }) => Promise<unknown>
   update: (input: { sessionID: string; permissions?: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }) => Promise<unknown>
   remove?: (input: { sessionID: string }) => Promise<unknown>
   compact?: (input: { sessionID: string }) => Promise<unknown>
@@ -130,8 +131,17 @@ export async function sendPrompt(api: SessionApi, input: unknown): Promise<unkno
   if (typeof body.system === "string" && body.system.length > 0) await api.synthetic({ sessionID, text: body.system })
   const denies = toolDenies(body.tools)
   if (denies.length > 0) await api.update({ sessionID, permissions: denies })
+  const text = textFromPrompt(input)
+  if (body.noReply === true) {
+    // V2 configuration is persistent control-plane state. The v1 recovery
+    // sentinel is not a user request or context for the model/tool bridge.
+    if (text.startsWith(AGENT_RECOVERY_PROMPT) && text.includes("<!-- OMO_INTERNAL_NOREPLY -->")) {
+      return api.get({ sessionID })
+    }
+    return api.synthetic({ sessionID, text, resume: false })
+  }
   const delivery = promptDelivery(input)
-  return api.prompt({ sessionID, text: textFromPrompt(input), ...(delivery ? { delivery } : {}) })
+  return api.prompt({ sessionID, text, ...(delivery ? { delivery } : {}) })
 }
 
 export async function readMessages(api: SessionApi, input: unknown): Promise<ReturnType<typeof storedMessagesToV1>> {

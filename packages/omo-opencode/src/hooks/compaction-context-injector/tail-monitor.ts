@@ -10,6 +10,7 @@ export type TailMonitorState = {
   consecutiveNoTextMessages: number
   lastCompactedAt?: number
   lastRecoveryAt?: number
+  recovery?: { inFlight?: boolean; completed?: boolean }
 }
 
 export function finalizeTrackedAssistantMessage(

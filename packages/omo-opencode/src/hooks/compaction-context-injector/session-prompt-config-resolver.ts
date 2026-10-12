@@ -29,16 +29,42 @@ type SessionMessage = {
 type ResolverContext = {
   client: {
     session: {
+      get?: (input: { path: { id: string } }) => Promise<unknown>
       messages: (input: { path: { id: string } }) => Promise<unknown>
     }
   }
   directory: string
 }
 
+async function persistentPromptConfig(ctx: ResolverContext, sessionID: string): Promise<CompactionAgentConfigCheckpoint | undefined> {
+  if (!ctx.client.session.get) return undefined
+  try {
+    const response = await ctx.client.session.get({ path: { id: sessionID } })
+    const info = normalizeSDKResponse(response, {} as {
+      agent?: string
+      model?: { id?: string; providerID?: string; variant?: string }
+      tools?: Record<string, boolean>
+    }, { preferResponseOnMissingData: true })
+    // V2 keeps agent/model on the session, not on each user/checkpoint row.
+    // V1 session.get has neither: keep its existing transcript-based fallback.
+    if (typeof info.agent !== "string" || isCompactionAgent(info.agent) ||
+        typeof info.model?.id !== "string" || typeof info.model.providerID !== "string") return undefined
+    const model = { providerID: info.model.providerID, modelID: info.model.id,
+      ...(typeof info.model.variant === "string" ? { variant: info.model.variant } : {}) }
+    if (isActiveCompactionPin(sessionID, model)) return undefined
+    const tools = normalizePromptTools(info.tools)
+    return { agent: info.agent, model, ...(tools ? { tools } : {}) }
+  } catch {
+    return undefined
+  }
+}
+
 export async function resolveSessionPromptConfig(
   ctx: ResolverContext,
   sessionID: string,
 ): Promise<CompactionAgentConfigCheckpoint> {
+  const persistent = await persistentPromptConfig(ctx, sessionID)
+  if (persistent) return persistent
   const storedModel = getSessionModel(sessionID)
   const promptConfig: CompactionAgentConfigCheckpoint = {
     agent: getSessionAgent(sessionID),
@@ -116,6 +142,8 @@ export async function resolveLatestSessionPromptConfig(
   ctx: ResolverContext,
   sessionID: string,
 ): Promise<CompactionAgentConfigCheckpoint> {
+  const persistent = await persistentPromptConfig(ctx, sessionID)
+  if (persistent) return persistent
   try {
     const response = await ctx.client.session.messages({ path: { id: sessionID } })
     const messages = normalizeSDKResponse(response, [] as SessionMessage[], {

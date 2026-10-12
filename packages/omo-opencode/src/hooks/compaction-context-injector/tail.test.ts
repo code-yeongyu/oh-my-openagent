@@ -52,7 +52,7 @@ function createMockContext(promptAsyncMock = mock(async (_input: PromptAsyncInpu
 }
 
 describe("createCompactionContextInjector tail recovery", () => {
-  it("recovers after five consecutive assistant messages with no text", async () => {
+  it("does not re-inject matching config after five consecutive assistant messages with no text", async () => {
     //#given
     const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
     const ctx = createMockContext(promptAsyncMock)
@@ -83,10 +83,6 @@ describe("createCompactionContextInjector tail recovery", () => {
     })
 
     //#then
-    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
-    const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
-    expect(recoveryCall?.path).toEqual({ id: "ses_no_text_tail" })
-    expect(recoveryCall?.body.noReply).toBe(true)
-    expect(recoveryCall?.body.agent).toBe("atlas")
+    expect(promptAsyncMock).toHaveBeenCalledTimes(0)
   })
 })

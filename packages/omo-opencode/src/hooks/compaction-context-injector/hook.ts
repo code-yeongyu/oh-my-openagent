@@ -55,6 +55,12 @@ export function createCompactionContextInjector(options?: {
     }
 
     setCompactionAgentConfigCheckpoint(sessionID, promptConfig)
+    // A new captured checkpoint owns a fresh recovery generation. An older
+    // asynchronous recovery must not consume the new checkpoint's allowance.
+    const tailState = getTailState(sessionID)
+    tailState.recovery = {}
+    tailState.lastRecoveryAt = undefined
+    tailState.lastCompactedAt = undefined
     log(`[compaction-context-injector] Captured agent checkpoint before compaction`, {
       sessionID,
       agent: promptConfig.agent,
@@ -84,6 +90,17 @@ export function createCompactionContextInjector(options?: {
       if (sessionID) {
         clearCompactionAgentConfigCheckpoint(sessionID)
         tailStates.delete(sessionID)
+      }
+      return
+    }
+
+    if (event.type === "session.compaction.failed") {
+      const sessionID = resolveSessionID(props)
+      if (sessionID) {
+        clearCompactionAgentConfigCheckpoint(sessionID)
+        const tailState = getTailState(sessionID)
+        tailState.recovery = { completed: true }
+        tailState.lastCompactedAt = undefined
       }
       return
     }
