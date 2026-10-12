@@ -91,6 +91,7 @@ describe("createParentNotifier batched injection delivery", () => {
         content: "st_1 completed",
         display: false,
         details: [{ ...completionDetails[0], task_id: "st_1" }],
+        onFlushed: expect.any(Function),
         onDeliveryFailed: expect.any(Function),
       },
     ])

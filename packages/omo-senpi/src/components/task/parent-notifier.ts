@@ -3,6 +3,7 @@ import { ASTRA_DAG_VERIFICATION_DIRECTIVE, buildCompletionMessage, type ParentNo
 
 import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { type CmuxNotifyBridge, createCmuxNotifyBridge } from "./cmux-notify-bridge"
 
 // The senpi-task completion custom-message type; the component registers a renderer for it.
 export const TASK_COMPLETION_MESSAGE_TYPE = "senpi-task.completion"
@@ -29,6 +30,7 @@ export function createParentNotifier(
   isStreaming?: () => boolean,
   onDeliveryFailed?: (taskIds: readonly string[], error: unknown) => void,
   getReceiverModel?: () => string | undefined,
+  cmuxNotify: CmuxNotifyBridge = createCmuxNotifyBridge(),
 ): ParentNotifier {
   return {
     enqueue(message: ParentNotifierMessage): void {
@@ -46,6 +48,7 @@ export function createParentNotifier(
           display: message.display,
           details: message.details,
           ...(message.details.some((detail) => detail.dag !== undefined) ? { contextScoped: true } : {}),
+          onFlushed: () => cmuxNotify.notify(message),
           onDeliveryFailed: (error) => onDeliveryFailed?.(taskIds, error),
         })
         // Refused: the coordinator retired with the session, so nothing is queued and no receipt is
@@ -67,6 +70,7 @@ export function createParentNotifier(
         },
         { triggerTurn: true, deliverAs: "steer" },
       )
+      cmuxNotify.notify(message)
     },
   }
 }
