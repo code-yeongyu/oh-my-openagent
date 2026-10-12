@@ -60,3 +60,33 @@ One fix is not part of this repository and survives OMO updates untouched:
 
 **Never commit them.** That churn is exactly what made PRs unmergeable — upstream regenerates
 the same files, so shipping ours creates conflicts in files nobody actually edited.
+
+## Staging from a work clone, and what activation checks (2026-10-13)
+
+No file inside the live checkout may be written while OpenChamber runs, so source and ledger
+work happens in a clone that the live checkout fast-forwards from during a closed window.
+
+```bash
+# in the clone, on integration/opencode-v2, tree clean:
+bun local-fixes/stage-bundle.mjs --target-checkout "C:/Users/Zephyrus/Documents/ai/oh-my-openagent-fix-v2-int"
+bun run fixes:verify "C:/Users/Zephyrus/Documents/ai/oh-my-openagent-fix-v2-int-staged/dist/index.js"
+```
+
+`--target-checkout` writes the bundle and `lane.json` beside the target checkout and records
+the target's paths, the clone it was built in (`source`) and the target's commit at build time.
+It refuses a target that cannot fast-forward to the staged commit.
+
+`activate-staged.ps1` (and `-Status`) refuse a staged bundle that does not belong to the
+checkout they run in: `lane.json` must name this checkout's staged and live paths, the staged
+file must match its recorded hash, and the checked-out commit must be the commit the bundle was
+built from. When the commit differs the script prints the two commands that bring the source
+over (`git fetch "<source>" integration/opencode-v2`, `git merge --ff-only <commit>`).
+`-Rollback` restores the newest backup only if it still matches the hash recorded in
+`backups/MANIFEST.txt`.
+
+`fixes:verify` checks the same provenance for the bundle it is given (or the live bundle) and
+says so. It proves markers and provenance, not behavior: a fix's behavior is proven by its
+tests. Do not use its exit code as the only activation gate.
+
+`OMO_V2_PERMISSION_FAIL_CLOSED=1` makes the v2 skill permission bridge (fixes 30 and 33) reject
+instead of skipping the prompt when the permission system cannot be reached.

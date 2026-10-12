@@ -462,6 +462,94 @@
         "23-skill-v2-ctx-ask-guard"
       ],
       "orderNote": "After 23 (renumbered from 26 to avoid colliding with the lane agent's cold-start fixes 26-29): tools.ts is unchanged - fix 23's typeof-ask guard now finds the bridge-provided ask() on the projected context, so v1 hosts keep their native ask and v2 gets the prompt. Origin resolution adds a netstat fallback for Windows where the lsof-based listenPortOf cannot work, covering OpenChamber's embedded server. pr is null: src/v2 is not in upstream dev; the upstreamable slice (the fix-23 guard itself) is filed as a separate upstream PR."
+    },
+    {
+      "id": "31-test-host-agent-id",
+      "title": "Align the v2 host agent-id expectation with fix 21",
+      "commit": "1c45f93d67afd7bb4487fcff60adae6ed6500d55",
+      "patch": "patches/31-test-host-agent-id.patch",
+      "pr": null,
+      "why": "Test-only. v2/host.test.ts still expected the nested oh-my-openagent/ agent id that fix 21 replaced with the bare id, and a QA evidence file was tracked by mistake. Recorded so a rebuilt branch keeps the suite honest.",
+      "markers": [],
+      "overlapsWith": [
+        "21-agent-registration-flat"
+      ],
+      "orderNote": "Test-only: markers are empty because nothing in it reaches dist/index.js (see fix 09)."
+    },
+    {
+      "id": "32-test-prefailures-spawn-shim",
+      "title": "Fix pre-existing test failures; route the lsof probe through the spawn shim",
+      "commit": "2615ea8f0c319e8834289c70cb9dfef397ae66df",
+      "patch": "patches/32-test-prefailures-spawn-shim.patch",
+      "pr": null,
+      "why": "v2/serve-http.ts called Bun.spawn directly, which the adapter runtime audit forbids and which throws under Node; it now uses the shared spawn shim. The rest is test hygiene: prompt-route allowlist entries for the v2 adapter, a GC before removing a bun:sqlite database on Windows, and environment isolation for the truncator tests.",
+      "markers": [],
+      "overlapsWith": [
+        "30-skill-v2-permission-bridge"
+      ],
+      "orderNote": "The production change adds no runtime string, so markers are empty; packages/omo-opencode/src/shared/opencode-adapter-bun-runtime-audit.test.ts is its regression test. Must come before 33, which removes the last raw Bun.spawn."
+    },
+    {
+      "id": "33-permission-bridge-verified-outcomes",
+      "title": "Never let a skill through on an unverified permission outcome",
+      "commit": "add2fa047fe107d2b311a17540bab393517ea57d",
+      "patch": "patches/33-permission-bridge-verified-outcomes.patch",
+      "pr": null,
+      "why": "Fix 30 resolved on every create failure. A cancelled tool call, or a create whose response was lost after the server had parked the request, therefore ran the skill without an answer and left the prompt dangling. It also subscribed to the reply after the create response, so a fast answer was lost and the call waited forever, and an aborted wait kept its event subscription. The bridge now chooses the request id, listens before it creates, rejects every aborted call, checks whether a failed create was parked (parked: wait; unverifiable: reject; verified unparked, retried once: the documented fail-open), rejects when a parked request disappears without an observed reply, bounds the create, always closes its subscription, runs netstat through the windows-hide spawn helper, and sends the server password only to a listener that refuses anonymous requests the way OpenCode does. OMO_V2_PERMISSION_FAIL_CLOSED=1 turns the remaining fail-open cases into rejections.",
+      "markers": [
+        "v2 permission bridge: permission check unavailable; skill blocked",
+        "skill permission request was answered but the reply was not observed; refusing to proceed"
+      ],
+      "overlapsWith": [
+        "30-skill-v2-permission-bridge",
+        "23-skill-v2-ctx-ask-guard"
+      ],
+      "orderNote": "After 30 and 32. The two fix-30 marker strings are kept verbatim. Cross-review A findings B1, M1, M2, M6."
+    },
+    {
+      "id": "34-process-cache-effective-keys",
+      "title": "Key the process config cache by every input it was built from",
+      "commit": "e2f966ba0f3edf4efbe02c0841c13cf7f2d9d4fd",
+      "patch": "patches/34-process-cache-effective-keys.patch",
+      "pr": null,
+      "why": "Fix 28's caches could replay artifacts built from other inputs: the agent snapshot ignored the OMO config (an instance with other disabled agents got the first instance's agents), the MCP cache watched two files that are not among the four the loader reads and ignored its cwd, the command cache ignored the user command and skill directories, the project fingerprint saw only top-level entries, the per-handler snapshot hid changes the fingerprint did see, and ancestor directories were not considered. Every key now covers its inputs with content fingerprints (path, mtime, size of every file, six levels deep); a source tree too large to fingerprint is not cached. Measured on the live profile: 16-22 ms per config pass, sibling chat folders still share one snapshot.",
+      "markers": [
+        "fingerprintAncestorSources",
+        "buildClaudeMcpCacheKey",
+        "known_marketplaces.json"
+      ],
+      "overlapsWith": [
+        "28-config-handler-cross-folder-reuse"
+      ],
+      "orderNote": "After 28 and 29. Removes the in-place-edit limitation documented for 28. Cross-review A findings M3, M4, M7."
+    },
+    {
+      "id": "35-model-capabilities-catalog-compare",
+      "title": "Do not rewrite the model capabilities cache for an unchanged catalog",
+      "commit": "14ac6d49967e778e0bdaa0c90b1a1f5a0b7f5ce2",
+      "patch": "patches/35-model-capabilities-catalog-compare.patch",
+      "pr": null,
+      "why": "Fix 27 compared the whole serialized snapshot, whose generatedAt is stamped on every fetch, so an unchanged catalog was still rewritten after every fetch. The store takes a comparable() that decides a rewrite; the capabilities cache excludes generatedAt.",
+      "markers": [
+        "unchanged; skipped write"
+      ],
+      "overlapsWith": [
+        "27-model-capabilities-write-once"
+      ],
+      "orderNote": "After 27. The change adds no new runtime string; the marker is fix 27's skip log line, which this fix keeps reachable for an unchanged catalog (regression test: shared/model-capabilities-cache.unchanged-catalog.test.ts). Cross-review A finding M5."
+    },
+    {
+      "id": "36-prompt-audit-reviewed-accesses",
+      "title": "Pin each prompt-route exemption to its reviewed raw accesses",
+      "commit": "def770eb57ac89891fa0bede58d25c438fe147b1",
+      "patch": "patches/36-prompt-audit-reviewed-accesses.patch",
+      "pr": null,
+      "why": "Test-only. A whole-file allowlist entry in the prompt-route audit exempted every future raw session.prompt call in that file; each allowlisted file must now match its reviewed count.",
+      "markers": [],
+      "overlapsWith": [
+        "32-test-prefailures-spawn-shim"
+      ],
+      "orderNote": "Test-only: markers are empty because nothing in it reaches dist/index.js. Cross-review A finding N1."
     }
   ],
   "externalFixes": [

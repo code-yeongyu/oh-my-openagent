@@ -1,0 +1,1120 @@
+From e2f966ba0f3edf4efbe02c0841c13cf7f2d9d4fd Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Tue, 13 Oct 2026 01:36:25 +0300
+Subject: [PATCH] fix(v2): key the process config cache by every input it was
+ built from
+
+The process-level config cache could replay artifacts built from different inputs. The agent snapshot ignored the OMO config, so an instance with other disabled agents, models or prompts got the first instance's agents. The MCP cache watched two files, neither of which is one of the four the loader reads, and ignored the loader's cwd. The command cache ignored the user command and skill directories. The project fingerprint saw only top-level entries, so a file added or edited below an existing source directory was missed, and the per-handler snapshot hid even the changes it did see. Ancestor directories, which the project loaders also search, were not considered at all.
+
+Every key now covers its inputs: the OpenCode config slice, a digest of the OMO config and of the loaded plugin components, content fingerprints (path, mtime and size of every file, six levels deep) of the user-level and project source directories and of the sources contributed by ancestors, the targets of file:// prompt references, and for MCP the loader context, its four files, the env allowlist and the environment. The per-handler snapshot uses the same key. A source tree too large to fingerprint is not served from the process cache. Sibling chat folders still share one snapshot.
+---
+ .../plugin-handlers/command-config-handler.ts |  26 +-
+ .../config-handler.effective-keys.test.ts     | 162 +++++++++
+ .../src/plugin-handlers/config-handler.ts     |  93 +++--
+ .../src/plugin-handlers/mcp-config-handler.ts |  36 +-
+ ...rocess-config-cache.effective-keys.test.ts | 199 +++++++++++
+ .../src/shared/process-config-cache.test.ts   |  10 +-
+ .../src/shared/process-config-cache.ts        | 327 +++++++++++++++---
+ 7 files changed, 773 insertions(+), 80 deletions(-)
+ create mode 100644 packages/omo-opencode/src/plugin-handlers/config-handler.effective-keys.test.ts
+ create mode 100644 packages/omo-opencode/src/shared/process-config-cache.effective-keys.test.ts
+
+diff --git a/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts b/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts
+index 614bcc301..b5a3e2091 100644
+--- a/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts
++++ b/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts
+@@ -35,6 +35,7 @@ import { adaptHostSkillConfig } from "../shared/host-skill-config";
+ import { collectDisabledSkillAliases } from "../plugin/skill-context";
+ import type { LoadedSkill } from "../features/opencode-skill-loader/types";
+ import {
++  fingerprintGlobalSources,
+   getProcessConfigCacheEntry,
+   setProcessConfigCacheEntry,
+ } from "../shared/process-config-cache";
+@@ -45,6 +46,10 @@ import {
+  * skills and OpenCode global commands/skills are identical for every folder,
+  * but they used to be re-loaded from disk on every folder rebuild. Project
+  * sources stay per-folder.
++ *
++ * The entry is keyed by the config flags, the registered agent names and a
++ * content fingerprint of the user-level source directories (local fix 31), so
++ * adding, removing or editing a user command or skill reloads them.
+  */
+ type GlobalCommandSources = {
+   builtinSkillCommands: Record<string, unknown>;
+@@ -67,8 +72,12 @@ function buildGlobalCommandSourcesCacheKey(params: {
+   disabledSkills: ReadonlySet<string>;
+   includeClaudeCommands: boolean;
+   includeClaudeSkills: boolean;
++  agentNames: ReadonlyArray<string>;
++  sourcesFingerprint: string;
+ }): string {
+   return JSON.stringify({
++    sources: params.sourcesFingerprint,
++    agentNames: params.agentNames,
+     disabledCommands: params.pluginConfig.disabled_commands ?? [],
+     teamMode: params.pluginConfig.team_mode?.enabled ?? false,
+     browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+@@ -84,9 +93,15 @@ async function loadGlobalCommandSources(params: {
+   disabledSkills: Set<string>;
+   includeClaudeCommands: boolean;
+   includeClaudeSkills: boolean;
++  agentNames: ReadonlyArray<string>;
++  sourcesFingerprint: string | undefined;
+ }): Promise<GlobalCommandSources> {
+-  const cacheKey = buildGlobalCommandSourcesCacheKey(params);
+-  const cached = getProcessConfigCacheEntry("globalCommandSources");
++  // Source directories too large to fingerprint are loaded every time.
++  const sourcesFingerprint = params.sourcesFingerprint;
++  const cacheKey = sourcesFingerprint === undefined
++    ? undefined
++    : buildGlobalCommandSourcesCacheKey({ ...params, sourcesFingerprint });
++  const cached = cacheKey === undefined ? undefined : getProcessConfigCacheEntry("globalCommandSources");
+   if (cached && cached.key === cacheKey) {
+     log("[command-config] reusing cached global command sources (process-level)");
+     const value = cached.value as GlobalCommandSources;
+@@ -135,7 +150,9 @@ async function loadGlobalCommandSources(params: {
+     opencodeGlobalCommands,
+     opencodeGlobalSkills,
+   };
+-  setProcessConfigCacheEntry("globalCommandSources", { key: cacheKey, value: sources });
++  if (cacheKey !== undefined) {
++    setProcessConfigCacheEntry("globalCommandSources", { key: cacheKey, value: sources });
++  }
+   return sources;
+ }
+ 
+@@ -144,6 +161,7 @@ export async function applyCommandConfig(params: {
+   pluginConfig: OhMyOpenCodeConfig;
+   ctx: { directory: string };
+   pluginComponents: PluginComponents;
++  globalSources?: { fingerprint: string | undefined };
+ }): Promise<void> {
+   const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
+ 
+@@ -170,6 +188,8 @@ export async function applyCommandConfig(params: {
+       disabledSkills: disabledSkills as Set<string>,
+       includeClaudeCommands,
+       includeClaudeSkills,
++      agentNames: Object.keys((params.config.agent as Record<string, unknown> | undefined) ?? {}).sort(),
++      sourcesFingerprint: params.globalSources ? params.globalSources.fingerprint : fingerprintGlobalSources(),
+     }),
+     discoverConfigSourceSkills({
+       config: params.pluginConfig.skills,
+diff --git a/packages/omo-opencode/src/plugin-handlers/config-handler.effective-keys.test.ts b/packages/omo-opencode/src/plugin-handlers/config-handler.effective-keys.test.ts
+new file mode 100644
+index 000000000..2128dd058
+--- /dev/null
++++ b/packages/omo-opencode/src/plugin-handlers/config-handler.effective-keys.test.ts
+@@ -0,0 +1,162 @@
++/// <reference types="bun-types" />
++
++import { afterEach, beforeEach, describe, expect, test } from "bun:test"
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++import { createConfigHandler, getLastConfigHandlerPhaseTiming } from "./config-handler"
++import { applyMcpConfig, buildClaudeMcpCacheKey } from "./mcp-config-handler"
++import { resetProcessConfigCacheForTests } from "../shared/process-config-cache"
++import { createModelCacheState } from "../plugin-state"
++import type { OhMyOpenCodeConfig } from "../config"
++
++// Local fix 31 (cross-review A M3/M4/M7). No module mocks: the real loaders run
++// against the hermetic home, with the Claude config directory redirected per test.
++
++const baseConfig = (): Record<string, unknown> => ({
++  formatter: { enabled: false },
++  model: "provider/model",
++})
++
++const agentKeys = (config: Record<string, unknown>, pattern: RegExp) =>
++  Object.keys(config.agent as Record<string, unknown>).filter((key) => pattern.test(key))
++const hasPrompt = (config: Record<string, unknown>, text: string) =>
++  Object.values(config.agent as Record<string, Record<string, unknown>>).some(
++    (agent) => typeof agent.prompt === "string" && agent.prompt.includes(text),
++  )
++const build = (directory: string, pluginConfig: OhMyOpenCodeConfig) =>
++  createConfigHandler({ ctx: { directory }, pluginConfig, modelCacheState: createModelCacheState() })
++
++describe("config handler effective cache keys (local fix 31)", () => {
++  let tempRoot: string
++  let claudeHome: string
++  let folderA: string
++  let folderB: string
++  const savedClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
++
++  beforeEach(() => {
++    resetProcessConfigCacheForTests()
++    delete process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE
++    tempRoot = mkdtempSync(join(tmpdir(), "omo-eff-"))
++    claudeHome = join(tempRoot, "claude-home")
++    folderA = join(tempRoot, "chats", "chat-a")
++    folderB = join(tempRoot, "chats", "chat-b")
++    for (const directory of [claudeHome, folderA, folderB]) mkdirSync(directory, { recursive: true })
++    process.env.CLAUDE_CONFIG_DIR = claudeHome
++  })
++
++  afterEach(() => {
++    if (savedClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
++    else process.env.CLAUDE_CONFIG_DIR = savedClaudeConfigDir
++    rmSync(tempRoot, { recursive: true, force: true })
++  })
++
++  test("a different effective OMO config never replays another instance's agents", async () => {
++    const configA = baseConfig()
++    await build(folderA, { disabled_agents: [] } as unknown as OhMyOpenCodeConfig)(configA)
++    expect(agentKeys(configA, /oracle/i).length).toBeGreaterThan(0)
++
++    const configB = baseConfig()
++    await build(folderB, { disabled_agents: ["oracle"] } as unknown as OhMyOpenCodeConfig)(configB)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(false)
++    expect(agentKeys(configB, /oracle/i)).toEqual([])
++
++    // The same config in another empty folder still shares the snapshot.
++    const configC = baseConfig()
++    await build(folderA, { disabled_agents: ["oracle"] } as unknown as OhMyOpenCodeConfig)(configC)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(true)
++    expect(configC.agent).toEqual(configB.agent)
++
++    resetProcessConfigCacheForTests()
++    const fresh = baseConfig()
++    await build(folderB, { disabled_agents: ["oracle"] } as unknown as OhMyOpenCodeConfig)(fresh)
++    expect(fresh.agent).toEqual(configB.agent)
++  })
++
++  test("a project agent added below an existing source directory is picked up by the same handler", async () => {
++    const project = join(tempRoot, "project")
++    mkdirSync(join(project, ".claude", "agents"), { recursive: true })
++    writeFileSync(
++      join(project, ".claude", "agents", "first.md"),
++      "---\ndescription: first\nmode: subagent\n---\nfirst project agent\n",
++    )
++    const handler = build(project, {} as OhMyOpenCodeConfig)
++    const initial = baseConfig()
++    await handler(initial)
++    expect(hasPrompt(initial, "first project agent")).toBe(true)
++
++    const repeated = baseConfig()
++    await handler(repeated)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(true)
++
++    writeFileSync(
++      join(project, ".claude", "agents", "second.md"),
++      "---\ndescription: second\nmode: subagent\n---\nsecond project agent\n",
++    )
++    const afterAdd = baseConfig()
++    await handler(afterAdd)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(false)
++    expect(hasPrompt(afterAdd, "second project agent")).toBe(true)
++
++    writeFileSync(
++      join(project, ".claude", "agents", "first.md"),
++      "---\ndescription: first\nmode: subagent\n---\nfirst project agent, edited in place\n",
++    )
++    const afterEdit = baseConfig()
++    await build(project, {} as OhMyOpenCodeConfig)(afterEdit)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(false)
++    expect(hasPrompt(afterEdit, "edited in place")).toBe(true)
++  })
++
++  test("a user skill or command added after the first load invalidates agents and commands", async () => {
++    const first = baseConfig()
++    await build(folderA, {} as OhMyOpenCodeConfig)(first)
++    const second = baseConfig()
++    await build(folderB, {} as OhMyOpenCodeConfig)(second)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(true)
++    expect(Object.keys(second.command as Record<string, unknown>)).not.toContain("late-command")
++
++    mkdirSync(join(claudeHome, "commands"), { recursive: true })
++    writeFileSync(join(claudeHome, "commands", "late-command.md"), "---\ndescription: late\n---\nrun the late command\n")
++    mkdirSync(join(claudeHome, "skills", "late-skill"), { recursive: true })
++    writeFileSync(
++      join(claudeHome, "skills", "late-skill", "SKILL.md"),
++      "---\nname: late-skill\ndescription: added after the first load\n---\n# late skill\n",
++    )
++
++    const third = baseConfig()
++    await build(folderA, {} as OhMyOpenCodeConfig)(third)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(false)
++    const commands = Object.keys(third.command as Record<string, unknown>)
++    expect(commands).toContain("late-command")
++    expect(commands).toContain("late-skill")
++  })
++
++  test("a Claude Code MCP file added after the first load is loaded", async () => {
++    const pluginComponents = { commands: {}, skills: {}, agents: {}, mcpServers: {}, hooksConfigs: [], plugins: [], errors: [] }
++    const pluginConfig = {} as OhMyOpenCodeConfig
++    const before: Record<string, unknown> = {}
++    await applyMcpConfig({ config: before, ctx: { directory: folderA }, pluginConfig, pluginComponents })
++    expect(Object.keys(before.mcp as Record<string, unknown>)).not.toContain("late-server")
++    const keyBefore = buildClaudeMcpCacheKey([], [])
++
++    writeFileSync(
++      join(claudeHome, ".mcp.json"),
++      JSON.stringify({ mcpServers: { "late-server": { command: "node", args: ["server.js"] } } }),
++    )
++    expect(buildClaudeMcpCacheKey([], [])).not.toBe(keyBefore)
++    const after: Record<string, unknown> = {}
++    await applyMcpConfig({ config: after, ctx: { directory: folderB }, pluginConfig, pluginComponents })
++    expect(Object.keys(after.mcp as Record<string, unknown>)).toContain("late-server")
++
++    // The environment the transformer expands from and the allowlist are part of the key.
++    const keyAfter = buildClaudeMcpCacheKey([], [])
++    process.env.OMO_EFFECTIVE_KEY_PROBE = "1"
++    try {
++      expect(buildClaudeMcpCacheKey([], [])).not.toBe(keyAfter)
++    } finally {
++      delete process.env.OMO_EFFECTIVE_KEY_PROBE
++    }
++    expect(buildClaudeMcpCacheKey([], ["EXTRA_VAR"])).not.toBe(keyAfter)
++  })
++})
+diff --git a/packages/omo-opencode/src/plugin-handlers/config-handler.ts b/packages/omo-opencode/src/plugin-handlers/config-handler.ts
+index ebbc7da0d..be9af53a3 100644
+--- a/packages/omo-opencode/src/plugin-handlers/config-handler.ts
++++ b/packages/omo-opencode/src/plugin-handlers/config-handler.ts
+@@ -5,9 +5,15 @@ import { applyOpenGatewayProviderConfig } from "../features/opengateway-provider
+ import type { ModelCacheState } from "../plugin-state";
+ import { log } from "../shared";
+ import {
++  type FingerprintMemo,
++  fingerprintAncestorSources,
++  fingerprintFileReferences,
++  fingerprintGlobalSources,
+   fingerprintProjectSources,
+   getProcessAgentSnapshotMap,
+   getProcessConfigCacheEntry,
++  rememberAgentSnapshot,
++  stableDigest,
+ } from "../shared/process-config-cache";
+ import { AGENT_DISPLAY_NAMES, getAgentListDisplayName } from "../shared/agent-display-names";
+ import { applyAgentConfig } from "./agent-config-handler";
+@@ -82,19 +88,44 @@ function createAgentConfigCacheKey(config: Record<string, unknown>): string {
+ 
+ /**
+  * Cross-folder agent-config snapshot key (local fix 28, first-message-drop
+- * F5c). The snapshot used to live in the per-instance closure, so every folder
+- * rebuild re-ran applyAgentConfig (the largest identified cold-start owner:
+- * 11.7s of a 17.7s cold plugin setup). The process-level map keys snapshots by
+- * the OpenCode config slice PLUS a fingerprint of the folder's project-level
+- * sources. Folders with none of those sources (every OpenChamber chat folder
+- * is an empty directory) share one snapshot; folders with project content are
+- * keyed per directory so their agents never leak into other folders.
++ * F5c; made complete by local fix 31). The snapshot used to live in the
++ * per-instance closure, so every folder rebuild re-ran applyAgentConfig (the
++ * largest identified cold-start owner: 11.7s of a 17.7s cold plugin setup).
++ *
++ * The key covers every input applyAgentConfig reads: the OpenCode config
++ * slice, the effective OMO config, the loaded plugin components, the user-level
++ * source directories, the folder's own project sources, the sources its
++ * ancestors contribute, and the targets of file:// prompt references. Folders
++ * for which all of that is identical (sibling OpenChamber chat folders are
++ * empty directories under one parent) share a snapshot; anything else gets its
++ * own. Returns undefined when a source tree is too large to fingerprint: such
++ * a folder is never served from the process cache.
+  */
+-function createProcessAgentSnapshotKey(
+-  agentCacheKey: string,
+-  directory: string,
+-): string {
+-  return `${agentCacheKey}::${fingerprintProjectSources(directory)}`
++function createEffectiveAgentSnapshotKey(params: {
++  agentCacheKey: string;
++  directory: string;
++  pluginConfig: OhMyOpenCodeConfig;
++  pluginComponents: { agents: unknown; plugins: unknown };
++  globalSourcesFingerprint: string | undefined;
++  memo: FingerprintMemo;
++}): string | undefined {
++  if (params.globalSourcesFingerprint === undefined) return undefined
++  const project = fingerprintProjectSources(params.directory, params.memo)
++  if (project === undefined) return undefined
++  const ancestors = fingerprintAncestorSources(params.directory, params.memo)
++  if (ancestors === undefined) return undefined
++  const fileReferences = fingerprintFileReferences(params.pluginConfig, params.directory)
++  return JSON.stringify({
++    config: params.agentCacheKey,
++    pluginConfig: stableDigest(params.pluginConfig),
++    components: stableDigest({ agents: params.pluginComponents.agents, plugins: params.pluginComponents.plugins }),
++    global: params.globalSourcesFingerprint,
++    project,
++    ancestors,
++    fileReferences: fileReferences.signature,
++    // A file:// prompt is resolved and path-checked against the folder.
++    directory: fileReferences.count > 0 ? params.directory : undefined,
++  })
+ }
+ 
+ function attachHiddenConfigKeyAliases(
+@@ -204,16 +235,30 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
+ 
+     await timePhase("hooks", () => applyHookConfig({ pluginComponents }));
+ 
++    const fingerprintMemo: FingerprintMemo = new Map();
++    const globalSourcesFingerprint = fingerprintGlobalSources(fingerprintMemo);
+     const agentCacheKey = createAgentConfigCacheKey(config);
+     let agentResult: Record<string, unknown>;
+     const processAgentSnapshots = getProcessAgentSnapshotMap();
+-    const processSnapshotKey = pluginComponentsLoadFailed
++    // One key for the per-handler and the process snapshot, so a changed source
++    // is never masked by a same-config hit. A source tree too large to
++    // fingerprint keeps the upstream per-handler, config-only snapshot and is
++    // never shared across handlers.
++    const effectiveSnapshotKey = pluginComponentsLoadFailed
+       ? undefined
+-      : createProcessAgentSnapshotKey(agentCacheKey, ctx.directory);
+-    const processSnapshot = processSnapshotKey
+-      ? (processAgentSnapshots.get(processSnapshotKey) as AgentConfigSnapshot | undefined)
++      : createEffectiveAgentSnapshotKey({
++          agentCacheKey,
++          directory: ctx.directory,
++          pluginConfig,
++          pluginComponents,
++          globalSourcesFingerprint,
++          memo: fingerprintMemo,
++        });
++    const closureKey = effectiveSnapshotKey ?? agentCacheKey;
++    const processSnapshot = effectiveSnapshotKey
++      ? (processAgentSnapshots.get(effectiveSnapshotKey) as AgentConfigSnapshot | undefined)
+       : undefined;
+-    const closureSnapshot = agentConfigSnapshot?.cacheKey === agentCacheKey
++    const closureSnapshot = agentConfigSnapshot?.cacheKey === closureKey
+       ? agentConfigSnapshot
+       : undefined;
+     const snapshot = closureSnapshot ?? processSnapshot;
+@@ -244,13 +289,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
+       agentConfigSnapshot = pluginComponentsLoadFailed
+         ? undefined
+         : {
+-            cacheKey: agentCacheKey,
++            cacheKey: closureKey,
+             configuredDefaultAgent,
+             defaultAgent: config.default_agent,
+             agents: cloneAgentConfig(agentResult),
+           };
+-      if (processSnapshotKey && agentConfigSnapshot) {
+-        processAgentSnapshots.set(processSnapshotKey, agentConfigSnapshot);
++      if (effectiveSnapshotKey && agentConfigSnapshot) {
++        rememberAgentSnapshot(processAgentSnapshots, effectiveSnapshotKey, agentConfigSnapshot);
+       }
+     }
+ 
+@@ -262,7 +307,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
+       applyMcpConfig({ config, pluginConfig, ctx, pluginComponents }),
+     );
+     await timePhase("commands", () =>
+-      applyCommandConfig({ config, pluginConfig, ctx, pluginComponents }),
++      applyCommandConfig({
++        config,
++        pluginConfig,
++        ctx,
++        pluginComponents,
++        globalSources: { fingerprint: globalSourcesFingerprint },
++      }),
+     );
+     if (runtimeSkillSourceUrl) {
+       await timePhase("runtimeSkills", () =>
+diff --git a/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts b/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts
+index e92f6bfe5..af35e725d 100644
+--- a/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts
++++ b/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts
+@@ -4,8 +4,10 @@ import { createBuiltinMcps } from "../mcp";
+ import type { PluginComponents } from "./plugin-components-loader";
+ import { log } from "../shared";
+ import {
++  digestEnvironment,
+   fingerprintClaudeMcpSources,
+   getProcessConfigCacheEntry,
++  resolveClaudeMcpLoaderContext,
+   setProcessConfigCacheEntry,
+ } from "../shared/process-config-cache";
+ 
+@@ -31,19 +33,35 @@ function captureUserDisabledMcps(
+ }
+ 
+ /**
+- * Claude Code MCP configs are directory-independent (they come from
+- * ~/.claude.json and ~/.claude settings), so the loaded server set is cached
+- * per process (local fix 28, first-message-drop F5c) and invalidated by a
+- * fingerprint of those files. Builtin MCPs embed the folder cwd and are still
++ * Everything loadMcpConfigs() reads when called without options (local fix
++ * 31): the loader context (process cwd, home, Claude config directory), the
++ * four files it loads from those (~/.claude.json, <claude config>/.mcp.json,
++ * <cwd>/.mcp.json, <cwd>/.claude/.mcp.json), the env-expansion allowlist and
++ * the environment the transformer expands variables from.
++ */
++export function buildClaudeMcpCacheKey(disabledMcps: ReadonlyArray<string>, envAllowlist: ReadonlyArray<string>): string {
++  const context = resolveClaudeMcpLoaderContext();
++  return JSON.stringify({
++    disabledMcps,
++    context,
++    sources: fingerprintClaudeMcpSources(context),
++    envAllowlist: [...envAllowlist].sort(),
++    environment: digestEnvironment(),
++  });
++}
++
++/**
++ * The Claude Code MCP server set does not depend on the plugin instance's
++ * folder (the loader resolves project files against the process cwd), so it is
++ * cached per process (local fix 28, first-message-drop F5c) under a key that
++ * covers all of its inputs. Builtin MCPs embed the folder cwd and are still
+  * rebuilt per folder.
+  */
+ async function loadCachedMcpConfigs(
+   disabledMcps: string[],
++  envAllowlist: ReadonlyArray<string>,
+ ): Promise<{ servers: Record<string, unknown> }> {
+-  const cacheKey = JSON.stringify({
+-    disabledMcps,
+-    sources: fingerprintClaudeMcpSources(),
+-  });
++  const cacheKey = buildClaudeMcpCacheKey(disabledMcps, envAllowlist);
+   const cached = getProcessConfigCacheEntry("claudeMcpServers");
+   if (cached && cached.key === cacheKey) {
+     log("[mcp-config] reusing cached Claude Code MCP configs (process-level)");
+@@ -65,7 +83,7 @@ export async function applyMcpConfig(params: {
+   const userDisabledMcps = captureUserDisabledMcps(userMcp);
+ 
+   const mcpResult = params.pluginConfig.claude_code?.mcp ?? true
+-    ? await loadCachedMcpConfigs(disabledMcps)
++    ? await loadCachedMcpConfigs(disabledMcps, params.pluginConfig.mcp_env_allowlist ?? [])
+     : { servers: {} };
+ 
+   if (userMcp) {
+diff --git a/packages/omo-opencode/src/shared/process-config-cache.effective-keys.test.ts b/packages/omo-opencode/src/shared/process-config-cache.effective-keys.test.ts
+new file mode 100644
+index 000000000..d56d24d37
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/process-config-cache.effective-keys.test.ts
+@@ -0,0 +1,199 @@
++/// <reference types="bun-types" />
++
++import { afterEach, beforeEach, describe, expect, test } from "bun:test"
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++import {
++  NO_PROJECT_SOURCES_FINGERPRINT,
++  digestEnvironment,
++  fingerprintAncestorSources,
++  fingerprintClaudeMcpSources,
++  fingerprintClaudePluginRoots,
++  fingerprintFileReferences,
++  fingerprintGlobalSources,
++  fingerprintProjectSources,
++  fingerprintTree,
++  getProcessAgentSnapshotMap,
++  rememberAgentSnapshot,
++  resetProcessConfigCacheForTests,
++  stableDigest,
++} from "./process-config-cache"
++
++// Local fix 31 (cross-review A M3/M4/M7): cache keys must cover every input.
++
++describe("process-config-cache effective keys", () => {
++  let tempRoot: string
++  const savedClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
++
++  beforeEach(() => {
++    resetProcessConfigCacheForTests()
++    delete process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE
++    tempRoot = mkdtempSync(join(tmpdir(), "omo-keys-"))
++  })
++
++  afterEach(() => {
++    if (savedClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
++    else process.env.CLAUDE_CONFIG_DIR = savedClaudeConfigDir
++    rmSync(tempRoot, { recursive: true, force: true })
++  })
++
++  test("a tree fingerprint follows nested additions, in-place edits and removals", () => {
++    const root = join(tempRoot, "tree")
++    mkdirSync(join(root, "a", "b"), { recursive: true })
++    writeFileSync(join(root, "a", "b", "one.md"), "one")
++    const initial = fingerprintTree(root)
++    expect(initial).toBe(fingerprintTree(root))
++
++    writeFileSync(join(root, "a", "b", "two.md"), "two")
++    const added = fingerprintTree(root)
++    expect(added).not.toBe(initial)
++
++    writeFileSync(join(root, "a", "b", "one.md"), "one, edited in place")
++    const edited = fingerprintTree(root)
++    expect(edited).not.toBe(added)
++
++    rmSync(join(root, "a", "b", "two.md"))
++    expect(fingerprintTree(root)).not.toBe(edited)
++    expect(fingerprintTree(join(root, "missing"))).toBe("absent")
++  })
++
++  test("a tree with too many entries is reported as not fingerprintable", () => {
++    const root = join(tempRoot, "huge")
++    mkdirSync(root)
++    for (let index = 0; index < 3001; index++) writeFileSync(join(root, `f${index}`), "")
++    expect(fingerprintTree(root)).toBeUndefined()
++    mkdirSync(join(tempRoot, "project", ".claude"), { recursive: true })
++    for (let index = 0; index < 3001; index++) writeFileSync(join(tempRoot, "project", ".claude", `f${index}`), "")
++    expect(fingerprintProjectSources(join(tempRoot, "project"))).toBeUndefined()
++  })
++
++  test("a memo serves repeated walks within one pass", () => {
++    const root = join(tempRoot, "memo")
++    mkdirSync(root)
++    const memo = new Map<string, string | undefined>()
++    const first = fingerprintTree(root, memo)
++    writeFileSync(join(root, "late.md"), "late")
++    expect(fingerprintTree(root, memo)).toBe(first)
++    expect(fingerprintTree(root)).not.toBe(first)
++  })
++
++  test("adding a file below an existing project source directory changes the project fingerprint", () => {
++    const folder = join(tempRoot, "project")
++    mkdirSync(join(folder, ".claude", "agents"), { recursive: true })
++    writeFileSync(join(folder, ".claude", "agents", "helper.md"), "agent")
++    const before = fingerprintProjectSources(folder)
++
++    // .claude and its listing are unchanged; only the nested directory gains an entry.
++    writeFileSync(join(folder, ".claude", "agents", "new.md"), "another agent")
++    const added = fingerprintProjectSources(folder)
++    expect(added).not.toBe(before)
++
++    writeFileSync(join(folder, ".claude", "agents", "helper.md"), "agent with a longer prompt")
++    expect(fingerprintProjectSources(folder)).not.toBe(added)
++  })
++
++  test("sibling folders share ancestor sources; folders under different ancestors do not", () => {
++    const parentA = join(tempRoot, "parent-a")
++    const parentB = join(tempRoot, "parent-b")
++    for (const parent of [parentA, parentB]) {
++      mkdirSync(join(parent, "chat-1"), { recursive: true })
++      mkdirSync(join(parent, "chat-2"), { recursive: true })
++    }
++    mkdirSync(join(parentA, ".claude", "skills", "only-a"), { recursive: true })
++    writeFileSync(join(parentA, ".claude", "skills", "only-a", "SKILL.md"), "---\nname: only-a\n---\n")
++
++    for (const folder of [join(parentA, "chat-1"), join(parentA, "chat-2"), join(parentB, "chat-1")]) {
++      expect(fingerprintProjectSources(folder)).toBe(NO_PROJECT_SOURCES_FINGERPRINT)
++    }
++    const siblingOne = fingerprintAncestorSources(join(parentA, "chat-1"))
++    expect(siblingOne).toBe(fingerprintAncestorSources(join(parentA, "chat-2")))
++    expect(siblingOne).not.toBe(fingerprintAncestorSources(join(parentB, "chat-1")))
++
++    writeFileSync(join(parentA, ".claude", "skills", "only-a", "SKILL.md"), "---\nname: only-a\ndescription: edited\n---\n")
++    expect(fingerprintAncestorSources(join(parentA, "chat-1"))).not.toBe(siblingOne)
++  })
++
++  test("user-level skill, command and agent changes change the global fingerprint", () => {
++    const claude = join(tempRoot, "claude-home")
++    mkdirSync(claude)
++    process.env.CLAUDE_CONFIG_DIR = claude
++    const empty = fingerprintGlobalSources()
++
++    mkdirSync(join(claude, "skills", "fresh"), { recursive: true })
++    writeFileSync(join(claude, "skills", "fresh", "SKILL.md"), "---\nname: fresh\n---\n")
++    const withSkill = fingerprintGlobalSources()
++    expect(withSkill).not.toBe(empty)
++
++    writeFileSync(join(claude, "skills", "fresh", "SKILL.md"), "---\nname: fresh\ndescription: edited\n---\n")
++    const editedSkill = fingerprintGlobalSources()
++    expect(editedSkill).not.toBe(withSkill)
++
++    mkdirSync(join(claude, "commands"))
++    writeFileSync(join(claude, "commands", "ship.md"), "ship it")
++    const withCommand = fingerprintGlobalSources()
++    expect(withCommand).not.toBe(editedSkill)
++
++    mkdirSync(join(claude, "agents"))
++    writeFileSync(join(claude, "agents", "reviewer.md"), "review")
++    expect(fingerprintGlobalSources()).not.toBe(withCommand)
++  })
++
++  test("a plugin installation change changes the plugin-root fingerprint", () => {
++    const claude = join(tempRoot, "claude-plugins")
++    mkdirSync(join(claude, "plugins"), { recursive: true })
++    process.env.CLAUDE_CONFIG_DIR = claude
++    const before = fingerprintClaudePluginRoots()
++    writeFileSync(join(claude, "plugins", "installed_plugins.json"), JSON.stringify({ plugins: { "a@b": [] } }))
++    expect(fingerprintClaudePluginRoots()).not.toBe(before)
++  })
++
++  test("the MCP fingerprint covers all four loader files and the loader context", () => {
++    const context = {
++      cwd: join(tempRoot, "cwd"),
++      homeDir: join(tempRoot, "home"),
++      claudeConfigDir: join(tempRoot, "home", ".claude"),
++    }
++    mkdirSync(join(context.cwd, ".claude"), { recursive: true })
++    mkdirSync(context.claudeConfigDir, { recursive: true })
++    let last = fingerprintClaudeMcpSources(context)
++    for (const file of [
++      join(context.homeDir, ".claude.json"),
++      join(context.claudeConfigDir, ".mcp.json"),
++      join(context.cwd, ".mcp.json"),
++      join(context.cwd, ".claude", ".mcp.json"),
++    ]) {
++      writeFileSync(file, JSON.stringify({ mcpServers: {} }))
++      const next = fingerprintClaudeMcpSources(context)
++      expect(next).not.toBe(last)
++      last = next
++    }
++    expect(fingerprintClaudeMcpSources({ ...context, cwd: join(tempRoot, "other-cwd") })).not.toBe(last)
++  })
++
++  test("digests are stable under key order and sensitive to values", () => {
++    expect(stableDigest({ a: 1, b: { c: [1, 2], d: "x" } })).toBe(stableDigest({ b: { d: "x", c: [1, 2] }, a: 1 }))
++    expect(stableDigest({ disabled_agents: [] })).not.toBe(stableDigest({ disabled_agents: ["oracle"] }))
++    expect(digestEnvironment({ A: "1", B: "2" })).toBe(digestEnvironment({ B: "2", A: "1" }))
++    expect(digestEnvironment({ A: "1" })).not.toBe(digestEnvironment({ A: "2" }))
++  })
++
++  test("file:// prompt references are found and follow their target", () => {
++    const folder = join(tempRoot, "prompts")
++    mkdirSync(folder)
++    const config = { agents: { oracle: { prompt_append: "file://./extra.md" } }, other: ["plain", "file://~/global.md"] }
++    const missing = fingerprintFileReferences(config, folder)
++    expect(missing.count).toBe(2)
++    writeFileSync(join(folder, "extra.md"), "extra")
++    expect(fingerprintFileReferences(config, folder).signature).not.toBe(missing.signature)
++    expect(fingerprintFileReferences({ agents: {} }, folder)).toEqual({ count: 0, signature: "" })
++  })
++
++  test("the process snapshot map is bounded", () => {
++    const map = getProcessAgentSnapshotMap()
++    for (let index = 0; index < 80; index++) rememberAgentSnapshot(map, `key-${index}`, index)
++    expect(map.size).toBe(64)
++    expect(map.has("key-0")).toBe(false)
++    expect(map.get("key-79")).toBe(79)
++  })
++})
+diff --git a/packages/omo-opencode/src/shared/process-config-cache.test.ts b/packages/omo-opencode/src/shared/process-config-cache.test.ts
+index 3b2769b6f..aadae09ce 100644
+--- a/packages/omo-opencode/src/shared/process-config-cache.test.ts
++++ b/packages/omo-opencode/src/shared/process-config-cache.test.ts
+@@ -50,8 +50,8 @@ describe("process-config-cache", () => {
+     const fingerprintB = fingerprintProjectSources(folderB)
+ 
+     // same content, different directory -> different keys (per-folder isolation)
+-    expect(fingerprintA.startsWith("dir:")).toBe(true)
+-    expect(fingerprintB.startsWith("dir:")).toBe(true)
++    expect(fingerprintA?.startsWith("dir:")).toBe(true)
++    expect(fingerprintB?.startsWith("dir:")).toBe(true)
+     expect(fingerprintA).not.toBe(fingerprintB)
+   })
+ 
+@@ -71,12 +71,6 @@ describe("process-config-cache", () => {
+     expect(fingerprintProjectSources(folder)).not.toBe(afterAdd)
+   })
+ 
+-  // Known limitation (documented in the fix report): an in-place edit of a
+-  // file inside an existing project source directory does not change the
+-  // directory stat or listing, so it does not invalidate the snapshot; the
+-  // OpenCode config key, a config.updated cycle, a process restart, or
+-  // OMO_DISABLE_PROCESS_CONFIG_CACHE=1 remain the invalidation paths.
+-
+   test("entries round-trip and reset clears them", () => {
+     setProcessConfigCacheEntry("pluginComponents", { key: "k1", value: { hello: 1 } })
+     expect(getProcessConfigCacheEntry("pluginComponents")?.key).toBe("k1")
+diff --git a/packages/omo-opencode/src/shared/process-config-cache.ts b/packages/omo-opencode/src/shared/process-config-cache.ts
+index ba150fbc9..652df8d38 100644
+--- a/packages/omo-opencode/src/shared/process-config-cache.ts
++++ b/packages/omo-opencode/src/shared/process-config-cache.ts
+@@ -1,6 +1,10 @@
++import { createHash } from "node:crypto";
+ import { readdirSync, statSync } from "node:fs";
+ import { homedir } from "node:os";
+-import { join } from "node:path";
++import { dirname, isAbsolute, join, resolve } from "node:path";
++
++import { getClaudeConfigDir } from "./claude-config-dir";
++import { getOpenCodeConfigDirs } from "./opencode-config-dir";
+ 
+ /**
+  * Process-level cache for configuration artifacts that are identical across
+@@ -14,9 +18,13 @@ import { join } from "node:path";
+  *
+  * State lives on `globalThis` behind a registered symbol so it survives
+  * per-location plugin module re-imports within one OpenCode process but never
+- * leaks across processes. Each entry carries its own key derived from the
+- * inputs that produced it (config slices + filesystem fingerprints), so a real
+- * change misses the cache and recomputes.
++ * leaks across processes.
++ *
++ * Every entry is keyed by ALL the inputs that produced it (local fix 31): the
++ * OpenCode config slice, the effective OMO config, the loaded plugin
++ * components, and content fingerprints (path, mtime, size of every file, to a
++ * bounded depth) of the global and project source directories the loaders
++ * read. A source tree too large to fingerprint is not cached at all.
+  *
+  * Escape hatch: set OMO_DISABLE_PROCESS_CONFIG_CACHE=1 to disable all reads
+  * and writes (each call recomputes, exactly the pre-fix behavior).
+@@ -69,6 +77,9 @@ export function setProcessConfigCacheEntry<K extends keyof ProcessConfigCacheEnt
+   getProcessState().entries[name] = value;
+ }
+ 
++/** Snapshots are small in number in practice; the bound only stops a pathological key churn. */
++const AGENT_SNAPSHOT_LIMIT = 64;
++
+ export function getProcessAgentSnapshotMap(): Map<string, unknown> {
+   const existing = getProcessConfigCacheEntry("agentSnapshots");
+   if (existing instanceof Map) return existing;
+@@ -77,12 +88,50 @@ export function getProcessAgentSnapshotMap(): Map<string, unknown> {
+   return created;
+ }
+ 
++/** Stores a snapshot, dropping the oldest entries beyond the bound. */
++export function rememberAgentSnapshot(map: Map<string, unknown>, key: string, value: unknown): void {
++  map.delete(key);
++  map.set(key, value);
++  while (map.size > AGENT_SNAPSHOT_LIMIT) {
++    map.delete(map.keys().next().value as string);
++  }
++}
++
+ /** Test-only: drop every process-level config cache entry. */
+ export function resetProcessConfigCacheForTests(): void {
+   const holder = globalThis as Record<symbol, unknown>;
+   delete holder[PROCESS_CONFIG_CACHE_SYMBOL];
+ }
+ 
++/** Order-independent digest of a JSON-like value. */
++export function stableDigest(value: unknown): string {
++  const seen = new WeakSet<object>();
++  const normalize = (input: unknown): unknown => {
++    if (typeof input !== "object" || input === null) {
++      return typeof input === "function" || typeof input === "symbol" ? String(input) : input;
++    }
++    if (seen.has(input)) return "[circular]";
++    seen.add(input);
++    if (Array.isArray(input)) return input.map(normalize);
++    if (input instanceof Set) return [...input].map(normalize);
++    if (input instanceof Map) return [...input.entries()].map(([key, entry]) => [normalize(key), normalize(entry)]);
++    const record = input as Record<string, unknown>;
++    return Object.fromEntries(
++      Object.keys(record)
++        .sort()
++        .map((key) => [key, normalize(record[key])]),
++    );
++  };
++  return createHash("sha1").update(JSON.stringify(normalize(value)) ?? "undefined").digest("hex");
++}
++
++/** Digest of the whole process environment (MCP config expands variables from it). */
++export function digestEnvironment(env: NodeJS.ProcessEnv = process.env): string {
++  const hash = createHash("sha1");
++  for (const name of Object.keys(env).sort()) hash.update(`${name}=${env[name] ?? ""}\0`);
++  return hash.digest("hex");
++}
++
+ function describeStat(path: string): string {
+   try {
+     const stats = statSync(path);
+@@ -93,31 +142,103 @@ function describeStat(path: string): string {
+   }
+ }
+ 
+-function describeDir(path: string): string {
+-  const statPart = describeStat(path);
+-  if (statPart === "absent" || statPart.startsWith("stat-error:")) {
+-    return statPart;
+-  }
++export type FingerprintMemo = Map<string, string | undefined>;
++
++const TREE_MAX_DEPTH = 6;
++const TREE_MAX_ENTRIES = 3000;
++const TREE_SKIPPED_DIRECTORIES = new Set(["node_modules", ".git"]);
++
++/**
++ * Content fingerprint of a file or directory tree: the relative path, mtime
++ * and size of every file down to six levels. An added, removed, renamed or
++ * edited file there changes it. Returns undefined when the tree has too many
++ * entries to walk cheaply (the caller must then skip its cache) and "absent"
++ * when the path does not exist.
++ */
++export function fingerprintTree(path: string, memo?: FingerprintMemo): string | undefined {
++  if (memo?.has(path)) return memo.get(path);
++  const result = walkTree(path);
++  memo?.set(path, result);
++  return result;
++}
++
++function walkTree(root: string): string | undefined {
++  let rootStats: ReturnType<typeof statSync>;
+   try {
+-    const entries = readdirSync(path).sort();
+-    return `${statPart}:[${entries.join("|")}]`;
++    rootStats = statSync(root);
+   } catch (error) {
+     const code = (error as NodeJS.ErrnoException)?.code ?? "unknown";
+-    return `${statPart}:readdir-error:${code}`;
++    return code === "ENOENT" || code === "ENOTDIR" ? "absent" : `stat-error:${code}`;
++  }
++  if (!rootStats.isDirectory()) return `file:${rootStats.mtimeMs}:${rootStats.size}`;
++
++  const hash = createHash("sha1");
++  let count = 0;
++  const pending: Array<{ directory: string; relative: string; depth: number }> = [
++    { directory: root, relative: "", depth: 0 },
++  ];
++  while (pending.length > 0) {
++    const current = pending.pop() as { directory: string; relative: string; depth: number };
++    let entries: Array<{ name: string; isDirectory: () => boolean }>;
++    try {
++      entries = readdirSync(current.directory, { withFileTypes: true });
++    } catch (error) {
++      hash.update(`${current.relative}/!${(error as NodeJS.ErrnoException)?.code ?? "unknown"}\0`);
++      continue;
++    }
++    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
++    for (const entry of entries) {
++      count += 1;
++      if (count > TREE_MAX_ENTRIES) return undefined;
++      const relative = `${current.relative}/${entry.name}`;
++      const full = join(current.directory, entry.name);
++      let stats: ReturnType<typeof statSync>;
++      try {
++        // statSync follows links, so a linked skill directory is walked like a real one.
++        stats = statSync(full);
++      } catch (error) {
++        hash.update(`${relative}!${(error as NodeJS.ErrnoException)?.code ?? "unknown"}\0`);
++        continue;
++      }
++      if (!stats.isDirectory()) {
++        hash.update(`${relative}:${stats.mtimeMs}:${stats.size}\0`);
++        continue;
++      }
++      // Deeper than any loader reads (and a self-referencing link must end somewhere):
++      // below the cap only the directory's own stat is recorded.
++      if (TREE_SKIPPED_DIRECTORIES.has(entry.name) || current.depth + 1 >= TREE_MAX_DEPTH) {
++        hash.update(`${relative}/:${stats.mtimeMs}\0`);
++        continue;
++      }
++      hash.update(`${relative}/\0`);
++      pending.push({ directory: full, relative, depth: current.depth + 1 });
++    }
+   }
++  return `tree:${count}:${hash.digest("hex")}`;
++}
++
++function fingerprintMany(paths: ReadonlyArray<string>, memo?: FingerprintMemo): string | undefined {
++  const parts: Array<string> = [];
++  for (const path of [...new Set(paths)]) {
++    const signature = fingerprintTree(path, memo);
++    if (signature === undefined) return undefined;
++    if (signature !== "absent") parts.push(`${path}=${signature}`);
++  }
++  return parts.join(";");
+ }
+ 
+ /**
+  * Fingerprint the project-level sources the config-handler loaders read from a
+- * folder. Folders where none of these roots exist (every OpenChamber chat
+- * folder is an empty directory) contribute nothing loader-visible, so they all
+- * map to the constant "no-project-sources" signature and can share cached
+- * config artifacts. Any folder with at least one root is keyed by directory +
+- * full signature instead.
++ * folder itself. Folders where none of these roots exist (every OpenChamber
++ * chat folder is an empty directory) all map to the constant
++ * "no-project-sources" signature. Any folder with at least one root is keyed
++ * by directory plus the content fingerprint of every root. Returns undefined
++ * when a root is too large to fingerprint.
+  */
+ const PROJECT_SOURCE_ROOTS = [
+   ".claude",
+   ".opencode",
++  ".agents",
+   "opencode",
+   "agents",
+   "skills",
+@@ -131,38 +252,166 @@ const PROJECT_SOURCE_ROOTS = [
+ 
+ export const NO_PROJECT_SOURCES_FINGERPRINT = "no-project-sources";
+ 
+-export function fingerprintProjectSources(directory: string): string {
+-  const present: Array<string> = [];
++export function fingerprintProjectSources(directory: string, memo?: FingerprintMemo): string | undefined {
++  const details: Array<string> = [];
+   for (const root of PROJECT_SOURCE_ROOTS) {
++    const signature = fingerprintTree(join(directory, root), memo);
++    if (signature === undefined) return undefined;
++    if (signature !== "absent") details.push(`${root}=${signature}`);
++  }
++  if (details.length === 0) return NO_PROJECT_SOURCES_FINGERPRINT;
++  return `dir:${directory}:${details.join(";")}`;
++}
++
++/**
++ * The project loaders also search every ancestor of the folder for skill,
++ * command and agent directories (up to the worktree root; this walks to the
++ * filesystem root, a superset). Two folders share cached artifacts only when
++ * their ancestors contribute the same content.
++ */
++const ANCESTOR_SOURCE_PATHS = [
++  [".claude", "skills"],
++  [".claude", "commands"],
++  [".claude", "agents"],
++  [".agents", "skills"],
++  [".opencode", "skills"],
++  [".opencode", "skill"],
++  [".opencode", "commands"],
++  [".opencode", "command"],
++  [".opencode", "agents"],
++  [".opencode", "agent"],
++] as const;
++
++export function fingerprintAncestorSources(directory: string, memo?: FingerprintMemo): string | undefined {
++  const candidates: Array<string> = [];
++  let current = resolve(directory);
++  for (let depth = 0; depth < 64; depth++) {
++    const parent = dirname(current);
++    if (parent === current) break;
++    current = parent;
++    for (const segments of ANCESTOR_SOURCE_PATHS) candidates.push(join(current, ...segments));
++  }
++  return fingerprintMany(candidates, memo);
++}
++
++/**
++ * Fingerprint the user-level directories the command, skill and agent loaders
++ * read: the Claude config directory, ~/.agents and every OpenCode config
++ * directory. Adding, removing or editing a user skill, command or agent
++ * changes it.
++ */
++export function fingerprintGlobalSources(memo?: FingerprintMemo): string | undefined {
++  const claudeConfigDir = getClaudeConfigDir();
++  const home = process.env.HOME || process.env.USERPROFILE || homedir();
++  const paths = [
++    join(claudeConfigDir, "skills"),
++    join(claudeConfigDir, "commands"),
++    join(claudeConfigDir, "agents"),
++    join(home, ".agents", "skills"),
++  ];
++  let configDirs: Array<string> = [];
++  try {
++    configDirs = getOpenCodeConfigDirs({ binary: "opencode" });
++  } catch {
++    configDirs = [];
++  }
++  for (const configDir of configDirs) {
++    const roots = [configDir];
++    // Profile directories inherit the parent's commands and skills.
++    if (dirname(configDir).endsWith("profiles")) roots.push(dirname(dirname(configDir)));
++    for (const root of roots) {
++      for (const name of ["skills", "skill", "commands", "command", "agents", "agent"]) {
++        paths.push(join(root, name));
++      }
++      paths.push(join(root, "opencode.json"), join(root, "opencode.jsonc"));
++    }
++  }
++  return fingerprintMany(paths, memo);
++}
++
++/**
++ * `file://` references inside the OMO config (agent prompts, prompt_append)
++ * are read from disk while agents are built. Their targets are part of the
++ * key; a relative or project-checked reference makes the result depend on the
++ * folder, so such configs are never shared across folders.
++ */
++export function fingerprintFileReferences(
++  value: unknown,
++  directory: string,
++): { readonly count: number; readonly signature: string } {
++  const references = new Set<string>();
++  const visit = (input: unknown, depth: number): void => {
++    if (depth > 12) return;
++    if (typeof input === "string") {
++      if (input.startsWith("file://")) references.add(input);
++      return;
++    }
++    if (Array.isArray(input)) {
++      for (const entry of input) visit(entry, depth + 1);
++      return;
++    }
++    if (typeof input === "object" && input !== null) {
++      for (const entry of Object.values(input)) visit(entry, depth + 1);
++    }
++  };
++  visit(value, 0);
++  const parts = [...references].sort().map((reference) => {
++    let target = reference.slice(7);
+     try {
+-      statSync(join(directory, root));
+-      present.push(root);
++      target = decodeURIComponent(target);
+     } catch {
+-      // not present in this folder
++      // keep the raw text; the reader reports the malformed URI itself
+     }
+-  }
+-  if (present.length === 0) {
+-    return NO_PROJECT_SOURCES_FINGERPRINT;
+-  }
+-  const details = present.map((root) => `${root}=${describeDir(join(directory, root))}`);
+-  return `dir:${directory}:${details.join(";")}`;
++    if (target.startsWith("~/")) target = join(homedir(), target.slice(2));
++    const path = isAbsolute(target) ? target : resolve(directory, target);
++    return `${reference}=${describeStat(path)}`;
++  });
++  return { count: parts.length, signature: parts.join(";") };
+ }
+ 
+-/** Fingerprint the Claude Code plugin installation roots (~/.claude/plugins). */
++/** Fingerprint the Claude Code plugin installation roots (<claude config>/plugins). */
+ export function fingerprintClaudePluginRoots(): string {
+-  const home = homedir();
++  const claudeConfigDir = getClaudeConfigDir();
++  const plugins = join(claudeConfigDir, "plugins");
++  let listing = "";
++  try {
++    listing = readdirSync(plugins).sort().join("|");
++  } catch (error) {
++    listing = `readdir-error:${(error as NodeJS.ErrnoException)?.code ?? "unknown"}`;
++  }
+   return [
+-    describeDir(join(home, ".claude", "plugins")),
+-    describeStat(join(home, ".claude", "plugins", "installed_plugins.json")),
+-    describeStat(join(home, ".claude", "settings.json")),
++    `${describeStat(plugins)}:[${listing}]`,
++    describeStat(join(plugins, "installed_plugins.json")),
++    describeStat(join(plugins, "known_marketplaces.json")),
++    describeStat(join(claudeConfigDir, "settings.json")),
+   ].join(";");
+ }
+ 
+-/** Fingerprint the global files the Claude Code MCP loader reads. */
+-export function fingerprintClaudeMcpSources(): string {
+-  const home = homedir();
++export type ClaudeMcpLoaderContext = {
++  readonly cwd: string;
++  readonly homeDir: string;
++  readonly claudeConfigDir: string;
++};
++
++/** The context the Claude Code MCP loader resolves when called without options. Keep in step with its resolveMcpLoaderContext(). */
++export function resolveClaudeMcpLoaderContext(): ClaudeMcpLoaderContext {
++  return {
++    cwd: process.cwd(),
++    homeDir: process.env.HOME || process.env.USERPROFILE || homedir(),
++    claudeConfigDir: getClaudeConfigDir(),
++  };
++}
++
++/** Fingerprint the four files the Claude Code MCP loader reads. Keep in step with its getMcpConfigPaths(). */
++export function fingerprintClaudeMcpSources(
++  context: ClaudeMcpLoaderContext = resolveClaudeMcpLoaderContext(),
++): string {
+   return [
+-    describeStat(join(home, ".claude.json")),
+-    describeStat(join(home, ".claude", "settings.json")),
+-  ].join(";");
++    join(context.homeDir, ".claude.json"),
++    join(context.claudeConfigDir, ".mcp.json"),
++    join(context.cwd, ".mcp.json"),
++    join(context.cwd, ".claude", ".mcp.json"),
++  ]
++    .map((path) => `${path}=${describeStat(path)}`)
++    .join(";");
+ }
+-- 
+2.55.0.windows.3
+

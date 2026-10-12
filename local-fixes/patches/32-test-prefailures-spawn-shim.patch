@@ -1,0 +1,159 @@
+From 2615ea8f0c319e8834289c70cb9dfef397ae66df Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 12 Oct 2026 23:09:21 +0300
+Subject: [PATCH] test(v2,shared): fix pre-existing failures - spawn shim,
+ audit allowlist, sqlite GC teardown, truncator env isolation
+
+- serve-http: route lsof port probe through the sanctioned Bun spawn shim
+  (fixes dist-bundle + adapter-runtime audits, raw Bun.spawn from 502a4f0fd)
+- prompt-async-route-audit: allowlist 3 pre-existing lane prompt routes
+- session-db.test: Bun.gc(true) before rm - bun:sqlite on Windows releases
+  the file handle only on GC, close() alone leaves opencode.db locked
+- dynamic-truncator tests: isolate ANTHROPIC_1M_CONTEXT/VERTEX_ env so a
+  polluted process env cannot flip explicit-false test expectations
+
+Monolithic proof: parent 44fe40175 = 8673p/7f, branch = 8679p/1f
+(remaining failure is an order-dependent artifact, passes 9/9 isolated)
+
+(cherry picked from commit f4b34d7be68cfa82e4750c41943ecf5f7221d873)
+---
+ .../shared/dynamic-truncator-behavior.test.ts | 21 +++++++++++++++++-
+ .../src/shared/dynamic-truncator.test.ts      |  2 ++
+ .../shared/prompt-async-route-audit.test.ts   | 12 ++++++++++
+ packages/omo-opencode/src/v2/serve-http.ts    | 22 +++++++++++++------
+ .../omo-opencode/src/v2/session-db.test.ts    |  8 ++++++-
+ 5 files changed, 56 insertions(+), 9 deletions(-)
+
+diff --git a/packages/omo-opencode/src/shared/dynamic-truncator-behavior.test.ts b/packages/omo-opencode/src/shared/dynamic-truncator-behavior.test.ts
+index 757cd6cb8..63de5fc22 100644
+--- a/packages/omo-opencode/src/shared/dynamic-truncator-behavior.test.ts
++++ b/packages/omo-opencode/src/shared/dynamic-truncator-behavior.test.ts
+@@ -1,6 +1,6 @@
+ /// <reference types="bun-types" />
+ 
+-import { describe, expect, it } from "bun:test"
++import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+ 
+ import {
+   createDynamicTruncator,
+@@ -8,6 +8,25 @@ import {
+   truncateToTokenLimit,
+ } from "./dynamic-truncator"
+ 
++// resolveActualContextLimit also honors the process-level 1M-context env vars;
++// scrub them per test so the explicit modelCacheState flag alone decides the limit.
++const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
++const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
++const originalAnthropicContextEnv = process.env[ANTHROPIC_CONTEXT_ENV_KEY]
++const originalVertexContextEnv = process.env[VERTEX_CONTEXT_ENV_KEY]
++
++beforeEach(() => {
++  delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
++  delete process.env[VERTEX_CONTEXT_ENV_KEY]
++})
++
++afterEach(() => {
++  if (originalAnthropicContextEnv === undefined) delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
++  else process.env[ANTHROPIC_CONTEXT_ENV_KEY] = originalAnthropicContextEnv
++  if (originalVertexContextEnv === undefined) delete process.env[VERTEX_CONTEXT_ENV_KEY]
++  else process.env[VERTEX_CONTEXT_ENV_KEY] = originalVertexContextEnv
++})
++
+ function createContextUsageMockContext(inputTokens: number) {
+   return {
+     client: {
+diff --git a/packages/omo-opencode/src/shared/dynamic-truncator.test.ts b/packages/omo-opencode/src/shared/dynamic-truncator.test.ts
+index aae20aed9..cdd2f6a82 100644
+--- a/packages/omo-opencode/src/shared/dynamic-truncator.test.ts
++++ b/packages/omo-opencode/src/shared/dynamic-truncator.test.ts
+@@ -152,6 +152,8 @@ describe("getContextWindowUsage", () => {
+ 
+       it("#then a follow-up call after invalidation retries fresh instead of being poisoned by the timeout", async () => {
+         // given
++        delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
++        delete process.env[VERTEX_CONTEXT_ENV_KEY]
+         _setContextWindowUsageFetchTimeoutMsForTesting(50)
+         let messagesCalls = 0
+         let shouldHang = true
+diff --git a/packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts b/packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts
+index 66ac12148..55b659b92 100644
+--- a/packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts
++++ b/packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts
+@@ -48,6 +48,18 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
+     path.join(SOURCE_ROOT, "plugin", "unstable-agent-babysitter.ts"),
+     "binds SDK Session.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
+   ],
++  [
++    path.join(SOURCE_ROOT, "plugin", "compaction-autocontinue-reroute.ts"),
++    "binds SDK Session.promptAsync into a narrow facade consumed only by the session-compacting auto-continue reissue, which must land as a pinned-model user turn immediately after compaction rather than through the internal-prompt queue the gate reserves",
++  ],
++  [
++    path.join(SOURCE_ROOT, "v2", "hook-bridge.ts"),
++    "OpenCode V2 host adapter: ctx.session.prompt is the v2 plugin-host session surface, not the v1 SDK client the shared gate wraps; dispatches the post-manual-compaction continue turn",
++  ],
++  [
++    path.join(SOURCE_ROOT, "v2", "project-config.ts"),
++    "OpenCode V2 host adapter: input.ctx.session.prompt executes v1 custom commands through the v2 plugin-host session API; the shared gate wraps only the v1 SDK client surface",
++  ],
+   [
+     path.join(WORKSPACE_ROOT, "packages", "senpi-task", "src", "runners", "in-process", "child-handle.ts"),
+     "drives a senpi CHILD AgentSession.prompt for spawned subagent turns; senpi-task cannot reach OpenCode session APIs (opencode-coupling audit) so the main-session injection invariant does not apply",
+diff --git a/packages/omo-opencode/src/v2/serve-http.ts b/packages/omo-opencode/src/v2/serve-http.ts
+index fd1f19af5..fb678ffbb 100644
+--- a/packages/omo-opencode/src/v2/serve-http.ts
++++ b/packages/omo-opencode/src/v2/serve-http.ts
+@@ -1,3 +1,4 @@
++import { spawn } from "../shared/bun-spawn-shim"
+ import { getServerBasicAuthHeader } from "../shared/opencode-server-auth"
+ 
+ export type SessionPage = {
+@@ -38,13 +39,20 @@ export async function resolveServeOrigin(input: {
+ }
+ 
+ export async function listenPortOf(pid = process.pid): Promise<number | undefined> {
+-  const proc = Bun.spawn(["lsof", "-nP", "-p", String(pid), "-iTCP", "-sTCP:LISTEN"], {
+-    stdout: "pipe",
+-    stderr: "ignore",
+-  })
+-  const text = await new Response(proc.stdout).text()
+-  const match = text.match(/:(\d+)\s+\(LISTEN\)/)
+-  return match ? Number(match[1]) : undefined
++  try {
++    const proc = spawn(["lsof", "-nP", "-p", String(pid), "-iTCP", "-sTCP:LISTEN"], {
++      stdout: "pipe",
++      stderr: "ignore",
++    })
++    // The node spawn path reports a missing binary through the exit channel;
++    // swallow it so an absent lsof (e.g. Windows) reads as "port unknown".
++    void proc.exited.catch(() => undefined)
++    const text = await new Response(proc.stdout).text()
++    const match = text.match(/:(\d+)\s+\(LISTEN\)/)
++    return match ? Number(match[1]) : undefined
++  } catch {
++    return undefined
++  }
+ }
+ 
+ async function getJson(url: string, fetchImpl: typeof fetch): Promise<unknown> {
+diff --git a/packages/omo-opencode/src/v2/session-db.test.ts b/packages/omo-opencode/src/v2/session-db.test.ts
+index 03176704d..e386c79b0 100644
+--- a/packages/omo-opencode/src/v2/session-db.test.ts
++++ b/packages/omo-opencode/src/v2/session-db.test.ts
+@@ -11,7 +11,13 @@ import { presentSession, sessionCatalog } from "./catalog"
+ const directories: string[] = []
+ 
+ afterEach(() => {
+-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
++  // bun:sqlite on Windows releases the file handle only when the closed Database
++  // is garbage-collected (verified: close() alone leaves opencode.db locked for
++  // seconds). Force GC, then rm with retries as belt-and-braces for EBUSY.
++  Bun.gc(true)
++  for (const directory of directories.splice(0)) {
++    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
++  }
+ })
+ 
+ describe("OpenCode V2 session catalog", () => {
+-- 
+2.55.0.windows.3
+

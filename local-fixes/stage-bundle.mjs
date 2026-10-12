@@ -3,6 +3,13 @@
  * Builds the plugin bundle BESIDE the checkout instead of into dist/.
  *
  *   bun local-fixes/stage-bundle.mjs
+ *   bun local-fixes/stage-bundle.mjs --target-checkout <dir>
+ *
+ * --target-checkout stages for ANOTHER checkout of this repository: the bundle and lane.json
+ * land beside that checkout and name its paths. Use it from a work clone, because no file
+ * inside the live checkout may be written while OpenChamber runs. The target has to be able
+ * to fast-forward to the commit being staged; activate-staged.ps1 there refuses the swap
+ * until it has.
  *
  * Why this exists
  * ---------------
@@ -19,16 +26,18 @@
 import { execFileSync, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = join(here, "..")
 const manifest = JSON.parse(readFileSync(join(here, "manifest.json"), "utf8"))
-const stagedRoot = join(repo, "..", `${basename(repo)}-staged`)
+const targetFlag = process.argv.indexOf("--target-checkout")
+const target = targetFlag > 0 ? resolve(process.argv[targetFlag + 1] ?? "") : resolve(repo)
+const stagedRoot = join(target, "..", `${basename(target)}-staged`)
 const stagedDist = join(stagedRoot, "dist")
 const staged = join(stagedDist, "index.js")
-const live = join(repo, manifest.build.artifact)
+const live = join(target, manifest.build.artifact)
 
 // Keep in step with the "index" node in script/build-nodes.ts; only --outdir differs.
 const INDEX_BUILD_ARGS = [
@@ -78,6 +87,20 @@ const dirty = execFileSync("git", ["status", "--porcelain"], { cwd: repo, encodi
 if (dirty.length > 0) fail(`working tree has uncommitted changes:\n${dirty.join("\n")}`)
 pass("working tree is clean")
 
+// 1b. Another checkout must be the same repository, behind this commit and nothing else.
+let targetHead = null
+if (resolve(target) !== resolve(repo)) {
+  try {
+    // --no-optional-locks: reading the target must not write its index.
+    targetHead = execFileSync("git", ["--no-optional-locks", "-C", target, "rev-parse", "HEAD"], { encoding: "utf8" }).trim()
+    git(["cat-file", "-e", `${targetHead}^{commit}`])
+    git(["merge-base", "--is-ancestor", targetHead, "HEAD"])
+  } catch {
+    fail(`${target} (at ${targetHead ?? "an unreadable commit"}) cannot fast-forward to this commit; fetch it here and rebase first`)
+  }
+  pass(`target checkout ${target} can fast-forward from ${targetHead.slice(0, 7)}`)
+}
+
 // 2. Bundle beside the checkout.
 mkdirSync(stagedDist, { recursive: true })
 const build = spawnSync("bun", INDEX_BUILD_ARGS, {
@@ -117,6 +140,9 @@ const lane = {
   commit: git(["rev-parse", "HEAD"]),
   branch,
   fixes: manifest.fixes.length,
+  fixIds: manifest.fixes.map((fix) => fix.id),
+  source: resolve(repo),
+  targetHeadAtBuild: targetHead,
   staged,
   stagedSha256: sha256(staged),
   live,
@@ -127,5 +153,7 @@ console.log(`staged ${lane.stagedSha256.slice(0, 12)} from ${lane.commit.slice(0
 console.log(
   lane.stagedSha256 === lane.liveSha256AtBuild
     ? "ACTIVE on disk: the live bundle already matches the staged one"
-    : "NOT ACTIVE: with OpenChamber fully closed, run  pwsh -NoProfile -File local-fixes\\activate-staged.ps1",
+    : targetHead && targetHead !== lane.commit
+      ? `NOT ACTIVE: with OpenChamber fully closed, in ${target}:  git fetch "${lane.source}" ${branch}  &&  git merge --ff-only ${lane.commit}  then  pwsh -NoProfile -File local-fixes\\activate-staged.ps1`
+      : "NOT ACTIVE: with OpenChamber fully closed, run  pwsh -NoProfile -File local-fixes\\activate-staged.ps1",
 )

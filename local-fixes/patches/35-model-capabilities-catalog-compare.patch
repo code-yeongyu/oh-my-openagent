@@ -1,0 +1,160 @@
+From 14ac6d49967e778e0bdaa0c90b1a1f5a0b7f5ce2 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Tue, 13 Oct 2026 01:36:25 +0300
+Subject: [PATCH] fix(v2): do not rewrite the model capabilities cache for an
+ unchanged catalog
+
+The write-if-changed check compared the whole serialized snapshot, and the snapshot carries a generatedAt stamped on every fetch, so the same catalog was never byte-identical and the multi-megabyte file was rewritten after every fetch anyway. The store can now be told which part of a value decides a rewrite; the capabilities cache excludes generatedAt.
+---
+ .../src/shared/json-file-cache-store.ts       | 14 +++-
+ .../src/shared/model-capabilities-cache.ts    |  3 +
+ ...pabilities-cache.unchanged-catalog.test.ts | 84 +++++++++++++++++++
+ 3 files changed, 100 insertions(+), 1 deletion(-)
+ create mode 100644 packages/omo-opencode/src/shared/model-capabilities-cache.unchanged-catalog.test.ts
+
+diff --git a/packages/omo-opencode/src/shared/json-file-cache-store.ts b/packages/omo-opencode/src/shared/json-file-cache-store.ts
+index 4e9529a5a..ffc605846 100644
+--- a/packages/omo-opencode/src/shared/json-file-cache-store.ts
++++ b/packages/omo-opencode/src/shared/json-file-cache-store.ts
+@@ -10,6 +10,11 @@ type JsonFileCacheStoreOptions<TValue> = {
+ 	cacheLabel: string
+ 	describe: (value: TValue) => Record<string, unknown>
+ 	serialize?: (value: TValue) => string
++	/**
++	 * The part of a value that decides whether writeIfChanged rewrites the file.
++	 * Lets a store ignore volatile fields such as a generation timestamp.
++	 */
++	comparable?: (value: TValue) => unknown
+ }
+ 
+ type JsonFileCacheStore<TValue> = {
+@@ -110,7 +115,14 @@ export function createJsonFileCacheStore<TValue>(
+ 		const serialized = options.serialize?.(value) ?? JSON.stringify(value, null, 2)
+ 
+ 		try {
+-			if (existsSync(cacheFile) && readFileSync(cacheFile, "utf-8") === serialized) {
++			const existing = existsSync(cacheFile) ? readFileSync(cacheFile, "utf-8") : undefined
++			const unchanged = existing !== undefined && (
++				existing === serialized ||
++				(options.comparable !== undefined &&
++					JSON.stringify(options.comparable(JSON.parse(existing) as TValue)) ===
++						JSON.stringify(options.comparable(value)))
++			)
++			if (unchanged) {
+ 				memoryValue = value
+ 				writtenInCurrentProcess = true
+ 				log(
+diff --git a/packages/omo-opencode/src/shared/model-capabilities-cache.ts b/packages/omo-opencode/src/shared/model-capabilities-cache.ts
+index 6fef261c6..d2ccbb351 100644
+--- a/packages/omo-opencode/src/shared/model-capabilities-cache.ts
++++ b/packages/omo-opencode/src/shared/model-capabilities-cache.ts
+@@ -28,6 +28,8 @@ export function createModelCapabilitiesCacheStore(
+       generatedAt: snapshot.generatedAt,
+     }),
+     serialize: (snapshot) => `${JSON.stringify(snapshot, null, 2)}\n`,
++    // generatedAt is stamped on every fetch; only the catalog itself decides a rewrite.
++    comparable: ({ generatedAt: _generatedAt, ...catalog }) => catalog,
+   })
+ 
+   function readModelCapabilitiesCache(): ModelCapabilitiesSnapshot | null {
+@@ -51,6 +53,7 @@ export function createModelCapabilitiesCacheStore(
+     // F5b): the startup check used to rewrite this multi-megabyte,
+     // 3,823-model cache on every plugin instance (~0.85s per rewrite, 79
+     // rewrites in 26h) even when the models.dev catalog had not changed.
++    // The comparison ignores generatedAt, which differs on every fetch.
+     snapshotCacheStore.writeIfChanged(snapshot)
+     return snapshot
+   }
+diff --git a/packages/omo-opencode/src/shared/model-capabilities-cache.unchanged-catalog.test.ts b/packages/omo-opencode/src/shared/model-capabilities-cache.unchanged-catalog.test.ts
+new file mode 100644
+index 000000000..e0fe489e9
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/model-capabilities-cache.unchanged-catalog.test.ts
+@@ -0,0 +1,84 @@
++/// <reference types="bun-types" />
++
++import { afterEach, beforeEach, describe, expect, test } from "bun:test"
++import { mkdtempSync, readFileSync, rmSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++import { createJsonFileCacheStore } from "./json-file-cache-store"
++import { createModelCapabilitiesCacheStore } from "./model-capabilities-cache"
++
++// Local fix 31 (cross-review A M5): fix 27 compared the whole serialized
++// snapshot, whose generatedAt changes on every fetch, so an unchanged catalog
++// was still rewritten.
++
++const catalog = (limit: number) => ({
++  provider: { models: { "model-a": { id: "model-a", reasoning: true, limit: { context: limit } } } },
++})
++const respond = (body: unknown) => async () => new Response(JSON.stringify(body), { status: 200 })
++
++describe("model capabilities cache with an unchanged catalog", () => {
++  let cacheDir: string
++
++  beforeEach(() => {
++    cacheDir = mkdtempSync(join(tmpdir(), "omo-caps-"))
++  })
++
++  afterEach(() => {
++    rmSync(cacheDir, { recursive: true, force: true })
++  })
++
++  test("a second fetch of the same catalog does not rewrite the cache file", async () => {
++    const file = join(cacheDir, "model-capabilities.json")
++    const first = await createModelCapabilitiesCacheStore(() => cacheDir).refreshModelCapabilitiesCache({
++      fetchImpl: respond(catalog(1000)),
++    })
++    const written = readFileSync(file, "utf8")
++    expect(JSON.parse(written).generatedAt).toBe(first.generatedAt)
++
++    await new Promise((resolve) => setTimeout(resolve, 15))
++    // A new store stands for another plugin instance or the next process.
++    const store = createModelCapabilitiesCacheStore(() => cacheDir)
++    const second = await store.refreshModelCapabilitiesCache({ fetchImpl: respond(catalog(1000)) })
++    expect(second.generatedAt).not.toBe(first.generatedAt)
++    expect(second.models).toEqual(first.models)
++    expect(readFileSync(file, "utf8")).toBe(written)
++    expect(store.readModelCapabilitiesCache()?.models).toEqual(first.models)
++
++    await store.refreshModelCapabilitiesCache({ fetchImpl: respond(catalog(2000)) })
++    const rewritten = readFileSync(file, "utf8")
++    expect(rewritten).not.toBe(written)
++    expect(JSON.parse(rewritten).models["model-a"].limit.context).toBe(2000)
++  })
++
++  test("writeIfChanged without a comparable still compares the whole serialized value", () => {
++    const store = createJsonFileCacheStore<{ stamp: number; value: string }>({
++      getCacheDir: () => cacheDir,
++      filename: "plain.json",
++      logPrefix: "test",
++      cacheLabel: "Cache",
++      describe: () => ({}),
++    })
++    expect(store.writeIfChanged({ stamp: 1, value: "same" })).toBe(true)
++    expect(store.writeIfChanged({ stamp: 1, value: "same" })).toBe(false)
++    expect(store.writeIfChanged({ stamp: 2, value: "same" })).toBe(true)
++  })
++
++  test("writeIfChanged with a comparable ignores the excluded field and survives a corrupt file", () => {
++    const store = createJsonFileCacheStore<{ stamp: number; value: string }>({
++      getCacheDir: () => cacheDir,
++      filename: "comparable.json",
++      logPrefix: "test",
++      cacheLabel: "Cache",
++      describe: () => ({}),
++      comparable: ({ stamp: _stamp, ...rest }) => rest,
++    })
++    expect(store.writeIfChanged({ stamp: 1, value: "same" })).toBe(true)
++    expect(store.writeIfChanged({ stamp: 2, value: "same" })).toBe(false)
++    expect(JSON.parse(readFileSync(join(cacheDir, "comparable.json"), "utf8")).stamp).toBe(1)
++    expect(store.writeIfChanged({ stamp: 3, value: "changed" })).toBe(true)
++
++    require("node:fs").writeFileSync(join(cacheDir, "comparable.json"), "{ not json")
++    expect(store.writeIfChanged({ stamp: 4, value: "changed" })).toBe(true)
++    expect(JSON.parse(readFileSync(join(cacheDir, "comparable.json"), "utf8")).stamp).toBe(4)
++  })
++})
+-- 
+2.55.0.windows.3
+

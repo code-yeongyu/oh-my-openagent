@@ -16,11 +16,19 @@
  * This is the cheap pre-flight: no build, no writes, ~1s. Run it before trusting
  * a bundle, and after any checkout, pull, or release.
  *
+ * What it proves: the bundle carries every ledger marker, the source would
+ * reproduce them, and (when a staging record exists) the bundle is the one
+ * staged from the checked-out commit. What it does NOT prove: that a fix
+ * behaves correctly. Markers are strings; behavior is covered by the test
+ * suites named in the fix reports. Never use this exit code as the only
+ * activation gate.
+ *
  * Exit codes: 0 = bundle is trustworthy, 1 = do not trust this bundle.
  */
 import { execFileSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { existsSync, readFileSync, statSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -84,6 +92,41 @@ if (!existsSync(bundlePath)) {
   }
 }
 
+// ── 2b. Is this bundle the one staged from the checked-out commit? ───────────
+// Markers cannot tell a bundle built here from one built elsewhere with extra
+// fixes: a bundle whose source is not checked out loses them on the next rebuild.
+// A bundle given on the command line is checked against the record beside it.
+const stagedRoot = bundleOverride ? dirname(dirname(resolve(bundleOverride))) : join(repo, "..", `${basename(repo)}-staged`)
+const lanePath = join(stagedRoot, "lane.json")
+const stagedBundlePath = join(stagedRoot, "dist", "index.js")
+const samePath = (a, b) => typeof a === "string" && typeof b === "string" && resolve(a).toLowerCase() === resolve(b).toLowerCase()
+if (existsSync(bundlePath) && existsSync(lanePath)) {
+  let lane = null
+  try {
+    lane = JSON.parse(readFileSync(lanePath, "utf8"))
+  } catch {
+    bad(`${lanePath} is not readable JSON. Fix: bun run fixes:apply`)
+  }
+  if (lane) {
+    const bundleSha = createHash("sha256").update(readFileSync(bundlePath)).digest("hex")
+    const head = tryGit(["rev-parse", "HEAD"])
+    const checkingStaged = samePath(bundlePath, stagedBundlePath)
+    if (checkingStaged || bundleSha === lane.stagedSha256) {
+      if (bundleSha !== lane.stagedSha256) bad(`staged bundle is ${bundleSha.slice(0, 12)} but lane.json records ${String(lane.stagedSha256).slice(0, 12)}. Fix: stage it again`)
+      else if (!samePath(lane.staged, stagedBundlePath)) bad(`lane.json names another staged bundle (${lane.staged}); it was staged for a different checkout. Fix: bun local-fixes/stage-bundle.mjs --target-checkout "${repo}" from the clone that built it`)
+      else if (lane.commit !== head) bad(`the bundle was built from ${String(lane.commit).slice(0, 7)} but this checkout is at ${head.slice(0, 7)}; a rebuild here would not reproduce it.\n        Fix (OpenChamber closed): git fetch "${lane.source ?? "<the clone that staged it>"}" ${lane.branch}  &&  git merge --ff-only ${lane.commit}`)
+      else if (lane.fixes !== manifest.fixes.length) bad(`lane.json records ${lane.fixes} fixes, the manifest has ${manifest.fixes.length}. Fix: bun run fixes:apply`)
+      else ok(`bundle ${bundleSha.slice(0, 12)} is the build staged from the checked-out commit ${head.slice(0, 7)} (${lane.fixes} fixes)`)
+    } else if (bundleOverride) {
+      ok(`no staging record covers ${bundleOverride}; provenance not checked`)
+    } else {
+      ok(`live bundle ${bundleSha.slice(0, 12)} is not the staged build ${String(lane.stagedSha256).slice(0, 12)} (staged, not active)`)
+    }
+  }
+} else if (existsSync(bundlePath)) {
+  ok("no staging record beside this checkout; provenance not checked")
+}
+
 // ── 3. Would a rebuild keep them? (source carries the markers) ───────────────
 let srcMissing = 0
 for (const fix of manifest.fixes) {
@@ -140,6 +183,7 @@ if (notInHistory.length === 0) {
   )
 }
 
+if (failures === 0) console.log("\n  note  markers and provenance only: behavior is proven by the test suites, not by this check")
 console.log(
   failures === 0
     ? "\nBundle is trustworthy. Safe to use.\n"
