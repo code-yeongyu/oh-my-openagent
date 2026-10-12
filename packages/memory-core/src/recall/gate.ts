@@ -46,6 +46,8 @@ const TMP_PREFIX_PATTERN = /\.tmp-/
 export interface RecallNudge {
   readonly path: string
   readonly hint: string
+  /** Where the agent can open the note when that differs from `path` (a project-scoped note, #10044). */
+  readonly source?: string
 }
 
 export interface PendingNudgesFile {

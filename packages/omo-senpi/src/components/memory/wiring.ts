@@ -14,6 +14,7 @@ import { createMemoryNoticeWiring } from "./memory-notice-wiring"
 import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
 import { createPressureDreamAdmission } from "./pressure-dream-admission"
 import { createMemoryRecallWiring } from "./recall-wiring"
+import { createProjectMemoryScope } from "./project-memory-nudge"
 import { branchEntryCount, sessionIdFrom } from "./wiring-context"
 import { createMemoryUserActivity } from "./user-activity"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
@@ -74,11 +75,20 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // One corpus cache for both: the sidecar's read-only memory tool reads the corpus the candidates came from.
   const corpusCache = new RecallCorpusCache()
 
+  const projectScope = createProjectMemoryScope({
+    resolveContext,
+    switches: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory).project_scope,
+    fallbackCwd: options.cwd,
+    env: options.env,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+
   const recallWiring = createMemoryRecallWiring({
     resolveContext,
     resolveSettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
     env: options.env,
     corpusCache,
+    projectCorpora: projectScope.recallCorpora,
     drainQueued: (sessionId, context) => deliveryRef.current?.drainForPrompt(sessionId, context) ?? [],
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
@@ -150,12 +160,14 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         resolveContext: (sessionId) => userActivity.hasInput(sessionId) ? resolveContext(sessionId) : undefined,
         recall: recallWiring,
         corpusCache,
+        projectScope,
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
         sendMessage: (message, sendOptions) => pi.sendMessage(message, sendOptions),
         appendEntry: (customType, data) => pi.appendEntry?.(customType, data),
         ...(options.kibitzerChildStarter === undefined ? {} : { childStarter: options.kibitzerChildStarter }),
         ...(options.logger === undefined ? {} : { logger: options.logger }),
       })
+      projectScope.register(pi)
       kibitzerRef.current = kibitzer
       deliveryRef.current = kibitzer.delivery
       registerMemoryStatic({

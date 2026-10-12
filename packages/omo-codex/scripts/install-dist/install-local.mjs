@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:d4760953e82ff7182c54f5a9435f29e953cae69458faac5a49841a618a72e8b0:998a0bc6d14bfc3b7214691f5912e7abb192ca92c553e844b7a5dc5d9e57b084
+// omo-codex-install:bfb8e7e6a22c8cf7311b7aa036e5e0317569d07e5b96c543df559469a5e82c32:3b9a751df61769040b0350aeb0cee75dd48808edbb6eff222e850de985a0152e
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19463,6 +19463,14 @@ var OmoMemoryRecallSchema = object({
   tool_budget: number2().int().positive().default(8),
   query_expansion: boolean2().default(false)
 }).strict();
+var OmoMemoryProjectScopeSchema = object({
+  nudge: boolean2().default(true),
+  recall: boolean2().default(true)
+}).strict();
+var OmoMemoryProjectScopeLayerSchema = object({
+  nudge: boolean2().optional(),
+  recall: boolean2().optional()
+}).strict();
 var OmoMemoryNudgeSchema = object({
   enabled: boolean2().default(true),
   every_user_turns: number2().int().min(1).default(10)
@@ -19578,9 +19586,11 @@ var OmoMemoryAgentOverridesSchema = object({
   projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
+var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
 var OmoMemorySettingsSchema = object({
   enabled: boolean2().default(true),
   agent: string2().min(1).default("auto"),
+  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
   reflection: OmoMemoryReflectionSchema.default({
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -19614,6 +19624,7 @@ var OmoMemorySettingsSchema = object({
     tool_budget: 8,
     query_expansion: false
   }),
+  project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
@@ -19621,6 +19632,7 @@ var OmoMemorySettingsSchema = object({
 var OmoMemorySettingsLayerSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
+  auto_identity: OmoMemoryAutoIdentitySchema.optional(),
   reflection: OmoMemoryReflectionLayerSchema.optional(),
   nudge: OmoMemoryNudgeLayerSchema.optional(),
   facts: OmoMemoryFactsLayerSchema.optional(),
@@ -19631,6 +19643,7 @@ var OmoMemorySettingsLayerSchema = object({
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
+  project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()

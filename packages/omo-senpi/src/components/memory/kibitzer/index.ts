@@ -23,6 +23,7 @@ import type { ComponentLogger, SenpiExtensionAPI } from "../../../extension/type
 import { resolveAgentHome } from "../../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../../config-resolution"
 import type { MemoryIdentityContext } from "../context"
+import type { ProjectMemoryScope } from "../project-memory-nudge"
 import { resolveMemoryModelRegistry } from "../model-registry-resolver"
 import { toolArgTexts, ToolArgWindow } from "../recall-query-planner-tools"
 import type { RecallSessionSnapshot } from "../recall-session-read"
@@ -52,6 +53,8 @@ export interface KibitzerCompositionOptions {
   readonly recall: Pick<MemoryRecallWiring, "snapshotSession" | "collectCandidatesFromSnapshot">
   /** Shared with recall so the sidecar's `memory` tool reads the corpus the candidates came from. */
   readonly corpusCache?: RecallCorpusCache
+  /** The child projects a session touched (#10044): their notes join the sidecar's memory tool, their nudges name a readable path. */
+  readonly projectScope?: Pick<ProjectMemoryScope, "recallCorpora" | "sourceFor">
   readonly coordinator?: IdleInjectionCoordinator
   readonly sendMessage: KibitzerDeliveryOptions["sendMessage"]
   readonly appendEntry: (customType: string, data?: unknown) => void
@@ -109,6 +112,7 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
     sendMessage: options.sendMessage,
     appendEntry: options.appendEntry,
     ...(options.coordinator === undefined ? {} : { coordinator: options.coordinator }),
+    ...(options.projectScope === undefined ? {} : { resolveSource: options.projectScope.sourceFor }),
     ...(logger === undefined ? {} : { logger }),
   })
 
@@ -157,7 +161,12 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
       createTools: (binding) => createKibitzerSidecarTools({
         workspaceRoot: cwd,
         session: { entries: () => captured.branch },
-        memory: { repo, cache: corpusCache, queryExpansion: settings.queryExpansion },
+        memory: {
+          repo,
+          cache: corpusCache,
+          queryExpansion: settings.queryExpansion,
+          ...(options.projectScope === undefined ? {} : { projectCorpora: () => options.projectScope?.recallCorpora(sessionId) ?? Promise.resolve([]) }),
+        },
         nudge: binding.nudge,
         budget: binding.budget,
       }),

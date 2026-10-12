@@ -1595,6 +1595,14 @@
           "type": "string",
           "minLength": 1
         },
+        "auto_identity": {
+          "default": "path",
+          "type": "string",
+          "enum": [
+            "path",
+            "git"
+          ]
+        },
         "reflection": {
           "default": {
             "enabled": true,
@@ -1926,6 +1934,24 @@
             },
             "query_expansion": {
               "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "project_scope": {
+          "default": {
+            "nudge": true,
+            "recall": true
+          },
+          "type": "object",
+          "properties": {
+            "nudge": {
+              "default": true,
+              "type": "boolean"
+            },
+            "recall": {
+              "default": true,
               "type": "boolean"
             }
           },
@@ -3947,6 +3973,13 @@
               "type": "string",
               "minLength": 1
             },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
+            },
             "reflection": {
               "type": "object",
               "properties": {
@@ -4174,6 +4207,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -6163,6 +6208,13 @@
               "type": "string",
               "minLength": 1
             },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
+            },
             "reflection": {
               "type": "object",
               "properties": {
@@ -6390,6 +6442,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -8379,6 +8443,13 @@
               "type": "string",
               "minLength": 1
             },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
+            },
             "reflection": {
               "type": "object",
               "properties": {
@@ -8606,6 +8677,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -10593,6 +10676,13 @@
                 "type": "string",
                 "minLength": 1
               },
+              "auto_identity": {
+                "type": "string",
+                "enum": [
+                  "path",
+                  "git"
+                ]
+              },
               "reflection": {
                 "type": "object",
                 "properties": {
@@ -10820,6 +10910,18 @@
                     "maximum": 9007199254740991
                   },
                   "query_expansion": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "project_scope": {
+                "type": "object",
+                "properties": {
+                  "nudge": {
+                    "type": "boolean"
+                  },
+                  "recall": {
                     "type": "boolean"
                   }
                 },
@@ -12809,6 +12911,13 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
+                  },
                   "reflection": {
                     "type": "object",
                     "properties": {
@@ -13036,6 +13145,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -15025,6 +15146,13 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
+                  },
                   "reflection": {
                     "type": "object",
                     "properties": {
@@ -15252,6 +15380,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -17241,6 +17381,13 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
+                  },
                   "reflection": {
                     "type": "object",
                     "properties": {
@@ -17468,6 +17615,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
