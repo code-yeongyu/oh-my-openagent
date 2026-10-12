@@ -165,6 +165,16 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.log("[oh-my-openagent] ENTRY - plugin loading", {
       directory: input.directory,
     })
+    // Per-phase setup timing (local fix 29, first-message-drop F16): makes the
+    // cold-start cost of every setup segment attributable in oh-my-opencode.log.
+    const setupTimings: Record<string, number> = {};
+    const setupStartedAt = Date.now();
+    let setupPhaseStartedAt = Date.now();
+    const markSetupPhase = (name: string): void => {
+      const now = Date.now();
+      setupTimings[name] = now - setupPhaseStartedAt;
+      setupPhaseStartedAt = now;
+    };
     deps.logLegacyPluginStartupWarning()
     deps.migrateLegacyWorkspaceDirectory(input.directory)
     startupMigration ??= deps.runOpenCodeStartupMigration({ cwd: input.directory })
@@ -185,6 +195,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       migratedFrom: startupMigration.migratedFrom,
       skippedConflictCount: startupMigration.skippedConflictCount,
     })
+    markSetupPhase("startupMigrationAndValidation");
     if (toast !== undefined) showStartupToast(input.client, toast, deps.log)
 
     // Unconditional omo process hygiene (T16): fire-and-forget family sweep,
@@ -286,6 +297,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
     const modelCacheState = deps.createModelCacheState()
 
+    markSetupPhase("pluginInit");
     const managers = deps.createManagers({
       ctx: input,
       pluginConfig,
@@ -295,12 +307,14 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       runtimeSkillSourceUrl: runtimeSkillSource?.url,
     })
 
+    markSetupPhase("managers");
     const toolsResult = await deps.createTools({
       ctx: input,
       pluginConfig,
       managers,
     })
 
+    markSetupPhase("tools");
     const hooks = deps.createHooks({
       ctx: input,
       pluginConfig,
@@ -314,6 +328,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       availableSkills: toolsResult.availableSkills,
     })
 
+    markSetupPhase("hooks");
     const pluginInterface = deps.createPluginInterface({
       ctx: input,
       pluginConfig,
@@ -345,6 +360,13 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
         await dispose()
       },
     }
+
+    markSetupPhase("interface");
+    setupTimings.total = Date.now() - setupStartedAt;
+    deps.log("[oh-my-openagent] setup phase timing", {
+      directory: input.directory,
+      ...setupTimings,
+    });
 
     return pluginHooks
   }

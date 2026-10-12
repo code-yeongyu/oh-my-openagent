@@ -104,6 +104,48 @@ describe("plugin init performance", () => {
     expect(metrics.medianMs).toBeLessThan(500)
   })
 
+  it("cross-folder: a new empty chat folder reuses the process cache (local fix 28)", async () => {
+    // The OpenChamber pattern: every new chat is a new empty folder, and
+    // folder release/eviction rebuilds instances. The second folder's init
+    // must hit the process-level config cache instead of re-paying the cold
+    // plugin-components/agents/commands cost.
+    const rootDirectory = mkdtempSync(join(tmpdir(), "perf-d09-xfolder-"))
+    const configDirectory = join(rootDirectory, "opencode-config")
+    const folderA = join(rootDirectory, "chat-a")
+    const folderB = join(rootDirectory, "chat-b")
+    const previousConfigDirectory = process.env.OPENCODE_CONFIG_DIR
+
+    mkdirSync(configDirectory, { recursive: true })
+    mkdirSync(folderA, { recursive: true })
+    mkdirSync(folderB, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = configDirectory
+
+    try {
+      const pluginModule = await importFreshPluginModule()
+      const startA = performance.now()
+      await pluginModule(createPluginInput(folderA), {})
+      const firstFolderMs = performance.now() - startA
+
+      const startB = performance.now()
+      await pluginModule(createPluginInput(folderB), {})
+      const secondFolderMs = performance.now() - startB
+
+      console.info(
+        `cross-folder: first-folder=${firstFolderMs.toFixed(1)}ms second-folder=${secondFolderMs.toFixed(1)}ms`,
+      )
+
+      // The second folder must not be slower than a same-folder warm rebuild.
+      expect(secondFolderMs).toBeLessThan(500)
+    } finally {
+      if (previousConfigDirectory === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = previousConfigDirectory
+      }
+      rmSync(rootDirectory, { recursive: true, force: true })
+    }
+  })
+
   it("stays within the in-tree fixture init budget", async () => {
     // given
     const fixtureDirectory = new URL("./fixtures/in-tree/", import.meta.url)
