@@ -4,8 +4,10 @@ import { createBuiltinMcps } from "../mcp";
 import type { PluginComponents } from "./plugin-components-loader";
 import { log } from "../shared";
 import {
+  digestEnvironment,
   fingerprintClaudeMcpSources,
   getProcessConfigCacheEntry,
+  resolveClaudeMcpLoaderContext,
   setProcessConfigCacheEntry,
 } from "../shared/process-config-cache";
 
@@ -31,19 +33,35 @@ function captureUserDisabledMcps(
 }
 
 /**
- * Claude Code MCP configs are directory-independent (they come from
- * ~/.claude.json and ~/.claude settings), so the loaded server set is cached
- * per process (local fix 28, first-message-drop F5c) and invalidated by a
- * fingerprint of those files. Builtin MCPs embed the folder cwd and are still
+ * Everything loadMcpConfigs() reads when called without options (local fix
+ * 31): the loader context (process cwd, home, Claude config directory), the
+ * four files it loads from those (~/.claude.json, <claude config>/.mcp.json,
+ * <cwd>/.mcp.json, <cwd>/.claude/.mcp.json), the env-expansion allowlist and
+ * the environment the transformer expands variables from.
+ */
+export function buildClaudeMcpCacheKey(disabledMcps: ReadonlyArray<string>, envAllowlist: ReadonlyArray<string>): string {
+  const context = resolveClaudeMcpLoaderContext();
+  return JSON.stringify({
+    disabledMcps,
+    context,
+    sources: fingerprintClaudeMcpSources(context),
+    envAllowlist: [...envAllowlist].sort(),
+    environment: digestEnvironment(),
+  });
+}
+
+/**
+ * The Claude Code MCP server set does not depend on the plugin instance's
+ * folder (the loader resolves project files against the process cwd), so it is
+ * cached per process (local fix 28, first-message-drop F5c) under a key that
+ * covers all of its inputs. Builtin MCPs embed the folder cwd and are still
  * rebuilt per folder.
  */
 async function loadCachedMcpConfigs(
   disabledMcps: string[],
+  envAllowlist: ReadonlyArray<string>,
 ): Promise<{ servers: Record<string, unknown> }> {
-  const cacheKey = JSON.stringify({
-    disabledMcps,
-    sources: fingerprintClaudeMcpSources(),
-  });
+  const cacheKey = buildClaudeMcpCacheKey(disabledMcps, envAllowlist);
   const cached = getProcessConfigCacheEntry("claudeMcpServers");
   if (cached && cached.key === cacheKey) {
     log("[mcp-config] reusing cached Claude Code MCP configs (process-level)");
@@ -65,7 +83,7 @@ export async function applyMcpConfig(params: {
   const userDisabledMcps = captureUserDisabledMcps(userMcp);
 
   const mcpResult = params.pluginConfig.claude_code?.mcp ?? true
-    ? await loadCachedMcpConfigs(disabledMcps)
+    ? await loadCachedMcpConfigs(disabledMcps, params.pluginConfig.mcp_env_allowlist ?? [])
     : { servers: {} };
 
   if (userMcp) {

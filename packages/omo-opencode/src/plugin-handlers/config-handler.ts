@@ -5,9 +5,15 @@ import { applyOpenGatewayProviderConfig } from "../features/opengateway-provider
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
 import {
+  type FingerprintMemo,
+  fingerprintAncestorSources,
+  fingerprintFileReferences,
+  fingerprintGlobalSources,
   fingerprintProjectSources,
   getProcessAgentSnapshotMap,
   getProcessConfigCacheEntry,
+  rememberAgentSnapshot,
+  stableDigest,
 } from "../shared/process-config-cache";
 import { AGENT_DISPLAY_NAMES, getAgentListDisplayName } from "../shared/agent-display-names";
 import { applyAgentConfig } from "./agent-config-handler";
@@ -82,19 +88,44 @@ function createAgentConfigCacheKey(config: Record<string, unknown>): string {
 
 /**
  * Cross-folder agent-config snapshot key (local fix 28, first-message-drop
- * F5c). The snapshot used to live in the per-instance closure, so every folder
- * rebuild re-ran applyAgentConfig (the largest identified cold-start owner:
- * 11.7s of a 17.7s cold plugin setup). The process-level map keys snapshots by
- * the OpenCode config slice PLUS a fingerprint of the folder's project-level
- * sources. Folders with none of those sources (every OpenChamber chat folder
- * is an empty directory) share one snapshot; folders with project content are
- * keyed per directory so their agents never leak into other folders.
+ * F5c; made complete by local fix 31). The snapshot used to live in the
+ * per-instance closure, so every folder rebuild re-ran applyAgentConfig (the
+ * largest identified cold-start owner: 11.7s of a 17.7s cold plugin setup).
+ *
+ * The key covers every input applyAgentConfig reads: the OpenCode config
+ * slice, the effective OMO config, the loaded plugin components, the user-level
+ * source directories, the folder's own project sources, the sources its
+ * ancestors contribute, and the targets of file:// prompt references. Folders
+ * for which all of that is identical (sibling OpenChamber chat folders are
+ * empty directories under one parent) share a snapshot; anything else gets its
+ * own. Returns undefined when a source tree is too large to fingerprint: such
+ * a folder is never served from the process cache.
  */
-function createProcessAgentSnapshotKey(
-  agentCacheKey: string,
-  directory: string,
-): string {
-  return `${agentCacheKey}::${fingerprintProjectSources(directory)}`
+function createEffectiveAgentSnapshotKey(params: {
+  agentCacheKey: string;
+  directory: string;
+  pluginConfig: OhMyOpenCodeConfig;
+  pluginComponents: { agents: unknown; plugins: unknown };
+  globalSourcesFingerprint: string | undefined;
+  memo: FingerprintMemo;
+}): string | undefined {
+  if (params.globalSourcesFingerprint === undefined) return undefined
+  const project = fingerprintProjectSources(params.directory, params.memo)
+  if (project === undefined) return undefined
+  const ancestors = fingerprintAncestorSources(params.directory, params.memo)
+  if (ancestors === undefined) return undefined
+  const fileReferences = fingerprintFileReferences(params.pluginConfig, params.directory)
+  return JSON.stringify({
+    config: params.agentCacheKey,
+    pluginConfig: stableDigest(params.pluginConfig),
+    components: stableDigest({ agents: params.pluginComponents.agents, plugins: params.pluginComponents.plugins }),
+    global: params.globalSourcesFingerprint,
+    project,
+    ancestors,
+    fileReferences: fileReferences.signature,
+    // A file:// prompt is resolved and path-checked against the folder.
+    directory: fileReferences.count > 0 ? params.directory : undefined,
+  })
 }
 
 function attachHiddenConfigKeyAliases(
@@ -204,16 +235,30 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     await timePhase("hooks", () => applyHookConfig({ pluginComponents }));
 
+    const fingerprintMemo: FingerprintMemo = new Map();
+    const globalSourcesFingerprint = fingerprintGlobalSources(fingerprintMemo);
     const agentCacheKey = createAgentConfigCacheKey(config);
     let agentResult: Record<string, unknown>;
     const processAgentSnapshots = getProcessAgentSnapshotMap();
-    const processSnapshotKey = pluginComponentsLoadFailed
+    // One key for the per-handler and the process snapshot, so a changed source
+    // is never masked by a same-config hit. A source tree too large to
+    // fingerprint keeps the upstream per-handler, config-only snapshot and is
+    // never shared across handlers.
+    const effectiveSnapshotKey = pluginComponentsLoadFailed
       ? undefined
-      : createProcessAgentSnapshotKey(agentCacheKey, ctx.directory);
-    const processSnapshot = processSnapshotKey
-      ? (processAgentSnapshots.get(processSnapshotKey) as AgentConfigSnapshot | undefined)
+      : createEffectiveAgentSnapshotKey({
+          agentCacheKey,
+          directory: ctx.directory,
+          pluginConfig,
+          pluginComponents,
+          globalSourcesFingerprint,
+          memo: fingerprintMemo,
+        });
+    const closureKey = effectiveSnapshotKey ?? agentCacheKey;
+    const processSnapshot = effectiveSnapshotKey
+      ? (processAgentSnapshots.get(effectiveSnapshotKey) as AgentConfigSnapshot | undefined)
       : undefined;
-    const closureSnapshot = agentConfigSnapshot?.cacheKey === agentCacheKey
+    const closureSnapshot = agentConfigSnapshot?.cacheKey === closureKey
       ? agentConfigSnapshot
       : undefined;
     const snapshot = closureSnapshot ?? processSnapshot;
@@ -244,13 +289,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       agentConfigSnapshot = pluginComponentsLoadFailed
         ? undefined
         : {
-            cacheKey: agentCacheKey,
+            cacheKey: closureKey,
             configuredDefaultAgent,
             defaultAgent: config.default_agent,
             agents: cloneAgentConfig(agentResult),
           };
-      if (processSnapshotKey && agentConfigSnapshot) {
-        processAgentSnapshots.set(processSnapshotKey, agentConfigSnapshot);
+      if (effectiveSnapshotKey && agentConfigSnapshot) {
+        rememberAgentSnapshot(processAgentSnapshots, effectiveSnapshotKey, agentConfigSnapshot);
       }
     }
 
@@ -262,7 +307,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       applyMcpConfig({ config, pluginConfig, ctx, pluginComponents }),
     );
     await timePhase("commands", () =>
-      applyCommandConfig({ config, pluginConfig, ctx, pluginComponents }),
+      applyCommandConfig({
+        config,
+        pluginConfig,
+        ctx,
+        pluginComponents,
+        globalSources: { fingerprint: globalSourcesFingerprint },
+      }),
     );
     if (runtimeSkillSourceUrl) {
       await timePhase("runtimeSkills", () =>

@@ -50,8 +50,8 @@ describe("process-config-cache", () => {
     const fingerprintB = fingerprintProjectSources(folderB)
 
     // same content, different directory -> different keys (per-folder isolation)
-    expect(fingerprintA.startsWith("dir:")).toBe(true)
-    expect(fingerprintB.startsWith("dir:")).toBe(true)
+    expect(fingerprintA?.startsWith("dir:")).toBe(true)
+    expect(fingerprintB?.startsWith("dir:")).toBe(true)
     expect(fingerprintA).not.toBe(fingerprintB)
   })
 
@@ -70,12 +70,6 @@ describe("process-config-cache", () => {
     rmSync(join(folder, ".claude", "agents"), { recursive: true, force: true })
     expect(fingerprintProjectSources(folder)).not.toBe(afterAdd)
   })
-
-  // Known limitation (documented in the fix report): an in-place edit of a
-  // file inside an existing project source directory does not change the
-  // directory stat or listing, so it does not invalidate the snapshot; the
-  // OpenCode config key, a config.updated cycle, a process restart, or
-  // OMO_DISABLE_PROCESS_CONFIG_CACHE=1 remain the invalidation paths.
 
   test("entries round-trip and reset clears them", () => {
     setProcessConfigCacheEntry("pluginComponents", { key: "k1", value: { hello: 1 } })

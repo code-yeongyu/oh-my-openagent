@@ -35,6 +35,7 @@ import { adaptHostSkillConfig } from "../shared/host-skill-config";
 import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import type { LoadedSkill } from "../features/opencode-skill-loader/types";
 import {
+  fingerprintGlobalSources,
   getProcessConfigCacheEntry,
   setProcessConfigCacheEntry,
 } from "../shared/process-config-cache";
@@ -45,6 +46,10 @@ import {
  * skills and OpenCode global commands/skills are identical for every folder,
  * but they used to be re-loaded from disk on every folder rebuild. Project
  * sources stay per-folder.
+ *
+ * The entry is keyed by the config flags, the registered agent names and a
+ * content fingerprint of the user-level source directories (local fix 31), so
+ * adding, removing or editing a user command or skill reloads them.
  */
 type GlobalCommandSources = {
   builtinSkillCommands: Record<string, unknown>;
@@ -67,8 +72,12 @@ function buildGlobalCommandSourcesCacheKey(params: {
   disabledSkills: ReadonlySet<string>;
   includeClaudeCommands: boolean;
   includeClaudeSkills: boolean;
+  agentNames: ReadonlyArray<string>;
+  sourcesFingerprint: string;
 }): string {
   return JSON.stringify({
+    sources: params.sourcesFingerprint,
+    agentNames: params.agentNames,
     disabledCommands: params.pluginConfig.disabled_commands ?? [],
     teamMode: params.pluginConfig.team_mode?.enabled ?? false,
     browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
@@ -84,9 +93,15 @@ async function loadGlobalCommandSources(params: {
   disabledSkills: Set<string>;
   includeClaudeCommands: boolean;
   includeClaudeSkills: boolean;
+  agentNames: ReadonlyArray<string>;
+  sourcesFingerprint: string | undefined;
 }): Promise<GlobalCommandSources> {
-  const cacheKey = buildGlobalCommandSourcesCacheKey(params);
-  const cached = getProcessConfigCacheEntry("globalCommandSources");
+  // Source directories too large to fingerprint are loaded every time.
+  const sourcesFingerprint = params.sourcesFingerprint;
+  const cacheKey = sourcesFingerprint === undefined
+    ? undefined
+    : buildGlobalCommandSourcesCacheKey({ ...params, sourcesFingerprint });
+  const cached = cacheKey === undefined ? undefined : getProcessConfigCacheEntry("globalCommandSources");
   if (cached && cached.key === cacheKey) {
     log("[command-config] reusing cached global command sources (process-level)");
     const value = cached.value as GlobalCommandSources;
@@ -135,7 +150,9 @@ async function loadGlobalCommandSources(params: {
     opencodeGlobalCommands,
     opencodeGlobalSkills,
   };
-  setProcessConfigCacheEntry("globalCommandSources", { key: cacheKey, value: sources });
+  if (cacheKey !== undefined) {
+    setProcessConfigCacheEntry("globalCommandSources", { key: cacheKey, value: sources });
+  }
   return sources;
 }
 
@@ -144,6 +161,7 @@ export async function applyCommandConfig(params: {
   pluginConfig: OhMyOpenCodeConfig;
   ctx: { directory: string };
   pluginComponents: PluginComponents;
+  globalSources?: { fingerprint: string | undefined };
 }): Promise<void> {
   const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
 
@@ -170,6 +188,8 @@ export async function applyCommandConfig(params: {
       disabledSkills: disabledSkills as Set<string>,
       includeClaudeCommands,
       includeClaudeSkills,
+      agentNames: Object.keys((params.config.agent as Record<string, unknown> | undefined) ?? {}).sort(),
+      sourcesFingerprint: params.globalSources ? params.globalSources.fingerprint : fingerprintGlobalSources(),
     }),
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
