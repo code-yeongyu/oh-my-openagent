@@ -31,7 +31,7 @@
       "commit": "7cb33a77c",
       "patch": "patches/02-hijack-working-model.patch",
       "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/8397",
-      "why": "The first fix resolved 'working model' from the newest message carrying agent+model fields, which matched compaction summaries and the internal compaction_continue prompts themselves — a self-sustaining loop that silently switched live sessions to the summarizer model.",
+      "why": "The first fix resolved 'working model' from the newest message carrying agent+model fields, which matched compaction summaries and the internal compaction_continue prompts themselves \u2014 a self-sustaining loop that silently switched live sessions to the summarizer model.",
       "markers": [
         "isInternalContinuationMessage",
         "pickActiveSessionMessage"
@@ -62,7 +62,7 @@
       "commit": "06aef99f5",
       "patch": "patches/04-compaction-pin-resolution.patch",
       "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/8511",
-      "why": "agents.<key>.compaction.model silently fell back to the session model on every failure path with no logging, and the failure log printed the SESSION model — a dead pin looked exactly like a working one. Four production compactions ran on the session model while the config pinned GLM.",
+      "why": "agents.<key>.compaction.model silently fell back to the session model on every failure path with no logging, and the failure log printed the SESSION model \u2014 a dead pin looked exactly like a working one. Four production compactions ran on the session model while the config pinned GLM.",
       "markers": [
         "summarize model resolved",
         "releasing a stalled summarize guard",
@@ -71,7 +71,7 @@
       "overlapsWith": [
         "03-empty-summary-guard"
       ],
-      "orderNote": "This is the local-lineage form, which builds on 03's empty-summary module. PR #8511 ships an equivalent port written against dev (commit eb15543ea) that does not depend on 03 — if 03 ever merges upstream, prefer that one instead. Keep after 03.",
+      "orderNote": "This is the local-lineage form, which builds on 03's empty-summary module. PR #8511 ships an equivalent port written against dev (commit eb15543ea) that does not depend on 03 \u2014 if 03 ever merges upstream, prefer that one instead. Keep after 03.",
       "portCommit": "eb15543ea"
     },
     {
@@ -80,7 +80,7 @@
       "commit": "af6461926",
       "patch": "patches/05-background-agent-liveness.patch",
       "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/8512",
-      "why": "session-activity.ts detached an SDK method (const sessionGet = client.session.get), so this._client was undefined and every read degraded to unavailable — which suppresses stale interruption — with no completion watchdog. Two review tasks stranded for six hours.",
+      "why": "session-activity.ts detached an SDK method (const sessionGet = client.session.get), so this._client was undefined and every read degraded to unavailable \u2014 which suppresses stale interruption \u2014 with no completion watchdog. Two review tasks stranded for six hours.",
       "markers": [
         "Task exceeded the hard deadline"
       ],
@@ -446,6 +446,22 @@
         "28-config-handler-cross-folder-reuse"
       ],
       "orderNote": "First-message-drop F16 (OMO lane). Must come after 28: the timing record reports the 28 cache-hit flags. The lazy-loading half of F16 is NOT implemented by design: the process cache already removes the repeat cost deterministically, and deferring the plugin-components load would change what the first config hook returns; the proposal lives in the fix report instead. getLastConfigHandlerPhaseTiming() and getPluginComponentsRealLoadCount() are observability seams so the hermetic suite needs no module mocks (mocking the ../shared barrel leaked across test files sharing a worker)."
+    },
+    {
+      "id": "30-skill-v2-permission-bridge",
+      "title": "Give projected v1 tools a working ask() through the v2 permission system",
+      "commit": "5b9e890316150b476c1fd141cad44c705b411341",
+      "patch": "patches/30-skill-v2-permission-bridge.patch",
+      "pr": null,
+      "why": "Fix 23 stopped the ctx.ask crash but skipped the skill permission prompt entirely on v2: the plugin host narrows ctx.permission to hook/list/get/reply (verified in the 2.0.25 and dev host.ts; there is no public request-creation API for a plugin tool), and a projected tool's context carries no ask. The platform's external surface POST /api/session/{id}/permission (Permission.ask) evaluates session/agent rules, parks a REAL pending request that clients prompt on (permission.asked), and returns the outcome as a permission.replied event readable via ctx.event. The bridge implements the v1 ask() contract on top of that: allow resolves, deny throws SkillPermissionDeniedError, a user rejection throws, an aborted tool call rejects its own parked request best-effort, and with no reachable server origin (or a create failure before anything was shown) it degrades to the fix-23 logged skip - a documented fail-open, chosen so an origin flap cannot brick the tool that fix 23 repaired.",
+      "markers": [
+        "v2 permission bridge: no server origin; skill permission prompt skipped",
+        "v2 permission bridge: asking the user"
+      ],
+      "overlapsWith": [
+        "23-skill-v2-ctx-ask-guard"
+      ],
+      "orderNote": "After 23 (renumbered from 26 to avoid colliding with the lane agent's cold-start fixes 26-29): tools.ts is unchanged - fix 23's typeof-ask guard now finds the bridge-provided ask() on the projected context, so v1 hosts keep their native ask and v2 gets the prompt. Origin resolution adds a netstat fallback for Windows where the lsof-based listenPortOf cannot work, covering OpenChamber's embedded server. pr is null: src/v2 is not in upstream dev; the upstreamable slice (the fix-23 guard itself) is filed as a separate upstream PR."
     }
   ],
   "externalFixes": [

@@ -1,0 +1,656 @@
+From 5e29dad968aeb3e37b5dad58514753213fa8b01a Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 12 Oct 2026 19:02:41 +0300
+Subject: [PATCH] fix(v2): give projected v1 tools a working ask() through the
+ v2 permission system
+
+Fix 23 stopped the 'ctx?.ask is not a function' crash but skipped the skill
+permission prompt entirely on v2. The plugin host narrows ctx.permission to
+hook/list/get/reply - there is no public request-creation API for a plugin
+tool - and the projected tool context carries no ask.
+
+The platform does expose Permission.ask over its external HTTP surface
+(POST /api/session/{id}/permission): it evaluates session/agent rules,
+parks a real pending request that clients prompt on (permission.asked),
+and the outcome returns as a permission.replied event on ctx.event. The
+bridge implements the v1 ask() contract on top of that:
+
+- allow -> resolves; deny -> SkillPermissionDeniedError (no prompt)
+- ask -> the user is prompted; once/always resolves, reject throws,
+  and an aborted tool call rejects its own parked request best-effort
+- no reachable server origin, or a create failure before anything was
+  shown -> the fix-23 logged skip (documented fail-open)
+
+Origin resolution extends serve-http.ts's lsof approach with a netstat
+fallback so embedded Windows servers (OpenChamber) resolve too. tools.ts
+is unchanged: fix 23's typeof-ask guard picks the bridge-provided ask up
+automatically, and v1 hosts are untouched.
+---
+ .../src/v2/permission-bridge.test.ts          | 295 ++++++++++++++++++
+ .../omo-opencode/src/v2/permission-bridge.ts  | 279 +++++++++++++++++
+ .../omo-opencode/src/v2/project-config.ts     |   7 +
+ 3 files changed, 581 insertions(+)
+ create mode 100644 packages/omo-opencode/src/v2/permission-bridge.test.ts
+ create mode 100644 packages/omo-opencode/src/v2/permission-bridge.ts
+
+diff --git a/packages/omo-opencode/src/v2/permission-bridge.test.ts b/packages/omo-opencode/src/v2/permission-bridge.test.ts
+new file mode 100644
+index 000000000..0870a4a69
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/permission-bridge.test.ts
+@@ -0,0 +1,295 @@
++import { afterEach, describe, expect, test } from "bun:test"
++
++import {
++  createPermissionBridge,
++  SkillPermissionDeniedError,
++  type V1AskInput,
++} from "./permission-bridge"
++
++type FetchCall = { url: string; method?: string; body?: unknown }
++
++function jsonResponse(status: number, body: unknown): Response {
++  return new Response(JSON.stringify(body), {
++    status,
++    headers: { "content-type": "application/json" },
++  })
++}
++
++const toolContext = {
++  sessionID: "ses_1",
++  agent: "build",
++  messageID: "msg_1",
++  id: "call_1",
++}
++
++const askInput: V1AskInput = {
++  permission: "skill",
++  patterns: ["review-work"],
++  always: ["review-work"],
++  metadata: { skill: "review-work" },
++}
++
++function makeHarness(options: {
++  createEffect?: "allow" | "deny" | "ask"
++  createStatus?: number
++  events?: Array<Record<string, unknown>>
++  hangEvents?: boolean
++  recordFetch?: Array<FetchCall>
++  replies?: Array<Record<string, unknown>>
++}) {
++  const calls: FetchCall[] = options.recordFetch ?? []
++  const fetchImpl = (async (url: RequestInfo | URL, init?: RequestInit) => {
++    const target = new URL(String(url))
++    calls.push({
++      url: target.toString(),
++      method: init?.method,
++      body: init?.body ? JSON.parse(String(init.body)) : undefined,
++    })
++    if (target.pathname === "/api/session/active") return jsonResponse(200, { data: {} })
++    if (target.pathname === "/api/session/ses_1/permission") {
++      if (options.createStatus !== undefined) return jsonResponse(options.createStatus, {})
++      return jsonResponse(200, {
++        data: { id: "req_1", effect: options.createEffect ?? "allow" },
++      })
++    }
++    return jsonResponse(404, {})
++  }) as typeof fetch
++
++  const ctx = {
++    event: {
++      subscribe: async function* () {
++        if (options.hangEvents) {
++          await new Promise<void>(() => {})
++          return
++        }
++        for (const event of options.events ?? []) yield event
++      },
++    },
++    permission: {
++      reply: async (input: Record<string, unknown>) => {
++        ;(options.replies ??= []).push(input)
++      },
++    },
++  } as never
++
++  const bridge = createPermissionBridge(ctx as never, {
++    fetchImpl,
++    argv: ["opencode", "serve", "--port", "4599"],
++    listenPort: async () => undefined,
++    probeTimeoutMs: 500,
++  })
++  return { bridge, calls, fetchImpl, ctx }
++}
++
++describe("v2 permission bridge", () => {
++  test("resolves without consuming events when the rules allow", async () => {
++    const { bridge } = makeHarness({ createEffect: "allow", events: [] })
++    await expect(bridge.ask(toolContext, askInput)).resolves.toBeUndefined()
++  })
++
++  test("sends the v1 ask payload to the platform create route", async () => {
++    const calls: FetchCall[] = []
++    const { bridge } = makeHarness({ createEffect: "allow", recordFetch: calls })
++    await bridge.ask(toolContext, askInput)
++    const create = calls.find((call) => call.url.endsWith("/api/session/ses_1/permission"))
++    expect(create?.method).toBe("POST")
++    expect(create?.body).toEqual({
++      action: "skill",
++      resources: ["review-work"],
++      save: ["review-work"],
++      metadata: { skill: "review-work" },
++      agent: "build",
++      source: { type: "tool", messageID: "msg_1", id: "call_1" },
++    })
++  })
++
++  test("rejects with SkillPermissionDeniedError when the rules deny", async () => {
++    const { bridge } = makeHarness({ createEffect: "deny", events: [] })
++    await expect(bridge.ask(toolContext, askInput)).rejects.toBeInstanceOf(SkillPermissionDeniedError)
++  })
++
++  test("waits for a once/always reply and resolves", async () => {
++    const { bridge } = makeHarness({
++      createEffect: "ask",
++      events: [
++        { type: "permission.updated", data: { noise: true } },
++        { type: "permission.replied", data: { sessionID: "ses_1", requestID: "req_1", reply: "once" } },
++      ],
++    })
++    await expect(bridge.ask(toolContext, askInput)).resolves.toBeUndefined()
++  })
++
++  test("rejects when the user rejects the prompt", async () => {
++    const { bridge } = makeHarness({
++      createEffect: "ask",
++      events: [
++        { type: "permission.replied", data: { sessionID: "ses_1", requestID: "req_1", reply: "reject" } },
++      ],
++    })
++    await expect(bridge.ask(toolContext, askInput)).rejects.toBeInstanceOf(SkillPermissionDeniedError)
++  })
++
++  test("accepts the flat (un-enveloped) replied event shape", async () => {
++    const { bridge } = makeHarness({
++      createEffect: "ask",
++      events: [
++        { type: "permission.replied", sessionID: "ses_1", requestID: "req_1", reply: "always" },
++      ],
++    })
++    await expect(bridge.ask(toolContext, askInput)).resolves.toBeUndefined()
++  })
++
++  test("ignores replied events for other requests", async () => {
++    const { bridge } = makeHarness({
++      createEffect: "ask",
++      events: [
++        { type: "permission.replied", data: { sessionID: "ses_1", requestID: "req_other", reply: "reject" } },
++        { type: "permission.replied", data: { sessionID: "ses_1", requestID: "req_1", reply: "once" } },
++      ],
++    })
++    await expect(bridge.ask(toolContext, askInput)).resolves.toBeUndefined()
++  })
++
++  test("aborted tool call rejects and unparks its own request", async () => {
++    const replies: Array<Record<string, unknown>> = []
++    const controller = new AbortController()
++    const { bridge } = makeHarness({ createEffect: "ask", hangEvents: true, replies })
++    const pending = bridge.ask({ ...toolContext, signal: controller.signal }, askInput)
++    await new Promise((resolve) => setTimeout(resolve, 10))
++    controller.abort()
++    await expect(pending).rejects.toThrow(/aborted/)
++    expect(replies).toEqual([{ sessionID: "ses_1", requestID: "req_1", decision: "reject" }])
++  })
++
++  test("stream ending without a reply fails loudly and unparks the request", async () => {
++    const replies: Array<Record<string, unknown>> = []
++    const { bridge } = makeHarness({ createEffect: "ask", events: [], replies })
++    await expect(bridge.ask(toolContext, askInput)).rejects.toThrow(/ended/)
++    expect(replies).toEqual([{ sessionID: "ses_1", requestID: "req_1", decision: "reject" }])
++  })
++
++  test("fails open with a logged skip when no server origin resolves", async () => {
++    const calls: FetchCall[] = []
++    const bridge = createPermissionBridge(
++      {
++        event: { subscribe: () => { throw new Error("must not be reached") } },
++        permission: {},
++      } as never,
++      {
++        fetchImpl: (async () => {
++          throw new Error("no server expected")
++        }) as typeof fetch,
++        argv: ["opencode"],
++        listenPort: async () => undefined,
++        probeTimeoutMs: 200,
++      },
++    )
++    void calls
++    await expect(bridge.ask(toolContext, askInput)).resolves.toBeUndefined()
++  })
++
++  test("fails open with a logged skip when create errors before prompting", async () => {
++    const { bridge } = makeHarness({ createStatus: 500, events: [] })
++    await expect(bridge.ask(toolContext, askInput)).resolves.toBeUndefined()
++  })
++})
++
++describe("v2 permission bridge wiring", () => {
++  const directories: string[] = []
++  afterEach(() => {
++    for (const directory of directories.splice(0)) {
++      try {
++        require("node:fs").rmSync(directory, { recursive: true, force: true })
++      } catch {}
++    }
++  })
++
++  test("projected v1 tools receive a working ask() on their context", async () => {
++    const { mkdtempSync, rmSync } = await import("node:fs")
++    const { tmpdir } = await import("node:os")
++    const { join } = await import("node:path")
++    const { projectV1Surface } = await import("./project-config")
++    const { createAdapterState } = await import("./adapter-state")
++
++    const directory = mkdtempSync(join(tmpdir(), "omo-perm-bridge-"))
++    directories.push(directory)
++    const state = createAdapterState(join(directory, "state"))
++
++    const registered: Array<{
++      name: string
++      execute: (args: unknown, context: Record<string, unknown>) => Promise<unknown>
++    }> = []
++    let projectedContext: Record<string, unknown> | undefined
++
++    const ctx = {
++      agent: { transform: async (fn: (editor: object) => void) => fn({}) },
++      tool: {
++        transform: async (fn: (editor: object) => void) =>
++          fn({
++            list: () => [] as Array<{ id: string; name: string }>,
++            add: (tool: { name: string; execute: (args: unknown, context: Record<string, unknown>) => Promise<unknown> }) => {
++              registered.push(tool)
++            },
++          }),
++      },
++      command: { transform: async (fn: (editor: object) => void) => fn({}) },
++      mcp: { transform: async (fn: (editor: object) => void) => fn({}) },
++      event: { subscribe: async function* () {} },
++      permission: { reply: async () => {} },
++    } as never
++
++    await projectV1Surface({
++      ctx,
++      directory,
++      agentDirectory: join(directory, "agents"),
++      config: {},
++      tools: {
++        skill: {
++          description: "skill tool",
++          execute: async (_args: unknown, context: Record<string, unknown>) => {
++            projectedContext = context
++            return "ok"
++          },
++        },
++      },
++      recordTodos: { read: state.todos, write: state.recordTodos },
++    })
++
++    const skillTool = registered.find((tool) => tool.name === "skill")
++    expect(skillTool).toBeDefined()
++    // The harness ctx has no origin (no --port, no netstat hit for this test
++    // process), so ask() resolves via the documented fail-open path.
++    await skillTool!.execute({ name: "review-work" }, {
++      sessionID: "ses_1",
++      agent: "build",
++      messageID: "msg_1",
++      id: "call_1",
++    })
++    expect(projectedContext).toBeDefined()
++    expect(typeof (projectedContext as { ask?: unknown }).ask).toBe("function")
++    expect((projectedContext as { sessionID?: string }).sessionID).toBe("ses_1")
++
++    // With a deny from the platform, the projected ask must throw so the
++    // denial propagates through the v1 skill tool unchanged.
++    const denyBridge = createPermissionBridge(
++      {
++        event: { subscribe: async function* () {} },
++        permission: {},
++      } as never,
++      {
++        fetchImpl: (async (url: RequestInfo | URL) => {
++          const target = new URL(String(url))
++          if (target.pathname === "/api/session/active") return jsonResponse(200, { data: {} })
++          return jsonResponse(200, { data: { id: "req_d", effect: "deny" } })
++        }) as typeof fetch,
++        argv: ["opencode", "serve", "--port", "4599"],
++        listenPort: async () => undefined,
++        probeTimeoutMs: 500,
++      },
++    )
++    await expect(
++      denyBridge.ask({ sessionID: "ses_1", agent: "build" }, askInput),
++    ).rejects.toBeInstanceOf(SkillPermissionDeniedError)
++
++  })
++})
+diff --git a/packages/omo-opencode/src/v2/permission-bridge.ts b/packages/omo-opencode/src/v2/permission-bridge.ts
+new file mode 100644
+index 000000000..2ed2d62c9
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/permission-bridge.ts
+@@ -0,0 +1,279 @@
++import type { Plugin } from "@opencode/plugin"
++
++import { log } from "../shared/logger"
++import { getServerBasicAuthHeader } from "../shared/opencode-server-auth"
++import { resolveServeOrigin } from "./serve-http"
++
++type V2Context = Plugin.Context
++
++/**
++ * The V1 ask() payload (@opencode-ai/plugin ToolContext.ask) that OMO's skill
++ * tool still speaks: a permission action plus resource patterns.
++ */
++export type V1AskInput = {
++  permission: string
++  patterns: string[]
++  always?: string[]
++  metadata?: Record<string, unknown>
++}
++
++/** The slices of a v2 tool execution context the bridge needs. */
++export type BridgeToolContext = {
++  sessionID: string
++  agent?: string
++  messageID?: string
++  id?: string
++  signal?: AbortSignal
++}
++
++export type PermissionBridgeDeps = {
++  fetchImpl?: typeof fetch
++  argv?: readonly string[]
++  listenPort?: () => Promise<number | undefined>
++  probeTimeoutMs?: number
++  retryOriginAfterMs?: number
++}
++
++export class SkillPermissionDeniedError extends Error {
++  constructor(message: string) {
++    super(message)
++    this.name = "SkillPermissionDeniedError"
++  }
++}
++
++type CreateOutcome = { id: string; effect: "allow" | "deny" | "ask" }
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return typeof value === "object" && value !== null && !Array.isArray(value)
++}
++
++function replyPayloadOf(event: unknown): Record<string, unknown> | undefined {
++  if (!isRecord(event)) return undefined
++  const payload = isRecord(event.data) ? event.data : event
++  return payload
++}
++
++/**
++ * Windows fallback for the lsof-based listenPortOf(): `lsof` does not exist
++ * there, so resolveServeOrigin() alone cannot find the embedded server's port.
++ * Reads this process's LISTENING TCP ports from netstat.
++ */
++async function windowsListenPorts(pid = process.pid): Promise<number[]> {
++  if (process.platform !== "win32") return []
++  try {
++    const proc = Bun.spawn(["netstat", "-ano", "-p", "tcp"], {
++      stdout: "pipe",
++      stderr: "ignore",
++    })
++    const text = await new Response(proc.stdout).text()
++    const ports = new Set<number>()
++    for (const line of text.split("\n")) {
++      const columns = line.trim().split(/\s+/)
++      // proto local-address foreign-address state pid
++      if (columns.length < 5 || !/^LISTENING$/i.test(columns[3])) continue
++      if (columns[4] !== String(pid)) continue
++      const local = columns[1]
++      const port = Number(local.substring(local.lastIndexOf(":") + 1))
++      if (Number.isInteger(port) && port > 0) ports.add(port)
++    }
++    return [...ports]
++  } catch {
++    return []
++  }
++}
++
++/**
++ * Implements the V1 ToolContext.ask() contract for tools that OpenCode v2
++ * projects through ctx.tool.transform.
++ *
++ * Why this exists: the v2 plugin host narrows ctx.permission to
++ * hook/list/get/reply (no request creation), and a projected tool's execute
++ * context carries no ask at all. The platform's supported external surface
++ * `POST /api/session/{sessionID}/permission` (Permission.ask) parks a REAL
++ * pending request — clients prompt on permission.asked and answer through
++ * session.permission.reply — and the outcome arrives on the event bus as a
++ * permission.replied event, which a plugin can read via ctx.event.
++ *
++ * Semantics (mirrors core's Permission.assert):
++ *  - rules say allow  -> resolves
++ *  - rules say deny   -> rejects (SkillPermissionDeniedError)
++ *  - rules say ask    -> the user is prompted; once/always resolves, reject
++ *                        rejects, and an aborted tool call rejects its own
++ *                        request best-effort so no prompt is left dangling
++ *  - no reachable server origin -> resolves with a logged skip (fix 23
++ *    behavior; documented fail-open)
++ */
++export function createPermissionBridge(ctx: V2Context, deps: PermissionBridgeDeps = {}) {
++  const fetchImpl = deps.fetchImpl ?? fetch
++  const argv = deps.argv ?? process.argv
++  const listenPort = deps.listenPort ?? (async () => (await windowsListenPorts())[0])
++  const probeTimeoutMs = deps.probeTimeoutMs ?? 2000
++  const retryOriginAfterMs = deps.retryOriginAfterMs ?? 30_000
++
++  let resolvedOrigin: string | undefined
++  let failedAt = 0
++
++  function authHeaders(): Headers {
++    const headers = new Headers({ "content-type": "application/json" })
++    const auth = getServerBasicAuthHeader()
++    if (auth) headers.set("Authorization", auth)
++    return headers
++  }
++
++  async function looksLikeOpenCode(origin: string): Promise<boolean> {
++    try {
++      const response = await fetchImpl(new URL("/api/session/active", origin).toString(), {
++        headers: authHeaders(),
++        signal: AbortSignal.timeout(probeTimeoutMs),
++      })
++      return response.ok || response.status === 401
++    } catch {
++      return false
++    }
++  }
++
++  async function resolveUsableOrigin(): Promise<string | undefined> {
++    if (resolvedOrigin) return resolvedOrigin
++    if (Date.now() - failedAt < retryOriginAfterMs) return undefined
++    const candidates = new Set<string>()
++    const direct = await resolveServeOrigin({ argv, listenPort }).catch(() => undefined)
++    if (direct) candidates.add(direct)
++    for (const port of await windowsListenPorts()) {
++      candidates.add(`http://127.0.0.1:${port}`)
++    }
++    for (const candidate of [...candidates].slice(0, 4)) {
++      if (await looksLikeOpenCode(candidate)) {
++        resolvedOrigin = candidate
++        return candidate
++      }
++    }
++    failedAt = Date.now()
++    return undefined
++  }
++
++  async function createRequest(
++    origin: string,
++    tool: BridgeToolContext,
++    input: V1AskInput,
++    signal?: AbortSignal,
++  ): Promise<CreateOutcome> {
++    const url = new URL(`/api/session/${encodeURIComponent(tool.sessionID)}/permission`, origin)
++    const response = await fetchImpl(url.toString(), {
++      method: "POST",
++      headers: authHeaders(),
++      body: JSON.stringify({
++        action: input.permission,
++        resources: input.patterns,
++        save: input.always,
++        metadata: input.metadata,
++        agent: tool.agent,
++        ...(tool.messageID !== undefined && tool.id !== undefined
++          ? { source: { type: "tool", messageID: tool.messageID, id: tool.id } }
++          : {}),
++      }),
++      signal,
++    })
++    if (!response.ok) {
++      throw new Error(`permission create failed with HTTP ${response.status}`)
++    }
++    const body: unknown = await response.json()
++    const data = isRecord(body) && isRecord(body.data) ? body.data : body
++    if (!isRecord(data) || typeof data.id !== "string" || typeof data.effect !== "string") {
++      throw new Error("permission create returned an unexpected payload")
++    }
++    return { id: data.id, effect: data.effect as CreateOutcome["effect"] }
++  }
++
++  function rejectOwnRequest(sessionID: string, requestID: string): void {
++    try {
++      const permission = ctx.permission as
++        | { reply?: (input: { sessionID: string; requestID: string; decision: "reject" }) => Promise<unknown> }
++        | undefined
++      void permission?.reply?.({ sessionID, requestID, decision: "reject" }).catch(() => {})
++    } catch {
++      // best-effort only
++    }
++  }
++
++  function waitForReply(requestID: string, sessionID: string, signal?: AbortSignal): Promise<void> {
++    return new Promise<void>((resolve, reject) => {
++      let settled = false
++      const settle = (fn: () => void) => {
++        if (settled) return
++        settled = true
++        signal?.removeEventListener("abort", onAbort)
++        fn()
++      }
++      const onAbort = () => {
++        rejectOwnRequest(sessionID, requestID)
++        settle(() => reject(new Error("skill permission request was aborted before the user answered")))
++      }
++      if (signal?.aborted) return onAbort()
++      signal?.addEventListener("abort", onAbort, { once: true })
++      void (async () => {
++        try {
++          const stream = ctx.event.subscribe()
++          for await (const event of stream) {
++            const payload = replyPayloadOf(event)
++            if (!payload) continue
++            if ((event as { type?: unknown }).type !== "permission.replied") continue
++            if (payload.requestID !== requestID) continue
++            const reply = payload.reply
++            settle(() => {
++              if (reply === "reject") {
++                reject(new SkillPermissionDeniedError(`Permission denied: skill ${String(payload.requestID)}`))
++              } else {
++                resolve()
++              }
++            })
++            return
++          }
++          // The stream ended without our reply: unpark the request and fail loudly.
++          rejectOwnRequest(sessionID, requestID)
++          settle(() => reject(new Error("skill permission event stream ended before the user answered")))
++        } catch (error) {
++          rejectOwnRequest(sessionID, requestID)
++          settle(() => reject(error instanceof Error ? error : new Error(String(error))))
++        }
++      })()
++    })
++  }
++
++  async function ask(tool: BridgeToolContext, input: V1AskInput): Promise<void> {
++    const origin = await resolveUsableOrigin()
++    if (!origin) {
++      log("[skill] v2 permission bridge: no server origin; skill permission prompt skipped", {
++        skill: input.patterns.join(", "),
++        sessionID: tool.sessionID,
++      })
++      return
++    }
++    let created: CreateOutcome
++    try {
++      created = await createRequest(origin, tool, input, tool.signal)
++    } catch (error) {
++      // Infrastructure failure before anything was shown to the user: keep the
++      // fix-23 behavior (documented fail-open) instead of bricking the tool.
++      log("[skill] v2 permission bridge: create failed; skill permission prompt skipped", {
++        skill: input.patterns.join(", "),
++        sessionID: tool.sessionID,
++        error: error instanceof Error ? error.message : String(error),
++      })
++      return
++    }
++    if (created.effect === "deny") {
++      throw new SkillPermissionDeniedError(`Permission denied: ${input.permission} ${input.patterns.join(", ")}`)
++    }
++    if (created.effect !== "ask") return
++    log("[skill] v2 permission bridge: asking the user", {
++      skill: input.patterns.join(", "),
++      sessionID: tool.sessionID,
++      requestID: created.id,
++    })
++    await waitForReply(created.id, tool.sessionID, tool.signal)
++  }
++
++  return { ask }
++}
++
++export type PermissionBridge = ReturnType<typeof createPermissionBridge>
+diff --git a/packages/omo-opencode/src/v2/project-config.ts b/packages/omo-opencode/src/v2/project-config.ts
+index 15b12bc08..99c035f35 100644
+--- a/packages/omo-opencode/src/v2/project-config.ts
++++ b/packages/omo-opencode/src/v2/project-config.ts
+@@ -5,6 +5,7 @@ import type { Plugin } from "@opencode/plugin"
+ 
+ import { log } from "../shared/logger"
+ import { agentMarkdownDirectory, nestedAgentID, writeAgentMarkdown } from "./agent-markdown"
++import { createPermissionBridge, type V1AskInput } from "./permission-bridge"
+ import { toolInputSchema, toolResult } from "./tool-schema"
+ 
+ type V2Context = Plugin.Context
+@@ -90,6 +91,11 @@ async function projectTools(input: {
+   disabled: unknown
+   defineTool: unknown
+ }): Promise<void> {
++  // Implements the V1 ToolContext.ask() contract for every projected tool: the
++  // v2 host provides no ask (and ctx.permission cannot create a request), so
++  // the bridge parks a real permission request through the platform's
++  // /api/session/{id}/permission surface and awaits the user's reply.
++  const permissionBridge = createPermissionBridge(input.ctx)
+   const tools = isRecord(input.tools) ? input.tools : {}
+   const definitions = new Map<string, { description: string; input: Record<string, unknown>; execute: (args: unknown, context: unknown) => Promise<unknown> }>()
+   for (const [name, value] of Object.entries(tools)) {
+@@ -124,6 +130,7 @@ async function projectTools(input: {
+               sessionID: context.sessionID,
+               callID: context.id,
+               abort: context.signal,
++              ask: (askInput: V1AskInput) => permissionBridge.ask(context, askInput),
+             })
+             return toolResult(result)
+           },
+-- 
+2.55.0.windows.3
+
