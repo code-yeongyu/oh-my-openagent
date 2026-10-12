@@ -5,6 +5,7 @@ import type { Plugin } from "@opencode/plugin"
 
 import { log } from "../shared/logger"
 import { agentMarkdownDirectory, nestedAgentID, writeAgentMarkdown } from "./agent-markdown"
+import { createPermissionBridge, type V1AskInput } from "./permission-bridge"
 import { toolInputSchema, toolResult } from "./tool-schema"
 
 type V2Context = Plugin.Context
@@ -90,6 +91,11 @@ async function projectTools(input: {
   disabled: unknown
   defineTool: unknown
 }): Promise<void> {
+  // Implements the V1 ToolContext.ask() contract for every projected tool: the
+  // v2 host provides no ask (and ctx.permission cannot create a request), so
+  // the bridge parks a real permission request through the platform's
+  // /api/session/{id}/permission surface and awaits the user's reply.
+  const permissionBridge = createPermissionBridge(input.ctx)
   const tools = isRecord(input.tools) ? input.tools : {}
   const definitions = new Map<string, { description: string; input: Record<string, unknown>; execute: (args: unknown, context: unknown) => Promise<unknown> }>()
   for (const [name, value] of Object.entries(tools)) {
@@ -124,6 +130,7 @@ async function projectTools(input: {
               sessionID: context.sessionID,
               callID: context.id,
               abort: context.signal,
+              ask: (askInput: V1AskInput) => permissionBridge.ask(context, askInput),
             })
             return toolResult(result)
           },
