@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Ctrl+Alt+S opens the native OmO side panel during a running session.** The panel can start hidden and open without restarting or clearing the conversation. Set `side_panel.shortcut` to another Senpi key chord, or `false` to disable it; startup visibility still follows `side_panel.enabled` and `--omo-side-panel`. ([#10006](https://github.com/code-yeongyu/oh-my-openagent/issues/10006))
+
 **`background_task.taskCleanupDelayMs` now also sets how long finished background tasks stay retrievable.** A delay longer than 30 minutes is no longer cut short; leaving it unset keeps the existing timing. Thanks to @imadal1n. ([#9984](https://github.com/code-yeongyu/oh-my-openagent/pull/9984))
 
 **The MCP OAuth callback server answers errors in plain text.** Its not-found, provider-error and missing-parameter responses are now sent as `text/plain; charset=utf-8` with `X-Content-Type-Options: nosniff`, so an `error_description` in the callback URL is shown as text and never rendered as HTML. MCP sign-in currently runs through a second callback server that never echoed that text, so nothing you see changes; consolidating the two is tracked separately. Thanks to @niStee. ([#6464](https://github.com/code-yeongyu/oh-my-openagent/pull/6464), [#9979](https://github.com/code-yeongyu/oh-my-openagent/issues/9979))

@@ -2252,6 +2252,19 @@
           "default": false,
           "type": "boolean"
         },
+        "shortcut": {
+          "default": "ctrl+alt+s",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "boolean",
+              "const": false
+            }
+          ]
+        },
         "width": {
           "default": "26%",
           "anyOf": [
@@ -4490,6 +4503,18 @@
             "enabled": {
               "type": "boolean"
             },
+            "shortcut": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "boolean",
+                  "const": false
+                }
+              ]
+            },
             "width": {
               "anyOf": [
                 {
@@ -6705,6 +6730,18 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "shortcut": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "boolean",
+                  "const": false
+                }
+              ]
             },
             "width": {
               "anyOf": [
@@ -8922,6 +8959,18 @@
             "enabled": {
               "type": "boolean"
             },
+            "shortcut": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "boolean",
+                  "const": false
+                }
+              ]
+            },
             "width": {
               "anyOf": [
                 {
@@ -11135,6 +11184,18 @@
             "properties": {
               "enabled": {
                 "type": "boolean"
+              },
+              "shortcut": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "boolean",
+                    "const": false
+                  }
+                ]
               },
               "width": {
                 "anyOf": [
@@ -13352,6 +13413,18 @@
                   "enabled": {
                     "type": "boolean"
                   },
+                  "shortcut": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "boolean",
+                        "const": false
+                      }
+                    ]
+                  },
                   "width": {
                     "anyOf": [
                       {
@@ -15568,6 +15641,18 @@
                   "enabled": {
                     "type": "boolean"
                   },
+                  "shortcut": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "boolean",
+                        "const": false
+                      }
+                    ]
+                  },
                   "width": {
                     "anyOf": [
                       {
@@ -17783,6 +17868,18 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "shortcut": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "boolean",
+                        "const": false
+                      }
+                    ]
                   },
                   "width": {
                     "anyOf": [

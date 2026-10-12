@@ -57,6 +57,61 @@ function settings(overrides: Partial<OmoSidePanelSettings> = {}): OmoSidePanelSe
 }
 
 describe("side panel component", () => {
+  test.each(["ctrl+alt+p", false] as const)("#given shortcut %s #when registered #then only the configured chord opens a hidden panel", async (configured) => {
+    // given
+    let shortcut: { key: string; handler: (ctx: unknown) => void | Promise<void> } | undefined
+    const pi = new FakeExtensionAPI()
+    Object.assign(pi, {
+      registerShortcut(key: string, options: { handler: (ctx: unknown) => void | Promise<void> }) {
+        shortcut = { key, handler: options.handler }
+      },
+    })
+    const widgets: WidgetCall[] = []
+    createSidePanelComponent({
+      loadSettings: () => settings({ enabled: false, shortcut: configured }),
+    }).register(pi, componentContext(pi))
+
+    // when
+    await pi.dispatch("session_start", {}, hostContext(widgets))
+    await shortcut?.handler({ mode: "rpc", hasUI: false })
+    expect(widgets).toEqual([])
+    await shortcut?.handler(hostContext(widgets))
+
+    // then
+    expect(shortcut?.key).toBe(configured === false ? undefined : configured)
+    expect(widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY)).toHaveLength(configured === false ? 0 : 1)
+    expect(pi.commands.some((command) => command.name === SIDE_PANEL_DIFF_COMMAND)).toBe(configured !== false)
+    await pi.dispatch("session_shutdown", {}, hostContext(widgets))
+  })
+
+  test("#given hidden startup #when the default shortcut is pressed twice #then one panel mounts without sending messages", async () => {
+    // given
+    let shortcut: { key: string; handler: (ctx: unknown) => void | Promise<void> } | undefined
+    const pi = new FakeExtensionAPI()
+    Object.assign(pi, {
+      registerShortcut(key: string, options: { handler: (ctx: unknown) => void | Promise<void> }) {
+        shortcut = { key, handler: options.handler }
+      },
+    })
+    const widgets: WidgetCall[] = []
+    const host = hostContext(widgets)
+    createSidePanelComponent({ loadSettings: () => settings({ enabled: false }) }).register(pi, componentContext(pi))
+    await pi.dispatch("session_start", {}, host)
+    expect(widgets).toEqual([])
+    expect(shortcut?.key).toBe("ctrl+alt+s")
+    if (shortcut === undefined) throw new Error("side panel shortcut missing")
+
+    // when
+    await shortcut.handler(host)
+    await shortcut.handler(host)
+
+    // then
+    expect(widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY)).toHaveLength(1)
+    expect(pi.messages).toEqual([])
+    expect(pi.userMessages).toEqual([])
+    await pi.dispatch("session_shutdown", {}, host)
+  })
+
   test("#given the panel is disabled #when a session starts #then nothing is mounted", async () => {
     // given
     const pi = new FakeExtensionAPI()

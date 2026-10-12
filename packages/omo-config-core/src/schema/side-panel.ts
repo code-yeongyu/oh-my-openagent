@@ -41,6 +41,8 @@ export const OmoSidePanelSectionsSchema = OmoSidePanelSectionsLayerSchema.extend
 const OmoSidePanelSettingsShape = {
   /** Render the side panel (default: false). It rearranges the whole screen, so it is opt-in. */
   enabled: z.boolean(),
+  /** Open the panel in-session; false disables the shortcut (default: "ctrl+alt+s"). */
+  shortcut: z.union([z.string().trim().min(1), z.literal(false)]),
   /** Panel width as a column count or a percentage of the terminal width (default: "26%"). */
   width: OmoSidePanelWidthSchema,
   /** Terminals narrower than this keep the classic single-column layout (default: 120). */
@@ -57,6 +59,7 @@ export const OmoSidePanelSettingsLayerSchema = z.object(OmoSidePanelSettingsShap
 
 export const OmoSidePanelSettingsSchema = OmoSidePanelSettingsLayerSchema.extend({
   enabled: z.boolean().default(false),
+  shortcut: OmoSidePanelSettingsShape.shortcut.default("ctrl+alt+s"),
   width: OmoSidePanelWidthSchema.default("26%"),
   min_columns: z.number().int().min(60).max(400).default(120),
   clickable: z.boolean().default(true),

@@ -284,7 +284,17 @@ instead, and a headless run renders nothing.
 The `files` section lists the working copy as `git status` sees it, both status columns included.
 Clicking a row opens that file's diff in a scrollable read-only viewer, and `/side-panel-diff`
 reaches the same viewer by name - for keyboards, and for a host that hands out no URL hook. No
-keyboard chord is registered by default.
+file-diff shortcut is registered.
+
+Press **Ctrl+Alt+S** to open the panel during an interactive session, even when it started hidden.
+Opening does not restart the session or clear the conversation; pressing it again keeps the panel
+open. `enabled` and `--omo-side-panel` still control startup visibility only. Configure
+`"side_panel": { "shortcut": "ctrl+alt+p" }` to choose another Senpi key chord, or
+`"side_panel": { "shortcut": false }` to disable the shortcut. The shortcut is registered at
+extension load, so reload after changing it. Avoid chords already assigned in Senpi's
+`keybindings.json` or another extension; host conflict handling applies. Some terminals intercept
+Ctrl+Alt chords; choose another chord if yours does. The same fullscreen and `min_columns`
+requirements apply when opening by shortcut; regular mode uses the block above the editor.
 
 The block may live at the shared top level, in `[native]`, or in profile layers, and follows the
 normal resolution order.

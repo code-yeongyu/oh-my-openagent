@@ -14,6 +14,7 @@ describe("omo config side_panel section", () => {
     expect(result.success).toBe(true)
     if (!result.success) return
     expect(result.data.side_panel?.enabled).toBe(false)
+    expect(resolveOmoSidePanelSettings({}).shortcut).toBe("ctrl+alt+s")
     expect(result.data.side_panel?.sections).toEqual({
       session: true,
       goal: true,
@@ -82,6 +83,7 @@ describe("omo config side_panel section", () => {
     expect(result.success).toBe(true)
     if (!result.success) return
     expect(result.data.side_panel?.enabled).toBeUndefined()
+    expect(result.data.side_panel?.shortcut).toBeUndefined()
     expect(result.data.side_panel?.width).toBeUndefined()
     expect(result.data.side_panel?.sections).toBeUndefined()
   })
@@ -95,6 +97,16 @@ describe("omo config side_panel section", () => {
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  test("#given shortcut overrides #when resolved #then a custom chord or explicit disable survives", () => {
+    // given
+    const values = ["ctrl+alt+p", false] as const
+    // when
+    const resolved = values.map((shortcut) => resolveOmoSidePanelSettings({ side_panel: { shortcut } }).shortcut)
+    // then
+    expect(resolved).toEqual(["ctrl+alt+p", false])
+    expect(OmoConfigSchema.safeParse({ side_panel: { shortcut: "" } }).success).toBe(false)
   })
 
   test("#given a width outside the sidebar range #when parsed #then the config is rejected", () => {
