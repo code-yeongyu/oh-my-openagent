@@ -10,6 +10,11 @@ type JsonFileCacheStoreOptions<TValue> = {
 	cacheLabel: string
 	describe: (value: TValue) => Record<string, unknown>
 	serialize?: (value: TValue) => string
+	/**
+	 * The part of a value that decides whether writeIfChanged rewrites the file.
+	 * Lets a store ignore volatile fields such as a generation timestamp.
+	 */
+	comparable?: (value: TValue) => unknown
 }
 
 type JsonFileCacheStore<TValue> = {
@@ -110,7 +115,14 @@ export function createJsonFileCacheStore<TValue>(
 		const serialized = options.serialize?.(value) ?? JSON.stringify(value, null, 2)
 
 		try {
-			if (existsSync(cacheFile) && readFileSync(cacheFile, "utf-8") === serialized) {
+			const existing = existsSync(cacheFile) ? readFileSync(cacheFile, "utf-8") : undefined
+			const unchanged = existing !== undefined && (
+				existing === serialized ||
+				(options.comparable !== undefined &&
+					JSON.stringify(options.comparable(JSON.parse(existing) as TValue)) ===
+						JSON.stringify(options.comparable(value)))
+			)
+			if (unchanged) {
 				memoryValue = value
 				writtenInCurrentProcess = true
 				log(

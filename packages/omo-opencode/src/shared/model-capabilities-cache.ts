@@ -28,6 +28,8 @@ export function createModelCapabilitiesCacheStore(
       generatedAt: snapshot.generatedAt,
     }),
     serialize: (snapshot) => `${JSON.stringify(snapshot, null, 2)}\n`,
+    // generatedAt is stamped on every fetch; only the catalog itself decides a rewrite.
+    comparable: ({ generatedAt: _generatedAt, ...catalog }) => catalog,
   })
 
   function readModelCapabilitiesCache(): ModelCapabilitiesSnapshot | null {
@@ -51,6 +53,7 @@ export function createModelCapabilitiesCacheStore(
     // F5b): the startup check used to rewrite this multi-megabyte,
     // 3,823-model cache on every plugin instance (~0.85s per rewrite, 79
     // rewrites in 26h) even when the models.dev catalog had not changed.
+    // The comparison ignores generatedAt, which differs on every fetch.
     snapshotCacheStore.writeIfChanged(snapshot)
     return snapshot
   }
