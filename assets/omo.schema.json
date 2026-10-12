@@ -2253,7 +2253,7 @@
           "type": "boolean"
         },
         "shortcut": {
-          "default": "ctrl+alt+s",
+          "default": "alt+s",
           "anyOf": [
             {
               "type": "string",

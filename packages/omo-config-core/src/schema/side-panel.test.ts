@@ -14,7 +14,7 @@ describe("omo config side_panel section", () => {
     expect(result.success).toBe(true)
     if (!result.success) return
     expect(result.data.side_panel?.enabled).toBe(false)
-    expect(resolveOmoSidePanelSettings({}).shortcut).toBe("ctrl+alt+s")
+    expect(resolveOmoSidePanelSettings({}).shortcut).toBe("alt+s")
     expect(result.data.side_panel?.sections).toEqual({
       session: true,
       goal: true,

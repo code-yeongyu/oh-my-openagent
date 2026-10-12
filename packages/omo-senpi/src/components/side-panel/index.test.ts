@@ -98,7 +98,7 @@ describe("side panel component", () => {
     createSidePanelComponent({ loadSettings: () => settings({ enabled: false }) }).register(pi, componentContext(pi))
     await pi.dispatch("session_start", {}, host)
     expect(widgets).toEqual([])
-    expect(shortcut?.key).toBe("ctrl+alt+s")
+    expect(shortcut?.key).toBe("alt+s")
     if (shortcut === undefined) throw new Error("side panel shortcut missing")
 
     // when
