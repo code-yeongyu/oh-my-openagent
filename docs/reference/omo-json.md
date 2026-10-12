@@ -197,6 +197,7 @@ default** because it rearranges the whole screen.
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `enabled` | boolean | `false` | Render the panel. |
+| `shortcut` | string \| false | `"alt+s"` | Open the panel during a session; `false` disables the shortcut. |
 | `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
 | `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
 | `clickable` | boolean | `true` | Paint file and subagent rows as OSC 8 links, so a mouse click opens the same viewer a command would. Set it to `false` on a terminal that mangles hyperlinks. |
@@ -208,7 +209,8 @@ hyperlinks; the panel paints its rows as links to a private scheme and claims th
 callback while it is mounted, handing every other URL straight back. Clicking a file opens its diff;
 clicking a subagent opens its card followed by everything that child recorded, rendered by the task
 engine itself - the same text `task_output` would give you. `/side-panel-diff` reaches the file
-viewer by name; it is registered only when the panel is enabled for the run.
+viewer by name; it is registered when the panel is enabled for the run or when the host supports
+an active panel-opening shortcut.
 
 A child the engine is holding rather than running - a host session whose daemon went away, one
 caught by a draining host, or simply one the engine detached when its session ended - is counted
