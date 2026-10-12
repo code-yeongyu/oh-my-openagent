@@ -4,6 +4,18 @@ import { log } from "../../shared"
 import { getFileAllSessions, getFileMainSessions, fileSessionExists, getFileSessionInfo, getFileSessionMessages, getFileSessionTodos, getFileSessionTranscript } from "./file-storage"
 import { getSdkAllSessions, getSdkMainSessions, getSdkSessionMessages, getSdkSessionTodos, sdkSessionExists, shouldFallbackFromSdkError, type GlobalSessionClient } from "./sdk-storage"
 import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"
+import { describeSessionError } from "./session-error"
+
+// A session that exists only in OpenCode's legacy JSON storage is listed, but the SQLite server answers
+// NotFoundError for it (#5854). For a single session that means "not in the SDK", so the reader goes on to
+// file storage, exactly as it does for an SDK read that came back empty.
+function isSdkSessionNotFound(error: unknown): boolean {
+  return error instanceof Error && error.name === "NotFoundError"
+}
+
+function shouldReadFileSession(error: unknown): boolean {
+  return shouldFallbackFromSdkError(error) || isSdkSessionNotFound(error)
+}
 
 export interface GetMainSessionsOptions {
   directory?: string
@@ -62,7 +74,7 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
       return mergeSessionMetadataLists(sdkSessions, fileSessions)
     } catch (error) {
       if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file session list after SDK unavailable error", { error: String(error) })
+      log("[session-manager] falling back to file session list after SDK unavailable error", { error: describeSessionError(error) })
     }
   }
 
@@ -77,7 +89,7 @@ export async function getAllSessions(limit?: number): Promise<string[]> {
       return mergeSessionIds(sdkSessionIds, fileSessionIds)
     } catch (error) {
       if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file session ids after SDK unavailable error", { error: String(error) })
+      log("[session-manager] falling back to file session ids after SDK unavailable error", { error: describeSessionError(error) })
     }
   }
 
@@ -92,8 +104,8 @@ export async function sessionExists(sessionID: string): Promise<boolean> {
       const existsInSdk = await sdkSessionExists(sdkClient, sessionID)
       if (existsInSdk) return true
     } catch (error) {
-      if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file sessionExists after SDK unavailable error", { error: String(error), sessionID })
+      if (!shouldReadFileSession(error)) throw error
+      log("[session-manager] reading file sessionExists after SDK error", { error: describeSessionError(error), sessionID })
     }
   }
   return fileSessionExists(sessionID)
@@ -105,8 +117,8 @@ export async function readSessionMessages(sessionID: string): Promise<SessionMes
       const sdkMessages = await getSdkSessionMessages(sdkClient, sessionID)
       if (sdkMessages.length > 0) return sdkMessages
     } catch (error) {
-      if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file session messages after SDK unavailable error", { error: String(error), sessionID })
+      if (!shouldReadFileSession(error)) throw error
+      log("[session-manager] reading file session messages after SDK error", { error: describeSessionError(error), sessionID })
     }
   }
 
@@ -119,8 +131,8 @@ export async function readSessionTodos(sessionID: string): Promise<TodoItem[]> {
       const sdkTodos = await getSdkSessionTodos(sdkClient, sessionID)
       if (sdkTodos.length > 0) return sdkTodos
     } catch (error) {
-      if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file session todos after SDK unavailable error", { error: String(error), sessionID })
+      if (!shouldReadFileSession(error)) throw error
+      log("[session-manager] reading file session todos after SDK error", { error: describeSessionError(error), sessionID })
     }
   }
 
@@ -165,8 +177,8 @@ export async function getSessionInfo(sessionID: string): Promise<SessionInfo | n
         }
       }
     } catch (error) {
-      if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file session info after SDK unavailable error", { error: String(error), sessionID })
+      if (!shouldReadFileSession(error)) throw error
+      log("[session-manager] reading file session info after SDK error", { error: describeSessionError(error), sessionID })
     }
   }
 

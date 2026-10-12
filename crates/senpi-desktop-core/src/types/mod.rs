@@ -11,7 +11,7 @@ mod display;
 mod window;
 
 pub use ax::{AxNode, AxQuery, AxSnapshot, AxSnapshotOptions};
-pub use capture::{CaptureCaps, CaptureMode, CaptureResult, DesktopCapture, DEFAULT_CAPTURE_MAX_BYTES};
+pub use capture::{CaptureCaps, CaptureMode, CaptureRegion, CaptureResult, DesktopCapture, ObserveResult, DEFAULT_CAPTURE_MAX_BYTES};
 pub use display::{DesktopCapabilities, DesktopDisplay, DisplaySelector};
 pub use window::{DesktopPoint, DesktopWindow, FrontWindow, PointerOptions, Target};
 
@@ -59,3 +59,6 @@ impl Default for ScreenshotGc {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod display_tests;

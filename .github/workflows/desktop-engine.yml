@@ -66,7 +66,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update
-          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y xvfb at-spi2-core dbus dbus-x11 xterm xdotool xfce4-terminal
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y xvfb at-spi2-core dbus dbus-x11 xterm xdotool xfce4-terminal python3-gi gir1.2-gtk-3.0 libatk-adaptor
 
       - name: Setup Rust
         shell: bash
@@ -126,6 +126,7 @@ jobs:
           for test in ax_tree_of_xterm_lists_window permission_is_toolkits_silent_until_a_toolkit_publishes; do
             dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact "live_tests::$test"
           done
+          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact --nocapture menus_live_tests::menu_listing_and_select_against_a_real_gtk_menu_bar
           env -u AT_SPI_BUS_ADDRESS DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/senpi-no-bus cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact live_tests::no_bus_reports_bus_unreachable
 
       - name: Write job summary

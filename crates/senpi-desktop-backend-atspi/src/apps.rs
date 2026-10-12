@@ -54,12 +54,17 @@ pub(crate) fn windows<B: AtSpiBus>(bus: &mut B) -> CoreResult<Vec<DesktopWindow>
     Ok(windows)
 }
 
+/// Whether `role` is a top-level frame, dialog, or window.
+pub(crate) fn is_top_level(role: Role) -> bool {
+    matches!(role, Role::Frame | Role::Dialog | Role::Window)
+}
+
 /// The children of `app` that are frames, dialogs, or windows.
 pub(crate) fn frames<B: AtSpiBus>(bus: &mut B, app: &B::Node) -> BusResult<Vec<B::Node>> {
     let children = bus.children(app)?;
     Ok(children
         .into_iter()
-        .filter(|child| matches!(bus.role(child), Ok(Role::Frame | Role::Dialog | Role::Window)))
+        .filter(|child| bus.role(child).is_ok_and(is_top_level))
         .collect())
 }
 

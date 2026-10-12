@@ -10,6 +10,8 @@
 		"desktop.displays",
 		"desktop.windows",
 		"desktop.capture",
+		"desktop.captureRegion",
+		"desktop.observe",
 		"desktop.click",
 		"desktop.moveMouse",
 		"desktop.drag",
@@ -43,6 +45,8 @@
 		"desktop.displays": "read",
 		"desktop.windows": "read",
 		"desktop.capture": "read",
+		"desktop.captureRegion": "read",
+		"desktop.observe": "read",
 		"desktop.click": "mutate",
 		"desktop.moveMouse": "mutate",
 		"desktop.drag": "mutate",
@@ -150,6 +154,208 @@
 							"minimum": 0,
 							"description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
 							"default": 5000000
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.captureRegion": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"region": {
+					"$ref": "#/definitions/CaptureRegion"
+				},
+				"caps": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/CaptureCaps"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"frameId": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"target",
+				"region"
+			],
+			"description": "`captureRegion`: native-detail zoom preserving the last full input frame.",
+			"additionalProperties": false,
+			"definitions": {
+				"CaptureRegion": {
+					"type": "object",
+					"properties": {
+						"x": {
+							"type": "number",
+							"format": "double"
+						},
+						"y": {
+							"type": "number",
+							"format": "double"
+						},
+						"width": {
+							"type": "number",
+							"format": "double"
+						},
+						"height": {
+							"type": "number",
+							"format": "double"
+						}
+					},
+					"required": [
+						"x",
+						"y",
+						"width",
+						"height"
+					],
+					"description": "Rectangle in the pixels of the last full screenshot, not the zoom image.",
+					"additionalProperties": false
+				},
+				"CaptureCaps": {
+					"type": "object",
+					"properties": {
+						"maxWidth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxHeight": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"coordinateSafe": {
+							"type": "boolean",
+							"description": "Clamp to the coordinate-safe size for models that click in image pixels.",
+							"default": false
+						},
+						"maxBytes": {
+							"type": "integer",
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
+							"default": 5000000
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.observe": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"caps": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/CaptureCaps"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"ax": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/AxSnapshotOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target"
+			],
+			"description": "`observe`: an atomic window screenshot and accessibility snapshot.",
+			"additionalProperties": false,
+			"definitions": {
+				"CaptureCaps": {
+					"type": "object",
+					"properties": {
+						"maxWidth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxHeight": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"coordinateSafe": {
+							"type": "boolean",
+							"description": "Clamp to the coordinate-safe size for models that click in image pixels.",
+							"default": false
+						},
+						"maxBytes": {
+							"type": "integer",
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
+							"default": 5000000
+						}
+					},
+					"additionalProperties": false
+				},
+				"AxSnapshotOptions": {
+					"type": "object",
+					"properties": {
+						"maxDepth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxNodes": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"all": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"default": null
 						}
 					},
 					"additionalProperties": false

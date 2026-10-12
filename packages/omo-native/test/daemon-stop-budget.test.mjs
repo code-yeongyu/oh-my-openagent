@@ -4,9 +4,11 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { runDaemonCommand } from "../bin/lib/daemon.js"
-import { hostStopBudgetMs } from "../bin/lib/daemon-stop-budget.js"
+import { hostStopBudgetMs, postDrainStopReserveMs } from "../bin/lib/daemon-stop-budget.js"
 
 const engineStopModule = join(dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))), "modes/rpc/host-ensure-stop.js")
+const engineIntentModule = join(dirname(engineStopModule), "host-stop-intent.js")
+const engineStalledModule = join(dirname(engineStopModule), "host-stalled-evidence.js")
 
 function stop({ releaseAt = Infinity, timeout = "30", env = {}, reachable = true } = {}) {
   let clock = 0
@@ -41,19 +43,29 @@ function stop({ releaseAt = Infinity, timeout = "30", env = {}, reachable = true
 }
 
 describe("daemon stop respects the engine shutdown budget", () => {
-  // Compatibility contract: a larger budget in an adopted engine must fail
-  // here rather than leave the mirrored launcher budget silently too small.
+  // Compare the total and its parts: an engine can move time into the
+  // post-drain reserve without changing its total stop budget.
   for (const value of [undefined, "120000", "900000", "1", " 120000 ", "0", "-1", "1.5", "bad"]) {
-    test(`the mirror covers installed Senpi with stalled stop override ${value === undefined ? "unset" : JSON.stringify(value)}`, () => {
+    test(`total and post-drain reserve match installed Senpi with stalled stop override ${value === undefined ? "unset" : JSON.stringify(value)}`, () => {
       const env = { ...process.env }
       delete env.SENPI_RPC_CHILD_STALLED_STOP_MAX_MS
       if (value !== undefined) env.SENPI_RPC_CHILD_STALLED_STOP_MAX_MS = value
-      const engineBudget = Number(execFileSync(process.execPath, [
+      const engine = JSON.parse(execFileSync(process.execPath, [
         "--eval",
-        `import { STOP_WAIT_BUDGET_MS } from ${JSON.stringify(pathToFileURL(engineStopModule).href)}; console.log(STOP_WAIT_BUDGET_MS)`,
+        `import { STOP_WAIT_BUDGET_MS, DEFAULT_STOP_TIMEOUT_MS, SIGKILL_GRACE_MS } from ${JSON.stringify(pathToFileURL(engineStopModule).href)};
+import { CHILD_STOP_TIMEOUT_MS, CHILD_KILL_EXIT_TIMEOUT_MS } from ${JSON.stringify(pathToFileURL(engineIntentModule).href)};
+import { childStalledStopMaxMs } from ${JSON.stringify(pathToFileURL(engineStalledModule).href)};
+console.log(JSON.stringify({
+  budget: STOP_WAIT_BUDGET_MS, defaultStop: DEFAULT_STOP_TIMEOUT_MS, sigkillGrace: SIGKILL_GRACE_MS,
+  childStop: CHILD_STOP_TIMEOUT_MS, childKillExit: CHILD_KILL_EXIT_TIMEOUT_MS, stalled: childStalledStopMaxMs(),
+}))`,
       ], { env, cwd: tmpdir(), encoding: "utf8", timeout: 15_000 }))
-      expect(Number.isFinite(engineBudget)).toBe(true)
-      expect(hostStopBudgetMs(env)).toBe(engineBudget)
+      expect(Number.isFinite(engine.budget)).toBe(true)
+      expect(hostStopBudgetMs(env)).toBe(engine.budget)
+      expect(postDrainStopReserveMs()).toBe(
+        engine.defaultStop - Math.max(engine.childStop, engine.stalled)
+          - engine.childKillExit + engine.sigkillGrace,
+      )
     })
   }
 

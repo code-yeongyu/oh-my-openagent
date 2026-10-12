@@ -20,6 +20,8 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("displays", "read", "public"),
     ("windows", "read", "public"),
     ("capture", "read", "public"),
+    ("captureRegion", "read", "public"),
+    ("observe", "read", "public"),
     ("click", "exec", "public"),
     ("moveMouse", "exec", "public"),
     ("drag", "exec", "public"),

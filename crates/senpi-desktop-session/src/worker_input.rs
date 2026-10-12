@@ -28,7 +28,7 @@ impl Worker {
         let frame = self.frames.latest(target, frame_id)?;
         let current = match target {
             Target::Window(_) => Some(self.window(target)?),
-            Target::Desktop => None,
+            Target::Desktop | Target::Display(_) => None,
         };
         Ok((frame, current))
     }

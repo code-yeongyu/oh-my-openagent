@@ -14,6 +14,7 @@ mod send_event;
 mod server;
 mod settle;
 mod toolkit_filter;
+mod transitions;
 mod xtest;
 
 #[cfg(test)]
@@ -38,11 +39,11 @@ use senpi_desktop_core::types::{DesktopPoint, Target};
 use x11rb::protocol::xproto::Window;
 
 pub use connection::X11InputConnection;
-use held::{Held, HeldButton, HeldKey, Route};
+use held::{Held, Route};
 use keys::Stroke;
 pub use keys::{keysym_variants, Keymap};
 pub use server::InputServer;
-use server::{FakeInput, SentEvent, Spot};
+use server::Spot;
 
 pub struct X11Input<S = X11InputConnection> {
     server: S,
@@ -78,7 +79,7 @@ impl<S: InputServer> X11Input<S> {
     pub fn pointer(&mut self, target: &Target, event: &PointerEvent, mode: DeliveryMode) -> CoreResult<()> {
         self.last_pointer_motion = None;
         match (target, mode) {
-            (Target::Desktop, _) => self.pointer_xtest(event, None),
+            (Target::Desktop | Target::Display(_), _) => self.pointer_xtest(event, None),
             (Target::Window(id), DeliveryMode::Foreground) => self.pointer_foreground(parse_window(id)?, event),
             (Target::Window(id), DeliveryMode::Background) => {
                 let window = self.background_window(id, send_event::event_kind(event))?;
@@ -197,7 +198,7 @@ impl<S: InputServer> X11Input<S> {
         deliver: impl FnOnce(&mut Self, Route) -> CoreResult<()>,
     ) -> CoreResult<()> {
         let result = match (target, mode) {
-            (Target::Desktop, _) => deliver(self, Route::Xtest),
+            (Target::Desktop | Target::Display(_), _) => deliver(self, Route::Xtest),
             (Target::Window(id), DeliveryMode::Foreground) => {
                 self.with_foreground(parse_window(id)?, |this| deliver(this, Route::Xtest))
             }
@@ -242,60 +243,6 @@ impl<S: InputServer> X11Input<S> {
             state &= !stroke.mask;
         }
         first_error.map_or(Ok(()), Err)
-    }
-
-    /// The single key-event emitter: a press is recorded as held before it
-    /// is sent, a release forgotten only once it was sent.
-    fn key(&mut self, route: Route, stroke: Stroke, press: bool, state: u16) -> CoreResult<()> {
-        let held = HeldKey {
-            route,
-            code: stroke.code,
-        };
-        if press {
-            self.held.key_down(held);
-        }
-        match route {
-            Route::Xtest => self.server.fake(FakeInput::Key {
-                code: stroke.code,
-                press,
-            }),
-            Route::Window(window) => self.server.send(
-                window,
-                SentEvent::Key {
-                    code: stroke.code,
-                    press,
-                    state,
-                },
-            ),
-        }?;
-        if !press {
-            self.held.key_up(held);
-        }
-        Ok(())
-    }
-
-    /// The single button-event emitter, with the same held-state rules.
-    fn button(&mut self, button: HeldButton, press: bool, state: u16) -> CoreResult<()> {
-        if press {
-            self.held.button_down(button);
-        }
-        let HeldButton { route, detail, at } = button;
-        match route {
-            Route::Xtest => self.server.fake(FakeInput::Button { detail, press }),
-            Route::Window(window) => self.server.send(
-                window,
-                SentEvent::Button {
-                    detail,
-                    press,
-                    at,
-                    state,
-                },
-            ),
-        }?;
-        if !press {
-            self.held.button_up(route, detail);
-        }
-        Ok(())
     }
 }
 

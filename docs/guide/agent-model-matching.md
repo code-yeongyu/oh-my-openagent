@@ -2,7 +2,7 @@
 
 > **For agents and users**: the four model-profile lanes that pick the main agent's model, which models carry tuned prompt presets, how curated agents and categories keep their own chains, and how to change any of it without breaking things.
 
-**OmO Native sets all of this up on its own, so you can probably skip this page.** With nothing in `omo.json`, a fresh session starts on Claude Opus 5.5 when you have it and otherwise on the next model of the Recommended list below that you have connected, and every category and curated agent picks its model from its own chain against the providers you are logged in to. A category that none of your providers can serve is left off the main agent's list, so it is never picked and then fails. Read on when you want to change a default, or when you want to know why a session landed on the model it did.
+**OmO Native sets all of this up on its own, so you can probably skip this page.** With nothing in `omo.json`, a fresh session starts on Daily · Normal (Claude Opus 5.5, then Kimi K3, then GLM 5.3, whichever you have connected), or on the first other lane that resolves, and every category and curated agent picks its model from its own chain against the providers you are logged in to. A category that none of your providers can serve is left off the main agent's list, so it is never picked and then fails. Read on when you want to change a default, or when you want to know why a session landed on the model it did.
 
 ---
 
@@ -17,7 +17,7 @@ The main agent thinks with your session model. The easiest way to choose it is a
 | Geeky · Normal | `geeky-normal` | Works on one task and thinks it through. | `chatgpt-subscription\|openai/gpt-6.1-sol-fast (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol (medium)` -> `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-5.6-sol (medium)` |
 | Geeky · Heavy | `geeky-heavy` | Works on one task and thinks it over from every side. | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (high)` |
 
-With no `model_profile` at all, a fresh desktop or headless session runs **Recommended** (`recommended`), which is not a lane: `claude-opus-5-5` (medium) -> `claude-fable-5-1` (xhigh) -> `kimi-k3` (max) -> `gpt-6-astra` (xhigh) -> `gpt-6.1-sol` (medium) -> `gpt-6-sol` (medium) -> `glm-5.3` (max), each rung served only by its ranked providers (Claude subscription, then the Anthropic API, Copilot, OpenCode; Kimi Code, then Moonshot and OpenCode Go; ChatGPT subscription, then the OpenAI API, Copilot, OpenCode, except GPT-6.1 Sol, which only the ChatGPT subscription and the OpenAI API serve; Z.ai Coding Plan, then OpenCode Go). Gateway aggregators such as OpenGateway and OpenRouter are never picked for it. It is the order Senpi's recommended-model auto-switch uses in the terminal, plus the GPT-6 Sol rung behind GPT-6.1 Sol so Copilot and OpenCode Zen still reach a GPT-6 Sol.
+With no `model_profile` at all, a fresh desktop or headless session starts on **Daily · Normal**. When none of its rungs resolves on the connected providers, the first of Daily · Heavy, Geeky · Normal and Geeky · Heavy that does is used instead, so a ChatGPT-only setup starts on Geeky · Normal. Every rung is served only by its ranked providers (Claude subscription, then the Anthropic API, Copilot, OpenCode; Kimi Code, then Moonshot and OpenCode Go; ChatGPT subscription, then the OpenAI API, Copilot, OpenCode, except GPT-6.1 Sol, which only the ChatGPT subscription and the OpenAI API serve; Z.ai Coding Plan, then OpenCode Go), and gateway aggregators such as OpenGateway and OpenRouter are never picked. There is no separate Recommended profile: Daily is OmO's recommendation.
 
 Activate a lane with a single key in `omo.json`:
 
@@ -29,17 +29,17 @@ The session prints `OmO Native: model profile "daily-normal" (Daily · Normal) s
 
 - **Pins win.** Write a literal `provider/model` into the same key (`"model_profile": "anthropic/claude-opus-5-5"`) and that exact model is applied; anything containing `/` is a pin.
 - **Explicit models are never clobbered.** A `--model` flag, a scoped model, a resumed session, and a fork keep their own model; the profile only touches a fresh session.
-- **Unset means Recommended.** With no `model_profile`, a fresh session applies `recommended`. That apply is session-scoped and is not written back to `omo.json`.
+- **Unset means Daily · Normal.** With no `model_profile`, a fresh session applies Daily · Normal, or the first lane that resolves. That apply is session-scoped and is not written back to `omo.json`. A config that still names the retired `recommended` gets the same default and one log line; it is not an error.
 - **Session-scoped.** The apply never writes `settings.json` or `omo.json`. Mid-session failures follow Senpi's retry chains, not the profile.
 - **The interactive TUI ignores `model_profile`**, pins included, because it has no lane surface yet. A TUI session that starts on an implicit default is moved by Senpi's own recommended-model switch, which uses the same six-model order.
-- **Retired ids are unknown.** `capable`, `deep-work`, and `simple-work` are not aliases. A config still naming one of them gets the unknown-profile notice listing `recommended` and the four lane ids.
+- **Retired ids are unknown.** `capable`, `deep-work`, and `simple-work` are not aliases. A config still naming one of them gets the unknown-profile notice listing the four lane ids.
 - **Your own chains.** `model_profiles.<name>` adds a profile or replaces a builtin's entire model chain. A builtin override keeps its family/tier identity unless those metadata fields are supplied. A provider-qualified candidate is used only on that provider; if absent, only the next configured candidate is tried. Bare model ids may match any provider. Key reference: [omo.json](../reference/omo-json.md#model-profiles-native-harness).
 
 You can still pick with `/model` and switch mid-session; the main agent switches with you, and the prompt preset follows the new model.
 
 ### The recommended models
 
-We tune the orchestration prompt against the models on the Recommended ladder: Claude Opus 5.5, Claude Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GLM 5.3. Their order is our order of preference. The Daily lanes and Geeky · Heavy are slices of it; Geeky · Normal runs GPT-6.1 Sol Fast at medium, then plain GPT-6.1 Sol, falling back to GPT-5.6 Sol where 6.1 Sol isn't served.
+We tune the orchestration prompt against Claude Opus 5.5, Claude Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GLM 5.3, in that order of preference. The Daily lanes and Geeky · Heavy are slices of it; Geeky · Normal runs GPT-6.1 Sol Fast at medium, then plain GPT-6.1 Sol, falling back to GPT-5.6 Sol where 6.1 Sol isn't served.
 
 - **Claude Opus 5.5 and Claude Fable 5.1** are the reference configuration for the orchestration prompt: long nested todos, delegation tables, many tool calls in a row.
 - **GPT-6 Astra, GPT-6.1 Sol and GPT-6 Sol** get the GPT-native `gpt-6-astra` preset, built for autonomous, principle-driven work. Over-orchestration on small bounded tasks is a known risk on GPT; give it a goal, not a recipe.
@@ -67,7 +67,7 @@ The harness ships a prompt preset per model family. When your session model matc
 | `gpt-5.4`, `gpt-5.3-codex` and older GPT-5 presets | Older GPT-5 ids | Kept for configs that still pin them. |
 | `kimi-k3` | Kimi K3 (`k3` on Kimi Code) and Devin SWE-2 | Instruction-following mirrors Claude closely. The preset is calibrated to stop overthinking and keep work moving, so expect thinking-token cost. |
 | `kimi-k2-8` / `kimi-k2-7` / `kimi-k2-6` | Kimi K2.8 (including `kimi-for-coding`), K2.7 (including `kimi-for-coding-highspeed`, the `explore` and `librarian` head), K2.6 | Older Kimi line. Not a recommended main-agent configuration. |
-| `glm-5.3` / `glm-5.2` | GLM 5.3 and 5.2 | Claude-like, slightly looser on long nested workflows. GLM 5.3 is the last Recommended rung; see the validation note above. |
+| `glm-5.3` / `glm-5.2` | GLM 5.3 and 5.2 | Claude-like, slightly looser on long nested workflows. GLM 5.3 is the last Daily · Normal rung; see the validation note above. |
 | `deepseek-v4-pro` | DeepSeek V4 Pro | Preset exists. Not a recommended main-agent configuration. |
 | `deepseek-v4-1-flash` | DeepSeek V4.1 Flash, including `deepseek-flash` and `deepseek/deepseek-v4-flash` (DeepSeek's own API has served V4.1 under that name since 2026-09-10) | Preset exists. Not a recommended main-agent configuration. |
 | `deepseek-v4-flash` / `deepseek-v4-flash-0731` | DeepSeek V4 Flash on other hosts, and the dated snapshot | Preset exists. Not a recommended main-agent configuration. |
@@ -124,7 +124,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect`, `visual-engineering` and `artistry` categories, and of Daily · Heavy, and the second rung of Recommended. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
+Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect`, `visual-engineering` and `artistry` categories, and of Daily · Heavy. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
 
 ```jsonc
 {
@@ -248,7 +248,7 @@ Because this is your own configuration, `deep-low` stays on the list even on a m
 
 **Risky**, family or role mismatch:
 
-- **Main agent on a model outside the Recommended ladder.** Maintainers don't test it. Can break at the very next patch. A prompt cannot fix a model.
+- **Main agent on a model outside the recommended models above.** Maintainers don't test it. Can break at the very next patch. A prompt cannot fix a model.
 - **`ultrabrain`, `deep-low` or `deep-high` on Claude or Kimi.** These categories are built for GPT's autonomous style. Other families finish eventually but don't shine.
 - **`plan-reviewer` on a small or fast model.** Review needs sustained reasoning; small models drift and rubber-stamp.
 - **`explore` / `librarian` on Opus or Fable.** Massive cost waste. Search needs speed, not intelligence.
@@ -264,7 +264,7 @@ For the main agent, resolution happens once, at session start (`packages/omo-sen
 1. --model flag or scoped model    -> kept as is; the profile never runs
 2. model_profile = provider/model  -> the pin; that exact model, if the registry serves it
 3. model_profile = <profile id>    -> builtins overlaid with model_profiles; first rung the registry serves
-4. model_profile unset            -> Recommended on a fresh desktop/headless session
+4. model_profile unset            -> Daily · Normal, else the first lane that resolves (Daily · Heavy, Geeky · Normal, Geeky · Heavy)
 5. No profile candidate available  -> notice; retain Senpi's selected model
 ```
 
@@ -288,6 +288,6 @@ Your explicit configuration always wins. If you set a model for a category or ag
 - [Installation Guide](./installation.md): setup and provider authentication
 - [Orchestration System Guide](./orchestration.md): how the main agent delegates to categories and curated agents
 - [omo.json Reference](../reference/omo-json.md): `model_profiles`, `model_profile`, `agents`, `categories`, and `models` keys
-- [`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`](../../packages/omo-senpi/src/components/model-profile/builtin-profiles.ts): the Recommended ladder and the four lane chains
+- [`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`](../../packages/omo-senpi/src/components/model-profile/builtin-profiles.ts): the four lane chains
 - [`packages/senpi-task/src/agents/builtin/fallback-chains.ts`](../../packages/senpi-task/src/agents/builtin/fallback-chains.ts): curated agent chains
 - [`packages/senpi-task/src/category/fallback-chains.ts`](../../packages/senpi-task/src/category/fallback-chains.ts): category chains

@@ -24,6 +24,10 @@ pub(crate) struct FakeNode {
     pub(crate) hit: Option<u64>,
     pub(crate) actions: Vec<String>,
     pub(crate) action_succeeds: bool,
+    pub(crate) key_binding: String,
+    /// The application connection serving this object, when it differs
+    /// from the one its parent chain leads to (0: follow the parent chain).
+    pub(crate) application: u64,
     pub(crate) text: String,
     pub(crate) text_accepted: bool,
     pub(crate) focus_accepted: bool,
@@ -46,6 +50,8 @@ impl FakeNode {
             hit: None,
             actions: Vec::new(),
             action_succeeds: true,
+            key_binding: String::new(),
+            application: 0,
             text: String::new(),
             text_accepted: true,
             focus_accepted: true,
@@ -61,6 +67,9 @@ impl FakeNode {
     }
 }
 
+/// `(node, nth read of its children, change applied before that read)`.
+pub(crate) type ChildrenMutation = (u64, usize, fn(&mut FakeBus));
+
 #[derive(Debug, Default)]
 pub(crate) struct FakeBus {
     pub(crate) nodes: HashMap<u64, FakeNode>,
@@ -68,6 +77,10 @@ pub(crate) struct FakeBus {
     pub(crate) pids: HashMap<u64, u32>,
     pub(crate) registry_down: bool,
     pub(crate) calls: Vec<String>,
+    /// Changes the tree when `node`'s children are read for the `nth` time,
+    /// standing in for an application that changes mid-request.
+    pub(crate) mutate_on_children: Option<ChildrenMutation>,
+    pub(crate) children_reads: HashMap<u64, usize>,
 }
 
 impl FakeBus {
@@ -80,6 +93,20 @@ impl FakeBus {
             owner.children.push(id);
         }
         self.nodes.insert(id, node);
+    }
+
+    /// The registered application `node` descends from (0 when detached).
+    fn application_of(&self, node: u64) -> u64 {
+        let mut current = node;
+        for _ in 0..64 {
+            match self.nodes.get(&current).map(|found| (found.application, found.parent)) {
+                Some((0, 0)) => return current,
+                Some((0, parent)) => current = parent,
+                Some((application, _)) => return application,
+                None => return 0,
+            }
+        }
+        0
     }
 
     fn get(&self, node: u64) -> BusResult<&FakeNode> {
@@ -150,6 +177,14 @@ impl AtSpiBus for FakeBus {
     }
 
     fn children(&mut self, node: &u64) -> BusResult<Vec<u64>> {
+        let reads = self.children_reads.entry(*node).or_default();
+        *reads += 1;
+        let reads = *reads;
+        if let Some((target, nth, mutate)) = self.mutate_on_children {
+            if target == *node && nth == reads {
+                mutate(self);
+            }
+        }
         Ok(self.get(*node)?.children.clone())
     }
 
@@ -187,6 +222,15 @@ impl AtSpiBus for FakeBus {
     fn do_action(&mut self, node: &u64, index: i32) -> BusResult<bool> {
         self.calls.push(format!("action {node} #{index}"));
         Ok(self.get(*node)?.action_succeeds)
+    }
+
+    fn key_binding(&mut self, node: &u64, _index: i32) -> BusResult<String> {
+        Ok(self.get(*node)?.key_binding.clone())
+    }
+
+    fn same_application(&self, a: &u64, b: &u64) -> bool {
+        let app = self.application_of(*a);
+        app != 0 && app == self.application_of(*b)
     }
 
     fn text(&mut self, node: &u64, max_chars: i32) -> BusResult<String> {

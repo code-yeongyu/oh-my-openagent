@@ -12,20 +12,7 @@ import registerMockProvider, {
 	streamMockStep,
 } from "./mock-provider/index.ts";
 
-interface Matcher {
-	not: Matcher;
-	toBe(expected: unknown): void;
-	toContain(expected: unknown): void;
-	toContainEqual(expected: unknown): void;
-	toMatch(expected: RegExp): void;
-}
-
-declare function describe(name: string, fn: () => void): void;
-declare function expect(value: unknown): Matcher;
-declare namespace expect {
-	function objectContaining(value: Record<string, unknown>): unknown;
-}
-declare function test(name: string, fn: () => void | Promise<void>): void;
+import { describe, expect, test } from "bun:test";
 
 interface ChildProcessModule {
 	spawnSync(

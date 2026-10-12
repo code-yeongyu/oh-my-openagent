@@ -107,7 +107,7 @@ impl MacInput {
         capture: &MacCapture,
     ) -> CoreResult<()> {
         match target {
-            Target::Desktop => global::pointer(&self.source, &mut self.held, event),
+            Target::Desktop | Target::Display(_) => global::pointer(&self.source, &mut self.held, event),
             Target::Window(id) => {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
@@ -155,7 +155,7 @@ impl MacInput {
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
         match target {
-            Target::Desktop => keys::type_text_interruptible(
+            Target::Desktop | Target::Display(_) => keys::type_text_interruptible(
                 &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
             ),
             Target::Window(id) => {
@@ -190,7 +190,7 @@ impl MacInput {
         capture: &MacCapture,
     ) -> CoreResult<()> {
         match target {
-            Target::Desktop => keys::chord(&self.source, &mut self.held, chord, KeyRoute::Global),
+            Target::Desktop | Target::Display(_) => keys::chord(&self.source, &mut self.held, chord, KeyRoute::Global),
             Target::Window(id) => {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;

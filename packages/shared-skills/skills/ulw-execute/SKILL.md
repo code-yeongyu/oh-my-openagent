@@ -96,7 +96,7 @@ Write `.omo/boulder.json` before implementation starts. Prefix session ids with 
 }
 ```
 
-Every phase (plan wave) runs in its own task-owned worktree with its own goal: before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then `git worktree add <repo>-wt/<plan>-<wave> <branch off the integration base>` (or verify a `--worktree` path with `git worktree list --porcelain`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once its checkboxes are verified (direct merge, or the PR under `--make-pr`/`--ship`), and the next wave branches from that landed base.
+Every phase (plan wave) runs in its own task-owned worktree with its own goal: before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then `git worktree add <repo>-wt/<plan>-<wave> <branch off the integration base>` (or verify a `--worktree` path with `git worktree list --porcelain`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once its checkboxes are verified (direct merge, or the PR under `--make-pr`/`--ship`), and the next wave branches from that landed base. Use the bundled ultrawork directive’s Task resources and todo rules at wave/worktree creation; read those sections if absent from context.
 
 ## Parallel delivery lanes (teams and worktrees)
 
@@ -227,7 +227,7 @@ Only after verification passes:
 When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:
 
 1. Run the plan's final verification commands.
-2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
+2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.
 3. Remove or mark the Boulder work as completed.
 4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.
 

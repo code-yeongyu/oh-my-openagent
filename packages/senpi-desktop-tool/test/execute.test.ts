@@ -42,6 +42,8 @@ describe("computer tool execute", HANG_GUARD, () => {
 			{
 			  "images": 1,
 			  "value": {
+			    "coordinateHeight": 800,
+			    "coordinateWidth": 1200,
 			    "frameId": "101-1",
 			    "height": 800,
 			    "scale": 1,
@@ -52,6 +54,34 @@ describe("computer tool execute", HANG_GUARD, () => {
 			  },
 			}
 		`);
+	});
+
+	it("shows observe's accessibility tree once, not again inside the returned value", async () => {
+		// Given
+		const { handle } = desktopFixture();
+		const params = { action: "run" as const, code: "const win = await desktop.window('101'); return await win.observe();" };
+
+		// When
+		const result = await toolFor(handle).execute("call-observe", params, undefined, undefined, hostContext());
+
+		// Then
+		const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
+		expect(texts.filter((text) => text.includes("button Run [ref=e1]"))).toEqual(["button Run [ref=e1]"]);
+		expect(texts.at(-1)).toContain('"ax": "[shown above]"');
+		expect(result.details.value).toMatchObject({ ax: "button Run [ref=e1]" });
+	});
+
+	it("keeps a short printed string in the returned value", async () => {
+		// Given
+		const { handle } = desktopFixture();
+		const params = { action: "run" as const, code: "console.log('Terminal'); return { title: 'Terminal' };" };
+
+		// When
+		const result = await toolFor(handle).execute("call-print", params, undefined, undefined, hostContext());
+
+		// Then
+		const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
+		expect(texts.at(-1)).toContain('"title": "Terminal"');
 	});
 
 	it("rejects a userReset chain as an unknown method before any engine is started", async () => {

@@ -1,6 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::DisplaySelector;
+
 /// One capturable top-level window in global logical desktop coordinates.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -37,10 +39,12 @@ pub struct FrontWindow {
     pub key_window_ax_title: Option<String>,
 }
 
-/// Parsed input/capture target: the whole desktop or one window id.
+/// Parsed input/capture target: desktop, window id, or a display selector.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
     Desktop,
+    /// Canonical `display:<selector>` key, distinct from desktop/window frames.
+    Display(String),
     Window(String),
 }
 
@@ -48,6 +52,13 @@ impl Target {
     pub fn parse(value: &str) -> Self {
         if value.eq_ignore_ascii_case("desktop") {
             Self::Desktop
+        } else if let Some(selector) = value.strip_prefix("display:") {
+            let selector = match DisplaySelector::parse(Some(selector.to_owned())) {
+                DisplaySelector::Active => "active".to_owned(),
+                DisplaySelector::All => "all".to_owned(),
+                DisplaySelector::Id(id) => id,
+            };
+            Self::Display(format!("display:{selector}"))
         } else {
             Self::Window(value.to_string())
         }
@@ -56,7 +67,16 @@ impl Target {
     pub fn key(&self) -> &str {
         match self {
             Self::Desktop => "desktop",
-            Self::Window(id) => id,
+            Self::Window(id) | Self::Display(id) => id,
+        }
+    }
+
+    pub fn display_selector(&self) -> Option<DisplaySelector> {
+        match self {
+            Self::Display(key) => Some(DisplaySelector::parse(
+                key.strip_prefix("display:").map(str::to_owned),
+            )),
+            Self::Desktop | Self::Window(_) => None,
         }
     }
 }

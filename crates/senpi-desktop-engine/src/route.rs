@@ -63,6 +63,8 @@ impl Engine {
             Method::Displays => parse::<EmptyParams>(params).and_then(|_| op(Op::Displays)),
             Method::Windows => parse::<EmptyParams>(params).and_then(|_| op(Op::Windows)),
             Method::Capture => op(Op::Capture(parse(params)?)),
+            Method::CaptureRegion => op(Op::CaptureRegion(parse(params)?)),
+            Method::Observe => op(Op::Observe(parse(params)?)),
             Method::Click => op(Op::Click(parse(params)?)),
             Method::MoveMouse => op(Op::MoveMouse(parse(params)?)),
             Method::Drag => op(Op::Drag(parse(params)?)),

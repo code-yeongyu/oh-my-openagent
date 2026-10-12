@@ -16,11 +16,17 @@ impl FakeBackend {
     /// one pixel per logical point.
     fn frame(&self, target: &Target) -> CoreResult<(FrameGeometry, u32, u32)> {
         match target {
-            Target::Desktop => {
-                let extent = |edge: fn(&DesktopDisplay) -> u32| self.displays.iter().map(edge).max();
-                let width = extent(|d| d.pixel_x.saturating_add(d.pixel_width)).unwrap_or(0);
-                let height = extent(|d| d.pixel_y.saturating_add(d.pixel_height)).unwrap_or(0);
-                Ok((FrameGeometry::for_displays(&self.displays), width, height))
+            Target::Desktop | Target::Display(_) => {
+                let selector = target.display_selector().unwrap_or(senpi_desktop_core::types::DisplaySelector::All);
+                let focused = self.windows.iter().find(|window| window.focused);
+                let mut displays = selector.select(self.displays.clone(), focused)?;
+                if displays.len() == 1 {
+                    displays[0].pixel_x = 0;
+                    displays[0].pixel_y = 0;
+                }
+                let width = displays.iter().map(|d| d.pixel_x.saturating_add(d.pixel_width)).max().unwrap_or(0);
+                let height = displays.iter().map(|d| d.pixel_y.saturating_add(d.pixel_height)).max().unwrap_or(0);
+                Ok((FrameGeometry::for_displays(&displays), width, height))
             }
             Target::Window(id) => {
                 let window = self.window(id)?;
@@ -97,7 +103,7 @@ impl Backend for FakeBackend {
         self.begin(method)?;
         self.input_gate(target, mode)?;
         let event = RecordedPointer::from(ev);
-        if *target == Target::Desktop || mode == DeliveryMode::Foreground {
+        if matches!(target, Target::Desktop | Target::Display(_)) || mode == DeliveryMode::Foreground {
             self.cursor = self.cursor.and(event.end_point());
         }
         self.deliver_focus(target, mode);

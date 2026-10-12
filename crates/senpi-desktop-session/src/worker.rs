@@ -99,8 +99,8 @@ impl Worker {
         capabilities
     }
 
-    /// `cancelled` reports that the request's waiter gave up; only mutating
-    /// requests consult it.
+    /// `cancelled` reports that the request's waiter gave up; mutation, zoom,
+    /// and atomic observation consult it.
     pub(crate) fn process(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         if self.options.is_none() {
             return Err(DesktopError::new(
@@ -116,6 +116,8 @@ impl Worker {
             Op::Displays => Ok(Response::Displays(self.backend()?.displays()?)),
             Op::Windows => Ok(Response::Windows(self.backend()?.windows()?)),
             Op::Capture(params) => self.capture(&params),
+            Op::Observe(params) => self.observe(&params, cancelled),
+            Op::CaptureRegion(params) => self.capture_region(&params, cancelled),
             Op::Click(params) => served(self.click(&params, cancelled)),
             Op::MoveMouse(params) => served(self.move_mouse(&params, cancelled)),
             Op::Drag(params) => served(self.drag(&params, cancelled)),
@@ -170,7 +172,7 @@ impl Worker {
                 .into_iter()
                 .find(|window| window.id == *id)
                 .ok_or_else(|| DesktopError::window_not_found(format!("window '{id}' was not found"))),
-            Target::Desktop => windows
+            Target::Desktop | Target::Display(_) => windows
                 .into_iter()
                 .find(|window| window.focused)
                 .ok_or_else(|| DesktopError::window_not_found("no focused window was found")),

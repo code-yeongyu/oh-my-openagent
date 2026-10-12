@@ -2,8 +2,12 @@ use super::round_to_u32;
 use crate::error::{CoreResult, DesktopError};
 use crate::types::{DesktopDisplay, DesktopWindow};
 
+mod zoom;
+
 #[derive(Debug, Clone, PartialEq)]
 struct FrameRegion {
+    id: String,
+    scale: f64,
     x: f64,
     y: f64,
     width: f64,
@@ -64,6 +68,8 @@ impl FrameGeometry {
         let regions = displays
             .iter()
             .map(|d| FrameRegion {
+                id: d.id.clone(),
+                scale: d.scale,
                 x: f64::from(d.x),
                 y: f64::from(d.y),
                 width: f64::from(d.width),
@@ -87,6 +93,8 @@ impl FrameGeometry {
             width: px_width,
             height: px_height,
             regions: vec![FrameRegion {
+                id: window.id.clone(),
+                scale: 1.0,
                 x: f64::from(window.x),
                 y: f64::from(window.y),
                 width: f64::from(window.width),

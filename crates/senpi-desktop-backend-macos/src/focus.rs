@@ -38,6 +38,14 @@ fn first_front_window(windows: &[WindowInfo], pid: u32) -> Option<u32> {
         .map(|window| window.window_number)
 }
 
+/// Capture needs only WindowServer identity; never sends Accessibility IPC to the front app.
+pub(crate) fn front_window_id() -> CoreResult<Option<u32>> {
+    let Some(pid) = current_front_pid().and_then(|pid| u32::try_from(pid).ok()) else {
+        return Ok(None);
+    };
+    Ok(first_front_window(&window_info()?, pid))
+}
+
 /// The frontmost application's first visible, normal-layer WindowServer window.
 /// AX provides its title, not its identity: AXFocusedWindow may be behind it.
 pub(crate) fn front_window() -> CoreResult<Option<FrontWindow>> {

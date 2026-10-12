@@ -178,6 +178,13 @@
       "installNow": "Install now",
       "readTheDocs": "Read the docs"
     },
+    "dori": {
+      "eyebrow": "Spoiler",
+      "title": "Someone's been working while you sleep.",
+      "body": "Not OmO. A new hire from the same people. He doesn't clock out, and you pay him in tokens.",
+      "cta": "Meet Dori",
+      "alt": "Dori, a white cartoon dog holding a rock, peeking up from the bottom of the page"
+    },
     "dag": {
       "region": "OmO desktop with the workflow graph open",
       "windowTitle": "OmO — market research, 12k sources",

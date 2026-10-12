@@ -71,6 +71,16 @@ function renderCallChain(chain: readonly ComputerCallStep[]): string {
 		: `return await (await desktop.${call(root)}).${call(hop)};`;
 }
 
+const SHOWN_ABOVE = "[shown above]";
+
+/** The return value without repeating observe's AX tree when the run already displayed it verbatim. */
+function stringifyReturn(value: unknown, shown: ReadonlySet<string>): string {
+	if (typeof value === "string") return value;
+	const replacer = (key: string, field: unknown) =>
+		key === "ax" && typeof field === "string" && shown.has(field) ? SHOWN_ABOVE : field;
+	return JSON.stringify(value, replacer, 2) ?? String(value);
+}
+
 function stringify(value: unknown): string {
 	return typeof value === "string" ? value : (JSON.stringify(value, null, 2) ?? String(value));
 }
@@ -110,7 +120,8 @@ export async function runComputer(
 		},
 	);
 	const content = [...outcome.displays];
-	if (outcome.returnValue !== undefined) content.push({ type: "text", text: stringify(outcome.returnValue) });
+	const shown = new Set(content.flatMap((part) => (part.type === "text" && part.text !== "" ? [part.text] : [])));
+	if (outcome.returnValue !== undefined) content.push({ type: "text", text: stringifyReturn(outcome.returnValue, shown) });
 	if (content.length === 0) content.push({ type: "text", text: "Done." });
 	return {
 		content,

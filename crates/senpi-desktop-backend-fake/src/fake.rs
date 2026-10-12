@@ -110,7 +110,7 @@ impl FakeBackend {
             )));
         }
         match target {
-            Target::Desktop => Ok(()),
+            Target::Desktop | Target::Display(_) => Ok(()),
             Target::Window(id) => {
                 self.window(id)?;
                 if mode == DeliveryMode::Background && !self.capabilities.background_window_input {

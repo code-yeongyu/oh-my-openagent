@@ -19,3 +19,7 @@ const xdgRoot = mkdtempSync(join(tmpdir(), "omo-test-xdg-"))
 markTestInfrastructureDir(xdgRoot)
 process.env.XDG_DATA_HOME = join(xdgRoot, "data")
 process.env.XDG_CACHE_HOME = join(xdgRoot, "cache")
+
+// Keep the telemetry opt-out in the worker baseline even if a failing local
+// afterEach prevents Bun from reaching the preload cleanup hook.
+process.env.OMO_DISABLE_POSTHOG = "true"

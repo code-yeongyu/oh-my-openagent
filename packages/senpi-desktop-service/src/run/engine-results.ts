@@ -6,7 +6,7 @@ import { DesktopServiceError } from "../service/rpc-client";
 // (`DesktopDisplay`, `DesktopWindow`, `AxNode`, `CaptureResult`). Engine stdout is the trust
 // boundary: every result is shape-checked here before the facade hands it to user code.
 
-/** Monitor geometry in global logical points plus composite screenshot pixels. */
+/** Monitor geometry in global points plus `display("all")` composite pixels, not active-capture pixels. */
 export interface DesktopDisplay {
 	readonly id: string;
 	readonly name: string;
@@ -65,10 +65,29 @@ export interface CaptureResult {
 	readonly height: number;
 	readonly sourceWidth: number;
 	readonly sourceHeight: number;
+	/** The full screenshot's frame for input; absent from engines that predate zoom, where it is `width`x`height`. */
+	readonly coordinateWidth?: number | null;
+	readonly coordinateHeight?: number | null;
+	readonly region?: CaptureRegion | null;
 	readonly scale: number;
 	readonly target: string;
 	readonly frameId: string;
 	readonly note?: string | null;
+}
+
+/** Rectangle in the last full screenshot's pixels. */
+export interface CaptureRegion {
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+/** Screenshot and AX text from one serialized, committed observation. */
+export interface ObserveResult extends CaptureResult {
+	readonly ax: string;
+	readonly nodeCount: number;
+	readonly truncated: boolean;
 }
 
 const DISPLAY: FieldSpec = {
@@ -132,6 +151,8 @@ const CAPTURE: FieldSpec = {
 	height: "number",
 	sourceWidth: "number",
 	sourceHeight: "number",
+	coordinateWidth: "number?",
+	coordinateHeight: "number?",
 	scale: "number",
 	target: "string",
 	frameId: "string",
@@ -160,7 +181,19 @@ export interface MenuItem {
 export const isMenuItem: Guard<MenuItem> = (value): value is MenuItem =>
 	matches(value, MENU_ITEM) && isStringArray(value.path);
 
-export const isCaptureResult: Guard<CaptureResult> = (value): value is CaptureResult => matches(value, CAPTURE);
+export const isCaptureResult: Guard<CaptureResult> = (value): value is CaptureResult =>
+	matches(value, CAPTURE) && (value.region == null ||
+		matches(value.region, { x: "number", y: "number", width: "number", height: "number" }));
+
+/** A zoom reply must carry the full input frame and its region; only plain captures may predate them. */
+export const isZoomResult: Guard<CaptureResult> = (value): value is CaptureResult =>
+	isCaptureResult(value) && typeof value.coordinateWidth === "number" &&
+	typeof value.coordinateHeight === "number" && value.region != null;
+
+/** An observe reply comes only from engines that already send the full input frame. */
+export const isObserveResult: Guard<ObserveResult> = (value): value is ObserveResult =>
+	isCaptureResult(value) && typeof value.coordinateWidth === "number" && typeof value.coordinateHeight === "number" &&
+	matches(value, { ax: "string", nodeCount: "number", truncated: "boolean" });
 
 export const isText: Guard<{ readonly text: string }> = (value): value is { readonly text: string } =>
 	isRecord(value) && typeof value.text === "string";

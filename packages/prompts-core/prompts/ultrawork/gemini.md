@@ -186,7 +186,13 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 
 ---
 
+## Task resources
+Before the first task command, create and record one `RUN_TMP=$(mktemp -d)` per task. Export `TMPDIR="$RUN_TMP" NODE_COMPILE_CACHE="$RUN_TMP/node-compile-cache" BUN_RUNTIME_TRANSPILER_CACHE_PATH="$RUN_TMP/bun-transpiler"` for every command; pass the same environment explicitly to children that do not inherit it. Give independent child tasks their own run roots.
+At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
+ALWAYS add a cleanup todo AT CREATION for each worktree, cache directory (including the run root), and QA resource (PID, tmux session, browser context, port, container, script or temp path); complete it only after a read-back teardown receipt.
+
 ## EXECUTION RULES
+
 - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
 - **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) - NEVER wait sequentially.
 - **BACKGROUND FIRST**: Use task for exploration/research agents (10+ concurrent if needed).
@@ -286,7 +292,7 @@ Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
 | Modifies config handling | Load the config. Verify it parses correctly. |
 
-**NAME THE EXACT TOOL + EXACT INVOCATION** per scenario — the literal `curl` / `send-keys` / `page.click` with inputs and the binary observable. **REGISTER EVERY QA-SPAWNED RESOURCE TEARDOWN AS ITS OWN TODO** (scripts, tmux assets, browser contexts, PIDs, ports, temp dirs), execute it, capture the receipt. A leftover process / tmux session / browser context = NOT done.
+**NAME THE EXACT TOOL + INVOCATION** per scenario. Tear down QA scripts, tmux assets, browser contexts, PIDs, ports, containers and QA temp paths inside `$RUN_TMP` before recording QA; leftover QA resources mean NOT done. Remove the run root and eligible worktrees at task end under Task resources.
 
 **UNACCEPTABLE (WILL BE REJECTED):**
 - "This should work" - DID YOU RUN IT? NO? THEN RUN IT.

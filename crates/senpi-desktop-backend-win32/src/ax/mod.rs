@@ -5,6 +5,7 @@
 
 mod action;
 mod automation;
+mod menus;
 mod patterns;
 mod props;
 

@@ -5,6 +5,18 @@ type AsyncBody = new (...parameters: string[]) => (...args: unknown[]) => Promis
 const AsyncFunction: AsyncBody = Object.getPrototypeOf(async () => {}).constructor;
 
 describe("JavaScript computer facade", () => {
+	it("sends display input as a display-hopped chain with its selector preserved", async () => {
+		// Given
+		const kernel = loadJsFacade(() => ({ text: "", details: { value: { id: "all" } } }));
+		// When
+		await kernel.run(`await (await computer.display("all")).click(20, 10);`);
+		// Then
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "display", args: ["all"] }] },
+			{ action: "call", chain: [{ method: "display", args: ["all"] }, { method: "click", args: [20, 10] }] },
+		]);
+	});
+
 	it("sends a window click as one two-step call chain through tool.computer", async () => {
 		// Given
 		const kernel = loadJsFacade(windowResponder);

@@ -42,14 +42,20 @@ async function main() {
     if (trees.some(existsSync)) throw new Error("source checkout remains accessible")
     const result = await drive(sandbox, controller.signal)
     if (process.platform !== "win32") {
-      const shutdown = await stopSmokeHosts(sandbox.binary, {
+      const supervisors = (await ownedProcesses(sandbox.root))
+        .filter(({ command }) => command.includes("--internal-rpc-host-supervisor"))
+      await stopSmokeHosts(sandbox.binary, {
         cwd: sandbox.cwd, env: isolatedEnvironment(sandbox), signal: controller.signal,
+      }, {
+        supervisors,
+        onDrained(shutdown) {
+          process.stderr.write(`SHUTDOWN ${shutdown.stdout.trim()}\n`)
+          for (const line of shutdown.stdout.split("\n")) {
+            const socket = line.match(/^(.+\.sock): drained/)?.[1]
+            if (socket) hostSockets.push(socket)
+          }
+        },
       })
-      process.stderr.write(`SHUTDOWN ${shutdown.stdout.trim()}\n`)
-      for (const line of shutdown.stdout.split("\n")) {
-        const socket = line.match(/^(.+\.sock): drained/)?.[1]
-        if (socket) hostSockets.push(socket)
-      }
     }
     if (result.code !== 0) throw new Error(`binary exited code=${result.code}\n${result.stderr.slice(-4000)}`)
     const passes = assertEvalLegs(sandbox, result)

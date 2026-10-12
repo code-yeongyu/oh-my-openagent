@@ -1,17 +1,25 @@
 import type { SessionInfo, SessionMessage, SearchResult } from "./types"
 import { getSessionInfo, readSessionMessages } from "./storage"
+import { describeSessionError, formatSkippedSessions, type SkippedSession } from "./session-error"
 
 export async function formatSessionList(sessionIDs: string[]): Promise<string> {
   if (sessionIDs.length === 0) {
     return "No sessions found."
   }
 
-  const infos = (await Promise.all(sessionIDs.map((id) => getSessionInfo(id)))).filter(
-    (info): info is SessionInfo => info !== null
+  const skipped: SkippedSession[] = []
+  const reads = await Promise.all(
+    sessionIDs.map((id) =>
+      getSessionInfo(id).catch((error: unknown) => {
+        skipped.push({ id, reason: describeSessionError(error) })
+        return null
+      }),
+    ),
   )
+  const infos = reads.filter((info): info is SessionInfo => info !== null)
 
   if (infos.length === 0) {
-    return "No valid sessions found."
+    return `No valid sessions found.${formatSkippedSessions(skipped)}`
   }
 
   const headers = ["Session ID", "Messages", "First", "Last", "Agents"]
@@ -38,7 +46,7 @@ export async function formatSessionList(sessionIDs: string[]): Promise<string> {
 
   const separator = "|" + colWidths.map((w) => "-".repeat(w + 2)).join("|") + "|"
 
-  return [formatRow(headers), separator, ...rows.map(formatRow)].join("\n")
+  return [formatRow(headers), separator, ...rows.map(formatRow)].join("\n") + formatSkippedSessions(skipped)
 }
 
 export function formatSessionMessages(

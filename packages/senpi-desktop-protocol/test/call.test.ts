@@ -14,8 +14,21 @@ function rejectionReason(chain: readonly ComputerCallStep[]): string {
 }
 
 describe("isReadOnlyComputerCall", () => {
-	it("returns true when a window screenshot chain is inspection-only", () => {
-		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "screenshot" }])).toBe(true);
+	it.each(["screenshot", "click", "doubleClick", "move", "drag", "scroll", "type", "press"])(
+		"classifies a display %s hop by its input policy",
+		(method) => {
+			// When
+			const readOnly = isReadOnlyComputerCall([{ method: "display", args: ["all"] }, { method }]);
+			// Then
+			expect(readOnly).toBe(method === "screenshot");
+		},
+	);
+
+	it("refuses window-only helpers on a display handle", () => {
+		expect(rejectionReason([{ method: "display" }, { method: "raise" }])).toBe("unknownMethod");
+	});
+	it.each(["screenshot", "observe"])("returns true when a window %s chain is inspection-only", (method) => {
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method }])).toBe(true);
 	});
 
 	it("returns false when a window click chain mutates", () => {

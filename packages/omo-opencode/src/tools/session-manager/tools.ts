@@ -18,6 +18,7 @@ import {
   searchInSession,
 } from "./session-formatter"
 import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
+import { describeSessionError, formatSkippedSessions, type SkippedSession } from "./session-error"
 
 const SEARCH_TIMEOUT_MS = 60_000
 const MAX_SESSIONS_TO_SCAN = 50
@@ -107,7 +108,7 @@ export function createSessionManagerTools(
 
         return await resolvedDeps.formatSessionList(sessionIDs)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })
@@ -143,7 +144,7 @@ export function createSessionManagerTools(
 
         return resolvedDeps.formatSessionMessages(messages, args.include_todos, todos)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })
@@ -160,6 +161,7 @@ export function createSessionManagerTools(
       try {
         const resultLimit = args.limit && args.limit > 0 ? args.limit : 20
 
+        const skipped: SkippedSession[] = []
         const searchOperation = async (): Promise<SearchResult[]> => {
           if (args.session_id) {
             return resolvedDeps.searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
@@ -173,8 +175,12 @@ export function createSessionManagerTools(
             if (allResults.length >= resultLimit) break
 
             const remaining = resultLimit - allResults.length
-            const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining)
-            allResults.push(...sessionResults)
+            try {
+              const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining)
+              allResults.push(...sessionResults)
+            } catch (error) {
+              skipped.push({ id: sid, reason: describeSessionError(error) })
+            }
           }
 
           return allResults.slice(0, resultLimit)
@@ -182,9 +188,9 @@ export function createSessionManagerTools(
 
         const results = await withTimeout(searchOperation(), SEARCH_TIMEOUT_MS, "Search")
 
-        return resolvedDeps.formatSearchResults(results)
+        return resolvedDeps.formatSearchResults(results) + formatSkippedSessions(skipped)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })
@@ -204,7 +210,7 @@ export function createSessionManagerTools(
 
         return resolvedDeps.formatSessionInfo(info)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })

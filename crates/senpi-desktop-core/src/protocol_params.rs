@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::RequestId;
-use crate::types::{AxQuery, AxSnapshotOptions, CaptureCaps, DesktopPoint, PointerOptions};
+use crate::types::{AxQuery, AxSnapshotOptions, CaptureCaps, CaptureRegion, DesktopPoint, PointerOptions};
 
 /// Parameters of a method that takes none: `{}`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
@@ -17,6 +17,25 @@ pub struct EmptyParams {}
 pub struct CaptureParams {
     pub target: String,
     pub caps: Option<CaptureCaps>,
+}
+
+/// `observe`: an atomic window screenshot and accessibility snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserveParams {
+    pub target: String,
+    pub caps: Option<CaptureCaps>,
+    pub ax: Option<AxSnapshotOptions>,
+}
+
+/// `captureRegion`: native-detail zoom preserving the last full input frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureRegionParams {
+    pub target: String,
+    pub region: CaptureRegion,
+    pub caps: Option<CaptureCaps>,
+    pub frame_id: Option<String>,
 }
 
 /// `click` / `moveMouse`: a point in the pixels of the target's latest frame.

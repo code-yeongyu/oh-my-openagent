@@ -17,6 +17,7 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"control.acquire",
 	"control.release",
 	"control.state",
+	"display",
 	"displays",
 	"doubleClick",
 	"drag",
@@ -26,6 +27,7 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"focusedElement",
 	"focusedWindow",
 	"move",
+	"observe",
 	"menu.items",
 	"menu.select",
 	"parent",
@@ -40,6 +42,7 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"value",
 	"window",
 	"windows",
+	"zoom",
 ];
 
 /**

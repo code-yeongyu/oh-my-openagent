@@ -76,6 +76,36 @@ fn a_selected_display_is_captured_alone() {
 
     assert_eq!((image.width(), image.height()), (1280, 800));
     assert_eq!(image.get_pixel(0, 0).0, root_pixel(0x80, 0x18));
+    let listed: Vec<String> = capture.all_displays().unwrap().into_iter().map(|display| display.name).collect();
+    assert_eq!(listed, ["DP-1", "HDMI-1"], "a configured display still lists every monitor for per-call targets");
+}
+
+#[test]
+fn active_capture_requeries_focus_and_per_call_target_does_not_change_default() {
+    let server = FakeServer::new(200, 80)
+        .monitor("DP-1", (0, 0, 100, 80), true)
+        .monitor("HDMI-1", (100, 0, 100, 80), false)
+        .root_words("_NET_ACTIVE_WINDOW", AtomEnum::WINDOW, &[77])
+        .window(77, viewable(10, 10, 50, 50))
+        .window(88, viewable(120, 10, 50, 50));
+    let mut capture = X11Capture::with_server(server, DisplaySelector::Active).unwrap();
+
+    let (first, frame) = capture.capture(&Target::Desktop).unwrap();
+    assert_eq!(first.dimensions(), (100, 80));
+    assert_eq!(frame.map_point(0.0, 0.0, None).unwrap(), (0.0, 0.0));
+    let server = std::mem::take(&mut capture.server);
+    capture.server = server.root_words("_NET_ACTIVE_WINDOW", AtomEnum::WINDOW, &[88]);
+    let (second, frame) = capture.capture(&Target::Desktop).unwrap();
+    assert_eq!(second.get_pixel(0, 0).0, root_pixel(100, 0));
+    assert_eq!(frame.map_point(0.0, 0.0, None).unwrap(), (100.0, 0.0));
+
+    let (override_image, _) = capture.capture(&Target::parse("display:DP-1")).unwrap();
+    assert_eq!(override_image.get_pixel(0, 0).0, root_pixel(0, 0));
+    let (again, _) = capture.capture(&Target::Desktop).unwrap();
+    assert_eq!(again, second);
+    let (all, _) = capture.capture(&Target::parse("display:all")).unwrap();
+    assert_eq!(all.dimensions(), (200, 80));
+    assert_eq!(capture.capture(&Target::parse("display:missing")).unwrap_err().code, ErrorCode::InvalidTarget);
 }
 
 #[test]

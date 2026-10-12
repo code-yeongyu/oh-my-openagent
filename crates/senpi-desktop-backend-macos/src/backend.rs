@@ -114,7 +114,7 @@ impl Backend for MacosBackend {
     }
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
-        self.capture.displays()
+        self.capture.all_displays()
     }
 
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {

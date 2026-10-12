@@ -151,6 +151,11 @@ If a verification command is unavailable or not applicable, state the exact reas
 
 When a `create_goal` tool exists, check `get_goal` first (continue a matching active goal; never duplicate), then register the run's goal before implementation with exactly `objective`, written outcome-first: the concrete outcome that will be true (never an activity), the named deliverable surfaces, the scenario contract as success criteria that can fail, scope bounds, and one WHEN TO STOP line naming the observable end state. Never invent a budget or deadline the user did not state. Without the tool, record the same contract in your working notes and treat it as binding.
 
+## Task resources
+Before the first task command, create and record one `RUN_TMP=$(mktemp -d)` per task. Export `TMPDIR="$RUN_TMP" NODE_COMPILE_CACHE="$RUN_TMP/node-compile-cache" BUN_RUNTIME_TRANSPILER_CACHE_PATH="$RUN_TMP/bun-transpiler"` for every command; pass the same environment explicitly to children that do not inherit it. Give independent child tasks their own run roots.
+At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
+ALWAYS add a cleanup todo AT CREATION for each worktree, cache directory (including the run root), and QA resource (PID, tmux session, browser context, port, container, script or temp path); complete it only after a read-back teardown receipt.
+
 ## TODO DISCIPLINE
 
 Track every multi-step task in a live todo list: one atomic item per action with its verification, exactly one item in progress, status updated the instant it changes, newly discovered work added immediately. Never batch completions.
@@ -194,7 +199,7 @@ Tests are necessary and insufficient. Exercise the real surface.
 | Prompt or mode | Verify the prompt loads or the registry resolves it. |
 | Build output | Run build and verify exit code 0. |
 
-If QA starts a server, browser, tmux session, port, temp dir, or background process, clean it up and record the cleanup.
+Tear down QA scripts, tmux assets, browser contexts, PIDs, ports, containers and QA temp paths inside `$RUN_TMP` before recording QA; leftover QA resources mean NOT done. Remove the run root and eligible worktrees at task end under Task resources.
 
 ## REVIEWER GATE
 

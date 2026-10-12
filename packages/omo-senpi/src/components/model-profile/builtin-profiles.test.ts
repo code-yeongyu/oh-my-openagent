@@ -2,11 +2,16 @@
 
 import { describe, expect, it } from "bun:test"
 
-import { BUILTIN_MODEL_PROFILES, DEFAULT_MODEL_PROFILE_ID } from "./builtin-profiles"
+import {
+  BUILTIN_MODEL_PROFILES,
+  DEFAULT_MODEL_PROFILE_ID,
+  DEFAULT_MODEL_PROFILE_ORDER,
+  RETIRED_MODEL_PROFILE_IDS,
+} from "./builtin-profiles"
 import { KNOWN_MODELS } from "../telemetry/model-vocabulary"
 
 const LANE_IDS = ["daily-normal", "daily-heavy", "geeky-normal", "geeky-heavy"] as const
-const EXPECTED_IDS = ["recommended", ...LANE_IDS] as const
+const EXPECTED_IDS = LANE_IDS
 
 const BANNED_VENDOR_TOKENS: readonly string[] = [["mini", "max"].join(""), ["gem", "ini"].join("")]
 
@@ -23,7 +28,8 @@ function chainOf(profile: string): readonly string[] {
 }
 
 describe("BUILTIN_MODEL_PROFILES", () => {
-  it("ships the recommended default then the four lane profiles in picker order", () => {
+  // Default + table contract (#10029): every builtin is a lane; there is no Recommended profile.
+  it("ships exactly the four lane profiles in picker order", () => {
     expect(Object.keys(BUILTIN_MODEL_PROFILES)).toEqual([...EXPECTED_IDS])
   })
 
@@ -39,41 +45,21 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     }
   })
 
-  it("uses recommended, which is not a lane, as the unset-config default id", () => {
-    expect(DEFAULT_MODEL_PROFILE_ID).toBe("recommended")
-    const recommended = BUILTIN_MODEL_PROFILES[DEFAULT_MODEL_PROFILE_ID]
-    expect(recommended?.displayName).toBe("Recommended")
-    expect(recommended?.family).toBeUndefined()
-    expect(recommended?.tier).toBeUndefined()
+  it("starts unset config on Daily · Normal, then the other lanes in order; (#10029)", () => {
+    expect(DEFAULT_MODEL_PROFILE_ORDER).toEqual(["daily-normal", "daily-heavy", "geeky-normal", "geeky-heavy"])
+    expect(DEFAULT_MODEL_PROFILE_ID).toBe("daily-normal")
   })
 
-  // Mirrors senpi's RECOMMENDED_DEFAULT_MODELS (recommended-models/index.ts, senpi#2074; GPT-6.1 Sol
-  // from senpi#2394), so the TUI and the desktop start from one order. Change both together. OmO adds
-  // the gpt-6-sol medium rung behind gpt-6.1-sol for the GPT lanes that do not serve 6.1 Sol.
-  it("orders recommended opus medium, fable xhigh, kimi max, astra xhigh, 6.1 sol medium, 6 sol medium, glm max", () => {
-    expect(chainOf("recommended")).toEqual([
-      "claude-opus-5-5 medium",
-      "claude-fable-5-1 xhigh",
-      "kimi-k3 max",
-      "gpt-6-astra xhigh",
-      "gpt-6.1-sol medium",
-      "gpt-6-sol medium",
-      "glm-5.3 max",
-    ])
+  // Migration contract: a saved config may still name the retired id; it must never be a builtin again.
+  it("retires recommended: no builtin carries that id", () => {
+    expect([...RETIRED_MODEL_PROFILE_IDS]).toEqual(["recommended"])
+    for (const id of RETIRED_MODEL_PROFILE_IDS) expect(BUILTIN_MODEL_PROFILES[id]).toBeUndefined()
   })
 
-  it("serves recommended's gpt-6.1-sol rung on the OpenAI lanes and its gpt-6-sol rung on every GPT lane", () => {
-    const sol = (BUILTIN_MODEL_PROFILES["recommended"]?.models ?? []).filter((rung) => rung.model.includes("-sol"))
-    expect(sol).toEqual([
-      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-sol", variant: "medium" },
-    ])
-  })
-
-  it("never lists a gateway aggregator on a recommended rung", () => {
+  it("never lists a gateway aggregator on a builtin rung", () => {
     const gateways = ["opengateway", "openrouter", "vercel-ai-gateway", "cloudflare-ai-gateway"]
-    const offenders = (BUILTIN_MODEL_PROFILES["recommended"]?.models ?? []).flatMap((rung) =>
-      rung.providers.filter((provider) => gateways.includes(provider)),
+    const offenders = rungs().flatMap((rung) =>
+      rung.providers.filter((provider) => gateways.includes(provider)).map((provider) => `${rung.profile}: ${provider}`),
     )
     expect(offenders).toEqual([])
   })

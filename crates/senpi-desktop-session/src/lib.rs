@@ -20,6 +20,8 @@ mod timeouts;
 mod worker;
 mod worker_ax;
 mod worker_capture;
+mod worker_observe;
+mod worker_zoom;
 mod worker_clipboard;
 mod worker_input;
 mod worker_menus;

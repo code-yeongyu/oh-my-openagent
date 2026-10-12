@@ -13,10 +13,12 @@ type MethodPolicies = Readonly<Record<string, ComputerCallPolicy>>;
 export const DESKTOP_METHODS: MethodPolicies = {
 	capabilities: "read",
 	displays: "read",
+	display: "read",
 	windows: "read",
 	window: "read",
 	focusedWindow: "read",
 	screenshot: "read",
+	zoom: "read",
 	click: "exec",
 	doubleClick: "exec",
 	move: "exec",
@@ -34,9 +36,24 @@ export const DESKTOP_METHODS: MethodPolicies = {
 	"control.state": "read",
 };
 
+/** Helpers callable on a display handle resolved through `desktop.display(selector)`. */
+export const DISPLAY_METHODS: MethodPolicies = {
+	screenshot: "read",
+	zoom: "read",
+	click: "exec",
+	doubleClick: "exec",
+	move: "exec",
+	drag: "exec",
+	scroll: "exec",
+	type: "exec",
+	press: "exec",
+};
+
 /** Helpers callable on a window handle resolved through `desktop.window(id)`. */
 export const WINDOW_METHODS: MethodPolicies = {
 	screenshot: "read",
+	observe: "read",
+	zoom: "read",
 	click: "exec",
 	doubleClick: "exec",
 	move: "exec",
@@ -69,6 +86,7 @@ export const ELEMENT_METHODS: MethodPolicies = {
 
 /** Root methods whose result accepts one chained handle call, mapped to the handle's method table. */
 const HANDLE_ROOTS: Readonly<Record<string, { readonly label: string; readonly methods: MethodPolicies }>> = {
+	display: { label: "display", methods: DISPLAY_METHODS },
 	window: { label: "window", methods: WINDOW_METHODS },
 	ref: { label: "element", methods: ELEMENT_METHODS },
 };
@@ -120,7 +138,7 @@ function classifyComputerCall(chain: readonly ComputerCallStep[]): ComputerCallP
 	if (handle === undefined) {
 		throw new ComputerCallError(
 			"notChainable",
-			`Only desktop.window(id)/desktop.ref(ref) results accept a chained call; got desktop.${root.method}().`,
+			`Only desktop.display(id)/desktop.window(id)/desktop.ref(ref) results accept a chained call; got desktop.${root.method}().`,
 		);
 	}
 	const stepPolicy = policyOf(handle.methods, step.method);

@@ -7,7 +7,7 @@ import type {
 } from "@oh-my-opencode/senpi-desktop-protocol";
 
 /** Why a computer run failed inside the runtime; engine failures surface as `DesktopEngineRpcError`. */
-export type ComputerRunErrorReason = "readOnly" | "timeout" | "aborted" | "ended" | "assertion" | "window" | "wait";
+export type ComputerRunErrorReason = "readOnly" | "timeout" | "aborted" | "ended" | "assertion" | "window" | "wait" | "unavailable";
 
 export class ComputerRunError extends Error {
 	readonly reason: ComputerRunErrorReason;

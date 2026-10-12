@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { IMAGE, runPythonFacade, WINDOW_SNAPSHOT } from "./harness";
 
 describe("Python computer facade", () => {
+	it("sends display screenshot through the display-hopped chain", () => {
+		// Given
+		const responders = { display: JSON.stringify({ text: "", details: { value: { id: "active" } } }) };
+		// When
+		const run = runPythonFacade("computer.display('active').screenshot(silent=True)", responders);
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "display", args: ["active"] }] },
+			{ action: "call", chain: [{ method: "display", args: ["active"] }, { method: "screenshot", args: [{ silent: true }] }] },
+		]);
+	});
+
 	it("turns keyword arguments into one trailing options object", () => {
 		// When
 		const run = runPythonFacade(

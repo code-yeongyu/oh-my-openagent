@@ -1,8 +1,21 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { isAbsolute, join, relative } from "node:path"
 import { runCheckThenTeardown, shardsCreatedBy } from "./test-hermetic-home"
+
+describe("hermetic memory home (#9469)", () => {
+  test("the preload pins memory inside the temporary home", () => {
+    const home = process.env.HOME
+    const memory = process.env.OMO_MEMORY_HOME
+    expect(home).toBeDefined()
+    expect(memory).toBeDefined()
+    if (!home || !memory) throw new Error("missing hermetic home")
+    const path = relative(home, memory)
+    expect(path).toBe(join(".omo", "memory"))
+    expect(isAbsolute(path)).toBe(false)
+  })
+})
 
 describe("shardsCreatedBy (#9673)", () => {
   const dirs: string[] = []

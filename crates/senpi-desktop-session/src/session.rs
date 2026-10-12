@@ -155,8 +155,12 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
             Message::Op { op, reply } => {
                 // `$/cancel` or a deadline drops the waiter: that is the
                 // request's cancellation signal while it runs.
-                let result = guarded(|| worker.process(op, &|| reply.is_disconnected()));
-                (reply, result)
+                worker.dispatch(
+                    op,
+                    &|| reply.is_disconnected(),
+                    |result| reply.send(result).is_ok(),
+                );
+                continue;
             }
         };
         // The waiter may give up while the request runs; its result is then moot.

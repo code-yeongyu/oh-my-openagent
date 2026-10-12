@@ -3,6 +3,7 @@ import { normalizeSDKResponse } from "../../shared"
 import type { SessionMessage, SessionMetadata, TodoItem } from "./types"
 import { sessionDirectoriesMatch } from "./directory-filter"
 import { isSessionSdkUnavailableError } from "./sdk-unavailable"
+import { toSessionError } from "./session-error"
 
 function unwrapSdkResponseError(response: unknown): unknown {
   if (!response || typeof response !== "object" || !("error" in response)) {
@@ -15,7 +16,7 @@ function unwrapSdkResponseError(response: unknown): unknown {
 function throwOnNonFallbackableSdkError(response: unknown): void {
   const error = unwrapSdkResponseError(response)
   if (!error) return
-  throw error
+  throw toSessionError(error)
 }
 
 const SDK_TRANSIENT_RETRY_ATTEMPTS = 3

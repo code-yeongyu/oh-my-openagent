@@ -8,6 +8,7 @@ use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, PointerEvent
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
     FrontWindow, Target,
@@ -101,8 +102,10 @@ impl Backend for Win32Backend {
         Win32Backend::capabilities(self)
     }
 
+    /// Every monitor, whatever the session's selector, so a per-call display
+    /// target can name one the session does not capture by default.
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
-        self.capture.displays()
+        crate::capture::all_displays()
     }
 
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
@@ -157,6 +160,24 @@ impl Backend for Win32Backend {
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
         Some(&mut self.ax)
+    }
+
+    fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+        self.ax.menu_items(window, path, self.integrity)
+    }
+
+    /// Both modes run the exact window's command without keyboard input;
+    /// foreground delivery raises the proven target before the command, which
+    /// also admits UIA providers that take foreground while they act.
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        delivery: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        let foreground = delivery == DeliveryMode::Foreground;
+        self.ax.menu_select(window, path, self.integrity, check_stop, foreground)
     }
 
     /// Without input nothing was ever pressed, so nothing is held.

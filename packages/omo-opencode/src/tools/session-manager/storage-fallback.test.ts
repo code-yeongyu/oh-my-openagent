@@ -118,6 +118,95 @@ describe("session-manager storage fallback", () => {
     if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
+  test("#given a legacy file-storage session the SQLite server answers NotFoundError for #when its messages are read #then the file copy is returned (#5854)", async () => {
+    //#given
+    createSessionMessage("ses_legacy", "msg_legacy", 1_000)
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "NotFoundError", data: { message: "Session not found: ses_legacy" } } }),
+    )
+
+    //#when
+    const messages = await storage.readSessionMessages("ses_legacy")
+
+    //#then
+    expect(messages.map((message) => message.id)).toEqual(["msg_legacy"])
+  })
+
+  test("#given a legacy file-storage session the SQLite server answers NotFoundError for #when its info is read #then the file info is returned instead of an error (#5854)", async () => {
+    //#given
+    createSessionMessage("ses_legacy", "msg_legacy", 1_000)
+    const notFound = { error: { name: "NotFoundError", data: { message: "Session not found: ses_legacy" } } }
+    mockClient.session.messages.mockImplementation(() => Promise.resolve(notFound))
+    mockClient.session.todo.mockImplementation(() => Promise.resolve(notFound))
+
+    //#when
+    const info = await storage.getSessionInfo("ses_legacy")
+
+    //#then
+    expect(info?.id).toBe("ses_legacy")
+    expect(info?.message_count).toBe(1)
+  })
+
+  test("#given a session neither the SQLite server nor file storage has #when its existence is checked #then it is reported missing, not thrown (#5854)", async () => {
+    //#given
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "NotFoundError", data: { message: "Session not found: ses_nowhere" } } }),
+    )
+
+    //#when
+    const exists = await storage.sessionExists("ses_nowhere")
+
+    //#then
+    expect(exists).toBe(false)
+  })
+
+  test("#given the SQLite server answers a session read with a non-NotFound error body #when its messages are read #then it still rejects with that error's text", async () => {
+    //#given
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "UnknownError", data: { message: "database disk image is malformed" } } }),
+    )
+
+    //#when
+    const failure = await storage.readSessionMessages("ses_bad").then(() => undefined, (error: unknown) => error)
+
+    //#then
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toBe("UnknownError: database disk image is malformed")
+  })
+
+  test("#given one session whose SDK read fails with a non-NotFound error #when sessions are listed #then the others are listed and the failing one is named", async () => {
+    //#given
+    createSessionMessage("ses_ok", "msg_ok", 1_000)
+    mockClient.session.messages.mockImplementation((input: unknown) => {
+      const id = (input as { path: { id: string } }).path.id
+      return Promise.resolve(id === "ses_bad" ? { error: { name: "UnknownError", data: { message: "database disk image is malformed" } } } : { data: [] })
+    })
+    mockClient.session.todo.mockImplementation(() => Promise.resolve({ data: [] }))
+    const { formatSessionList } = await import("./session-formatter")
+
+    //#when
+    const output = await formatSessionList(["ses_ok", "ses_bad"])
+
+    //#then
+    expect(output).toContain("ses_ok")
+    expect(output).toContain("Skipped 1 session that could not be read: ses_bad (UnknownError: database disk image is malformed)")
+    expect(output).not.toContain("[object Object]")
+  })
+
+  test("#given an SDK error body whose message says the server is unreachable #when a session is read #then it falls back to file storage like a thrown network error", async () => {
+    //#given
+    createSessionMessage("ses_file", "msg_file", 1_000)
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "UnknownError", data: { message: "fetch failed" } } }),
+    )
+
+    //#when
+    const messages = await storage.readSessionMessages("ses_file")
+
+    //#then
+    expect(messages.map((message) => message.id)).toEqual(["msg_file"])
+  })
+
   test("#given unreachable SDK list response #when getMainSessions runs #then falls back to file sessions", async () => {
     createSessionMetadata("proj_test", "ses_file", "/workspace/project", 2_000)
     mockClient.session.list.mockImplementation(() => Promise.resolve({ error: createSdkUnavailableError("fetch failed ECONNREFUSED") }))

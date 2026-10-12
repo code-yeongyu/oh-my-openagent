@@ -76,7 +76,7 @@ impl Win32Input {
         mode: DeliveryMode,
     ) -> CoreResult<()> {
         match (target, mode) {
-            (Target::Desktop, _) => self.system_pointer(event, None),
+            (Target::Desktop | Target::Display(_), _) => self.system_pointer(event, None),
             (Target::Window(id), DeliveryMode::Foreground) => {
                 self.with_foreground(id, |this, target| {
                     compositor::await_next_present();
@@ -102,7 +102,7 @@ impl Win32Input {
             .collect::<CoreResult<Vec<_>>>()?;
         let vks = chord_virtual_keys(&strokes);
         match (target, mode) {
-            (Target::Desktop, _) => self.holding(Via::Enigo, &vks, |_| Ok(())),
+            (Target::Desktop | Target::Display(_), _) => self.holding(Via::Enigo, &vks, |_| Ok(())),
             (Target::Window(id), DeliveryMode::Foreground) => {
                 self.with_foreground(id, |this, target| {
                     this.holding(Via::SendInput(Some(target)), &vks, |_| Ok(()))
