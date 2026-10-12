@@ -8,7 +8,7 @@ import {
 } from "../../packages/senpi-task/src/workpool/measurement.ts"
 import { openMeasureEnv } from "./omp-item2-measure-env.ts"
 
-const E = process.env.E ?? "/Users/yeongyu/sisyphuslabs/.omo/evidence/omp-adoption-eval-dag-read-20260912"
+const E = process.env.E ?? ""
 const PLAN = "31121b6554593f7f2a24d552ffe39825943b94bcfef78efbe63bcf556ba33f55"
 const MODES = ["fresh", "keep_alive", "keep_alive", "fresh"] as const
 const batch = JSON.parse(readFileSync(new URL("../../packages/senpi-task/test/fixtures/workpool-real-batch.json", import.meta.url), "utf8")) as {
@@ -17,6 +17,7 @@ const batch = JSON.parse(readFileSync(new URL("../../packages/senpi-task/test/fi
 }
 
 export async function runMeasure(out: string) {
+  if (!E) throw new Error("omp-item2 measure-modes: set E to the adoption-eval evidence directory (it must contain gates/OQ3.json)")
   const oq3 = JSON.parse(readFileSync(join(E, "gates/OQ3.json"), "utf8")) as { readonly decision: { readonly provider: string; readonly model: string; readonly max_cost_usd: number; readonly max_total_tokens: number; readonly allowed_fallback_chain: unknown[] } }
   const ceiling = { max_cost_usd: oq3.decision.max_cost_usd, max_total_tokens: oq3.decision.max_total_tokens }
   const caps = digestJson({ width: 2, global_concurrency: 2, default_concurrency: 2, residency_max_children: 2 })

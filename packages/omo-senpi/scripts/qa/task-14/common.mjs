@@ -2,12 +2,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { execFileSync, spawn } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 export const OMO_ROOT = new URL("../../../", import.meta.url).pathname
-// Same override seam as the thread-tools harness: the defaults are this author's checkout
-// layout, but every path a foreign machine cannot have is redirectable by env.
-export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
-export const EVIDENCE_ROOT = process.env.THREAD_QA_EVIDENCE_ROOT ?? "/Users/yeongyu/sisyphuslabs/.omo/evidence/thread-tools/task-14"
+// Same override seam as the thread-tools harness: the defaults are sibling checkouts of this
+// repository and a repo-local evidence dir; every path is redirectable by env.
+export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? fileURLToPath(new URL("../../../../../../senpi-thread-tools", import.meta.url))
+export const EVIDENCE_ROOT = process.env.THREAD_QA_EVIDENCE_ROOT ?? fileURLToPath(new URL("../../../../../.omo/evidence/thread-tools/task-14", import.meta.url))
 
 export function scratch(label) {
   const root = mkdtempSync(join(tmpdir(), `omo-thread-t14-${label}-`))
