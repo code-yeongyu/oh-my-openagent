@@ -1,3 +1,7 @@
+## 2026-10-12 - Adopt senpi 2026.10.12
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.11 to 2026.10.12: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer/dev pins with their `senpi-tui` and `senpi-ai` aliases, the pin and package-shape assertions, and the coverage test's comment. `bun.lock` resolves the senpi entries at 2026.10.12 (refreshed with `bun install --no-cache`), and the committed Senpi plugin bundle (`omo.js`, whose embedded pin moves) is rebuilt on Linux (node 24, bun 1.4.2), the toolchain CI checks it with.
+
 ## 2026-10-12 - Session tools read legacy-storage sessions and show the real error (#5854)
 
 Thanks to @crazyrabbit0 for the fresh reproduction on 5.1.30 with OpenCode 1.19.0. A session that exists only in OpenCode's legacy JSON storage is merged into the session list, but the SQLite server answers `NotFoundError` for it. The SDK layer threw that error body unchanged, so every session tool printed `Error: [object Object]`, and a no-match `session_search` or `session_list` failed on that one session.

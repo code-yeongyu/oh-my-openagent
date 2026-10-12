@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { createFallbackSessionHarness } from "./__fixtures__/in-process-fallback-session"
+import { createFallbackSessionHarness, FALLBACK_PROVIDER } from "./__fixtures__/in-process-fallback-session"
 
 const quotaError =
   `403: {"message":"You've reached your usage limit for this billing cycle.",` +
@@ -23,7 +23,7 @@ describe("in-process access_terminated_error fallback", () => {
       expect(harness.events).toContainEqual({
         type: "retry_fallback_applied",
         from: "runtime-fallback-test/dead-primary",
-        to: "runtime-fallback-test/healthy-fallback",
+        to: `${FALLBACK_PROVIDER}/healthy-fallback`,
         chainKey: "runtime-fallback-test/dead-primary",
         reason: "billing",
         limit: "account",
