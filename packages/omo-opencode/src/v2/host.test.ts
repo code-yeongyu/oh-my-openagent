@@ -39,7 +39,8 @@ function createFakeContext(): {
   const pendingEvents: unknown[] = []
   let notifyEvent: (() => void) | undefined
   const agents = new Map<string, { description?: string; mode?: string; system?: string }>([
-    ["oh-my-openagent/sisyphus", { description: "stale" }],
+    // Flat id: fix 21 registers agents under their bare names (agents/sisyphus.md).
+    ["sisyphus", { description: "stale" }],
   ])
 
   const ctx = {
@@ -355,7 +356,7 @@ describe("OpenCode V2 adapter", () => {
     expect(event.prompt.text).toBe("ulw build!")
 
     expect(readFileSync(join(directory, "sisyphus.md"), "utf8")).toContain("Do the work.")
-    expect(fake.agents.get("oh-my-openagent/sisyphus")?.description).toBe("Orchestrates work")
+    expect(fake.agents.get("sisyphus")?.description).toBe("Orchestrates work")
     expect(fake.tools.map((tool) => tool.name)).toEqual(["greeting", "todowrite", "todoread"])
     const result = await fake.tools[0]?.execute({ name: "Ada" }, { sessionID: "ses_1", id: "call_1", signal: new AbortController().signal })
     expect(result?.content).toBe("Hello Ada")
