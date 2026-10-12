@@ -1,3 +1,4 @@
+import { spawn } from "../shared/bun-spawn-shim"
 import { getServerBasicAuthHeader } from "../shared/opencode-server-auth"
 
 export type SessionPage = {
@@ -38,13 +39,20 @@ export async function resolveServeOrigin(input: {
 }
 
 export async function listenPortOf(pid = process.pid): Promise<number | undefined> {
-  const proc = Bun.spawn(["lsof", "-nP", "-p", String(pid), "-iTCP", "-sTCP:LISTEN"], {
-    stdout: "pipe",
-    stderr: "ignore",
-  })
-  const text = await new Response(proc.stdout).text()
-  const match = text.match(/:(\d+)\s+\(LISTEN\)/)
-  return match ? Number(match[1]) : undefined
+  try {
+    const proc = spawn(["lsof", "-nP", "-p", String(pid), "-iTCP", "-sTCP:LISTEN"], {
+      stdout: "pipe",
+      stderr: "ignore",
+    })
+    // The node spawn path reports a missing binary through the exit channel;
+    // swallow it so an absent lsof (e.g. Windows) reads as "port unknown".
+    void proc.exited.catch(() => undefined)
+    const text = await new Response(proc.stdout).text()
+    const match = text.match(/:(\d+)\s+\(LISTEN\)/)
+    return match ? Number(match[1]) : undefined
+  } catch {
+    return undefined
+  }
 }
 
 async function getJson(url: string, fetchImpl: typeof fetch): Promise<unknown> {

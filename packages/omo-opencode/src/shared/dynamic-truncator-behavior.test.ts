@@ -1,12 +1,31 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 
 import {
   createDynamicTruncator,
   dynamicTruncate,
   truncateToTokenLimit,
 } from "./dynamic-truncator"
+
+// resolveActualContextLimit also honors the process-level 1M-context env vars;
+// scrub them per test so the explicit modelCacheState flag alone decides the limit.
+const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
+const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
+const originalAnthropicContextEnv = process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+const originalVertexContextEnv = process.env[VERTEX_CONTEXT_ENV_KEY]
+
+beforeEach(() => {
+  delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+  delete process.env[VERTEX_CONTEXT_ENV_KEY]
+})
+
+afterEach(() => {
+  if (originalAnthropicContextEnv === undefined) delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+  else process.env[ANTHROPIC_CONTEXT_ENV_KEY] = originalAnthropicContextEnv
+  if (originalVertexContextEnv === undefined) delete process.env[VERTEX_CONTEXT_ENV_KEY]
+  else process.env[VERTEX_CONTEXT_ENV_KEY] = originalVertexContextEnv
+})
 
 function createContextUsageMockContext(inputTokens: number) {
   return {

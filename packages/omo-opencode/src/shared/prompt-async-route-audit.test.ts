@@ -49,6 +49,18 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
     "binds SDK Session.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
   ],
   [
+    path.join(SOURCE_ROOT, "plugin", "compaction-autocontinue-reroute.ts"),
+    "binds SDK Session.promptAsync into a narrow facade consumed only by the session-compacting auto-continue reissue, which must land as a pinned-model user turn immediately after compaction rather than through the internal-prompt queue the gate reserves",
+  ],
+  [
+    path.join(SOURCE_ROOT, "v2", "hook-bridge.ts"),
+    "OpenCode V2 host adapter: ctx.session.prompt is the v2 plugin-host session surface, not the v1 SDK client the shared gate wraps; dispatches the post-manual-compaction continue turn",
+  ],
+  [
+    path.join(SOURCE_ROOT, "v2", "project-config.ts"),
+    "OpenCode V2 host adapter: input.ctx.session.prompt executes v1 custom commands through the v2 plugin-host session API; the shared gate wraps only the v1 SDK client surface",
+  ],
+  [
     path.join(WORKSPACE_ROOT, "packages", "senpi-task", "src", "runners", "in-process", "child-handle.ts"),
     "drives a senpi CHILD AgentSession.prompt for spawned subagent turns; senpi-task cannot reach OpenCode session APIs (opencode-coupling audit) so the main-session injection invariant does not apply",
   ],

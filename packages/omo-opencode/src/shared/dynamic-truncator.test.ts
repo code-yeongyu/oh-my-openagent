@@ -152,6 +152,8 @@ describe("getContextWindowUsage", () => {
 
       it("#then a follow-up call after invalidation retries fresh instead of being poisoned by the timeout", async () => {
         // given
+        delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+        delete process.env[VERTEX_CONTEXT_ENV_KEY]
         _setContextWindowUsageFetchTimeoutMsForTesting(50)
         let messagesCalls = 0
         let shouldHang = true

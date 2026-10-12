@@ -11,7 +11,13 @@ import { presentSession, sessionCatalog } from "./catalog"
 const directories: string[] = []
 
 afterEach(() => {
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  // bun:sqlite on Windows releases the file handle only when the closed Database
+  // is garbage-collected (verified: close() alone leaves opencode.db locked for
+  // seconds). Force GC, then rm with retries as belt-and-braces for EBUSY.
+  Bun.gc(true)
+  for (const directory of directories.splice(0)) {
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
 })
 
 describe("OpenCode V2 session catalog", () => {
