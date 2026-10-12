@@ -3,6 +3,7 @@ import { resolveOmoSidePanelSettings, type OmoSidePanelSettings } from "@oh-my-o
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import type { PanelCommandContext } from "./commands"
+import { panelContextFrom } from "./context"
 import { SIDE_PANEL_DIFF_COMMAND, SIDE_PANEL_FLAG, SIDE_PANEL_RUNTIME_FILE } from "./constants"
 import type { SidePanelController, SidePanelRuntimeOptions } from "./runtime"
 
@@ -17,7 +18,7 @@ type SidePanelControllerFactory = (
 export interface SidePanelComponentOptions extends SidePanelRuntimeOptions {
   /** Injectable so tests decide the gate without depending on the developer's own omo.json. */
   readonly loadSettings?: (cwd: string) => OmoSidePanelSettings
-  /** Imports the implementation; the default is the bundle beside this one, on the first session with the panel on. */
+  /** Imports the implementation on first use, from the bundle beside this one. */
   readonly loadRuntime?: () => Promise<SidePanelControllerFactory>
 }
 
@@ -25,8 +26,8 @@ export interface SidePanelComponentOptions extends SidePanelRuntimeOptions {
  * The side panel's registration shell.
  *
  * This is all the entry bundle carries: the flag, the command and a forwarder per event. The
- * panel itself lives in `runtime.ts`, built as its own bundle and imported the first time a
- * session starts with the panel on, so a run without the panel loads none of it.
+ * panel itself lives in `runtime.ts`, built as its own bundle and imported on first opening,
+ * so a run that keeps the panel hidden loads none of it.
  */
 export function createSidePanelComponent(options: SidePanelComponentOptions = {}): OmoSenpiComponent {
   const loadSettings = options.loadSettings ?? defaultLoadSettings
@@ -59,9 +60,8 @@ export function createSidePanelComponent(options: SidePanelComponentOptions = {}
         return loading
       }
 
-      // The command exists only when the panel can be on for this run, read at load from the same
-      // switches the mount reads; a session where the panel still stays dark is told so.
-      if (isPanelEnabled(loadSettings(cwd), ctx)) {
+      const settingsAtLoad = loadSettings(cwd)
+      if (isPanelEnabled(settingsAtLoad, ctx) || (settingsAtLoad.shortcut !== false && pi.registerShortcut !== undefined)) {
         pi.registerCommand(SIDE_PANEL_DIFF_COMMAND, {
           description: "Open the diff of a file the side panel lists as changed.",
           handler: async (_args: string, commandCtx: PanelCommandContext): Promise<void> => {
@@ -71,9 +71,7 @@ export function createSidePanelComponent(options: SidePanelComponentOptions = {}
         })
       }
 
-      pi.on("session_start", async (_payload: unknown, eventCtx: unknown): Promise<undefined> => {
-        const settings = loadSettings(cwd)
-        if (!isPanelEnabled(settings, ctx)) return undefined
+      const openPanel = async (settings: OmoSidePanelSettings, eventCtx: unknown): Promise<undefined> => {
         const started = epoch
         let loaded: SidePanelController
         try {
@@ -87,6 +85,22 @@ export function createSidePanelComponent(options: SidePanelComponentOptions = {}
         }
         if (started !== epoch) return undefined
         return await loaded.sessionStart(settings, eventCtx)
+      }
+
+      if (settingsAtLoad.shortcut !== false) {
+        pi.registerShortcut?.(settingsAtLoad.shortcut, {
+          description: "Open the omo side panel.",
+          handler: async (eventCtx): Promise<void> => {
+            if (panelContextFrom(eventCtx)?.hasUI !== true) return
+            await openPanel(loadSettings(cwd), eventCtx)
+          },
+        })
+      }
+
+      pi.on("session_start", async (_payload: unknown, eventCtx: unknown): Promise<undefined> => {
+        const settings = loadSettings(cwd)
+        if (!isPanelEnabled(settings, ctx)) return undefined
+        return await openPanel(settings, eventCtx)
       })
 
       // The host awaits these handlers and every tool call queues behind them, so each one starts the

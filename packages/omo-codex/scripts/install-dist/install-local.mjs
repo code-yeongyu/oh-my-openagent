@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:62ae20c0150c4d02d2014bef5c8d17df51bf3d971a47b903045fe83c529a5bbb:89cde07f8cecd211463494f5e9d1fe432e9e87738fd9af46e3a60416767f57b8
+// omo-codex-install:1f100b438c07e9b95d4b4335a6d45337e9005e531d3114155fe95e9868775e1c:b37bce6484e02acbc4af13b5b7b8b4f0b39ba72cbc656bf306bd1f69c0131219
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19693,6 +19693,7 @@ var OmoSidePanelSectionsSchema = OmoSidePanelSectionsLayerSchema.extend({
 }).strict();
 var OmoSidePanelSettingsShape = {
   enabled: boolean2(),
+  shortcut: union([string2().trim().min(1), literal(false)]),
   width: OmoSidePanelWidthSchema,
   min_columns: number2().int().min(60).max(400),
   clickable: boolean2(),
@@ -19702,6 +19703,7 @@ var OmoSidePanelSettingsShape = {
 var OmoSidePanelSettingsLayerSchema = object(OmoSidePanelSettingsShape).partial().strict();
 var OmoSidePanelSettingsSchema = OmoSidePanelSettingsLayerSchema.extend({
   enabled: boolean2().default(false),
+  shortcut: OmoSidePanelSettingsShape.shortcut.default("alt+s"),
   width: OmoSidePanelWidthSchema.default("26%"),
   min_columns: number2().int().min(60).max(400).default(120),
   clickable: boolean2().default(true),
