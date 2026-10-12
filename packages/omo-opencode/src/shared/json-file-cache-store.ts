@@ -16,6 +16,12 @@ type JsonFileCacheStore<TValue> = {
 	read: () => TValue | null
 	has: () => boolean
 	write: (value: TValue) => void
+	/**
+	 * Write only when the serialized content differs from what is already on
+	 * disk (local fix 27, first-message-drop F5b). Returns true when the file
+	 * was rewritten, false when the write was skipped because nothing changed.
+	 */
+	writeIfChanged: (value: TValue) => boolean
 	resetMemory: () => void
 }
 
@@ -98,6 +104,39 @@ export function createJsonFileCacheStore<TValue>(
 		}
 	}
 
+	function writeIfChanged(value: TValue): boolean {
+		ensureCacheDir()
+		const cacheFile = getCacheFilePath()
+		const serialized = options.serialize?.(value) ?? JSON.stringify(value, null, 2)
+
+		try {
+			if (existsSync(cacheFile) && readFileSync(cacheFile, "utf-8") === serialized) {
+				memoryValue = value
+				writtenInCurrentProcess = true
+				log(
+					`[${options.logPrefix}] ${options.cacheLabel} unchanged; skipped write`,
+					options.describe(value),
+				)
+				return false
+			}
+		} catch {
+			// A read failure must not block the write below.
+		}
+
+		try {
+			writeFileSync(cacheFile, serialized)
+			memoryValue = value
+			writtenInCurrentProcess = true
+			log(`[${options.logPrefix}] ${options.cacheLabel} written`, options.describe(value))
+			return true
+		} catch (error) {
+			log(`[${options.logPrefix}] Error writing ${toLogLabel(options.cacheLabel)}`, {
+				error: String(error),
+			})
+			return false
+		}
+	}
+
 	function resetMemory(): void {
 		memoryValue = undefined
 		writtenInCurrentProcess = false
@@ -107,6 +146,7 @@ export function createJsonFileCacheStore<TValue>(
 		read,
 		has,
 		write,
+		writeIfChanged,
 		resetMemory,
 	}
 }

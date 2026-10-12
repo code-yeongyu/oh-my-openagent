@@ -47,7 +47,11 @@ export function createModelCapabilitiesCacheStore(
     fetchImpl?: (input: string) => Promise<Response>
   } = {}): Promise<ModelCapabilitiesSnapshot> {
     const snapshot = await fetchModelCapabilitiesSnapshot(args)
-    writeModelCapabilitiesCache(snapshot)
+    // Write once, rewrite only on real change (local fix 27, first-message-drop
+    // F5b): the startup check used to rewrite this multi-megabyte,
+    // 3,823-model cache on every plugin instance (~0.85s per rewrite, 79
+    // rewrites in 26h) even when the models.dev catalog had not changed.
+    snapshotCacheStore.writeIfChanged(snapshot)
     return snapshot
   }
 
