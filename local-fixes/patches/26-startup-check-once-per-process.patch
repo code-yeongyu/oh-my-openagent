@@ -1,0 +1,211 @@
+From fe7faf0b77a04e9883193b96de2c5e622d7d38f1 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 12 Oct 2026 19:15:39 +0300
+Subject: [PATCH] fix(v2): run the startup check once per process, not per
+ plugin instance
+
+First-message-drop F5a. The 'already checked' flag lived in the per-instance
+closure, so every folder rebuild re-ran the whole deferred startup check
+(provider-list fetch + 3,823-model capabilities-cache rewrite + npm update
+check, ~0.85s each) about 5s after any root session.created - measured 79
+cache rewrites in 26h. The gate now lives on globalThis behind a registered
+symbol in a dependency-leaf module, so it survives per-location module
+re-imports within one OpenCode process and resets only on process restart.
+A failed check still closes the gate (no retry fan-out).
+---
+ .../hooks/auto-update-checker/hook.test.ts    | 70 +++++++++++++++++++
+ .../src/hooks/auto-update-checker/hook.ts     | 19 +++++
+ .../startup-check-process-state.ts            | 39 +++++++++++
+ 3 files changed, 128 insertions(+)
+ create mode 100644 packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state.ts
+
+diff --git a/packages/omo-opencode/src/hooks/auto-update-checker/hook.test.ts b/packages/omo-opencode/src/hooks/auto-update-checker/hook.test.ts
+index ac8be7251..bac0cf4e4 100644
+--- a/packages/omo-opencode/src/hooks/auto-update-checker/hook.test.ts
++++ b/packages/omo-opencode/src/hooks/auto-update-checker/hook.test.ts
+@@ -3,6 +3,7 @@
+ import type { PluginInput } from "@opencode-ai/plugin"
+ import { afterAll, describe, expect, mock, test } from "bun:test"
+ import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
++import { resetStartupCheckProcessStateForTests } from "./startup-check-process-state"
+ 
+ type CreateAutoUpdateCheckerHook = typeof import("./hook").createAutoUpdateCheckerHook
+ type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
+@@ -109,10 +110,13 @@ const createHook = async (
+   }
+ }
+ 
++// The startup-check gate lives on globalThis (local fix 26) so it survives
++// per-instance rebuilds; tests must reset it like any other deferred state.
+ const resetDeferredState = (): void => {
+   latestVersionCallCount = 0
+   scheduleDeferredStartupCheckCallCount = 0
+   scheduledCheck = null
++  resetStartupCheckProcessStateForTests()
+ }
+ 
+ const runScheduledCheck = async (): Promise<void> => {
+@@ -354,4 +358,70 @@ describe("auto-update-checker hook", () => {
+       expect.any(String),
+     )
+   })
++
++  // local fix 26 (first-message-drop F5a): the startup check runs once per
++  // PROCESS, not once per plugin instance — OpenCode rebuilds plugin instances
++  // on folder release/eviction and every fresh instance used to re-run the
++  // whole deferred startup check.
++  test("second plugin instance in the same process never re-runs the startup check", async () => {
++    // given: instance A already completed its startup check
++    resetDeferredState()
++    const first = await createHook()
++    triggerSessionCreated(first.hook)
++    await runScheduledCheck()
++    expect(first.mocks.showVersionToast).toHaveBeenCalledTimes(1)
++
++    // when: instance B (a rebuilt/new folder instance) sees session.created
++    const second = await createHook()
++    triggerSessionCreated(second.hook)
++    await runScheduledCheck()
++
++    // then: B is gated by the process-level flag — nothing scheduled, nothing run
++    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
++    expect(second.mocks.showConfigErrorsIfAny).not.toHaveBeenCalled()
++    expect(second.mocks.updateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
++    expect(second.mocks.refreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
++    expect(second.mocks.showVersionToast).not.toHaveBeenCalled()
++    expect(second.mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
++  })
++
++  test("instance skips while another instance's deferred check is still running", async () => {
++    // given: instance A scheduled its check (running gate held) but it has not fired yet
++    resetDeferredState()
++    const first = await createHook()
++    triggerSessionCreated(first.hook)
++    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
++
++    // when: instance B triggers before A's deferred check executes
++    const second = await createHook()
++    triggerSessionCreated(second.hook)
++
++    // then: B does not schedule a duplicate check
++    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
++
++    // and: A's check still completes normally
++    await runScheduledCheck()
++    expect(first.mocks.showVersionToast).toHaveBeenCalledTimes(1)
++  })
++
++  test("a failed startup check still marks the process gate so failures do not fan out", async () => {
++    // given: the startup check body throws
++    resetDeferredState()
++    const failing = await createHook({}, {
++      showConfigErrorsIfAny: mock(async () => {
++        throw new Error("boom")
++      }),
++    })
++    triggerSessionCreated(failing.hook)
++    await runScheduledCheck()
++
++    // when: another instance triggers afterwards
++    const second = await createHook()
++    triggerSessionCreated(second.hook)
++    await runScheduledCheck()
++
++    // then: the gate is closed even after the failure — no retry storm
++    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
++    expect(second.mocks.showVersionToast).not.toHaveBeenCalled()
++  })
+ })
+diff --git a/packages/omo-opencode/src/hooks/auto-update-checker/hook.ts b/packages/omo-opencode/src/hooks/auto-update-checker/hook.ts
+index 1be41a2e3..8fb5ed6c0 100644
+--- a/packages/omo-opencode/src/hooks/auto-update-checker/hook.ts
++++ b/packages/omo-opencode/src/hooks/auto-update-checker/hook.ts
+@@ -12,6 +12,7 @@ import { refreshModelCapabilitiesOnStartup } from "./hook/model-capabilities-sta
+ import { showModelCacheWarningIfNeeded } from "./hook/model-cache-warning"
+ import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
+ import { ignoreToastError } from "./hook/ignore-toast-error"
++import { getStartupCheckProcessState } from "./startup-check-process-state"
+ 
+ interface AutoUpdateCheckerDeps {
+   getBundledVersion?: typeof getBundledVersion
+@@ -89,7 +90,16 @@ export function createAutoUpdateCheckerHook(
+       if (hasChecked || hasScheduled) return
+       if (getParentID(event.properties)) return
+ 
++      const processState = getStartupCheckProcessState()
++      if (processState.completed || processState.running) {
++        deps.log(
++          "[auto-update-checker] startup check already completed in this process; skipping per-instance rerun",
++        )
++        return
++      }
++
+       hasScheduled = true
++      processState.running = true
+ 
+       scheduleDeferredStartupCheck(() => {
+         hasChecked = true
+@@ -125,6 +135,15 @@ export function createAutoUpdateCheckerHook(
+             deps.log("[auto-update-checker] Background update check failed:", err)
+           })
+         })()
++          .catch((error) => {
++            // A failed startup check must neither crash the process nor fan
++            // out retries on the next plugin instance (local fix 26).
++            deps.log("[auto-update-checker] startup check failed:", error)
++          })
++          .finally(() => {
++            processState.running = false
++            processState.completed = true
++          })
+       })
+     },
+   }
+diff --git a/packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state.ts b/packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state.ts
+new file mode 100644
+index 000000000..73799c3a3
+--- /dev/null
++++ b/packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state.ts
+@@ -0,0 +1,39 @@
++/**
++ * Startup-check state kept per PROCESS, not per plugin instance (local fix 26,
++ * first-message-drop F5a).
++ *
++ * OpenCode rebuilds plugin instances on folder release/eviction, and every
++ * fresh instance used to re-run the whole deferred startup check (~0.85s each:
++ * provider-list fetch + a 3,823-model capabilities-cache rewrite + npm update
++ * check), fanning out across all live instances ~5s after any root
++ * session.created (79 cache rewrites in 26h).
++ *
++ * Stored on globalThis behind a registered symbol so it survives per-location
++ * plugin module re-imports within the same OpenCode process. This module is a
++ * deliberate dependency leaf: the test preload imports it, so it must not pull
++ * any module with import-time side effects (HOME reads, config caches, shims).
++ */
++export const STARTUP_CHECK_PROCESS_STATE_SYMBOL = Symbol.for(
++  "omo.autoUpdateChecker.startupCheckState.v1",
++)
++
++export type StartupCheckProcessState = {
++  completed: boolean
++  running: boolean
++}
++
++export function getStartupCheckProcessState(): StartupCheckProcessState {
++  const holder = globalThis as Record<symbol, StartupCheckProcessState | undefined>
++  let state = holder[STARTUP_CHECK_PROCESS_STATE_SYMBOL]
++  if (state === undefined) {
++    state = { completed: false, running: false }
++    holder[STARTUP_CHECK_PROCESS_STATE_SYMBOL] = state
++  }
++  return state
++}
++
++/** Test-only: reset the per-process startup-check gate. */
++export function resetStartupCheckProcessStateForTests(): void {
++  const holder = globalThis as Record<symbol, StartupCheckProcessState | undefined>
++  delete holder[STARTUP_CHECK_PROCESS_STATE_SYMBOL]
++}
+-- 
+2.55.0.windows.3
+

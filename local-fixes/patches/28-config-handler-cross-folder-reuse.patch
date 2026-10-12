@@ -1,0 +1,1161 @@
+From 42289f2a94056ed70b8bf469af6745fbdd86a3bc Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 12 Oct 2026 19:16:35 +0300
+Subject: [PATCH] fix(v2): reuse config-handler artifacts across chat folders
+ via a process cache
+
+First-message-drop F5c. OMO's config handler owned 11.7s of a 17.7s cold
+plugin setup (66%, app-layer addendum B.5), and every folder rebuild re-paid
+it although plugin components, agents, global commands and the Claude Code
+MCP configs are identical for every (empty) chat folder. New process-level
+cache (globalThis + registered symbol, survives module re-imports):
+ - plugin components keyed by the claude_code config slice + a fingerprint of
+   the ~/.claude plugin roots (install/uninstall invalidates); retryable load
+   failures are never cached;
+ - the agent-config snapshot hoisted from the per-instance closure to a
+   process map keyed by the OpenCode config slice + a fingerprint of the
+   folder's project sources; folders with none of those sources (every chat
+   folder) share one snapshot, folders with project content stay per-folder;
+ - directory-independent command sources (builtin commands/skills, user and
+   global commands/skills) memoized; project sources still load per folder;
+ - loadMcpConfigs memoized on a ~/.claude.json fingerprint; cwd-bound builtin
+   MCPs still rebuild per folder.
+Escape hatch: OMO_DISABLE_PROCESS_CONFIG_CACHE=1 restores per-call loads.
+test-setup resets the caches per test.
+---
+ .../plugin-handlers/command-config-handler.ts | 135 +++++++++++---
+ .../config-handler.process-cache.test.ts      | 165 +++++++++++++++++
+ .../src/plugin-handlers/config-handler.ts     | 155 +++++++++++++---
+ .../src/plugin-handlers/mcp-config-handler.ts |  31 +++-
+ ...in-components-loader.process-cache.test.ts |  69 +++++++
+ .../plugin-components-loader.ts               |  48 +++++
+ .../src/shared/process-config-cache.test.ts   | 104 +++++++++++
+ .../src/shared/process-config-cache.ts        | 168 ++++++++++++++++++
+ test-setup.ts                                 |   8 +
+ 9 files changed, 833 insertions(+), 50 deletions(-)
+ create mode 100644 packages/omo-opencode/src/plugin-handlers/config-handler.process-cache.test.ts
+ create mode 100644 packages/omo-opencode/src/plugin-handlers/plugin-components-loader.process-cache.test.ts
+ create mode 100644 packages/omo-opencode/src/shared/process-config-cache.test.ts
+ create mode 100644 packages/omo-opencode/src/shared/process-config-cache.ts
+
+diff --git a/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts b/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts
+index 60eb841ef..614bcc301 100644
+--- a/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts
++++ b/packages/omo-opencode/src/plugin-handlers/command-config-handler.ts
+@@ -34,14 +34,73 @@ import type { PluginComponents } from "./plugin-components-loader";
+ import { adaptHostSkillConfig } from "../shared/host-skill-config";
+ import { collectDisabledSkillAliases } from "../plugin/skill-context";
+ import type { LoadedSkill } from "../features/opencode-skill-loader/types";
++import {
++  getProcessConfigCacheEntry,
++  setProcessConfigCacheEntry,
++} from "../shared/process-config-cache";
+ 
+-export async function applyCommandConfig(params: {
+-  config: Record<string, unknown>;
++/**
++ * Directory-independent command sources (local fix 28, first-message-drop
++ * F5c): builtin commands, builtin skills, user commands/skills, global agent
++ * skills and OpenCode global commands/skills are identical for every folder,
++ * but they used to be re-loaded from disk on every folder rebuild. Project
++ * sources stay per-folder.
++ */
++type GlobalCommandSources = {
++  builtinSkillCommands: Record<string, unknown>;
++  builtinCommands: Record<string, unknown>;
++  userCommands: Record<string, unknown>;
++  userSkills: Record<string, unknown>;
++  globalAgentsSkills: Record<string, unknown>;
++  opencodeGlobalCommands: Record<string, unknown>;
++  opencodeGlobalSkills: Record<string, unknown>;
++};
++
++function shallowCopyCommandRecord<T>(record: Record<string, T>): Record<string, T> {
++  return Object.fromEntries(
++    Object.entries(record).map(([name, command]) => [name, { ...command }]),
++  );
++}
++
++function buildGlobalCommandSourcesCacheKey(params: {
+   pluginConfig: OhMyOpenCodeConfig;
+-  ctx: { directory: string };
+-  pluginComponents: PluginComponents;
+-}): Promise<void> {
+-  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
++  disabledSkills: ReadonlySet<string>;
++  includeClaudeCommands: boolean;
++  includeClaudeSkills: boolean;
++}): string {
++  return JSON.stringify({
++    disabledCommands: params.pluginConfig.disabled_commands ?? [],
++    teamMode: params.pluginConfig.team_mode?.enabled ?? false,
++    browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
++    disabledSkills: [...params.disabledSkills].sort(),
++    includeClaudeCommands: params.includeClaudeCommands,
++    includeClaudeSkills: params.includeClaudeSkills,
++    systemMcpNames: getSystemMcpServerNames(),
++  });
++}
++
++async function loadGlobalCommandSources(params: {
++  pluginConfig: OhMyOpenCodeConfig;
++  disabledSkills: Set<string>;
++  includeClaudeCommands: boolean;
++  includeClaudeSkills: boolean;
++}): Promise<GlobalCommandSources> {
++  const cacheKey = buildGlobalCommandSourcesCacheKey(params);
++  const cached = getProcessConfigCacheEntry("globalCommandSources");
++  if (cached && cached.key === cacheKey) {
++    log("[command-config] reusing cached global command sources (process-level)");
++    const value = cached.value as GlobalCommandSources;
++    return {
++      builtinSkillCommands: shallowCopyCommandRecord(value.builtinSkillCommands),
++      builtinCommands: shallowCopyCommandRecord(value.builtinCommands),
++      userCommands: shallowCopyCommandRecord(value.userCommands),
++      userSkills: shallowCopyCommandRecord(value.userSkills),
++      globalAgentsSkills: shallowCopyCommandRecord(value.globalAgentsSkills),
++      opencodeGlobalCommands: shallowCopyCommandRecord(value.opencodeGlobalCommands),
++      opencodeGlobalSkills: shallowCopyCommandRecord(value.opencodeGlobalSkills),
++    };
++  }
++
+   const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
+     useRegisteredAgents: true,
+     teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+@@ -49,7 +108,7 @@ export async function applyCommandConfig(params: {
+   const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
+     resolveActiveBuiltinSkills({
+       browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+-      disabledSkills,
++      disabledSkills: params.disabledSkills,
+       teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+       systemMcpNames: getSystemMcpServerNames(),
+     }),
+@@ -57,7 +116,36 @@ export async function applyCommandConfig(params: {
+   for (const disabledCommand of params.pluginConfig.disabled_commands ?? []) {
+     delete builtinSkillCommands[disabledCommand];
+   }
+-  const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
++
++  const [userCommands, userSkills, globalAgentsSkills, opencodeGlobalCommands, opencodeGlobalSkills] =
++    await Promise.all([
++      params.includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
++      params.includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
++      params.includeClaudeSkills ? loadGlobalAgentsSkills() : Promise.resolve({}),
++      loadOpencodeGlobalCommands(),
++      loadOpencodeGlobalSkills(),
++    ]);
++
++  const sources: GlobalCommandSources = {
++    builtinSkillCommands,
++    builtinCommands,
++    userCommands,
++    userSkills,
++    globalAgentsSkills,
++    opencodeGlobalCommands,
++    opencodeGlobalSkills,
++  };
++  setProcessConfigCacheEntry("globalCommandSources", { key: cacheKey, value: sources });
++  return sources;
++}
++
++export async function applyCommandConfig(params: {
++  config: Record<string, unknown>;
++  pluginConfig: OhMyOpenCodeConfig;
++  ctx: { directory: string };
++  pluginComponents: PluginComponents;
++}): Promise<void> {
++  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
+ 
+   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
+   const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
+@@ -67,41 +155,48 @@ export async function applyCommandConfig(params: {
+     log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName));
+   }
+ 
+-  const hostSkillConfig = adaptHostSkillConfig(params.config.skills);
+   const [
++    globalSources,
+     configSourceSkills,
+     hostConfigSkills,
+-    userCommands,
+     projectCommands,
+-    opencodeGlobalCommands,
+     opencodeProjectCommands,
+-    userSkills,
+-    globalAgentsSkills,
+     projectSkills,
+     projectAgentsSkills,
+-    opencodeGlobalSkills,
+     opencodeProjectSkills,
+   ] = await Promise.all([
++    loadGlobalCommandSources({
++      pluginConfig: params.pluginConfig,
++      disabledSkills: disabledSkills as Set<string>,
++      includeClaudeCommands,
++      includeClaudeSkills,
++    }),
+     discoverConfigSourceSkills({
+       config: params.pluginConfig.skills,
+       configDir: params.ctx.directory,
+     }),
+     discoverConfigSourceSkills({
+-      config: hostSkillConfig,
++      config: adaptHostSkillConfig(params.config.skills),
+       configDir: params.ctx.directory,
+     }),
+-    includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
+     includeClaudeCommands ? loadProjectCommands(params.ctx.directory) : Promise.resolve({}),
+-    loadOpencodeGlobalCommands(),
+     loadOpencodeProjectCommands(params.ctx.directory),
+-    includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
+-    includeClaudeSkills ? loadGlobalAgentsSkills() : Promise.resolve({}),
+     includeClaudeSkills ? loadProjectSkills(params.ctx.directory) : Promise.resolve({}),
+     includeClaudeSkills ? loadProjectAgentsSkills(params.ctx.directory) : Promise.resolve({}),
+-    loadOpencodeGlobalSkills(),
+     loadOpencodeProjectSkills(params.ctx.directory),
+   ]);
+ 
++  const {
++    builtinSkillCommands,
++    builtinCommands,
++    userCommands,
++    userSkills,
++    globalAgentsSkills,
++    opencodeGlobalCommands,
++    opencodeGlobalSkills,
++  } = globalSources;
++  const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
++
+   params.config.command = {
+     ...builtinSkillCommands,
+     ...builtinCommands,
+diff --git a/packages/omo-opencode/src/plugin-handlers/config-handler.process-cache.test.ts b/packages/omo-opencode/src/plugin-handlers/config-handler.process-cache.test.ts
+new file mode 100644
+index 000000000..ddd310278
+--- /dev/null
++++ b/packages/omo-opencode/src/plugin-handlers/config-handler.process-cache.test.ts
+@@ -0,0 +1,165 @@
++/// <reference types="bun-types" />
++
++import { beforeEach, describe, expect, test } from "bun:test"
++import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++import { createConfigHandler, getLastConfigHandlerPhaseTiming } from "./config-handler"
++import { resetProcessConfigCacheForTests } from "../shared/process-config-cache"
++import { createModelCacheState } from "../plugin-state"
++import type { OhMyOpenCodeConfig } from "../config"
++
++// This suite intentionally uses NO module mocks: the shared logger/agent-name
++// barrels are imported by dozens of other test files, and mocking them leaks
++// across files sharing a worker. The real sub-handlers run against the
++// hermetic home (empty ~/.claude, empty plugin roots), which is both fast and
++// a stronger assertion: it proves cross-folder reuse is output-equivalent for
++// the real applyAgentConfig, not a mocked one.
++
++const pluginConfig = {} as OhMyOpenCodeConfig
++
++const baseConfig = (): Record<string, unknown> => ({
++  formatter: { enabled: false },
++  model: "provider/model",
++})
++
++describe("config handler process-level snapshot reuse (local fix 28, first-message-drop F5c)", () => {
++  let tempRoot: string
++  let emptyFolderA: string
++  let emptyFolderB: string
++
++  beforeEach(() => {
++    resetProcessConfigCacheForTests()
++    delete process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE
++    tempRoot = mkdtempSync(join(tmpdir(), "omo-cfg-"))
++    emptyFolderA = join(tempRoot, "chat-a")
++    emptyFolderB = join(tempRoot, "chat-b")
++    mkdirSync(emptyFolderA)
++    mkdirSync(emptyFolderB)
++  })
++
++  test("a rebuilt instance of the same folder reuses the agent snapshot", async () => {
++    const first = createConfigHandler({
++      ctx: { directory: emptyFolderA },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    const configA = baseConfig()
++    await first(configA)
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(false)
++    expect(Object.keys(configA.agent as Record<string, unknown>).length).toBeGreaterThan(0)
++
++    // A rebuild creates a brand-new handler instance for the same folder.
++    const rebuilt = createConfigHandler({
++      ctx: { directory: emptyFolderA },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    const configB = baseConfig()
++    await rebuilt(configB)
++
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(true)
++    expect(configB.agent).toEqual(configA.agent)
++    expect(configB.default_agent).toBe(configA.default_agent)
++    expect(getLastConfigHandlerPhaseTiming()?.componentsCacheHit).toBe(true)
++  })
++
++  test("a different empty chat folder shares the snapshot with identical output", async () => {
++    const handlerA = createConfigHandler({
++      ctx: { directory: emptyFolderA },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    const configA = baseConfig()
++    await handlerA(configA)
++
++    const handlerB = createConfigHandler({
++      ctx: { directory: emptyFolderB },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    const configB = baseConfig()
++    await handlerB(configB)
++
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(true)
++    // Output-equivalence proof for the REAL agent pipeline: two distinct empty
++    // folders produce deep-equal agent configs, so sharing the snapshot is
++    // behavior-preserving (no directory is baked into agent definitions).
++    expect(configB.agent).toEqual(configA.agent)
++  })
++
++  test("a folder with project sources gets its own snapshot", async () => {
++    const projectFolder = join(tempRoot, "project-folder")
++    mkdirSync(join(projectFolder, ".claude", "agents"), { recursive: true })
++    writeFileSync(
++      join(projectFolder, ".claude", "agents", "project-helper.md"),
++      "---\ndescription: project helper\nmode: subagent\n---\nhelps the project\n",
++    )
++
++    const handlerA = createConfigHandler({
++      ctx: { directory: emptyFolderA },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    const configA = baseConfig()
++    await handlerA(configA)
++
++    const handlerProject = createConfigHandler({
++      ctx: { directory: projectFolder },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    const configProject = baseConfig()
++    await handlerProject(configProject)
++
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(false)
++    const projectAgents = configProject.agent as Record<string, Record<string, unknown>>
++    const helper = Object.values(projectAgents).find((agent) =>
++      typeof agent.prompt === "string" ? agent.prompt.includes("helps the project") : false,
++    )
++    expect(helper).toBeDefined()
++
++    const emptyAgents = configA.agent as Record<string, unknown>
++    expect(Object.keys(projectAgents).length).toBeGreaterThan(Object.keys(emptyAgents).length)
++  })
++
++  test("a changed OpenCode config slice recomputes instead of reusing", async () => {
++    const handler = createConfigHandler({
++      ctx: { directory: emptyFolderA },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    await handler(baseConfig())
++
++    const changedConfig = baseConfig()
++    changedConfig.model = "provider/other-model"
++    await createConfigHandler({
++      ctx: { directory: emptyFolderA },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })(changedConfig)
++
++    expect(getLastConfigHandlerPhaseTiming()?.agentsCacheHit).toBe(false)
++  })
++
++  test("phase timing is recorded with all phases and cache flags (local fix 29, F16)", async () => {
++    const handler = createConfigHandler({
++      ctx: { directory: emptyFolderA },
++      pluginConfig,
++      modelCacheState: createModelCacheState(),
++    })
++    await handler(baseConfig())
++
++    const timing = getLastConfigHandlerPhaseTiming()
++    expect(timing).toBeDefined()
++    expect(timing?.total).toBeGreaterThanOrEqual(0)
++    expect(timing?.provider).toBeGreaterThanOrEqual(0)
++    expect(timing?.pluginComponents).toBeGreaterThanOrEqual(0)
++    expect(timing?.hooks).toBeGreaterThanOrEqual(0)
++    expect(timing?.tools).toBeGreaterThanOrEqual(0)
++    expect(timing?.mcp).toBeGreaterThanOrEqual(0)
++    expect(timing?.commands).toBeGreaterThanOrEqual(0)
++    expect(timing?.agentsCacheHit).toBe(false)
++    expect(timing?.directory).toBe(emptyFolderA)
++  })
++})
+diff --git a/packages/omo-opencode/src/plugin-handlers/config-handler.ts b/packages/omo-opencode/src/plugin-handlers/config-handler.ts
+index aaa77d989..ebbc7da0d 100644
+--- a/packages/omo-opencode/src/plugin-handlers/config-handler.ts
++++ b/packages/omo-opencode/src/plugin-handlers/config-handler.ts
+@@ -4,6 +4,11 @@ import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-load
+ import { applyOpenGatewayProviderConfig } from "../features/opengateway-provider";
+ import type { ModelCacheState } from "../plugin-state";
+ import { log } from "../shared";
++import {
++  fingerprintProjectSources,
++  getProcessAgentSnapshotMap,
++  getProcessConfigCacheEntry,
++} from "../shared/process-config-cache";
+ import { AGENT_DISPLAY_NAMES, getAgentListDisplayName } from "../shared/agent-display-names";
+ import { applyAgentConfig } from "./agent-config-handler";
+ import { applyCommandConfig } from "./command-config-handler";
+@@ -75,6 +80,23 @@ function createAgentConfigCacheKey(config: Record<string, unknown>): string {
+   })
+ }
+ 
++/**
++ * Cross-folder agent-config snapshot key (local fix 28, first-message-drop
++ * F5c). The snapshot used to live in the per-instance closure, so every folder
++ * rebuild re-ran applyAgentConfig (the largest identified cold-start owner:
++ * 11.7s of a 17.7s cold plugin setup). The process-level map keys snapshots by
++ * the OpenCode config slice PLUS a fingerprint of the folder's project-level
++ * sources. Folders with none of those sources (every OpenChamber chat folder
++ * is an empty directory) share one snapshot; folders with project content are
++ * keyed per directory so their agents never leak into other folders.
++ */
++function createProcessAgentSnapshotKey(
++  agentCacheKey: string,
++  directory: string,
++): string {
++  return `${agentCacheKey}::${fingerprintProjectSources(directory)}`
++}
++
+ function attachHiddenConfigKeyAliases(
+   config: Record<string, unknown>,
+   pluginConfig: OhMyOpenCodeConfig,
+@@ -126,48 +148,99 @@ function replayAgentConfigSideEffects(params: {
+   }
+ }
+ 
++/**
++ * Test/telemetry seam: the most recent phase-timing record (local fix 29).
++ * Lets the hermetic suite assert cache-hit behavior without mocking the
++ * shared logger barrel (module mocks of ../shared leak across test files).
++ */
++let lastPhaseTiming: Record<string, unknown> | undefined;
++
++export function getLastConfigHandlerPhaseTiming(): Record<string, unknown> | undefined {
++  return lastPhaseTiming;
++}
++
+ export function createConfigHandler(deps: ConfigHandlerDeps) {
+   const { ctx, pluginConfig, modelCacheState, runtimeSkillSourceUrl } = deps;
+   let agentConfigSnapshot: AgentConfigSnapshot | undefined;
+ 
+   return async (config: Record<string, unknown>) => {
++    // Per-phase timing (local fix 29, first-message-drop F16): the cold plugin
++    // setup had no attribution — OMO's share was only measurable end to end.
++    // These numbers make the remaining cold-start cost attributable in
++    // %TEMP%\oh-my-opencode.log.
++    const phaseTiming: Record<string, number> = {};
++    let agentsCacheHit = false;
++    let componentsCacheHit = false;
++    const timePhase = async <T>(name: string, run: () => Promise<T> | T): Promise<T> => {
++      const startedAt = Date.now();
++      try {
++        return await run();
++      } finally {
++        phaseTiming[name] = Date.now() - startedAt;
++      }
++    };
++    const totalStartedAt = Date.now();
++
+     const formatterConfig = config.formatter;
+ 
+-    setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
+-    applyOpenGatewayProviderConfig(config);
+-    applyProviderConfig({
+-      config,
+-      modelCacheState,
+-      trustedVisionCapableModels: collectTrustedVisionCapableModels(pluginConfig),
++    await timePhase("provider", async () => {
++      setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
++      applyOpenGatewayProviderConfig(config);
++      applyProviderConfig({
++        config,
++        modelCacheState,
++        trustedVisionCapableModels: collectTrustedVisionCapableModels(pluginConfig),
++      });
++      clearFormatterCache()
+     });
+-    clearFormatterCache()
+ 
+-    const pluginComponents = await loadPluginComponents({ pluginConfig });
++    const cachedComponentsBefore = getProcessConfigCacheEntry("pluginComponents");
++    const pluginComponents = await timePhase("pluginComponents", () =>
++      loadPluginComponents({ pluginConfig }),
++    );
++    componentsCacheHit =
++      cachedComponentsBefore !== undefined && cachedComponentsBefore.value === pluginComponents;
+     const pluginComponentsLoadFailed = pluginComponents.retryableLoadFailure === true;
+ 
+-    applyHookConfig({ pluginComponents });
++    await timePhase("hooks", () => applyHookConfig({ pluginComponents }));
+ 
+     const agentCacheKey = createAgentConfigCacheKey(config);
+     let agentResult: Record<string, unknown>;
+-    if (!pluginComponentsLoadFailed && agentConfigSnapshot?.cacheKey === agentCacheKey) {
+-      config.agent = cloneAgentConfig(agentConfigSnapshot.agents);
+-      if (agentConfigSnapshot.defaultAgent !== undefined) {
+-        config.default_agent = agentConfigSnapshot.defaultAgent;
++    const processAgentSnapshots = getProcessAgentSnapshotMap();
++    const processSnapshotKey = pluginComponentsLoadFailed
++      ? undefined
++      : createProcessAgentSnapshotKey(agentCacheKey, ctx.directory);
++    const processSnapshot = processSnapshotKey
++      ? (processAgentSnapshots.get(processSnapshotKey) as AgentConfigSnapshot | undefined)
++      : undefined;
++    const closureSnapshot = agentConfigSnapshot?.cacheKey === agentCacheKey
++      ? agentConfigSnapshot
++      : undefined;
++    const snapshot = closureSnapshot ?? processSnapshot;
++    if (!pluginComponentsLoadFailed && snapshot) {
++      config.agent = cloneAgentConfig(snapshot.agents);
++      if (snapshot.defaultAgent !== undefined) {
++        config.default_agent = snapshot.defaultAgent;
+       }
+       agentResult = config.agent as Record<string, unknown>;
+       replayAgentConfigSideEffects({
+         agentResult,
+-        configuredDefaultAgent: agentConfigSnapshot.configuredDefaultAgent,
++        configuredDefaultAgent: snapshot.configuredDefaultAgent,
+         defaultAgent: config.default_agent,
+       })
++      agentsCacheHit = true;
+     } else {
+-      const configuredDefaultAgent = getConfiguredDefaultAgent(config);
+-      agentResult = await applyAgentConfig({
+-        config,
+-        pluginConfig,
+-        ctx,
+-        pluginComponents,
++      const configuredDefaultAgent = await timePhase("agents", () => {
++        return getConfiguredDefaultAgent(config);
+       });
++      agentResult = await timePhase("agents", () =>
++        applyAgentConfig({
++          config,
++          pluginConfig,
++          ctx,
++          pluginComponents,
++        }),
++      );
+       agentConfigSnapshot = pluginComponentsLoadFailed
+         ? undefined
+         : {
+@@ -176,26 +249,50 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
+             defaultAgent: config.default_agent,
+             agents: cloneAgentConfig(agentResult),
+           };
++      if (processSnapshotKey && agentConfigSnapshot) {
++        processAgentSnapshots.set(processSnapshotKey, agentConfigSnapshot);
++      }
+     }
+ 
+-    applyToolConfig({ config, pluginConfig, agentResult });
+-    attachHiddenConfigKeyAliases(config, pluginConfig);
+-    await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });
+-    await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
++    await timePhase("tools", () =>
++      applyToolConfig({ config, pluginConfig, agentResult }),
++    );
++    await timePhase("agentAliases", () => attachHiddenConfigKeyAliases(config, pluginConfig));
++    await timePhase("mcp", () =>
++      applyMcpConfig({ config, pluginConfig, ctx, pluginComponents }),
++    );
++    await timePhase("commands", () =>
++      applyCommandConfig({ config, pluginConfig, ctx, pluginComponents }),
++    );
+     if (runtimeSkillSourceUrl) {
+-      applyRuntimeSkillSourceConfig({
+-        config,
+-        pluginConfig,
+-        sourceUrl: runtimeSkillSourceUrl,
+-      })
++      await timePhase("runtimeSkills", () =>
++        applyRuntimeSkillSourceConfig({
++          config,
++          pluginConfig,
++          sourceUrl: runtimeSkillSourceUrl,
++        }),
++      );
+     }
+ 
+     config.formatter = formatterConfig;
+ 
++    phaseTiming.total = Date.now() - totalStartedAt;
++    lastPhaseTiming = {
++      directory: ctx.directory,
++      ...phaseTiming,
++      agentsCacheHit,
++      componentsCacheHit,
++    };
+     log("[config-handler] config handler applied", {
+       agentCount: Object.keys(agentResult).length,
+       commandCount: Object.keys((config.command as Record<string, unknown>) ?? {})
+         .length,
+     });
++    log("[config-handler] phase timing", {
++      directory: ctx.directory,
++      ...phaseTiming,
++      agentsCacheHit,
++      componentsCacheHit,
++    });
+   };
+ }
+diff --git a/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts b/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts
+index 07506b6a3..e92f6bfe5 100644
+--- a/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts
++++ b/packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts
+@@ -3,6 +3,11 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
+ import { createBuiltinMcps } from "../mcp";
+ import type { PluginComponents } from "./plugin-components-loader";
+ import { log } from "../shared";
++import {
++  fingerprintClaudeMcpSources,
++  getProcessConfigCacheEntry,
++  setProcessConfigCacheEntry,
++} from "../shared/process-config-cache";
+ 
+ type McpEntry = Record<string, unknown>;
+ 
+@@ -25,6 +30,30 @@ function captureUserDisabledMcps(
+   return disabled;
+ }
+ 
++/**
++ * Claude Code MCP configs are directory-independent (they come from
++ * ~/.claude.json and ~/.claude settings), so the loaded server set is cached
++ * per process (local fix 28, first-message-drop F5c) and invalidated by a
++ * fingerprint of those files. Builtin MCPs embed the folder cwd and are still
++ * rebuilt per folder.
++ */
++async function loadCachedMcpConfigs(
++  disabledMcps: string[],
++): Promise<{ servers: Record<string, unknown> }> {
++  const cacheKey = JSON.stringify({
++    disabledMcps,
++    sources: fingerprintClaudeMcpSources(),
++  });
++  const cached = getProcessConfigCacheEntry("claudeMcpServers");
++  if (cached && cached.key === cacheKey) {
++    log("[mcp-config] reusing cached Claude Code MCP configs (process-level)");
++    return cached.value as { servers: Record<string, unknown> };
++  }
++  const result = await loadMcpConfigs(disabledMcps);
++  setProcessConfigCacheEntry("claudeMcpServers", { key: cacheKey, value: result });
++  return result;
++}
++
+ export async function applyMcpConfig(params: {
+   config: Record<string, unknown>;
+   ctx: { directory: string };
+@@ -36,7 +65,7 @@ export async function applyMcpConfig(params: {
+   const userDisabledMcps = captureUserDisabledMcps(userMcp);
+ 
+   const mcpResult = params.pluginConfig.claude_code?.mcp ?? true
+-    ? await loadMcpConfigs(disabledMcps)
++    ? await loadCachedMcpConfigs(disabledMcps)
+     : { servers: {} };
+ 
+   if (userMcp) {
+diff --git a/packages/omo-opencode/src/plugin-handlers/plugin-components-loader.process-cache.test.ts b/packages/omo-opencode/src/plugin-handlers/plugin-components-loader.process-cache.test.ts
+new file mode 100644
+index 000000000..9d12f9ab0
+--- /dev/null
++++ b/packages/omo-opencode/src/plugin-handlers/plugin-components-loader.process-cache.test.ts
+@@ -0,0 +1,69 @@
++/// <reference types="bun-types" />
++
++import { beforeEach, describe, expect, test } from "bun:test"
++import {
++  getPluginComponentsRealLoadCount,
++  loadPluginComponents,
++} from "./plugin-components-loader"
++import { resetProcessConfigCacheForTests } from "../shared/process-config-cache"
++import type { OhMyOpenCodeConfig } from "../config"
++
++// No module mocks: the compat-core loader barrel is imported by other test
++// files (hook-config merging), and mocking it leaks across files sharing a
++// worker. The real loader runs against the hermetic home (no ~/.claude/plugins),
++// and cache behavior is observed through the real-load counter seam.
++const basePluginConfig = {
++  claude_code: { plugins: true },
++} as OhMyOpenCodeConfig
++
++describe("plugin-components-loader process cache (local fix 28, first-message-drop F5c)", () => {
++  beforeEach(() => {
++    resetProcessConfigCacheForTests()
++    delete process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE
++  })
++
++  test("second load with the same config does not re-run the real loader", async () => {
++    const first = await loadPluginComponents({ pluginConfig: basePluginConfig })
++    const loadsAfterFirst = getPluginComponentsRealLoadCount()
++
++    const second = await loadPluginComponents({ pluginConfig: basePluginConfig })
++
++    expect(getPluginComponentsRealLoadCount()).toBe(loadsAfterFirst)
++    expect(second).toBe(first)
++  })
++
++  test("a different plugin config slice re-runs the real loader", async () => {
++    await loadPluginComponents({ pluginConfig: basePluginConfig })
++    const loadsAfterFirst = getPluginComponentsRealLoadCount()
++
++    await loadPluginComponents({
++      pluginConfig: {
++        ...basePluginConfig,
++        claude_code: { plugins: true, anthropic_provider: "custom" },
++      } as OhMyOpenCodeConfig,
++    })
++
++    expect(getPluginComponentsRealLoadCount()).toBe(loadsAfterFirst + 1)
++  })
++
++  test("the kill-switch OMO_DISABLE_PROCESS_CONFIG_CACHE=1 restores per-call loads", async () => {
++    process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE = "1"
++    await loadPluginComponents({ pluginConfig: basePluginConfig })
++    const loadsAfterFirst = getPluginComponentsRealLoadCount()
++
++    await loadPluginComponents({ pluginConfig: basePluginConfig })
++
++    expect(getPluginComponentsRealLoadCount()).toBe(loadsAfterFirst + 1)
++  })
++
++  test("plugins disabled returns the empty result without touching the loader or cache", async () => {
++    const loadsBefore = getPluginComponentsRealLoadCount()
++
++    const result = await loadPluginComponents({
++      pluginConfig: { ...basePluginConfig, claude_code: { plugins: false } } as OhMyOpenCodeConfig,
++    })
++
++    expect(getPluginComponentsRealLoadCount()).toBe(loadsBefore)
++    expect(result.commands).toEqual({})
++  })
++})
+diff --git a/packages/omo-opencode/src/plugin-handlers/plugin-components-loader.ts b/packages/omo-opencode/src/plugin-handlers/plugin-components-loader.ts
+index 28a8f750b..b9b04c94f 100644
+--- a/packages/omo-opencode/src/plugin-handlers/plugin-components-loader.ts
++++ b/packages/omo-opencode/src/plugin-handlers/plugin-components-loader.ts
+@@ -2,6 +2,11 @@ import type { OhMyOpenCodeConfig } from "../config";
+ import { loadAllPluginComponents } from "@oh-my-opencode/claude-code-compat-core/claude-code-plugin-loader";
+ import type { PluginHooksConfig } from "../hooks/claude-code-hooks/types";
+ import { addConfigLoadError, log } from "../shared";
++import {
++  fingerprintClaudePluginRoots,
++  getProcessConfigCacheEntry,
++  setProcessConfigCacheEntry,
++} from "../shared/process-config-cache";
+ 
+ export type PluginComponents = {
+   commands: Record<string, unknown>;
+@@ -24,6 +29,29 @@ const EMPTY_PLUGIN_COMPONENTS: PluginComponents = {
+   errors: [],
+ };
+ 
++function buildPluginComponentsCacheKey(params: {
++  pluginConfig: OhMyOpenCodeConfig;
++}): string {
++  return JSON.stringify({
++    enabled: params.pluginConfig.claude_code?.plugins ?? true,
++    override: params.pluginConfig.claude_code?.plugins_override ?? null,
++    provider: params.pluginConfig.claude_code?.anthropic_provider ?? null,
++    // Fingerprint the installation roots so installing/uninstalling a Claude
++    // Code plugin invalidates the cache without a process restart.
++    roots: fingerprintClaudePluginRoots(),
++  });
++}
++
++/**
++ * Test/telemetry seam: how many times the underlying plugin loader actually
++ * ran in this process (local fix 28). Cache hits do not increment it.
++ */
++let pluginComponentsRealLoadCount = 0;
++
++export function getPluginComponentsRealLoadCount(): number {
++  return pluginComponentsRealLoadCount;
++}
++
+ export async function loadPluginComponents(params: {
+   pluginConfig: OhMyOpenCodeConfig;
+ }): Promise<PluginComponents> {
+@@ -32,6 +60,20 @@ export async function loadPluginComponents(params: {
+     return EMPTY_PLUGIN_COMPONENTS;
+   }
+ 
++  // Process-level reuse (local fix 28, first-message-drop F5c): plugin
++  // components depend only on the global plugin config and the ~/.claude
++  // plugin roots — identical for every chat folder — yet every folder rebuild
++  // used to re-discover and re-import them all. Cached per process; a change
++  // to the config slice or the plugin roots misses the key and recomputes.
++  const cacheKey = buildPluginComponentsCacheKey(params);
++  const cached = getProcessConfigCacheEntry("pluginComponents");
++  if (cached && cached.key === cacheKey) {
++    log("[plugin-components] reusing cached plugin components (process-level)", {
++      plugins: ((cached.value as PluginComponents).plugins ?? []).map((p) => `${p.name}@${p.version}`),
++    });
++    return cached.value as PluginComponents;
++  }
++
+   const timeoutMs = params.pluginConfig.experimental?.plugin_load_timeout_ms ?? 10000;
+ 
+   try {
+@@ -43,6 +85,7 @@ export async function loadPluginComponents(params: {
+       );
+     });
+ 
++    pluginComponentsRealLoadCount += 1;
+     const pluginComponents = (await Promise.race([
+       loadAllPluginComponents({
+         enabledPluginsOverride: params.pluginConfig.claude_code?.plugins_override,
+@@ -63,6 +106,11 @@ export async function loadPluginComponents(params: {
+       log(`Plugin load errors`, { errors: pluginComponents.errors });
+     }
+ 
++    // Never cache a retryable failure: the next config pass must retry the load.
++    if (pluginComponents.retryableLoadFailure !== true) {
++      setProcessConfigCacheEntry("pluginComponents", { key: cacheKey, value: pluginComponents });
++    }
++
+     return pluginComponents;
+   } catch (error) {
+     const errorMessage = error instanceof Error ? error.message : String(error);
+diff --git a/packages/omo-opencode/src/shared/process-config-cache.test.ts b/packages/omo-opencode/src/shared/process-config-cache.test.ts
+new file mode 100644
+index 000000000..3b2769b6f
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/process-config-cache.test.ts
+@@ -0,0 +1,104 @@
++/// <reference types="bun-types" />
++
++import { beforeEach, describe, expect, test } from "bun:test"
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++import {
++  NO_PROJECT_SOURCES_FINGERPRINT,
++  fingerprintProjectSources,
++  getProcessConfigCacheEntry,
++  isProcessConfigCacheDisabled,
++  resetProcessConfigCacheForTests,
++  setProcessConfigCacheEntry,
++} from "./process-config-cache"
++
++describe("process-config-cache", () => {
++  let tempRoot: string
++
++  beforeEach(() => {
++    resetProcessConfigCacheForTests()
++    delete process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE
++    tempRoot = mkdtempSync(join(tmpdir(), "omo-pcc-"))
++  })
++
++  test("empty folder fingerprints to the shared no-project-sources constant", () => {
++    const emptyFolder = join(tempRoot, "empty-chat-folder")
++    mkdirSync(emptyFolder)
++
++    expect(fingerprintProjectSources(emptyFolder)).toBe(NO_PROJECT_SOURCES_FINGERPRINT)
++  })
++
++  test("two distinct empty folders share the same fingerprint", () => {
++    const folderA = join(tempRoot, "chat-a")
++    const folderB = join(tempRoot, "chat-b")
++    mkdirSync(folderA)
++    mkdirSync(folderB)
++
++    expect(fingerprintProjectSources(folderA)).toBe(fingerprintProjectSources(folderB))
++  })
++
++  test("a folder with project sources is keyed by directory and content", () => {
++    const folderA = join(tempRoot, "project-a")
++    const folderB = join(tempRoot, "project-b")
++    mkdirSync(join(folderA, ".claude", "agents"), { recursive: true })
++    writeFileSync(join(folderA, ".claude", "agents", "helper.md"), "agent")
++    mkdirSync(join(folderB, ".claude", "agents"), { recursive: true })
++    writeFileSync(join(folderB, ".claude", "agents", "helper.md"), "agent")
++
++    const fingerprintA = fingerprintProjectSources(folderA)
++    const fingerprintB = fingerprintProjectSources(folderB)
++
++    // same content, different directory -> different keys (per-folder isolation)
++    expect(fingerprintA.startsWith("dir:")).toBe(true)
++    expect(fingerprintB.startsWith("dir:")).toBe(true)
++    expect(fingerprintA).not.toBe(fingerprintB)
++  })
++
++  test("adding or removing a project source entry changes the fingerprint", () => {
++    const folder = join(tempRoot, "project")
++    mkdirSync(join(folder, ".claude"), { recursive: true })
++    const before = fingerprintProjectSources(folder)
++
++    // a new entry under a project root changes the directory listing
++    mkdirSync(join(folder, ".claude", "agents"))
++    const afterAdd = fingerprintProjectSources(folder)
++    expect(afterAdd).not.toBe(before)
++
++    // removing the entry changes the fingerprint again (the directory stat
++    // keeps the mutation), which still invalidates the cache correctly.
++    rmSync(join(folder, ".claude", "agents"), { recursive: true, force: true })
++    expect(fingerprintProjectSources(folder)).not.toBe(afterAdd)
++  })
++
++  // Known limitation (documented in the fix report): an in-place edit of a
++  // file inside an existing project source directory does not change the
++  // directory stat or listing, so it does not invalidate the snapshot; the
++  // OpenCode config key, a config.updated cycle, a process restart, or
++  // OMO_DISABLE_PROCESS_CONFIG_CACHE=1 remain the invalidation paths.
++
++  test("entries round-trip and reset clears them", () => {
++    setProcessConfigCacheEntry("pluginComponents", { key: "k1", value: { hello: 1 } })
++    expect(getProcessConfigCacheEntry("pluginComponents")?.key).toBe("k1")
++
++    resetProcessConfigCacheForTests()
++    expect(getProcessConfigCacheEntry("pluginComponents")).toBeUndefined()
++  })
++
++  test("OMO_DISABLE_PROCESS_CONFIG_CACHE=1 disables reads and writes", () => {
++    process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE = "1"
++    expect(isProcessConfigCacheDisabled()).toBe(true)
++
++    setProcessConfigCacheEntry("pluginComponents", { key: "k1", value: {} })
++    expect(getProcessConfigCacheEntry("pluginComponents")).toBeUndefined()
++  })
++
++  test("state survives a fresh import of the module (module re-import safety)", async () => {
++    setProcessConfigCacheEntry("globalCommandSources", { key: "k2", value: { n: 2 } })
++    // A per-location plugin module re-import in the same process must keep the
++    // cache: it lives on globalThis behind a registered symbol, not module scope.
++    const moduleUrl = new URL("./process-config-cache.ts", import.meta.url).href + "?reimport=1"
++    await import(moduleUrl)
++    expect(getProcessConfigCacheEntry("globalCommandSources")?.key).toBe("k2")
++  })
++})
+diff --git a/packages/omo-opencode/src/shared/process-config-cache.ts b/packages/omo-opencode/src/shared/process-config-cache.ts
+new file mode 100644
+index 000000000..ba150fbc9
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/process-config-cache.ts
+@@ -0,0 +1,168 @@
++import { readdirSync, statSync } from "node:fs";
++import { homedir } from "node:os";
++import { join } from "node:path";
++
++/**
++ * Process-level cache for configuration artifacts that are identical across
++ * chat folders (local fix 28, first-message-drop F5c).
++ *
++ * OpenCode creates one plugin instance per folder and rebuilds instances on
++ * release/eviction. Every rebuild used to re-pay the full cold config-handler
++ * cost (measured 11.7s of a 17.7s cold plugin setup), even though plugin
++ * components, agents, commands and MCP config are identical for every chat
++ * folder.
++ *
++ * State lives on `globalThis` behind a registered symbol so it survives
++ * per-location plugin module re-imports within one OpenCode process but never
++ * leaks across processes. Each entry carries its own key derived from the
++ * inputs that produced it (config slices + filesystem fingerprints), so a real
++ * change misses the cache and recomputes.
++ *
++ * Escape hatch: set OMO_DISABLE_PROCESS_CONFIG_CACHE=1 to disable all reads
++ * and writes (each call recomputes, exactly the pre-fix behavior).
++ */
++
++const PROCESS_CONFIG_CACHE_SYMBOL = Symbol.for("omo.processConfigCache.v1");
++
++export type PluginComponentsCacheEntry = {
++  key: string;
++  value: unknown;
++};
++
++export type ProcessConfigCacheEntries = {
++  pluginComponents?: PluginComponentsCacheEntry;
++  agentSnapshots?: Map<string, unknown>;
++  globalCommandSources?: PluginComponentsCacheEntry;
++  claudeMcpServers?: PluginComponentsCacheEntry;
++};
++
++type ProcessConfigCacheState = {
++  entries: ProcessConfigCacheEntries;
++};
++
++export function isProcessConfigCacheDisabled(): boolean {
++  return process.env.OMO_DISABLE_PROCESS_CONFIG_CACHE === "1";
++}
++
++function getProcessState(): ProcessConfigCacheState {
++  const holder = globalThis as Record<symbol, unknown>;
++  let state = holder[PROCESS_CONFIG_CACHE_SYMBOL] as ProcessConfigCacheState | undefined;
++  if (state === undefined) {
++    state = { entries: {} };
++    holder[PROCESS_CONFIG_CACHE_SYMBOL] = state;
++  }
++  return state;
++}
++
++export function getProcessConfigCacheEntry<K extends keyof ProcessConfigCacheEntries>(
++  name: K,
++): ProcessConfigCacheEntries[K] | undefined {
++  if (isProcessConfigCacheDisabled()) return undefined;
++  return getProcessState().entries[name];
++}
++
++export function setProcessConfigCacheEntry<K extends keyof ProcessConfigCacheEntries>(
++  name: K,
++  value: ProcessConfigCacheEntries[K],
++): void {
++  if (isProcessConfigCacheDisabled()) return;
++  getProcessState().entries[name] = value;
++}
++
++export function getProcessAgentSnapshotMap(): Map<string, unknown> {
++  const existing = getProcessConfigCacheEntry("agentSnapshots");
++  if (existing instanceof Map) return existing;
++  const created = new Map<string, unknown>();
++  setProcessConfigCacheEntry("agentSnapshots", created);
++  return created;
++}
++
++/** Test-only: drop every process-level config cache entry. */
++export function resetProcessConfigCacheForTests(): void {
++  const holder = globalThis as Record<symbol, unknown>;
++  delete holder[PROCESS_CONFIG_CACHE_SYMBOL];
++}
++
++function describeStat(path: string): string {
++  try {
++    const stats = statSync(path);
++    return `${stats.mtimeMs}:${stats.size}`;
++  } catch (error) {
++    const code = (error as NodeJS.ErrnoException)?.code ?? "unknown";
++    return code === "ENOENT" ? "absent" : `stat-error:${code}`;
++  }
++}
++
++function describeDir(path: string): string {
++  const statPart = describeStat(path);
++  if (statPart === "absent" || statPart.startsWith("stat-error:")) {
++    return statPart;
++  }
++  try {
++    const entries = readdirSync(path).sort();
++    return `${statPart}:[${entries.join("|")}]`;
++  } catch (error) {
++    const code = (error as NodeJS.ErrnoException)?.code ?? "unknown";
++    return `${statPart}:readdir-error:${code}`;
++  }
++}
++
++/**
++ * Fingerprint the project-level sources the config-handler loaders read from a
++ * folder. Folders where none of these roots exist (every OpenChamber chat
++ * folder is an empty directory) contribute nothing loader-visible, so they all
++ * map to the constant "no-project-sources" signature and can share cached
++ * config artifacts. Any folder with at least one root is keyed by directory +
++ * full signature instead.
++ */
++const PROJECT_SOURCE_ROOTS = [
++  ".claude",
++  ".opencode",
++  "opencode",
++  "agents",
++  "skills",
++  "commands",
++  ".mcp.json",
++  "opencode.json",
++  "opencode.jsonc",
++  "AGENTS.md",
++  "CLAUDE.md",
++] as const;
++
++export const NO_PROJECT_SOURCES_FINGERPRINT = "no-project-sources";
++
++export function fingerprintProjectSources(directory: string): string {
++  const present: Array<string> = [];
++  for (const root of PROJECT_SOURCE_ROOTS) {
++    try {
++      statSync(join(directory, root));
++      present.push(root);
++    } catch {
++      // not present in this folder
++    }
++  }
++  if (present.length === 0) {
++    return NO_PROJECT_SOURCES_FINGERPRINT;
++  }
++  const details = present.map((root) => `${root}=${describeDir(join(directory, root))}`);
++  return `dir:${directory}:${details.join(";")}`;
++}
++
++/** Fingerprint the Claude Code plugin installation roots (~/.claude/plugins). */
++export function fingerprintClaudePluginRoots(): string {
++  const home = homedir();
++  return [
++    describeDir(join(home, ".claude", "plugins")),
++    describeStat(join(home, ".claude", "plugins", "installed_plugins.json")),
++    describeStat(join(home, ".claude", "settings.json")),
++  ].join(";");
++}
++
++/** Fingerprint the global files the Claude Code MCP loader reads. */
++export function fingerprintClaudeMcpSources(): string {
++  const home = homedir();
++  return [
++    describeStat(join(home, ".claude.json")),
++    describeStat(join(home, ".claude", "settings.json")),
++  ].join(";");
++}
+diff --git a/test-setup.ts b/test-setup.ts
+index 2fcec67f3..93f69a2a4 100644
+--- a/test-setup.ts
++++ b/test-setup.ts
+@@ -10,6 +10,8 @@ import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./pack
+ import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-path"
+ import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
+ import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
++import { resetProcessConfigCacheForTests } from "./packages/omo-opencode/src/shared/process-config-cache"
++import { resetStartupCheckProcessStateForTests } from "./packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state"
+ import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
+ import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
+ import { installHermeticHome } from "./test-hermetic-home"
+@@ -76,6 +78,10 @@ beforeEach(() => {
+   resetConnectedProvidersCache()
+   releaseAllPromptAsyncReservationsForTesting()
+   resetLiveServerRouteForTesting()
++  // Process-level config caches + the once-per-process startup-check gate
++  // (local fixes 26/28) must not leak state between tests.
++  resetProcessConfigCacheForTests()
++  resetStartupCheckProcessStateForTests()
+ })
+ 
+ afterEach(() => {
+@@ -113,6 +119,8 @@ afterEach(() => {
+   resetConnectedProvidersCache()
+   releaseAllPromptAsyncReservationsForTesting()
+   resetLiveServerRouteForTesting()
++  resetProcessConfigCacheForTests()
++  resetStartupCheckProcessStateForTests()
+   isGlobalMockCleanup = true
+   try {
+     mock.restore()
+-- 
+2.55.0.windows.3
+

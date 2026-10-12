@@ -1,0 +1,148 @@
+From c51041f3284ab6d7932ed31a68b39ffb96d2726b Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 12 Oct 2026 19:16:36 +0300
+Subject: [PATCH] fix(v2): add per-phase timing to setup and the config handler
+
+First-message-drop F16 (OMO lane). The cold plugin setup had no per-phase
+attribution - OMO's share was only measurable end to end. The config handler
+now logs '[config-handler] phase timing' (provider/pluginComponents/hooks/
+agents/tools/agentAliases/mcp/commands/runtimeSkills/total plus cache-hit
+flags) and the plugin setup logs '[oh-my-openagent] setup phase timing'
+(startupMigrationAndValidation/pluginInit/managers/tools/hooks/interface/
+total) to oh-my-opencode.log. Adds a cross-folder perf scenario that measures
+a second empty chat folder's init against the process cache.
+---
+ .../src/__tests__/perf/plugin-init.test.ts    | 42 +++++++++++++++++++
+ .../src/testing/create-plugin-module.ts       | 22 ++++++++++
+ 2 files changed, 64 insertions(+)
+
+diff --git a/packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts b/packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts
+index 2a5505c35..a819ff623 100644
+--- a/packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts
++++ b/packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts
+@@ -104,6 +104,48 @@ describe("plugin init performance", () => {
+     expect(metrics.medianMs).toBeLessThan(500)
+   })
+ 
++  it("cross-folder: a new empty chat folder reuses the process cache (local fix 28)", async () => {
++    // The OpenChamber pattern: every new chat is a new empty folder, and
++    // folder release/eviction rebuilds instances. The second folder's init
++    // must hit the process-level config cache instead of re-paying the cold
++    // plugin-components/agents/commands cost.
++    const rootDirectory = mkdtempSync(join(tmpdir(), "perf-d09-xfolder-"))
++    const configDirectory = join(rootDirectory, "opencode-config")
++    const folderA = join(rootDirectory, "chat-a")
++    const folderB = join(rootDirectory, "chat-b")
++    const previousConfigDirectory = process.env.OPENCODE_CONFIG_DIR
++
++    mkdirSync(configDirectory, { recursive: true })
++    mkdirSync(folderA, { recursive: true })
++    mkdirSync(folderB, { recursive: true })
++    process.env.OPENCODE_CONFIG_DIR = configDirectory
++
++    try {
++      const pluginModule = await importFreshPluginModule()
++      const startA = performance.now()
++      await pluginModule(createPluginInput(folderA), {})
++      const firstFolderMs = performance.now() - startA
++
++      const startB = performance.now()
++      await pluginModule(createPluginInput(folderB), {})
++      const secondFolderMs = performance.now() - startB
++
++      console.info(
++        `cross-folder: first-folder=${firstFolderMs.toFixed(1)}ms second-folder=${secondFolderMs.toFixed(1)}ms`,
++      )
++
++      // The second folder must not be slower than a same-folder warm rebuild.
++      expect(secondFolderMs).toBeLessThan(500)
++    } finally {
++      if (previousConfigDirectory === undefined) {
++        delete process.env.OPENCODE_CONFIG_DIR
++      } else {
++        process.env.OPENCODE_CONFIG_DIR = previousConfigDirectory
++      }
++      rmSync(rootDirectory, { recursive: true, force: true })
++    }
++  })
++
+   it("stays within the in-tree fixture init budget", async () => {
+     // given
+     const fixtureDirectory = new URL("./fixtures/in-tree/", import.meta.url)
+diff --git a/packages/omo-opencode/src/testing/create-plugin-module.ts b/packages/omo-opencode/src/testing/create-plugin-module.ts
+index 6d41c6e18..bdcf0de9f 100644
+--- a/packages/omo-opencode/src/testing/create-plugin-module.ts
++++ b/packages/omo-opencode/src/testing/create-plugin-module.ts
+@@ -165,6 +165,16 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+     deps.log("[oh-my-openagent] ENTRY - plugin loading", {
+       directory: input.directory,
+     })
++    // Per-phase setup timing (local fix 29, first-message-drop F16): makes the
++    // cold-start cost of every setup segment attributable in oh-my-opencode.log.
++    const setupTimings: Record<string, number> = {};
++    const setupStartedAt = Date.now();
++    let setupPhaseStartedAt = Date.now();
++    const markSetupPhase = (name: string): void => {
++      const now = Date.now();
++      setupTimings[name] = now - setupPhaseStartedAt;
++      setupPhaseStartedAt = now;
++    };
+     deps.logLegacyPluginStartupWarning()
+     deps.migrateLegacyWorkspaceDirectory(input.directory)
+     startupMigration ??= deps.runOpenCodeStartupMigration({ cwd: input.directory })
+@@ -185,6 +195,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+       migratedFrom: startupMigration.migratedFrom,
+       skippedConflictCount: startupMigration.skippedConflictCount,
+     })
++    markSetupPhase("startupMigrationAndValidation");
+     if (toast !== undefined) showStartupToast(input.client, toast, deps.log)
+ 
+     // Unconditional omo process hygiene (T16): fire-and-forget family sweep,
+@@ -286,6 +297,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+ 
+     const modelCacheState = deps.createModelCacheState()
+ 
++    markSetupPhase("pluginInit");
+     const managers = deps.createManagers({
+       ctx: input,
+       pluginConfig,
+@@ -295,12 +307,14 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+       runtimeSkillSourceUrl: runtimeSkillSource?.url,
+     })
+ 
++    markSetupPhase("managers");
+     const toolsResult = await deps.createTools({
+       ctx: input,
+       pluginConfig,
+       managers,
+     })
+ 
++    markSetupPhase("tools");
+     const hooks = deps.createHooks({
+       ctx: input,
+       pluginConfig,
+@@ -314,6 +328,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+       availableSkills: toolsResult.availableSkills,
+     })
+ 
++    markSetupPhase("hooks");
+     const pluginInterface = deps.createPluginInterface({
+       ctx: input,
+       pluginConfig,
+@@ -346,6 +361,13 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+       },
+     }
+ 
++    markSetupPhase("interface");
++    setupTimings.total = Date.now() - setupStartedAt;
++    deps.log("[oh-my-openagent] setup phase timing", {
++      directory: input.directory,
++      ...setupTimings,
++    });
++
+     return pluginHooks
+   }
+ 
+-- 
+2.55.0.windows.3
+

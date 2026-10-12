@@ -382,6 +382,70 @@
       ],
       "overlapsWith": [],
       "orderNote": "Independent of 01-24; touches only packages/omo-opencode/src/v2/project-config.ts and adds project-config.todo.test.ts. Runtime description literals survive bundling. Tests cover exact schemas, per-session persistence, whole-list replacement/clear, and preserving host-provided tools. Use the staging lane introduced in b7151fa79: fixes:apply stages beside the checkout and fixes:verify accepts that bundle path. Do not write live dist/index.js under active OpenChamber; activation is owner-initiated offline. pr is null because src/v2 is not in upstream dev."
+    },
+    {
+      "id": "26-startup-check-once-per-process",
+      "title": "Run the deferred startup check once per process, not per plugin instance",
+      "commit": "fe7faf0b77a04e9883193b96de2c5e622d7d38f1",
+      "patch": "patches/26-startup-check-once-per-process.patch",
+      "pr": null,
+      "why": "The already-checked flag lived in the per-instance closure of createAutoUpdateCheckerHook, so every folder rebuild re-ran the whole deferred startup check (config-error toast, connected-providers fetch, model-capabilities refresh + 3,823-model cache rewrite, npm update check; ~0.85s each) about 5s after any root session.created, fanning out across all live OMO instances (measured 79 capabilities-cache rewrites in 26h; app-layer addendum B.6). The gate now lives on globalThis behind the registered symbol omo.autoUpdateChecker.startupCheckState.v1 in a dependency-leaf module (startup-check-process-state.ts), so it survives per-location plugin module re-imports within one OpenCode process and resets only on process restart. A failed check logs and still closes the gate so failures do not fan out either.",
+      "markers": [
+        "startup check already completed in this process",
+        "startup check failed:",
+        "omo.autoUpdateChecker.startupCheckState.v1"
+      ],
+      "overlapsWith": [],
+      "orderNote": "First-message-drop F5a (fix plan v2 2026-10-12). The leaf module exists so test-setup.ts can reset the gate at preload time without importing the checker graph (HOME reads at import time poison the hermetic home). hook.test.ts resets via the same leaf. pr null for now: v2-lane only; upstreamable after the closed window."
+    },
+    {
+      "id": "27-model-capabilities-write-once",
+      "title": "Rewrite the model-capabilities cache only when its content changes",
+      "commit": "2422a87e8e4bf2b603db15008b4b82e73f0b57bf",
+      "patch": "patches/27-model-capabilities-write-once.patch",
+      "pr": null,
+      "why": "refreshModelCapabilitiesCache unconditionally rewrote the multi-megabyte model-capabilities.json on every startup-check run even when the models.dev catalog was unchanged (79 rewrites in 26h across instances; each rewrite is ~0.85s of fs work). createJsonFileCacheStore gains writeIfChanged: serialize, compare with the on-disk file, skip identical writes while still updating the in-memory value and writtenInCurrentProcess. The refresh path uses writeIfChanged; plain write() is unchanged for every other caller.",
+      "markers": [
+        "unchanged; skipped write",
+        "writeIfChanged"
+      ],
+      "overlapsWith": [],
+      "orderNote": "First-message-drop F5b. Independent of fix 26: it also protects the CLI refresh path and any future caller. writeIfChanged is a runtime method name and survives bundling."
+    },
+    {
+      "id": "28-config-handler-cross-folder-reuse",
+      "title": "Reuse config-handler artifacts across chat folders via a process-level cache",
+      "commit": "42289f2a94056ed70b8bf469af6745fbdd86a3bc",
+      "patch": "patches/28-config-handler-cross-folder-reuse.patch",
+      "pr": null,
+      "why": "OMO config handler owned 11.7s of a 17.7s cold plugin setup (66%, app-layer addendum B.5; warm 0.4s), and OpenCode rebuilds plugin instances on folder release (UI 30s release) and hourly eviction, so folders kept re-paying the cold cost even though plugin components, agents, global commands and the Claude Code MCP configs are identical for every chat folder. New shared/process-config-cache.ts stores entries on globalThis behind Symbol.for omo.processConfigCache.v1 (survives per-location module re-imports, per-process lifetime): plugin components keyed by the claude_code config slice + a fingerprint of the ~/.claude plugin roots (retryable failures never cached); the agent-config snapshot hoisted from the per-instance closure to a process map keyed by the OpenCode config slice + fingerprintProjectSources(directory) - folders with none of the project source roots (every OpenChamber chat folder is an empty dir) share the constant no-project-sources key, folders with project content stay per-directory; the directory-independent command sources memoized (builtin commands/skills, user + global commands/skills; project sources still load per folder); loadMcpConfigs memoized on a ~/.claude.json + ~/.claude/settings.json fingerprint (cwd-bound builtin MCPs still rebuild per folder). Known limitation: an in-place content edit inside an existing project source dir does not change the dir stat/listing fingerprint; invalidation paths remain config change, config.updated cycle, restart, or the kill-switch. Escape hatch: OMO_DISABLE_PROCESS_CONFIG_CACHE=1 restores per-call loads. test-setup.ts resets the cache per test.",
+      "markers": [
+        "reusing cached plugin components (process-level)",
+        "no-project-sources",
+        "reusing cached Claude Code MCP configs (process-level)",
+        "reusing cached global command sources (process-level)",
+        "omo.processConfigCache.v1"
+      ],
+      "overlapsWith": [
+        "24-agent-writer-self-ingest"
+      ],
+      "orderNote": "First-message-drop F5c. test-setup.ts is part of this commit because it imports resetProcessConfigCacheForTests (fix 26 startup-check reset coexists there via the leaf module). Cross-folder agent reuse is output-equivalent by test: two distinct empty folders produce deep-equal agent configs through the REAL applyAgentConfig (config-handler.process-cache.test.ts). The snapshot replay still deep-clones agents per instance because attachHiddenConfigKeyAliases and applyToolConfig mutate config.agent."
+    },
+    {
+      "id": "29-setup-phase-timing",
+      "title": "Per-phase timing for plugin setup and the config handler",
+      "commit": "c51041f3284ab6d7932ed31a68b39ffb96d2726b",
+      "patch": "patches/29-setup-phase-timing.patch",
+      "pr": null,
+      "why": "The cold plugin setup had no per-phase attribution - OMO share of a cold start was only measurable end to end (app-layer B.5 reconstructed it from http.span boundaries). The config handler now logs [config-handler] phase timing with per-phase milliseconds (provider, pluginComponents, hooks, agents, tools, agentAliases, mcp, commands, runtimeSkills, total) plus agentsCacheHit/componentsCacheHit flags and the directory; the plugin setup logs [oh-my-openagent] setup phase timing (startupMigrationAndValidation, pluginInit, managers, tools, hooks, interface, total) to oh-my-opencode.log. Also adds a cross-folder perf scenario to the plugin-init perf test measuring a second empty chat folder init against the process cache from fix 28.",
+      "markers": [
+        "[config-handler] phase timing",
+        "[oh-my-openagent] setup phase timing"
+      ],
+      "overlapsWith": [
+        "28-config-handler-cross-folder-reuse"
+      ],
+      "orderNote": "First-message-drop F16 (OMO lane). Must come after 28: the timing record reports the 28 cache-hit flags. The lazy-loading half of F16 is NOT implemented by design: the process cache already removes the repeat cost deterministically, and deferring the plugin-components load would change what the first config hook returns; the proposal lives in the fix report instead. getLastConfigHandlerPhaseTiming() and getPluginComponentsRealLoadCount() are observability seams so the hermetic suite needs no module mocks (mocking the ../shared barrel leaked across test files sharing a worker)."
     }
   ],
   "externalFixes": [

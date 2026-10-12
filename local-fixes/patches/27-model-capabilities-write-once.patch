@@ -1,0 +1,184 @@
+From 2422a87e8e4bf2b603db15008b4b82e73f0b57bf Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 12 Oct 2026 19:15:42 +0300
+Subject: [PATCH] fix(v2): rewrite the model capabilities cache only when
+ content changes
+
+First-message-drop F5b. refreshModelCapabilitiesCache wrote the multi-megabyte
+model-capabilities.json on every startup-check run even when the models.dev
+catalog was unchanged. The cache store gains writeIfChanged (compare serialized
+content, skip identical writes) and the refresh path uses it; plain write() is
+unchanged for other callers.
+---
+ ...-file-cache-store-write-if-changed.test.ts | 75 +++++++++++++++++++
+ .../src/shared/json-file-cache-store.ts       | 40 ++++++++++
+ .../src/shared/model-capabilities-cache.ts    |  6 +-
+ 3 files changed, 120 insertions(+), 1 deletion(-)
+ create mode 100644 packages/omo-opencode/src/shared/json-file-cache-store-write-if-changed.test.ts
+
+diff --git a/packages/omo-opencode/src/shared/json-file-cache-store-write-if-changed.test.ts b/packages/omo-opencode/src/shared/json-file-cache-store-write-if-changed.test.ts
+new file mode 100644
+index 000000000..ef7f17a81
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/json-file-cache-store-write-if-changed.test.ts
+@@ -0,0 +1,75 @@
++/// <reference types="bun-types" />
++
++import { beforeEach, describe, expect, test } from "bun:test"
++import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++import { createJsonFileCacheStore } from "./json-file-cache-store"
++
++type Snapshot = { models: Record<string, unknown>; generatedAt: string }
++
++const snapshotA: Snapshot = { models: { "provider/model-a": { reasoning: true } }, generatedAt: "2026-10-12T00:00:00Z" }
++const snapshotB: Snapshot = { models: { "provider/model-a": { reasoning: false } }, generatedAt: "2026-10-12T01:00:00Z" }
++
++describe("json-file-cache-store writeIfChanged (local fix 27, first-message-drop F5b)", () => {
++  let cacheDir: string
++  let store: ReturnType<typeof createJsonFileCacheStore<Snapshot>>
++
++  beforeEach(() => {
++    cacheDir = mkdtempSync(join(tmpdir(), "omo-jfcs-"))
++    store = createJsonFileCacheStore<Snapshot>({
++      getCacheDir: () => cacheDir,
++      filename: "snapshot.json",
++      logPrefix: "test-cache",
++      cacheLabel: "Cache",
++      describe: (value) => ({ generatedAt: value.generatedAt }),
++      serialize: (value) => `${JSON.stringify(value, null, 2)}\n`,
++    })
++  })
++
++  test("first write creates the file and returns true", () => {
++    const wrote = store.writeIfChanged(snapshotA)
++
++    expect(wrote).toBe(true)
++    expect(existsSync(join(cacheDir, "snapshot.json"))).toBe(true)
++  })
++
++  test("identical content skips the write and returns false", () => {
++    store.writeIfChanged(snapshotA)
++    const file = join(cacheDir, "snapshot.json")
++    const contentAfterFirstWrite = readFileSync(file, "utf-8")
++
++    const wrote = store.writeIfChanged(snapshotA)
++
++    expect(wrote).toBe(false)
++    expect(readFileSync(file, "utf-8")).toBe(contentAfterFirstWrite)
++  })
++
++  test("changed content rewrites the file and returns true", () => {
++    store.writeIfChanged(snapshotA)
++
++    const wrote = store.writeIfChanged(snapshotB)
++
++    expect(wrote).toBe(true)
++    expect(JSON.parse(readFileSync(join(cacheDir, "snapshot.json"), "utf-8"))).toEqual(snapshotB)
++  })
++
++  test("skipped write still updates the in-memory value so has() stays true", () => {
++    store.writeIfChanged(snapshotA)
++    store.resetMemory()
++
++    const wrote = store.writeIfChanged(snapshotA)
++
++    expect(wrote).toBe(false)
++    expect(store.has()).toBe(true)
++    expect(store.read()).toEqual(snapshotA)
++  })
++
++  test("plain write still always writes (unchanged behavior for other callers)", () => {
++    store.write(snapshotA)
++    const before = readFileSync(join(cacheDir, "snapshot.json"), "utf-8")
++    store.write(snapshotA)
++
++    expect(readFileSync(join(cacheDir, "snapshot.json"), "utf-8")).toBe(before)
++  })
++})
+diff --git a/packages/omo-opencode/src/shared/json-file-cache-store.ts b/packages/omo-opencode/src/shared/json-file-cache-store.ts
+index 18ee6c0d1..4e9529a5a 100644
+--- a/packages/omo-opencode/src/shared/json-file-cache-store.ts
++++ b/packages/omo-opencode/src/shared/json-file-cache-store.ts
+@@ -16,6 +16,12 @@ type JsonFileCacheStore<TValue> = {
+ 	read: () => TValue | null
+ 	has: () => boolean
+ 	write: (value: TValue) => void
++	/**
++	 * Write only when the serialized content differs from what is already on
++	 * disk (local fix 27, first-message-drop F5b). Returns true when the file
++	 * was rewritten, false when the write was skipped because nothing changed.
++	 */
++	writeIfChanged: (value: TValue) => boolean
+ 	resetMemory: () => void
+ }
+ 
+@@ -98,6 +104,39 @@ export function createJsonFileCacheStore<TValue>(
+ 		}
+ 	}
+ 
++	function writeIfChanged(value: TValue): boolean {
++		ensureCacheDir()
++		const cacheFile = getCacheFilePath()
++		const serialized = options.serialize?.(value) ?? JSON.stringify(value, null, 2)
++
++		try {
++			if (existsSync(cacheFile) && readFileSync(cacheFile, "utf-8") === serialized) {
++				memoryValue = value
++				writtenInCurrentProcess = true
++				log(
++					`[${options.logPrefix}] ${options.cacheLabel} unchanged; skipped write`,
++					options.describe(value),
++				)
++				return false
++			}
++		} catch {
++			// A read failure must not block the write below.
++		}
++
++		try {
++			writeFileSync(cacheFile, serialized)
++			memoryValue = value
++			writtenInCurrentProcess = true
++			log(`[${options.logPrefix}] ${options.cacheLabel} written`, options.describe(value))
++			return true
++		} catch (error) {
++			log(`[${options.logPrefix}] Error writing ${toLogLabel(options.cacheLabel)}`, {
++				error: String(error),
++			})
++			return false
++		}
++	}
++
+ 	function resetMemory(): void {
+ 		memoryValue = undefined
+ 		writtenInCurrentProcess = false
+@@ -107,6 +146,7 @@ export function createJsonFileCacheStore<TValue>(
+ 		read,
+ 		has,
+ 		write,
++		writeIfChanged,
+ 		resetMemory,
+ 	}
+ }
+diff --git a/packages/omo-opencode/src/shared/model-capabilities-cache.ts b/packages/omo-opencode/src/shared/model-capabilities-cache.ts
+index 3d029588c..6fef261c6 100644
+--- a/packages/omo-opencode/src/shared/model-capabilities-cache.ts
++++ b/packages/omo-opencode/src/shared/model-capabilities-cache.ts
+@@ -47,7 +47,11 @@ export function createModelCapabilitiesCacheStore(
+     fetchImpl?: (input: string) => Promise<Response>
+   } = {}): Promise<ModelCapabilitiesSnapshot> {
+     const snapshot = await fetchModelCapabilitiesSnapshot(args)
+-    writeModelCapabilitiesCache(snapshot)
++    // Write once, rewrite only on real change (local fix 27, first-message-drop
++    // F5b): the startup check used to rewrite this multi-megabyte,
++    // 3,823-model cache on every plugin instance (~0.85s per rewrite, 79
++    // rewrites in 26h) even when the models.dev catalog had not changed.
++    snapshotCacheStore.writeIfChanged(snapshot)
+     return snapshot
+   }
+ 
+-- 
+2.55.0.windows.3
+
