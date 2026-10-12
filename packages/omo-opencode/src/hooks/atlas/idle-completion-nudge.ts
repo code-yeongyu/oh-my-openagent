@@ -1,6 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BoulderState } from "../../features/boulder-state"
-import { completeBoulder, formatDurationHuman, getWorkById, getWorkForSession, markCompletionNudged } from "../../features/boulder-state"
+import {
+  completeBoulder,
+  formatDurationHuman,
+  getWorkById,
+  getWorkForSession,
+  markCompletionNudged,
+} from "../../features/boulder-state"
 import { isAgentRegistered, resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 import { createInternalAgentContinuationTextPart } from "../../shared"
 import { log } from "../../shared/logger"
@@ -134,5 +140,7 @@ function recordCompletionNudge(directory: string, sessionState: SessionState, wo
     ...(sessionState.boulderCompletionNudgedAt ?? {}),
     [workId]: Date.now(),
   }
-  markCompletionNudged(directory, workId)
+  if (!markCompletionNudged(directory, workId)) {
+    log(`[${HOOK_NAME}] Boulder completion nudge marker not persisted; a restart may repeat the nudge`, { workId })
+  }
 }

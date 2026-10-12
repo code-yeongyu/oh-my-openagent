@@ -52,7 +52,7 @@ describe("boulder completion nudge is sent once per work, across state loss (#47
       return state
     }
     const idle = async () => {
-      await handleAtlasSessionIdle({ ctx, sessionID: SESSION_ID, getState })
+      await handleAtlasSessionIdle({ ctx, options: { idleSettleMs: 0 }, sessionID: SESSION_ID, getState })
       releaseAllPromptAsyncReservationsForTesting()
     }
     return { promptAsync, sessions, idle }
@@ -85,6 +85,33 @@ describe("boulder completion nudge is sent once per work, across state loss (#47
     //#then
     expect(before.promptAsync).toHaveBeenCalledTimes(1)
     expect(afterRestart.promptAsync).not.toHaveBeenCalled()
+  })
+
+  it("#given a legacy boulder file without a works map #when the session idles across state loss #then the nudge is sent once and the marker is persisted", async () => {
+    //#given
+    const planPath = join(directory, "plan.md")
+    writeFileSync(planPath, "## TODOs\n- [x] 1. Parse input\n")
+    const {
+      works: _works,
+      active_work_id: _activeWorkId,
+      schema_version: _schemaVersion,
+      ...legacy
+    } = createBoulderState(planPath, SESSION_ID, "atlas")
+    writeBoulderState(directory, legacy)
+    const { promptAsync, sessions, idle } = harness()
+    await idle()
+
+    //#when
+    sessions.delete(SESSION_ID)
+    await idle()
+    sessions.delete(SESSION_ID)
+    await idle()
+
+    //#then
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    const works = Object.values(readBoulderState(directory)?.works ?? {})
+    expect(works).toHaveLength(1)
+    expect(works[0]?.completion_nudged_at).toBeString()
   })
 
   it("#given the nudge was sent #when the boulder state is read back #then the work records when it was nudged", async () => {
