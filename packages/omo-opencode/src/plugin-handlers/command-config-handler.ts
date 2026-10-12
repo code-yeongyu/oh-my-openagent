@@ -34,6 +34,110 @@ import type { PluginComponents } from "./plugin-components-loader";
 import { adaptHostSkillConfig } from "../shared/host-skill-config";
 import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import type { LoadedSkill } from "../features/opencode-skill-loader/types";
+import {
+  getProcessConfigCacheEntry,
+  setProcessConfigCacheEntry,
+} from "../shared/process-config-cache";
+
+/**
+ * Directory-independent command sources (local fix 28, first-message-drop
+ * F5c): builtin commands, builtin skills, user commands/skills, global agent
+ * skills and OpenCode global commands/skills are identical for every folder,
+ * but they used to be re-loaded from disk on every folder rebuild. Project
+ * sources stay per-folder.
+ */
+type GlobalCommandSources = {
+  builtinSkillCommands: Record<string, unknown>;
+  builtinCommands: Record<string, unknown>;
+  userCommands: Record<string, unknown>;
+  userSkills: Record<string, unknown>;
+  globalAgentsSkills: Record<string, unknown>;
+  opencodeGlobalCommands: Record<string, unknown>;
+  opencodeGlobalSkills: Record<string, unknown>;
+};
+
+function shallowCopyCommandRecord<T>(record: Record<string, T>): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(record).map(([name, command]) => [name, { ...command }]),
+  );
+}
+
+function buildGlobalCommandSourcesCacheKey(params: {
+  pluginConfig: OhMyOpenCodeConfig;
+  disabledSkills: ReadonlySet<string>;
+  includeClaudeCommands: boolean;
+  includeClaudeSkills: boolean;
+}): string {
+  return JSON.stringify({
+    disabledCommands: params.pluginConfig.disabled_commands ?? [],
+    teamMode: params.pluginConfig.team_mode?.enabled ?? false,
+    browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+    disabledSkills: [...params.disabledSkills].sort(),
+    includeClaudeCommands: params.includeClaudeCommands,
+    includeClaudeSkills: params.includeClaudeSkills,
+    systemMcpNames: getSystemMcpServerNames(),
+  });
+}
+
+async function loadGlobalCommandSources(params: {
+  pluginConfig: OhMyOpenCodeConfig;
+  disabledSkills: Set<string>;
+  includeClaudeCommands: boolean;
+  includeClaudeSkills: boolean;
+}): Promise<GlobalCommandSources> {
+  const cacheKey = buildGlobalCommandSourcesCacheKey(params);
+  const cached = getProcessConfigCacheEntry("globalCommandSources");
+  if (cached && cached.key === cacheKey) {
+    log("[command-config] reusing cached global command sources (process-level)");
+    const value = cached.value as GlobalCommandSources;
+    return {
+      builtinSkillCommands: shallowCopyCommandRecord(value.builtinSkillCommands),
+      builtinCommands: shallowCopyCommandRecord(value.builtinCommands),
+      userCommands: shallowCopyCommandRecord(value.userCommands),
+      userSkills: shallowCopyCommandRecord(value.userSkills),
+      globalAgentsSkills: shallowCopyCommandRecord(value.globalAgentsSkills),
+      opencodeGlobalCommands: shallowCopyCommandRecord(value.opencodeGlobalCommands),
+      opencodeGlobalSkills: shallowCopyCommandRecord(value.opencodeGlobalSkills),
+    };
+  }
+
+  const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
+    useRegisteredAgents: true,
+    teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+  });
+  const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
+    resolveActiveBuiltinSkills({
+      browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+      disabledSkills: params.disabledSkills,
+      teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+      systemMcpNames: getSystemMcpServerNames(),
+    }),
+  );
+  for (const disabledCommand of params.pluginConfig.disabled_commands ?? []) {
+    delete builtinSkillCommands[disabledCommand];
+  }
+
+  const [userCommands, userSkills, globalAgentsSkills, opencodeGlobalCommands, opencodeGlobalSkills] =
+    await Promise.all([
+      params.includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
+      params.includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
+      params.includeClaudeSkills ? loadGlobalAgentsSkills() : Promise.resolve({}),
+      loadOpencodeGlobalCommands(),
+      loadOpencodeGlobalSkills(),
+    ]);
+
+  const sources: GlobalCommandSources = {
+    builtinSkillCommands,
+    builtinCommands,
+    userCommands,
+    userSkills,
+    globalAgentsSkills,
+    opencodeGlobalCommands,
+    opencodeGlobalSkills,
+  };
+  setProcessConfigCacheEntry("globalCommandSources", { key: cacheKey, value: sources });
+  return sources;
+}
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
@@ -42,22 +146,6 @@ export async function applyCommandConfig(params: {
   pluginComponents: PluginComponents;
 }): Promise<void> {
   const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
-  const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
-    useRegisteredAgents: true,
-    teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
-  });
-  const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
-    resolveActiveBuiltinSkills({
-      browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
-      disabledSkills,
-      teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
-      systemMcpNames: getSystemMcpServerNames(),
-    }),
-  );
-  for (const disabledCommand of params.pluginConfig.disabled_commands ?? []) {
-    delete builtinSkillCommands[disabledCommand];
-  }
-  const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
   const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
@@ -67,40 +155,47 @@ export async function applyCommandConfig(params: {
     log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName));
   }
 
-  const hostSkillConfig = adaptHostSkillConfig(params.config.skills);
   const [
+    globalSources,
     configSourceSkills,
     hostConfigSkills,
-    userCommands,
     projectCommands,
-    opencodeGlobalCommands,
     opencodeProjectCommands,
-    userSkills,
-    globalAgentsSkills,
     projectSkills,
     projectAgentsSkills,
-    opencodeGlobalSkills,
     opencodeProjectSkills,
   ] = await Promise.all([
+    loadGlobalCommandSources({
+      pluginConfig: params.pluginConfig,
+      disabledSkills: disabledSkills as Set<string>,
+      includeClaudeCommands,
+      includeClaudeSkills,
+    }),
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
       configDir: params.ctx.directory,
     }),
     discoverConfigSourceSkills({
-      config: hostSkillConfig,
+      config: adaptHostSkillConfig(params.config.skills),
       configDir: params.ctx.directory,
     }),
-    includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
     includeClaudeCommands ? loadProjectCommands(params.ctx.directory) : Promise.resolve({}),
-    loadOpencodeGlobalCommands(),
     loadOpencodeProjectCommands(params.ctx.directory),
-    includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
-    includeClaudeSkills ? loadGlobalAgentsSkills() : Promise.resolve({}),
     includeClaudeSkills ? loadProjectSkills(params.ctx.directory) : Promise.resolve({}),
     includeClaudeSkills ? loadProjectAgentsSkills(params.ctx.directory) : Promise.resolve({}),
-    loadOpencodeGlobalSkills(),
     loadOpencodeProjectSkills(params.ctx.directory),
   ]);
+
+  const {
+    builtinSkillCommands,
+    builtinCommands,
+    userCommands,
+    userSkills,
+    globalAgentsSkills,
+    opencodeGlobalCommands,
+    opencodeGlobalSkills,
+  } = globalSources;
+  const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   params.config.command = {
     ...builtinSkillCommands,

@@ -10,6 +10,8 @@ import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./pack
 import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-path"
 import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
 import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
+import { resetProcessConfigCacheForTests } from "./packages/omo-opencode/src/shared/process-config-cache"
+import { resetStartupCheckProcessStateForTests } from "./packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
 import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
 import { installHermeticHome } from "./test-hermetic-home"
@@ -76,6 +78,10 @@ beforeEach(() => {
   resetConnectedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
+  // Process-level config caches + the once-per-process startup-check gate
+  // (local fixes 26/28) must not leak state between tests.
+  resetProcessConfigCacheForTests()
+  resetStartupCheckProcessStateForTests()
 })
 
 afterEach(() => {
@@ -113,6 +119,8 @@ afterEach(() => {
   resetConnectedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
+  resetProcessConfigCacheForTests()
+  resetStartupCheckProcessStateForTests()
   isGlobalMockCleanup = true
   try {
     mock.restore()

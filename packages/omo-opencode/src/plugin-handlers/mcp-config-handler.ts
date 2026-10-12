@@ -3,6 +3,11 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { PluginComponents } from "./plugin-components-loader";
 import { log } from "../shared";
+import {
+  fingerprintClaudeMcpSources,
+  getProcessConfigCacheEntry,
+  setProcessConfigCacheEntry,
+} from "../shared/process-config-cache";
 
 type McpEntry = Record<string, unknown>;
 
@@ -25,6 +30,30 @@ function captureUserDisabledMcps(
   return disabled;
 }
 
+/**
+ * Claude Code MCP configs are directory-independent (they come from
+ * ~/.claude.json and ~/.claude settings), so the loaded server set is cached
+ * per process (local fix 28, first-message-drop F5c) and invalidated by a
+ * fingerprint of those files. Builtin MCPs embed the folder cwd and are still
+ * rebuilt per folder.
+ */
+async function loadCachedMcpConfigs(
+  disabledMcps: string[],
+): Promise<{ servers: Record<string, unknown> }> {
+  const cacheKey = JSON.stringify({
+    disabledMcps,
+    sources: fingerprintClaudeMcpSources(),
+  });
+  const cached = getProcessConfigCacheEntry("claudeMcpServers");
+  if (cached && cached.key === cacheKey) {
+    log("[mcp-config] reusing cached Claude Code MCP configs (process-level)");
+    return cached.value as { servers: Record<string, unknown> };
+  }
+  const result = await loadMcpConfigs(disabledMcps);
+  setProcessConfigCacheEntry("claudeMcpServers", { key: cacheKey, value: result });
+  return result;
+}
+
 export async function applyMcpConfig(params: {
   config: Record<string, unknown>;
   ctx: { directory: string };
@@ -36,7 +65,7 @@ export async function applyMcpConfig(params: {
   const userDisabledMcps = captureUserDisabledMcps(userMcp);
 
   const mcpResult = params.pluginConfig.claude_code?.mcp ?? true
-    ? await loadMcpConfigs(disabledMcps)
+    ? await loadCachedMcpConfigs(disabledMcps)
     : { servers: {} };
 
   if (userMcp) {

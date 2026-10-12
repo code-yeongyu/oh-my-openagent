@@ -4,6 +4,11 @@ import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-load
 import { applyOpenGatewayProviderConfig } from "../features/opengateway-provider";
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
+import {
+  fingerprintProjectSources,
+  getProcessAgentSnapshotMap,
+  getProcessConfigCacheEntry,
+} from "../shared/process-config-cache";
 import { AGENT_DISPLAY_NAMES, getAgentListDisplayName } from "../shared/agent-display-names";
 import { applyAgentConfig } from "./agent-config-handler";
 import { applyCommandConfig } from "./command-config-handler";
@@ -75,6 +80,23 @@ function createAgentConfigCacheKey(config: Record<string, unknown>): string {
   })
 }
 
+/**
+ * Cross-folder agent-config snapshot key (local fix 28, first-message-drop
+ * F5c). The snapshot used to live in the per-instance closure, so every folder
+ * rebuild re-ran applyAgentConfig (the largest identified cold-start owner:
+ * 11.7s of a 17.7s cold plugin setup). The process-level map keys snapshots by
+ * the OpenCode config slice PLUS a fingerprint of the folder's project-level
+ * sources. Folders with none of those sources (every OpenChamber chat folder
+ * is an empty directory) share one snapshot; folders with project content are
+ * keyed per directory so their agents never leak into other folders.
+ */
+function createProcessAgentSnapshotKey(
+  agentCacheKey: string,
+  directory: string,
+): string {
+  return `${agentCacheKey}::${fingerprintProjectSources(directory)}`
+}
+
 function attachHiddenConfigKeyAliases(
   config: Record<string, unknown>,
   pluginConfig: OhMyOpenCodeConfig,
@@ -126,48 +148,99 @@ function replayAgentConfigSideEffects(params: {
   }
 }
 
+/**
+ * Test/telemetry seam: the most recent phase-timing record (local fix 29).
+ * Lets the hermetic suite assert cache-hit behavior without mocking the
+ * shared logger barrel (module mocks of ../shared leak across test files).
+ */
+let lastPhaseTiming: Record<string, unknown> | undefined;
+
+export function getLastConfigHandlerPhaseTiming(): Record<string, unknown> | undefined {
+  return lastPhaseTiming;
+}
+
 export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState, runtimeSkillSourceUrl } = deps;
   let agentConfigSnapshot: AgentConfigSnapshot | undefined;
 
   return async (config: Record<string, unknown>) => {
+    // Per-phase timing (local fix 29, first-message-drop F16): the cold plugin
+    // setup had no attribution — OMO's share was only measurable end to end.
+    // These numbers make the remaining cold-start cost attributable in
+    // %TEMP%\oh-my-opencode.log.
+    const phaseTiming: Record<string, number> = {};
+    let agentsCacheHit = false;
+    let componentsCacheHit = false;
+    const timePhase = async <T>(name: string, run: () => Promise<T> | T): Promise<T> => {
+      const startedAt = Date.now();
+      try {
+        return await run();
+      } finally {
+        phaseTiming[name] = Date.now() - startedAt;
+      }
+    };
+    const totalStartedAt = Date.now();
+
     const formatterConfig = config.formatter;
 
-    setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
-    applyOpenGatewayProviderConfig(config);
-    applyProviderConfig({
-      config,
-      modelCacheState,
-      trustedVisionCapableModels: collectTrustedVisionCapableModels(pluginConfig),
+    await timePhase("provider", async () => {
+      setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
+      applyOpenGatewayProviderConfig(config);
+      applyProviderConfig({
+        config,
+        modelCacheState,
+        trustedVisionCapableModels: collectTrustedVisionCapableModels(pluginConfig),
+      });
+      clearFormatterCache()
     });
-    clearFormatterCache()
 
-    const pluginComponents = await loadPluginComponents({ pluginConfig });
+    const cachedComponentsBefore = getProcessConfigCacheEntry("pluginComponents");
+    const pluginComponents = await timePhase("pluginComponents", () =>
+      loadPluginComponents({ pluginConfig }),
+    );
+    componentsCacheHit =
+      cachedComponentsBefore !== undefined && cachedComponentsBefore.value === pluginComponents;
     const pluginComponentsLoadFailed = pluginComponents.retryableLoadFailure === true;
 
-    applyHookConfig({ pluginComponents });
+    await timePhase("hooks", () => applyHookConfig({ pluginComponents }));
 
     const agentCacheKey = createAgentConfigCacheKey(config);
     let agentResult: Record<string, unknown>;
-    if (!pluginComponentsLoadFailed && agentConfigSnapshot?.cacheKey === agentCacheKey) {
-      config.agent = cloneAgentConfig(agentConfigSnapshot.agents);
-      if (agentConfigSnapshot.defaultAgent !== undefined) {
-        config.default_agent = agentConfigSnapshot.defaultAgent;
+    const processAgentSnapshots = getProcessAgentSnapshotMap();
+    const processSnapshotKey = pluginComponentsLoadFailed
+      ? undefined
+      : createProcessAgentSnapshotKey(agentCacheKey, ctx.directory);
+    const processSnapshot = processSnapshotKey
+      ? (processAgentSnapshots.get(processSnapshotKey) as AgentConfigSnapshot | undefined)
+      : undefined;
+    const closureSnapshot = agentConfigSnapshot?.cacheKey === agentCacheKey
+      ? agentConfigSnapshot
+      : undefined;
+    const snapshot = closureSnapshot ?? processSnapshot;
+    if (!pluginComponentsLoadFailed && snapshot) {
+      config.agent = cloneAgentConfig(snapshot.agents);
+      if (snapshot.defaultAgent !== undefined) {
+        config.default_agent = snapshot.defaultAgent;
       }
       agentResult = config.agent as Record<string, unknown>;
       replayAgentConfigSideEffects({
         agentResult,
-        configuredDefaultAgent: agentConfigSnapshot.configuredDefaultAgent,
+        configuredDefaultAgent: snapshot.configuredDefaultAgent,
         defaultAgent: config.default_agent,
       })
+      agentsCacheHit = true;
     } else {
-      const configuredDefaultAgent = getConfiguredDefaultAgent(config);
-      agentResult = await applyAgentConfig({
-        config,
-        pluginConfig,
-        ctx,
-        pluginComponents,
+      const configuredDefaultAgent = await timePhase("agents", () => {
+        return getConfiguredDefaultAgent(config);
       });
+      agentResult = await timePhase("agents", () =>
+        applyAgentConfig({
+          config,
+          pluginConfig,
+          ctx,
+          pluginComponents,
+        }),
+      );
       agentConfigSnapshot = pluginComponentsLoadFailed
         ? undefined
         : {
@@ -176,26 +249,50 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             defaultAgent: config.default_agent,
             agents: cloneAgentConfig(agentResult),
           };
+      if (processSnapshotKey && agentConfigSnapshot) {
+        processAgentSnapshots.set(processSnapshotKey, agentConfigSnapshot);
+      }
     }
 
-    applyToolConfig({ config, pluginConfig, agentResult });
-    attachHiddenConfigKeyAliases(config, pluginConfig);
-    await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });
-    await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
+    await timePhase("tools", () =>
+      applyToolConfig({ config, pluginConfig, agentResult }),
+    );
+    await timePhase("agentAliases", () => attachHiddenConfigKeyAliases(config, pluginConfig));
+    await timePhase("mcp", () =>
+      applyMcpConfig({ config, pluginConfig, ctx, pluginComponents }),
+    );
+    await timePhase("commands", () =>
+      applyCommandConfig({ config, pluginConfig, ctx, pluginComponents }),
+    );
     if (runtimeSkillSourceUrl) {
-      applyRuntimeSkillSourceConfig({
-        config,
-        pluginConfig,
-        sourceUrl: runtimeSkillSourceUrl,
-      })
+      await timePhase("runtimeSkills", () =>
+        applyRuntimeSkillSourceConfig({
+          config,
+          pluginConfig,
+          sourceUrl: runtimeSkillSourceUrl,
+        }),
+      );
     }
 
     config.formatter = formatterConfig;
 
+    phaseTiming.total = Date.now() - totalStartedAt;
+    lastPhaseTiming = {
+      directory: ctx.directory,
+      ...phaseTiming,
+      agentsCacheHit,
+      componentsCacheHit,
+    };
     log("[config-handler] config handler applied", {
       agentCount: Object.keys(agentResult).length,
       commandCount: Object.keys((config.command as Record<string, unknown>) ?? {})
         .length,
+    });
+    log("[config-handler] phase timing", {
+      directory: ctx.directory,
+      ...phaseTiming,
+      agentsCacheHit,
+      componentsCacheHit,
     });
   };
 }
