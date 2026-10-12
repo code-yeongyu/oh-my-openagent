@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import omoNativeManifest from "../package.json"
 import omoSenpiManifest from "../../omo-senpi/package.json"
+import omoOpenCodeManifest from "../../omo-opencode/package.json"
 import senpiTaskManifest from "../../senpi-task/package.json"
 import rootManifest from "../../../package.json"
 
@@ -9,7 +10,7 @@ const SENPI_PIN = "2026.10.11"
 const EXACT_PIN = /^\d/
 
 describe("senpi dependency pin", () => {
-  describe("#given the three manifests that pin @code-yeongyu/senpi", () => {
+  describe("#given the manifests that pin @code-yeongyu/senpi", () => {
     describe("#when their pins are read", () => {
       test("#then omo-ai pins the exact senpi version", () => {
         expect(omoNativeManifest.dependencies["@code-yeongyu/senpi"]).toBe(SENPI_PIN)
@@ -23,6 +24,11 @@ describe("senpi dependency pin", () => {
 
       test("#then the root devDependency pin matches", () => {
         expect(rootManifest.devDependencies["@code-yeongyu/senpi"]).toBe(SENPI_PIN)
+      })
+
+      test("#then OpenCode uses the same engine and catalog as Native", () => {
+        expect(omoOpenCodeManifest.dependencies["@code-yeongyu/senpi"]).toBe(SENPI_PIN)
+        expect(omoOpenCodeManifest.dependencies["@earendil-works/pi-ai"]).toBe(`npm:@code-yeongyu/senpi-ai@${SENPI_PIN}`)
       })
 
       test("#then senpi-task pins match", () => {

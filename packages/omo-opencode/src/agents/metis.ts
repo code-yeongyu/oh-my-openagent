@@ -1,3 +1,4 @@
+import { buildNativeAgentPrompt } from "./native-model-prompt"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { buildClaudeThinkingConfig, isKimiK2CodeModel } from "./types"
@@ -404,7 +405,7 @@ export function createMetisAgent(model: string): AgentConfig {
     model,
     temperature: 0.3,
     ...metisRestrictions,
-    prompt,
+    prompt: buildNativeAgentPrompt(model, prompt),
     ...buildClaudeThinkingConfig(model),
   } as AgentConfig
 }

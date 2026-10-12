@@ -1,4 +1,3 @@
-export { decideNativeEditionNudge } from "./decide"
 export {
   createNativeEditionNudgeHook,
   detectNativeEdition,
@@ -8,4 +7,4 @@ export {
 } from "./hook"
 export { createNudgeStateStore, NUDGE_STATE_FILE, parseNudgeState } from "./state"
 export type { NudgeStateStore } from "./state"
-export type { NudgeDecision, NudgeDecisionInput, NudgeState } from "./types"
+export type { NudgeState } from "./types"

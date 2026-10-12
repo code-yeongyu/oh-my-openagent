@@ -1,3 +1,7 @@
+## 2026-10-11 - Share Native model prompt builders with OpenCode (#9856, refs #9851)
+
+OpenCode imports the public generation facade from senpi 2026.10.11, applies one documented host-tool transform, and appends explicit agent roles instead of maintaining duplicate model bodies; runtime model switches preserve task mode and Hephaestus model eligibility, with catalog-wide byte parity and mutation checks covering both construction and reconciliation.
+
 ## 2026-10-12 - Session tools read legacy-storage sessions and show the real error (#5854)
 
 Thanks to @crazyrabbit0 for the fresh reproduction on 5.1.30 with OpenCode 1.19.0. A session that exists only in OpenCode's legacy JSON storage is merged into the session list, but the SQLite server answers `NotFoundError` for it. The SDK layer threw that error body unchanged, so every session tool printed `Error: [object Object]`, and a no-match `session_search` or `session_list` failed on that one session.
@@ -13,6 +17,7 @@ Ultrawork now scopes runtime caches before task commands, registers path-specifi
 The QA smoke records its sandbox-owned supervisor pids before daemon stop, then waits for those observed processes to exit within the supervisor-completion and final-kill reserve from the same shared engine stop-budget formula. Several supervisors share one deadline. A survivor still fails with its pid, command and measured time after drain; the final process/socket leak check remains in place. Drain receipts are retained before the exit wait so failure cleanup still removes owned socket namespaces. Deterministic clock, liveness and waiter regressions cover capped waits, persistent supervisors and timely exits.
 
 Review regressions pin the original deadline when one supervisor exits late, compare the reserve against the installed engine's exported budget parts, and distinguish command time from post-drain receipt work. Permission-denied liveness probes remain alive for the bounded diagnostic without authorizing a signal; timely-exit assertions no longer depend on the polling step.
+
 ## 2026-10-11 - Detect environment leaks at test-file teardown (#9390, #9469)
 
 Thanks to @Dante-dan for the per-file teardown leak check: tests now report added, removed, or changed `process.env` keys after a file's own cleanup, then restore the worker baseline without printing values. Maintainer follow-ups put `OMO_MEMORY_HOME` in the shared hermetic-home installer so package-local Senpi tests use a per-run temporary memory root too, and remove the leftover implicit-test-globals reference. Tests loaded by the integrity plugin must import their test functions from `bun:test`.

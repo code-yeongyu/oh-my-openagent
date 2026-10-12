@@ -1,4 +1,5 @@
 import { loadPromptSync, prometheusPromptVariants } from "@oh-my-opencode/prompts-core"
+import { buildNativeAgentPrompt } from "../native-model-prompt"
 
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
@@ -18,7 +19,7 @@ function loadDefaultPrometheusPrompt(): string {
 export const PROMETHEUS_SYSTEM_PROMPT = loadDefaultPrometheusPrompt()
 
 export function getPrometheusPrompt(model?: string, disabledTools?: readonly string[]): string {
-  void model
-  void disabledTools
-  return PROMETHEUS_SYSTEM_PROMPT
+  const tools = ["read", "grep", "glob", "bash", "edit", "write", "question", "skill"]
+    .filter((name) => !disabledTools?.includes(name))
+  return buildNativeAgentPrompt(model, PROMETHEUS_SYSTEM_PROMPT, tools)
 }
