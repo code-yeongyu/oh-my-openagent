@@ -1,3 +1,4 @@
+export { markCompletionNudged } from "./completion-nudge"
 export { getBoulderFilePath, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "./path"
 export { findPrometheusPlans, getPlanName, getPlanProgress } from "./plan-progress"
 export {

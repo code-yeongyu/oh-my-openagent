@@ -36,6 +36,7 @@ export {
   hashPlanContent,
   isContainedPlanPath,
   isWorkStale,
+  markCompletionNudged,
   normalizeSessionId,
   readBoulderState,
   reconcileStaleWorks,

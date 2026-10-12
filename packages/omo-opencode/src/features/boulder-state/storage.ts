@@ -23,6 +23,7 @@ export {
   hashPlanContent,
   isContainedPlanPath,
   isStructuredTaskRow,
+  markCompletionNudged,
   normalizeSessionId,
   readBoulderState,
   reconcileStaleWorks,
