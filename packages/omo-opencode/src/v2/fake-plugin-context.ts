@@ -4,6 +4,8 @@ import type {
   V2AgentRecord,
   V2CommandDefinition,
   V2PromptInput,
+  V2ToolAfterEvent,
+  V2ToolBeforeEvent,
   V2Event,
   V2ModelRef,
   V2McpEditor,
@@ -48,6 +50,10 @@ export type FakePluginContext = {
   /** Delivers an event to every active `event.subscribe()` loop. */
   readonly emit: (event: V2Event) => void
   readonly activeSubscribers: () => number
+  /** Runs the registered tool hooks in registration order and returns the event they mutated. */
+  readonly triggerToolBefore: (event: V2ToolBeforeEvent) => Promise<V2ToolBeforeEvent>
+  readonly triggerToolAfter: (event: V2ToolAfterEvent) => Promise<V2ToolAfterEvent>
+  readonly toolHookCount: () => number
 }
 
 function toRecord(agent: V2AgentInfo): V2AgentRecord {
@@ -92,6 +98,8 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
   let commandReloads = 0
   const sessionCalls: FakeSessionCall[] = []
   const subscribers = new Set<(event: V2Event) => void>()
+  const beforeHooks: Array<(event: V2ToolBeforeEvent) => Promise<void> | void> = []
+  const afterHooks: Array<(event: V2ToolAfterEvent) => Promise<void> | void> = []
 
   const rebuildAgents = (): void => {
     built = new Map((options.agents ?? []).map((agent) => [agent.id, toRecord(agent)]))
@@ -171,6 +179,15 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
         callback({ add: (info) => void addedTools.push(info) })
         return registration
       },
+      hook: ((name: "execute.before" | "execute.after", callback: (event: never) => Promise<void> | void) => {
+        const list = (name === "execute.before" ? beforeHooks : afterHooks) as Array<typeof callback>
+        list.push(callback)
+        return Promise.resolve({
+          dispose: async () => {
+            list.splice(list.indexOf(callback), 1)
+          },
+        })
+      }) as V2PluginContext["tool"]["hook"],
     },
     model: {
       list: async () => ({ data: options.models ?? [] }),
@@ -251,5 +268,14 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
       for (const push of subscribers) push(event)
     },
     activeSubscribers: () => subscribers.size,
+    triggerToolBefore: async (event) => {
+      for (const hook of beforeHooks) await hook(event)
+      return event
+    },
+    triggerToolAfter: async (event) => {
+      for (const hook of afterHooks) await hook(event)
+      return event
+    },
+    toolHookCount: () => beforeHooks.length + afterHooks.length,
   }
 }

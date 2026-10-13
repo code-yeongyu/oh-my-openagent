@@ -63,8 +63,35 @@ export type V2ToolEditor = {
   readonly add: (tool: V2ToolInfo) => void
 }
 
+export type V2ToolContentPart = { type: string; text?: string; [key: string]: unknown }
+
+export type V2ToolBeforeEvent = {
+  tool: string
+  readonly sessionID: string
+  readonly agent: string
+  readonly messageID: string
+  readonly id: string
+  input: unknown
+}
+
+export type V2ToolAfterEvent = {
+  readonly tool: string
+  readonly sessionID: string
+  readonly agent: string
+  readonly messageID: string
+  readonly id: string
+  readonly input: unknown
+  readonly status: "completed" | "error"
+  /** Present when status is "completed"; the hook may rewrite it. */
+  result?: { output?: unknown; content?: V2ToolContentPart[]; metadata?: Record<string, unknown> }
+}
+
 export type V2ToolDomain = {
   readonly transform: (callback: (editor: V2ToolEditor) => void) => Promise<V2Registration>
+  readonly hook: {
+    (name: "execute.before", callback: (event: V2ToolBeforeEvent) => Promise<void> | void): Promise<V2Registration>
+    (name: "execute.after", callback: (event: V2ToolAfterEvent) => Promise<void> | void): Promise<V2Registration>
+  }
 }
 
 export type V2Listed<T> = { readonly data: ReadonlyArray<T> }
