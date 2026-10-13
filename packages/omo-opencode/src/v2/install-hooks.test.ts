@@ -69,6 +69,30 @@ describe("installHooks", () => {
     })
   })
 
+  describe("#given a V1 config hook that defines agents", () => {
+    it("#when installed #then the hook runs once and its agents exist on the host until disposed", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const configHook = mock(async (config: Record<string, unknown>) => {
+        Object.assign(config, { agent: { Sisyphus: { prompt: "You orchestrate." } } })
+      })
+      const hooks = { config: configHook } as unknown as Hooks
+
+      // when
+      const uninstall = await installHooks(fake.context, hooks, { warn: () => {} })
+
+      // then
+      expect(configHook).toHaveBeenCalledTimes(1)
+      expect(fake.builtAgents().get("Sisyphus")?.system).toBe("You orchestrate.")
+
+      // when
+      await uninstall()
+
+      // then
+      expect(fake.activeSubscribers()).toBe(0)
+    })
+  })
+
   describe("#given V1 hooks without tools", () => {
     it("#when installed #then no tool transform is registered", async () => {
       // given

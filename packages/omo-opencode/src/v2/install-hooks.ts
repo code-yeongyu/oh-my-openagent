@@ -1,5 +1,6 @@
 import type { Hooks } from "@opencode-ai/plugin"
 import type { V2PluginContext, V2Registration } from "./context-types"
+import { installConfigBridge, type ConfigHook } from "./config-bridge"
 import { toV2Tool } from "./tool-bridge"
 
 export type InstallHooksDeps = {
@@ -8,8 +9,8 @@ export type InstallHooksDeps = {
 
 /**
  * Registers what a V1 `Hooks` object defines onto the matching 2.x domains and returns one
- * disposer for everything it registered. Only tools are mapped so far; the other hooks are added
- * one domain at a time as their 2.x counterparts are wired.
+ * disposer for everything it registered. Tools and the `config` hook (agents) are mapped so far; the
+ * other hooks are added one domain at a time as their 2.x counterparts are wired.
  */
 export async function installHooks(
   context: V2PluginContext,
@@ -38,6 +39,11 @@ export async function installHooks(
         }
       }),
     )
+  }
+
+  if (hooks.config !== undefined) {
+    const dispose = await installConfigBridge(context, hooks.config as unknown as ConfigHook, { warn: deps.warn })
+    registrations.push({ dispose })
   }
 
   let disposed = false

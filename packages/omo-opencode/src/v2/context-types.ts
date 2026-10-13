@@ -116,8 +116,40 @@ export type V2ProviderDomain = {
   readonly list: () => Promise<V2Listed<V2ProviderInfo>>
 }
 
+/** A mutable 2.x agent as the agent transform hands it out. */
+export type V2AgentRecord = {
+  id: string
+  name: string
+  model?: V2ModelRef
+  request: { settings: Record<string, unknown>; headers: Record<string, string>; body: Record<string, unknown> }
+  system?: string
+  description?: string
+  mode: "subagent" | "primary" | "all"
+  hidden: boolean
+  color?: string
+  steps?: number
+  permissions: V2PermissionRule[]
+}
+
+export type V2AgentEditor = {
+  readonly list: () => V2AgentRecord[]
+  readonly get: (id: string) => V2AgentRecord | undefined
+  readonly default: (id: string | undefined) => void
+  /** Creates the agent from 2.x defaults when the id is unknown. */
+  readonly update: (id: string, update: (agent: V2AgentRecord) => void) => void
+  readonly remove: (id: string) => void
+}
+
 export type V2AgentDomain = {
   readonly list: () => Promise<V2Listed<V2AgentInfo>>
+  readonly transform: (callback: (editor: V2AgentEditor) => void) => Promise<V2Registration>
+  readonly reload: () => Promise<void>
+}
+
+export type V2Event = { readonly type: string }
+
+export type V2EventDomain = {
+  readonly subscribe: (options?: { readonly signal?: AbortSignal }) => AsyncIterable<V2Event>
 }
 
 export type V2PluginContext = {
@@ -128,6 +160,7 @@ export type V2PluginContext = {
   readonly model: V2ModelDomain
   readonly provider: V2ProviderDomain
   readonly agent: V2AgentDomain
+  readonly event: V2EventDomain
 }
 
 export type V2PluginDefinition = {
