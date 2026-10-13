@@ -72,6 +72,39 @@ describe("resolveAgent category stage", () => {
     expect(result.requested_model?.source).toBe("agent")
   })
 
+  test("#given a category chain that runs one model at two thinking levels #when the agent resolves #then both levels stay on the agent runtime chain", () => {
+    // given
+    const agents = categorizedAgent(["quick"])
+    const models = registry([model("vendor-a", "primary-model"), model("vendor-b", "fallback-model")])
+    const omoConfig = {
+      categories: {
+        quick: {
+          models: [
+            { model: "vendor-a/primary-model", reasoning: "high" },
+            { model: "vendor-a/primary-model", reasoning: "off" },
+            { model: "vendor-b/fallback-model", reasoning: "off" },
+          ],
+        },
+      },
+    } as OmoConfig
+
+    // when
+    const result = expectResolved(resolveAgent("categorized", agents, models, { omoConfig }))
+
+    // then
+    expect(result.model).toBe("vendor-a/primary-model")
+    expect(result.resolved_model?.reasoning).toBe("high")
+    expect(
+      [result.requested_model, ...(result.fallback_models ?? [])].map(
+        (rung) => `${rung?.display}:${rung?.reasoning ?? rung?.reasoning_effort}`,
+      ),
+    ).toEqual([
+      "vendor-a/primary-model:high",
+      "vendor-a/primary-model:off",
+      "vendor-b/fallback-model:off",
+    ])
+  })
+
   test("#given categories deep then unspecified-high #when the deep gate model is absent #then the second category supplies the model", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-high"])
