@@ -2,7 +2,10 @@ import type {
   V2AgentEditor,
   V2AgentInfo,
   V2AgentRecord,
+  V2CommandDefinition,
+  V2PromptInput,
   V2Event,
+  V2ModelRef,
   V2McpEditor,
   V2McpServerConfig,
   V2ModelInfo,
@@ -18,7 +21,14 @@ export type FakeContextOptions = {
   readonly agents?: ReadonlyArray<V2AgentInfo>
   readonly defaultModel?: V2ModelInfo | null
   readonly directory?: string
+  /** The agent the fake session is currently on. */
+  readonly sessionAgent?: string
 }
+
+export type FakeSessionCall =
+  | { readonly kind: "prompt"; readonly input: V2PromptInput }
+  | { readonly kind: "switchAgent"; readonly sessionID: string; readonly agent: string }
+  | { readonly kind: "switchModel"; readonly sessionID: string; readonly model: V2ModelRef }
 
 export type FakePluginContext = {
   readonly context: V2PluginContext
@@ -30,6 +40,10 @@ export type FakePluginContext = {
   /** The MCP servers after the last time every registered MCP transform ran. */
   readonly builtMcp: () => ReadonlyMap<string, V2McpServerConfig>
   readonly mcpReloadCount: () => number
+  readonly builtCommands: () => ReadonlyMap<string, V2CommandDefinition>
+  readonly commandReloadCount: () => number
+  /** Everything the plugin asked the session API to do, in order. */
+  readonly sessionCalls: ReadonlyArray<FakeSessionCall>
   readonly reloadCount: () => number
   /** Delivers an event to every active `event.subscribe()` loop. */
   readonly emit: (event: V2Event) => void
@@ -73,6 +87,10 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
   const mcpTransforms: Array<(editor: V2McpEditor) => void> = []
   let mcpBuilt = new Map<string, V2McpServerConfig>()
   let mcpReloads = 0
+  const commandTransforms: Array<(editor: { readonly add: (definition: V2CommandDefinition) => void }) => void> = []
+  let commandsBuilt = new Map<string, V2CommandDefinition>()
+  let commandReloads = 0
+  const sessionCalls: FakeSessionCall[] = []
   const subscribers = new Set<(event: V2Event) => void>()
 
   const rebuildAgents = (): void => {
@@ -103,6 +121,11 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
       remove: (name) => void mcpBuilt.delete(name),
     }
     for (const transform of mcpTransforms) transform(editor)
+  }
+
+  const rebuildCommands = (): void => {
+    commandsBuilt = new Map()
+    for (const transform of commandTransforms) transform({ add: (definition) => void commandsBuilt.set(definition.name, definition) })
   }
 
   const subscribe = (subscribeOptions?: { readonly signal?: AbortSignal }): AsyncIterable<V2Event> => ({
@@ -187,6 +210,28 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
         rebuildMcp()
       },
     },
+    command: {
+      transform: async (callback) => {
+        commandTransforms.push(callback)
+        rebuildCommands()
+        return {
+          dispose: async () => {
+            commandTransforms.splice(commandTransforms.indexOf(callback), 1)
+            rebuildCommands()
+          },
+        }
+      },
+      reload: async () => {
+        commandReloads += 1
+        rebuildCommands()
+      },
+    },
+    session: {
+      get: async () => ({ ...(options.sessionAgent === undefined ? {} : { agent: options.sessionAgent }) }),
+      prompt: async (input) => void sessionCalls.push({ kind: "prompt", input }),
+      switchAgent: async (input) => void sessionCalls.push({ kind: "switchAgent", ...input }),
+      switchModel: async (input) => void sessionCalls.push({ kind: "switchModel", ...input }),
+    },
     event: { subscribe },
   }
 
@@ -198,6 +243,9 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
     defaultAgent: () => chosenDefault,
     builtMcp: () => mcpBuilt,
     mcpReloadCount: () => mcpReloads,
+    builtCommands: () => commandsBuilt,
+    commandReloadCount: () => commandReloads,
+    sessionCalls,
     reloadCount: () => reloads,
     emit: (event) => {
       for (const push of subscribers) push(event)

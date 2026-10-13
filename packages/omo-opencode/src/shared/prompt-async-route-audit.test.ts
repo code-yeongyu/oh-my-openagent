@@ -49,6 +49,10 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
     "binds SDK Session.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
   ],
   [
+    path.join(SOURCE_ROOT, "v2", "config-bridge", "create-command-executor.ts"),
+    "OpenCode 2.x runs a user-typed slash command by calling the plugin's execute(invocation) with an explicit steer/queue delivery, and 2.x session.prompt is a durable inbox enqueue (session.inbox.enqueued/delivered), not 1.x promptAsync; routing it through the gate would wait for idle (defeating steer) and coalesce a repeated command as a duplicate. Internal 2.x injections (wakes, continuations) are not covered by this entry and must use the gate",
+  ],
+  [
     path.join(WORKSPACE_ROOT, "packages", "senpi-task", "src", "runners", "in-process", "child-handle.ts"),
     "drives a senpi CHILD AgentSession.prompt for spawned subagent turns; senpi-task cannot reach OpenCode session APIs (opencode-coupling audit) so the main-session injection invariant does not apply",
   ],

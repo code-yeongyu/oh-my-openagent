@@ -180,6 +180,36 @@ export type V2McpDomain = {
   readonly reload: () => Promise<void>
 }
 
+export type V2PromptInput = {
+  readonly sessionID: string
+  readonly text: string
+  readonly delivery?: "steer" | "queue" | null
+}
+
+export type V2SessionDomain = {
+  readonly get: (input: { readonly sessionID: string }) => Promise<{ readonly agent?: string }>
+  readonly prompt: (input: V2PromptInput) => Promise<unknown>
+  readonly switchAgent: (input: { readonly sessionID: string; readonly agent: string }) => Promise<void>
+  readonly switchModel: (input: { readonly sessionID: string; readonly model: V2ModelRef }) => Promise<void>
+}
+
+export type V2CommandInvocation = {
+  readonly sessionID: string
+  readonly prompt: { readonly text: string }
+  readonly delivery: "steer" | "queue"
+}
+
+export type V2CommandDefinition = {
+  readonly name: string
+  readonly description?: string
+  readonly execute: (invocation: V2CommandInvocation) => Promise<void>
+}
+
+export type V2CommandDomain = {
+  readonly transform: (callback: (editor: { readonly add: (definition: V2CommandDefinition) => void }) => void) => Promise<V2Registration>
+  readonly reload: () => Promise<void>
+}
+
 export type V2Event = { readonly type: string }
 
 export type V2EventDomain = {
@@ -195,6 +225,8 @@ export type V2PluginContext = {
   readonly provider: V2ProviderDomain
   readonly agent: V2AgentDomain
   readonly mcp: V2McpDomain
+  readonly command: V2CommandDomain
+  readonly session: V2SessionDomain
   readonly event: V2EventDomain
 }
 
