@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**omo loads on OpenCode 2.x instead of being rejected at startup.** OpenCode 2.0 refused the plugin with `Plugin must export a default definition with an id and an effect or setup function` and skipped its TUI entry. The package now exposes a 2.x `setup` entry for the server and the TUI beside the existing 1.x `server` and `tui` entries, so OpenCode 1.x loads it exactly as before ([#10089](https://github.com/code-yeongyu/oh-my-openagent/issues/10089)). Porting the plugin's hooks, tools and sidebar to the 2.x API is still in progress: on 2.x the plugin now starts, but it does not add its agents, commands or tools yet, and the sidebar, BTW and native-edition nudge do not appear.
+**omo loads on OpenCode 2.x and registers its tools instead of being rejected at startup.** OpenCode 2.0 refused the plugin with `Plugin must export a default definition with an id and an effect or setup function` and skipped its TUI entry. The package now exposes a 2.x `setup` entry for the server and the TUI beside the existing 1.x `server` and `tui` entries, so OpenCode 1.x loads it exactly as before ([#10089](https://github.com/code-yeongyu/oh-my-openagent/issues/10089)). On 2.x the plugin's tools (`grep`, `glob`, `skill`, `session_*`, `background_*`, `task` and the rest) now reach the model. Porting the remaining hooks, agents, commands, skills, MCP servers and the sidebar to the 2.x API is still in progress, and a tool that needs the OpenCode client, such as `session_list`, fails with a message that names the call it is missing.
 
 ## [5.1.33] - 2026-10-13
 
