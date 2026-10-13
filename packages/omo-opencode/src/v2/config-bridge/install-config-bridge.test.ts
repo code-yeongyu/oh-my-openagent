@@ -126,6 +126,69 @@ describe("installConfigBridge", () => {
     })
   })
 
+  describe("#given a config hook that defines commands", () => {
+    const commandConfig = {
+      command: {
+        triage: { template: "Triage: $ARGUMENTS", description: "Triage an issue", agent: "Sisyphus" },
+        broken: { description: "no template" },
+      },
+    }
+
+    it("#when installed #then valid commands exist on the host and the invalid one is skipped with a warning", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const warn = mock((_message: string) => {})
+
+      // when
+      await installConfigBridge(fake.context, hookReturning(commandConfig), { warn, debounceMs: 0 })
+
+      // then
+      expect([...fake.builtCommands().keys()]).toEqual(["triage"])
+      expect(fake.builtCommands().get("triage")?.description).toBe("Triage an issue")
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]?.[0]).toContain('"broken"')
+    })
+
+    it("#when the command runs #then the plugin's before-hook sees it and the session gets the rewritten prompt", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const beforeCommand = mock(async (_input: unknown, output: { parts: Array<{ type: string; text?: string }> }) => {
+        output.parts[0] = { type: "text", text: `${output.parts[0]?.text} [hooked]` }
+      })
+
+      // when
+      await installConfigBridge(fake.context, hookReturning(commandConfig), { warn: () => {}, debounceMs: 0, beforeCommand })
+      await fake.builtCommands().get("triage")?.execute({ sessionID: "ses_1", prompt: { text: "login bug" }, delivery: "steer" })
+
+      // then
+      expect(beforeCommand).toHaveBeenCalledTimes(1)
+      expect(fake.sessionCalls.map((call) => call.kind)).toEqual(["switchAgent", "prompt"])
+      expect(fake.sessionCalls[1]).toEqual({
+        kind: "prompt",
+        input: { sessionID: "ses_1", text: "Triage: login bug [hooked]", delivery: "steer" },
+      })
+    })
+
+    it("#when the hook output changes on a later run #then the command registry is reloaded too", async () => {
+      // given
+      const fake = createFakePluginContext()
+      let round = 0
+      const hook: ConfigHook = async (config) => {
+        round += 1
+        Object.assign(config, { command: { triage: { template: `round ${round}` } } })
+      }
+      await installConfigBridge(fake.context, hook, { warn: () => {}, debounceMs: 0 })
+      const before = fake.commandReloadCount()
+
+      // when
+      fake.emit({ type: "provider.updated" })
+      await settle()
+
+      // then
+      expect(fake.commandReloadCount()).toBe(before + 1)
+    })
+  })
+
   describe("#given the snapshot handed to the config hook", () => {
     it("#when invoked #then it carries the host default model and empty agent, command and mcp maps", async () => {
       // given

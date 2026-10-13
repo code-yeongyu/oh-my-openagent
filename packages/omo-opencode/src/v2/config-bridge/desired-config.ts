@@ -1,4 +1,5 @@
 import type { V2McpServerConfig, V2PermissionRule } from "../context-types"
+import type { CommandSpec } from "./create-command-executor"
 import { migrateMcpConfig } from "./migrate-mcp"
 import { migrateAgentConfig, migratePermissionConfig, type V2AgentPatch } from "./migrate-agent"
 
@@ -9,10 +10,13 @@ export type DesiredConfig = {
   readonly mcp: ReadonlyArray<readonly [string, V2McpServerConfig]>
   /** MCP entries 2.x cannot represent; the bridge warns about them. */
   readonly skippedMcp: ReadonlyArray<string>
+  readonly commands: ReadonlyArray<readonly [string, CommandSpec]>
+  /** Command entries without a usable template; the bridge warns about them. */
+  readonly skippedCommands: ReadonlyArray<string>
   readonly defaultAgent?: string
 }
 
-export const EMPTY_DESIRED_CONFIG: DesiredConfig = { agents: [], globalPermissions: [], mcp: [], skippedMcp: [] }
+export const EMPTY_DESIRED_CONFIG: DesiredConfig = { agents: [], globalPermissions: [], mcp: [], skippedMcp: [], commands: [], skippedCommands: [] }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -33,11 +37,32 @@ export function readDesiredConfig(config: Readonly<Record<string, unknown>>): De
       else mcp.push([name, migrated])
     }
   }
+  const commands: Array<readonly [string, CommandSpec]> = []
+  const skippedCommands: string[] = []
+  if (isRecord(config.command)) {
+    for (const [name, entry] of Object.entries(config.command)) {
+      if (!isRecord(entry) || typeof entry.template !== "string") {
+        skippedCommands.push(name)
+        continue
+      }
+      commands.push([
+        name,
+        {
+          template: entry.template,
+          ...(typeof entry.description === "string" ? { description: entry.description } : {}),
+          ...(typeof entry.agent === "string" ? { agent: entry.agent } : {}),
+          ...(typeof entry.model === "string" ? { model: entry.model } : {}),
+        },
+      ])
+    }
+  }
   return {
     agents,
     globalPermissions: migratePermissionConfig(config.tools, config.permission),
     mcp,
     skippedMcp,
+    commands,
+    skippedCommands,
     ...(typeof config.default_agent === "string" ? { defaultAgent: config.default_agent } : {}),
   }
 }

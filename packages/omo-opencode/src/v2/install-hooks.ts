@@ -1,6 +1,6 @@
 import type { Hooks } from "@opencode-ai/plugin"
 import type { V2PluginContext, V2Registration } from "./context-types"
-import { installConfigBridge, type ConfigHook } from "./config-bridge"
+import { installConfigBridge, type BeforeCommandHook, type ConfigHook } from "./config-bridge"
 import { toV2Tool } from "./tool-bridge"
 
 export type InstallHooksDeps = {
@@ -42,7 +42,12 @@ export async function installHooks(
   }
 
   if (hooks.config !== undefined) {
-    const dispose = await installConfigBridge(context, hooks.config as unknown as ConfigHook, { warn: deps.warn })
+    const dispose = await installConfigBridge(context, hooks.config as unknown as ConfigHook, {
+      warn: deps.warn,
+      ...(hooks["command.execute.before"] === undefined
+        ? {}
+        : { beforeCommand: hooks["command.execute.before"] as unknown as BeforeCommandHook }),
+    })
     registrations.push({ dispose })
   }
 
