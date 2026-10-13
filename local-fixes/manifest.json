@@ -249,20 +249,6 @@
       "orderNote": "Apply after 14. Grafted from the main ledger 2026-10-02; patch path relative to local-fixes/ per v2-int convention."
     },
     {
-      "id": "17-tool-args-in-place",
-      "title": "Tool argument rewrites land on the object opencode executes; git env prefix follows the configured shell",
-      "commit": "33582bc1967b5a8d4249e52b5772a95090ac5a3b",
-      "patch": "patches/17-tool-args-in-place.patch",
-      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/9449",
-      "why": "opencode 1.18 calls tool.execute.before with { args } and then executes its own args reference; it never reads output.args back. replaceToolArgs did output.args = {...}, so all 12 OMO argument rewrites were silently dropped and the args object was detached for every plugin hook after OMO: the squeez plugin wrapped a copy, so almost no command was squeez-wrapped (canon X-124). The helper now edits in place and only replaces a frozen object. Because the non-interactive env prefix becomes live, the hook reads shell from the opencode config so that shell: bash on Windows gets export ...; instead of cmd or PowerShell syntax. NOTE: on the v2 host it is not yet proven whether the tool pipeline reads output.args back; this fix is benign either way (in-place edit + frozen fallback).",
-      "markers": [
-        "shellTypeFromConfiguredShell",
-        "Object.isFrozen(output.args)"
-      ],
-      "overlapsWith": [],
-      "orderNote": "Independent of 01-16. The second marker lives in packages/utils/src, which apply.mjs and verify.mjs search since this fix (ported to v2-int 2026-10-02). Upstream: issue #9448 and PR #9449."
-    },
-    {
       "id": "18-runtime-fallback-recovery-arbitration",
       "title": "runtime-fallback owns session.error recovery before the background manager finalizes the task",
       "commit": "01b3b411ea80234dd268bd472e9a5d11ff302701",
@@ -325,19 +311,6 @@
       ],
       "overlapsWith": [],
       "orderNote": "Independent of 01-20; touches only packages/omo-opencode/src/v2/agent-markdown.ts. Complemented outside this repo by carrying v1's opencode.json agent block and default_agent into the v2 profile config (the cutover dropped both)."
-    },
-    {
-      "id": "22-hook-spawn-windowshide",
-      "title": "Hide shell-hook console windows when the backend has no console",
-      "commit": "4dcc1b377e4a8602aec00ddc47b03146f77971ee",
-      "patch": "patches/22-hook-spawn-windowshide.patch",
-      "pr": null,
-      "why": "executeHookCommand spawned shell children without windowsHide. A console-less backend therefore gave each hook child a visible console, handed to Windows Terminal when it is the default terminal (X-119/G-17 mechanism; reproduced 2026-10-10). Pass windowsHide=true without changing detachment, streams, environment, or timeout cleanup. A registered background service must not be killed merely because its initiating parent exited.",
-      "markers": [
-        "HOOK_SPAWN_WINDOWSHIDE"
-      ],
-      "overlapsWith": [],
-      "orderNote": "Independent of 01-21; touches packages/utils/src/command-executor/execute-hook-command.ts. Runtime constant is consumed by the actual spawn option and survives bundling; comments are not used as markers. Companion open-code-review.ts spawn fixes live outside this repo. Activation of the rebuilt plugin in existing backends requires separate verification; restart remains owner-initiated."
     },
     {
       "id": "23-skill-v2-ctx-ask-guard",
@@ -592,6 +565,28 @@
       ],
       "verifyWith": "cd C:\\Users\\Zephyrus\\Documents\\ai\\opencode-core-fix && bun run fixes:verify",
       "note": "Not part of the OMO repo. Has its own ledger at opencode-core-fix/local-fixes. Upgrades: bun run fixes:apply <version> rebuilds from the new tag, re-applies the immutable fix commit, gates on the test file + 3 binary markers, and stages to a stable filename. v1.x ONLY - the pipeline refuses v2+. OpenChamber is pinned to the staged binary by the User env var OPENCODE_BINARY (read at startup); opencodeBinary in ~/.config/openchamber/settings.json is cosmetic and gets dropped on settings rewrites."
+    }
+  ],
+  "retiredFixes": [
+    {
+      "id": "17-tool-args-in-place",
+      "title": "Tool argument rewrites land on the object opencode executes; git env prefix follows the configured shell",
+      "commit": "33582bc1967b5a8d4249e52b5772a95090ac5a3b",
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/9449",
+      "retiredOn": "2026-10-13",
+      "retiredAt": "v5.1.33",
+      "upstream": "#9466 (argument rewrites in place, in 5.1.28) and #9909 (shell prefix follows the shell OpenCode runs, in 5.1.32); our PR #9449 was closed as landed",
+      "resolution": "non-interactive-env-hook.ts and its index.test.ts are upstream's files; replace-tool-args.ts was already identical"
+    },
+    {
+      "id": "22-hook-spawn-windowshide",
+      "title": "Hide shell-hook console windows when the backend has no console",
+      "commit": "4dcc1b377e4a8602aec00ddc47b03146f77971ee",
+      "pr": null,
+      "retiredOn": "2026-10-13",
+      "retiredAt": "v5.1.33",
+      "upstream": "#9837 (commit 6543d81c3, in 5.1.30) sets windowsHide: true on the same spawn",
+      "resolution": "execute-hook-command.ts is upstream's file; the textually clean merge left the windowsHide key twice in one object"
     }
   ]
 }

@@ -90,3 +90,55 @@ tests. Do not use its exit code as the only activation gate.
 
 `OMO_V2_PERMISSION_FAIL_CLOSED=1` makes the v2 skill permission bridge (fixes 30 and 33) reject
 instead of skipping the prompt when the permission system cannot be reached.
+
+## Retired fixes
+
+A fix leaves `manifest.fixes` when upstream ships the same change. Its record moves to
+`retiredFixes` in `manifest.json` and its patch file is deleted, so `apply.mjs` never tries to
+cherry-pick it again and `fixes:verify` stops asking for its markers.
+
+| id | retired at | superseded by |
+|---|---|---|
+| `17-tool-args-in-place` | v5.1.33 (2026-10-13) | #9466 (in 5.1.28) and #9909 (in 5.1.32); our PR #9449 was closed as landed |
+| `22-hook-spawn-windowshide` | v5.1.33 (2026-10-13) | #9837 (in 5.1.30) |
+
+For a retired fix, take upstream's version of every file the fix touched, even when git reports
+a clean merge. Fix 22 merged cleanly and still left `windowsHide` twice in one object literal.
+
+## Promoting an upstream release into this lane
+
+The v2 layer (PR #9016) is not in the manifest, so the manifest cannot be replayed onto a clean
+tag. Merge the tag into `integration/opencode-v2` in the work clone instead:
+
+```bash
+git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/tags/vX.Y.Z
+git merge --no-ff vX.Y.Z          # resolve by hand; retire what upstream now ships
+bun install --frozen-lockfile     # its prepare step runs `bun run build` and writes dist/ in the clone
+bun run typecheck
+git checkout -- packages/omo-native/bin/lib/service-auth.generated.js   # the build rewrites this tracked file
+bun local-fixes/stage-bundle.mjs --target-checkout "C:/Users/Zephyrus/Documents/ai/oh-my-openagent-fix-v2-int"
+bun run fixes:verify "C:/Users/Zephyrus/Documents/ai/oh-my-openagent-fix-v2-int-staged/dist/index.js"
+```
+
+The staged bundle keeps `zod` and `@opencode/plugin` external and loads them from the live
+checkout's `node_modules`. Compare both versions between the clone and the live checkout before
+the window. When they match (5.1.28 to 5.1.33: `zod` 4.6.5 and `@opencode/plugin` 2.0.16 on both
+sides) the swap needs no install. When they differ, or before building or testing in the live
+checkout, run `bun install --frozen-lockfile --ignore-scripts` there in the closed window: without
+`--ignore-scripts` the `prepare` step rebuilds `dist/index.js` in place, outside
+`activate-staged.ps1` and its backup.
+
+The fast-forward in the live checkout refuses to run while the regenerated bundles there are
+modified and the incoming release changes the same files (5.1.28 to 5.1.33: all 14). They are
+build output, never real work, so restore them first, in the closed window:
+
+```bash
+git status --porcelain            # expect only packages/omo-senpi/plugin/ and packages/omo-codex/scripts/install-dist/
+git checkout -- packages/omo-senpi/plugin packages/omo-codex/scripts/install-dist
+git fetch "<work clone>" integration/opencode-v2
+git merge --ff-only <staged commit>
+```
+
+Known gap: the markers of fixes 10 (`DEFAULT_FIRST_PROMPT_WATCHDOG_MS`) and 11
+(`cancellationRequested`) also exist in pristine upstream, so `fixes:verify` cannot notice if
+either fix is dropped. Their tests are the only evidence.
