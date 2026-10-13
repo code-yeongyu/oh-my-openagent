@@ -173,10 +173,11 @@ export function resolveAgent<TModel extends SenpiModelPort>(
         // A builtin chain rung carries its own variant, but an agent that configured tuning without
         // naming a model still resolves here, so the configured values must win over the rung's.
         const availableModelSet = new Set(availableModels)
+        const selectedVariant = configuredTuning.variant ?? resolution.variant
         return resolvedAgent(
           context,
           found,
-          configuredTuning.variant ?? resolution.variant,
+          selectedVariant,
           configuredTuning.reasoningEffort,
           buildRuntimeModelChain({
             candidates: chainRungCandidates({
@@ -185,6 +186,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
               ...(resolution.fallbackEntry !== undefined
                 ? { selectedRungEntry: resolution.fallbackEntry }
                 : {}),
+              ...(selectedVariant !== undefined ? { selectedVariant } : {}),
               availableModels: availableModelSet,
             }),
             selectedModel: resolution.model,

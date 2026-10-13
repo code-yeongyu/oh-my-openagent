@@ -1,6 +1,7 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { DEFAULT_CATEGORIES, resolveCategory, type SenpiModelPort, type SenpiModelRegistryPort } from "../category"
+import { recordRungKey } from "../model-chain"
 import { findExactAgentModel } from "./agent-model-registry"
 import type { ResolvedModelRecord } from "../state"
 
@@ -129,19 +130,22 @@ function selectedFirstRecords(spec: CategorySpecChain): readonly ResolvedModelRe
     ...(reasoning !== undefined ? { variant: reasoning, reasoning } : {}),
   }
   const rest = [spec.requested_model, ...(spec.fallback_models ?? [])]
-    .filter((record): record is ResolvedModelRecord => record !== undefined && record.display !== display)
+    .filter((record): record is ResolvedModelRecord =>
+      record !== undefined && recordRungKey(record) !== recordRungKey(selected))
   return [selected, ...rest]
 }
 
-// Winner chain first, then every later resolved category's chain, deduplicated by display and
-// re-stamped as an agent-sourced record (the child ran because of the agent, not a category call).
+// Winner chain first, then every later resolved category's chain, deduplicated by rung identity
+// (model plus thinking level) and re-stamped as an agent-sourced record (the child ran because of
+// the agent, not a category call).
 function agentModelChain(specs: readonly CategorySpecChain[]): RuntimeChain {
   const records: ResolvedModelRecord[] = []
   const seen = new Set<string>()
   for (const spec of specs) {
     for (const record of selectedFirstRecords(spec)) {
-      if (seen.has(record.display)) continue
-      seen.add(record.display)
+      const key = recordRungKey(record)
+      if (seen.has(key)) continue
+      seen.add(key)
       records.push({ ...record, source: "agent" })
     }
   }

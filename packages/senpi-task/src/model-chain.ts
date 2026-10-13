@@ -20,6 +20,24 @@ export type RuntimeModelChain = {
   readonly fallback_models?: readonly ResolvedModelRecord[]
 }
 
+/** The thinking level a record carries, in the precedence the engine's own rung selectors use. */
+export function recordReasoning(record: ResolvedModelRecord): string | undefined {
+  return record.reasoning ?? record.reasoning_effort ?? record.variant
+}
+
+/**
+ * `provider/model[:reasoning]`: a rung's identity is its model AND its thinking level. The same
+ * model may be listed twice at different levels on purpose - run it thinking first and retry it
+ * with thinking off - and collapsing those into one rung drops the retry the user configured.
+ */
+export function rungKey(model: string, reasoning: string | undefined): string {
+  return reasoning === undefined ? model : `${model}:${reasoning}`
+}
+
+export function recordRungKey(record: ResolvedModelRecord): string {
+  return rungKey(record.display, recordReasoning(record))
+}
+
 export function buildRuntimeModelChain(options: BuildModelChainOptions): RuntimeModelChain {
   const candidates = deduplicateCandidates(options.candidates)
   const requestedModel = toResolvedModelRecord(candidates[0], options.source)
@@ -46,6 +64,12 @@ export type ChainRungCandidateOptions = {
   readonly chain: readonly DelegateFallbackEntry[]
   readonly selectedModel: string
   readonly selectedRungEntry?: DelegateFallbackEntry
+  /**
+   * The thinking level in effect for the selected model. It belongs to the head candidate's
+   * identity: a bare head would read as a SECOND rung of a model whose configured rung already
+   * carries a level, and the chain would gain a level-less retry nobody asked for.
+   */
+  readonly selectedVariant?: string
   readonly availableModels: ReadonlySet<string>
 }
 
@@ -58,7 +82,11 @@ export function chainRungCandidates(options: ChainRungCandidateOptions): readonl
   const selectedIndex = locateSelectedRung(options)
   if (selectedIndex === -1) return []
 
-  return [{ model: options.selectedModel }, ...availableChainCandidates(options.chain.slice(selectedIndex + 1), options.availableModels)]
+  const head: ModelChainCandidate = {
+    model: options.selectedModel,
+    ...(options.selectedVariant !== undefined ? { variant: options.selectedVariant } : {}),
+  }
+  return [head, ...availableChainCandidates(options.chain.slice(selectedIndex + 1), options.availableModels)]
 }
 
 /**
@@ -113,8 +141,9 @@ function locateSelectedRung(options: ChainRungCandidateOptions): number {
 function deduplicateCandidates(candidates: readonly ModelChainCandidate[]): readonly ModelChainCandidate[] {
   const seen = new Set<string>()
   return candidates.filter((candidate) => {
-    if (seen.has(candidate.model)) return false
-    seen.add(candidate.model)
+    const key = rungKey(candidate.model, candidate.reasoningEffort ?? candidate.variant)
+    if (seen.has(key)) return false
+    seen.add(key)
     return true
   })
 }

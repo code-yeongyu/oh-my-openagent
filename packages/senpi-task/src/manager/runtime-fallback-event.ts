@@ -1,3 +1,4 @@
+import { recordRungKey } from "../model-chain"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import type { ManagedChildEvent } from "./child-handle"
 
@@ -58,9 +59,14 @@ function remainingFallbacks(
   selected: ResolvedModelRecord,
 ): readonly ResolvedModelRecord[] | undefined {
   if (candidates === undefined) return undefined
-  const selectedIndex = candidates.findIndex((candidate) =>
-    candidate.provider === selected.provider && candidate.model_id === selected.model_id
-  )
+  const selectedKey = recordRungKey(selected)
+  const exact = candidates.findIndex((candidate) => recordRungKey(candidate) === selectedKey)
+  // A chain written before rungs carried a thinking level has no identity match; keep trimming at
+  // the model-only match then, so an older record is never left holding the rung it moved to.
+  const selectedIndex = exact !== -1
+    ? exact
+    : candidates.findIndex((candidate) =>
+        candidate.provider === selected.provider && candidate.model_id === selected.model_id)
   return selectedIndex === -1 ? candidates : candidates.slice(selectedIndex + 1)
 }
 
@@ -73,9 +79,7 @@ function appendFallbackAttempts(
   for (const candidate of [previous, selected]) {
     if (
       candidate !== undefined
-      && !next.some((attempt) =>
-        attempt.provider === candidate.provider && attempt.model_id === candidate.model_id
-      )
+      && !next.some((attempt) => recordRungKey(attempt) === recordRungKey(candidate))
     ) {
       next.push(candidate)
     }

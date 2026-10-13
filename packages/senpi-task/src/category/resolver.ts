@@ -384,9 +384,15 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const canonicalChain = config.models !== undefined && config.models.length > 0
     ? categoryModelCandidates(config)
     : undefined
-  const canonicalReasoningByModel = new Map(
-    (canonicalChain ?? []).map((candidate) => [candidate.model, candidate.reasoningEffort]),
-  )
+  // A model may appear on SEVERAL canonical rungs at different thinking levels. Availability is
+  // per model, so the selection always lands on the first rung of the model it picks; a map that
+  // let a later entry overwrite it would label the run with the last rung's level instead.
+  const canonicalReasoningByModel = new Map<string, string | undefined>()
+  for (const candidate of canonicalChain ?? []) {
+    if (!canonicalReasoningByModel.has(candidate.model)) {
+      canonicalReasoningByModel.set(candidate.model, candidate.reasoningEffort)
+    }
+  }
   const userModel = canonicalChain !== undefined ? canonicalChain[0].model : userConfig?.model
   const userFallbackModels = canonicalChain !== undefined
     ? canonicalChain.slice(1).map((candidate) => candidate.model)
@@ -448,6 +454,9 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const effectiveReasoningEffort = canonicalReasoningByModel.get(selection.selectedModel)
       ?? config.reasoning
       ?? config.reasoningEffort
+  // The level the selected rung actually runs at, whichever channel carries it: canonical reasoning,
+  // the legacy effort, or the rung's own variant.
+  const selectedLevel = effectiveReasoningEffort ?? variant
   // Builtin chain rungs remaining after the selected one extend the runtime retry chain, appended
   // after any user-configured fallback_models so user entries keep priority (dedupe keeps firsts).
   const chainCandidates = fallbackChain === undefined
@@ -456,6 +465,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
         chain: fallbackChain,
         selectedModel: selection.selectedModel,
         ...(selection.fallbackEntry !== undefined ? { selectedRungEntry: selection.fallbackEntry } : {}),
+        ...(selectedLevel !== undefined ? { selectedVariant: selectedLevel } : {}),
         availableModels: availableModelSet,
       })
   const runtimeModelChain = buildRuntimeModelChain({
