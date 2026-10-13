@@ -1,3 +1,13 @@
+## 2026-10-13 - Ultrawork never arms on relayed-origin input (#10096)
+
+A chat bot built on OmO printed ULTRAWORK banners when a third party typed `ulw` / `ultrawork` in a group chat: the gateway relays the external message into the bot's session as plain text, and the ultrawork keyword hook armed on it with no speaker distinction. The relay header stripper (`skill-pointers/strip-quoted-regions.ts` `RELAY_HEADER`) already masks header-shaped relays, but a bare gateway-relayed message matches no header and arrives as ordinary interactive input, and source `rpc` is a legitimate user path, so arming must key on relay-layer provenance, not transport or a header heuristic.
+
+`components/ultrawork/index.ts` gates arming on a provenance mark instead. `SenpiInputEvent` gains an optional `origin` field the omo gateway sets to `"relayed"` (plus the external sender) on every transport; `classifyUltraworkInput` / `handleInput` suppress arming when `origin` is relayed, with a new `relayed_origin` suppression reason, unless the session owner sets the `omo-senpi-ultrawork-allow-relayed` config flag (default off, read from `ctx.config.getFlag`, not the payload, so a relayed message cannot set its own opt-in). One implementation keyed on provenance; a legitimate rpc prompt still arms.
+
+The field on the input event is the senpi host contract (senpi adds `InputOrigin` to `InputEvent`); this component reads it, and the omo gateway sets it after. The suppression is inert until both land, so it fixes nothing on its own until the gateway setter ships.
+
+Tests (`ultrawork.test.ts`): a relayed-origin keyword does not arm (classification `relayed_origin` and `expectNoInjection` for interactive and rpc), a relayed lane report that merely mentions `ulw-loop` mid-sentence does not arm (live-evidence regression: the duty lane's `[DUTY] ... ulw-loop G002 checkpoint` report armed the lead's session; the same sentence typed by the session owner still arms), and the owner opt-in arms; each fails on the pre-change code for the intended reason. The existing owner-`"ulw do it"`-over-rpc guard is unchanged. `bun test packages/omo-senpi/src/components/ultrawork/`: 78 pass / 0 fail.
+
 ## 2026-10-11 - The control confirm drops its redundant time floor (#9967)
 
 `control-confirm.ts` no longer refuses a confirm under 3 s of budget: the service facade already throws before asking when under 8 s of run time is left, so the component check never fired in production. The near-duplicate "RPC-mode confirm frame never answered" test is removed; "a client that never answers" keeps that contract.

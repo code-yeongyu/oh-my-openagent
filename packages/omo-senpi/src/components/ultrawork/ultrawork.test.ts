@@ -20,6 +20,53 @@ import {
 const generatedDirectivePath = resolve("packages/omo-senpi/src/components/ultrawork/generated-directive.ts")
 
 describe("omo-senpi ultrawork component", () => {
+  it("#given a relayed-origin message carrying the keyword #when classified and dispatched #then it does not arm ultrawork", async () => {
+    // A gateway relays a third party's group-chat message into the bot's session as plain text.
+    // The relay layer marks provenance on the input event; arming on it would let any chat member
+    // switch the bot into ultrawork mode. Until the hook honors provenance, this arms (the bug).
+    const relayed = { text: "ulw fix the flaky test", source: "interactive" as const, origin: "relayed" as const }
+    expect(classifyUltraworkInput(relayed, { wasArmed: false, compactRearmPending: false })).toMatchObject({
+      effective: false, stage: "none", route: "none", suppressionReason: "relayed_origin",
+    })
+    for (const source of ["interactive", "rpc"] as const) {
+      const pi = new FakeExtensionAPI()
+      await registerIsolatedUltrawork(pi)
+      expectNoInjection(pi, await dispatchInput(pi, { type: "input", text: "ulw fix the flaky test", source, origin: "relayed" }))
+    }
+  })
+
+  it("#given a relayed lane report that merely mentions ulw-loop mid-sentence #when it reaches a session #then it does not arm", async () => {
+    // Live evidence 2026-10-13: a relayed lane status report reading "...ulw-loop G002 checkpoint..."
+    // mid-sentence armed the receiving session. The keyword form matches by design (the skill form
+    // "mass ulw-loop" must keep arming when TYPED); the only correct suppression layer is the relay
+    // layer's provenance mark. The report body matches no relay-header pattern, so the header
+    // heuristics never see it - this is a mention, not an instruction.
+    const laneReport =
+      "Lane checkpoint: the ulw-loop G002 checkpoint is green, two PRs waiting on CI, next is the bundle regen"
+    expect(classifyUltraworkInput(
+      { text: laneReport, source: "interactive", origin: "relayed" },
+      { wasArmed: false, compactRearmPending: false },
+    )).toMatchObject({ effective: false, stage: "none", route: "none", suppressionReason: "relayed_origin" })
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+    expectNoInjection(
+      pi,
+      await dispatchInput(pi, { type: "input", text: laneReport, source: "interactive", origin: "relayed" }),
+    )
+    // The same sentence typed by the session owner still arms: only provenance changed.
+    const typed = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(typed)
+    const typedResult = await dispatchInput(typed, laneReport, "interactive", undefined, sessionEventCtx("session-typed-mention"))
+    expectHiddenInjection(typed, typedResult)
+  })
+
+  it("#given the session owner opted in to relayed ultrawork #when a relayed message carries the keyword #then it arms", () => {
+    expect(classifyUltraworkInput(
+      { text: "ulw fix the flaky test", source: "interactive", origin: "relayed", allowRelayed: true },
+      { wasArmed: false, compactRearmPending: false },
+    )).toMatchObject({ effective: true, suppressionReason: "none" })
+  })
+
   it("#given a task child role #when a brief carrying the keyword is classified #then reports a suppressed child session", () => {
     expect(classifyUltraworkInput(
       { text: "ulw: implement the unit; evidence goes in .omo/ulw-execute/ledger.jsonl", source: "rpc", sessionRole: "child" },

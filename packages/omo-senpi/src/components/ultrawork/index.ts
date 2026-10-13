@@ -19,6 +19,9 @@ import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./ge
 const ULTRAWORK_KEYWORD = /\b(?:ultrawork|ulw)\b/i
 const ULTRAWORK_CURRENT_PROMPT_PATTERN = new RegExp(String.raw`${NOT_AFTER_IDENTIFIER}\b(?:ultrawork|ulw)\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`, "i")
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
+// Session-owner opt-in to arming ultrawork from relayed (external) messages. Default off:
+// a third party's relayed "ulw" must not switch the bot into ultrawork mode.
+const ULTRAWORK_ALLOW_RELAYED_FLAG = "omo-senpi-ultrawork-allow-relayed"
 const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
 const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
 const SKILL_COMMAND_PREFIX = "/skill:"
@@ -37,6 +40,11 @@ interface SenpiInputEvent {
   text: string
   source: "interactive" | "rpc" | "extension"
   streamingBehavior?: "steer" | "followUp"
+  // Provenance marked by the relay layer (the omo gateway injecting external chat messages),
+  // on every transport. A third party's relayed text must not arm the bot's ultrawork mode.
+  origin?: "relayed"
+  // The external sender, when the relay layer knows it. Informational only; never parsed.
+  originSender?: string
 }
 
 export interface ArmingSnapshot {
@@ -48,6 +56,7 @@ export type UltraworkInvocationStage = "none" | "first_arm" | "remention" | "pos
 export type UltraworkRoute = "none" | "direct" | "skill_args" | "skill_expansion" | "embedded_directive"
 export type UltraworkSuppressionReason =
   | "none"
+  | "relayed_origin"
   | "extension_source"
   | "child_session"
   | "no_keyword"
@@ -197,7 +206,7 @@ export function armingSnapshot(sessionId: string | undefined): ArmingSnapshot {
 }
 
 export function classifyUltraworkInput(
-  input: { readonly text: string; readonly source: SenpiInputEvent["source"]; readonly sessionRole?: SessionRole },
+  input: { readonly text: string; readonly source: SenpiInputEvent["source"]; readonly sessionRole?: SessionRole; readonly origin?: SenpiInputEvent["origin"]; readonly allowRelayed?: boolean },
   snapshot: ArmingSnapshot,
 ): UltraworkClassification {
   const quotedText = stripQuotedSpans(input.text)
@@ -221,6 +230,12 @@ export function classifyUltraworkInput(
 
   if (input.sessionRole !== undefined) {
     return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "child_session" }
+  }
+
+  // A relayed external message never arms unless the session owner opted in. Keyed on the
+  // relay layer's provenance mark, not on transport, so a legitimate rpc prompt still arms.
+  if (input.origin === "relayed" && input.allowRelayed !== true) {
+    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "relayed_origin" }
   }
 
   if (input.source === "extension") {
@@ -360,7 +375,7 @@ function handleInput(
   const sessionId = sessionIdFromEventCtx(eventCtx) ?? arming.currentSessionId()
   const directive = directiveForModel(modelIdFromContext(eventCtx))
   const classification = classifyUltraworkInput(
-    { ...payload, sessionRole: readSessionRole(pi) },
+    { ...payload, sessionRole: readSessionRole(pi), allowRelayed: ctx.config.getFlag(ULTRAWORK_ALLOW_RELAYED_FLAG) === true },
     snapshotSessionArming(arming, sessionId),
   )
 
