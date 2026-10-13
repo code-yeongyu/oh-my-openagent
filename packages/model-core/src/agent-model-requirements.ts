@@ -168,4 +168,32 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode"], model: "big-pickle" }
     ],
   },
+  argus: {
+    fallbackChain: [
+      {
+        providers: ["openai", "chatgpt-subscription", "opencode"],
+        model: "gpt-6-astra",
+        variant: "high",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "xhigh",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode"],
+        model: "gemini-3.1-pro",
+        variant: "high",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode", "bailian-coding-plan"],
+        model: "glm-5.2",
+      },
+    ],
+  },
 }
