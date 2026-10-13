@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { planRecallQueries } from "./planner"
+import { planRecallQueries, recallTermRarity } from "./planner"
+import { selectRecallCandidates } from "./select"
 
 describe("planRecallQueries", () => {
   it("#given no texts #when queries are planned #then no query is emitted", () => {
@@ -271,6 +272,99 @@ describe("planRecallQueries", () => {
 
       // then
       expect(queries).toEqual(["리콜", "검색", '"리콜 검색"'])
+    })
+  })
+
+  describe("with the memory's word rarity", () => {
+    // Ten notes share brief boilerplate; one note names the project the brief is about.
+    const notes = [
+      ...Array.from({ length: 10 }, (_, index) => ({ path: `reference/brief-${index}.md`, description: `Brief ${index}`, body: "independently implementation verification executable reviewer" })),
+      { path: "reference/quokkaline.md", description: "Quokkaline orders", body: "quokkaline order inquiries and staff rules" },
+    ]
+
+    it("#given a long brief that names its project once #when queries are planned with rarity #then the project word is searched and words no note holds are not", () => {
+      // given
+      const brief = "Independently re-run the executable verification for the implementation reviewer; the quokkaline queue is waiting on a nonexistentword."
+
+      // when
+      const plain = planRecallQueries([brief])
+      const rare = planRecallQueries([brief], { rarity: recallTermRarity(notes) })
+
+      // then (the length order spends both single slots on boilerplate the whole memory shares; with rarity
+      // the word one note holds is searched first, ahead of words ten notes share)
+      expect(plain).not.toContain("quokkaline")
+      expect(rare[0]).toBe("quokkaline")
+      expect(rare).not.toContain("nonexistentword")
+    })
+
+    it("#given an English inflection no note holds verbatim #when queries are planned with rarity #then it is still searched through its stem", () => {
+      // given (bm25 folds "deployments" and "deployment" to one stem, so the selector would find the note. The
+      // message also holds seven words one note each holds, more than the six single slots, so a word counted
+      // as unknown would be pushed out instead of filling a spare slot)
+      const memory = [
+        ...notes,
+        { path: "reference/deploy.md", description: "Deploy notes", body: "every deployment waits for the canary" },
+        { path: "reference/radio.md", description: "Radio alphabet", body: "alpha bravo charlie delta echo foxtrot golf" },
+      ]
+
+      // when
+      const queries = planRecallQueries(["check the deployments for alpha bravo charlie delta echo foxtrot golf"], { rarity: recallTermRarity(memory) })
+
+      // then
+      expect(queries).toContain("deployments")
+    })
+
+    it("#given a word one note holds verbatim whose stem many notes share #when queries are planned with rarity #then it counts by its own form", () => {
+      // given (stems fold "staged" with "stage": counted by stem it would look as common as the ten stage notes and
+      // lose its slot to seven words two notes each hold; counted by its own form it is the rarest word)
+      const memory = [
+        ...Array.from({ length: 10 }, (_, index) => ({ path: `reference/stage-${index}.md`, description: `Stage ${index}`, body: "the stage plan" })),
+        { path: "reference/staged.md", description: "Rollout", body: "the rollout is staged by region" },
+        ...Array.from({ length: 2 }, (_, index) => ({ path: `reference/radio-${index}.md`, description: `Radio ${index}`, body: "alpha bravo charlie delta echo foxtrot golf" })),
+      ]
+
+      // when
+      const queries = planRecallQueries(["staged alpha bravo charlie delta echo foxtrot golf"], { rarity: recallTermRarity(memory) })
+
+      // then
+      expect(queries).toContain("staged")
+    })
+
+    it("#given a short word the substring scorer meets inside a longer word #when recall selects with rarity #then that note is still found", () => {
+      // given (no note holds "auth" as a word or stem, but "authentication" contains it; a small English memory
+      // uses the substring scorer, where today's plan finds both notes)
+      const memory = [
+        { path: "reference/auth.md", description: "Authentication setup", body: "Tokens rotate weekly." },
+        { path: "reference/cache.md", description: "Cache operations", body: "Flush the cache on deploy." },
+      ]
+
+      // when
+      const found = selectRecallCandidates(memory, planRecallQueries(["auth cache"], { rarity: recallTermRarity(memory) }), { maxItems: 5, surfaced: new Set() })
+
+      // then
+      expect(found.map((candidate) => candidate.path).sort()).toEqual(["reference/auth.md", "reference/cache.md"])
+    })
+
+    it("#given a phrase holding a word no note holds #when queries are planned with rarity #then the phrase is skipped and the next held pair is used", () => {
+      // given (without rarity the first adjacent pair becomes a phrase whatever the memory holds)
+      const message = "flurbish quokkaline staff rules"
+
+      // when
+      const plain = planRecallQueries([message])
+      const rare = planRecallQueries([message], { rarity: recallTermRarity(notes) })
+
+      // then
+      expect(plain).toContain('"flurbish quokkaline"')
+      expect(rare).not.toContain('"flurbish quokkaline"')
+      expect(rare).toContain('"quokkaline staff"')
+    })
+
+    it("#given a message that is mostly Hangul #when queries are planned with rarity #then the plan is the length-ordered plan", () => {
+      // given
+      const message = "쿼카라인 주문 문의 규칙을 다시 정리해 줘 quokkaline"
+
+      // when / then
+      expect(planRecallQueries([message], { rarity: recallTermRarity(notes) })).toEqual(planRecallQueries([message]))
     })
   })
 })

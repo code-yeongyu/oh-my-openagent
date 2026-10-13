@@ -42,6 +42,7 @@ const FULL_DEFAULTS: OmoMemorySettings = {
     max_concurrent_wakes: 2,
     tool_budget: 8,
     query_expansion: false,
+    query_rarity: true,
   },
   projection: { max_entries_per_directory: 40, max_bytes: 24576 },
   compile_warn_tokens: 30000,
@@ -97,6 +98,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         max_concurrent_wakes: 2,
         tool_budget: 8,
         query_expansion: false,
+        query_rarity: true,
       },
       projection: { max_entries_per_directory: 12, max_bytes: 4096 },
       compile_warn_tokens: 50000,
@@ -239,6 +241,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       max_concurrent_wakes: 2,
       tool_budget: 8,
       query_expansion: false,
+      query_rarity: true,
     })
   })
 
@@ -268,6 +271,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         max_concurrent_wakes: 2,
         tool_budget: 8,
         query_expansion: false,
+        query_rarity: true,
       },
     }
 
@@ -284,6 +288,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       max_concurrent_wakes: 2,
       tool_budget: 8,
       query_expansion: false,
+      query_rarity: true,
     })
   })
 

@@ -1,0 +1,727 @@
+{
+ "corpus": "omo repository Markdown at 5814fdd3e (memory path = reference/<repo path>); build with memory-recall-ab.mjs build --markdown <checkout> --out <repo>",
+ "head90": [
+  {
+   "id": "q01",
+   "lang": "en",
+   "question": "During the rename from the old project name, which project-scope directory is the migration target, and how many skills does it hold compared with the older one?",
+   "goldPath": "reference/.agents/AGENTS.md"
+  },
+  {
+   "id": "q02",
+   "lang": "ko",
+   "question": "Codex 플러그인의 각 컴포넌트가 어떤 훅 이벤트에서 발동했는지 단위 프로브와 라이브 구동으로 어떻게 증명하나요?",
+   "goldPath": "reference/.agents/skills/codex-qa/references/components-hooks.md"
+  },
+  {
+   "id": "q03",
+   "lang": "en",
+   "question": "Which three release layers must every change be classified into when comparing HEAD to the published npm versions?",
+   "goldPath": "reference/.agents/skills/get-unpublished-changes/SKILL.md"
+  },
+  {
+   "id": "q04",
+   "lang": "ko",
+   "question": "적대적 다중 에이전트 계획 스킬에서 팀 모드 도구가 없으면 사용자에게 무엇을 설정하라고 안내해야 하나요?",
+   "goldPath": "reference/.agents/skills/hyperplan/SKILL.md"
+  },
+  {
+   "id": "q05",
+   "lang": "en",
+   "question": "What celebratory message gets printed verbatim when someone stumbles on the hidden fun command about the plugin?",
+   "goldPath": "reference/.agents/skills/omomomo/SKILL.md"
+  },
+  {
+   "id": "q06",
+   "lang": "ko",
+   "question": "opencode가 서버 전송 이벤트로 내보내는 수명주기 이벤트를 curl로 확인하려면 어떤 엔드포인트를 쓰나요?",
+   "goldPath": "reference/.agents/skills/opencode-qa/references/events-hooks.md"
+  },
+  {
+   "id": "q07",
+   "lang": "en",
+   "question": "Why must a release request go straight to the workflow without running any extra code re-review first?",
+   "goldPath": "reference/.agents/skills/publish/SKILL.md"
+  },
+  {
+   "id": "q08",
+   "lang": "ko",
+   "question": "사용되지 않는 코드를 지울 때 삭제를 병렬 에이전트에게 맡기기 전에 어떤 도구로 참조 여부를 검증해야 하나요?",
+   "goldPath": "reference/.agents/skills/remove-deadcode/SKILL.md"
+  },
+  {
+   "id": "q09",
+   "lang": "en",
+   "question": "How many vulnerability hunters and proof-of-concept engineers make up the parallel audit team, and which scoring frameworks calibrate severity?",
+   "goldPath": "reference/.agents/skills/security-research/SKILL.md"
+  },
+  {
+   "id": "q10",
+   "lang": "ko",
+   "question": "실제 senpi 바이너리를 격리 환경에서 검증할 때 증거 파일은 어느 한 경로에만 저장해야 하나요?",
+   "goldPath": "reference/.agents/skills/senpi-qa/SKILL.md"
+  },
+  {
+   "id": "q11",
+   "lang": "en",
+   "question": "What sections must the generated debt report file contain, such as the quick wins list and the list of things that look bad but are fine?",
+   "goldPath": "reference/.agents/skills/tech-debt-audit/SKILL.md"
+  },
+  {
+   "id": "q12",
+   "lang": "ko",
+   "question": "개발 컨테이너 안에서 공급자 API 키를 사용하려면 .env 파일을 어떻게 만들거나 Codespaces에서 어떻게 주입하나요?",
+   "goldPath": "reference/.devcontainer/README.md"
+  },
+  {
+   "id": "q13",
+   "lang": "en",
+   "question": "What headings does a pull request description need, and what must be pasted under the evidence section instead of raw logs?",
+   "goldPath": "reference/.github/pull_request_template.md"
+  },
+  {
+   "id": "q14",
+   "lang": "ko",
+   "question": "새 버전을 배포하면 디스코드 채널에 공지가 자동으로 올라가는데, 어떤 조건에서만 게시되고 어떤 비밀 값이 필요한가요?",
+   "goldPath": "reference/.github/RELEASE-ANNOUNCEMENTS.md"
+  },
+  {
+   "id": "q15",
+   "lang": "en",
+   "question": "Why is a test that passes nine times out of ten still considered broken, and what should replace sleep-based waiting?",
+   "goldPath": "reference/.omo/rules/test-discipline.md"
+  },
+  {
+   "id": "q16",
+   "lang": "ko",
+   "question": ".opencode 디렉터리에는 슬래시 명령이 몇 개 있고, 새 이름을 쓰는 디렉터리와는 어떤 관계인가요?",
+   "goldPath": "reference/.opencode/AGENTS.md"
+  },
+  {
+   "id": "q17",
+   "lang": "en",
+   "question": "Which generator scripts produce the checked-in JSON schema files, and what should be run after changing the source schema?",
+   "goldPath": "reference/assets/AGENTS.md"
+  },
+  {
+   "id": "q18",
+   "lang": "ko",
+   "question": "루트 실행 shim은 어떻게 플랫폼별 패키지를 찾아 실제 런처를 띄우나요?",
+   "goldPath": "reference/bin/AGENTS.md"
+  },
+  {
+   "id": "q19",
+   "lang": "en",
+   "question": "How can the computer-use tool capture a magnified region of the screen without shifting where later clicks land?",
+   "goldPath": "reference/CHANGELOG.md"
+  },
+  {
+   "id": "q20",
+   "lang": "ko",
+   "question": "컴퓨터 사용 엔진을 이루는 러스트 크레이트들은 각각 무슨 역할을 맡나요?",
+   "goldPath": "reference/crates/desktop/README.md"
+  },
+  {
+   "id": "q21",
+   "lang": "en",
+   "question": "Which message framing does the desktop engine speak over stdio, and how is a cancellation sent?",
+   "goldPath": "reference/crates/senpi-desktop-core/docs/engine-protocol.md"
+  },
+  {
+   "id": "q22",
+   "lang": "ko",
+   "question": "플러그인은 몇 가지 에디션으로 배포되고 코덱스용 가벼운 에디션에는 어떤 구성요소가 들어 있나요?",
+   "goldPath": "reference/docs/guide/installation.md"
+  },
+  {
+   "id": "q23",
+   "lang": "en",
+   "question": "What anonymous usage event is sent at most once per UTC day, and when is it triggered?",
+   "goldPath": "reference/docs/legal/privacy-policy.md"
+  },
+  {
+   "id": "q24",
+   "lang": "ko",
+   "question": "서비스 이용 약관에서 사용자가 스스로 책임져야 하는 일은 무엇인가요?",
+   "goldPath": "reference/docs/legal/terms-of-service.md"
+  },
+  {
+   "id": "q25",
+   "lang": "en",
+   "question": "What are the layers consulted when resolving model capabilities, and when is it acceptable to add an alias?",
+   "goldPath": "reference/docs/model-capabilities-maintenance.md"
+  },
+  {
+   "id": "q26",
+   "lang": "ko",
+   "question": "백그라운드 셸 명령 출력을 에이전트 세션으로 스트리밍하는 기능은 기본값이 켜져 있나요, 어떻게 활성화하나요?",
+   "goldPath": "reference/docs/reference/monitor.md"
+  },
+  {
+   "id": "q27",
+   "lang": "en",
+   "question": "Which kinds of bugs still need manual verification before shipping even when continuous integration is green?",
+   "goldPath": "reference/docs/reference/release-process.md"
+  },
+  {
+   "id": "q28",
+   "lang": "ko",
+   "question": "올라마에서 도구 호출 중 JSON 파싱이 EOF에서 실패하는 문제를 재현하려면 어떤 절차를 따라야 하나요?",
+   "goldPath": "reference/docs/troubleshooting/ollama.md"
+  },
+  {
+   "id": "q29",
+   "lang": "en",
+   "question": "What does the per-session cache in the directory-context injection library remember, and how is a path that escapes the root rejected?",
+   "goldPath": "reference/packages/agents-md-core/AGENTS.md"
+  },
+  {
+   "id": "q30",
+   "lang": "ko",
+   "question": "모노레포에는 패키지가 몇 개이고 어떤 역할 그룹으로 나뉘나요?",
+   "goldPath": "reference/packages/AGENTS.md"
+  },
+  {
+   "id": "q31",
+   "lang": "en",
+   "question": "Which three tools does the structural code search server expose, and why does a rewrite first produce a preview?",
+   "goldPath": "reference/packages/ast-grep-mcp/AGENTS.md"
+  },
+  {
+   "id": "q32",
+   "lang": "ko",
+   "question": "진행 중인 작업 계획 상태는 어느 파일에 저장되고 루트 필드는 활성 작업의 어떤 역할을 하나요?",
+   "goldPath": "reference/packages/boulder-state/AGENTS.md"
+  },
+  {
+   "id": "q33",
+   "lang": "en",
+   "question": "Which kinds of third-party assistant configuration does this compatibility package discover and translate?",
+   "goldPath": "reference/packages/claude-code-compat-core/AGENTS.md"
+  },
+  {
+   "id": "q34",
+   "lang": "ko",
+   "question": "패치 형식의 편집 내용을 구조화하고 외부 주석 검사 바이너리를 실행하는 패키지는 프로세스 실행을 왜 주입 방식으로 두었나요?",
+   "goldPath": "reference/packages/comment-checker-core/AGENTS.md"
+  },
+  {
+   "id": "q35",
+   "lang": "en",
+   "question": "In what order does the delegated-task model resolver try an override, the category default, user fallbacks and the hardcoded chain?",
+   "goldPath": "reference/packages/delegate-core/AGENTS.md"
+  },
+  {
+   "id": "q36",
+   "lang": "ko",
+   "question": "윈도우에서만 명령을 실행하는 도구는 무엇이고 다른 플랫폼에서는 도구 목록에서 어떻게 되나요?",
+   "goldPath": "reference/packages/git-bash-mcp/AGENTS.md"
+  },
+  {
+   "id": "q37",
+   "lang": "en",
+   "question": "How does the line-tagging edit engine reject edits that refer to stale lines?",
+   "goldPath": "reference/packages/hashline-core/AGENTS.md"
+  },
+  {
+   "id": "q38",
+   "lang": "ko",
+   "question": "격리 백엔드가 시작에 실패하거나 정리에 실패할 때 파일 트리는 어떻게 처리되나요?",
+   "goldPath": "reference/packages/isolation-core/AGENTS.md"
+  },
+  {
+   "id": "q39",
+   "lang": "en",
+   "question": "Which filesystem clone backends does the copy-on-write isolation layer support, and what is the default copy budget?",
+   "goldPath": "reference/packages/isolation-core/changes.md"
+  },
+  {
+   "id": "q40",
+   "lang": "ko",
+   "question": "언어 서버 클라이언트를 참조 횟수로 관리하는 풀과 유휴 정리기는 어떤 파일에 구현되어 있나요?",
+   "goldPath": "reference/packages/lsp-core/AGENTS.md"
+  },
+  {
+   "id": "q41",
+   "lang": "en",
+   "question": "How do short-lived agent sessions share a single warm language-server process per user?",
+   "goldPath": "reference/packages/lsp-daemon/AGENTS.md"
+  },
+  {
+   "id": "q42",
+   "lang": "ko",
+   "question": "독립 LSP 도구 패키지의 첫 릴리스에서 설정 경로를 덮어쓰려면 어떤 환경 변수를 쓰나요?",
+   "goldPath": "reference/packages/lsp-tools-mcp/CHANGELOG.md"
+  },
+  {
+   "id": "q43",
+   "lang": "en",
+   "question": "Which file filters package-manager config variables and secret-bearing variables out of the environment of a spawned stdio server?",
+   "goldPath": "reference/packages/mcp-client-core/AGENTS.md"
+  },
+  {
+   "id": "q44",
+   "lang": "ko",
+   "question": "JSON-RPC 표준입출력 전송에서 지원하는 두 가지 프레이밍 방식은 무엇인가요?",
+   "goldPath": "reference/packages/mcp-stdio-core/AGENTS.md"
+  },
+  {
+   "id": "q45",
+   "lang": "en",
+   "question": "What machine-wide lease limits how many recall wake-ups can run at once, and what error ends a bounded wait?",
+   "goldPath": "reference/packages/memory-core/AGENTS.md"
+  },
+  {
+   "id": "q46",
+   "lang": "ko",
+   "question": "추출된 사실을 큐에 쌓을 때 한 번에 보낼 수 있는 페이로드의 크기 제한은 얼마인가요?",
+   "goldPath": "reference/packages/memory-core/src/facts/AGENTS.md"
+  },
+  {
+   "id": "q47",
+   "lang": "en",
+   "question": "How does the fuzzy model matcher fall back from an exact match, and is it prefix-based?",
+   "goldPath": "reference/packages/model-core/AGENTS.md"
+  },
+  {
+   "id": "q48",
+   "lang": "ko",
+   "question": "코덱스 플러그인의 주석 검사기는 삭제 편집을 왜 무시하고, 검사기가 종료 코드 2를 내면 어떻게 하나요?",
+   "goldPath": "reference/packages/omo-codex/plugin/components/comment-checker/README.md"
+  },
+  {
+   "id": "q49",
+   "lang": "en",
+   "question": "Which components are vendored in the Codex harness adapter, and what does the rules component inject at session start?",
+   "goldPath": "reference/packages/omo-codex/README.md"
+  },
+  {
+   "id": "q50",
+   "lang": "ko",
+   "question": "배포되는 설치 진입점 파일과 생성된 번들은 각각 직접 수정해도 되나요?",
+   "goldPath": "reference/packages/omo-codex/scripts/AGENTS.md"
+  },
+  {
+   "id": "q51",
+   "lang": "en",
+   "question": "What file families make up the Codex installer engine, and which configuration file does it mutate?",
+   "goldPath": "reference/packages/omo-codex/src/install/AGENTS.md"
+  },
+  {
+   "id": "q52",
+   "lang": "ko",
+   "question": "설치 쪽 텔레메트리와 플러그인 쪽 텔레메트리의 상수가 서로 어긋나지 않게 무엇이 보장하나요?",
+   "goldPath": "reference/packages/omo-codex/src/telemetry/AGENTS.md"
+  },
+  {
+   "id": "q53",
+   "lang": "en",
+   "question": "How many bundled role definitions exist for spawning helpers, and which difficulty tiers map to worker roles?",
+   "goldPath": "reference/packages/omo-codex/SUBAGENT-ROUTING.md"
+  },
+  {
+   "id": "q54",
+   "lang": "ko",
+   "question": "설정 레이어를 합칠 때 기본 블록, 하니스 블록, 프로필 순서는 어떻게 해석되나요?",
+   "goldPath": "reference/packages/omo-config-core/AGENTS.md"
+  },
+  {
+   "id": "q55",
+   "lang": "en",
+   "question": "How does the evaluation smoke test derive its shutdown wait instead of using fixed cutoffs?",
+   "goldPath": "reference/packages/omo-native/changes.md"
+  },
+  {
+   "id": "q56",
+   "lang": "ko",
+   "question": "게이트웨이 모델 카탈로그를 만드는 스크립트는 어떤 외부 목록들을 가져와 어떤 파일에 쓰나요?",
+   "goldPath": "reference/packages/omo-opencode/scripts/AGENTS.md"
+  },
+  {
+   "id": "q57",
+   "lang": "en",
+   "question": "After a continuation prompt is injected, what must happen before the hook re-arms, and how long are the cooldown and the countdown?",
+   "goldPath": "reference/packages/omo-opencode/src/hooks/todo-continuation-enforcer/AGENTS.md"
+  },
+  {
+   "id": "q58",
+   "lang": "ko",
+   "question": "센파이 어댑터 패키지가 의존해도 되는 패키지와 의존하면 안 되는 경계는 무엇인가요?",
+   "goldPath": "reference/packages/omo-senpi/AGENTS.md"
+  },
+  {
+   "id": "q59",
+   "lang": "en",
+   "question": "Why was the research skill's companion list changed so that the browser skill is armed on every web lane?",
+   "goldPath": "reference/packages/omo-senpi/changes.md"
+  },
+  {
+   "id": "q60",
+   "lang": "ko",
+   "question": "센파이 플러그인이 기본으로 제공하는 스킬은 몇 개이고 어떤 것들인가요?",
+   "goldPath": "reference/packages/omo-senpi/plugin/README.md"
+  },
+  {
+   "id": "q61",
+   "lang": "en",
+   "question": "Which script writes the single daemon launch profile, and how does its check mode verify it?",
+   "goldPath": "reference/packages/omo-senpi/plugin/scripts/AGENTS.md"
+  },
+  {
+   "id": "q62",
+   "lang": "ko",
+   "question": "실제 센파이 바이너리를 구동하는 QA 드라이버들은 어떤 작업 레인으로 나뉘나요?",
+   "goldPath": "reference/packages/omo-senpi/scripts/qa/AGENTS.md"
+  },
+  {
+   "id": "q63",
+   "lang": "en",
+   "question": "Which native skill must be read before building any chained dependency graph, and what does it cover?",
+   "goldPath": "reference/packages/omo-senpi/skills/AGENTS.md"
+  },
+  {
+   "id": "q64",
+   "lang": "ko",
+   "question": "센파이 LSP 컴포넌트는 언어 서버를 직접 띄우지 않는다는데 도구 호출은 어디로 전달되나요?",
+   "goldPath": "reference/packages/omo-senpi/src/components/lsp/AGENTS.md"
+  },
+  {
+   "id": "q65",
+   "lang": "en",
+   "question": "How does the reply listener inject chat replies back into the right terminal pane?",
+   "goldPath": "reference/packages/openclaw-core/AGENTS.md"
+  },
+  {
+   "id": "q66",
+   "lang": "ko",
+   "question": "프롬프트 마크다운은 빌드 시점에 어떻게 번들되며 모델에 따른 변형은 무엇으로 고르나요?",
+   "goldPath": "reference/packages/prompts-core/AGENTS.md"
+  },
+  {
+   "id": "q67",
+   "lang": "en",
+   "question": "What must the model say the first time the maximum-effort mode activates in a conversation, and how often?",
+   "goldPath": "reference/packages/prompts-core/prompts/ultrawork/gpt.md"
+  },
+  {
+   "id": "q68",
+   "lang": "ko",
+   "question": "규칙 파일 후보를 찾고 경로와 매칭하는 패키지에서 AGENTS.md를 위로 거슬러 찾는 함수는 무엇인가요?",
+   "goldPath": "reference/packages/rules-engine/AGENTS.md"
+  },
+  {
+   "id": "q69",
+   "lang": "en",
+   "question": "In what order does the launcher look for the desktop engine binary, and what happens to quarantined candidates?",
+   "goldPath": "reference/packages/senpi-desktop-engine/README.md"
+  },
+  {
+   "id": "q70",
+   "lang": "ko",
+   "question": "데스크톱 조작 도우미에서 입력과 변경 동작은 어떤 권한 단계를 요구하나요?",
+   "goldPath": "reference/packages/senpi-desktop-prelude/docs/computer.md"
+  },
+  {
+   "id": "q71",
+   "lang": "en",
+   "question": "What assets does the prelude package export, and what ensures the generated asset module is not stale?",
+   "goldPath": "reference/packages/senpi-desktop-prelude/README.md"
+  },
+  {
+   "id": "q72",
+   "lang": "ko",
+   "question": "데스크톱 패키지들 사이에서 어떤 방향으로만 임포트가 허용되나요?",
+   "goldPath": "reference/packages/senpi-desktop-protocol/README.md"
+  },
+  {
+   "id": "q73",
+   "lang": "en",
+   "question": "What happens when an in-flight desktop request is cancelled and the engine does not answer within the grace period?",
+   "goldPath": "reference/packages/senpi-desktop-service/README.md"
+  },
+  {
+   "id": "q74",
+   "lang": "ko",
+   "question": "컴퓨터 도구의 매개변수는 왜 루트 유니온이 아닌 하나의 객체로 노출되나요?",
+   "goldPath": "reference/packages/senpi-desktop-tool/README.md"
+  },
+  {
+   "id": "q75",
+   "lang": "en",
+   "question": "How many statuses does the task state machine define, and what kind of store backs the records?",
+   "goldPath": "reference/packages/senpi-task/AGENTS.md"
+  },
+  {
+   "id": "q76",
+   "lang": "ko",
+   "question": "의존 프런티어 방식 작업 그래프 엔진은 노드를 언제 실행에 투입하고 경계 전이는 어디에 기록하나요?",
+   "goldPath": "reference/packages/senpi-task/src/dag/AGENTS.md"
+  },
+  {
+   "id": "q77",
+   "lang": "en",
+   "question": "What are the rules about prompt language and batch size for the child-spawning tool?",
+   "goldPath": "reference/packages/senpi-task/src/tools/task/AGENTS.md"
+  },
+  {
+   "id": "q78",
+   "lang": "ko",
+   "question": "공유 스킬 번들의 루트 경로 함수는 어떤 후보 경로를 가까운 순으로 확인하나요?",
+   "goldPath": "reference/packages/shared-skills/AGENTS.md"
+  },
+  {
+   "id": "q79",
+   "lang": "en",
+   "question": "What three things must every block of unchecked low-level Rust code have before it passes review?",
+   "goldPath": "reference/packages/shared-skills/skills/programming/references/rust/unsafe-discipline.md"
+  },
+  {
+   "id": "q80",
+   "lang": "ko",
+   "question": "스킬 로딩 코어는 어떤 하위 시스템들로 이루어져 있나요?",
+   "goldPath": "reference/packages/skills-loader-core/AGENTS.md"
+  },
+  {
+   "id": "q81",
+   "lang": "en",
+   "question": "How does the version-control expert skill decide between its commit, rebase and history-search modes?",
+   "goldPath": "reference/packages/skills-loader-core/src/features/builtin-skills/git-master/SKILL.md"
+  },
+  {
+   "id": "q82",
+   "lang": "ko",
+   "question": "같은 이름의 스킬이 여러 범위에 있을 때 어느 범위가 우선하나요?",
+   "goldPath": "reference/packages/skills-loader-core/src/features/opencode-skill-loader/AGENTS.md"
+  },
+  {
+   "id": "q83",
+   "lang": "en",
+   "question": "Where are team configuration files discovered, and what do mailbox payload caps and delivery reservations do?",
+   "goldPath": "reference/packages/team-core/AGENTS.md"
+  },
+  {
+   "id": "q84",
+   "lang": "ko",
+   "question": "일일 활성 사용 이벤트가 하루에 한 번만 전송되도록 어떻게 중복을 막나요?",
+   "goldPath": "reference/packages/telemetry-core/AGENTS.md"
+  },
+  {
+   "id": "q85",
+   "lang": "en",
+   "question": "Why are the terminal multiplexer helpers dependency-injected, and which consumers use them?",
+   "goldPath": "reference/packages/tmux-core/AGENTS.md"
+  },
+  {
+   "id": "q86",
+   "lang": "ko",
+   "question": "깊은 병합 함수는 프로토타입 오염을 어떻게 막고 최대 깊이는 얼마인가요?",
+   "goldPath": "reference/packages/utils/AGENTS.md"
+  },
+  {
+   "id": "q87",
+   "lang": "en",
+   "question": "Why does the repository have both a singular and a plural scripts directory at its root?",
+   "goldPath": "reference/script/AGENTS.md"
+  },
+  {
+   "id": "q88",
+   "lang": "ko",
+   "question": "릴리스 의존성 감사 캡처는 각 케이스마다 바이너리를 어떻게 다루고 어떤 환경에서 실행해야 하나요?",
+   "goldPath": "reference/script/qa/dependency-audit/README.md"
+  },
+  {
+   "id": "q89",
+   "lang": "en",
+   "question": "Which helper validates that third-party notices cover the shipped payload, and which npm output formats does it normalize?",
+   "goldPath": "reference/scripts/AGENTS.md"
+  },
+  {
+   "id": "q90",
+   "lang": "ko",
+   "question": "저장소 수준 통합 테스트는 생성된 스키마가 소스와 일치하는지 어떻게 확인하나요?",
+   "goldPath": "reference/tests/AGENTS.md"
+  }
+ ],
+ "deep30": [
+  {
+   "id": "d01",
+   "lang": "en",
+   "question": "How do I register a custom password-strength rule with the Go request validator when the app starts?",
+   "goldPath": "reference/packages/shared-skills/skills/programming/references/go/data-modeling.md"
+  },
+  {
+   "id": "d02",
+   "lang": "ko",
+   "question": "버그 리포트 스킬이 만든 이슈 본문 끝에 반드시 붙여야 하는 꼬리말과 라벨은 뭐야?",
+   "goldPath": "reference/packages/omo-codex/plugin/components/lcx/skills/lcx-report-bug/SKILL.md"
+  },
+  {
+   "id": "d03",
+   "lang": "en",
+   "question": "Which rules-injection capability skips discovery and parsing when the on-disk fingerprint of every candidate file is unchanged?",
+   "goldPath": "reference/docs/reference/rules-injection-cross-module-comparison.md"
+  },
+  {
+   "id": "d04",
+   "lang": "ko",
+   "question": "깃허브 트리아지에서 이슈와 PR을 질문, 버그, 기능 요청 같은 유형으로 분류하는 기준이 뭐야?",
+   "goldPath": "reference/.agents/skills/github-triage/SKILL.md"
+  },
+  {
+   "id": "d05",
+   "lang": "en",
+   "question": "In the Kimi K3 orchestration prompt, which two kinds of dependency are allowed to block firing tasks in one parallel batch?",
+   "goldPath": "reference/packages/prompts-core/prompts/atlas/kimi-k3.md"
+  },
+  {
+   "id": "d06",
+   "lang": "ko",
+   "question": "태스크 컴포넌트가 등록될 때 sweep, 플래그 확인, 설정 로드는 어떤 순서로 진행돼?",
+   "goldPath": "reference/packages/omo-senpi/src/components/task/AGENTS.md"
+  },
+  {
+   "id": "d07",
+   "lang": "en",
+   "question": "What does the ultrawork directive say to do first: survey the skill list and name each applicable skill with a reason?",
+   "goldPath": "reference/packages/omo-senpi/skills/ultrawork/SKILL.md"
+  },
+  {
+   "id": "d08",
+   "lang": "ko",
+   "question": "드림 페르소나가 메모리를 정리하기 전에 파일 트리와 system 파일, 최근 기록을 먼저 살펴보는 단계는 뭐라고 해?",
+   "goldPath": "reference/packages/omo-senpi/plugin/extensions/dream-persona.md"
+  },
+  {
+   "id": "d09",
+   "lang": "en",
+   "question": "When working on a PR, after creating the worktree, what should I do before implementing (like installing dependencies)?",
+   "goldPath": "reference/.agents/skills/work-with-pr/SKILL.md"
+  },
+  {
+   "id": "d10",
+   "lang": "ko",
+   "question": "MCP 환경변수 허용 목록이나 playwright 인자는 왜 프로젝트 설정에서 확장할 수 없어?",
+   "goldPath": "reference/docs/reference/configuration.md"
+  },
+  {
+   "id": "d11",
+   "lang": "en",
+   "question": "Where do I put my Anthropic and OpenAI API keys for local development and the QA sandbox?",
+   "goldPath": "reference/CONTRIBUTING.md"
+  },
+  {
+   "id": "d12",
+   "lang": "ko",
+   "question": "오픈코드 훅 중에서 AI가 쓴 군더더기 주석 패턴을 막는 도구 가드 훅은 뭐야?",
+   "goldPath": "reference/packages/omo-opencode/src/hooks/AGENTS.md"
+  },
+  {
+   "id": "d13",
+   "lang": "en",
+   "question": "How do I route explore and librarian to Antigravity Claude while keeping a direct Anthropic model for sisyphus?",
+   "goldPath": "reference/docs/reference/opencode-config.md"
+  },
+  {
+   "id": "d14",
+   "lang": "ko",
+   "question": "QA 증거 파일은 어느 폴더에 남겨야 하고 커밋해도 돼?",
+   "goldPath": "reference/AGENTS.md"
+  },
+  {
+   "id": "d15",
+   "lang": "en",
+   "question": "After migrating from OpenCode, which OAuth logins cannot be copied and need to be redone inside omo?",
+   "goldPath": "reference/docs/guide/migrating-from-opencode.md"
+  },
+  {
+   "id": "d16",
+   "lang": "ko",
+   "question": "리플렉션 페르소나가 새로운 배움을 통합하기 전에 메모리 구조를 파악하는 첫 단계에서 무엇부터 봐?",
+   "goldPath": "reference/packages/memory-core/src/reflection/assets/reflection-persona.md"
+  },
+  {
+   "id": "d17",
+   "lang": "en",
+   "question": "What must the frontend skill decide before changing UI code when the user supplied a screenshot or mockup as reference?",
+   "goldPath": "reference/packages/skills-loader-core/src/features/builtin-skills/frontend/SKILL.md"
+  },
+  {
+   "id": "d18",
+   "lang": "ko",
+   "question": "omo-native 패키지는 어떤 Node 버전을 요구하고 테스트는 무엇으로 돌려?",
+   "goldPath": "reference/packages/omo-native/AGENTS.md"
+  },
+  {
+   "id": "d19",
+   "lang": "en",
+   "question": "How can I ask the main agent to spawn the architect category or ask librarian about an implementation?",
+   "goldPath": "reference/docs/reference/features.md"
+  },
+  {
+   "id": "d20",
+   "lang": "ko",
+   "question": "omo thread에서 바인딩 없이 send를 하면 실행 중인 턴과 겹칠 때 어떻게 전달돼?",
+   "goldPath": "reference/docs/reference/omo-thread.md"
+  },
+  {
+   "id": "d21",
+   "lang": "en",
+   "question": "Is there a known issue where LazyCodex frontend runs finish without the visual QA screenshots?",
+   "goldPath": "reference/docs/reference/known-issues.md"
+  },
+  {
+   "id": "d22",
+   "lang": "ko",
+   "question": "응답하지 않는 자식 태스크를 취소할 때 task_cancel이 영원히 멈추던 문제는 어떻게 고쳐졌어?",
+   "goldPath": "reference/packages/senpi-task/changes.md"
+  },
+  {
+   "id": "d23",
+   "lang": "en",
+   "question": "What is the pitch for typing mass ulw: turning a whole job into a graph of agents?",
+   "goldPath": "reference/README.md"
+  },
+  {
+   "id": "d24",
+   "lang": "ko",
+   "question": "omo 데몬을 세션별로 나누면 메모리 비용이 어떻게 늘어나고 상한은 있어?",
+   "goldPath": "reference/docs/reference/omo-daemon.md"
+  },
+  {
+   "id": "d25",
+   "lang": "en",
+   "question": "In what order are shared keys, harness blocks and profiles resolved when omo.json layers merge?",
+   "goldPath": "reference/docs/reference/omo-json.md"
+  },
+  {
+   "id": "d26",
+   "lang": "ko",
+   "question": "권장 모델 목록에는 어떤 모델들이 있고 선호 순서는 어떻게 돼?",
+   "goldPath": "reference/docs/guide/agent-model-matching.md"
+  },
+  {
+   "id": "d27",
+   "lang": "en",
+   "question": "What should I confirm in the publish run log for the omo-ai release, like the OIDC and dist-tag checks?",
+   "goldPath": "reference/docs/reference/omo-ai-publishing.md"
+  },
+  {
+   "id": "d28",
+   "lang": "ko",
+   "question": "Почему OmO 섹션처럼, 러시아어 README에서 ultrawork 키워드를 소개하는 부분은 어디야?",
+   "goldPath": "reference/README.ru.md"
+  },
+  {
+   "id": "d29",
+   "lang": "en",
+   "question": "How do task_send, task_output and task_cancel target a child task, by id or by name?",
+   "goldPath": "reference/docs/guide/senpi-task.md"
+  },
+  {
+   "id": "d30",
+   "lang": "ko",
+   "question": "프롬프트 비동기 게이트 RFC를 적용하면 중복 주입이나 디스패치 타임아웃 측면에서 어떤 장점이 있어?",
+   "goldPath": "reference/docs/reference/prompt-async-gate-rfc.md"
+  }
+ ]
+}

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Memory recall searches a long message by its rarest words.** Recall now picks the words of its search by how few of your notes hold them (up to 6) instead of the two longest words of the newest message, so the topic of a long brief or resume message is no longer buried under boilerplate the whole memory shares; on the published 90-question benchmark R@5 rises from 0.356 to 0.444 (MRR 0.248 to 0.315), and on 38 labeled real recall events the right note reaches the two candidates the Kibitzer judge sees 18 times instead of 10. Messages written mostly in Korean, Japanese or Chinese keep the previous search, and `memory.recall.query_rarity: false` restores it everywhere. ([#10037](https://github.com/code-yeongyu/oh-my-openagent/issues/10037), [#10043](https://github.com/code-yeongyu/oh-my-openagent/pull/10043))
+
 ## [5.1.32] - 2026-10-12
 
 **5.1.32 is the release that 5.1.31 was meant to be: 5.1.31 never reached npm.** Two checks in the release pipeline stopped it before any package was published, one on the macOS Intel desktop engine and one on the Linux musl builds. omo itself did not change between the two, so every entry below is new to anyone upgrading from 5.1.30. The notarization check now waits for Apple's ticket to reach Gatekeeper, and the musl smoke no longer reports an exited host supervisor as a leak. ([#10081](https://github.com/code-yeongyu/oh-my-openagent/pull/10081), [#10082](https://github.com/code-yeongyu/oh-my-openagent/pull/10082))

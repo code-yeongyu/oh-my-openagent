@@ -1,8 +1,8 @@
 // Recall query planner: turns newest-first conversation texts into a handful of
 // short lexical queries for the AND-semantics FTS-lite scorer (search/query.ts).
 // Every term AND every phrase of a query must substring-match a document, so
-// queries stay tiny: one or two distinctive single terms, plus quoted bigram
-// phrases of adjacent kept terms (verbatim adjacency, never spanning a
+// queries stay tiny: two single terms (up to six when the memory's word rarity is known), plus quoted
+// bigram phrases of adjacent kept terms (verbatim adjacency, never spanning a
 // stopword). Pure and deterministic; the same input always yields the same
 // queries.
 //
@@ -12,7 +12,8 @@
 // noise floor; non-ASCII terms keep a 2-char floor because scripts like Korean
 // pack a full content word into two syllables (e.g. 리콜, 검색).
 
-export const MAX_RECALL_QUERIES = 4
+import { recallDocumentFrequency, recallTerms } from "./bm25"
+import type { RecallDocument } from "./provider"
 
 const MAX_SINGLE_TERMS = 2
 const MAX_TOOL_SINGLE_TERMS = 2
@@ -82,28 +83,85 @@ interface TermRank {
   readonly length: number
 }
 
+/**
+ * How many memory notes hold each word, from the loaded corpus (recallTermRarity). Given it, the
+ * planner picks the words that are rare in this memory instead of the longest ones.
+ */
+export interface RecallTermRarity {
+  readonly documentFrequency: (term: string) => number
+  readonly documentCount: number
+}
+
+/** Single-term queries when the planner knows the memory's word rarity. */
+export const RARITY_SINGLE_TERMS = 6
+
+const RARITY_CACHE = new WeakMap<readonly RecallDocument[], RecallTermRarity>()
+
+/**
+ * How many notes hold each planner word, read from the bm25 index's document frequencies (one
+ * tokenization pass per corpus revision, shared with the ranking; nothing stored on disk). A word counts
+ * by its own form first: stems fold ordinary words together ("presented" with "present") and would make
+ * them look common. A word no note holds verbatim counts by the rarest unit bm25 indexes for it that some
+ * note holds: an English inflection ("deployments") through its folded stem, a word with a particle or
+ * ending attached ("메모리를") through its pieces.
+ */
+export function recallTermRarity(documents: readonly RecallDocument[]): RecallTermRarity {
+  const cached = RARITY_CACHE.get(documents)
+  if (cached !== undefined) return cached
+  const { unitFrequency, surfaceFrequency, documentCount } = recallDocumentFrequency(documents)
+  const documentFrequency = (term: string): number => {
+    const whole = surfaceFrequency.get(term) ?? 0
+    if (whole > 0) return whole
+    const units = recallTerms(term).map((unit) => unitFrequency.get(unit) ?? 0).filter((count) => count > 0)
+    return units.length === 0 ? 0 : Math.min(...units)
+  }
+  const rarity: RecallTermRarity = { documentFrequency, documentCount }
+  RARITY_CACHE.set(documents, rarity)
+  return rarity
+}
+
+/**
+ * Whether most letters of the text are outside ASCII (Korean, Japanese, Chinese...). Such a message keeps
+ * the length-ordered words: its words carry particles and endings, bm25 already meets them through their
+ * pieces, and swapping them for rare words lost Korean questions in the public benchmark.
+ */
+function mostlyNonAsciiLetters(text: string | undefined): boolean {
+  const letters = text?.match(/\p{L}/gu) ?? []
+  if (letters.length === 0) return false
+  return letters.filter((letter) => !ASCII_ONLY.test(letter)).length * 2 > letters.length
+}
+
+export interface PlanRecallOptions {
+  readonly toolTexts?: readonly string[]
+  /** The memory's word rarity; omitted, the plan is the length-ordered plan. */
+  readonly rarity?: RecallTermRarity
+}
+
 export function planRecallQueries(
   texts: readonly string[],
-  options?: { readonly toolTexts?: readonly string[] },
+  options?: PlanRecallOptions,
 ): readonly string[] {
   const tokenLists = texts.map(tokenize)
-  const singles = rankedTerms(tokenLists).slice(0, MAX_SINGLE_TERMS).map((entry) => entry.term)
+  const rarity = options?.rarity === undefined || mostlyNonAsciiLetters(texts[0]) ? undefined : options.rarity
+  const singles = rankedTerms(tokenLists, rarity)
+    .slice(0, rarity === undefined ? MAX_SINGLE_TERMS : RARITY_SINGLE_TERMS)
+    .map((entry) => entry.term)
   const toolTexts = options?.toolTexts
   if (toolTexts === undefined || toolTexts.length === 0) {
-    return [...singles, ...planPhrases(tokenLists)].slice(0, MAX_RECALL_QUERIES)
+    return [...singles, ...planPhrases(tokenLists, rarity)].slice(0, singles.length + MAX_PHRASES)
   }
 
   const userSingles = new Set(singles)
   const toolTokenLists = toolTexts.map(tokenize)
   const pathDerived = pathDerivedTerms(toolTexts)
-  const toolSingles = rankedTerms(toolTokenLists)
+  const toolSingles = rankedTerms(toolTokenLists, rarity)
     .filter((entry) => !userSingles.has(entry.term) && !COMMAND_STOPWORDS.has(entry.term))
     .sort((left, right) => Number(pathDerived.has(right.term)) - Number(pathDerived.has(left.term)))
     .slice(0, MAX_TOOL_SINGLE_TERMS)
     .map((entry) => entry.term)
 
-  return [...singles, ...toolSingles, ...planPhrases([...tokenLists, ...toolTokenLists])]
-    .slice(0, MAX_RECALL_QUERIES + MAX_TOOL_SINGLE_TERMS)
+  return [...singles, ...toolSingles, ...planPhrases([...tokenLists, ...toolTokenLists], rarity)]
+    .slice(0, singles.length + MAX_PHRASES + MAX_TOOL_SINGLE_TERMS)
 }
 
 function pathDerivedTerms(toolTexts: readonly string[]): ReadonlySet<string> {
@@ -115,7 +173,7 @@ function pathDerivedTerms(toolTexts: readonly string[]): ReadonlySet<string> {
   return terms
 }
 
-function rankedTerms(tokenLists: readonly string[][]): TermRank[] {
+function rankedTerms(tokenLists: readonly string[][], rarity?: RecallTermRarity): TermRank[] {
   const firstTextIndex = new Map<string, number>()
   const firstSequence = new Map<string, number>()
   const textCount = new Map<string, number>()
@@ -147,6 +205,19 @@ function rankedTerms(tokenLists: readonly string[][]): TermRank[] {
     }
   }
 
+  if (rarity !== undefined) {
+    // Words some note holds go first, rarest first; words no note holds keep the length order after them.
+    // They are not dropped: the substring scorer can still meet them inside a longer word ("auth" in
+    // "authentication"), so they take any slot the known words leave.
+    const byPosition = (left: TermRank, right: TermRank): number => left.firstTextIndex - right.firstTextIndex
+    const byLength = (left: TermRank, right: TermRank): number =>
+      left.textCount - right.textCount || right.length - left.length || left.firstSequence - right.firstSequence
+    const known = pool.filter((entry) => rarity.documentFrequency(entry.term) > 0)
+      .sort((left, right) => byPosition(left, right) || rarity.documentFrequency(left.term) - rarity.documentFrequency(right.term) || byLength(left, right))
+    const unknown = pool.filter((entry) => rarity.documentFrequency(entry.term) === 0)
+      .sort((left, right) => byPosition(left, right) || byLength(left, right))
+    return [...known, ...unknown]
+  }
   return pool.sort(
     (left, right) =>
       left.firstTextIndex - right.firstTextIndex
@@ -157,15 +228,17 @@ function rankedTerms(tokenLists: readonly string[][]): TermRank[] {
 }
 
 /** Quoted bigram phrases from the newest text that has a verbatim kept pair. */
-function planPhrases(tokenLists: readonly string[][]): string[] {
+function planPhrases(tokenLists: readonly string[][], rarity?: RecallTermRarity): string[] {
   const phrases: string[] = []
   const seen = new Set<string>()
+  // With rarity, a phrase needs each of its words held by some note.
+  const known = (term: string): boolean => rarity === undefined || rarity.documentFrequency(term) > 0
   for (const tokens of tokenLists) {
     for (let index = 0; index + 1 < tokens.length; index += 1) {
       const left = tokens[index]
       const right = tokens[index + 1]
       if (left === undefined || right === undefined) continue
-      if (!isKeptTerm(left) || !isKeptTerm(right)) continue
+      if (!isKeptTerm(left) || !isKeptTerm(right) || !known(left) || !known(right)) continue
       const phrase = `${left} ${right}`
       if (seen.has(phrase)) continue
       seen.add(phrase)

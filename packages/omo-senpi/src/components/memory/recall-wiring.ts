@@ -20,6 +20,7 @@ import {
   RecallCorpusCache,
   RecallLedger,
   planRecallQueries,
+  recallTermRarity,
   selectRecallCandidates,
   type RecallCandidate,
   type RecallNudge,
@@ -158,13 +159,17 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     // newest-first slots so a filename can score even when user chatter owns both default singles.
     const texts = userTexts(session.entries)
     if (texts.length === 0 && extraTexts.length === 0) return undefined
+    // recall.query_rarity: the planner picks the words that are rare in this memory, so the corpus loads
+    // first. Off, the order and the plan are the length-ordered ones.
+    const preloaded = recall.query_rarity ? await corpusCache.load(createRepo(context)) : undefined
+    const planOptions = preloaded !== undefined && preloaded.documents.length > 0 ? { rarity: recallTermRarity(preloaded.documents) } : {}
     const queries = extraTexts.length === 0
-      ? planRecallQueries(texts)
-      : planRecallQueries(texts, { toolTexts: [...extraTexts].reverse() })
+      ? planRecallQueries(texts, planOptions)
+      : planRecallQueries(texts, { toolTexts: [...extraTexts].reverse(), ...planOptions })
     if (queries.length === 0) return undefined
 
     const repo = createRepo(context)
-    const corpus = await corpusCache.load(repo)
+    const corpus = preloaded ?? await corpusCache.load(repo)
     if (corpus.documents.length === 0) return undefined
 
     // Raw entries include tool calls/results that the judge's text-only window omits. The index

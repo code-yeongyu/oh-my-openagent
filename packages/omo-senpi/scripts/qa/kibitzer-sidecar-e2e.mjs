@@ -40,6 +40,11 @@
 //                  with the four added-term fields, a search whose own words match no memory finds one
 //                  through its synonyms, and that memory - never offered as a candidate - is nudged and
 //                  reaches the parent.
+//   query-rarity / query-rarity-off
+//                  ten notes share a brief's long words and one note names the project the brief mentions
+//                  once; `memory.recall.max_items` is 2. With `memory.recall.query_rarity` at its default (on)
+//                  the project note is a candidate and its nudge reaches the parent; with it off (control) the
+//                  two longest brief words win both slots and the project note is never offered.
 //
 // Every wait is an RPC event, a filesystem change or a process exit with a bounded timeout. Evidence
 // is structured: the mock's request log, the parent session JSONL and every child transcript.
@@ -92,7 +97,7 @@ import {
   writeOmoConfig,
 } from "./kibitzer-sidecar-support.mjs"
 
-export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "cjk-auto", "query-expansion"]
+export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "cjk-auto", "query-expansion", "query-rarity", "query-rarity-off"]
 /** The pinned model the refused-pinned-model provider refuses, and the builtin quick rung it falls back to. */
 const REFUSED_MODEL = "refused-1"
 const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
@@ -101,6 +106,8 @@ const CONFIG = {
   "category-unavailable": { categories: {} },
   "refused-pinned-model": { categories: { quick: { description: "QA pin outside the builtin quick chain", model: `omo-mock/${REFUSED_MODEL}` } } },
   "query-expansion": { recall: { query_expansion: true } },
+  "query-rarity": { recall: { max_items: 2 } },
+  "query-rarity-off": { recall: { max_items: 2, query_rarity: false } },
 }
 /** A search whose own words match no seeded memory; only the added terms reach the helm memory. */
 const WIDENED_SEARCH = {
@@ -122,9 +129,23 @@ const KOREAN_PUBLISH = {
   body: "배포 토큰은 키체인에 저장한다.",
   prompt: "퍼블리시할 때 막히면 어디서 꺼내 써",
 }
+/** Ten notes that share a brief's long words (never its exact word pairs) and one note naming the project. */
+const RARITY_BRIEFS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"].map((word, index) => ({
+  path: `reference/brief-${word}.md`,
+  description: `Brief ${word} checklist`,
+  body: `The ${word} reviewer signs off on the implementation after an executable check; each step runs independently of step ${index}.`,
+}))
+const RARITY_PROJECT = {
+  path: "reference/quokkaline-orders.md",
+  description: "Quokkaline order rules",
+  body: "Quokkaline orders wait for staff approval; inquiries go to the order channel.",
+  prompt: "Independently rerun the executable verification for the implementation reviewer, then check whether the quokkaline queue is clear.",
+}
 /** Scenario-specific seed corpus; every other scenario seeds the two disjoint English memories. */
 const SEEDS = {
   "cjk-auto": [MEMORIES.rollout, MEMORIES.helm, KOREAN_PUBLISH],
+  "query-rarity": [...RARITY_BRIEFS, RARITY_PROJECT],
+  "query-rarity-off": [...RARITY_BRIEFS, RARITY_PROJECT],
 }
 /** A non-transient refusal: Devin's Connect trailer surfaces as `permission_denied`; an HTTP provider answers 403. */
 const PERMISSION_DENIED_STEP = {
@@ -594,7 +615,30 @@ async function runQueryExpansion({ session, state, identity, router, facts, pare
   }
 }
 
-const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
+// ---- query-rarity / query-rarity-off -----------------------------------------------------------------------------
+
+function runQueryRarity(rarityOn) {
+  return async ({ session, state, identity, router, facts, parentTurns, record }) => {
+    // On, the project note is offered and nudged; off, the first offered brief is nudged so the wake still completes.
+    const nudged = rarityOn ? RARITY_PROJECT : RARITY_BRIEFS[4]
+    router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+    router.setSidecarSteps([nudgeStep({ ...nudged, body: "The note records the rule this brief needs." })])
+
+    await prompt(session, RARITY_PROJECT.prompt)
+    const held = await waitForAccepted(identity, state, nudged, { description: `query-rarity: ${nudged.path} was nudged` })
+    const lineage = sidecarDirs(identity)[0]
+    const candidates = candidatePathsOf(lineage === undefined ? "" : messageText(childTranscripts(lineage.dir)[0]?.users[0]))
+    record("project-note-offered", candidates.length === 2 && candidates.includes(RARITY_PROJECT.path) === rarityOn, `candidates=${candidates.join(",")}`)
+    record("nudge-accepted", held.nudges.some((nudge) => nudge.path === nudged.path), `held=${JSON.stringify(held)}`)
+
+    await prompt(session, RARITY_PROJECT.prompt)
+    const entries = readEntries(state.sessionFile)
+    record("nudge-reached-parent", nudgedPaths(entries).includes(nudged.path) && entries.some(isRecall), `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`)
+    facts.result = { queryRarity: rarityOn, candidates, nudgedPaths: nudgedPaths(entries), sidecarRequests: router.state.sidecar, parentRequests: parentTurns() }
+  }
+}
+
+const RUNNERS = { "query-rarity": runQueryRarity(true), "query-rarity-off": runQueryRarity(false), happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
 
 // ---- main --------------------------------------------------------------------------------------------------------
 

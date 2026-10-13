@@ -1851,7 +1851,8 @@
             "sidecar_max_tokens": 48000,
             "max_concurrent_wakes": 2,
             "tool_budget": 8,
-            "query_expansion": false
+            "query_expansion": false,
+            "query_rarity": true
           },
           "type": "object",
           "properties": {
@@ -1926,6 +1927,10 @@
             },
             "query_expansion": {
               "default": false,
+              "type": "boolean"
+            },
+            "query_rarity": {
+              "default": true,
               "type": "boolean"
             }
           },
@@ -2202,6 +2207,9 @@
                     "maximum": 9007199254740991
                   },
                   "query_expansion": {
+                    "type": "boolean"
+                  },
+                  "query_rarity": {
                     "type": "boolean"
                   }
                 },
@@ -4175,6 +4183,9 @@
                 },
                 "query_expansion": {
                   "type": "boolean"
+                },
+                "query_rarity": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -4442,6 +4453,9 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      },
+                      "query_rarity": {
                         "type": "boolean"
                       }
                     },
@@ -6391,6 +6405,9 @@
                 },
                 "query_expansion": {
                   "type": "boolean"
+                },
+                "query_rarity": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -6658,6 +6675,9 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      },
+                      "query_rarity": {
                         "type": "boolean"
                       }
                     },
@@ -8607,6 +8627,9 @@
                 },
                 "query_expansion": {
                   "type": "boolean"
+                },
+                "query_rarity": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -8874,6 +8897,9 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      },
+                      "query_rarity": {
                         "type": "boolean"
                       }
                     },
@@ -10821,6 +10847,9 @@
                   },
                   "query_expansion": {
                     "type": "boolean"
+                  },
+                  "query_rarity": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -11088,6 +11117,9 @@
                           "maximum": 9007199254740991
                         },
                         "query_expansion": {
+                          "type": "boolean"
+                        },
+                        "query_rarity": {
                           "type": "boolean"
                         }
                       },
@@ -13037,6 +13069,9 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "query_rarity": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -13304,6 +13339,9 @@
                               "maximum": 9007199254740991
                             },
                             "query_expansion": {
+                              "type": "boolean"
+                            },
+                            "query_rarity": {
                               "type": "boolean"
                             }
                           },
@@ -15253,6 +15291,9 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "query_rarity": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -15520,6 +15561,9 @@
                               "maximum": 9007199254740991
                             },
                             "query_expansion": {
+                              "type": "boolean"
+                            },
+                            "query_rarity": {
                               "type": "boolean"
                             }
                           },
@@ -17469,6 +17513,9 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "query_rarity": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -17736,6 +17783,9 @@
                               "maximum": 9007199254740991
                             },
                             "query_expansion": {
+                              "type": "boolean"
+                            },
+                            "query_rarity": {
                               "type": "boolean"
                             }
                           },

@@ -678,6 +678,7 @@ relying on it, and expanding the entry shows that caveat.
 | `recall.max_concurrent_wakes` | `2` | Machine-wide cap on wakes running at once |
 | `recall.tool_budget` | `8` | Read-only tool calls one wake may make before it is cut off |
 | `recall.query_expansion` | `false` | Let the sidecar add synonyms, keywords in your other languages and related terms to its own memory searches; each counts for less than a query word |
+| `recall.query_rarity` | `true` | Pick the words of a recall search by how rare they are in this memory (up to 6), instead of the two longest words of the newest message; words no note holds come after the ones it knows and fill any slot left. A message that is mostly Korean, Japanese or Chinese keeps the length order. `false` restores the length order exactly |
 
 Like the other memory blocks, every recall option can be overridden per agent under
 `memory.agents.<name>.recall`; `event_caps` merges field by field.

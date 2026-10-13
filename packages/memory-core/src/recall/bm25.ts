@@ -38,6 +38,8 @@ interface RecallBm25Index {
   readonly termFrequencies: readonly ReadonlyMap<string, number>[]
   readonly lengths: readonly number[]
   readonly documentFrequency: ReadonlyMap<string, number>
+  /** How many notes hold each token before stemming, from the same tokens (the query planner's rarity). */
+  readonly surfaceFrequency: ReadonlyMap<string, number>
   readonly averageLength: number
 }
 
@@ -114,11 +116,13 @@ function indexFor(documents: readonly RecallDocument[]): RecallBm25Index {
   const termFrequencies: Map<string, number>[] = []
   const lengths: number[] = []
   const documentFrequency = new Map<string, number>()
+  const surfaceFrequency = new Map<string, number>()
   for (const document of documents) {
     const frequencies = new Map<string, number>()
     const { tokens, standaloneHanCharacters } = tokenize(`${document.description}\n${document.body}`)
     for (const token of tokens.map(stemEnglishToken)) frequencies.set(token, (frequencies.get(token) ?? 0) + 1)
     for (const token of frequencies.keys()) documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1)
+    for (const token of new Set(tokens)) surfaceFrequency.set(token, (surfaceFrequency.get(token) ?? 0) + 1)
     termFrequencies.push(frequencies)
     // The stand-alone Han characters repeat text the run and its bigrams already count. Leaving them out
     // keeps every length as it was, so planned queries that hold no Han character after NFKC rank and
@@ -130,10 +134,25 @@ function indexFor(documents: readonly RecallDocument[]): RecallBm25Index {
     termFrequencies,
     lengths,
     documentFrequency,
+    surfaceFrequency,
     averageLength: documents.length === 0 ? 0 : totalLength / documents.length,
   }
   INDEXES.set(documents, index)
   return index
+}
+
+/**
+ * The bm25 index's own document frequencies, read from the same per-revision index the ranking builds so
+ * a caller pays no second tokenization pass: per indexed unit (a stemmed English word, a CJK run or
+ * bigram) and per token before stemming.
+ */
+export function recallDocumentFrequency(documents: readonly RecallDocument[]): {
+  readonly unitFrequency: ReadonlyMap<string, number>
+  readonly surfaceFrequency: ReadonlyMap<string, number>
+  readonly documentCount: number
+} {
+  const index = indexFor(documents)
+  return { unitFrequency: index.documentFrequency, surfaceFrequency: index.surfaceFrequency, documentCount: documents.length }
 }
 
 /**
