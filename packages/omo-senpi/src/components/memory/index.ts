@@ -1,5 +1,5 @@
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { resolveMemoryIdentity, resolveMemoryRoot } from "@oh-my-opencode/memory-core"
+import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"
@@ -134,7 +134,9 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         // process happens to sit in: one shared host serves sessions from many workspaces (#8556).
         const sessionCwd = surface.cwd ?? cwd
         const memoryRoot = resolveMemoryRoot(env, sessionCwd)
-        const resolved = resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
+        const resolved = isAutoAgentValue(sessionConfig.agent)
+          ? resolveAutoIdentity(sessionCwd, env, sessionConfig.auto_identity)
+          : resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
         const previous = findLatestMemoryBinding(surface.entries)
         const adoption = adoptSessionIdentity({
           recorded: previous,
