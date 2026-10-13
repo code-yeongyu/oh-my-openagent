@@ -67,11 +67,67 @@ export type V2ToolDomain = {
   readonly transform: (callback: (editor: V2ToolEditor) => void) => Promise<V2Registration>
 }
 
+export type V2Listed<T> = { readonly data: ReadonlyArray<T> }
+
+export type V2ModelRef = { readonly providerID: string; readonly id: string; readonly variant?: string }
+
+export type V2ModelInfo = {
+  readonly id: string
+  readonly modelID: string
+  readonly providerID: string
+  readonly name: string
+  readonly status: "alpha" | "beta" | "deprecated" | "active"
+  readonly enabled: boolean
+  readonly capabilities: { readonly tools: boolean; readonly input: ReadonlyArray<string>; readonly output: ReadonlyArray<string> }
+  readonly variants: ReadonlyArray<{ readonly id: string }>
+  readonly limit: { readonly context: number; readonly input?: number; readonly output: number }
+}
+
+export type V2ProviderInfo = {
+  readonly id: string
+  readonly name: string
+  readonly activation: "auto" | "enabled" | "disabled"
+}
+
+export type V2PermissionRule = {
+  readonly action: string
+  readonly resource: string
+  readonly effect: "allow" | "deny" | "ask"
+}
+
+export type V2AgentInfo = {
+  readonly id: string
+  readonly name: string
+  readonly model?: V2ModelRef
+  readonly description?: string
+  readonly mode: "subagent" | "primary" | "all"
+  readonly hidden: boolean
+  readonly color?: string
+  readonly steps?: number
+  readonly permissions: ReadonlyArray<V2PermissionRule>
+}
+
+export type V2ModelDomain = {
+  readonly list: () => Promise<V2Listed<V2ModelInfo>>
+  readonly default: () => Promise<{ readonly data: V2ModelInfo | null }>
+}
+
+export type V2ProviderDomain = {
+  readonly list: () => Promise<V2Listed<V2ProviderInfo>>
+}
+
+export type V2AgentDomain = {
+  readonly list: () => Promise<V2Listed<V2AgentInfo>>
+}
+
 export type V2PluginContext = {
   readonly app: V2App
   readonly location: V2Location
   readonly options: Readonly<Record<string, unknown>>
   readonly tool: V2ToolDomain
+  readonly model: V2ModelDomain
+  readonly provider: V2ProviderDomain
+  readonly agent: V2AgentDomain
 }
 
 export type V2PluginDefinition = {

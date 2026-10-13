@@ -2,17 +2,13 @@ import { describe, expect, it, mock } from "bun:test"
 import type { Hooks, PluginInput, PluginOptions } from "@opencode-ai/plugin"
 import type { V2PluginContext } from "./context-types"
 import { createV2Setup } from "./create-v2-setup"
+import { createFakePluginContext } from "./fake-plugin-context"
 import { V2UnsupportedOperationError } from "./unsupported-operation-error"
 
 function createContext(overrides: Partial<V2PluginContext> = {}): V2PluginContext {
   return {
-    app: { name: "cli", version: "2.0.28", channel: "latest" },
-    location: {
-      directory: "/work/app/packages/web",
-      project: { id: "proj_1", directory: "/work/app", canonical: "/work/app" },
-    },
+    ...createFakePluginContext({ directory: "/work/app/packages/web" }).context,
     options: { greeting: "hello" },
-    tool: { transform: async () => ({ dispose: async () => {} }) },
     ...overrides,
   }
 }

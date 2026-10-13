@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from "bun:test"
 import { tool } from "@opencode-ai/plugin/tool"
 import type { Hooks } from "@opencode-ai/plugin"
 import type { V2PluginContext, V2Registration, V2ToolEditor, V2ToolInfo } from "./context-types"
+import { createFakePluginContext } from "./fake-plugin-context"
 import { installHooks } from "./install-hooks"
 
 function createFakeContext() {
@@ -11,15 +12,7 @@ function createFakeContext() {
     callback({ add: (info) => void added.push(info) })
     return { dispose }
   })
-  const context: V2PluginContext = {
-    app: { name: "cli", version: "2.0.28", channel: "latest" },
-    location: {
-      directory: "/work/app",
-      project: { id: "proj_1", directory: "/work/app", canonical: "/work/app" },
-    },
-    options: {},
-    tool: { transform },
-  }
+  const context: V2PluginContext = { ...createFakePluginContext().context, tool: { transform } }
   return { context, added, transform, dispose }
 }
 

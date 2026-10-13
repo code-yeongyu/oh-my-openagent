@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { V2PluginContext } from "./context-types"
-import { createClientFacade } from "./create-client-facade"
+import { createClientFacade } from "./client-facade"
 import { V2UnsupportedOperationError } from "./unsupported-operation-error"
 
 type V1Shell = PluginInput["$"]
@@ -22,7 +22,7 @@ function resolveShell(): V1Shell {
 export function createPluginInput(context: V2PluginContext): PluginInput {
   const { directory, project } = context.location
   return {
-    client: createClientFacade(),
+    client: createClientFacade(context),
     project: {
       id: project.id,
       worktree: project.canonical,
