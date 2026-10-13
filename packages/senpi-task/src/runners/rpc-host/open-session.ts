@@ -7,6 +7,7 @@ import {
   type TaskStartFailureReason,
 } from "../../state"
 import { RunnerError } from "../in-process/runner-error"
+import { differsOnlyByPriorityAlias, reportedEffectiveModel, startedOnPinnedModel } from "../pinned-model-equivalence"
 import type { RpcRunnerSpec } from "../types"
 import { HostUnavailableError } from "./daemon"
 import {
@@ -24,6 +25,7 @@ export async function openTaskHostSession(input: {
   readonly client: {
     open(request: HostSessionOpenInput): Promise<OpenedHostSession>
     getState?(): Promise<HostSessionLiveness>
+    getAvailableModels?(): Promise<readonly unknown[]>
     close?(): Promise<void>
   }
   readonly spec: RpcRunnerSpec
@@ -63,8 +65,11 @@ export async function openTaskHostSession(input: {
   const freshOpen = opened.attached !== true
   if (model !== undefined && freshOpen) {
     let effective: HostSessionLiveness["model"]
+    let serviceTier: string | undefined
     try {
-      effective = (await input.client.getState?.())?.model
+      const state = await input.client.getState?.()
+      effective = state?.model
+      serviceTier = state?.serviceTier
     } catch (error) {
       await input.client.close?.().catch(() => undefined)
       throw new RunnerError({
@@ -80,19 +85,36 @@ export async function openTaskHostSession(input: {
         message: `the host reported no model after opening the requested ${model.provider}/${model.modelId}; refusing to start unverified`,
       })
     }
-    if (effective.provider !== model.provider || effective.id !== model.modelId) {
+    const pinned = { provider: model.provider, id: model.modelId }
+    let pinnedEntry: unknown = pinned
+    if (differsOnlyByPriorityAlias(effective, pinned)) {
+      try {
+        if (input.client.getAvailableModels === undefined) throw new Error("get_available_models is unavailable")
+        const catalog = await input.client.getAvailableModels()
+        pinnedEntry = catalog.find(entry => typeof entry === "object" && entry !== null
+          && "provider" in entry && entry.provider === pinned.provider && "id" in entry && entry.id === pinned.id)
+      } catch (error) {
+        await input.client.close?.().catch(() => undefined)
+        throw new RunnerError({
+          kind: "model_unavailable",
+          message: `the host's model catalog could not be read for the requested ${pinned.provider}/${pinned.id}; refusing to start unverified`,
+          cause: error,
+        })
+      }
+    }
+    if (pinnedEntry === undefined || !startedOnPinnedModel(effective, pinned, pinnedEntry)) {
       await input.client.close?.().catch(() => undefined)
       throw new RunnerError({
         kind: "model_unavailable",
         message: `the host opened the child on ${effective.provider}/${effective.id} instead of the requested ${model.provider}/${model.modelId}; refusing the substitution`,
       })
     }
-    return { ...opened, reportedModel: effective }
+    return { ...opened, reportedModel: reportedEffectiveModel(effective, serviceTier) }
   }
   if (freshOpen && input.client.getState !== undefined) {
     const state = await input.client.getState().catch(() => undefined)
     const effective = state?.model
-    return effective === undefined ? opened : { ...opened, reportedModel: effective }
+    return effective === undefined ? opened : { ...opened, reportedModel: reportedEffectiveModel(effective, state?.serviceTier) }
   }
   return opened
 }

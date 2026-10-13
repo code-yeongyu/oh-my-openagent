@@ -9,7 +9,13 @@ const cli = fileURLToPath(new URL("../scripts/retain-static-assets.mjs", import.
 const oldPath = "/_next/static/chunks/old.css"
 const css = "body { color: #eee; font-family: sans-serif }"
 
-async function deployment({ bootstrap = false, history = false, routeLifetime = 3600 } = {}) {
+async function deployment({
+  bootstrap = false,
+  history = false,
+  routeLifetime = 3600,
+  advertised = false,
+  env = {},
+} = {}) {
   const root = await mkdtemp(join(tmpdir(), "web-retention-cli-"))
   const assets = join(root, "assets")
   await mkdir(join(assets, "_next/static/chunks"), { recursive: true })
@@ -40,9 +46,12 @@ async function deployment({ bootstrap = false, history = false, routeLifetime = 
       const path = new URL(request.url).pathname
       if (path === "/sitemap.xml") return new Response("<urlset/>")
       if (path === "/")
-        return new Response(`<html><link href="${oldPath}"></html>`, {
-          headers: { "content-type": "text/html", "cache-control": "s-maxage=3600" },
-        })
+        return new Response(
+          `<html${advertised ? ' data-dpl-id="live"' : ""}><link href="${oldPath}"></html>`,
+          {
+            headers: { "content-type": "text/html", "cache-control": "s-maxage=3600" },
+          },
+        )
       if (path === "/__asset-history.json") {
         if (!history) return new Response(null, { status: 404 })
         return Response.json({
@@ -75,7 +84,12 @@ async function deployment({ bootstrap = false, history = false, routeLifetime = 
       )
       args.push(inventory)
     }
-    const child = Bun.spawn(args, { cwd: root, stdout: "pipe", stderr: "pipe" })
+    const child = Bun.spawn(args, {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, ACCEPT_MISSING_ASSET_HISTORY: "", ...env },
+    })
     const [exit, stdout, stderr] = await Promise.all([
       child.exited,
       new Response(child.stdout).text(),
@@ -140,4 +154,45 @@ test("the CLI refuses a document that outlives its compiled retention budget", a
   // Then: it fails before publishing an under-retained asset inventory.
   expect(result.exit).not.toBe(0)
   expect(result.historyPublished).toBe(false)
+})
+
+test("a live deployment made outside the pipeline (identified, no history) still fails closed without a reason", async () => {
+  // Given: live HTML carries data-dpl-id but /__asset-history.json is 404, as after a deploy that skipped retention.
+  // When: a normal (push) deploy runs the bootstrap flag with no operator reason.
+  const result = await deployment({ bootstrap: "current", advertised: true })
+  // Then: it refuses instead of treating it as a first migration.
+  expect(result.exit).not.toBe(0)
+  expect(result.stderr).toContain("asset history is missing")
+  expect(result.historyPublished).toBe(false)
+})
+
+test("with an operator reason, the same case builds a verified inventory, publishes history and reports the reason", async () => {
+  const result = await deployment({
+    bootstrap: "current",
+    advertised: true,
+    env: { ACCEPT_MISSING_ASSET_HISTORY: "first deploy after the account move" },
+  })
+  expect(result.exit).toBe(0)
+  expect(result.retainedCss).toBe(css)
+  expect(result.historyPublished).toBe(true)
+  expect(result.stdout).toContain('"missingHistoryAccepted":"first deploy after the account move"')
+})
+
+test("a whitespace-only reason is refused", async () => {
+  const result = await deployment({
+    bootstrap: "current",
+    advertised: true,
+    env: { ACCEPT_MISSING_ASSET_HISTORY: "   " },
+  })
+  expect(result.exit).not.toBe(0)
+  expect(result.historyPublished).toBe(false)
+})
+
+test("a reason on a deploy whose live pages carry no deployment id is not reported as used", async () => {
+  const result = await deployment({
+    bootstrap: "current",
+    env: { ACCEPT_MISSING_ASSET_HISTORY: "first deploy after the account move" },
+  })
+  expect(result.exit).toBe(0)
+  expect(result.stdout).not.toContain("missingHistoryAccepted")
 })

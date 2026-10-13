@@ -104,6 +104,7 @@ export function createTeamCreateTool(
           userCategories: executorConfig?.userCategories,
           sisyphusJuniorModel: executorConfig?.sisyphusJuniorModel,
           agentOverrides: executorConfig?.agentOverrides,
+          claudeCodeAgentsEnabled: executorConfig?.claudeCodeAgentsEnabled,
         },
         config,
         bgMgr,

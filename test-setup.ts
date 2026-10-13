@@ -14,6 +14,7 @@ import { resetProcessConfigCacheForTests } from "./packages/omo-opencode/src/sha
 import { resetStartupCheckProcessStateForTests } from "./packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
 import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
+import { installEnvironmentIntegrityCheck } from "./test-support/environment-integrity"
 import { installHermeticHome } from "./test-hermetic-home"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
@@ -129,3 +130,5 @@ afterEach(() => {
     isGlobalMockCleanup = false
   }
 })
+
+installEnvironmentIntegrityCheck()

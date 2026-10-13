@@ -20,7 +20,10 @@ try {
   ensureBunBinShim({ scriptPath })
   const reexeced = await maybeReexecUnderBun({ scriptPath })
   if (!reexeced) {
-    if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
+    if (["login", "logout", "whoami"].includes(process.argv[2])) {
+      const { runServiceAuthCommand } = await import("./lib/service-auth.generated.js")
+      await runServiceAuthCommand(process.argv.slice(2))
+    } else if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
     else await runLauncher()
   }
 } catch (error) {

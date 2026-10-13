@@ -6,7 +6,17 @@ import type { ComputerSettings } from "./settings";
 /** The `DesktopService` surface the tool, the command, and the activation hook use. */
 export type ComputerService = Pick<
 	DesktopService,
-	"open" | "ensureStopPath" | "call" | "onAudit" | "capabilities" | "stopPathStatus" | "stop" | "resume" | "close"
+	| "open"
+	| "ensureStopPath"
+	| "call"
+	| "onAudit"
+	| "capabilities"
+	| "stopPathStatus"
+	| "stop"
+	| "resume"
+	| "close"
+	| "revokeControl"
+	| "reportError"
 >;
 
 export interface ComputerHandleOptions {

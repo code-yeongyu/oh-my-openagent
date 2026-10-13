@@ -5,10 +5,13 @@ on:
     branches: [master, dev]
   pull_request:
     branches: [master, dev]
-    # `labeled` lets the ci:full-matrix label retrigger CI; concurrency cancel-in-progress absorbs bot-label churn.
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
+  merge_group:
+    types: [checks_requested]
+  workflow_call:
 
 concurrency:
+  # Queue refs are unique per group, so unrelated groups never cancel each other.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -17,7 +20,7 @@ permissions:
 
 jobs:
   ci-mode:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -33,7 +36,7 @@ jobs:
         id: classify
         shell: bash
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before) }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
@@ -68,6 +71,14 @@ jobs:
           jq -r '"runtime_touching=\(.runtimeTouching)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq . <<< "$MODE_JSON"
 
+      # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
+      - name: Report-only temp-leak list only shrinks
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node script/check-temp-leak-report-only.mjs "$(git merge-base "$BASE_SHA" "$GITHUB_SHA")"
+
       - name: Write job summary
         if: always()
         shell: bash
@@ -79,13 +90,13 @@ jobs:
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
             - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (true runs every OS leg; only web, docs, and repository-metadata changes stay ubuntu-only).
-            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (false keeps heavy work on ubuntu and every skipped leg says so; add the `ci:full-matrix` label to force it).
+            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (false keeps heavy work on ubuntu; add `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
           JOB_SUMMARY_NEXT: Classification failures default to heavy validation on the full matrix; inspect the changed-path diff and event metadata.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   # Block PRs targeting master branch (comment + auto-close, then fail the check)
   block-master-pr:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: github.event_name == 'pull_request'
     permissions:
       pull-requests: write
@@ -147,10 +158,14 @@ jobs:
 
   test:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
+      # merge_group uses these same six required contexts, without PR labels.
+      # Queue commits always run heavy validation on every OS leg, including
+      # docs/web-only groups; the fast path remains a pull-request optimization.
       matrix:
         include:
           - os: ubuntu-latest
@@ -304,7 +319,7 @@ jobs:
 
   typecheck:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -346,9 +361,11 @@ jobs:
 
   codex-compatibility:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains all three required compatibility contexts.
       matrix:
         include:
           - os: ubuntu-latest
@@ -462,9 +479,11 @@ jobs:
 
   senpi-compatibility:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains this matrix, including the required ubuntu context.
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
@@ -587,7 +606,7 @@ jobs:
 
   lazycodex-published-smoke:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/setup-node@v7
@@ -676,7 +695,7 @@ jobs:
 
   build:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -741,7 +760,7 @@ jobs:
 
   omo-ai-payload-check:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -905,7 +924,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   auto-commit-schema:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
+    runs-on: ubuntu-24.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
@@ -955,7 +975,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   draft-release:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
+    runs-on: ubuntu-24.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&

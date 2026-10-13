@@ -1,4 +1,5 @@
 import type { AgentSession } from "@code-yeongyu/senpi"
+import { reportedEffectiveModel, type CatalogModelIdentity, type EffectiveModel } from "../pinned-model-equivalence"
 
 import type { TaskStartFailureKind, TaskStartFailureReason } from "../../state/start-failure"
 
@@ -28,7 +29,8 @@ export type ChildExtensionRunner = {
  */
 export type ChildSession = {
   readonly sessionId: string
-  readonly model?: { readonly provider: string; readonly id: string }
+  readonly model?: CatalogModelIdentity
+  readonly effectiveServiceTier?: string
   prompt(text: string): Promise<void>
   steer(text: string): Promise<QueuedInputDisposition>
   followUp(text: string): Promise<QueuedInputDisposition>
@@ -92,7 +94,7 @@ export type ChildHandle = {
   readonly task_id: string
   readonly sessionId: string
   /** The model the child session is ACTUALLY on, read live - the post-start record's source (#9722). */
-  effectiveModel(): { readonly provider: string; readonly id: string } | undefined
+  effectiveModel(): EffectiveModel | undefined
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
   abort(): Promise<void>
@@ -278,7 +280,7 @@ function createTrackedChildHandle(
   const handle: ChildHandle = {
     task_id: taskId,
     sessionId: session.sessionId,
-    effectiveModel: () => session.model,
+    effectiveModel: () => reportedEffectiveModel(session.model, session.effectiveServiceTier),
     steer: (text) => session.steer(text).then(ignoreQueuedInputDisposition),
     followUp: async (text) => {
       // While a turn is running, a follow-up is queued and delivered when the agent settles. Once

@@ -175,12 +175,14 @@ describe("host session heartbeat", () => {
   test("#given a live session #when the heartbeat interval elapses #then it reads get_state and records lastSeen", async () => {
     // given
     const port = fakeSessionPort()
-    const handle = handleOverPort(port, 1)
+    const observed = Promise.withResolvers<void>()
+    const handle = handleOverPort(port, 1, () => { observed.resolve(); return 7 })
     expect(handle.lastSeen()).toBeUndefined()
 
     // when
     await port.stateAsked()
     await port.answerState({ sessionId: "durable-routing-1" })
+    await observed.promise
 
     // then the durable session id and the liveness stamp both come from get_state
     expect(handle.lastSeen()).toBe(7)

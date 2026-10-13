@@ -12,6 +12,7 @@ use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopWindow, DisplaySelector, Target,
 };
@@ -211,6 +212,28 @@ impl Backend for WaylandBackend {
             "window {id} wayland-compositor-focus-only: Wayland cannot programmatically activate a \
              non-focused window; only the currently focused surface is reachable"
         )))
+    }
+
+    fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+        match &mut self.ax {
+            Ok(ax) => ax.menu_items(window, &[], path),
+            Err(error) => Err(error.clone()),
+        }
+    }
+
+    /// The command runs through its own AT-SPI action, which needs no focus,
+    /// so it reaches a non-focused surface Wayland input cannot target.
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        _delivery: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        match &mut self.ax {
+            Ok(ax) => ax.menu_select(window, &[], &|| Ok(Vec::new()), path, check_stop),
+            Err(error) => Err(error.clone()),
+        }
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {

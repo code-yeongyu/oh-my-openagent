@@ -211,7 +211,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     ...(deps.host === undefined ? {} : { host: deps.host }),
     baseStore,
     generations: categoryConfigGenerations,
-    lifecycle: { store: storeChain.store, registry, kernelToolBindings, isolation },
+    lifecycle: { store: storeChain.store, registry, kernelToolBindings, isolation, onStoreMutation: storeChain.onMutation },
   })
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES

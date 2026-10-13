@@ -13,6 +13,9 @@ export const CAPABILITIES_TIMEOUT_MS = 10_000;
 /** Cadence of `stopPath.heartbeat` while a session is open. */
 export const HEARTBEAT_MS = 500;
 
+/** Bounds a best-effort `control.revoke`; failure is logged, `session.close` stays the backstop. */
+export const REVOKE_TIMEOUT_MS = 2_000;
+
 /** Why a request failed after the child was killed for ignoring `$/cancel`. */
 export const RESTART_MESSAGE = "desktop engine restarted; captures and ax refs were reset";
 

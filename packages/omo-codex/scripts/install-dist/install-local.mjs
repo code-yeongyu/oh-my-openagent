@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:de226fc361640de0ae4c8b648fc7a0973ca35aecd9e7b22552d8a65b8fd6bdb9:2dbb6a4f066ea238ae0ba31e7854babb2ab6d5e0b1dd0f10d0cec33e03a43f2b
+// omo-codex-install:4db5a98bf382e58a89b56055512793d4bc6f240d8cbbc9ef5b5436489c7806c3:9caee560115d9e4c1cceedc4e7d98a44b5555d61f3d069b250240f76ef5b4af8
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -9984,7 +9984,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.28",
+    version: "5.1.33",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -10239,6 +10239,9 @@ function resolveStdio(options) {
   }
   return [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"];
 }
+function createBunSpawnOptions(options) {
+  return { ...options, windowsHide: true };
+}
 function createNodeSpawnOptions(options, platform = process.platform) {
   const nodeOptions = {
     stdio: resolveStdio(options),
@@ -10327,7 +10330,7 @@ function spawn(cmdOrOpts, opts) {
   const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts);
   const bun = getBunRuntime();
   if (bun)
-    return wrapBunProcess(bun.spawn(cmd, options));
+    return wrapBunProcess(bun.spawn(cmd, createBunSpawnOptions(options)));
   const [bin, ...args] = cmd;
   if (!bin)
     throw new Error("spawn requires a command");
@@ -10409,7 +10412,7 @@ function isKnownNonGitBashLauncher(path) {
 }
 function whereCommand(command) {
   try {
-    return execFileSync("where", [command], { encoding: "utf8" }).split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+    return execFileSync("where", [command], { encoding: "utf8", windowsHide: true }).split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
   } catch (error) {
     if (error instanceof Error)
       return [];
@@ -19466,7 +19469,8 @@ var OmoMemoryNudgeSchema = object({
 }).strict();
 var OmoMemoryFactsSchema = object({
   enabled: boolean2().default(true),
-  debounce_settles: number2().int().min(1).default(4)
+  debounce_settles: number2().int().min(1).default(4),
+  model: string2().min(1).optional()
 }).strict();
 var OmoMemoryDreamSchema = object({
   enabled: boolean2().default(true),
@@ -19528,7 +19532,8 @@ var OmoMemoryNudgeLayerSchema = object({
 }).strict();
 var OmoMemoryFactsLayerSchema = object({
   enabled: boolean2().optional(),
-  debounce_settles: number2().int().min(1).optional()
+  debounce_settles: number2().int().min(1).optional(),
+  model: string2().min(1).optional()
 }).strict();
 var OmoMemoryDreamLayerSchema = object({
   enabled: boolean2().optional(),

@@ -316,7 +316,7 @@ The GitHub one-liner calls the user "the master of graph engineering". The focal
 
 ### Section order (`app/_components/landing-page.tsx`)
 
-`hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta`. Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
+`hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta` → `dori-teaser` (§16). Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
 
 - **secret**: the fold. The body alone owns the word sweep, from its top at 80vh until its bottom reaches 50vh. Every word then remains fully lit for `--lit-read-hold: 18vh` of additional scroll with the follow-up fully hidden. The follow-up has an independent opacity/rise animation over `--lit-follow-fade: 22vh`, starting only after both the reading hold and its untransformed top crossing the viewport midpoint. `--lit-follow-gap: 1.25em` preserves the existing prose paragraph gap (40px mobile, about 64px desktop); `--lit-follow-rise: var(--space-6)` preserves the 24px rise. No extra layout space or time-based delay is added. Anchoring completion to the body's bottom, not the combined block or its containment range, keeps taller Korean mobile paragraphs correct and the follow-up on-screen while appearing.
 - The secret body preserves authored newline boundaries with `white-space: pre-line`. English uses three short sentences, one per line on desktop; each sentence may wrap naturally on mobile. Whitespace stays outside animated word spans, preserving both readable spacing and the continuous sweep.
@@ -490,3 +490,28 @@ plus Japanese/Chinese smoke. Check each changed panel's own scroll width,
 not just the root's clipped overflow. Exercise Copy, navigation, DAG controls,
 normal progress/memory and reduced-motion states. Keep frame and nudge
 containment visible in the evidence. No new accessibility debt is accepted.
+
+## 16. Dori teaser (2026-10-12)
+
+The last section of the landing page, under the CTA band and above the footer: a glimpse of
+Dori, the 24/7 agent engineer from the same makers (sisyphuslabs.ai). It is a spoiler, not a
+pitch, and it must read as a different product.
+
+- Surface: `ink-0` with a top `--line` hairline; the CTA band's bottom hairline stays above it.
+  Copy column padding `pt-16 pb-10 lg:py-24`; the art box carries no padding so it clips at the section's bottom edge.
+- Layout: Frame → grid `minmax(0,1fr) minmax(0,20rem)` at ≥ lg (copy left, art right,
+  `items-end`); stacked below lg with the art centred under the copy.
+- Copy: Eyebrow (`rule`, `busy` dot — it pulses because someone is literally working) →
+  Title → Lead → one `link` Button to `https://sisyphuslabs.ai` (`target=_blank`,
+  `rel="noopener noreferrer"`, no UTM, like every other outbound link). All strings live in
+  `messages/*.json` under `landing.dori`.
+- Art: `public/images/dori-mascot.png` (480×480, the sisyphuslabs.ai mascot; no new character
+  art). It sits in a `.dori-peek-clip` box (`h-40 w-56`, `lg:h-56 lg:w-80`) that clips at its
+  bottom edge and fades out over the last third (the reel's edge mask, vertical). The image rests at
+  `translate3d(0, 26%, 0)` and `opacity: .8`, so only the head and the rock show.
+- Motion: hovering or focusing the link (`:has(a:hover)` / `:has(a:focus-visible)`) lifts the
+  art to `14%` and full opacity over `--dur-reveal` / `--ease-out-quart`. Transform and
+  opacity only. Reduced motion: no transition; the resting glimpse is the final state. Browsers
+  without `:has()` keep the resting glimpse.
+- Share card: the link target serves its own `og:image` (`/og-dori.png`, 1200×630). omo.dev
+  has no per-section share links, so no second OG image is added here.

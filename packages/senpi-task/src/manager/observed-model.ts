@@ -1,6 +1,7 @@
 import { isTerminalRecord, nowIso } from "./manager-helpers"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
+import type { EffectiveModel } from "../runners/pinned-model-equivalence"
 
 /**
  * The provider/model a child event says the child is running on (#9722). The only real carrier is
@@ -27,7 +28,7 @@ export type EffectiveModelPort = {
 }
 
 /** The record's effective route at spawn, read from the child handle itself - never the plan (#9722). */
-export function stampSpawnEffectiveModel(record: TaskRecord, observedModel: { readonly provider: string; readonly id: string } | undefined): TaskRecord {
+export function stampSpawnEffectiveModel(record: TaskRecord, observedModel: EffectiveModel | undefined): TaskRecord {
   if (observedModel === undefined) return record
   return {
     ...record,
@@ -36,6 +37,7 @@ export function stampSpawnEffectiveModel(record: TaskRecord, observedModel: { re
       model_id: observedModel.id,
       display: `${observedModel.provider}/${observedModel.id}`,
       source: record.resolved_model?.source ?? "explicit",
+      ...(observedModel.serviceTier === undefined ? {} : { service_tier: observedModel.serviceTier }),
     },
   }
 }
@@ -46,16 +48,19 @@ export function stampSpawnEffectiveModel(record: TaskRecord, observedModel: { re
  * the fallback path's job. A same-value observation is a no-op, so the store is not churned per
  * assistant message.
  */
-export function observeChildEffectiveModel(port: EffectiveModelPort, provider: string, modelId: string): void {
+export function observeChildEffectiveModel(port: EffectiveModelPort, provider: string, modelId: string, serviceTier?: string): void {
   if (port.store.load === undefined || port.store.replace === undefined) return
   const current = port.store.load(port.taskId)
   if (current === null || current === undefined || isTerminalRecord(current)) return
-  if (current.effective_model?.provider === provider && current.effective_model.model_id === modelId) return
+  const sameRoute = current.effective_model?.provider === provider && current.effective_model.model_id === modelId
+  const tier = serviceTier ?? (sameRoute ? current.effective_model?.service_tier : undefined)
+  if (sameRoute && current.effective_model?.service_tier === tier) return
   const effective: ResolvedModelRecord = {
     provider,
     model_id: modelId,
     display: `${provider}/${modelId}`,
     source: current.effective_model?.source ?? current.resolved_model?.source ?? "explicit",
+    ...(tier === undefined ? {} : { service_tier: tier }),
   }
   port.store.replace({ ...current, effective_model: effective, updated_at: nowIso(port.now) })
 }
@@ -64,7 +69,11 @@ export function observeChildEffectiveModel(port: EffectiveModelPort, provider: s
 export function subscribeEffectiveModel(handle: ManagedChildHandle, port: EffectiveModelPort): () => void {
   return handle.subscribe((event) => {
     const observed = readObservedModel(event)
-    if (observed !== undefined) observeChildEffectiveModel(port, observed.provider, observed.modelId)
+    if (observed !== undefined) {
+      const effective = handle.effectiveModel?.()
+      const tier = effective?.provider === observed.provider && effective.id === observed.modelId ? effective.serviceTier : undefined
+      observeChildEffectiveModel(port, observed.provider, observed.modelId, tier)
+    }
   })
 }
 

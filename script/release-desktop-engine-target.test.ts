@@ -137,10 +137,11 @@ describe("compiled desktop engine staging", () => {
       // When the actual release staging entry point is run.
       const stage = (): void => { stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root) }
 
-      // Then a missing required compiled payload fails closed.
+      // Then a missing required compiled payload fails closed before the plugin build starts (#9857).
       expect(stage).toThrow(/missing required desktop engine for windows-x64:.*x86_64-pc-windows-msvc/)
+      expect(existsSync(join(root, "stage", "plugin"))).toBe(false)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  }, 60_000)
+  })
 })

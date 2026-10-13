@@ -2,8 +2,6 @@ import { Type, type Static } from "typebox"
 
 import { TASK_SUMMARY_MAX_LENGTH } from "../../task-summary"
 
-export const MAX_TASK_BATCH_ITEMS = 16
-
 const isolationParams = {
   isolated: Type.Optional(Type.Boolean({
     description: "Run the child in a copy-on-write clone of the checkout and merge its changes back on completion; defaults to task.isolation.enabled.",
@@ -75,8 +73,7 @@ export const TaskToolParams = Type.Object({
         ),
       }),
       {
-        maxItems: MAX_TASK_BATCH_ITEMS,
-        description: "Batch of up to 16 child tasks to spawn in one call. Empty provider padding is normalized before validation. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them. An item whose effective target is a category must not carry a model (own or inherited). run_in_background is batch-wide: set it once at the top level; item-level copies must agree.",
+        description: "Batch of child tasks to spawn in one call. Empty provider padding is normalized before validation. Mutually exclusive with prompt; top-level category/subagent_type/model/load_skills are inherited by items that omit them. An item whose effective target is a category must not carry a model (own or inherited). run_in_background is batch-wide: set it once at the top level; item-level copies must agree.",
       },
     ),
   ),

@@ -106,7 +106,7 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
         expect(concurrency.leaseState(task.task_id, 2)).toBeUndefined()
       } finally {
         runner.finishClose.resolve()
-        manager.forget(task.task_id)
+        manager.forget(task.task_id, { path: "end" })
         manager.workpools.dispose()
         lifecycle.dispose?.()
       }
@@ -170,7 +170,7 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
       } finally {
         releaseClose.resolve()
         await manager.getResidentHandle(taskId)?.dispose()
-        manager.forget(taskId)
+        manager.forget(taskId, { path: "end" })
         manager.workpools.dispose()
         lifecycle.dispose?.()
       }

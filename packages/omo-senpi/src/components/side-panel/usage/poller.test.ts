@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { PanelTimers } from "../types"
@@ -8,6 +7,7 @@ import { readUsageCache } from "./cache"
 import { UsageHttpError, type UsageFetch } from "./http"
 import { createUsagePoller, type UsageCredentialSource } from "./poller"
 import type { PanelUsageCacheFile } from "./types"
+import { testTempDir } from "../../../../test-support/temp-dir"
 
 const NOW = 1_700_000_000_000
 const POLL_MS = 150_000
@@ -31,7 +31,7 @@ interface Harness {
 }
 
 function harness(): Harness {
-  return { cachePath: join(mkdtempSync(join(tmpdir(), "omo-usage-")), "usage.json"), calls: [], headers: [] }
+  return { cachePath: join(testTempDir("omo-usage-"), "usage.json"), calls: [], headers: [] }
 }
 
 function recordingFetch(base: Harness, respond: (url: string) => unknown): UsageFetch {
@@ -265,7 +265,7 @@ describe("createUsagePoller claims", () => {
   test("#given a cache that cannot be written #when polled #then a claim that never reached the disk fetches nothing", async () => {
     // given: the cache path sits under a regular file, so neither the claim nor its read-back lands
     const base = harness()
-    const blocker = join(mkdtempSync(join(tmpdir(), "omo-usage-")), "blocker")
+    const blocker = join(testTempDir("omo-usage-"), "blocker")
     writeFileSync(blocker, "")
     const poller = createUsagePoller({
       fetch: recordingFetch(base, () => claudePayload),

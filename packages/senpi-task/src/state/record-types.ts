@@ -111,6 +111,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly created_at: string
   readonly updated_at: string
   readonly started_at?: string
+  /** Live snapshot metadata from the owning handle, not a persisted liveness claim. */
+  readonly last_seen_at?: string
   readonly terminal_at?: string
   readonly pid?: number
   readonly host_pid?: number
@@ -120,6 +122,13 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly effective_model?: ResolvedModelRecord
   readonly final_response?: string
   readonly error_message?: string
+  // Exit observed, cause unconfirmed: status stays running until the owning manager confirms it.
+  readonly provisional_exit?: {
+    readonly observed_at: string
+    readonly run_epoch: number
+    readonly code: number | null
+    readonly signal: string | null
+  }
   readonly killed?: boolean
   readonly run_stats?: TaskRunStats
   readonly notification: TaskNotification
@@ -138,10 +147,17 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly suspension_reason?: SuspensionReason
   // With `suspension_reason: "revival_deferred"`: the reconcile outcome's reason (capacity, lock_contended, ...).
   readonly revival_deferred_reason?: string
+  // One parked episode's absolute deadline; retry writes and parent restarts must not extend it.
+  readonly recovery_deadline_at?: number
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly fallback_handoff_epoch?: number
-  readonly fallback_closing_child?: { readonly pid?: number; readonly host_session?: HostSessionIdentity }
+  readonly fallback_closing_child?: {
+    readonly pid?: number
+    readonly host_session?: HostSessionIdentity
+    // #9350: silence is not proof of closure after a suspended daemon child is failed.
+    readonly requires_confirmation?: boolean
+  }
   readonly residency_claim?: string
   // task_cancel accepted while the child was unreachable (omo#9403). The cancel is final: every
   // revival reads it and finishes the cancel instead of running the child again.

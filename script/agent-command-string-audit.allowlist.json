@@ -20,7 +20,8 @@
     "packages/omo-opencode/src/cli/install-native/run-native-install.test.ts: /bin/omo x2",
     "packages/omo-opencode/src/cli/install-platform-resolution.test.ts: omo cleanup",
     "packages/omo-opencode/src/cli/install-platform-resolution.test.ts: omo install",
-    "packages/omo-opencode/src/cli/installer-native-setup-offer.test.ts: /bin/omo"
+    "packages/omo-opencode/src/cli/installer-native-setup-offer.test.ts: /bin/omo",
+    "packages/omo-opencode/src/cli/service-auth/cli-roundtrip.test.ts: /bin/omo"
   ],
   "docs": [
     ".agents/skills/codex-qa/SKILL.md: omo get-local-version",

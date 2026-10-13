@@ -35,7 +35,7 @@ describe("resolveComputerSettings", () => {
 		// Then
 		expect(settings).toEqual({
 			enabled: true,
-			display: "all",
+			display: "active",
 			maxWidth: 3840,
 			maxHeight: 2400,
 			screenshotMaxBytes: 5_000_000,
@@ -47,6 +47,11 @@ describe("resolveComputerSettings", () => {
 			enginePath: undefined,
 			cuaAdapter: false,
 		});
+	});
+
+	it.each(["all", "screen-2"])("preserves explicit display %s", (display) => {
+		const settings = resolveComputerSettings({ display });
+		expect(settings.display).toBe(display);
 	});
 
 	it("defaults enabled off on an unsupported host", () => {

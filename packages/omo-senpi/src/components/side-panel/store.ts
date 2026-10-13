@@ -19,7 +19,7 @@ export interface PanelChild {
   readonly cost?: number
 }
 
-export type PanelChildStatus = "queued" | "running" | "suspended" | "finished" | "failed" | "cancelled"
+export type PanelChildStatus = "queued" | "running" | "resuming" | "ending" | "finished" | "failed" | "cancelled"
 
 /** A child update carries only what the source knows; absent fields keep their previous value. */
 export interface PanelChildUpdate {
@@ -93,7 +93,7 @@ export function createPanelStore(now: () => number = Date.now): PanelStore {
       const previous = children.get(update.id)
       const status = update.status ?? previous?.status ?? "queued"
       // A reason only describes a parked child: once it runs or ends, the old reason is history.
-      const parkedReason = status === "suspended" ? (update.parkedReason ?? previous?.parkedReason) : undefined
+      const parkedReason = (status === "resuming" || status === "ending") ? (update.parkedReason ?? previous?.parkedReason) : undefined
       const host = update.host ?? previous?.host
       const merged: PanelChild = {
         id: update.id,

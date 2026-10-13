@@ -8,9 +8,7 @@ use senpi_desktop_core::ax::{AxBackend, AxRegistry};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::types::{
-    DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target,
-};
+use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
 use crate::mutate::SessionSafety;
@@ -35,6 +33,10 @@ pub(crate) struct Worker {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
     pub(crate) gc: ArtifactGc,
+    /// Identifies this worker as the control slot's owner.
+    pub(crate) instance: u64,
+    /// This session's live foreground control grant, when it holds the slot.
+    pub(crate) control: Option<crate::grant::ControlGrant>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -60,6 +62,8 @@ impl Worker {
             session_id: String::new(),
             run_id: String::new(),
             gc: ArtifactGc::default(),
+            instance: crate::grant::next_instance(),
+            control: None,
         };
         worker.refresh_capabilities();
         worker
@@ -95,8 +99,8 @@ impl Worker {
         capabilities
     }
 
-    /// `cancelled` reports that the request's waiter gave up; only mutating
-    /// requests consult it.
+    /// `cancelled` reports that the request's waiter gave up; mutation, zoom,
+    /// and atomic observation consult it.
     pub(crate) fn process(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         if self.options.is_none() {
             return Err(DesktopError::new(
@@ -104,6 +108,7 @@ impl Worker {
                 "desktop session is not open; call session.open first",
             ));
         }
+        self.reconcile_grant();
         self.maybe_gc();
         let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
         // Every mutating request goes through `mutate`; reads bypass it.
@@ -111,6 +116,8 @@ impl Worker {
             Op::Displays => Ok(Response::Displays(self.backend()?.displays()?)),
             Op::Windows => Ok(Response::Windows(self.backend()?.windows()?)),
             Op::Capture(params) => self.capture(&params),
+            Op::Observe(params) => self.observe(&params, cancelled),
+            Op::CaptureRegion(params) => self.capture_region(&params, cancelled),
             Op::Click(params) => served(self.click(&params, cancelled)),
             Op::MoveMouse(params) => served(self.move_mouse(&params, cancelled)),
             Op::Drag(params) => served(self.drag(&params, cancelled)),
@@ -132,6 +139,11 @@ impl Worker {
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
+            Op::ControlGrant(params) => self.control_grant(&params),
+            Op::ControlRevoke => self.control_revoke(),
+            Op::ControlState => Ok(Response::ControlState(self.control_state())),
+            Op::MenuItems(params) => self.menu_items(&params),
+            Op::MenusSelect(params) => served(self.menu_select(&params, cancelled)),
         }
     }
 
@@ -160,7 +172,7 @@ impl Worker {
                 .into_iter()
                 .find(|window| window.id == *id)
                 .ok_or_else(|| DesktopError::window_not_found(format!("window '{id}' was not found"))),
-            Target::Desktop => windows
+            Target::Desktop | Target::Display(_) => windows
                 .into_iter()
                 .find(|window| window.focused)
                 .ok_or_else(|| DesktopError::window_not_found("no focused window was found")),

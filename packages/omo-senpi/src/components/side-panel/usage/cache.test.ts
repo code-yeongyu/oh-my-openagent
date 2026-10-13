@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, statSync } from "node:fs"
-import { homedir, tmpdir } from "node:os"
+import { statSync } from "node:fs"
+import { homedir } from "node:os"
 import { join } from "node:path"
 
 import {
@@ -13,6 +13,7 @@ import {
   writeUsageCache,
 } from "./cache"
 import type { PanelUsageCacheFile } from "./types"
+import { testTempDir } from "../../../../test-support/temp-dir"
 
 const NOW = 1_700_000_000_000
 const POLL_MS = 150_000
@@ -255,7 +256,7 @@ describe("usageCachePath", () => {
 describe("writeUsageCache permissions", () => {
   test.skipIf(process.platform === "win32")("#given a cache write #when it lands #then only the owner can read it", () => {
     // given
-    const path = join(mkdtempSync(join(tmpdir(), "omo-usage-")), "usage.json")
+    const path = join(testTempDir("omo-usage-"), "usage.json")
 
     // when
     const written = writeUsageCache(path, {})

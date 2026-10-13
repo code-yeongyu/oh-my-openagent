@@ -179,6 +179,10 @@ export function isRuntimeFallbackRetryableError(
   // OpenCode starts native compaction for this error; fallback would abort that compaction on its timeout.
   if (errorType === "abort" || errorType === "context_overflow") return false
 
+  if (getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "") === "contentfiltererror") {
+    return true
+  }
+
   if (
     errorType === "missing_api_key" ||
     errorType === "model_not_found" ||

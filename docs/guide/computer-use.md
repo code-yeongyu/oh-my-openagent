@@ -95,7 +95,7 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `enabled` | `true` on macOS, Linux and Windows | Register the `computer` tool and `/computer` controls |
-| `display` | `"all"` | `all` composites every display; otherwise one display id from `computer.displays()` |
+| `display` | `"active"` | `active` follows the focused window's monitor (primary fallback); `all` composites every display; otherwise one display id from `computer.displays()` |
 | `max_width` | `3840` | Largest screenshot width in pixels; bigger captures are scaled down |
 | `max_height` | `2400` | Largest screenshot height in pixels |
 | `screenshot_max_bytes` | `5000000` | Largest inline screenshot; a bigger one is returned only as a file path |
@@ -110,6 +110,10 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | `cua_adapter` | `false` | Also register `computer_actions`, OpenAI computer-use actions over the same permissions, audit and stop path |
 
 The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults are resolved in `packages/senpi-desktop-tool/src/settings.ts`. An invalid block is reported in the log and the component stays unregistered for that session. Start a new session after changing the file.
+
+`await computer.display(id)` returns a screenshot/input handle for one display; `"active"` follows focus and `"all"` composites every display. For example, `await (await computer.display("all")).screenshot()` observes every monitor without reopening or changing the session default. Each target has its own screenshot frame. `computer.displays()` lists all known monitors; its pixel rectangles describe the `"all"` composite, not the default active capture. Active chooses the monitor with the largest focused-window intersection; ties or missing focus use the primary display.
+
+Wayland has no focused-window geometry and uses the first display the portal reports, not a known compositor primary. The explicit id `"wayland-portal-0"` still means the whole Screenshot-portal image, even when libei proves a multi-monitor layout; other `"wayland-portal-N"` ids select a region through the Screenshot portal. Without a proven layout, only the whole-desktop image is available and coordinate input is refused. Explicit `"wayland-screencast-N"` ids now fail `InvalidTarget` if ScreenCast is unavailable instead of silently returning an unrelated Screenshot image; use `"all"` or `"wayland-portal-0"` for that fallback.
 
 ## Safety model
 

@@ -151,11 +151,26 @@ if [ "$status" != "Accepted" ]; then
   exit 1
 fi
 
+# Apple's ticket reaches Gatekeeper a little after notarytool reports Accepted, so a
+# fresh binary can read "Unnotarized Developer ID" for a few minutes. Only that answer
+# is polled; any other assessment fails at once, and nothing is re-signed or resubmitted.
+gatekeeper_timeout="${GATEKEEPER_TIMEOUT_SECONDS:-600}"
 for file in "${files[@]}"; do
-  assessment="$(spctl --assess -vvv --type open --context context:primary-signature "$file" 2>&1 || true)"
-  echo "$assessment"
-  grep -q "source=Notarized Developer ID" <<<"$assessment" || {
-    echo "::error::Gatekeeper does not accept ${file} as notarized" >&2
-    exit 1
-  }
+  gatekeeper_deadline=$(( $(date +%s) + gatekeeper_timeout ))
+  attempt=1
+  while :; do
+    assessment="$(spctl --assess -vvv --type open --context context:primary-signature "$file" 2>&1 || true)"
+    echo "$assessment"
+    if grep -q "source=Notarized Developer ID" <<<"$assessment"; then
+      echo "Gatekeeper accepts ${file} as notarized (attempt ${attempt})"
+      break
+    fi
+    if ! grep -q "source=Unnotarized Developer ID" <<<"$assessment" || [ "$(date +%s)" -ge "$gatekeeper_deadline" ]; then
+      echo "::error::Gatekeeper does not accept ${file} as notarized" >&2
+      exit 1
+    fi
+    echo "Gatekeeper has not seen the notarization ticket for ${file} yet (attempt ${attempt}); retrying" >&2
+    attempt=$((attempt + 1))
+    sleep "${GATEKEEPER_POLL_SECONDS:-20}"
+  done
 done

@@ -48,7 +48,7 @@ describe("TaskManager.residencyChanged", () => {
     const wake = manager.residencyChanged("parent-1")
 
     // when
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "end" })
 
     // then
     expect(await firedYet(wake)).toBe("fired")

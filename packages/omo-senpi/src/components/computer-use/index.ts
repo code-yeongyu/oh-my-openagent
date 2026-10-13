@@ -27,7 +27,7 @@ import {
   createComputerRuntimeLoader,
 } from "./runtime-loader"
 import { resolveOmoComputerSettings } from "./settings"
-import { skillStatusLine, toolActivatedNames } from "./registration-support"
+import { skillStatusLine, toolActivatedNames, wireComputerControlEvents } from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
 import { wireComputerPermissionEvents } from "./permission-events"
 
@@ -144,6 +144,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
                 if (state.telemetryContext !== undefined) telemetry.engineError(state.telemetryContext, code, state.backend)
               },
             })
+      wireComputerControlEvents(pi, runtime)
 
       pi.registerCommand("computer", {
         description: "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)",

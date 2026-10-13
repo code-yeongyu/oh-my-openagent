@@ -130,6 +130,11 @@ export function runRollbackPrepare({
     deadEndpoints,
     dryRun,
   }))
+  for (const result of results) {
+    for (const warning of result.warnings ?? []) {
+      stderr.write(`WARNING ${warning.code} [${warning.task_ids.join(", ")}]: ${warning.message}\n`)
+    }
+  }
   const storesWithoutMap = discovered.metadata
     .filter(({ document }) => !Array.isArray(document.stores))
     .map(({ document, path }) => document.socket ?? basename(path))

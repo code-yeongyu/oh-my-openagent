@@ -89,7 +89,7 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
       schema_version INTEGER NOT NULL DEFAULT 1,
       revision INTEGER NOT NULL CHECK (revision >= 1),
       status TEXT NOT NULL CHECK (status IN ('active', 'detached', 'expired')),
-      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'notion', 'feishu', 'herdr', 'custom')),
+      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'notion', 'feishu', 'herdr', 'custom', 'whatsapp')),
       account_id TEXT NOT NULL,
       chat_id TEXT NOT NULL,
       thread_id TEXT NOT NULL,
@@ -191,6 +191,48 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE deliveries ADD COLUMN actor_user_id TEXT",
     "CREATE TABLE extension_objects (type TEXT NOT NULL, name TEXT NOT NULL, owner TEXT, PRIMARY KEY (type, name))",
     "INSERT INTO extension_objects (type, name, owner) SELECT type, name, NULL FROM sqlite_schema",
+  ],
+  // v7: `whatsapp` is a binding platform (the omo-gateway WhatsApp channel binds its chats here).
+  // SQLite cannot widen a CHECK in place, so `bindings` is rebuilt with the widened list; every
+  // column is carried over verbatim and the two indexes are recreated before the old table drops.
+  // This step runs with foreign_keys OFF (set in migrate()): a table drop would otherwise fire
+  // foreign-key actions from any extension table referencing `bindings`. The AUTOINCREMENT
+  // high-water mark is carried over so a deleted newest row's key is never reused. Before the
+  // version bump commits, migrate() runs PRAGMA foreign_key_check from TypeScript and throws
+  // (rolling back to v6) if the step introduced a violation referencing `bindings`.
+  [
+    `CREATE TABLE bindings_v7 (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      binding_id TEXT NOT NULL UNIQUE,
+      schema_version INTEGER NOT NULL DEFAULT 1,
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      status TEXT NOT NULL CHECK (status IN ('active', 'detached', 'expired')),
+      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'notion', 'feishu', 'herdr', 'custom', 'whatsapp')),
+      account_id TEXT NOT NULL,
+      chat_id TEXT NOT NULL,
+      thread_id TEXT NOT NULL,
+      root_message_id TEXT,
+      progress_message_id TEXT,
+      session_realm_id TEXT NOT NULL,
+      session_durable_id TEXT NOT NULL,
+      direction_inbound INTEGER NOT NULL CHECK (direction_inbound IN (0, 1)),
+      direction_outbound INTEGER NOT NULL CHECK (direction_outbound IN (0, 1)),
+      inbound_mode TEXT NOT NULL CHECK (inbound_mode IN ('auto', 'follow_up')),
+      outbound_events TEXT NOT NULL,
+      policy_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      lease_started_at TEXT NOT NULL,
+      ttl_seconds INTEGER,
+      expires_at TEXT,
+      CHECK (direction_inbound = 1 OR direction_outbound = 1)
+    )`,
+    "INSERT INTO bindings_v7 SELECT seq, binding_id, schema_version, revision, status, platform, account_id, chat_id, thread_id, root_message_id, progress_message_id, session_realm_id, session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at, updated_at, lease_started_at, ttl_seconds, expires_at FROM bindings",
+    "UPDATE sqlite_sequence SET seq = (SELECT seq FROM sqlite_sequence WHERE name = 'bindings') WHERE name = 'bindings_v7'",
+    "DROP TABLE bindings",
+    "ALTER TABLE bindings_v7 RENAME TO bindings",
+    "CREATE UNIQUE INDEX bindings_one_active_thread ON bindings (platform, account_id, chat_id, thread_id) WHERE status = 'active'",
+    "CREATE INDEX bindings_session ON bindings (session_durable_id, status)",
   ],
 ]
 

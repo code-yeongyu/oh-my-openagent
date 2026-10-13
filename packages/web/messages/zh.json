@@ -178,6 +178,13 @@
       "installNow": "立即安装",
       "readTheDocs": "阅读文档"
     },
+    "dori": {
+      "eyebrow": "剧透",
+      "title": "你睡觉的时候，有人一直在干活。",
+      "body": "不是 OmO。是同一群人请来的新同事。他不下班，工资用 token 结算。",
+      "cta": "认识 Dori",
+      "alt": "从页面底部探出头来、手里拿着石头的白色小狗 Dori"
+    },
     "dag": {
       "region": "打开工作流图的 OmO 桌面端",
       "windowTitle": "OmO — 市场研究 12k 来源",

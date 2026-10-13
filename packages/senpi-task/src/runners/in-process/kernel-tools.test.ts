@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import { resolveKernelToolGrant, type KernelToolGrant } from "../../kernel-tools/resolve"
-import { createKernelToolWrappers } from "../../kernel-tools/wrapper"
+import { createKernelToolWrappers, type KernelToolWrapper } from "../../kernel-tools/wrapper"
 import { isReservedKernelToolName, kernelToolKey, normalizeKernelToolName } from "../../kernel-tools/names"
 import { fakeKernelTools } from "./__fixtures__/kernel-tools-fakes"
 
@@ -12,8 +12,8 @@ function grantRequest(overrides: Partial<Parameters<typeof resolveKernelToolGran
   return { requestedNames: ["lookup"], capability, executionMode: "in-process" as const, ...overrides }
 }
 
-async function detailsOf(wrapper: ToolDefinition, args: Record<string, unknown> = {}): Promise<AgentToolResult<unknown>> {
-  return (await wrapper.execute("call-1", args as never, undefined, undefined, {} as never)) as AgentToolResult<unknown>
+async function detailsOf(wrapper: KernelToolWrapper, args: Record<string, unknown> = {}): Promise<AgentToolResult<unknown>> {
+  return wrapper.execute("call-1", args)
 }
 
 function errorCode(result: AgentToolResult<unknown>): string | undefined {

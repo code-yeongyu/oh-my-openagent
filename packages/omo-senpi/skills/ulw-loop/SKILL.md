@@ -16,7 +16,7 @@ This skill is compact by design: the run contract below is the whole bootstrap. 
 
 1. Create goals from a JS eval cell: `agentToolkit.createGoals({ brief })` after the SDK import below. The SDK binds this session from the host env, so never pass a session id or a plan path. If the envelope reports `ULW_LOOP_PLAN_EXISTS_COMPLETE` (this session's aggregate is already complete), unrelated new work needs a fresh session; `createGoals({ brief, force: true })` is only for deliberately overwriting completed evidence.
 2. Register the aggregate objective from the returned handoff with `create_goal`, shaped by `references/define-goal.md`. Goal creation is NEVER skipped.
-3. Mirror every atomic step into the live `todo` checklist: one granular step per action, exactly one in_progress, transitions marked the instant they happen.
+3. Mirror every atomic step into the live `todo` checklist: one granular step per action, exactly one in_progress, transitions marked the instant they happen. Use the ultrawork directive’s Task resources and todo rules; read those sections of the bundled `ultrawork` skill if absent from context.
 4. Treat each goal as a phase: create its own worktree off the integration base; dispatch its dependency-ordered lanes as ONE `workflow` run (read the mass-ulw skill first; ordering-free lanes stay a `task` batch); verify every criterion with real-surface evidence; land the worktree on the integration base at `agentToolkit.checkpoint({ goalId, status: "complete", evidence })` per the repository's flow (direct merge or merged PR); define the next goal's run from what this one proved. Tests alone never prove done. When a mass-ulw pointer accompanies this skill, this contract still owns goals, criteria, evidence, and checkpoints.
 5. Stop when the goal's WHEN-TO-STOP line holds with evidence in hand.
 
@@ -78,7 +78,7 @@ When the units are genuinely independent — separate files, no shared contract 
 
 Under team mode, isolate and land per unit:
 
-- **One git worktree per member**, never a shared checkout — concurrent members editing one working tree corrupt each other's diffs and evidence. Give each member its own branch off the base and its own worktree path.
+- **One git worktree per member**, never a shared checkout — concurrent members editing one working tree corrupt each other's diffs and evidence. Give each member its own branch off the base and its own worktree path. Apply the same resource rules when creating member worktrees.
 - **Merge per work unit, as each unit is verified.** A member's unit lands when its own evidence is captured and its gates are green; it does not wait for the slowest sibling. Integrate each merged unit back into the base the others branch from, so overlapping members rebase onto real merged work rather than guessing at it.
 - **Conflicts are the lead's job.** When two members' units touch the same lines, the lead decides the order they land and tells the later member what changed; members never resolve a sibling's conflict blind.
 

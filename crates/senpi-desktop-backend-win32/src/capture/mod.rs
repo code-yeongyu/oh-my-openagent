@@ -41,14 +41,31 @@ impl Win32Capture {
 
     pub(crate) fn capture(&self, target: &Target) -> CoreResult<(RgbaImage, FrameGeometry)> {
         match target {
-            Target::Desktop => self.capture_desktop(),
+            Target::Desktop | Target::Display(_) => {
+                let selector = target.display_selector().unwrap_or_else(|| self.selector.clone());
+                self.capture_desktop(&selector)
+            }
             Target::Window(id) => self.capture_window(id),
         }
     }
 
-    fn capture_desktop(&self) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture_desktop(&self, selector: &DisplaySelector) -> CoreResult<(RgbaImage, FrameGeometry)> {
+        let focused = if *selector == DisplaySelector::Active {
+            windows::focused()?
+        } else {
+            None
+        };
+        let monitors = monitors::read(selector)?;
+        let displays = selector.select(monitors.iter().map(|(_, display)| display.clone()).collect(), focused.as_ref())?;
         let mut regions = Vec::new();
-        for (monitor, display) in monitors::read(&self.selector)? {
+        for (monitor, mut display) in monitors {
+            if !displays.iter().any(|selected| selected.id == display.id) {
+                continue;
+            }
+            if displays.len() == 1 {
+                display.pixel_x = 0;
+                display.pixel_y = 0;
+            }
             let image = monitor.capture_image().map_err(|error| {
                 DesktopError::capture_failed(format!("capture of display '{}' failed: {error}", display.id))
             })?;

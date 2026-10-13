@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import { Value } from "typebox/value"
 
 import { TASK_SUMMARY_MAX_LENGTH } from "../../task-summary"
-import { MAX_TASK_BATCH_ITEMS, TaskToolParams } from "./params"
+import { TaskToolParams } from "./params"
 
 describe("TaskToolParams", () => {
   test("#given the schema #when inspected #then it is a TypeBox object with the task tool fields", () => {
@@ -39,8 +40,13 @@ describe("TaskToolParams", () => {
     expect(description).toContain("message")
   })
 
-  test("#given batch task parameters #when schema is inspected #then a finite maximum is enforced", () => {
-    expect(TaskToolParams.properties.tasks).toMatchObject({ maxItems: MAX_TASK_BATCH_ITEMS })
+  test("#given batch task parameters #when schema is inspected #then no per-call batch size cap is enforced", () => {
+    expect(Reflect.get(TaskToolParams.properties.tasks, "maxItems")).toBeUndefined()
+  })
+
+  test("#given a 40-item batch #when validated against the schema #then it is accepted", () => {
+    const tasks = Array.from({ length: 40 }, (_, index) => ({ prompt: `item ${index}` }))
+    expect(Value.Check(TaskToolParams, { tasks })).toBe(true)
   })
 
   test("#given the schema #when task_summary is inspected #then it sits right after prompt with the schema length limit", () => {

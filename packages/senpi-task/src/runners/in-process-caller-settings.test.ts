@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { readFileSync } from "node:fs"
 
-import { createCallerSettingsWorld, PROVIDER, type CallerSettingsWorld } from "./__fixtures__/caller-settings-world"
+import { ALT_PROVIDER, createCallerSettingsWorld, PROVIDER, type CallerSettingsWorld } from "./__fixtures__/caller-settings-world"
 import { InProcessRunner } from "./in-process"
 
 // The configured stream-start guard is tiny; the engine default is 300 s. A guard that has not fired
@@ -84,7 +84,7 @@ describe("in-process child honors the caller's settings", () => {
       { retry: { modelFallback: true, fallbackChains: { [`${PROVIDER}/primary`]: [`${PROVIDER}/global-fallback`] } } },
       { primary: "quota", "own-fallback": "complete", "global-fallback": "complete" },
     )
-    const ownFallback = { source: "category" as const, provider: PROVIDER, model_id: "own-fallback", display: `${PROVIDER}/own-fallback` }
+    const ownFallback = { source: "category" as const, provider: ALT_PROVIDER, model_id: "own-fallback", display: `${ALT_PROVIDER}/own-fallback` }
     const handle = await new InProcessRunner().start(world.spec({
       selectedModel: `${PROVIDER}/primary`,
       fallbackModels: [ownFallback],
@@ -107,7 +107,7 @@ describe("in-process child honors the caller's settings", () => {
       { primary: "quota", "own-fallback": "complete" },
     )
     const before = readFileSync(world.settingsPath, "utf8")
-    const ownFallback = { source: "category" as const, provider: PROVIDER, model_id: "own-fallback", display: `${PROVIDER}/own-fallback` }
+    const ownFallback = { source: "category" as const, provider: ALT_PROVIDER, model_id: "own-fallback", display: `${ALT_PROVIDER}/own-fallback` }
 
     // when
     const handle = await new InProcessRunner().start(world.spec({

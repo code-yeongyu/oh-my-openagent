@@ -2,6 +2,7 @@ import type { TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { isHostSessionRecord } from "./host-session"
 import { pidLiveness } from "./pid-liveness"
+import { blocksFinishedTeardown } from "./residency"
 import { suspendHandle } from "./shutdown"
 
 /**
@@ -25,7 +26,7 @@ export async function parkTerminalResident(context: LifecycleContext, taskId: st
       // An interrupted child is resumable, and a resume may hold its slot before its handle exists.
       fresh.status === "interrupted" ||
       fresh.killed === true ||
-      context.registry.hasPendingSends(taskId)
+      blocksFinishedTeardown(context, taskId)
     ) return false
     const handle = context.registry.get(taskId)
     if (handle !== undefined) {

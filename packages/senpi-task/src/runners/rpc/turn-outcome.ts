@@ -45,19 +45,22 @@ export function agentEndOutcome(
 }
 
 export function exitTurnOutcome(exit: ChildExitOutcome, finalText: string | undefined): RunnerOutcome {
+  const processExit = exit.facts.pid !== undefined && exit.kind !== "spawn_error"
+    ? { exit: { kind: exit.kind, code: exit.facts.code, signal: exit.facts.signal } }
+    : {}
   if (exit.kind === "clean" && finalText !== undefined && finalText.length > 0) {
     return { status: "completed", finalResponse: finalText }
   }
   if (exit.kind === "clean") {
     return {
       status: "error",
-      failure: { kind: "child-turn-failed", message: "RPC child exited without assistant output" },
+      failure: { kind: "child-turn-failed", message: "RPC child exited without assistant output", ...processExit },
     }
   }
   const facts = mapExitOutcomeToError(exit, { alreadyTerminal: false })
   return {
     status: "error",
-    failure: { kind: "child-prompt-failed", message: facts?.error_message ?? "RPC child terminated abnormally" },
+    failure: { kind: "child-prompt-failed", message: facts?.error_message ?? "RPC child terminated abnormally", ...processExit },
     ...(facts?.killed === true ? { killed: true } : {}),
   }
 }

@@ -32,6 +32,13 @@ for (const [path, route] of Object.entries(prerender.routes)) {
   }
 }
 
+// Set only by web-deploy.yml / cutover-target-deploy.yml for a workflow_dispatch run with a non-empty reason; a push
+// can never set it (see those workflows), so a lost history on a normal deploy still fails closed.
+const acceptMissingHistory = process.env.ACCEPT_MISSING_ASSET_HISTORY ?? ""
+if (acceptMissingHistory !== "" && acceptMissingHistory.trim() === "") {
+  throw new AssetRetentionError("ACCEPT_MISSING_ASSET_HISTORY must carry a reason")
+}
+
 let bootstrap = { paths: [], htmlLifetimeSeconds }
 if (bootstrapFile === "--bootstrap-current") {
   const previous = await fetch(new URL("/__asset-history.json", origin), {
@@ -39,8 +46,11 @@ if (bootstrapFile === "--bootstrap-current") {
     redirect: "error",
     signal: AbortSignal.timeout(30000),
   })
-  if (previous.status === 404) bootstrap = await liveAssetInventory(origin)
-  else if (!previous.ok) throw new AssetRetentionError("Prior inventory cannot be read")
+  if (previous.status === 404) {
+    bootstrap = await liveAssetInventory(origin, { acceptMissingHistory })
+    if (bootstrap.missingHistoryWaived)
+      process.stdout.write(`${JSON.stringify({ missingHistoryAccepted: acceptMissingHistory })}\n`)
+  } else if (!previous.ok) throw new AssetRetentionError("Prior inventory cannot be read")
 } else if (bootstrapFile) {
   const input = JSON.parse(await readFile(bootstrapFile, "utf8"))
   if (

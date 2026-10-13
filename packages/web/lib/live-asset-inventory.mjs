@@ -1,10 +1,18 @@
 import { AssetRetentionError } from "./asset-retention.ts"
 
-export async function liveAssetInventory(origin) {
+/**
+ * `acceptMissingHistory` (a non-empty operator reason, only ever passed for a workflow_dispatch run) waives ONE
+ * refusal: a live deployment that identifies itself (data-dpl-id) but has no asset history. That is the first deploy
+ * after a deployment made outside the retention pipeline (the 2026-10-09 account move deployed with
+ * cutover-target-deploy.yml). Every other check still applies: every recorded asset must download and have the right
+ * MIME type.
+ */
+export async function liveAssetInventory(origin, { acceptMissingHistory = "" } = {}) {
   const base = new URL(origin)
   const paths = new Set()
   const documents = new Set(["/"])
   let htmlLifetimeSeconds = 0
+  let missingHistoryWaived = false
   async function get(path, document = false) {
     let url = new URL(path, base)
     for (let hop = 0; hop < 5; hop++) {
@@ -68,9 +76,10 @@ export async function liveAssetInventory(origin) {
         },
       })
     await reader.transform(response).text()
-    if (advertisedHistory) {
+    if (advertisedHistory && acceptMissingHistory.trim() === "") {
       throw new AssetRetentionError("Deployment identified itself but its asset history is missing")
     }
+    if (advertisedHistory) missingHistoryWaived = true
   }
   for (const path of paths) {
     const response = await get(path)
@@ -97,5 +106,5 @@ export async function liveAssetInventory(origin) {
       "Current live inventory is empty or has no bounded cache lifetime",
     )
   }
-  return { paths: [...paths], htmlLifetimeSeconds }
+  return { paths: [...paths], htmlLifetimeSeconds, missingHistoryWaived }
 }

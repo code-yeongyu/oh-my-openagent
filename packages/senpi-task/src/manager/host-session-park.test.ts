@@ -44,7 +44,7 @@ function trackerOver(store: ReturnType<typeof tempStore>, handle: ManagedChildHa
     tryLoad: (taskId) => store.load(taskId),
     runStatsSnapshot: () => undefined,
     releaseSlot: () => undefined,
-    forget: (taskId) => forgotten.push(taskId),
+    forget: (taskId, _options) => forgotten.push(taskId),
     settleWaiters: () => undefined,
     tryRuntimeFallback: () => Promise.resolve(false),
   })

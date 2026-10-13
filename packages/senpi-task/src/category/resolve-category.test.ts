@@ -54,14 +54,14 @@ const gpt56CategoryCases = [
   },
   {
     category: "unspecified-low",
-    modelId: "gpt-5.6-terra",
-    nativeVariant: "high",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-terra", variant: "high" },
-    copilotVariant: "high",
+    modelId: "gpt-5.6-sol",
+    nativeVariant: "medium",
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
+    copilotVariant: "medium",
     copilotFallbackEntry: {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
-      model: "gpt-5.6-terra",
-      variant: "high",
+      model: "gpt-5.6-sol",
+      variant: "medium",
     },
   },
 ] as const

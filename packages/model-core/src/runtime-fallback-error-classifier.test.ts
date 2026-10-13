@@ -11,6 +11,36 @@ import {
 const DEFAULT_RETRY_CODES = [429, 500, 502, 503, 504] as const
 
 describe("runtime fallback error classifier", () => {
+  test("recognizes named content-filter errors without retrying validation messages about filtering", () => {
+    const errors = [
+      {
+        name: "ContentFilterError",
+        data: { message: "Blocked by the provider's content management policy." },
+      },
+      {
+        error: {
+          name: "content_filter_error",
+          data: { message: "The provider refused this response." },
+        },
+      },
+      {
+        name: "ValidationError",
+        statusCode: 400,
+        message: "Invalid content filter configuration.",
+      },
+      {
+        name: "ValidationError",
+        data: {
+          statusCode: 400,
+          message: "Unsupported content_filter setting; ContentFilterError is not a valid request option.",
+        },
+      },
+    ]
+
+    expect(errors.map((error) => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)))
+      .toEqual([true, true, false, false])
+  })
+
   test("classifies representative Anthropic provider payloads without adapter state", () => {
     //#given
     const cases = [

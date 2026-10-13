@@ -12,6 +12,8 @@ use atspi::{CoordType, InterfaceSet, ObjectRefOwned, Role, StateSet};
 use crate::bus::{AtSpiBus, BusResult, Extents, ScreenPoint};
 use crate::connection::LiveBus;
 
+const MAX_ACTIONS: i32 = 64;
+
 type Accessible = AccessibleProxy<'static>;
 
 impl AtSpiBus for LiveBus {
@@ -131,9 +133,19 @@ impl AtSpiBus for LiveBus {
         })
     }
 
+    /// Reads names one index at a time: the batched `GetActions` reply makes
+    /// at-spi2-atk 2.38 (Ubuntu 22.04) abort the application it serializes.
     fn actions(&mut self, node: &ObjectRefOwned) -> BusResult<Vec<String>> {
         self.with_proxy("actions", node, |p: ActionProxy<'static>| async move {
-            Ok(p.get_actions().await?.into_iter().map(|a| a.name).collect())
+            let count = p.n_actions().await?;
+            if !(0..=MAX_ACTIONS).contains(&count) {
+                return Err(zbus::Error::Failure(format!("{count} declared actions")));
+            }
+            let mut names = Vec::new();
+            for index in 0..count {
+                names.push(p.get_name(index).await?);
+            }
+            Ok(names)
         })
     }
 
@@ -141,6 +153,16 @@ impl AtSpiBus for LiveBus {
         self.with_proxy("action", node, |p: ActionProxy<'static>| async move {
             p.do_action(index).await
         })
+    }
+
+    fn key_binding(&mut self, node: &ObjectRefOwned, index: i32) -> BusResult<String> {
+        self.with_proxy("key binding", node, |p: ActionProxy<'static>| async move {
+            p.get_key_binding(index).await
+        })
+    }
+
+    fn same_application(&self, a: &ObjectRefOwned, b: &ObjectRefOwned) -> bool {
+        a.name_as_str().is_some() && a.name_as_str() == b.name_as_str()
     }
 
     fn text(&mut self, node: &ObjectRefOwned, max_chars: i32) -> BusResult<String> {

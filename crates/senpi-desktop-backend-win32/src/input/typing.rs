@@ -21,7 +21,7 @@ impl Win32Input {
         mode: DeliveryMode,
     ) -> CoreResult<()> {
         match (target, mode) {
-            (Target::Desktop, _) => self.enigo.text(text).map_err(enigo_error),
+            (Target::Desktop | Target::Display(_), _) => self.enigo.text(text).map_err(enigo_error),
             (Target::Window(id), DeliveryMode::Foreground) => {
                 self.with_foreground(id, |input, target| {
                     text_units(text).try_for_each(|unit| foreground_unit(input, unit, target))
@@ -65,7 +65,7 @@ impl Win32Input {
                 },
                 delivered,
             ),
-            (Target::Desktop, _) => {
+            (Target::Desktop | Target::Display(_), _) => {
                 for character in text.chars() {
                     check_stop()?;
                     self.enigo

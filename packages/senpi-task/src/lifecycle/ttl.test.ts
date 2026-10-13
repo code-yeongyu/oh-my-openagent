@@ -153,7 +153,7 @@ describe("cleanupExpiredRecords (TTL)", () => {
     expect(existsSync(recordPath(store, "st_00000006"))).toBe(true)
 
     // when the resident is forgotten and cleanup runs again
-    registry.forget("st_00000006")
+    registry.forget("st_00000006", { path: "end" })
     const afterForget = await lifecycle.cleanupExpiredRecords()
 
     // then the expired terminal record can be safely removed

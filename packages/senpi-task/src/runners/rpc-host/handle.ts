@@ -20,6 +20,7 @@ import type {
   HostSessionPort,
 } from "./handle-port"
 import { startHostHeartbeat } from "./handle-heartbeat"
+import { unresponsiveMessage } from "../rpc/heartbeat"
 import { createHandleListeners } from "./handle-listeners"
 import { createHandleRecovery } from "./handle-recovery"
 import { createHandleStop } from "./handle-stop"
@@ -100,6 +101,13 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     onState: (state) => {
       lastSeenAt = now()
       sessionId = state.sessionId
+    },
+    onUnresponsive: () => {
+      settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: unresponsiveMessage(taskId) } })
+      settleExit({ kind: "crashed", facts: { pid: undefined, code: null, signal: null, stderrTail: "child-unresponsive" } })
+      void teardown.detach().catch((error: unknown) => {
+        log("senpi-task unresponsive host child detach failed", { taskId, error: String(error) })
+      })
     },
   })
 

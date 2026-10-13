@@ -29,7 +29,7 @@ describe("Python kernel tools", () => {
     const [wrapper] = createKernelToolWrappers(resolved.grant)
     if (wrapper === undefined) throw new Error("no wrapper for the granted Python tool")
 
-    const result = await wrapper.execute("call-1", { a: 1, b: 2 } as never, undefined, undefined, {} as never)
+    const result = await wrapper.execute("call-1", { a: 1, b: 2 })
 
     expect(JSON.stringify(result)).toContain("3")
     expect(capability.invocations.map((call) => call.name)).toEqual(["add"])

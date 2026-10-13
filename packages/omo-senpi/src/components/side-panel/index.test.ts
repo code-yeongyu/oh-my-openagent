@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { OmoSidePanelSettingsSchema, type OmoSidePanelSettings } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
-import { homedir } from "node:os"
 
 import {
   GIT_REFRESH_FLOOR_MS,
@@ -21,6 +19,7 @@ import { createSidePanelComponent } from "./index"
 import type { PanelMemory, PanelMemoryIdentity, PanelTimers } from "./types"
 import { SIDE_PANEL_DIFF_COMMAND } from "./constants"
 import type { PanelTaskRecord } from "./data/task-records"
+import { testTempDir } from "../../../test-support/temp-dir"
 
 interface WidgetCall {
   readonly key: string
@@ -240,8 +239,10 @@ function columnRows(tui: FakeTui, width = 52): string[] {
 function mounted(
   overrides: Partial<Parameters<typeof createSidePanelComponent>[0]> = {},
   hostExtras: Record<string, unknown> = {},
+  cwd = "/repo",
 ) {
   const pi = new FakeExtensionAPI()
+  pi.cwd = cwd
   const widgets: WidgetCall[] = []
   const timers = manualTimers()
   let clock = 100_000
@@ -308,9 +309,15 @@ function mounted(
 }
 
 describe("side panel wiring", () => {
-  test("#given a mounted panel #when the column renders #then it carries the session facts and the location", async () => {
+  test.each([
+    { cwd: "/repo", location: "/repo" },
+    {
+      cwd: "/workspaces/long-nested-directory/another-directory/oh-my-openagent-test-worktree",
+      location: "…ory/another-directory/oh-my-openagent-test-worktree",
+    },
+  ])("#given a mounted panel at $cwd #when the column renders #then it carries the session facts and the location", async ({ cwd, location }) => {
     // given
-    const harness = mounted()
+    const harness = mounted({}, {}, cwd)
     await harness.pi.dispatch("session_start", {}, harness.host)
 
     // when
@@ -321,7 +328,7 @@ describe("side panel wiring", () => {
     expect(rows[0]).toBe("SESSION  $1.20 · 16.8K")
     expect(rows).toContain("model   claude-opus-5")
     expect(rows).toContain("CONTEXT  29K/1M")
-    expect(rows[rows.length - 1]).toBe(process.cwd().replace(homedir(), "~"))
+    expect(rows[rows.length - 1]).toBe(location)
   })
 
   test("#given a tool starts #when the column renders #then the tool row appears with its target", async () => {
@@ -568,7 +575,7 @@ describe("side panel usage wiring", () => {
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
       usage: {
-        cachePath: join(mkdtempSync(join(tmpdir(), "omo-usage-wiring-")), "usage.json"),
+        cachePath: join(testTempDir("omo-usage-wiring-"), "usage.json"),
         readCredentials: () => {
           reads += 1
           return { auth: {}, pool: undefined }
@@ -591,7 +598,7 @@ describe("side panel usage wiring", () => {
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
       usage: {
-        cachePath: join(mkdtempSync(join(tmpdir(), "omo-usage-nudge-")), "usage.json"),
+        cachePath: join(testTempDir("omo-usage-nudge-"), "usage.json"),
         readCredentials: () => {
           reads += 1
           return { auth: {}, pool: undefined }
@@ -612,7 +619,7 @@ describe("side panel usage wiring", () => {
 
   test("#given numbers another session cached #when the panel mounts #then they are on screen at once", async () => {
     // given the cache is shared, so a new window starts with the numbers rather than waiting
-    const cachePath = join(mkdtempSync(join(tmpdir(), "omo-usage-shared-")), "usage.json")
+    const cachePath = join(testTempDir("omo-usage-shared-"), "usage.json")
     writeFileSync(
       cachePath,
       JSON.stringify({ claude: { account: "work", updatedAt: 100_000, windows: [{ label: "5h", percent: 44 }] } }),

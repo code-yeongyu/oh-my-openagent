@@ -102,6 +102,7 @@ export type ResolvedModelRecord = {
   readonly reasoning_effort?: string
   /** Canonical unified reasoning level (off|minimal|low|medium|high|xhigh|max) or a harness-native preset token. */
   readonly reasoning?: string
+  readonly service_tier?: string
   readonly source: ResolvedModelSource
 }
 

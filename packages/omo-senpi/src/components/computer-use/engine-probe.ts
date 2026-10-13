@@ -99,6 +99,12 @@ export function probeComputerUseEngine(
   return new Promise((resolveProbe) => {
     const replies = new Map<number, unknown>()
     let stderrTail = ""
+    // The point a stalled probe reached, so a timeout says where the engine stopped answering (#9720).
+    const phase = (): string => {
+      if (replies.has(1) && !replies.has(2)) return "engine.hello answered, awaiting capabilities"
+      if (replies.has(2) && !replies.has(1)) return "capabilities answered, awaiting engine.hello"
+      return "requests sent, awaiting engine.hello and capabilities"
+    }
     let settled: EngineProbeResult | undefined
     const settle = (result: EngineProbeResult) => {
       if (settled !== undefined) return
@@ -107,7 +113,7 @@ export function probeComputerUseEngine(
     }
     const timer = setTimeout(() => {
       const result: EngineProbeResult = settled ?? {
-        ok: false, code: "timeout", message: `desktop engine probe timed out after ${timeoutMs} ms at ${enginePath}`,
+        ok: false, code: "timeout", message: `desktop engine probe timed out after ${timeoutMs} ms at ${enginePath} (phase: ${phase()})`,
       }
       settle(result)
       resolveProbe(result)

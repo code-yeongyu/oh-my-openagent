@@ -1,4 +1,5 @@
 import type { ChildSpec, ChildSession } from "../in-process"
+import { startedOnPinnedModel } from "../pinned-model-equivalence"
 import { RunnerError } from "./runner-error"
 
 /**
@@ -15,7 +16,7 @@ export function assertPinnedModelHonoured(spec: ChildSpec, session: ChildSession
   if (selected === undefined) return
   const effective = session.model
   if (effective === undefined) return
-  if (effective.provider === selected.provider && effective.id === selected.model_id) return
+  if (startedOnPinnedModel(effective, { provider: selected.provider, id: selected.model_id }, spec.model)) return
   throw new RunnerError({
     kind: "model_unavailable",
     message: `the child session started on ${effective.provider}/${effective.id} instead of the pinned ${selected.provider}/${selected.model_id}; refusing the substitution`,

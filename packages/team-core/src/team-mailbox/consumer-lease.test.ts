@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { rmSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -24,7 +25,9 @@ function createSignal(): { readonly promise: Promise<void>; readonly resolve: ()
 }
 
 async function createBaseDirectory(): Promise<string> {
-  return await mkdtemp(path.join(tmpdir(), "team-mailbox-consumer-lease-"))
+  const directory = await mkdtemp(path.join(tmpdir(), "team-mailbox-consumer-lease-"))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  return directory
 }
 
 describe("withInboxConsumerLease", () => {

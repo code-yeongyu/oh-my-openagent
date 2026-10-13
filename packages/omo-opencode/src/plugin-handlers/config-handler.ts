@@ -30,6 +30,7 @@ import {
 } from "../features/claude-code-session-state";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
 import { getConfiguredDefaultAgent } from "./agent-config-assembly";
+import { openCodeShellTypeResolver } from "../shared/opencode-shell"
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
@@ -195,6 +196,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
   let agentConfigSnapshot: AgentConfigSnapshot | undefined;
 
   return async (config: Record<string, unknown>) => {
+    openCodeShellTypeResolver.setConfiguredShell(config.shell);
+
     // Per-phase timing (local fix 29, first-message-drop F16): the cold plugin
     // setup had no attribution — OMO's share was only measurable end to end.
     // These numbers make the remaining cold-start cost attributable in

@@ -48,6 +48,9 @@ export class TrackedDesktopService extends DesktopService {
     super(options)
     this.#onError = options.onError
     this.#onPermissionRequired = options.onPermissionRequired
+    // Failures nobody awaits (a best-effort revoke, a heartbeat, a malformed notification) reach the
+    // service's error hub, never a caller; without this they would go nowhere (#9967).
+    this.onError((error) => this.#report(error))
   }
 
   get engineState(): EngineState {

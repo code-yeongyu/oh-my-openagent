@@ -114,12 +114,14 @@ export function classifyCiMode({
   headRef = "",
   labels = [],
 }) {
+  // Queue commits never use generated-release push policy.
+  const classificationEvent = eventName === "merge_group" ? "pull_request" : eventName
   const subject = headCommitMessage.split("\n", 1)[0] ?? ""
   // Provenance is machine-derived, never prose alone: an actual merge commit
   // (exactly two parents) whose subject matches the generated release shape.
   const isRealMerge = mergeParentCount === 2
   const generatedReleasePush =
-    eventName === "push" &&
+    classificationEvent === "push" &&
     diffAvailable &&
     isRealMerge &&
     generatedReleaseMerge.test(subject)
@@ -129,7 +131,8 @@ export function classifyCiMode({
   // observe, and it fails open: any event we cannot fully inspect keeps all
   // three operating systems.
   const fullMatrix =
-    eventName === "push" ||
+    eventName === "merge_group" ||
+    classificationEvent === "push" ||
     runtimeTouching ||
     releaseStateHeadRef.test(headRef) ||
     labels.includes(fullMatrixLabel) ||
@@ -138,7 +141,7 @@ export function classifyCiMode({
   return {
     generatedReleasePush,
     webOnly,
-    runHeavy: !(generatedReleasePush || webOnly),
+    runHeavy: eventName === "merge_group" || !(generatedReleasePush || webOnly),
     fullMatrix,
     runtimeTouching,
   }

@@ -72,19 +72,19 @@ const scenarios = [
       categories: {
         fallbackcat: {
           model: "omo-fallback-mock/dead-primary",
-          fallback_models: ["omo-fallback-mock/healthy-fallback"],
+          fallback_models: ["omo-fallback-healthy/healthy-fallback"],
         },
       },
     },
     checks: (artifacts, stdoutText) => ({
       final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
       fallback_event: fallbackRecorded(artifacts.log),
-      final_model: artifacts.task?.model === "omo-fallback-mock/healthy-fallback" ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "omo-fallback-healthy/healthy-fallback" ? "PASS" : "FAIL",
       fallback_attempts: JSON.stringify(
         artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
       ) === JSON.stringify([
         "omo-fallback-mock/dead-primary",
-        "omo-fallback-mock/healthy-fallback",
+        "omo-fallback-healthy/healthy-fallback",
       ]) ? "PASS" : "FAIL",
     }),
   },
@@ -159,7 +159,7 @@ const scenarios = [
       categories: {
         toolcat: {
           model: turn.model,
-          fallback_models: ["omo-fallback-mock/healthy-fallback"],
+          fallback_models: ["omo-fallback-healthy/healthy-fallback"],
         },
       },
     },
@@ -168,7 +168,7 @@ const scenarios = [
       fallback_event: fallbackRecorded(artifacts.log),
       // The task event log records each finished tool call as `tool_execution`; the hop must come after it.
       tool_ran_before_limit: /"type":"tool_execution","payload":\{"tool":"bash"/.test(artifacts.log) ? "PASS" : "FAIL",
-      final_model: artifacts.task?.model === "omo-fallback-mock/healthy-fallback" ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "omo-fallback-healthy/healthy-fallback" ? "PASS" : "FAIL",
       settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
         ? "PASS"
         : "FAIL",

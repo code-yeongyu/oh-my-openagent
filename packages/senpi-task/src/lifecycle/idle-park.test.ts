@@ -68,7 +68,7 @@ describe("idle suspension", () => {
     const store = tempStore()
     const trace: string[] = []
     class Registry extends FakeRegistry {
-      override forget(id: string): void { trace.push(`forget:${id}`); super.forget(id) }
+      override forget(id: string, options: Parameters<FakeRegistry["forget"]>[1]): void { trace.push(`forget:${id}`); super.forget(id, options) }
     }
     const registry = new Registry()
     const cases = [

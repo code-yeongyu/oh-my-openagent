@@ -124,6 +124,61 @@ describe("InProcessRunner", () => {
     await handle.dispose()
   })
 
+  test.each([
+    ["a -fast pin reported on its base model", "pinned-fast", "pinned"],
+    ["a base pin reported on its -fast variant", "pinned", "pinned-fast"],
+  ])("#given %s #when start runs #then the child is accepted, not refused as a substitution (#9793)", async (_label, pinnedId, startedId) => {
+    // given: senpi starts a -fast catalog pin on its base model with the priority tier remembered
+    const fake = createFakeSession()
+    fake.session = {
+      ...fake.session,
+      ...{ effectiveServiceTier: "priority" },
+      model: { provider: "vendor-a", id: startedId, serviceTier: "priority", upstreamModelId: "pinned" },
+    }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when
+    const handle = await runner.start(
+      baseSpec({
+        model: { ...realModel("vendor-a", pinnedId), serviceTier: "priority", upstreamModelId: "pinned" },
+        selectedModel: `vendor-a/${pinnedId}`,
+        resolvedModel: { provider: "vendor-a", model_id: pinnedId, display: `vendor-a/${pinnedId}`, source: "explicit" },
+      }),
+    )
+
+    // then
+    fake.lastText.value = "done"
+    fake.resolvePrompt()
+    await expect(handle.waitForIdle()).resolves.toMatchObject({ status: "completed" })
+    await handle.dispose()
+  })
+
+  test.each([
+    ["another model", "vendor-a", "other-model"],
+    ["another suffix", "vendor-a", "pinned-ultra"],
+    ["the base model on another provider", "vendor-b", "pinned"],
+  ])("#given a -fast pin reported on %s #when start runs #then it is still refused as a substitution (#9793)", async (_label, provider, startedId) => {
+    // given
+    const fake = createFakeSession()
+    fake.session = { ...fake.session, model: { provider, id: startedId } }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when
+    const failure = await runner
+      .start(
+        baseSpec({
+          model: realModel("vendor-a", "pinned-fast"),
+          selectedModel: "vendor-a/pinned-fast",
+          resolvedModel: { provider: "vendor-a", model_id: "pinned-fast", display: "vendor-a/pinned-fast", source: "explicit" },
+        }),
+      )
+      .catch((error: unknown) => error)
+
+    // then
+    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
+    expect(fake.promptCalls).toBe(0)
+  })
+
   test("#given a running child #when steered while the prompt is in flight #then the fake session receives it", async () => {
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })

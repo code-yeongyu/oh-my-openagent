@@ -58,8 +58,8 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
     {
       name: "unspecified-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["unspecified-low"],
-      expectedModel: "github-copilot/gpt-5.6-terra",
-      expectedVariant: "high",
+      expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedVariant: "medium",
     },
   ] as const
 

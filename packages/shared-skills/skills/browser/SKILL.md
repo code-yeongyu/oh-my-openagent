@@ -11,7 +11,7 @@ One library, two engines. omowright ships inside this skill; choose the engine b
 |---|---|---|
 | A site the user is signed into, their open tabs, a form, a click-through, a screenshot, web QA, an extension popup | **attached** — the user's own browser through BrowserSkill | `connectBrowserSkill()` |
 | A throwaway profile, bot-scoring evasion, a CAPTCHA, network interception, a QA flight trace, coordinate control, headless runs | **owned** — a browser your code launches | `connectPipe()` / `connectCloakProfile()` — [references/owned-engine/README.md](references/owned-engine/README.md) |
-| Text out of a URL, a 403 bypass, a platform that blocks fetchers | neither | the `ultimate-browsing` skill |
+| A 403/WAF host the attached engine cannot open, a platform with a native reader, an archive snapshot | neither | the `ultimate-browsing` skill |
 
 **Attached is the default,** because it is the only engine carrying the user's logins and the only
 one where a human is a single call away. Never substitute one engine for the other silently: if

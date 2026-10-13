@@ -7,6 +7,7 @@
 
 mod audit;
 mod budget;
+mod grant;
 mod mutate;
 mod pointer;
 mod request;
@@ -19,9 +20,13 @@ mod timeouts;
 mod worker;
 mod worker_ax;
 mod worker_capture;
+mod worker_observe;
+mod worker_zoom;
 mod worker_clipboard;
 mod worker_input;
+mod worker_menus;
 
+pub use grant::ControlSlot;
 pub use mutate::SessionSafety;
 pub use request::{Op, Response};
 pub use selection::{BackendFactory, BackendSelection, SelectionError};

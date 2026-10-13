@@ -19,10 +19,11 @@ pub enum MutatingAction {
     AxFocus,
     AxClick,
     ClipboardWrite,
+    MenuSelect,
 }
 
 impl MutatingAction {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Click,
         Self::MoveMouse,
         Self::Drag,
@@ -35,6 +36,7 @@ impl MutatingAction {
         Self::AxFocus,
         Self::AxClick,
         Self::ClipboardWrite,
+        Self::MenuSelect,
     ];
 
     /// The engine method this action is requested through.
@@ -53,6 +55,7 @@ impl MutatingAction {
             Self::AxFocus => Method::AxFocus,
             Self::AxClick => Method::AxClick,
             Self::ClipboardWrite => Method::ClipboardWrite,
+            Self::MenuSelect => Method::MenusSelect,
         }
     }
 
@@ -69,7 +72,8 @@ impl MutatingAction {
             | Self::AxSetValue
             | Self::AxFocus
             | Self::AxClick
-            | Self::ClipboardWrite => false,
+            | Self::ClipboardWrite
+            | Self::MenuSelect => false,
         }
     }
 }

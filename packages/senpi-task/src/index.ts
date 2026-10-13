@@ -13,6 +13,7 @@ export {
   KERNEL_TOOL_ERROR_CODES,
   KernelToolError,
   createKernelToolWrappers,
+  type KernelToolWrapper,
   isReservedKernelToolName,
   kernelToolKey,
   normalizeKernelToolName,
@@ -370,6 +371,7 @@ export type { NoticeLine, NoticeSpec, NoticeTheme, NoticeTone } from "./notice-b
 // helpers above can read the pi-tui namespace synchronously without statically binding the
 // omo-task.js/omo-member.js blobs to the pi-tui barrel.
 export { loadPiTui } from "./lazy/pi-tui"
+export { recoveryPresentation } from "./state/recovery-presentation"
 export {
   buildCompletionDetails,
   buildCompletionMessage,
@@ -657,3 +659,4 @@ export type {
 
 export * from "./tools/team"
 export { createEvalHandleHost, type EvalHandleHostDeps } from "./eval-handles"
+export { isPriorityAliasOf } from "./runners/pinned-model-equivalence"

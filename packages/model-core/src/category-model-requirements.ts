@@ -104,10 +104,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.6-pro", variant: "max" },
       { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
+      // GPT-6.1 Sol is the current GPT default, served only by the OpenAI lanes; GPT-5.6 Sol stays
+      // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane (#9844).
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-terra",
-        variant: "high",
+        model: "gpt-5.6-sol",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],

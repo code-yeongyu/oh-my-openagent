@@ -61,6 +61,7 @@ impl Engine {
         let safety = SessionSafety {
             supervisor,
             audit: Box::new(move |event| audited.push(Notification::Audit, event)),
+            control_slot: senpi_desktop_session::ControlSlot::process_wide(),
         };
         Ok(Self {
             session: Session::start_supervised(config.selection, config.timeouts, safety)?,

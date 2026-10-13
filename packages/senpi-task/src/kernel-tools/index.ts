@@ -43,5 +43,6 @@ export {
   createUnavailableKernelToolStubs,
   kernelToolErrorResult,
   type KernelToolResultDetails,
+  type KernelToolWrapper,
   type KernelToolWrapperOptions,
 } from "./wrapper"

@@ -10,7 +10,6 @@ export interface CommandResult {
 
 const DEFAULT_HOOK_TIMEOUT_MS = 30_000;
 const SIGKILL_GRACE_MS = 5_000;
-const HOOK_SPAWN_WINDOWSHIDE = true;
 
 export interface ExecuteHookOptions {
   forceZsh?: boolean;
@@ -103,9 +102,9 @@ export async function executeHookCommand(
     const proc = spawn(finalCommand, {
       cwd,
       shell: true,
-      windowsHide: HOOK_SPAWN_WINDOWSHIDE,
       detached: !isWin32,
       env,
+      windowsHide: true,
     });
 
     let stdout = "";

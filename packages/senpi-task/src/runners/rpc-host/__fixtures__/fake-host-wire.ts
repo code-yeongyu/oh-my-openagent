@@ -92,6 +92,8 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
     }
     case "get_entries":
       return ok({ entries: [], leafId: null })
+    case "get_available_models":
+      return ok({ models: [] })
     case "switch_session":
       return ok({ cancelled: false })
     case "warm":

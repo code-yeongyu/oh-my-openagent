@@ -121,6 +121,10 @@ export const hotkeyLatches: Scenario = {
       const blocked = await engine.exec("typeText", { target: notepad.id, text: blockedText, opts: foreground })
       const resumed = await engine.call("stopPath.resume", { token: engine.resumeToken })
       const resumedStatus = resumed.result === undefined ? {} : asObject(resumed.result)
+      // The stop revoked the foreground grant and resume never restores it (#9651 B5): the human
+      // confirms again, so the host re-grants before foreground input lands.
+      const controlAfterResume = asObject(await engine.result("control.state"))
+      await engine.grant()
       const liveText = marker("resumed")
       const live = await engine.exec("typeText", { target: notepad.id, text: liveText, opts: foreground })
       const after = await observeUntil([notepad.id], (seen) => windowText(seen, notepad.id).includes(liveText))
@@ -132,6 +136,7 @@ export const hotkeyLatches: Scenario = {
           ["suspended-input-refused", errorCode(blocked) === "Suspended"],
           ["suspended-text-never-landed", !windowText(after, notepad.id).includes(blockedText)],
           ["resume-unsuspends", resumed.error === undefined && resumedStatus.suspended === false],
+          ["resume-does-not-restore-the-grant", controlAfterResume.active === false],
           ["resumed-input-lands", live.error === undefined && windowText(after, notepad.id).includes(liveText)],
         ],
         facts: {
@@ -145,6 +150,7 @@ export const hotkeyLatches: Scenario = {
           blockedError: errorCode(blocked) ?? null,
           resumeError: errorCode(resumed) ?? null,
           liveError: errorCode(live) ?? null,
+          controlAfterResume,
         },
         before,
         after,

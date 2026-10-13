@@ -13,6 +13,7 @@ const MASS_ULW_MARKER = "<omo-mass-ulw-pointer>"
 const ULW_PLAN_MARKER = "<omo-ulw-plan-pointer>"
 const ULW_LOOP_MARKER = "<omo-ulw-loop-pointer>"
 const ULW_RESEARCH_MARKER = "<omo-ulw-research-pointer>"
+const BROWSER_MARKER = "<omo-browser-pointer>"
 const ULTIMATE_BROWSING_MARKER = "<omo-ultimate-browsing-pointer>"
 
 const SCENARIOS = [
@@ -23,14 +24,14 @@ const SCENARIOS = [
       { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md", "workflow tool"] },
       { customType: "omo-ulw-loop:skill-pointer", markers: [ULW_LOOP_MARKER, "ulw-loop/SKILL.md", "read tool"] },
     ],
-    forbidMarkers: [ULW_PLAN_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    forbidMarkers: [ULW_PLAN_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
   {
     name: "ulw-plan",
     prompt: "go ulw plan the migration",
     expectHidden: [{ customType: "omo-ulw-plan:skill-pointer", markers: [ULW_PLAN_MARKER, "ulw-plan/SKILL.md", "read tool"] }],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
   {
@@ -39,6 +40,7 @@ const SCENARIOS = [
     expectHidden: [
       { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md"] },
       { customType: "omo-ulw-research:skill-pointer", markers: [ULW_RESEARCH_MARKER, "ulw-research/SKILL.md"] },
+      { customType: "omo-browser:skill-pointer", markers: [BROWSER_MARKER, "browser/SKILL.md"] },
       {
         customType: "omo-ultimate-browsing:skill-pointer",
         markers: [ULTIMATE_BROWSING_MARKER, "ultimate-browsing/SKILL.md", 'load_skills: ["ultimate-browsing"]'],
@@ -52,6 +54,7 @@ const SCENARIOS = [
     prompt: "ulw research the gateway options",
     expectHidden: [
       { customType: "omo-ulw-research:skill-pointer", markers: [ULW_RESEARCH_MARKER, "ulw-research/SKILL.md", "read tool"] },
+      { customType: "omo-browser:skill-pointer", markers: [BROWSER_MARKER, "browser/SKILL.md", "read tool"] },
       {
         customType: "omo-ultimate-browsing:skill-pointer",
         markers: [ULTIMATE_BROWSING_MARKER, "ultimate-browsing/SKILL.md", "read tool", 'load_skills: ["ultimate-browsing"]'],
@@ -64,7 +67,7 @@ const SCENARIOS = [
     name: "plain-mass-ulw",
     prompt: "mass ulw please orchestrate the docs refresh",
     expectHidden: [{ customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md"] }],
-    forbidMarkers: [ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    forbidMarkers: [ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
   // #9600: a relayed report or a quoted mention describes someone else's request, so nothing arms.
@@ -72,14 +75,14 @@ const SCENARIOS = [
     name: "relayed-report",
     prompt: "[REPORT] lane | filed | the executor quoted mass ulw research and ulw-loop in its brief",
     expectHidden: [],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
     expectTranscriptMarkers: [],
   },
   {
     name: "quoted-mention",
     prompt: "the user typed \u201Cmass ulw research the market\u201D and it armed; is that expected?",
     expectHidden: [],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
     expectTranscriptMarkers: [],
   },
   // #9738 / #9740: a skill name inside an identifier or path, or named only to forbid it, is a reference.
@@ -87,35 +90,35 @@ const SCENARIOS = [
     name: "identifier-reference",
     prompt: "what happened in the mass-ulw-refactor session? see the senpi-ulw-loop lane and .omo/ulw-plan/draft.md",
     expectHidden: [],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
     expectTranscriptMarkers: [],
   },
   {
     name: "negated-mention",
     prompt: "Do not load mass-ulw or ulw-research or launch your own workflow. Summarize the release notes.",
     expectHidden: [],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
     expectTranscriptMarkers: [],
   },
   {
     name: "lead-relay-naming-five-skills",
     prompt: "Lead (w46:p1), bugwatch: build both rules; this report fired the mass-ulw, ulw-plan, ulw-loop, ulw-research and ultimate-browsing pointers",
     expectHidden: [],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER, "<ultrawork-mode>"],
     expectTranscriptMarkers: [],
   },
   {
     name: "request-after-prohibition",
     prompt: "Don't use tmux. ulw this",
     expectHidden: [],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
   {
     name: "korean-sentence-ending-keyword",
     prompt: "\uC774 \uBC84\uADF8 \uACE0\uCCD0\uC918 ulw",
     expectHidden: [],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, BROWSER_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
 ]

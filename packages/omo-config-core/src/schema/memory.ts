@@ -63,12 +63,13 @@ export const OmoMemoryNudgeSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
-// Facts (category is deliberately NOT a knob: pinned "quick")
+// Facts (explicit model overrides the live session; quick remains the legacy configuration)
 // ---------------------------------------------------------------------------
 
 export const OmoMemoryFactsSchema = z.object({
   enabled: z.boolean().default(true),
   debounce_settles: z.number().int().min(1).default(4),
+  model: z.string().min(1).optional(),
 }).strict()
 
 // ---------------------------------------------------------------------------
@@ -163,6 +164,7 @@ export const OmoMemoryNudgeLayerSchema = z.object({
 export const OmoMemoryFactsLayerSchema = z.object({
   enabled: z.boolean().optional(),
   debounce_settles: z.number().int().min(1).optional(),
+  model: z.string().min(1).optional(),
 }).strict()
 
 export const OmoMemoryDreamLayerSchema = z.object({

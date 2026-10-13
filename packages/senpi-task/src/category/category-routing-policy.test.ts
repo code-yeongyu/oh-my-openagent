@@ -45,9 +45,14 @@ describe("Senpi category routing policy", () => {
         variant: "xhigh",
       },
       {
+        providers: ["chatgpt-subscription", "openai"],
+        model: "gpt-6.1-sol",
+        variant: "medium",
+      },
+      {
         providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
-        model: "gpt-5.6-terra",
-        variant: "high",
+        model: "gpt-5.6-sol",
+        variant: "medium",
       },
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],

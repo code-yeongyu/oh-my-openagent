@@ -147,8 +147,8 @@ describe("resolveModelProfile", () => {
     expect(result).toEqual({
       kind: "unknown",
       name: "nope",
-      known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal", "night-shift", "recommended"],
-      message: 'model_profile "nope" is not defined; known profiles: daily-heavy, daily-normal, geeky-heavy, geeky-normal, night-shift, recommended',
+      known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal", "night-shift"],
+      message: 'model_profile "nope" is not defined; known profiles: daily-heavy, daily-normal, geeky-heavy, geeky-normal, night-shift',
     })
   })
 
@@ -158,7 +158,7 @@ describe("resolveModelProfile", () => {
     expect(result).toMatchObject({
       kind: "unknown",
       name: "",
-      known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal", "recommended"],
+      known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal"],
     })
   })
 })
@@ -193,7 +193,7 @@ describe("builtin chain routing", () => {
       expect(result).toMatchObject({
         kind: "unknown",
         name,
-        known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal", "recommended"],
+        known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal"],
       })
     }
   })
@@ -388,42 +388,6 @@ describe("builtin chain routing", () => {
     })
   })
 
-  it("resolves recommended to gpt-6.1-sol medium when the subscription serves it next to gpt-6-sol", () => {
-    const result = resolveModelProfile({
-      active: "recommended",
-      availableModels: ["chatgpt-subscription/gpt-6-sol", SOL_61, "zai/glm-5.3"],
-    })
-
-    expect(result).toMatchObject({
-      kind: "resolved",
-      provider: "chatgpt-subscription",
-      modelId: "gpt-6.1-sol",
-      reasoning: "medium",
-    })
-  })
-
-  it("resolves recommended to gpt-6-sol medium when only Copilot serves a GPT-6 Sol", () => {
-    const result = resolveModelProfile({ active: "recommended", availableModels: [SOL_COPILOT, "zai/glm-5.3"] })
-
-    expect(result).toMatchObject({
-      kind: "resolved",
-      provider: "github-copilot",
-      modelId: "gpt-6-sol",
-      reasoning: "medium",
-    })
-  })
-
-  it("picks zai/glm-5.3 on recommended when only a zai key serves glm", () => {
-    const result = resolveModelProfile({ active: "recommended", availableModels: ["zai/glm-5.3"] })
-
-    expect(result).toMatchObject({
-      kind: "resolved",
-      provider: "zai",
-      modelId: "glm-5.3",
-      reasoning: "max",
-    })
-  })
-
   it("picks zai/glm-5.3 on daily-normal when only a zai key serves glm", () => {
     const result = resolveModelProfile({ active: "daily-normal", availableModels: ["zai/glm-5.3"] })
 
@@ -435,9 +399,9 @@ describe("builtin chain routing", () => {
     })
   })
 
-  it("does not pick OpenCode zai-coding-plan on recommended", () => {
+  it("does not pick OpenCode zai-coding-plan on daily-normal", () => {
     const result = resolveModelProfile({
-      active: "recommended",
+      active: "daily-normal",
       availableModels: ["zai-coding-plan/glm-5.3"],
     })
 

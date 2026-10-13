@@ -56,6 +56,7 @@ export type TaskSnapshot = {
   readonly age_ms: number
   readonly pid?: number
   readonly child_session_id?: string
+  readonly last_seen_at?: string
   readonly final_response?: string
   readonly error_message?: string
   readonly run_stats?: TaskRunStats

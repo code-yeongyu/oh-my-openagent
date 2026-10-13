@@ -1,3 +1,35 @@
+## 2026-10-10 - Seed-from-disk subprocess tests wait on signals, not a 5 s budget (#9890)
+
+The three `manager-claim.test.ts` "seeds from disk" cases start a fresh Bun process on `__fixtures__/seed-floor-child.ts`. They ran under bun's implicit 5 s per-test default, so under full-suite load a cold start alone could fail them. The fixture now prints `READY` after its imports load and `DONE` when its work finishes. The new `__fixtures__/signalled-child.ts` helper waits on those signals and the child's exit, with an explicit hang ceiling (20 s, 60 s on Windows) that is only a guard. On the deadline it kills exactly the child it spawned, by its own pid, and fails with the phase it reached plus the child's stdout and stderr. `signalled-child.test.ts` proves that path with a child that never signals. Under a parallel load of 40 runs at concurrency 8 beside a full senpi-task suite, each run took 13-17 s and all passed.
+
+## 2026-10-09 - Bound suspended-child cleanup and protect session startup (#9350)
+
+Rollback preparation maps `failure_kind: "suspended_unresumable"` to R0's `session_unavailable`, keeping the `suspended_unresumable:<cause>` error text. The R0 contract fixture checks the failure kind and the other closed enum fields, including nested model, isolation, owner and run-stat fields. Preparation reports open strict closure obligations in its return value and warning log, naming the affected tasks and warning that the old daemon session may still be running.
+
+Rollback is not blocked on background closure. Older binaries keep the ended record visible but do not keep retrying the strict close. A newer binary resumes those retries only if the obligation field survived: an older binary rewriting the record can drop the field. The rollback warning is printed on stderr as well as included in the JSON report.
+
+An unconfirmed local stop now keeps its existing expiry claim and follows the deferred-revival backoff: 5, 15, 30, 60, 120, then 300 seconds between attempts, capped at 300 seconds. Recovery still checks every five seconds, but intervening ticks do not rewrite the record, append another claim event, or signal the child. A failed stop remains nonterminal until the existing stop path confirms it.
+
+Strict daemon closure retries run in a session-scoped background pass, one pass per lifecycle, rather than blocking `session_start` and its subsequent TTL sweep. A timed-out close retains its in-process identity reservation until the transport settles; repeated startup/cleanup calls cannot accumulate hung requests for the same old session. TTL retains strict obligations until their matching confirmed close clears them. Because the pass is scoped to the owning session, a strict close is retried only when that session starts again or runs its cleanup: if the session is never reopened, its old daemon session is not closed by retry.
+
+The lifecycle fixture now observes every terminal status and reconstructs the observed store, manager and notifier on restart. Tests cover parent shutdown during the budget, at the locked expiry claim, and after the claim (one buffered result); unconfirmed local-stop backoff; stale residency and closure identities; and startup with hung own/foreign obligations. Removing either parent guard, the residency-claim guard, or closure identity comparisons now fails the corresponding regression.
+
+## 2026-10-09 - Suspended children recover while their parent is still live (#9350)
+
+The lifecycle now observes the adapter's existing store-mutation channel. A manager `onParked` event, daemon-loss park, or reconcile deferral immediately attempts scoped revival through the existing admission lease, residency claim and `reviveClaimed`; there is no second respawn path. Observation runs after the synchronous park/forget operation.
+
+Only `pending` and `running` children in `persisted_only` or `rpc_detached` qualify, and only while the registry identifies this engine as their live parent owner. All suspension reasons qualify, including legacy records without a reason. Terminal statuses (including `interrupted` and finished idle evictions), explicit pending user cancellations, and live foreign owners are excluded. Shutdown/disposal stops supervision; an absent parent's children keep their session-start recovery behavior.
+
+`LIVE_PARENT_SUSPENSION_BUDGET_MS` is 300,000 ms, with recovery checks every 5,000 ms. Five minutes matches the sustained interval in the existing deferred-revival policy and exceeds both the 1/4/16-second daemon-loss ladder and the usual 20-second generation-drain budget. The deadline belongs to the suspension episode, not `updated_at`, so failed retries cannot extend it.
+
+At expiry, an atomic epoch/claim check fences the unfinished run against revival. In-process and child-process children use the existing destruction and confirmed process-stop paths. A failed stop is not falsely reported as confirmed. Failure uses the existing `fail` transition (`status: "error"`), `failure_kind: "suspended_unresumable"`, and `error_message` beginning `suspended_unresumable:<cause>`. The terminal run releases its queue/lane and residency; normal notification bookkeeping delivers one parent result and manager waiters settle.
+
+Daemon-only contract change: an unconfirmed close no longer leaves the live parent waiting forever. The record fails while retaining `fallback_closing_child` with `requires_confirmation: true`. Cleanup and session-start recovery retry this durable obligation regardless of TTL age. Silence, refusal and timeout do not clear it. A late confirmed close clears only the matching socket/session/instance/routing identity, never the task's status or notification epoch. A timed-out request keeps its identity reservation until it settles; a refused request can be retried. Transcripts and partial output remain available.
+
+The unconfirmed-close result tells the parent that the old session may still be running on an unreachable host, closing is being retried, and re-dispatch has no at-most-once guarantee: work may run twice, so side effects must be checked before re-running. A confirmed local stop carries no such caveat. Error records already leave live widget rows while remaining in `/tasks` history.
+
+`lifecycle/live-parent-recovery.test.ts` covers immediate recovery, both local execution modes, unreachable and timed-out daemon closure, retry/restart persistence, late closure, both revival/expiry orderings, pending children, absent parents, and finished idle eviction with injected clocks and lifecycle/manager fixtures.
+
 ## 2026-10-09 - Cancelling a running child that never answers its abort no longer hangs (#9791)
 
 `steering/controls.ts` awaited `handle.abort()` before it destroyed a running child (`task_cancel`), and before it recorded an interrupt. An RPC abort waits for the child's answer with no timeout, so a child that never answered held `task_cancel` (or the interrupt) forever. #9785 had bounded the destruction port and the idle sweep, but not this step.

@@ -16,6 +16,7 @@ mod route;
 mod rpc;
 mod selftest;
 mod serve;
+mod settle;
 mod stop_path;
 
 use clap::Parser;

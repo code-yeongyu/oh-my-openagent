@@ -46,6 +46,7 @@ fn live_stop_path() -> SessionSafety {
     SessionSafety {
         supervisor,
         audit: Box::new(|_| {}),
+        control_slot: senpi_desktop_session::ControlSlot::new(),
     }
 }
 
