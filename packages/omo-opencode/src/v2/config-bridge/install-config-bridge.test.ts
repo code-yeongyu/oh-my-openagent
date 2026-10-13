@@ -75,6 +75,57 @@ describe("installConfigBridge", () => {
     })
   })
 
+  describe("#given a config hook that defines MCP servers", () => {
+    const mcpConfig = {
+      mcp: {
+        context7: { type: "remote", url: "https://mcp.context7.com/mcp", enabled: true },
+        lsp: { type: "local", command: ["node", "lsp.mjs"], enabled: false },
+        broken: { type: "ftp" },
+      },
+    }
+
+    it("#when installed #then valid servers exist on the host in 2.x form and the invalid one is skipped with a warning", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const warn = mock((_message: string) => {})
+
+      // when
+      await installConfigBridge(fake.context, hookReturning(mcpConfig), { warn, debounceMs: 0 })
+
+      // then
+      expect(fake.builtMcp().get("context7")).toEqual({
+        type: "remote",
+        url: "https://mcp.context7.com/mcp",
+        disabled: false,
+        codemode: false,
+      })
+      expect(fake.builtMcp().get("lsp")).toMatchObject({ type: "local", command: ["node", "lsp.mjs"], disabled: true })
+      expect(fake.builtMcp().has("broken")).toBe(false)
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]?.[0]).toContain('"broken"')
+    })
+
+    it("#when the hook output changes on a later run #then the MCP registry is reloaded as well", async () => {
+      // given
+      const fake = createFakePluginContext()
+      let round = 0
+      const hook: ConfigHook = async (config) => {
+        round += 1
+        Object.assign(config, { mcp: { stub: { type: "remote", url: `https://example.test/${round}` } } })
+      }
+      await installConfigBridge(fake.context, hook, { warn: () => {}, debounceMs: 0 })
+      const before = fake.mcpReloadCount()
+
+      // when
+      fake.emit({ type: "provider.updated" })
+      await settle()
+
+      // then
+      expect(fake.builtMcp().get("stub")).toMatchObject({ url: "https://example.test/2" })
+      expect(fake.mcpReloadCount()).toBe(before + 1)
+    })
+  })
+
   describe("#given the snapshot handed to the config hook", () => {
     it("#when invoked #then it carries the host default model and empty agent, command and mcp maps", async () => {
       // given

@@ -3,6 +3,8 @@ import type {
   V2AgentInfo,
   V2AgentRecord,
   V2Event,
+  V2McpEditor,
+  V2McpServerConfig,
   V2ModelInfo,
   V2PluginContext,
   V2ProviderInfo,
@@ -25,6 +27,9 @@ export type FakePluginContext = {
   /** The agents after the last time every registered agent transform ran against the host's base agents. */
   readonly builtAgents: () => ReadonlyMap<string, V2AgentRecord>
   readonly defaultAgent: () => string | undefined
+  /** The MCP servers after the last time every registered MCP transform ran. */
+  readonly builtMcp: () => ReadonlyMap<string, V2McpServerConfig>
+  readonly mcpReloadCount: () => number
   readonly reloadCount: () => number
   /** Delivers an event to every active `event.subscribe()` loop. */
   readonly emit: (event: V2Event) => void
@@ -65,6 +70,9 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
   let built = new Map<string, V2AgentRecord>()
   let chosenDefault: string | undefined
   let reloads = 0
+  const mcpTransforms: Array<(editor: V2McpEditor) => void> = []
+  let mcpBuilt = new Map<string, V2McpServerConfig>()
+  let mcpReloads = 0
   const subscribers = new Set<(event: V2Event) => void>()
 
   const rebuildAgents = (): void => {
@@ -84,6 +92,17 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
       remove: (id) => void built.delete(id),
     }
     for (const transform of agentTransforms) transform(editor)
+  }
+
+  const rebuildMcp = (): void => {
+    mcpBuilt = new Map()
+    const editor: V2McpEditor = {
+      list: () => [...mcpBuilt],
+      get: (name) => mcpBuilt.get(name),
+      set: (name, config) => void mcpBuilt.set(name, config),
+      remove: (name) => void mcpBuilt.delete(name),
+    }
+    for (const transform of mcpTransforms) transform(editor)
   }
 
   const subscribe = (subscribeOptions?: { readonly signal?: AbortSignal }): AsyncIterable<V2Event> => ({
@@ -152,6 +171,22 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
         rebuildAgents()
       },
     },
+    mcp: {
+      transform: async (callback) => {
+        mcpTransforms.push(callback)
+        rebuildMcp()
+        return {
+          dispose: async () => {
+            mcpTransforms.splice(mcpTransforms.indexOf(callback), 1)
+            rebuildMcp()
+          },
+        }
+      },
+      reload: async () => {
+        mcpReloads += 1
+        rebuildMcp()
+      },
+    },
     event: { subscribe },
   }
 
@@ -161,6 +196,8 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
     registration,
     builtAgents: () => built,
     defaultAgent: () => chosenDefault,
+    builtMcp: () => mcpBuilt,
+    mcpReloadCount: () => mcpReloads,
     reloadCount: () => reloads,
     emit: (event) => {
       for (const push of subscribers) push(event)

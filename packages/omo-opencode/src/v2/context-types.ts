@@ -146,6 +146,40 @@ export type V2AgentDomain = {
   readonly reload: () => Promise<void>
 }
 
+export type V2McpTimeout = { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+
+export type V2McpServerConfig =
+  | {
+      readonly type: "local"
+      readonly command: ReadonlyArray<string>
+      readonly cwd?: string
+      readonly environment?: Readonly<Record<string, string>>
+      readonly disabled?: boolean
+      readonly codemode?: boolean
+      readonly timeout?: V2McpTimeout
+    }
+  | {
+      readonly type: "remote"
+      readonly url: string
+      readonly headers?: Readonly<Record<string, string>>
+      readonly oauth?: false | Readonly<Record<string, string | number>>
+      readonly disabled?: boolean
+      readonly codemode?: boolean
+      readonly timeout?: V2McpTimeout
+    }
+
+export type V2McpEditor = {
+  readonly list: () => ReadonlyArray<readonly [string, V2McpServerConfig]>
+  readonly get: (name: string) => V2McpServerConfig | undefined
+  readonly set: (name: string, config: V2McpServerConfig) => void
+  readonly remove: (name: string) => void
+}
+
+export type V2McpDomain = {
+  readonly transform: (callback: (editor: V2McpEditor) => void) => Promise<V2Registration>
+  readonly reload: () => Promise<void>
+}
+
 export type V2Event = { readonly type: string }
 
 export type V2EventDomain = {
@@ -160,6 +194,7 @@ export type V2PluginContext = {
   readonly model: V2ModelDomain
   readonly provider: V2ProviderDomain
   readonly agent: V2AgentDomain
+  readonly mcp: V2McpDomain
   readonly event: V2EventDomain
 }
 
