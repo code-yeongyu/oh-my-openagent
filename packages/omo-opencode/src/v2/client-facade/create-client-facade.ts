@@ -4,6 +4,7 @@ import { createAppNamespace } from "./app-namespace"
 import { createConfigNamespace } from "./config-namespace"
 import { withFallback } from "./fallback"
 import { createProviderNamespace } from "./provider-namespace"
+import { createSessionNamespace, type SessionNamespaceDeps } from "./session-namespace"
 
 type V1Client = PluginInput["client"]
 
@@ -12,10 +13,11 @@ type V1Client = PluginInput["client"]
  * methods return the 1.x response shape; every method not mapped yet rejects with the exact
  * operation name (see fallback.ts).
  */
-export function createClientFacade(context: V2PluginContext): V1Client {
+export function createClientFacade(context: V2PluginContext, deps: SessionNamespaceDeps): V1Client {
   return withFallback(["client"], {
     provider: withFallback(["client", "provider"], createProviderNamespace(context)),
     config: withFallback(["client", "config"], createConfigNamespace(context)),
     app: withFallback(["client", "app"], createAppNamespace(context)),
+    session: withFallback(["client", "session"], createSessionNamespace(context, deps)),
   }) as unknown as V1Client
 }

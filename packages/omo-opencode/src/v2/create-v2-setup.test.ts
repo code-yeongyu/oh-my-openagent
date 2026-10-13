@@ -80,11 +80,11 @@ describe("createV2Setup", () => {
       await setup(createContext())
 
       // when
-      const call = client?.session.todo({ path: { id: "ses_1" } })
+      const call = client?.session.list()
 
       // then
       await expect(call).rejects.toBeInstanceOf(V2UnsupportedOperationError)
-      await expect(call).rejects.toMatchObject({ operation: "client.session.todo" })
+      await expect(call).rejects.toMatchObject({ operation: "client.session.list" })
     })
 
     it("#when the client is awaited directly #then it is not mistaken for a thenable", async () => {
@@ -103,6 +103,73 @@ describe("createV2Setup", () => {
 
       // then
       expect(resolved).toBe(client)
+    })
+  })
+  describe("#given 2.x session events", () => {
+    async function until(predicate: () => boolean): Promise<void> {
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        if (predicate()) return
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+      throw new Error("condition was not met in time")
+    }
+
+    it("#when a turn runs #then the plugin's event hook sees the 1.x events and client.session.status follows", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const seen: string[] = []
+      let client: PluginInput["client"] | undefined
+      const setup = createV2Setup({
+        serverPlugin: async (input) => {
+          client = input.client
+          return { event: async ({ event }) => void seen.push(event.type) } as Hooks
+        },
+      })
+      await setup({ ...fake.context, options: {} })
+      await until(() => fake.activeSubscribers() === 1)
+
+      // when
+      fake.emit({ type: "session.execution.started", data: { sessionID: "ses_1" } })
+      await until(() => seen.length === 1)
+      const busy = await client?.session.status()
+      fake.emit({ type: "session.execution.succeeded", data: { sessionID: "ses_1" } })
+      await until(() => seen.length === 3)
+      const idle = await client?.session.status()
+
+      // then
+      expect(seen).toEqual(["session.status", "session.status", "session.idle"])
+      expect(busy?.data).toEqual({ ses_1: { type: "busy" } })
+      expect(idle?.data).toEqual({})
+    })
+
+    it("#when the cleanup runs #then the event subscription ends", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const setup = createV2Setup({ serverPlugin: async () => ({}) as Hooks })
+      const cleanup = await setup({ ...fake.context, options: {} })
+      await until(() => fake.activeSubscribers() === 1)
+
+      // when
+      await cleanup()
+
+      // then
+      await until(() => fake.activeSubscribers() === 0)
+    })
+
+    it("#when the server plugin fails to initialise #then no event subscription is left behind", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const setup = createV2Setup({
+        serverPlugin: async () => {
+          throw new Error("config invalid")
+        },
+      })
+
+      // when
+      await setup({ ...fake.context, options: {} }).catch(() => {})
+
+      // then
+      await until(() => fake.activeSubscribers() === 0)
     })
   })
 })

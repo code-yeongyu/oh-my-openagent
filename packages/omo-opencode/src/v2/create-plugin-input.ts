@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { V2PluginContext } from "./context-types"
-import { createClientFacade } from "./client-facade"
+import { createClientFacade, type SessionNamespaceDeps } from "./client-facade"
 import { V2UnsupportedOperationError } from "./unsupported-operation-error"
 
 type V1Shell = PluginInput["$"]
@@ -19,10 +19,10 @@ function resolveShell(): V1Shell {
  * not to plugins, and a `--standalone` server has no HTTP port at all. The V1 code already treats
  * an undefined `serverUrl` as "no live server" (see create-managers.ts).
  */
-export function createPluginInput(context: V2PluginContext): PluginInput {
+export function createPluginInput(context: V2PluginContext, deps: SessionNamespaceDeps): PluginInput {
   const { directory, project } = context.location
   return {
-    client: createClientFacade(context),
+    client: createClientFacade(context, deps),
     project: {
       id: project.id,
       worktree: project.canonical,

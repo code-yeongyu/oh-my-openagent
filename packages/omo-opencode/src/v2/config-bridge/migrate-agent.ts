@@ -27,7 +27,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Ported from OpenCode 2.x `ConfigMigrateV1.normalizeAction`: 1.x tool names to their 2.x actions. */
-function normalizeAction(action: string): string {
+export function normalizeAction(action: string): string {
   if (action === "write" || action === "patch") return "edit"
   if (action === "task") return "subagent"
   if (action === "bash") return "shell"

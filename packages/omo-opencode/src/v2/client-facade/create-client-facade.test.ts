@@ -1,8 +1,11 @@
 import { describe, expect, it } from "bun:test"
 import type { V2AgentInfo, V2ModelInfo, V2ProviderInfo } from "../context-types"
 import { createFakePluginContext } from "../fake-plugin-context"
+import { createSessionTracker } from "../session-tracker"
 import { V2UnsupportedOperationError } from "../unsupported-operation-error"
 import { createClientFacade } from "./create-client-facade"
+
+const facadeDeps = () => ({ tracker: createSessionTracker(), warn: () => {} })
 
 function model(overrides: Partial<V2ModelInfo> & Pick<V2ModelInfo, "providerID" | "modelID">): V2ModelInfo {
   return {
@@ -39,7 +42,7 @@ describe("createClientFacade", () => {
       })
 
       // when
-      const result = await createClientFacade(context).provider.list()
+      const result = await createClientFacade(context, facadeDeps()).provider.list()
 
       // then
       expect(result.data?.connected).toEqual(["anthropic"])
@@ -62,7 +65,7 @@ describe("createClientFacade", () => {
       })
 
       // when
-      const result = await createClientFacade(context).provider.list()
+      const result = await createClientFacade(context, facadeDeps()).provider.list()
 
       // then
       const anthropic = result.data?.all.find((provider) => provider.id === "anthropic")
@@ -84,7 +87,7 @@ describe("createClientFacade", () => {
       const { context } = createFakePluginContext({ providers, models: [opus], defaultModel: opus })
 
       // when
-      const result = await createClientFacade(context).provider.list()
+      const result = await createClientFacade(context, facadeDeps()).provider.list()
 
       // then
       expect(result.data?.default).toEqual({ anthropic: "claude-opus" })
@@ -98,7 +101,7 @@ describe("createClientFacade", () => {
       const { context } = createFakePluginContext({ models: [opus], defaultModel: opus })
 
       // when
-      const result = await createClientFacade(context).config.get()
+      const result = await createClientFacade(context, facadeDeps()).config.get()
 
       // then
       expect(result.data).toMatchObject({ model: "anthropic/claude-opus" })
@@ -109,7 +112,7 @@ describe("createClientFacade", () => {
       const { context } = createFakePluginContext()
 
       // when
-      const result = await createClientFacade(context).config.get()
+      const result = await createClientFacade(context, facadeDeps()).config.get()
 
       // then
       expect(result.data && "model" in result.data).toBe(false)
@@ -127,7 +130,7 @@ describe("createClientFacade", () => {
       })
 
       // when
-      const result = await createClientFacade(context).app.agents()
+      const result = await createClientFacade(context, facadeDeps()).app.agents()
 
       // then
       expect(result.data).toMatchObject([
@@ -141,20 +144,20 @@ describe("createClientFacade", () => {
     it("#when it lives in an unmapped namespace #then it rejects naming the exact call", async () => {
       // given
       const { context } = createFakePluginContext()
-      const client = createClientFacade(context)
+      const client = createClientFacade(context, facadeDeps())
 
       // when
-      const call = client.session.todo({ path: { id: "ses_1" } })
+      const call = client.session.list()
 
       // then
       await expect(call).rejects.toBeInstanceOf(V2UnsupportedOperationError)
-      await expect(call).rejects.toMatchObject({ operation: "client.session.todo" })
+      await expect(call).rejects.toMatchObject({ operation: "client.session.list" })
     })
 
     it("#when it lives in a mapped namespace #then it still rejects naming the exact call", async () => {
       // given
       const { context } = createFakePluginContext()
-      const client = createClientFacade(context)
+      const client = createClientFacade(context, facadeDeps())
 
       // when
       const call = client.provider.auth()
@@ -166,7 +169,7 @@ describe("createClientFacade", () => {
     it("#when the client is awaited directly #then it is not mistaken for a thenable", async () => {
       // given
       const { context } = createFakePluginContext()
-      const client = createClientFacade(context)
+      const client = createClientFacade(context, facadeDeps())
 
       // when
       const resolved = await Promise.resolve(client)
