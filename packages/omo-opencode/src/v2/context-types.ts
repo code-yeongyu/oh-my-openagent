@@ -211,11 +211,122 @@ export type V2PromptInput = {
   readonly sessionID: string
   readonly text: string
   readonly delivery?: "steer" | "queue" | null
+  /** false enqueues the message without starting a turn. */
+  readonly resume?: boolean | null
 }
 
+export type V2SyntheticInput = {
+  readonly sessionID: string
+  readonly text: string
+  readonly description?: string | null
+  readonly delivery?: "steer" | "queue" | null
+  readonly resume?: boolean | null
+}
+
+export type V2TokenUsage = {
+  readonly input: number
+  readonly output: number
+  readonly reasoning: number
+  readonly cache: { readonly read: number; readonly write: number }
+}
+
+export type V2SessionInfo = {
+  readonly id: string
+  readonly parentID?: string
+  readonly projectID: string
+  readonly agent?: string
+  readonly model?: V2ModelRef
+  readonly title?: string
+  readonly cost: number
+  readonly tokens: V2TokenUsage
+  readonly time: { readonly created: number; readonly updated: number; readonly idle?: number }
+  readonly location: { readonly directory: string }
+}
+
+export type V2StructuredError = { readonly type: string; readonly message: string; readonly status?: number }
+
+export type V2ToolContentItem =
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "file"; readonly uri: string; readonly mime: string; readonly name?: string }
+
+export type V2ToolState =
+  | { readonly status: "streaming"; readonly input: string }
+  | { readonly status: "running"; readonly input: Readonly<Record<string, unknown>>; readonly metadata: Readonly<Record<string, unknown>> }
+  | {
+      readonly status: "completed"
+      readonly input: Readonly<Record<string, unknown>>
+      readonly content: ReadonlyArray<V2ToolContentItem>
+      readonly metadata?: Readonly<Record<string, unknown>>
+    }
+  | {
+      readonly status: "error"
+      readonly input: Readonly<Record<string, unknown>>
+      readonly error: V2StructuredError
+      readonly content?: ReadonlyArray<V2ToolContentItem>
+      readonly metadata?: Readonly<Record<string, unknown>>
+    }
+
+export type V2AssistantContent =
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "reasoning"; readonly text: string; readonly time?: { readonly created: number; readonly completed?: number } }
+  | {
+      readonly type: "tool"
+      readonly id: string
+      readonly name: string
+      readonly state: V2ToolState
+      readonly time: { readonly created: number; readonly ran?: number; readonly completed?: number }
+    }
+
+type V2MessageBase = { readonly id: string; readonly time: { readonly created: number } }
+
+/** The 2.x session message log entries the translator understands; others are ignored by type. */
+export type V2SessionMessage =
+  | (V2MessageBase & {
+      readonly type: "user"
+      readonly text: string
+      readonly files?: ReadonlyArray<{ readonly uri: string; readonly name?: string }>
+    })
+  | (V2MessageBase & { readonly type: "synthetic" | "system"; readonly text: string })
+  | (V2MessageBase & { readonly type: "skill"; readonly name: string; readonly text: string })
+  | (V2MessageBase & { readonly type: "agent-switched"; readonly agent: string })
+  | (V2MessageBase & { readonly type: "model-switched"; readonly model: V2ModelRef })
+  | (V2MessageBase & {
+      readonly type: "assistant"
+      readonly agent: string
+      readonly model: V2ModelRef
+      readonly content: ReadonlyArray<V2AssistantContent>
+      readonly finish?: string
+      readonly cost?: number
+      readonly tokens?: V2TokenUsage
+      readonly error?: V2StructuredError
+      readonly time: { readonly created: number; readonly streamed?: number; readonly completed?: number }
+    })
+  | (V2MessageBase & { readonly type: "compaction"; readonly status: "running" | "completed" | "failed"; readonly reason: "auto" | "manual"; readonly summary?: string })
+  | (V2MessageBase & {
+      readonly type: "idle"
+      /** How the execution that just ended finished; absent on entries from hosts that do not record it. */
+      readonly outcome?: "succeeded" | "failed" | "interrupted"
+      readonly error?: V2StructuredError
+    })
+  | (V2MessageBase & { readonly type: "shell" | "location-switched" })
+
 export type V2SessionDomain = {
-  readonly get: (input: { readonly sessionID: string }) => Promise<{ readonly agent?: string }>
+  readonly get: (input: { readonly sessionID: string }) => Promise<V2SessionInfo>
+  readonly create: (input: {
+    readonly parentID?: string | null
+    readonly title?: string | null
+    readonly agent?: string | null
+    readonly model?: V2ModelRef | null
+    readonly location?: { readonly directory: string } | null
+    readonly permissions?: ReadonlyArray<V2PermissionRule> | null
+  }) => Promise<V2SessionInfo>
+  readonly remove: (input: { readonly sessionID: string }) => Promise<void>
+  readonly context: (input: { readonly sessionID: string }) => Promise<ReadonlyArray<V2SessionMessage>>
+  readonly wait: (input: { readonly sessionID: string }) => Promise<void>
+  readonly interrupt: (input: { readonly sessionID: string; readonly resume?: boolean }) => Promise<unknown>
+  readonly compact: (input: { readonly sessionID: string }) => Promise<unknown>
   readonly prompt: (input: V2PromptInput) => Promise<unknown>
+  readonly synthetic: (input: V2SyntheticInput) => Promise<unknown>
   readonly switchAgent: (input: { readonly sessionID: string; readonly agent: string }) => Promise<void>
   readonly switchModel: (input: { readonly sessionID: string; readonly model: V2ModelRef }) => Promise<void>
 }
@@ -237,7 +348,8 @@ export type V2CommandDomain = {
   readonly reload: () => Promise<void>
 }
 
-export type V2Event = { readonly type: string }
+/** A host event: `data` is the event's schema fields, which for session events include `sessionID`. */
+export type V2Event = { readonly type: string; readonly data?: unknown }
 
 export type V2EventDomain = {
   readonly subscribe: (options?: { readonly signal?: AbortSignal }) => AsyncIterable<V2Event>

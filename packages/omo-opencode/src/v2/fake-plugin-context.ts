@@ -4,6 +4,10 @@ import type {
   V2AgentRecord,
   V2CommandDefinition,
   V2PromptInput,
+  V2SessionDomain,
+  V2SessionInfo,
+  V2SessionMessage,
+  V2SyntheticInput,
   V2ToolAfterEvent,
   V2ToolBeforeEvent,
   V2Event,
@@ -25,10 +29,20 @@ export type FakeContextOptions = {
   readonly directory?: string
   /** The agent the fake session is currently on. */
   readonly sessionAgent?: string
+  /** What `session.context` returns for any session. */
+  readonly sessionMessages?: ReadonlyArray<V2SessionMessage>
+  /** Fields merged over the fake session info returned by `session.get`. */
+  readonly sessionInfo?: Partial<V2SessionInfo>
 }
 
 export type FakeSessionCall =
   | { readonly kind: "prompt"; readonly input: V2PromptInput }
+  | { readonly kind: "synthetic"; readonly input: V2SyntheticInput }
+  | { readonly kind: "create"; readonly input: Parameters<V2SessionDomain["create"]>[0] }
+  | { readonly kind: "remove"; readonly sessionID: string }
+  | { readonly kind: "interrupt"; readonly sessionID: string }
+  | { readonly kind: "compact"; readonly sessionID: string }
+  | { readonly kind: "wait"; readonly sessionID: string }
   | { readonly kind: "switchAgent"; readonly sessionID: string; readonly agent: string }
   | { readonly kind: "switchModel"; readonly sessionID: string; readonly model: V2ModelRef }
 
@@ -50,10 +64,34 @@ export type FakePluginContext = {
   /** Delivers an event to every active `event.subscribe()` loop. */
   readonly emit: (event: V2Event) => void
   readonly activeSubscribers: () => number
+  /** Makes every active `event.subscribe()` loop throw `error`, as the host does when it cannot encode an event. */
+  readonly failSubscribers: (error: Error) => void
+  /** Ends every active `event.subscribe()` loop normally, as the host does when it closes the stream. */
+  readonly endSubscribers: () => void
   /** Runs the registered tool hooks in registration order and returns the event they mutated. */
   readonly triggerToolBefore: (event: V2ToolBeforeEvent) => Promise<V2ToolBeforeEvent>
   readonly triggerToolAfter: (event: V2ToolAfterEvent) => Promise<V2ToolAfterEvent>
   readonly toolHookCount: () => number
+}
+
+function fakeSessionInfo(
+  id: string,
+  options: FakeContextOptions,
+  parentID?: string,
+  title?: string,
+): V2SessionInfo {
+  return {
+    id,
+    ...(parentID === undefined ? {} : { parentID }),
+    projectID: "proj_1",
+    ...(options.sessionAgent === undefined ? {} : { agent: options.sessionAgent }),
+    ...(title === undefined ? {} : { title }),
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    time: { created: 1_000, updated: 2_000 },
+    location: { directory: options.directory ?? "/work/app" },
+    ...options.sessionInfo,
+  }
 }
 
 function toRecord(agent: V2AgentInfo): V2AgentRecord {
@@ -97,7 +135,10 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
   let commandsBuilt = new Map<string, V2CommandDefinition>()
   let commandReloads = 0
   const sessionCalls: FakeSessionCall[] = []
+  let createdSessions = 0
   const subscribers = new Set<(event: V2Event) => void>()
+  const failers = new Set<(error: Error) => void>()
+  const enders = new Set<() => void>()
   const beforeHooks: Array<(event: V2ToolBeforeEvent) => Promise<void> | void> = []
   const afterHooks: Array<(event: V2ToolAfterEvent) => Promise<void> | void> = []
 
@@ -141,21 +182,36 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
       const queue: V2Event[] = []
       let wake: (() => void) | undefined
       let closed = false
+      let failure: Error | undefined
       const push = (event: V2Event): void => {
         queue.push(event)
         wake?.()
       }
+      const fail = (error: Error): void => {
+        failure = error
+        wake?.()
+      }
       subscribers.add(push)
+      failers.add(fail)
       const close = (): void => {
         closed = true
         subscribers.delete(push)
+        failers.delete(fail)
+        enders.delete(close)
         wake?.()
       }
+      enders.add(close)
       subscribeOptions?.signal?.addEventListener("abort", close, { once: true })
       if (subscribeOptions?.signal?.aborted) close()
       return {
         async next() {
-          while (queue.length === 0 && !closed) await new Promise<void>((resolve) => (wake = resolve))
+          while (queue.length === 0 && !closed && failure === undefined) await new Promise<void>((resolve) => (wake = resolve))
+          if (failure !== undefined) {
+            const error = failure
+            failure = undefined
+            close()
+            throw error
+          }
           const event = queue.shift()
           return event === undefined ? { done: true, value: undefined } : { done: false, value: event }
         },
@@ -244,8 +300,19 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
       },
     },
     session: {
-      get: async () => ({ ...(options.sessionAgent === undefined ? {} : { agent: options.sessionAgent }) }),
+      get: async ({ sessionID }) => fakeSessionInfo(sessionID, options),
+      create: async (input) => {
+        sessionCalls.push({ kind: "create", input })
+        createdSessions += 1
+        return fakeSessionInfo(`ses_created_${createdSessions}`, options, input.parentID ?? undefined, input.title ?? undefined)
+      },
+      remove: async ({ sessionID }) => void sessionCalls.push({ kind: "remove", sessionID }),
+      context: async () => options.sessionMessages ?? [],
+      wait: async ({ sessionID }) => void sessionCalls.push({ kind: "wait", sessionID }),
+      interrupt: async ({ sessionID }) => void sessionCalls.push({ kind: "interrupt", sessionID }),
+      compact: async ({ sessionID }) => void sessionCalls.push({ kind: "compact", sessionID }),
       prompt: async (input) => void sessionCalls.push({ kind: "prompt", input }),
+      synthetic: async (input) => void sessionCalls.push({ kind: "synthetic", input }),
       switchAgent: async (input) => void sessionCalls.push({ kind: "switchAgent", ...input }),
       switchModel: async (input) => void sessionCalls.push({ kind: "switchModel", ...input }),
     },
@@ -268,6 +335,12 @@ export function createFakePluginContext(options: FakeContextOptions = {}): FakeP
       for (const push of subscribers) push(event)
     },
     activeSubscribers: () => subscribers.size,
+    failSubscribers: (error) => {
+      for (const fail of [...failers]) fail(error)
+    },
+    endSubscribers: () => {
+      for (const end of [...enders]) end()
+    },
     triggerToolBefore: async (event) => {
       for (const hook of beforeHooks) await hook(event)
       return event
