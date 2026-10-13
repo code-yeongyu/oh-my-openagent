@@ -550,6 +550,18 @@
         "32-test-prefailures-spawn-shim"
       ],
       "orderNote": "Test-only: markers are empty because nothing in it reaches dist/index.js. Cross-review A finding N1."
+    },
+    {
+      "id": "37-compaction-recovery-control-plane",
+      "title": "Restore checkpointed config once through v2 control APIs without model-visible prompts",
+      "commit": "21382f49839c900982ea1c3e2affbb160e603dc1",
+      "originalCommit": "8260428be32a8e5b156d7cabbf49d6fc1ccaca7f",
+      "patch": "patches/37-compaction-recovery-control-plane.patch",
+      "pr": null,
+      "why": "X-149: v2 output events were not translated, so productive steps appeared as empty tails; recovery only had a cooldown and skipped config checks on that path. V2 sendPrompt also dropped noReply, exposing its configuration sentinel to the model and potentially to Claude's tool-result steering. Recovery now admits at most one accepted restore per captured checkpoint, validates persistent v2 agent/model on every trigger, invalidates failed compactions, translates actual output, and uses control APIs only for restoration. General noReply is synthetic with resume=false.",
+      "markers": ["compaction-recovery-once accepted"],
+      "overlapsWith": ["13-compaction-pin-checkpoint"],
+      "orderNote": "Rebased onto the activated 36-fix lane without dropping entries 30-36. Original side-branch slot 30 was renumbered to 37. Pair with the opencode-claude-v2 parked-history-boundary-changed fix (original 27fcc05): it stops reuse of the old parked Claude turn after another provider summarized. Tests: compaction-context-injector/loop-regression.test.ts and v2/session-actions.recovery.test.ts. Existing preemptive-compaction timeout/cache-clear and runtime-fallback protections remain carried. Stage only while OpenChamber runs; import source and activate during the closed window."
     }
   ],
   "externalFixes": [

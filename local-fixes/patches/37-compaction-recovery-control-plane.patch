@@ -1,0 +1,505 @@
+From 21382f49839c900982ea1c3e2affbb160e603dc1 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Tue, 13 Oct 2026 01:46:52 +0300
+Subject: [PATCH] fix(compaction): restore configuration once without prompting
+ the model
+
+---
+ .../hooks/compaction-context-injector/hook.ts |  17 +++
+ .../loop-regression.test.ts                   | 143 ++++++++++++++++++
+ .../compaction-context-injector/recovery.ts   |  33 +++-
+ .../session-prompt-config-resolver.ts         |  28 ++++
+ .../tail-monitor.ts                           |   1 +
+ .../compaction-context-injector/tail.test.ts  |   8 +-
+ .../compaction-context-injector/types.ts      |   1 +
+ packages/omo-opencode/src/v2/event-shape.ts   |  15 +-
+ .../src/v2/session-actions.recovery.test.ts   |  33 ++++
+ .../omo-opencode/src/v2/session-actions.ts    |  14 +-
+ 10 files changed, 278 insertions(+), 15 deletions(-)
+ create mode 100644 packages/omo-opencode/src/hooks/compaction-context-injector/loop-regression.test.ts
+ create mode 100644 packages/omo-opencode/src/v2/session-actions.recovery.test.ts
+
+diff --git a/packages/omo-opencode/src/hooks/compaction-context-injector/hook.ts b/packages/omo-opencode/src/hooks/compaction-context-injector/hook.ts
+index 9251d92c0..5183f8a4d 100644
+--- a/packages/omo-opencode/src/hooks/compaction-context-injector/hook.ts
++++ b/packages/omo-opencode/src/hooks/compaction-context-injector/hook.ts
+@@ -55,6 +55,12 @@ export function createCompactionContextInjector(options?: {
+     }
+ 
+     setCompactionAgentConfigCheckpoint(sessionID, promptConfig)
++    // A new captured checkpoint owns a fresh recovery generation. An older
++    // asynchronous recovery must not consume the new checkpoint's allowance.
++    const tailState = getTailState(sessionID)
++    tailState.recovery = {}
++    tailState.lastRecoveryAt = undefined
++    tailState.lastCompactedAt = undefined
+     log(`[compaction-context-injector] Captured agent checkpoint before compaction`, {
+       sessionID,
+       agent: promptConfig.agent,
+@@ -88,6 +94,17 @@ export function createCompactionContextInjector(options?: {
+       return
+     }
+ 
++    if (event.type === "session.compaction.failed") {
++      const sessionID = resolveSessionID(props)
++      if (sessionID) {
++        clearCompactionAgentConfigCheckpoint(sessionID)
++        const tailState = getTailState(sessionID)
++        tailState.recovery = { completed: true }
++        tailState.lastCompactedAt = undefined
++      }
++      return
++    }
++
+     if (event.type === "session.idle") {
+       const sessionID = resolveSessionID(props)
+       if (!sessionID) {
+diff --git a/packages/omo-opencode/src/hooks/compaction-context-injector/loop-regression.test.ts b/packages/omo-opencode/src/hooks/compaction-context-injector/loop-regression.test.ts
+new file mode 100644
+index 000000000..e45f0f239
+--- /dev/null
++++ b/packages/omo-opencode/src/hooks/compaction-context-injector/loop-regression.test.ts
+@@ -0,0 +1,143 @@
++import { afterEach, describe, expect, it } from "bun:test"
++import { setCompactionAgentConfigCheckpoint, clearCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
++import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
++import { createRecoveryLogic } from "./recovery"
++import { createCompactionContextInjector } from "./hook"
++import type { TailMonitorState } from "./tail-monitor"
++import { toV1Event } from "../../v2/event-shape"
++import { resolveLatestSessionPromptConfig } from "./session-prompt-config-resolver"
++
++const sessionID = "ses_compaction_loop_regression"
++afterEach(() => {
++  clearCompactionAgentConfigCheckpoint(sessionID)
++  releaseAllPromptAsyncReservationsForTesting()
++})
++
++describe("post-compaction recovery is a one-shot control operation", () => {
++  it("does not reinject a successful checkpoint after cooldown or a later empty tail", async () => {
++    setCompactionAgentConfigCheckpoint(sessionID, { agent: "atlas" })
++    const state: TailMonitorState = { currentHasOutput: false, consecutiveNoTextMessages: 5 }
++    let restored = false
++    let sends = 0
++    const ctx = {
++      directory: "/isolated",
++      client: { session: {
++        messages: async () => ({ data: [{ info: { agent: restored ? "atlas" : "compaction" } }] }),
++        promptAsync: async () => { sends++; restored = true; return {} },
++      } },
++    }
++    const recovery = createRecoveryLogic(ctx, () => state)
++    expect(await recovery.recoverCheckpointedAgentConfig(sessionID, "no-text-tail")).toBe(true)
++    releaseAllPromptAsyncReservationsForTesting()
++    state.lastRecoveryAt = undefined
++    restored = false // the latest transcript row need not repeat persistent config
++    expect(await recovery.recoverCheckpointedAgentConfig(sessionID, "no-text-tail")).toBe(false)
++    expect(sends).toBe(1)
++  })
++
++  it("does not send recovery when current config is already correct, including no-text-tail", async () => {
++    setCompactionAgentConfigCheckpoint(sessionID, { agent: "atlas" })
++    let sends = 0
++    const recovery = createRecoveryLogic({ directory: "/isolated", client: { session: {
++      messages: async () => ({ data: [{ info: { agent: "atlas" } }] }),
++      promptAsync: async () => { sends++; return {} },
++    } } }, () => ({ currentHasOutput: false, consecutiveNoTextMessages: 5 }))
++    expect(await recovery.recoverCheckpointedAgentConfig(sessionID, "no-text-tail")).toBe(false)
++    expect(sends).toBe(0)
++  })
++
++  it("does not repeat an accepted restore when transcript projection is incomplete", async () => {
++    setCompactionAgentConfigCheckpoint(sessionID, { agent: "atlas" })
++    const state: TailMonitorState = { currentHasOutput: false, consecutiveNoTextMessages: 5 }
++    let sends = 0
++    const recovery = createRecoveryLogic({ directory: "/isolated", client: { session: {
++      messages: async () => ({ data: [] }),
++      promptAsync: async () => { sends++; return {} },
++    } } }, () => state)
++    expect(await recovery.recoverCheckpointedAgentConfig(sessionID, "session.compacted")).toBe(false)
++    releaseAllPromptAsyncReservationsForTesting()
++    state.lastRecoveryAt = undefined
++    expect(await recovery.recoverCheckpointedAgentConfig(sessionID, "no-text-tail")).toBe(false)
++    expect(sends).toBe(1)
++  })
++
++  it("reads persistent v2 config rather than treating a checkpoint row as missing config", async () => {
++    const config = await resolveLatestSessionPromptConfig({ directory: "/isolated", client: { session: {
++      get: async () => ({ data: { agent: "atlas", model: { providerID: "claude-code", id: "claude-opus-5-5", variant: "xhigh" } } }),
++      messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "compaction" }] }] }),
++    } } }, sessionID)
++    expect(config).toEqual({ agent: "atlas", model: { providerID: "claude-code", modelID: "claude-opus-5-5", variant: "xhigh" } })
++  })
++
++  it("allows one legitimate restore for each newly captured checkpoint", async () => {
++    let agent = "atlas"
++    let sends = 0
++    const hook = createCompactionContextInjector({ ctx: { directory: "/isolated", client: { session: {
++      messages: async () => ({ data: [{ info: { agent } }] }),
++      promptAsync: async () => { sends++; agent = "atlas"; return {} },
++    } } } })
++    for (let i = 0; i < 2; i++) {
++      await hook.capture(sessionID)
++      agent = "compaction"
++      await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
++      releaseAllPromptAsyncReservationsForTesting()
++      await hook.restore(sessionID)
++      expect(sends).toBe(i + 1)
++    }
++  })
++
++  it("coalesces concurrent completion/autocontinue callbacks before reading or dispatching", async () => {
++    setCompactionAgentConfigCheckpoint(sessionID, { agent: "atlas" })
++    const state: TailMonitorState = { currentHasOutput: false, consecutiveNoTextMessages: 0 }
++    let restored = false
++    let reads = 0
++    let sends = 0
++    const recovery = createRecoveryLogic({ directory: "/isolated", client: { session: {
++      messages: async () => { reads++; return { data: [{ info: { agent: restored ? "atlas" : "compaction" } }] } },
++      promptAsync: async () => { sends++; restored = true; return {} },
++    } } }, () => state)
++    const result = await Promise.all([
++      recovery.recoverCheckpointedAgentConfig(sessionID, "session.compacted"),
++      recovery.recoverCheckpointedAgentConfig(sessionID, "compaction.autocontinue"),
++    ])
++    expect(result).toEqual([true, false])
++    expect(sends).toBe(1)
++    expect(reads).toBe(4) // current, latest, gate admission and post-dispatch read
++  })
++
++  it("does not restore a failed compaction using the previous successful compaction window", async () => {
++    let agent = "atlas"
++    let sends = 0
++    const hook = createCompactionContextInjector({ ctx: { directory: "/isolated", client: { session: {
++      messages: async () => ({ data: [{ info: { agent } }] }),
++      promptAsync: async () => { sends++; agent = "atlas"; return {} },
++    } } } })
++    await hook.capture(sessionID)
++    await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
++    await hook.capture(sessionID)
++    agent = "compaction"
++    await hook.event({ event: toV1Event({ type: "session.compaction.failed", data: { sessionID, error: { message: "interrupted" } } }) })
++    await hook.restore(sessionID)
++    expect(sends).toBe(0)
++  })
++
++  it("recognizes productive v2 text, reasoning and tool steps instead of counting an empty tail", async () => {
++    let reads = 0
++    const hook = createCompactionContextInjector({ ctx: { directory: "/isolated", client: { session: {
++      messages: async () => { reads++; return { data: [] } },
++      promptAsync: async () => ({}),
++    } } } })
++    await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
++    setCompactionAgentConfigCheckpoint(sessionID, { agent: "atlas" })
++    reads = 0
++    for (let i = 0; i < 8; i++) {
++      const assistantMessageID = `msg_${i}`
++      for (const raw of [
++        { type: "session.step.started", data: { sessionID, assistantMessageID } },
++        { type: ["session.text.ended", "session.reasoning.ended", "session.tool.called"][i % 3], data: { sessionID, assistantMessageID, id: `call_${i}`, text: "work" } },
++        { type: "session.step.ended", data: { sessionID, assistantMessageID, finish: "tool-calls" } },
++      ]) await hook.event({ event: toV1Event(raw) })
++    }
++    expect(reads).toBe(0)
++  })
++})
+diff --git a/packages/omo-opencode/src/hooks/compaction-context-injector/recovery.ts b/packages/omo-opencode/src/hooks/compaction-context-injector/recovery.ts
+index 27579fb0c..cbd784804 100644
+--- a/packages/omo-opencode/src/hooks/compaction-context-injector/recovery.ts
++++ b/packages/omo-opencode/src/hooks/compaction-context-injector/recovery.ts
+@@ -31,9 +31,10 @@ export function createRecoveryLogic(
+   ctx: CompactionContextClient | undefined,
+   getTailState: (sessionID: string) => TailMonitorState,
+ ) {
+-  const recoverCheckpointedAgentConfig = async (
++  const attemptRecovery = async (
+     sessionID: string,
+     reason: "compaction.autocontinue" | "session.compacted" | "no-text-tail",
++    recovery: NonNullable<TailMonitorState["recovery"]>,
+   ): Promise<boolean> => {
+     if (!ctx) {
+       return false
+@@ -78,11 +79,10 @@ export function createRecoveryLogic(
+     const model = expectedPromptConfig.model
+     const tools = expectedPromptConfig.tools
+ 
+-    if (reason === "compaction.autocontinue" || reason === "session.compacted") {
+-      const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
+-      if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
+-        return false
+-      }
++    const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
++    if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
++      recovery.completed = true
++      return false
+     }
+ 
+     try {
+@@ -107,6 +107,7 @@ export function createRecoveryLogic(
+       if (!isInternalPromptDispatchAccepted(promptResult)) {
+         if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+           tailState.lastRecoveryAt = now
++          recovery.completed = true
+         }
+         log(`[compaction-context-injector] Recovery skipped by promptAsync gate`, {
+           sessionID,
+@@ -116,6 +117,10 @@ export function createRecoveryLogic(
+         return false
+       }
+       tailState.lastRecoveryAt = now
++      // Dispatch acceptance is once-only for this checkpoint even if the read
++      // projection lags. Replaying the control message cannot verify recovery.
++      recovery.completed = true
++      log("[compaction-context-injector] compaction-recovery-once accepted", { sessionID, reason })
+ 
+       const recoveredPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
+       if (!isPromptConfigRecovered(recoveredPromptConfig, expectedPromptConfig)) {
+@@ -139,6 +144,7 @@ export function createRecoveryLogic(
+       }
+ 
+       tailState.consecutiveNoTextMessages = 0
++      recovery.completed = true
+ 
+       log(`[compaction-context-injector] Re-injected checkpointed agent config`, {
+         sessionID,
+@@ -158,6 +164,21 @@ export function createRecoveryLogic(
+     }
+   }
+ 
++  const recoverCheckpointedAgentConfig = async (
++    sessionID: string,
++    reason: "compaction.autocontinue" | "session.compacted" | "no-text-tail",
++  ): Promise<boolean> => {
++    const state = getTailState(sessionID)
++    const recovery = state.recovery ??= {}
++    if (recovery.completed || recovery.inFlight) return false
++    recovery.inFlight = true
++    try {
++      return await attemptRecovery(sessionID, reason, recovery)
++    } finally {
++      recovery.inFlight = false
++    }
++  }
++
+   const maybeWarnAboutNoTextTail = async (sessionID: string): Promise<void> => {
+     const tailState = getTailState(sessionID)
+     if (tailState.consecutiveNoTextMessages < NO_TEXT_TAIL_THRESHOLD) {
+diff --git a/packages/omo-opencode/src/hooks/compaction-context-injector/session-prompt-config-resolver.ts b/packages/omo-opencode/src/hooks/compaction-context-injector/session-prompt-config-resolver.ts
+index ef1e1d630..1104de21a 100644
+--- a/packages/omo-opencode/src/hooks/compaction-context-injector/session-prompt-config-resolver.ts
++++ b/packages/omo-opencode/src/hooks/compaction-context-injector/session-prompt-config-resolver.ts
+@@ -29,16 +29,42 @@ type SessionMessage = {
+ type ResolverContext = {
+   client: {
+     session: {
++      get?: (input: { path: { id: string } }) => Promise<unknown>
+       messages: (input: { path: { id: string } }) => Promise<unknown>
+     }
+   }
+   directory: string
+ }
+ 
++async function persistentPromptConfig(ctx: ResolverContext, sessionID: string): Promise<CompactionAgentConfigCheckpoint | undefined> {
++  if (!ctx.client.session.get) return undefined
++  try {
++    const response = await ctx.client.session.get({ path: { id: sessionID } })
++    const info = normalizeSDKResponse(response, {} as {
++      agent?: string
++      model?: { id?: string; providerID?: string; variant?: string }
++      tools?: Record<string, boolean>
++    }, { preferResponseOnMissingData: true })
++    // V2 keeps agent/model on the session, not on each user/checkpoint row.
++    // V1 session.get has neither: keep its existing transcript-based fallback.
++    if (typeof info.agent !== "string" || isCompactionAgent(info.agent) ||
++        typeof info.model?.id !== "string" || typeof info.model.providerID !== "string") return undefined
++    const model = { providerID: info.model.providerID, modelID: info.model.id,
++      ...(typeof info.model.variant === "string" ? { variant: info.model.variant } : {}) }
++    if (isActiveCompactionPin(sessionID, model)) return undefined
++    const tools = normalizePromptTools(info.tools)
++    return { agent: info.agent, model, ...(tools ? { tools } : {}) }
++  } catch {
++    return undefined
++  }
++}
++
+ export async function resolveSessionPromptConfig(
+   ctx: ResolverContext,
+   sessionID: string,
+ ): Promise<CompactionAgentConfigCheckpoint> {
++  const persistent = await persistentPromptConfig(ctx, sessionID)
++  if (persistent) return persistent
+   const storedModel = getSessionModel(sessionID)
+   const promptConfig: CompactionAgentConfigCheckpoint = {
+     agent: getSessionAgent(sessionID),
+@@ -116,6 +142,8 @@ export async function resolveLatestSessionPromptConfig(
+   ctx: ResolverContext,
+   sessionID: string,
+ ): Promise<CompactionAgentConfigCheckpoint> {
++  const persistent = await persistentPromptConfig(ctx, sessionID)
++  if (persistent) return persistent
+   try {
+     const response = await ctx.client.session.messages({ path: { id: sessionID } })
+     const messages = normalizeSDKResponse(response, [] as SessionMessage[], {
+diff --git a/packages/omo-opencode/src/hooks/compaction-context-injector/tail-monitor.ts b/packages/omo-opencode/src/hooks/compaction-context-injector/tail-monitor.ts
+index c936b9473..6e9d01ae0 100644
+--- a/packages/omo-opencode/src/hooks/compaction-context-injector/tail-monitor.ts
++++ b/packages/omo-opencode/src/hooks/compaction-context-injector/tail-monitor.ts
+@@ -10,6 +10,7 @@ export type TailMonitorState = {
+   consecutiveNoTextMessages: number
+   lastCompactedAt?: number
+   lastRecoveryAt?: number
++  recovery?: { inFlight?: boolean; completed?: boolean }
+ }
+ 
+ export function finalizeTrackedAssistantMessage(
+diff --git a/packages/omo-opencode/src/hooks/compaction-context-injector/tail.test.ts b/packages/omo-opencode/src/hooks/compaction-context-injector/tail.test.ts
+index 65aaf1201..992ac8511 100644
+--- a/packages/omo-opencode/src/hooks/compaction-context-injector/tail.test.ts
++++ b/packages/omo-opencode/src/hooks/compaction-context-injector/tail.test.ts
+@@ -52,7 +52,7 @@ function createMockContext(promptAsyncMock = mock(async (_input: PromptAsyncInpu
+ }
+ 
+ describe("createCompactionContextInjector tail recovery", () => {
+-  it("recovers after five consecutive assistant messages with no text", async () => {
++  it("does not re-inject matching config after five consecutive assistant messages with no text", async () => {
+     //#given
+     const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
+     const ctx = createMockContext(promptAsyncMock)
+@@ -83,10 +83,6 @@ describe("createCompactionContextInjector tail recovery", () => {
+     })
+ 
+     //#then
+-    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+-    const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
+-    expect(recoveryCall?.path).toEqual({ id: "ses_no_text_tail" })
+-    expect(recoveryCall?.body.noReply).toBe(true)
+-    expect(recoveryCall?.body.agent).toBe("atlas")
++    expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+   })
+ })
+diff --git a/packages/omo-opencode/src/hooks/compaction-context-injector/types.ts b/packages/omo-opencode/src/hooks/compaction-context-injector/types.ts
+index 1772550d2..86df7684c 100644
+--- a/packages/omo-opencode/src/hooks/compaction-context-injector/types.ts
++++ b/packages/omo-opencode/src/hooks/compaction-context-injector/types.ts
+@@ -8,6 +8,7 @@ export interface CompactionContextInjector {
+ export type CompactionContextClient = {
+   client: {
+     session: {
++      get?: (input: { path: { id: string } }) => Promise<unknown>
+       messages: (input: { path: { id: string } }) => Promise<unknown>
+       promptAsync: (input: {
+         path: { id: string }
+diff --git a/packages/omo-opencode/src/v2/event-shape.ts b/packages/omo-opencode/src/v2/event-shape.ts
+index 6ce1756cc..d73d5e951 100644
+--- a/packages/omo-opencode/src/v2/event-shape.ts
++++ b/packages/omo-opencode/src/v2/event-shape.ts
+@@ -51,7 +51,7 @@ export function toV1Event(event: unknown): V1Event {
+     }
+   }
+ 
+-  if (type === "session.step.ended") {
++  if (type === "session.step.started" || type === "session.step.ended") {
+     return {
+       type: "message.updated",
+       properties: {
+@@ -66,5 +66,18 @@ export function toV1Event(event: unknown): V1Event {
+     }
+   }
+ 
++  if (type === "session.text.delta" || type === "session.reasoning.delta") {
++    return { type: "message.part.delta", properties: {
++      sessionID, messageID: data.assistantMessageID, field: "text", delta: data.delta,
++    } }
++  }
++  if (type === "session.text.ended" || type === "session.reasoning.ended" || type === "session.tool.called") {
++    return { type: "message.part.updated", properties: { part: {
++      sessionID, messageID: data.assistantMessageID,
++      type: type === "session.tool.called" ? "tool" : type === "session.reasoning.ended" ? "reasoning" : "text",
++      text: data.text,
++    } } }
++  }
++
+   return { type, properties: { ...data } }
+ }
+diff --git a/packages/omo-opencode/src/v2/session-actions.recovery.test.ts b/packages/omo-opencode/src/v2/session-actions.recovery.test.ts
+new file mode 100644
+index 000000000..8c4cd0199
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/session-actions.recovery.test.ts
+@@ -0,0 +1,33 @@
++/// <reference path="../../../../bun-test.d.ts" />
++import { expect, it } from "bun:test"
++import { sendPrompt } from "./session-actions"
++
++function fixture() {
++  const calls: string[] = []
++  const session: Record<string, unknown> = { agent: "compaction" }
++  const api = {
++    get: async () => session, context: async () => [], create: async () => ({}), interrupt: async () => ({}),
++    switchAgent: async ({ agent }: { agent: string }) => { calls.push("agent"); session.agent = agent },
++    switchModel: async ({ model }: { model: unknown }) => { calls.push("model"); session.model = model },
++    update: async () => { calls.push("permissions") },
++    synthetic: async ({ text, resume }: { text: string; resume?: boolean }) => { expect(resume).toBe(false); calls.push(`synthetic:${text}`) },
++    prompt: async ({ text }: { text: string }) => { calls.push(`prompt:${text}`) },
++  }
++  return { api, calls }
++}
++
++it("restores internal noReply config through control APIs without a user prompt or tool-result payload", async () => {
++  const { api, calls } = fixture()
++  await sendPrompt(api, { path: { id: "ses_recovery" }, body: {
++    noReply: true, agent: "atlas", model: { providerID: "claude-code", modelID: "claude-opus-5-5" }, tools: { bash: false },
++    parts: [{ type: "text", synthetic: true, text: "[restore checkpointed session agent configuration after compaction]\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->" }],
++  } })
++  expect(calls).toEqual(["agent", "model", "permissions"])
++})
++
++it("keeps general noReply context synthetic and ordinary user prompts reply-producing", async () => {
++  const { api, calls } = fixture()
++  await sendPrompt(api, { path: { id: "ses_context" }, body: { noReply: true, parts: [{ type: "text", text: "additional context" }] } })
++  await sendPrompt(api, { path: { id: "ses_context" }, body: { parts: [{ type: "text", text: "user request" }] } })
++  expect(calls).toEqual(["synthetic:additional context", "prompt:user request"])
++})
+diff --git a/packages/omo-opencode/src/v2/session-actions.ts b/packages/omo-opencode/src/v2/session-actions.ts
+index 6c288abc1..77fd52df5 100644
+--- a/packages/omo-opencode/src/v2/session-actions.ts
++++ b/packages/omo-opencode/src/v2/session-actions.ts
+@@ -1,6 +1,7 @@
+ import { storedMessagesToV1 } from "./message-shape"
+ import type { AdapterState } from "./adapter-state"
+ import { SessionHttpError } from "./serve-http"
++import { AGENT_RECOVERY_PROMPT } from "../hooks/compaction-context-injector/constants"
+ 
+ function isRecord(value: unknown): value is Record<string, unknown> {
+   return typeof value === "object" && value !== null && !Array.isArray(value)
+@@ -67,7 +68,7 @@ type SessionApi = {
+   interrupt: (input: { sessionID: string }) => Promise<unknown>
+   switchAgent: (input: { sessionID: string; agent: string }) => Promise<unknown>
+   switchModel: (input: { sessionID: string; model: { id: string; providerID: string; variant?: string } }) => Promise<unknown>
+-  synthetic: (input: { sessionID: string; text: string }) => Promise<unknown>
++  synthetic: (input: { sessionID: string; text: string; resume?: boolean }) => Promise<unknown>
+   update: (input: { sessionID: string; permissions?: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }) => Promise<unknown>
+   remove?: (input: { sessionID: string }) => Promise<unknown>
+   compact?: (input: { sessionID: string }) => Promise<unknown>
+@@ -130,8 +131,17 @@ export async function sendPrompt(api: SessionApi, input: unknown): Promise<unkno
+   if (typeof body.system === "string" && body.system.length > 0) await api.synthetic({ sessionID, text: body.system })
+   const denies = toolDenies(body.tools)
+   if (denies.length > 0) await api.update({ sessionID, permissions: denies })
++  const text = textFromPrompt(input)
++  if (body.noReply === true) {
++    // V2 configuration is persistent control-plane state. The v1 recovery
++    // sentinel is not a user request or context for the model/tool bridge.
++    if (text.startsWith(AGENT_RECOVERY_PROMPT) && text.includes("<!-- OMO_INTERNAL_NOREPLY -->")) {
++      return api.get({ sessionID })
++    }
++    return api.synthetic({ sessionID, text, resume: false })
++  }
+   const delivery = promptDelivery(input)
+-  return api.prompt({ sessionID, text: textFromPrompt(input), ...(delivery ? { delivery } : {}) })
++  return api.prompt({ sessionID, text, ...(delivery ? { delivery } : {}) })
+ }
+ 
+ export async function readMessages(api: SessionApi, input: unknown): Promise<ReturnType<typeof storedMessagesToV1>> {
+-- 
+2.55.0.windows.3
+
