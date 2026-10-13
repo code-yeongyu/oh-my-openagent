@@ -1,19 +1,13 @@
 import path from "node:path"
 import type { Hooks } from "@opencode-ai/plugin"
 import type { V2PluginContext, V2Registration, V2ToolContentPart } from "./context-types"
-
-/** 2.x built-in tool names to the 1.x names the plugin's hooks match on. */
-const V1_TOOL_NAMES: Readonly<Record<string, string>> = { shell: "bash", patch: "apply_patch" }
+import { toV1ToolName } from "./tool-names"
 
 /** 2.x file tools take `path`; the 1.x hooks read `filePath` (and most also accept `path`). */
 const FILE_TOOLS: ReadonlySet<string> = new Set(["read", "write", "edit"])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function toV1Name(tool: string): string {
-  return V1_TOOL_NAMES[tool] ?? tool
 }
 
 function toV1Args(tool: string, input: unknown): Record<string, unknown> {
@@ -73,7 +67,7 @@ export async function installToolHooks(context: V2PluginContext, hooks: Hooks): 
     registrations.push(
       await context.tool.hook("execute.before", async (event) => {
         const output = { args: toV1Args(event.tool, event.input) as Record<string, unknown> }
-        await before({ tool: toV1Name(event.tool), sessionID: event.sessionID, callID: event.id }, output)
+        await before({ tool: toV1ToolName(event.tool), sessionID: event.sessionID, callID: event.id }, output)
         event.input = toV2Input(event.tool, event.input, output.args)
       }),
     )
@@ -92,7 +86,7 @@ export async function installToolHooks(context: V2PluginContext, hooks: Hooks): 
           output: text,
           metadata,
         }
-        await after({ tool: toV1Name(event.tool), sessionID: event.sessionID, callID: event.id, args }, output)
+        await after({ tool: toV1ToolName(event.tool), sessionID: event.sessionID, callID: event.id, args }, output)
         if (output.output !== text) {
           event.result.content = [{ type: "text", text: output.output }, ...content.filter((part) => part.type !== "text")]
         }
