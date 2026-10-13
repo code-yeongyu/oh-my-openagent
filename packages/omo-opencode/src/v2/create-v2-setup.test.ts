@@ -12,6 +12,7 @@ function createContext(overrides: Partial<V2PluginContext> = {}): V2PluginContex
       project: { id: "proj_1", directory: "/work/app", canonical: "/work/app" },
     },
     options: { greeting: "hello" },
+    tool: { transform: async () => ({ dispose: async () => {} }) },
     ...overrides,
   }
 }
