@@ -1,4 +1,4 @@
-import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
+import type { Hooks, Plugin } from "@opencode-ai/plugin"
 import type { HookName } from "../config"
 import { validatePluginConfig } from "../config/validate"
 import { initConfigContext } from "../cli/config-manager/config-context"
@@ -41,6 +41,7 @@ import {
 } from "../shared/live-server-route"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
 import { runOpenCodeStartupMigration } from "../startup-migration"
+import { createV2Setup, type DualPluginModule } from "../v2"
 
 type StartupToastClient = {
   readonly tui?: {
@@ -156,7 +157,7 @@ function startupToastBody(input: {
   return undefined
 }
 
-export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): PluginModule {
+export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): DualPluginModule {
   const deps = { ...defaultPluginModuleDeps, ...overrides }
   let startupMigration: ReturnType<PluginModuleDeps["runOpenCodeStartupMigration"]> | undefined
   const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
@@ -349,5 +350,6 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
   return {
     id: "oh-my-openagent",
     server: serverPlugin,
+    setup: createV2Setup({ serverPlugin }),
   }
 }

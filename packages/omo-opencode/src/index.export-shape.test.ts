@@ -13,4 +13,18 @@ describe("oh-my-openagent plugin export shape", () => {
     expect(typeof defaultServer).toBe("function")
     expect(namedServer).toBe(defaultServer)
   })
+
+  it("exposes the OpenCode 1.x server entry and the 2.x setup entry on one default export", () => {
+    // given
+    const moduleShape = pluginModule
+
+    // when
+    const keys = Object.keys(moduleShape)
+
+    // then
+    expect(moduleShape.id).toBe("oh-my-openagent")
+    expect(typeof moduleShape.server).toBe("function")
+    expect(typeof moduleShape.setup).toBe("function")
+    expect(keys).not.toContain("tui")
+  })
 })
