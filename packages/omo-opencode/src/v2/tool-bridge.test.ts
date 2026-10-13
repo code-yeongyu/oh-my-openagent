@@ -213,6 +213,22 @@ describe("toV2Tool", () => {
       expect(result).toEqual({ content: "done", metadata: { title: "Greeting", count: 2 } })
     })
 
+    it("#when the result metadata holds undefined values #then they are dropped so the host can encode it", async () => {
+      // given
+      const info = toV2Tool(
+        "greet",
+        greetTool(async () => ({ output: "done", title: "Greeting", metadata: { sessionId: "ses_child", model: undefined } })),
+        deps,
+      )
+
+      // when
+      const result = await info.execute({ name: "Ada" }, createExecuteContext())
+
+      // then
+      expect(result).toEqual({ content: "done", metadata: { title: "Greeting", sessionId: "ses_child" } })
+      expect(Object.hasOwn(result.metadata ?? {}, "model")).toBe(false)
+    })
+
     it("#when it returns attachments #then they become file content after the text", async () => {
       // given
       const definition = tool({
@@ -284,6 +300,79 @@ describe("toV2Tool", () => {
 
       // then
       expect(progress).toHaveBeenCalledWith({ title: "Working", step: 1 })
+    })
+
+    it("#when the metadata holds values JSON cannot carry #then only JSON values reach V2 progress", async () => {
+      // given
+      const progress = mock(async (_update: Record<string, unknown>) => {})
+      const info = toV2Tool(
+        "greet",
+        greetTool(async (_args, context) => {
+          context.metadata({
+            title: "Working",
+            metadata: { sessionId: "ses_child", model: undefined, nested: { keep: 1, drop: undefined }, at: new Date(0), list: [1, undefined] },
+          })
+          return "ok"
+        }),
+        deps,
+      )
+
+      // when
+      await info.execute({ name: "Ada" }, createExecuteContext({ progress }))
+
+      // then
+      expect(progress).toHaveBeenCalledWith({
+        title: "Working",
+        sessionId: "ses_child",
+        nested: { keep: 1 },
+        at: "1970-01-01T00:00:00.000Z",
+        list: [1, null],
+      })
+    })
+
+    it("#when the metadata cannot be serialised at all #then the update is skipped with a warning and the tool goes on", async () => {
+      // given
+      const progress = mock(async (_update: Record<string, unknown>) => {})
+      const warn = mock((_message: string) => {})
+      const cyclic: Record<string, unknown> = {}
+      cyclic.self = cyclic
+      const info = toV2Tool(
+        "greet",
+        greetTool(async (_args, context) => {
+          context.metadata({ title: "Working", metadata: cyclic })
+          return "ok"
+        }),
+        { ...deps, warn },
+      )
+
+      // when
+      const result = await info.execute({ name: "Ada" }, createExecuteContext({ progress }))
+
+      // then
+      expect(result).toEqual({ content: "ok" })
+      expect(progress).not.toHaveBeenCalled()
+      expect(warn.mock.calls[0]?.[0]).toContain("greet")
+    })
+
+    it("#when the host rejects a progress update #then the tool is not interrupted and the failure is reported", async () => {
+      // given
+      const warn = mock((_message: string) => {})
+      const info = toV2Tool(
+        "greet",
+        greetTool(async (_args, context) => {
+          context.metadata({ title: "Working" })
+          return "ok"
+        }),
+        { ...deps, warn },
+      )
+
+      // when
+      const result = await info.execute({ name: "Ada" }, createExecuteContext({ progress: async () => Promise.reject(new Error("stream closed")) }))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      // then
+      expect(result).toEqual({ content: "ok" })
+      expect(warn.mock.calls.some((call) => call[0].includes("stream closed"))).toBe(true)
     })
 
     it("#when the tool asks for permission #then it resolves and warns that 2.x does not enforce it", async () => {

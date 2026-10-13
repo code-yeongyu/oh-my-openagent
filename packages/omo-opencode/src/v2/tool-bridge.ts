@@ -1,5 +1,6 @@
 import { tool, type ToolContext, type ToolDefinition, type ToolResult } from "@opencode-ai/plugin/tool"
 import type { V2ToolContent, V2ToolExecuteContext, V2ToolInfo, V2ToolResult } from "./context-types"
+import { toJsonRecord } from "./json-record"
 
 export type ToolBridgeDeps = {
   readonly directory: string
@@ -7,12 +8,14 @@ export type ToolBridgeDeps = {
   readonly warn: (message: string) => void
 }
 
-function toV2Result(result: ToolResult): V2ToolResult {
+function toV2Result(result: ToolResult, warn: (message: string) => void): V2ToolResult {
   if (typeof result === "string") return { content: result }
-  const metadata =
+  const merged =
     result.title === undefined && result.metadata === undefined
       ? undefined
       : { ...(result.title === undefined ? {} : { title: result.title }), ...result.metadata }
+  const metadata = merged === undefined ? undefined : toJsonRecord(merged)
+  if (merged !== undefined && metadata === undefined) warn("a tool returned result metadata that cannot be serialised; it was dropped")
   const files: V2ToolContent[] = (result.attachments ?? []).map((attachment) => ({
     type: "file",
     uri: attachment.url,
@@ -23,7 +26,7 @@ function toV2Result(result: ToolResult): V2ToolResult {
   return { content, ...(metadata === undefined ? {} : { metadata }) }
 }
 
-function toV1Context(context: V2ToolExecuteContext, deps: ToolBridgeDeps): ToolContext {
+function toV1Context(name: string, context: V2ToolExecuteContext, deps: ToolBridgeDeps): ToolContext {
   return {
     sessionID: context.sessionID,
     messageID: context.messageID,
@@ -32,7 +35,14 @@ function toV1Context(context: V2ToolExecuteContext, deps: ToolBridgeDeps): ToolC
     worktree: deps.worktree,
     abort: context.signal,
     metadata: (input) => {
-      void context.progress({ ...(input.title === undefined ? {} : { title: input.title }), ...input.metadata })
+      const update = toJsonRecord({ ...(input.title === undefined ? {} : { title: input.title }), ...input.metadata })
+      if (update === undefined) {
+        deps.warn(`tool "${name}" reported metadata that cannot be serialised; the progress update was skipped`)
+        return
+      }
+      void (async () => context.progress(update))().catch((error: unknown) => {
+        deps.warn(`tool "${name}" progress update was rejected: ${error instanceof Error ? error.message : String(error)}`)
+      })
     },
     ask: async () => {
       deps.warn("ToolContext.ask is not enforced on OpenCode 2.x: the plugin has no permission prompt API there")
@@ -102,7 +112,7 @@ export function toV2Tool(name: string, definition: ToolDefinition, deps: ToolBri
     execute: async (rawInput, context) => {
       const parsed = schema.safeParse(rawInput)
       if (!parsed.success) throw new Error(`Invalid arguments for tool "${name}": ${describeIssues(parsed.error)}`)
-      return toV2Result(await definition.execute(parsed.data, toV1Context(context, deps)))
+      return toV2Result(await definition.execute(parsed.data, toV1Context(name, context, deps)), (message) => deps.warn(`tool "${name}": ${message}`))
     },
   }
 }
