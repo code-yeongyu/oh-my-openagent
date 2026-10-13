@@ -2,6 +2,7 @@ import type { Hooks } from "@opencode-ai/plugin"
 import type { V2PluginContext, V2Registration } from "./context-types"
 import { installConfigBridge, type BeforeCommandHook, type ConfigHook } from "./config-bridge"
 import { toV2Tool } from "./tool-bridge"
+import { installToolHooks } from "./tool-hooks"
 
 export type InstallHooksDeps = {
   readonly warn: (message: string) => void
@@ -9,8 +10,9 @@ export type InstallHooksDeps = {
 
 /**
  * Registers what a V1 `Hooks` object defines onto the matching 2.x domains and returns one
- * disposer for everything it registered. Tools and the `config` hook (agents) are mapped so far; the
- * other hooks are added one domain at a time as their 2.x counterparts are wired.
+ * disposer for everything it registered. Tools, the `config` hook (agents, MCP servers, commands) and
+ * the tool execute hooks are mapped so far; the other hooks are added one domain at a time as their
+ * 2.x counterparts are wired.
  */
 export async function installHooks(
   context: V2PluginContext,
@@ -49,6 +51,10 @@ export async function installHooks(
         : { beforeCommand: hooks["command.execute.before"] as unknown as BeforeCommandHook }),
     })
     registrations.push({ dispose })
+  }
+
+  if (hooks["tool.execute.before"] !== undefined || hooks["tool.execute.after"] !== undefined) {
+    registrations.push({ dispose: await installToolHooks(context, hooks) })
   }
 
   let disposed = false

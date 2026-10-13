@@ -93,6 +93,28 @@ describe("installHooks", () => {
     })
   })
 
+  describe("#given V1 tool execute hooks", () => {
+    it("#when installed #then they run around 2.x tool calls until disposed", async () => {
+      // given
+      const fake = createFakePluginContext()
+      const seen: string[] = []
+      const hooks = {
+        "tool.execute.before": async (input: { tool: string }) => void seen.push(`before:${input.tool}`),
+        "tool.execute.after": async (input: { tool: string }) => void seen.push(`after:${input.tool}`),
+      } as unknown as Hooks
+      const uninstall = await installHooks(fake.context, hooks, { warn: () => {} })
+
+      // when
+      await fake.triggerToolBefore({ tool: "shell", sessionID: "s", agent: "a", messageID: "m", id: "c", input: {} })
+      await fake.triggerToolAfter({ tool: "shell", sessionID: "s", agent: "a", messageID: "m", id: "c", input: {}, status: "completed", result: { content: [] } })
+      await uninstall()
+
+      // then
+      expect(seen).toEqual(["before:bash", "after:bash"])
+      expect(fake.toolHookCount()).toBe(0)
+    })
+  })
+
   describe("#given V1 hooks without tools", () => {
     it("#when installed #then no tool transform is registered", async () => {
       // given
