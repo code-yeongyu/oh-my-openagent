@@ -23,6 +23,7 @@ import { FactsTerminalWrites } from "./facts-terminal-writes"
 import { readFactsPeoplePayload } from "./facts-people-payload"
 import { launchFactsInProcess } from "./facts-in-process-launch"
 import { resolveFactsModel } from "./facts-model"
+import type { ReflectionModelCandidate, ReflectionModelResolution } from "./worker/resolve-model"
 import { readRunJson } from "./worker/run-artifacts"
 
 export type { FactsExtractorRunnerOptions, FactsLaunchResult } from "./facts-runner-types"
@@ -144,11 +145,17 @@ export class FactsExtractorRunner {
     const people = await readFactsPeoplePayload(repo.dir)
     const envelope = { version: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people } as const
     const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
-    const oversizedModel = capped.oversized.length === 0 ? undefined
-      : (await import("#omo-task-runtime")).findModelReference(childModelRegistry, resolution.model)
-    const admitted = capped.envelopeOversized ? [] : capped.oversized.filter((entry) =>
-      admitOversizedFacts({ ...envelope, entries: [entry] }, oversizedModel),
-    )
+    // An oversized entry runs alone on ONE pinned model: the first of the user's declared facts
+    // candidates (the primary, then its declared fallbacks) whose known context fits the whole entry.
+    const oversizedCandidates = capped.oversized.length === 0 || capped.envelopeOversized ? []
+      : await oversizedFactsCandidates(childModelRegistry, resolution)
+    const admittedOn = new Map<FactsQueueEntry, ReflectionModelCandidate>()
+    for (const entry of oversizedCandidates.length === 0 ? [] : capped.oversized) {
+      const fit = oversizedCandidates.find((candidate) =>
+        admitOversizedFacts({ ...envelope, entries: [entry] }, candidate.reference))
+      if (fit !== undefined) admittedOn.set(entry, fit.candidate)
+    }
+    const admitted = capped.oversized.filter((entry) => admittedOn.has(entry))
     const envelopeRefused = await classifyOversizePayload({
       terminal: this.terminal,
       envelope,
@@ -163,6 +170,15 @@ export class FactsExtractorRunner {
       return { status: "skipped" }
     }
     const batch: readonly FactsQueueEntry[] = capped.selected.length > 0 ? capped.selected : admitted.slice(0, 1)
+    const oversizedPin = capped.selected.length === 0 && batch[0] !== undefined ? admittedOn.get(batch[0]) : undefined
+    if (oversizedPin !== undefined && oversizedPin.model !== resolution.model) {
+      this.options.logger?.info("facts oversized entry pinned to a declared candidate whose context fits it", {
+        conversationId: batch[0]?.conversationId,
+        primary: resolution.model,
+        model: oversizedPin.model,
+      })
+    }
+    const launchResolution = oversizedPin === undefined ? resolution : pinFactsResolution(resolution, oversizedPin)
     if (batch.length === 0) {
       this.options.logger?.warn("facts batch selection carried nothing within the payload cap", {
         pending: entries.length,
@@ -209,7 +225,7 @@ export class FactsExtractorRunner {
         runDir,
         payload,
         oversized: capped.selected.length === 0,
-        resolution,
+        resolution: launchResolution,
         modelRegistry: childModelRegistry,
         options: this.options,
         env: this.options.env ?? process.env,
@@ -254,6 +270,34 @@ export class FactsExtractorRunner {
     return { status: "failed", runId }
   }
 
+}
+
+type ResolvedFactsModel = Extract<ReflectionModelResolution, { readonly kind: "resolved" }>
+
+async function oversizedFactsCandidates(
+  registry: ChildModelRegistry,
+  resolution: ResolvedFactsModel,
+): Promise<readonly { readonly candidate: ReflectionModelCandidate; readonly reference: unknown }[]> {
+  const { findModelReference } = await import("#omo-task-runtime")
+  const candidates: readonly ReflectionModelCandidate[] = [
+    { model: resolution.model, ...(resolution.thinking === undefined ? {} : { thinking: resolution.thinking }) },
+    ...resolution.fallbacks,
+  ]
+  return candidates.flatMap((candidate) => {
+    const reference = findModelReference(registry, candidate.model)
+    return reference === undefined || reference === null ? [] : [{ candidate, reference }]
+  })
+}
+
+/** The oversized budget pins one model with no fallback rungs; keep the declared candidate's own thinking. */
+function pinFactsResolution(resolution: ResolvedFactsModel, candidate: ReflectionModelCandidate): ResolvedFactsModel {
+  const { thinking: _primaryThinking, ...rest } = resolution
+  return {
+    ...rest,
+    model: candidate.model,
+    ...(candidate.thinking === undefined ? {} : { thinking: candidate.thinking }),
+    fallbacks: [],
+  }
 }
 
 function isChildModelRegistry(value: unknown): value is ChildModelRegistry {
