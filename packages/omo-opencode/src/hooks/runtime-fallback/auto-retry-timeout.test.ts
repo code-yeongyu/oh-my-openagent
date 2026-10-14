@@ -102,7 +102,7 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(state.failedModels.size).toBe(0)
   })
 
-  test("#given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed", async () => {
+  test("#given an accepted fallback is awaiting its result #when timeout escalation is blocked #then recovery ownership is released", async () => {
     // given
     const sessionID = "session-timeout-awaiting-dispatch-blocked"
     SessionCategoryRegistry.register(sessionID, "test")
@@ -140,8 +140,8 @@ describe("createFallbackTimeoutHelpers", () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     // then
-    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
-    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(true)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
     helpers.clearSessionFallbackTimeout(sessionID)
   })
 
