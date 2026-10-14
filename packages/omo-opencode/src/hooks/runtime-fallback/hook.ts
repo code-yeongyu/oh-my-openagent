@@ -84,7 +84,7 @@ export function createRuntimeFallbackHook(
     }
   }
 
-  const releaseRecoveryOwner = registerRuntimeFallbackRecoveryOwner()
+  const releaseRecoveryOwner = config.enabled ? registerRuntimeFallbackRecoveryOwner() : () => {}
 
   // A session.error is recovered here when a retry dispatch is pending or awaiting its result. That covers
   // an accepted retry and an error from a superseded generation that arrives while one is live; an error

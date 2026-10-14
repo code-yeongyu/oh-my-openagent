@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 
 import type { AutoRetryHelpers } from "./auto-retry"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createFallbackState } from "./fallback-state"
+import { createFallbackTimeoutHelpers } from "./auto-retry-timeout"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
 function createContext(toastMessages: string[]): RuntimeFallbackPluginInput {
@@ -63,6 +64,55 @@ function createRejectedDispatchHelpers(dispatchCalls: string[]): AutoRetryHelper
 }
 
 describe("dispatchFallbackRetry", () => {
+  test("refused dispatch releases an existing recovery claim state", async () => {
+    const deps = createDeps([])
+    const sessionID = "session-refused"
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionRetryInFlight.add(sessionID)
+    let cleared = false
+    const helpers = createRejectedDispatchHelpers([])
+    helpers.clearSessionFallbackTimeout = () => { cleared = true }
+
+    await dispatchFallbackRetry(deps, helpers, {
+      sessionID, state, fallbackModels: ["openai/gpt-5.5"], source: "session.error",
+    })
+
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+    expect(cleared).toBe(true)
+  })
+
+  for (const refusal of [false, true]) {
+    test(`timeout releases recovery ownership after ${refusal ? "refused dispatch" : "model exhaustion"}`, async () => {
+      const deps = createDeps([])
+      const sessionID = "session-timeout-release"
+      const state = createFallbackState("openai/gpt-5.4")
+      deps.sessionStates.set(sessionID, state)
+      deps.sessionAwaitingFallbackResult.add(sessionID)
+      deps.pluginConfig = {
+        agents: { oracle: { fallback_models: refusal ? ["openai/gpt-5.5"] : [] } },
+      }
+      let fireTimeout: (() => Promise<void>) | undefined
+      const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: Parameters<typeof setTimeout>[0]) => {
+        fireTimeout = callback as () => Promise<void>
+        return 1 as unknown as ReturnType<typeof setTimeout>
+      }) as typeof setTimeout)
+      try {
+        const helpers = createFallbackTimeoutHelpers(deps, async () => {}, async () => ({
+          accepted: false, status: "blocked", reason: "test refusal",
+        }))
+        helpers.scheduleSessionFallbackTimeout(sessionID, "oracle")
+        await fireTimeout?.()
+        expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+        expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+      } finally {
+        timer.mockRestore()
+      }
+    })
+  }
+
   test("#given fallback dispatch is blocked #when fallback retry runs #then state is restored and no success toast is shown", async () => {
     // given
     const toastMessages: string[] = []

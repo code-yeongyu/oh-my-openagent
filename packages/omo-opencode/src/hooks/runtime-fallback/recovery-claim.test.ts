@@ -50,10 +50,10 @@ function createPluginInput(promptCalls: unknown[]): RuntimeFallbackPluginInput {
 
 type SessionErrorEvent = { type: string; properties: Record<string, unknown> }
 
-function sessionError(sessionID: string, model: string): SessionErrorEvent {
+function sessionError(sessionID: string, model?: string): SessionErrorEvent {
   return {
     type: "session.error",
-    properties: { sessionID, model, error: { statusCode: 429, message: "Rate limit" } },
+    properties: { sessionID, ...(model ? { model } : {}), error: { statusCode: 429, message: "Rate limit" } },
   }
 }
 
@@ -136,7 +136,7 @@ describe("runtime-fallback recovery claim", () => {
 
     // then
     expect(promptCalls).toHaveLength(0)
-    expect(decision).toBe("declined")
+    expect(decision).toBeUndefined()
     hook.dispose?.()
   })
 
@@ -170,7 +170,7 @@ describe("runtime-fallback recovery claim", () => {
     const firstDecision = await deliver(hook, sessionError("ses_claim_retry_failed", "google/gemini-2.5-pro"))
 
     // when
-    const retryFailureDecision = await deliver(hook, sessionError("ses_claim_retry_failed", "openai/gpt-5.4"))
+    const retryFailureDecision = await deliver(hook, sessionError("ses_claim_retry_failed"))
 
     // then
     expect(firstDecision).toBe("retry-owned")

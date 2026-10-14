@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import {
   _resetRuntimeFallbackRecoveryForTesting,
   awaitRuntimeFallbackRecoveryDecision,
@@ -91,17 +91,27 @@ describe("runtime-fallback recovery claims", () => {
     expect(await awaitRuntimeFallbackRecoveryDecision(event)).toBe("retry-owned")
   })
 
-  test("resolves as declined when the owner never settles", async () => {
+  test("timeout does not authorize competing recovery while the hook is still pending", async () => {
     // given
     registerRuntimeFallbackRecoveryOwner()
     const event = { type: "session.error" }
     openRuntimeFallbackRecoveryClaim(event, "ses_1")
 
     // when
-    const decision = await awaitRuntimeFallbackRecoveryDecision(event, 10)
+    let fireTimeout: (() => void) | undefined
+    const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: Parameters<typeof setTimeout>[0]) => {
+      fireTimeout = callback as () => void
+      return 1 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout)
+    const pending = awaitRuntimeFallbackRecoveryDecision(event)
+    fireTimeout?.()
+    timer.mockRestore()
+    const decision = await pending
 
     // then
-    expect(decision).toBe("declined")
+    expect(decision).toBe("timed-out")
+    settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
+    expect(await awaitRuntimeFallbackRecoveryDecision(event)).toBe("retry-owned")
   })
 
   test("stops opening claims once the last owner is released", () => {

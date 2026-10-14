@@ -226,7 +226,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (sessionAwaitingFallbackResult.has(sessionID)) {
       const pendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
       const eventModel = resolveEventModel(props)
-      if (!pendingFallbackModel || eventModel !== pendingFallbackModel) {
+      // Real session.error events have no model. Once dispatch has finished,
+      // treat those as the retry's failure; only an explicitly older model is stale.
+      if (pendingFallbackModel && eventModel && eventModel !== pendingFallbackModel) {
         log(`[${HOOK_NAME}] session.error skipped - awaiting fallback result`, {
           sessionID,
           pendingFallbackModel,
