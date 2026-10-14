@@ -9,6 +9,7 @@
     "#omo-computer-use-runtime": "./src/components/computer-use/runtime.ts",
     "#omo-memory-doctor-runtime": "./src/components/memory/commands/doctor-runtime.ts",
     "#omo-memory-memfs-runtime": "./src/components/memory/commands/memfs-runtime.ts",
+    "#omo-memory-compile-runtime": "./src/components/memory/memory-compile-runtime.ts",
     "#omo-agent-toolkit-sdk": "./src/extension/agent-toolkit-sdk.ts"
   },
   "exports": {

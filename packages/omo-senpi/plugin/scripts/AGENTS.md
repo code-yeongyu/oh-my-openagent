@@ -45,3 +45,5 @@ bun test plugin/scripts/                          # colocated suite
 ```
 
 The `/memfs` registrar remains synchronous; its handlers are loaded on first invocation from `src/components/memory/commands/memfs-runtime.ts` via `#omo-memory-memfs-runtime`, mapped to `extensions/omo-memory-memfs.js` in the published plugin. Build freshness, required artifacts and bundle audits include this sidecar.
+
+`memory-compile-runtime.ts` builds as `extensions/omo-memory-compile.js`, external to the main bundle through `#omo-memory-compile-runtime`; freshness and installer artifact checks include it.

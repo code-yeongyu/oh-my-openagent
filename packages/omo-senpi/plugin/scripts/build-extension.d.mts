@@ -9,6 +9,7 @@ export interface BuildExtensionOptions {
   rollbackRuntimeOutputPath?: string
   memoryDoctorOutputPath?: string
   memoryMemfsOutputPath?: string
+  memoryCompileOutputPath?: string
   computerUseOutputPath?: string
   gatewayStoreWorkerOutputPath?: string
   threadSdkOutputPath?: string
@@ -22,6 +23,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   sidePanelRuntimeInputs: string[]
   memoryDoctorInputs: string[]
   memoryMemfsInputs: string[]
+  memoryCompileInputs: string[]
   computerUseInputs: string[]
   toolkitSdkInputs: string[]
   rollbackRuntimeInputs: string[]

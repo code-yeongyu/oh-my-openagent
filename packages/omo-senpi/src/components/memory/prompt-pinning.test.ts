@@ -2,10 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-import { MemoryBlockCache, type GitMemoryRepo } from "@oh-my-opencode/memory-core"
+import { type GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { MemoryIdentityContext } from "./context"
+import { createLazyMemoryCompileCache } from "./lazy-compile-cache"
 import { createMemoryPromptHandler } from "./prompt"
 import {
   IDENTITY,
@@ -49,7 +50,7 @@ function pinnedHandler(
   pi.on("before_agent_start", createMemoryPromptHandler({
     resolveContext: () => context,
     createRepo: () => repo,
-    cache: new MemoryBlockCache(),
+    cache: createLazyMemoryCompileCache(),
     pins: overrides.pins ?? createProjectionPins(),
     recordPin: (record) => records.push(record),
     onRepin: (_sessionId, reason) => repins.push(reason),

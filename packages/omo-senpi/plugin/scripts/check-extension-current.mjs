@@ -19,6 +19,7 @@ export async function checkExtensionCurrent(options = {}) {
     computerUseOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
+    memoryCompileOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
   } = resolveOutputs(options)
@@ -40,8 +41,10 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentSidePanelRuntime === undefined) return { ok: false, reason: "missing-output", output: sidePanelRuntimeOutput }
   const currentMemoryDoctor = await readBuiltEntry(memoryDoctorOutput)
   const currentMemoryMemfs = await readBuiltEntry(memoryMemfsOutput)
+  const currentMemoryCompile = await readBuiltEntry(memoryCompileOutput)
   if (currentMemoryDoctor === undefined) return { ok: false, reason: "missing-output", output: memoryDoctorOutput }
   if (currentMemoryMemfs === undefined) return { ok: false, reason: "missing-output", output: memoryMemfsOutput }
+  if (currentMemoryCompile === undefined) return { ok: false, reason: "missing-output", output: memoryCompileOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
   const currentGatewayStoreWorker = await readBuiltEntry(gatewayStoreWorkerOutput)
@@ -61,6 +64,7 @@ export async function checkExtensionCurrent(options = {}) {
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
+    memoryCompileOutputPath: join(tempRoot, "omo-memory-compile.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
     threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
@@ -78,6 +82,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentSidePanelRuntime, expected.sidePanelRuntimeOutputPath, sidePanelRuntimeOutput],
       [currentMemoryDoctor, expected.memoryDoctorOutputPath, memoryDoctorOutput],
       [currentMemoryMemfs, expected.memoryMemfsOutputPath, memoryMemfsOutput],
+      [currentMemoryCompile, expected.memoryCompileOutputPath, memoryCompileOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
       [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
