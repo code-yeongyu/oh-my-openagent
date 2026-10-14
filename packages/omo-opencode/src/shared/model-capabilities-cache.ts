@@ -28,6 +28,8 @@ export function createModelCapabilitiesCacheStore(
       generatedAt: snapshot.generatedAt,
     }),
     serialize: (snapshot) => `${JSON.stringify(snapshot, null, 2)}\n`,
+    // generatedAt is stamped on every fetch; only the catalog itself decides a rewrite.
+    comparable: ({ generatedAt: _generatedAt, ...catalog }) => catalog,
   })
 
   function readModelCapabilitiesCache(): ModelCapabilitiesSnapshot | null {
@@ -47,7 +49,10 @@ export function createModelCapabilitiesCacheStore(
     fetchImpl?: (input: string) => Promise<Response>
   } = {}): Promise<ModelCapabilitiesSnapshot> {
     const snapshot = await fetchModelCapabilitiesSnapshot(args)
-    writeModelCapabilitiesCache(snapshot)
+    // The startup check refreshes on every start; rewrite the file only when
+    // the catalog changed. The comparison ignores generatedAt, which differs
+    // on every fetch.
+    snapshotCacheStore.writeIfChanged(snapshot)
     return snapshot
   }
 
