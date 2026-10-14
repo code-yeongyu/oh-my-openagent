@@ -1,3 +1,17 @@
+## 2026-10-13 - Kimi K3 first-turn Todo requests require their phased list
+
+`src/components/kimi-todo-first-turn/index.ts` specializes the first-response Todo
+wire schema for `kimi-coding/k3` on Anthropic Messages, requiring `op` and `list`
+and advertising only `init`. Direct Provider SSE showed K3 returning `init` with
+only scalar `task`/`phase` fields under the shared all-optional schema, even with
+no forced tool choice; those calls reach the normalizer without a recoverable
+plan. A required-list request generated a complete plan in the observed probes.
+
+The component recognizes the staged first-turn reminder in the actual request,
+not only the persisted branch. Later assistant responses and existing Todo tasks
+keep the full tool schema. Other models, local validation, tool choice, state
+persistence and error recovery are unchanged. `src/extension/component-list.ts`
+registers it with the adapter's standard component disable flag.
 ## 2026-10-12 - Thread QA rides the neutral senpi qa-shared helpers (#10033)
 
 The thread-tools harness and runner no longer import senpi's app-server-named QA library. `scripts/qa/thread-tools/lib/harness.mjs` resolves `scripts/qa-shared/lib/{env,fake-model,cleanup}.mjs` from the senpi checkout (the prerequisite extraction in senpi #3177) and `run-all.mjs`'s legacy precondition checks the same path, so the suite keeps its coverage instead of silently skipping once the old helper location is removed. The ulw-loop delegation guidance and `docs/reference/mass-ulw-protocol.md` stop naming the retired protocol; the DAG widget's non-TUI suppression test uses the rpc mode fixture. No behavior changes: the harness still drives the real `--mode rpc --multi-session` host.
