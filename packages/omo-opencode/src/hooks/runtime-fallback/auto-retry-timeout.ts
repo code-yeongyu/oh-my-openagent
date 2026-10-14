@@ -76,6 +76,9 @@ export function createFallbackTimeoutHelpers(
         return
       }
       sessionRetryInFlight.delete(sessionID)
+      // The timed-out generation is no longer live. A new accepted dispatch
+      // will acquire awaiting ownership again; exhaustion/refusal must not keep it.
+      deps.sessionAwaitingFallbackResult.delete(sessionID)
 
       if (state.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
@@ -97,9 +100,7 @@ export function createFallbackTimeoutHelpers(
         const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
         if (!dispatchOutcome.accepted) {
           restoreFallbackState(state, stateSnapshot)
-          if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
-            scheduleSessionFallbackTimeout(sessionID, resolvedAgent)
-          }
+          deps.sessionAwaitingFallbackResult.delete(sessionID)
           log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
             sessionID,
             status: dispatchOutcome.status,

@@ -16,7 +16,7 @@ import { log } from "./logger"
  * marker on a message can tell a stale error from the failure of the retry; the
  * event itself is the only identity that stays attached to one error.
  */
-export type RuntimeFallbackRecoveryDecision = "retry-owned" | "declined"
+export type RuntimeFallbackRecoveryDecision = "retry-owned" | "declined" | "timed-out"
 
 export const RUNTIME_FALLBACK_RECOVERY_DECISION_TIMEOUT_MS = 20_000
 
@@ -62,8 +62,8 @@ export function settleRuntimeFallbackRecoveryClaim(
 /**
  * Called by consumers that would otherwise terminalize on the event. Returns
  * undefined when no claim was opened for it, so callers pay no extra await in
- * that case. A claim that is never settled resolves as `declined` after the
- * timeout, which is the behavior from before arbitration existed.
+ * that case. A timeout is not a refusal: the hook may still commit a dispatch.
+ * Consumers must not start competing recovery on `timed-out`.
  */
 export function awaitRuntimeFallbackRecoveryDecision(
   event: object,
@@ -81,11 +81,11 @@ export function awaitRuntimeFallbackRecoveryDecision(
     const timer = setTimeout(() => {
       const index = claim.waiters.indexOf(onDecision)
       if (index >= 0) claim.waiters.splice(index, 1)
-      log("[runtime-fallback-recovery] Recovery decision timed out; treating as declined", {
+      log("[runtime-fallback-recovery] Recovery decision timed out; withholding competing recovery", {
         sessionID: claim.sessionID,
         timeoutMs,
       })
-      resolve("declined")
+      resolve("timed-out")
     }, timeoutMs)
     claim.waiters.push(onDecision)
   })

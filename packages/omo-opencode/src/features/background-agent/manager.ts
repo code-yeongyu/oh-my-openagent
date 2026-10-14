@@ -2180,12 +2180,15 @@ The fallback retry session is now created and can be inspected directly.
     // would leave its generation running unobserved. It decides first; only a declined recovery falls through.
     const runtimeFallbackDecision = awaitRuntimeFallbackRecoveryDecision(args.event)
     if (runtimeFallbackDecision) {
+      const sessionID = task.sessionId
+      const attemptID = task.currentAttemptID
       const decision = await runtimeFallbackDecision
-      if (task.status !== "running") return
-      if (decision === "retry-owned") {
+      if (task.status !== "running" || task.sessionId !== sessionID || task.currentAttemptID !== attemptID) return
+      if (decision !== "declined") {
         task.consecutiveErroredIdlePolls = 0
-        log("[background-agent] session.error recovered by runtime-fallback retry; keeping task running:", {
+        log("[background-agent] session.error recovery not declined by runtime-fallback; keeping task running:", {
           taskId: task.id,
+          decision,
           sessionID: task.sessionId,
           errorName,
           errorMessage: errorMessage?.slice(0, 200),

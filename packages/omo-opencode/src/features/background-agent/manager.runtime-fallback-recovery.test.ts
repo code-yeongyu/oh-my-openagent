@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
@@ -33,6 +33,7 @@ function createPluginContext(client: object): PluginInput {
     directory,
     worktree: directory,
     serverUrl: new URL("http://localhost:4096"),
+    experimental_workspace: { register: () => {} },
     $: {} as PluginInput["$"],
     client: client as PluginInput["client"],
   }
@@ -100,6 +101,52 @@ function deliver(manager: BackgroundManager, event: SessionErrorEvent): void {
 }
 
 describe("BackgroundManager session.error arbitration with runtime-fallback", () => {
+  test("decision timeout cannot finalize the task or launch a replacement", async () => {
+    const { manager, task, replacementCalls } = createHarness()
+    registerRuntimeFallbackRecoveryOwner()
+    const event = sessionError(ORIGINAL_ERROR)
+    openRuntimeFallbackRecoveryClaim(event, SESSION_ID)
+    let fireTimeout: (() => void) | undefined
+    const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: Parameters<typeof setTimeout>[0]) => {
+      fireTimeout = callback as () => void
+      return 1 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout)
+    try {
+      const handled = manager["handleSessionErrorEvent"]({
+        event, task, errorInfo: ORIGINAL_ERROR,
+        errorName: ORIGINAL_ERROR.name, errorMessage: ORIGINAL_ERROR.message,
+      })
+      fireTimeout?.()
+      await handled
+      expect(task.status).toBe("running")
+      expect(replacementCalls).toEqual([])
+      settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
+    } finally {
+      timer.mockRestore()
+      await manager.shutdown()
+    }
+  })
+
+  for (const changed of ["session", "attempt"]) {
+    test(`declined old error cannot finalize a newer ${changed}`, async () => {
+      const { manager, task, replacementCalls } = createHarness()
+      registerRuntimeFallbackRecoveryOwner()
+      const event = sessionError(ORIGINAL_ERROR)
+      openRuntimeFallbackRecoveryClaim(event, SESSION_ID)
+      const handled = manager["handleSessionErrorEvent"]({
+        event, task, errorInfo: ORIGINAL_ERROR,
+        errorName: ORIGINAL_ERROR.name, errorMessage: ORIGINAL_ERROR.message,
+      })
+      if (changed === "session") task.sessionId = "ses_new_attempt"
+      else task.currentAttemptID = "attempt-new"
+      settleRuntimeFallbackRecoveryClaim(event, "declined")
+      await handled
+      expect(task.status).toBe("running")
+      expect(replacementCalls).toEqual([])
+      await manager.shutdown()
+    })
+  }
+
   beforeEach(() => {
     _resetRuntimeFallbackRecoveryForTesting()
     registerRuntimeFallbackRecoveryOwner()
