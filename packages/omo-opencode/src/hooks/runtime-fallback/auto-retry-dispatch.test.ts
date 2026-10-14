@@ -7,6 +7,11 @@ import { createFallbackState } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import {
+  createRuntimeFallbackRetryTextPart,
+  OMO_RUNTIME_FALLBACK_RETRY_MARKER,
+} from "../../shared/runtime-fallback-retry-marker"
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
@@ -639,5 +644,79 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     releaseCurrentLookup()
     await currentRetry
     expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+  })
+
+  test("#given an internal prompt is retried twice #when the second hop selects its source #then it reuses the same prompt and message ID", async () => {
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-internal-prompt-two-hops"
+    const internalPrompt = `real delegated prompt\n${OMO_INTERNAL_INITIATOR_MARKER}`
+    let lookupCount = 0
+    const promptBodies: Array<Record<string, unknown>> = []
+    deps.ctx.client.session.messages = async () => {
+      lookupCount += 1
+      return {
+        data: [{
+          info: { id: "internal-message", role: "user" },
+          parts: [{
+            type: "text",
+            text: lookupCount === 1 ? internalPrompt : `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+          }],
+        }],
+      }
+    }
+    deps.ctx.client.session.promptAsync = async (input) => {
+      promptCalls.count += 1
+      promptBodies.push((input as { body: Record<string, unknown> }).body)
+      return {}
+    }
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    deps.sessionStates.set(sessionID, state)
+    const helpers = createAutoRetryHelpers(deps)
+
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.status")
+    await helpers.autoRetryWithFallback(sessionID, "google/gemini-2.5-pro", undefined, "session.status")
+
+    expect(promptCalls.count).toBe(2)
+    expect(promptBodies).toHaveLength(2)
+    expect(promptBodies[0]?.messageID).toBe("internal-message")
+    expect(promptBodies[1]?.messageID).toBe("internal-message")
+    expect(promptBodies[0]?.parts).toEqual([{
+      type: "text",
+      text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+    }])
+    expect(promptBodies[1]?.parts).toEqual([{
+      type: "text",
+      text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+    }])
+  })
+
+  test("#given the first hop had to send the synthetic continuation #when the second hop finds the real prompt beside it #then it retries the real prompt under its message ID", async () => {
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-synthetic-continuation-not-replayed"
+    const promptBodies: Array<Record<string, unknown>> = []
+    let persistedRows: unknown[] = []
+    deps.ctx.client.session.messages = async () => ({ data: persistedRows })
+    deps.ctx.client.session.promptAsync = async (input) => {
+      promptCalls.count += 1
+      promptBodies.push((input as { body: Record<string, unknown> }).body)
+      return {}
+    }
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    const helpers = createAutoRetryHelpers(deps)
+
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.status")
+    persistedRows = [
+      { info: { id: "real-message", role: "user" }, parts: [{ type: "text", text: "real human prompt" }] },
+      { info: { id: "synthetic-message", role: "user" }, parts: promptBodies[0]?.parts },
+    ]
+    await helpers.autoRetryWithFallback(sessionID, "google/gemini-2.5-pro", undefined, "session.status")
+
+    expect(promptBodies).toHaveLength(2)
+    expect(promptBodies[0]?.messageID).toBeUndefined()
+    expect(promptBodies[0]?.parts).toEqual([createRuntimeFallbackRetryTextPart("continue")])
+    expect(promptBodies[1]?.messageID).toBe("real-message")
+    expect(promptBodies[1]?.parts).toEqual([{ type: "text", text: "real human prompt" }])
   })
 })
