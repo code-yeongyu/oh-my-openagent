@@ -169,9 +169,10 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       if (!state) {
-        const initialModel = resolveFallbackBootstrapModel({
+        const initialModel = await resolveFallbackBootstrapModel({
           sessionID,
           source: "message.updated",
+          ctx: deps.ctx,
           eventModel: model,
           resolvedAgent,
           pluginConfig,
