@@ -6,6 +6,7 @@ import { _resetForTesting as resetClaudeSessionState } from "./packages/omo-open
 import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./packages/omo-opencode/src/features/task-toast-manager/manager"
 import { _resetForTesting as resetModelFallbackState } from "./packages/omo-opencode/src/hooks/model-fallback/hook"
 import { RULES_INJECTOR_STORAGE } from "./packages/omo-opencode/src/hooks/rules-injector/constants"
+import { resetStartupCheckProcessStateForTests } from "./packages/omo-opencode/src/hooks/auto-update-checker/startup-check-process-state"
 import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./packages/omo-opencode/src/shared/connected-providers-cache"
 import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-path"
 import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
@@ -77,6 +78,7 @@ beforeEach(() => {
   resetConnectedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
+  resetStartupCheckProcessStateForTests()
 })
 
 afterEach(() => {
