@@ -16,6 +16,8 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
   join("extensions", "memory-run-supervisor.mjs"),
+  // The omo Herdr reporter: listed in pi.extensions, its basename makes senpi's builtin defer.
+  join("extensions", "herdr-omo.js"),
   // The thread gateway store worker: the inbox drain cannot open its store without it.
   join("extensions", "gateway-store-worker.mjs"),
   ...PERSONA_ASSET_FILES.map((filename) => join("extensions", filename)),

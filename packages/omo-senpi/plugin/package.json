@@ -21,7 +21,8 @@
   "pi": {
     "system": true,
     "extensions": [
-      "./extensions/omo.js"
+      "./extensions/omo.js",
+      "./extensions/herdr-omo.js"
     ]
   },
   "files": [

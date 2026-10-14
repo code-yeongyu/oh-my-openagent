@@ -18,6 +18,7 @@ Senpi ExtensionAPI composition layer: validates the host surface, registers comp
 | `agent-toolkit-sdk.ts` | Self-contained eval SDK entry built to `plugin/runtime/agent-toolkit-sdk/sdk.js`, also mapped by `#omo-agent-toolkit-sdk` for host status reads. Exports the per-call session-bound singleton, explicit-context factory, env binder, manifest, operations, version and source-only types. |
 | `toolkit-path-provisioning.ts` | Prepends `OMO_AGENT_TOOLKIT_BIN` / PATH for the packaged `../runtime/agent-toolkit` so component spawns resolve it without global bins. |
 | `omo-task.ts` | Re-export shim for `createTaskComponent` (build-graph entry). |
+| `herdr-omo.ts` | Second Pi extension entry, bundled to `plugin/extensions/herdr-omo.js`. Default-exports `createHerdrExtension()` from `../components/herdr/` — the omo Herdr pane reporter. Its `herdr-` basename in `pi.extensions` is what makes senpi's builtin herdr reporter defer to it; keep the file name. |
 
 ## Conventions
 

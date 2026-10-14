@@ -80,6 +80,10 @@ const memoryDoctorEntryPath = join(packageRoot, "src", "components", "memory", "
 const memoryMemfsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "memfs-runtime.ts")
 const memoryDoctorOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-doctor.js")
 const memoryMemfsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-memfs.js")
+// The omo Herdr reporter: its `herdr-` basename makes senpi's builtin herdr reporter defer to it.
+export const HERDR_EXTENSION_NAME = "herdr-omo.js"
+const herdrEntryPath = join(packageRoot, "src", "extension", "herdr-omo.ts")
+const herdrOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", HERDR_EXTENSION_NAME)
 // The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
 // same contract as the staged personas, so omo.js carries none of the ~29 KB of prelude text (#9113).
 export const COMPUTER_PRELUDE_ASSET_NAME = "assets.generated.json"
@@ -127,6 +131,7 @@ export const extensionBuildPaths = {
   memoryMemfsOutputPath,
   gatewayStoreWorkerOutputPath,
   gatewayRulesExtensionOutputPath,
+  herdrOutputPath,
 }
 
 // An explicit path wins; with only `outputPath` set, every sidecar lands beside it.
@@ -149,6 +154,7 @@ export function resolveOutputs(options) {
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
     gatewayRulesExtensionOutput: sibling(options.gatewayRulesExtensionOutputPath, gatewayRulesExtensionOutputPath, GATEWAY_RULES_EXTENSION_NAME),
+    herdrOutput: sibling(options.herdrOutputPath, herdrOutputPath, HERDR_EXTENSION_NAME),
   }
 }
 
@@ -176,6 +182,7 @@ export async function buildExtension(options = {}) {
     memoryMemfsOutput,
     gatewayStoreWorkerOutput,
     gatewayRulesExtensionOutput,
+    herdrOutput,
   } = resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
@@ -191,6 +198,7 @@ export async function buildExtension(options = {}) {
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
   const gatewayRulesExtensionInputs = await buildEntry(gatewayRulesExtensionEntryPath, gatewayRulesExtensionOutput, buildDefines)
   const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, sdkExternalSpecifiers)
+  const herdrInputs = await buildEntry(herdrEntryPath, herdrOutput, buildDefines)
   // Bundling inlines assets.ts but its markdown is read from disk at runtime next to the bundle,
   // so the persona and the computer-use prelude are staged into the directory the loader runs from.
   await Promise.all([
@@ -212,6 +220,7 @@ export async function buildExtension(options = {}) {
     gatewayStoreWorkerInputs,
     gatewayRulesExtensionInputs,
     threadSdkInputs,
+    herdrInputs,
   }
 }
 

@@ -40,7 +40,7 @@ function adapterVersionIfPresent(): string | undefined {
 }
 
 describe("OMO Senpi plugin manifest", () => {
-  it("#given a Pi package manifest #when loaded #then it points at exactly one bundled extension and no manifest skills", () => {
+  it("#given a Pi package manifest #when loaded #then it lists the bundled extensions in order and no manifest skills", () => {
     const manifest = readJsonObject(pluginManifestPath)
     const pi = manifest.pi
 
@@ -49,7 +49,7 @@ describe("OMO Senpi plugin manifest", () => {
       throw new Error("plugin package.json pi manifest is not an object")
     }
 
-    expect(Reflect.get(pi, "extensions")).toEqual(["./extensions/omo.js"])
+    expect(Reflect.get(pi, "extensions")).toEqual(["./extensions/omo.js", "./extensions/herdr-omo.js"])
     // Bundled skills are contributed at runtime through resources_discover (bundled-skills
     // component) so `disabled_skills` can hide them; a manifest entry would load every skill
     // unfiltered on the launcher's --extension path. skills-conditional stays runtime-only too.
