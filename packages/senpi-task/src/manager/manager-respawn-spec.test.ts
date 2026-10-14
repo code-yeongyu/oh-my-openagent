@@ -160,6 +160,7 @@ describe("buildRespawnManagedSpec", () => {
     if (!rebuilt.ok) throw new Error(`expected a rebuilt spec, got ${rebuilt.code}`)
     expect(rebuilt.spec).toEqual({
       taskId: original.taskId,
+      sessionName: `task [parent-1]: ${result.task_id}`,
       cwd: original.cwd,
       stateDir: join(store.stateDir, "children", result.task_id),
       prompt: "RAW PROMPT\n\nPLANNER APPEND",

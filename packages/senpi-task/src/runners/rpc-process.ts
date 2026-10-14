@@ -89,6 +89,7 @@ export class RpcProcessRunner {
       await this.applyFallbackChain(client, spec)
       resume = spec.resumeSessionPath === undefined ? undefined : client.switchSession(spec.resumeSessionPath)
       if (resume === undefined) {
+        if (spec.session_name !== undefined) await client.send({ type: "set_session_name", name: spec.session_name })
         await handle.startInitialPrompt(spec.prompt)
       } else {
         await resume

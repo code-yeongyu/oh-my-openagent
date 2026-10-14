@@ -289,3 +289,16 @@ function ensured() {
     upgradeable: true,
   }
 }
+
+
+test("#given a task title #when a fresh host child starts #then naming runs on its own session before the prompt", async () => {
+  const host = await fakeHost()
+  const runner = runnerOver(host)
+  const name = "task: Write docs (parent: parent-1)"
+  const handle = await runner.start(childSpec({ session_name: name }))
+  const names = ofType(host.commands, "set_session_name")
+  expect(names).toHaveLength(1)
+  expect(names[0]?.payload["name"]).toBe(name)
+  expect(host.commands.findIndex((command) => command.type === "set_session_name")).toBeLessThan(host.commands.findIndex((command) => command.type === "prompt"))
+  await handle.terminate()
+})

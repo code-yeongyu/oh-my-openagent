@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { createTaskRecord } from "../state"
 import type { TaskRecord } from "../state"
 import { parseTaskRecord } from "../store/record-parse"
-import { buildRecordInput, promotedBackgroundMode } from "./manager-helpers"
+import { buildManagedSpec, buildRecordInput, promotedBackgroundMode } from "./manager-helpers"
 import { TaskSequence } from "./task-sequence"
 import type { ManagerStartSpec, ResolvedChildPlan } from "./types"
 
@@ -146,5 +146,16 @@ describe("task_summary record roundtrip", () => {
 
     // then
     expect(reparsed.task_summary).toBe("Audit the record plumbing")
+  })
+})
+
+
+describe("task session display name", () => {
+  test("#given a task summary and parent #when the managed runner spec is built #then the picker title includes both without prompt text", () => {
+    const spec = spawnSpec({ name: "auditor", task_summary: "Audit\nrecord plumbing" })
+    const record = createTaskRecord(buildRecordInput({ spec, plan: PLAN, name: "auditor", executionMode: "in-process", taskSeq: 0 }))
+    const managed = buildManagedSpec({ record, spec, plan: PLAN, cwd: "/tmp/project", stateDir: "/tmp/state" })
+    expect(managed.sessionName).toBe("task [session-1]: Audit record plumbing")
+    expect(managed.sessionName).not.toContain(spec.prompt)
   })
 })

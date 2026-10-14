@@ -97,6 +97,7 @@ export type ChildSpec = {
   readonly kernelTools?: KernelToolGrant
   readonly depth: number
   readonly parentSessionId: string
+  readonly sessionName?: string
   readonly rootSessionId: string
   readonly agentType?: string
   readonly instructions?: string
@@ -183,6 +184,7 @@ export class InProcessRunner {
         uiOnlyToolNames: this.#uiOnlyToolNames,
         ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
+      if (spec.sessionName !== undefined) options.sessionManager?.appendSessionInfo(spec.sessionName)
       session = await this.#createSession(options)
       createdSession = session
       assertPinnedModelHonoured(spec, session)
@@ -275,6 +277,9 @@ export class InProcessRunner {
         revivedSessionPath: sessionPath,
         ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
+      if (spec.sessionName !== undefined && options.sessionManager?.getSessionName() === undefined) {
+        options.sessionManager?.appendSessionInfo(spec.sessionName)
+      }
       session = await this.#createSession(options)
     } catch (error) {
       if (RunnerError.is(error)) throw error

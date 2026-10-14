@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import type { RpcSpawnDescriptor } from "./rpc/spawn"
 import { mapExitOutcomeToError } from "./rpc/exit-mapping"
@@ -346,4 +346,26 @@ describe("RpcProcessRunner", () => {
     // then
     expect(seen?.extensions).toEqual(["/tmp/explicit.ts"])
   })
+})
+
+
+test("#given a task session title #when a process child starts #then naming precedes its first prompt", async () => {
+  const commands: string[] = []
+  const runner = new RpcProcessRunner({
+    spawnChild: (descriptor) => {
+      const child = spawnFakeChild(descriptor.env)
+      children.push(child)
+      if (child.stdin === null) throw new Error("missing RPC input")
+      const input = child.stdin
+      const original = input.write.bind(input)
+      spyOn(input, "write").mockImplementation((chunk: string | Uint8Array, encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void), callback?: (error?: Error | null) => void) => {
+        const command = JSON.parse(String(chunk))
+        commands.push(command.type)
+        return typeof encodingOrCallback === "string" ? original(chunk, encodingOrCallback, callback) : original(chunk, encodingOrCallback)
+      })
+      return child
+    },
+  })
+  await runner.start(makeSpec({ session_name: "task: Write docs (parent: parent-1)" }))
+  expect(commands.slice(0, 2)).toEqual(["set_session_name", "prompt"])
 })

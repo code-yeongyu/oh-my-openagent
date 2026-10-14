@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 
-import type { CreateAgentSessionOptions, SessionManager } from "@code-yeongyu/senpi"
+import { SessionManager, type CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
 import { InProcessRunner, RunnerError } from "./in-process"
 import type { ChildSession, ChildSpec } from "./in-process"
@@ -177,10 +177,10 @@ describe("InProcessRunner session persistence", () => {
     expect(createCalls).toBe(0)
   })
 
-  test("#given the real default session manager #when one stubbed turn runs #then a jsonl transcript with the child messages appears under the session dir", async () => {
+  test("#given a named child and the real session manager #when one stubbed turn runs #then engine session listing carries its task title and parent", async () => {
     // given
     let captured: CreateAgentSessionOptions | undefined
-    const spec = baseSpec()
+    const spec = baseSpec({ sessionName: "task: Write docs (parent: parent-1)" })
     const appendTurn = (): void => {
       const sessionManager = capturedSessionManager(captured)
       const stamp = Date.now()
@@ -226,5 +226,10 @@ describe("InProcessRunner session persistence", () => {
     const transcript = readFileSync(join(sessionDir, transcripts[0] ?? ""), "utf8")
     expect(transcript).toContain("child prompt marker")
     expect(transcript).toContain("child assistant marker")
+    const rows = await SessionManager.list(spec.cwd, sessionDir)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.name).toBe(spec.sessionName)
+    expect(rows[0]?.firstMessage).toBe("child prompt marker")
+    expect(rows[0]?.messageCount).toBe(2)
   })
 })

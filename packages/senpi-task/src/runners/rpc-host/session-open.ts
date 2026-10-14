@@ -111,7 +111,17 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
       })
       input.liveChildren.add(handle)
       const switchOnPort = handle.switchSession
-      if (spec.resumeSessionPath === undefined) await startTurn(handle, spec)
+      if (spec.resumeSessionPath === undefined) {
+        if (spec.session_name !== undefined && !opened.attached) {
+          try {
+            await client.send({ type: "set_session_name", name: spec.session_name })
+          } catch (error) {
+            await discardUnstartedRpcHandle(handle)
+            throw error
+          }
+        }
+        await startTurn(handle, spec)
+      }
       return Object.assign(handle, {
         spawnSpec: {
           cwd: spec.cwd,

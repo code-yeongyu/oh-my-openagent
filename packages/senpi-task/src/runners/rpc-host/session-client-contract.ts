@@ -20,6 +20,7 @@ export type HostSessionCommand =
   | { readonly type: "steer"; readonly message: string }
   | { readonly type: "followUp"; readonly message: string }
   | { readonly type: "abort" }
+  | { readonly type: "set_session_name"; readonly name: string }
 
 /** Why a child parked itself instead of reattaching. */
 export type HostParkReason = "host_incompatible" | "own_host_unreachable" | "store_index_unavailable"
