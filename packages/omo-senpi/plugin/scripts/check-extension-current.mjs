@@ -21,6 +21,7 @@ export async function checkExtensionCurrent(options = {}) {
     memoryMemfsOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
+    herdrOutput,
   } = resolveOutputs(options)
   const currentToolkitSdk = await readBuiltEntry(toolkitSdkOutput)
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
@@ -48,6 +49,8 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentGatewayStoreWorker === undefined) return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
   const currentThreadSdk = await readBuiltEntry(threadSdkOutput)
   if (currentThreadSdk === undefined) return { ok: false, reason: "missing-output", output: threadSdkOutput }
+  const currentHerdr = await readBuiltEntry(herdrOutput)
+  if (currentHerdr === undefined) return { ok: false, reason: "missing-output", output: herdrOutput }
 
   const tempRoot = await mkdtemp(join(tmpdir(), "omo-senpi-build-check-"))
   const expected = {
@@ -64,6 +67,7 @@ export async function checkExtensionCurrent(options = {}) {
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
     threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
+    herdrOutputPath: join(tempRoot, "herdr-omo.js"),
   }
   try {
     await buildExtension(expected)
@@ -81,6 +85,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
       [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
+      [currentHerdr, expected.herdrOutputPath, herdrOutput],
     ]) {
       if (!artifactsMatch(current, await readFile(built, "utf8"))) {
         return { ok: false, reason: "stale-output", output: outputFile }
