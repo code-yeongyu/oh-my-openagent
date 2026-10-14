@@ -42,7 +42,11 @@ function childFactory(mode: Mode, captured: CreateAgentSessionOptions[], prompts
   }
 }
 
-async function setup(mode: Mode = "success", started?: () => void) {
+async function setup(
+  mode: Mode = "success",
+  started?: () => void,
+  quickModels: readonly { readonly model: string }[] = [{ model: "omo-mock/mock-1" }, { model: "omo-mock/mock-2" }],
+) {
   const f = await fixture()
   await f.queue.markConsumed(await f.queue.listPending())
   await enqueue(f.queue, f.identity, "large", "last", SOURCE)
@@ -52,10 +56,32 @@ async function setup(mode: Mode = "success", started?: () => void) {
   const options = runnerOptions(f.root, f.identity, f.queue, "empty", {
     env: { HOME: f.root }, createRunner: undefined, createSession: childFactory(mode, captured, prompts, started),
     resolveModelRegistry: () => registry,
-    loadConfig: () => ({ config: { categories: { quick: { models: [{ model: "omo-mock/mock-1" }, { model: "omo-mock/mock-2" }] } } }, diagnostics: [], layers: [], sources: [] }),
+    loadConfig: () => ({ config: { categories: { quick: { models: [...quickModels] } } }, diagnostics: [], layers: [], sources: [] }),
   })
   return { ...f, options, captured, prompts }
 }
+
+test("#given a declared quick chain whose first model is too small #when an oversized entry is the only work #then it runs once, complete, on the first declared model that fits", async () => {
+  const f = await setup("success", undefined, [{ model: "omo-mock/mock-2" }, { model: "omo-mock/mock-1" }])
+  expect((await new FactsExtractorRunner(f.options).launchPending()).status).toBe("committed")
+  expect(f.captured).toHaveLength(1)
+  expect(f.captured[0]?.model?.id).toBe("mock-1")
+  expect(f.captured[0]?.settingsManager?.getRetryFallbackSettings().modelFallback).toBe(false)
+  const prompt = f.prompts[0] ?? ""
+  const payload = JSON.parse(prompt.slice(prompt.indexOf("\n\n") + 2))
+  expect(payload.entries[0].entries[0].text).toBe(SOURCE)
+  expect(await f.queue.listPending()).toHaveLength(0)
+  expect((await new FactsFailureStore({ identityPaths: f.identity.paths }).readFailures()).entries).toHaveLength(0)
+}, 30_000)
+
+test("#given no declared quick model fits #when an oversized entry is the only work #then it parks as before and nothing launches", async () => {
+  const f = await setup("success", undefined, [{ model: "omo-mock/mock-2" }])
+  await new FactsExtractorRunner(f.options).launchPending()
+  expect(f.captured).toHaveLength(0)
+  const failures = (await new FactsFailureStore({ identityPaths: f.identity.paths }).readFailures()).entries
+  expect(failures.map((record) => [record.lastReason, record.state])).toEqual([["payload_entry_oversize", "parked"]])
+  expect(await f.queue.listPending()).toHaveLength(1)
+}, 30_000)
 
 test("#given ordinary work and two eligible oversized entries #when draining #then ordinary batching stays intact and each complete oversized input commits once", async () => {
   const f = await setup()
