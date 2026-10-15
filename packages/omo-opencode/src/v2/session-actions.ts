@@ -1,3 +1,5 @@
+import { resolve } from "node:path"
+
 import { storedMessagesToV1 } from "./message-shape"
 import type { AdapterState } from "./adapter-state"
 import { SessionHttpError } from "./serve-http"
@@ -72,6 +74,7 @@ type SessionApi = {
   update: (input: { sessionID: string; permissions?: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }) => Promise<unknown>
   remove?: (input: { sessionID: string }) => Promise<unknown>
   compact?: (input: { sessionID: string }) => Promise<unknown>
+  move?: (input: { sessionID: string; directory: string }) => Promise<unknown>
 }
 
 export function withParent(session: Record<string, unknown>, state: AdapterState): Record<string, unknown> {
@@ -86,6 +89,14 @@ export function withParent(session: Record<string, unknown>, state: AdapterState
 function directoryOf(session: Record<string, unknown>): unknown {
   if (typeof session.directory === "string") return session.directory
   return isRecord(session.location) ? session.location.directory : undefined
+}
+
+function sameDirectory(left: string, right: string): boolean {
+  const normalize = (value: string) => {
+    const resolved = resolve(value).replaceAll("\\", "/").replace(/\/+$/, "")
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved
+  }
+  return normalize(left) === normalize(right)
 }
 
 export function childSessions(sessions: Array<Record<string, unknown>>, parentID: string, state: AdapterState): Array<Record<string, unknown>> {
@@ -107,15 +118,25 @@ export async function createSession(api: SessionApi, input: unknown, state: Adap
   }
   const model = modelRef(body.model, body.variant)
   const permissions = permissionsFrom(body.permission)
+  const requestedDirectory = typeof query.directory === "string" ? query.directory : directory
   const created = await api.create({
+    ...(parentID ? { parentID } : {}),
     ...(typeof body.title === "string" ? { title: body.title } : {}),
     ...(typeof body.agent === "string" ? { agent: body.agent } : {}),
     ...(model ? { model } : {}),
-    ...(typeof query.directory === "string" ? { location: { directory: query.directory } } : { location: { directory } }),
+    location: { directory: requestedDirectory },
     ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     ...(permissions.length > 0 ? { permissions } : {}),
   })
-  const session = withParent(isRecord(created) ? created : {}, state)
+  let record = isRecord(created) ? created : {}
+  const placed = directoryOf(record)
+  // The native host creates a child at its parent's location, so a child asked to run elsewhere is moved after creation.
+  if (parentID && typeof record.id === "string" && typeof placed === "string" && !sameDirectory(placed, requestedDirectory) && api.move) {
+    await api.move({ sessionID: record.id, directory: requestedDirectory })
+    const location = { ...(isRecord(record.location) ? record.location : {}), directory: requestedDirectory }
+    record = typeof record.directory === "string" ? { ...record, directory: requestedDirectory, location } : { ...record, location }
+  }
+  const session = withParent(record, state)
   if (typeof session.id === "string" && parentID) state.recordParent(session.id, parentID)
   if (typeof session.id === "string") state.noteSession(session)
   return session

@@ -28,14 +28,14 @@ function createFakeContext(): {
   prompts: Array<{ sessionID: string; text: string }>
   agents: Map<string, { description?: string; mode?: string; system?: string }>
   pushEvent: (event: unknown) => void
-  calls: { agent: string[]; model: unknown[]; synthetic: string[]; create: unknown[] }
+  calls: { agent: string[]; model: unknown[]; synthetic: string[]; create: unknown[]; move: unknown[] }
 } {
   const hooks: RegisteredHook[] = []
   const tools: Array<{ name: string; execute: (input: unknown, context: { sessionID: string; id: string; signal: AbortSignal }) => Promise<{ content: string }> }> = []
   const commands: Array<{ name: string; execute: (input: { sessionID: string; prompt: { text: string }; delivery: "steer" }) => Promise<void> }> = []
   const mcps: Array<[string, { type: string; url?: string; disabled?: boolean }]> = []
   const prompts: Array<{ sessionID: string; text: string }> = []
-  const calls = { agent: [] as string[], model: [] as unknown[], synthetic: [] as string[], create: [] as unknown[] }
+  const calls = { agent: [] as string[], model: [] as unknown[], synthetic: [] as string[], create: [] as unknown[], move: [] as unknown[] }
   const pendingEvents: unknown[] = []
   let notifyEvent: (() => void) | undefined
   const agents = new Map<string, { description?: string; mode?: string; system?: string }>([
@@ -59,8 +59,9 @@ function createFakeContext(): {
       },
       create: async (input: unknown) => {
         calls.create.push(input)
-        const body = typeof input === "object" && input !== null ? input as { metadata?: { omoParentID?: string } } : {}
-        return { id: "created", metadata: body.metadata }
+        const body = typeof input === "object" && input !== null ? input as { parentID?: string; location?: unknown; metadata?: { omoParentID?: string } } : {}
+        // Like the native host, a child lands at its parent's location (the project here), not the requested one.
+        return { id: "created", metadata: body.metadata, location: body.parentID ? { directory: ctx.location.directory } : body.location }
       },
       interrupt: async () => undefined,
       switchAgent: async (input: { agent: string }) => {
@@ -70,7 +71,9 @@ function createFakeContext(): {
         calls.model.push(input.model)
       },
       update: async () => undefined,
-      move: async () => undefined,
+      move: async (input: unknown) => {
+        calls.move.push(input)
+      },
       wait: async () => undefined,
       generate: async () => ({ text: "" }),
       command: async () => undefined,
@@ -523,7 +526,7 @@ describe("OpenCode V2 adapter", () => {
     await expect((unauthorized.client.session.status as () => Promise<unknown>)()).rejects.toThrow("unauthorized")
   })
 
-  test("create remembers parentID and prompt applies agent, model, and system", async () => {
+  test("create links the native parent and prompt applies agent, model, and system", async () => {
     const directory = mkdtempSync(join(tmpdir(), "omo-v2-parent-"))
     directories.push(directory)
     const fake = createFakeContext()
@@ -536,8 +539,10 @@ describe("OpenCode V2 adapter", () => {
     await (v1.client.session.create as (input: unknown) => Promise<unknown>)({
       body: { title: "child", parentID: "ses_parent", permission: [{ permission: "question", action: "deny", pattern: "*" }] },
     })
-    const created = fake.calls.create[0] as { metadata?: { omoParentID?: string }; permissions?: unknown[] }
+    const created = fake.calls.create[0] as { parentID?: string; metadata?: { omoParentID?: string }; permissions?: unknown[] }
+    expect(created.parentID).toBe("ses_parent")
     expect(created.metadata?.omoParentID).toBe("ses_parent")
+    expect(fake.calls.move).toEqual([])
     expect(created.permissions).toEqual([{ action: "question", resource: "*", effect: "deny" }])
     const children = await (v1.client.session.children as (input: unknown) => Promise<{ data: Array<{ id: string; parentID?: string }> }>)({ path: { id: "ses_parent" } })
     expect(children.data[0]?.parentID).toBe("ses_parent")
@@ -549,6 +554,32 @@ describe("OpenCode V2 adapter", () => {
     expect(fake.calls.model).toEqual([{ id: "gpt", providerID: "openai" }])
     expect(fake.calls.synthetic).toEqual(["be brief"])
     expect(fake.prompts[0]?.text).toBe("go")
+  })
+
+  test("a child requested in another directory is moved there after native parent linking", async () => {
+    // given
+    const directory = mkdtempSync(join(tmpdir(), "omo-v2-parent-"))
+    const worktree = mkdtempSync(join(tmpdir(), "omo-v2-member-"))
+    directories.push(directory, worktree)
+    const fake = createFakeContext()
+    Object.assign(fake.ctx.location, { directory })
+    const v1 = createV1PluginInput(fake.ctx, {
+      state: createAdapterState(`${directory}/.omo/v2-state`),
+      fetchImpl: async () => jsonResponse({ data: [], cursor: {} }),
+      argv: ["opencode", "serve", "--port", "9"],
+    })
+
+    // when
+    const result = await (v1.client.session.create as (input: unknown) => Promise<{ data?: { directory?: string; parentID?: string } }>)({
+      body: { title: "member", parentID: "ses_parent" },
+      query: { directory: worktree },
+    })
+
+    // then
+    expect((fake.calls.create[0] as { parentID?: string }).parentID).toBe("ses_parent")
+    expect(fake.calls.move).toEqual([{ sessionID: "created", directory: worktree }])
+    expect(result.data?.directory).toBe(worktree)
+    expect(result.data?.parentID).toBe("ses_parent")
   })
 
   test("stored tool, synthetic, and idle messages keep the V1 roles", async () => {
