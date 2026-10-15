@@ -65,10 +65,16 @@ describe("memory receipts", () => {
   test("#given appends racing in one process and three child processes #when they finish #then every line is whole", async () => {
     // given
     const dir = await runtimeDir()
+    // Keep an in-process race without flooding Windows with 50 simultaneous lock acquisitions.
+    const writers = process.platform === "win32" ? 2 : 20
 
     // when
     await Promise.all([
-      ...Array.from({ length: 20 }, (_, index) => appendMemoryReceipt(dir, { kind: "dream", runId: `local-${index}`, trigger: "idle", event: "launched", generation: "g1" })),
+      ...Array.from({ length: writers }, async (_, writer) => {
+        for (let index = writer; index < 20; index += writers) {
+          await appendMemoryReceipt(dir, { kind: "dream", runId: `local-${index}`, trigger: "idle", event: "launched", generation: "g1" })
+        }
+      }),
       runWorker(dir, "append", 10, "child-a"),
       runWorker(dir, "append", 10, "child-b"),
       runWorker(dir, "append", 10, "child-c"),
