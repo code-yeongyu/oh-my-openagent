@@ -571,6 +571,19 @@
         "31-test-host-agent-id"
       ],
       "orderNote": "One line in src/v2/catalog.ts agentsFrom plus the v2 host.test.ts owner test. Apply after 38 (same test file). Tests: v2/host.test.ts. Rebased on the #9016 head at https://github.com/mradwankhalil/oh-my-openagent/tree/fix/v2-native-parent-linkage-on-9016."
+    },
+    {
+      "id": "40-v2-hook-writeback-identity",
+      "title": "Write V2 context-hook message edits back by identity, not index",
+      "commit": "1f9b48ef2aedbe7ec36368d2a15b9a742c682aa0",
+      "patch": "patches/40-v2-hook-writeback-identity.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/1",
+      "upstreamIssue": "https://github.com/anomalyco/opencode/issues/55271",
+      "why": "The V2 hook bridge wrote messages.transform output back by array index; an inserted message (team-mode status, monitor status, team mailbox, btw-side context) moved each later message's parts into its neighbour, putting reasoning + tool-call parts into a tool message. Every OpenCode 2.0.28 route rejected the request ('... tool messages only support tool-result content for now') and the turn failed to drain on every provider until the next user prompt changed which message the transform targets. Observed 3x in ses_ec3488f10ffenfb1BJ0CJEyU8x on 2026-10-14; all three reproduced from the stored history. The bridge now records each V1 view's source message and writes edits back to that message (inserted views become new messages).",
+      "markers": [
+        "viewSources.set(view, message)"
+      ],
+      "orderNote": "Independent of 01-39; touches only src/v2/message-shape.ts plus a new test. Cherry-picks cleanly onto integration/opencode-v2 (merge-tree). Tests: src/v2/message-shape.test.ts, hooks/team-mode-status-injector."
     }
   ],
   "externalFixes": [
