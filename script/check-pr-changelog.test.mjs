@@ -118,7 +118,30 @@ describe("gate verdict", () => {
     ["existing release version", `## [Unreleased]\n\n## [1.0.0] - 2026-10-11\n${notes}\n\n${history}`, false],
     ["release after another section", `## [Unreleased]\n\n${history}\n## [1.1.0]\n${notes}\n`, false],
   ])("%s with shipped code", (_name, after, pass) => {
-    expect(checkPrChangelog({ ...facts, before: beforeRelease, after, diff: "" }).pass).toBe(pass)
+    expect(checkPrChangelog({
+      ...facts, before: beforeRelease, after, diff: "",
+      policy: manifestPolicy({ version: "1.1.0", files: ["runtime.mjs"] }),
+      previousPolicy: manifestPolicy({ version: "1.0.0", files: ["runtime.mjs"] }),
+      changedFiles: ["runtime.mjs", "package.json"],
+    }).pass).toBe(pass)
+  })
+  test.each([
+    ["fake heading without version bump", "1.1.0", "1.0.0", "1.0.0", false],
+    ["heading differs from bumped version", "1.1.0", "1.0.0", "1.2.0", false],
+    ["matching beta release bump", "1.1.0-beta.2", "1.1.0-beta.1", "1.1.0-beta.2", true],
+    ["matching multi-identifier prerelease bump", "1.1.0-rc.preview.2", "1.1.0-beta.2", "1.1.0-rc.preview.2", true],
+    ["prerelease without bump", "1.1.0-beta.2", "1.1.0-beta.2", "1.1.0-beta.2", false],
+    ["invalid prerelease numeric identifier", "1.1.0-beta.02", "1.1.0-beta.1", "1.1.0-beta.02", false],
+    ["missing previous root version", "1.1.0", undefined, "1.1.0", false],
+    ["missing current root version", "1.1.0", "1.0.0", undefined, false],
+  ])("%s", (_name, heading, previousVersion, version, pass) => {
+    expect(checkPrChangelog({
+      ...facts, before: beforeRelease,
+      after: `## [Unreleased]\n\n## [${heading}] - 2026-10-11\n\n${notes}\n\n${history}`,
+      policy: manifestPolicy({ version, files: ["runtime.mjs"] }),
+      previousPolicy: manifestPolicy({ version: previousVersion, files: ["runtime.mjs"] }),
+      changedFiles: ["runtime.mjs", "package.json"],
+    }).pass).toBe(pass)
   })
   test.each(["", "### Fixed", "<!-- hidden note -->"])("does not release an empty or heading/comment-only section: %s", (body) => {
     expect(checkPrChangelog({
