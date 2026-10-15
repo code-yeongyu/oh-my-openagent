@@ -90,32 +90,45 @@ export function storedMessagesToV1(messages: unknown, sessionID: string): V1Mess
   return view
 }
 
+// The message each v1 view was made from. Transforms insert, drop and reorder views, so edits are
+// written back to the message a view came from, never to whatever sits at the view's index.
+const viewSources = new WeakMap<V1Message, unknown>()
+
+function hookMessageToV1(message: unknown, sessionID: string): V1Message {
+  if (!isRecord(message)) {
+    return { info: { sessionID, role: "user" }, parts: textPart("") }
+  }
+  if (typeof message.type === "string" && message.role === undefined) {
+    return storedMessage(message, sessionID) ?? { info: { sessionID, role: "user" }, parts: textPart("") }
+  }
+  return {
+    info: {
+      id: message.id,
+      sessionID,
+      role: message.role,
+      ...(message.agent !== undefined ? { agent: message.agent } : {}),
+      ...(message.model !== undefined ? { model: message.model } : {}),
+    },
+    parts: Array.isArray(message.content) ? partsFromContent(message.content) : partsFromContent(message.parts),
+  }
+}
+
 export function hookMessagesToV1(messages: readonly unknown[], sessionID: string): V1Message[] {
   return messages.map((message) => {
-    if (!isRecord(message)) {
-      return { info: { sessionID, role: "user" }, parts: textPart("") }
-    }
-    if (typeof message.type === "string" && message.role === undefined) {
-      return storedMessage(message, sessionID) ?? { info: { sessionID, role: "user" }, parts: textPart("") }
-    }
-    return {
-      info: {
-        id: message.id,
-        sessionID,
-        role: message.role,
-        ...(message.agent !== undefined ? { agent: message.agent } : {}),
-        ...(message.model !== undefined ? { model: message.model } : {}),
-      },
-      parts: Array.isArray(message.content) ? partsFromContent(message.content) : partsFromContent(message.parts),
-    }
+    const view = hookMessageToV1(message, sessionID)
+    viewSources.set(view, message)
+    return view
   })
 }
 
 export function writeHookMessagesBack<T>(original: readonly T[], edited: readonly V1Message[]): T[] {
-  return edited.map((message, index) => {
-    const current = original[index]
+  const written = new Set<T>()
+  return edited.map((message) => {
+    const source = viewSources.get(message) as T | undefined
+    const current = source !== undefined && original.includes(source) && !written.has(source) ? source : undefined
     const content = contentFromParts(message.parts)
-    if (isRecord(current) && Array.isArray(current.content)) {
+    if (current !== undefined && isRecord(current) && Array.isArray(current.content)) {
+      written.add(current)
       current.content.splice(0, current.content.length, ...content)
       return current
     }
