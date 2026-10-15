@@ -25,7 +25,8 @@ concurrency:
 jobs:
   deploy:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9944.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # The Sisyphus Labs account (moved 2026-10-09). wrangler.toml names the account and the zone routes; the
     # token in this environment can edit Workers scripts and the omo.dev zone's routes, nothing else.

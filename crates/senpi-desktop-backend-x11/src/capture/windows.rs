@@ -70,6 +70,23 @@ fn active_window(server: &impl XServer) -> CoreResult<Option<Window>> {
         .filter(|&window| window != 0))
 }
 
+/// Current front window geometry, without the client-list enumeration cap.
+pub(crate) fn focused(server: &impl XServer) -> CoreResult<Option<DesktopWindow>> {
+    let Some(id) = active_window(server)? else { return Ok(None) };
+    Ok(server.placement(id).map(|placement| DesktopWindow {
+        id: id.to_string(),
+        title: String::new(),
+        app: String::new(),
+        pid: None,
+        x: placement.x,
+        y: placement.y,
+        width: placement.width,
+        height: placement.height,
+        focused: true,
+        elevated: None,
+    }))
+}
+
 fn visible_on_root(placement: Placement, root_width: u32, root_height: u32) -> bool {
     let (x, y) = (i64::from(placement.x), i64::from(placement.y));
     placement.viewable

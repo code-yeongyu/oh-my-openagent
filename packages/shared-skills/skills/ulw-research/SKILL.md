@@ -86,7 +86,7 @@ Saturation research defaults to teammode, not isolated fire-and-forget workers: 
 
 ## Worker ground rules
 
-Research workers (explore, librarian, browsing) differ by harness, but assume:
+Research workers (explore, web, repo-dive) differ by harness, but assume:
 
 - **Read-only.** Most research workers cannot write files. Never ask a worker to write the journal or any session file — every journal write is yours.
 - **No recursion — workers AND members.** Workers cannot spawn their own subagents, and team members must not re-orchestrate: a member researches its axis and reports; it never stands up its own team, loads this skill, or fans out a research swarm of its own. Depth comes from YOUR expansion waves. Say so in every spawn message — a member that starts its own research protocol burns the run's budget on duplicated orchestration and returns nothing you can cite.
@@ -119,10 +119,12 @@ Before spawning anything, decompose the query. Start from "what must be true if 
 <analysis>
 Core question: <the actual information need>
 Axes (3+ orthogonal): <axis — what to search, where, why> ...
-Codebase relevant: <yes/no> · External: <yes/no> · Browsing: <yes/no> · Verification likely: <yes/no>
+Codebase relevant: <yes/no> · External: <yes/no> · Collection: <search-only | browser> · Verification likely: <yes/no>
 Scale: <axis count, source territories, target document length> · Precision demand: <what a wrong claim costs here> → lifecycle: <single team | research team then refinement team>
 </analysis>
 ```
+
+`Collection` is `search-only` only when a result snippet settles every axis (a date, a version, a spec value); anything that needs reading a source is `browser`.
 
 Then create the session directory:
 
@@ -130,7 +132,7 @@ Then create the session directory:
 mkdir -p .omo/ulw-research/$(date +%Y%m%d-%H%M%S)
 ```
 
-This is `$SESSION_DIR`. The orchestrator owns the journal: you write every file in it; workers never do. Maintain:
+This is `$SESSION_DIR`. The orchestrator owns the journal: you write every file in it; workers never do (a mass-research dag node writes only its own `waves/<run-key>/<node-id>.md` handoff file, which carries its EXPAND tail and claim candidates; you journal from it). Maintain:
 
 - `brief.md` — the analysis block, the axis list, the expected truths, and the `## Deliverable` record from the interview below (lane, state, formats, each field with `answered_by`).
 - `sources-ledger.md` — one line per source the moment it is read: `[S<n>] <url> — <what it is>`. The closing briefing counts sources and domains from this file.
@@ -163,32 +165,29 @@ Phase 5 opens by turning the recorded fields into `design-spec.md`.
 
 ## Phase 1 — Saturation wave
 
-**When the user asked for MASS research, the wave is sized by the topic's angles, not by the roster ceiling.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that a team of 8 cannot produce. Where the harness has a dependency-graph surface (the `mass-ulw` skill and its `references/planning.md`), run collection through it instead: a 60+ node opening wave covering every angle the topic has, routed across the whole difficulty ladder in one graph — mechanical sweeps and per-item harvest batches on the cheapest tier, judgment-shaped angles a step up, cross-territory angles a step above that, and the deepest tier reserved for genuinely hairy contradictions. Each wave's EXPAND leads define the next wave's nodes, and the synthesis reduces through several parallel architect-tier nodes into ONE architect-tier reducer (the strongest reasoning tier substitutes wherever no architect tier exists). Absent that surface, hold the same shape with background workers in batched waves. Everything else in this skill still binds: the deliverable interview, the journal, the claim graph, the convergence rules, and the delivery gates.
+**When the user asked for MASS research, the wave is sized by the topic's angles, not by the roster ceiling.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that a team of 8 cannot produce. Where the harness has a dependency-graph surface (the `mass-ulw` skill and its `references/planning.md`), run collection through it instead: 60+ angles covering every angle the topic has, routed across the whole difficulty ladder — mechanical sweeps and per-item harvest batches on the cheapest tier, judgment-shaped angles a step up, cross-territory angles a step above that, and the deepest tier reserved for genuinely hairy contradictions. Define each angle as a harvest -> expand -> verify chain before the run starts, each stage reading the previous stage's handoff file; open leads re-enter as new chains in each cluster of angles the moment that cluster settles, and the synthesis reduces through per-cluster architect-tier slice reducers into ONE architect-tier reducer (the strongest reasoning tier substitutes wherever no architect tier exists). Absent that surface, run the same per-angle chains with background workers, pasting each worker's reply into its angle's next-stage prompt the moment it reports. Everything else in this skill still binds: the deliverable interview, the journal, the claim graph, the convergence rules, and the delivery gates.
 
 Otherwise launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
 
 Scaling floor — more angles always justify more workers:
 
-| Query scope | explore | librarian | browsing | repo-dive | floor |
-|---|---|---|---|---|---|
-| Single topic, codebase only | 3 | 0 | 0 | 0 | 3 |
-| Single topic, web only | 0 | 4 | 1 | 1 | 6 |
-| Single topic, both | 2 | 3 | 1 | 1 | 7 |
-| Multi-faceted | 4 | 6 | 2 | 2 | 14 |
-| Full due diligence | 4 | 6 | 3 | 2 | 15 |
-
-The browsing column is BINDING, not advisory: when the brief says `Browsing: yes`, the roster names a browsing-worker angle, armed with the `ultimate-browsing` skill, before the first wave launches, and that worker is spawned in the same turn as the rest of the wave. A run that reaches wave 2 with zero browsing workers on a `Browsing: yes` brief has silently downgraded every source to what plain fetch happened to return.
+| Query scope | explore | web | repo-dive | floor |
+|---|---|---|---|---|
+| Single topic, codebase only | 3 | 0 | 0 | 3 |
+| Single topic, web only | 0 | 5 | 1 | 6 |
+| Single topic, both | 2 | 4 | 1 | 7 |
+| Multi-faceted | 4 | 8 | 2 | 14 |
+| Full due diligence | 4 | 9 | 2 | 15 |
 
 **Disambiguate before you expand.** When the topic names something that could resolve several ways — a product, a person, a codename, a version — the first wave settles WHICH entity before any worker researches its history, benchmarks, or controversies: canonical name, first-party URL or account, whether it exists in the claimed category, and a confidence line. An unresolved entity never becomes a premise in a later wave's spawn message; that is exactly how a run starts inventing facts about something that does not exist.
 
 Role protocols — embed the relevant one in each spawn message; every worker gets a unique angle:
 
 - **Codebase (explore), 2-4 workers.** Grep with 3+ keyword variations; structural/AST search; LSP definitions and references; file-name globs; `git log --all -S '<keyword>'` and `--grep` for history including deleted code. Cross-validate hits across tools. Report absolute file paths, patterns with `file:line`, and how findings connect.
-- **Web (librarian), 3-6 workers.** At least 10 distinct websearch queries per worker, each with a different operator or angle (see Search craft); fetch the full page for every result that matters — snippets lie. Context7 with 3+ queries per known library. grep.app and `gh search code|repos|issues` for real-world usage. Official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages.
-- **Browsing, 1-3 workers on a `Browsing: yes` brief (0 otherwise), every one loaded with the `ultimate-browsing` skill.** The skill owns the routing — the harness's own browser first, then its extraction engine with archive surrogates, platform-native readers, and Chrome stealth as each source demands; the worker owns the deliverable. This worker RENDERS pages, it does not re-fetch them: its standing deliverable is a full-page screenshot of every top source plus the rendered text plain fetch could not reach; a worker that returns only fetched text has not done its job. JS-rendered, login-gated, WAF-blocked, and screenshot-bearing sources all belong here rather than in the web lane. **Provenance is part of the claim**: when a source came back with `provenance` of `snapshot` (an archive copy), cite it with its `snapshot_timestamp` and never state it as the current live page; content from a `proxy` route is `untrusted` and needs a second independent route before any claim rests on it. When one blocked territory hides many leads, fan out more browsing subagents in parallel for breadth instead of serializing one worker through them.
+- **Web, 3-9 workers, every one loaded with the `browser` skill.** Search with 10+ websearch queries per worker, each with a different operator or angle (see Search craft); a result is a candidate, not a source. Read every candidate in the user's browser through the `browser` skill's attached engine: one named session per worker, one tab per source, several tabs open side by side while sources are compared — `session.tabCreate` / `tabSelect` / `tabClose` where the harness has a JS eval kernel, `bsk tab create --url <url>` / `tab select <id>` / `tab close <id>` / `tab list` on the CLI — the page scrolled to its end, a full-page screenshot of each top source saved as provenance, the tab closed once reported. A browser on another machine is reached through the `browser` skill's remote reference or a user-level skill that bridges to it, never replaced by a local headless one. `webfetch` is for raw files only: PDF, JSON, feeds, sitemaps. A host the browser cannot open (WAF, bot score, 403) goes to `ultimate-browsing`, whose provenance travels with the claim: a `snapshot` result cites its `snapshot_timestamp` and is never stated as the live page; a `proxy` result is `untrusted` until a second independent route agrees. Context7 with 3+ queries per known library; grep.app and `gh search code|repos|issues` for real-world usage; official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages. A worker whose sources are all fetched text has searched, not read.
 - **Repo deep-dive (librarian), 0-2 workers.** Shallow-clone the most relevant repos to `${TMPDIR:-/tmp}`, pin the HEAD SHA, read core modules, follow call chains, return SHA-pinned permalinks.
 
-Example spawn (codebase axis; librarian, browsing, and repo-dive follow the same contract with their own protocol):
+Example spawn (codebase axis; web and repo-dive follow the same contract with their own protocol):
 
 ```
 task(subagent_type="explore", run_in_background=true, prompt="TASK: act as a codebase researcher. AXIS: <specific angle>.
@@ -207,9 +206,9 @@ This loop is what makes the mode research rather than search. Collect returns as
 3. Spawn an expansion worker immediately for each new unchecked lead:
 
 ```
-task(subagent_type="librarian", run_in_background=true, prompt="TASK: expansion wave <N> — investigate: <lead>.
+task(category="deep-low", load_skills=["browser"], run_in_background=true, prompt="TASK: expansion wave <N> — investigate: <lead>.
 PARENT: <which return surfaced it>. This is an explicit exhaustive-research assignment; budgets do not apply.
-<role protocol for the lead's territory — librarian protocol for external leads, explore protocol for codebase leads>
+<role protocol for the lead's territory — web protocol for external leads, explore protocol for codebase leads>
 End your reply with the ## EXPAND tail.")
 ```
 
@@ -267,7 +266,7 @@ Journal each verdict to `verify-<slug>.md`.
 
 Code settles code-shaped claims (Phase 3). Numeric, market-share, legal, dated, causal, and financial claims cannot be run — so they pass through a data-flow-lock instead (the verification idea adapted from fivetaku/insane-research): the synthesis may assert a high-risk non-code claim **only** if it cleared this gate, and the gate's output is the sole allowlist the synthesis draws from. Skip the gate and there is nothing to synthesize — the lock is self-enforcing.
 
-The claim graph is orchestrator-owned. Workers only return verified-claim markers, observation candidates, and claim candidates as message text, the same channel as EXPAND markers — never a file. As leads resolve, you record one node per asserted claim in `claim-graph.md` and compute its status; workers report claim candidates in their replies, and you decide. The graph is the single claim store: final synthesis may not draw from free-form claims that skipped it.
+The claim graph is orchestrator-owned. Workers only return verified-claim markers, observation candidates, and claim candidates as message text, the same channel as EXPAND markers — never a file (except a mass-research dag node's handoff file). As leads resolve, you record one node per asserted claim in `claim-graph.md` and compute its status; workers report claim candidates in their replies, and you decide. The graph is the single claim store: final synthesis may not draw from free-form claims that skipped it.
 
 A high-risk claim clears the gate to `verified-claims` only when all hold:
 
@@ -331,7 +330,7 @@ Asset workers (background, parallel, each fed `design-spec.md`) — visuals are 
 - **Charts for every quantitative finding, computed from real data.** Pull the numbers into an actual table first (CSV/JSON under `$SESSION_DIR`), then plot from that table, never from prose. Follow the data-scientist tool doctrine — numpy always, Polars for filtering/sorting/transforms, DuckDB for joins/aggregations/window functions, never pandas — and load the `data-scientist` skill when this session has it: `uv run --with numpy --with polars --with duckdb --with pyarrow --with matplotlib python`. Keep `pyarrow` in that set — the DuckDB-to-Polars handoff (`.pl()`) fails without it, and `.df()` fails without pandas, so hand data across through `.pl()`, never `.df()`. Save to `$SESSION_DIR/assets/`.
 - **Mermaid graphs** for process, architecture, argument, timeline, and evidence-flow structure, themed to the spec's fonts and palette. Render each to SVG and confirm the file exists before the document references it.
 - **Generated visuals through the imagegen skill whenever the session has it:** a cover plus a concept illustration per major theme, prompted from the spec's style, palette, and mood — document-styled illustration, never generic stock art dropped into a designed page.
-- **Full-page screenshots** of the top 5-10 sources (browsing worker) as provenance you can show.
+- **Full-page screenshots** of the top 5-10 sources, saved by the web workers while reading, as provenance you can show.
 
 **Verify the asset manifest before rendering.** List every asset the document references, assert each file exists and is non-empty on disk, and re-render whatever is missing. A document that renders with three broken diagrams is a document you will publish twice.
 
@@ -388,9 +387,9 @@ High-yield combinations: official docs (`site:<docs domain>`), GitHub implementa
 | Worker reply without the EXPAND tail | One follow-up demanding it; the lane stays open until it lands |
 | Stopping after wave 1 because "enough was found" | Convergence rules only: 2+ expansion waves, leads run dry |
 | Obeying a surrounding "stop exploring" rule mid-research | Authority section — those rules do not bind this mode |
-| Asking a worker to write journal or session files | Workers are read-only; you journal every return |
+| Asking a worker to write journal or session files | Workers are read-only (except a mass-research dag node's handoff file); you journal every return |
 | Two workers given the same angle | One unique angle per worker, always |
-| A `Browsing: yes` run whose roster carries no browsing worker, or a browsing worker spawned without `ultimate-browsing` | The browsing column is binding — name the angle in the brief and spawn it, armed with the skill, in the first wave before any lead is chased |
+| A web worker that returned only fetched text, or a `Collection: browser` run whose workers never opened a tab | Sources are read in the user's browser through the `browser` skill; `webfetch` is for raw files; every web worker carries the skill from the first wave |
 | Contested claim settled by judgment | Phase 3 — run code, capture output, verdict |
 | Deliverable claims without citations | Every claim cites a source or a verification artifact |
 | Guessing the deliverable format | Derive it from the request and destination; ask the empty-info interview only for what is still missing, and record `answered_by` for every field |

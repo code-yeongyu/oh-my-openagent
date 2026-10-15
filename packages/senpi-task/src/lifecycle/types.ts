@@ -18,6 +18,7 @@ export type ReconcileDeferredReason =
   | "tools_unavailable"
   | "session_unavailable"
   | "spawn_spec_unavailable"
+  | "transcript_unavailable"
   | "team_inactive"
   | "reattach_disabled"
   | "rollback_failed"
@@ -40,6 +41,7 @@ export type ReconcileOutcome = {
   readonly task_id: string
   readonly kind: ReconcileOutcomeKind
   readonly reason?: string
+  readonly permanent?: boolean
 }
 
 export type ReconcileResult = {

@@ -10,6 +10,7 @@ export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const ULW_PLAN_CUSTOM_TYPE = "omo-ulw-plan:skill-pointer"
 export const ULW_LOOP_CUSTOM_TYPE = "omo-ulw-loop:skill-pointer"
 export const ULW_RESEARCH_CUSTOM_TYPE = "omo-ulw-research:skill-pointer"
+export const BROWSER_CUSTOM_TYPE = "omo-browser:skill-pointer"
 export const ULTIMATE_BROWSING_CUSTOM_TYPE = "omo-ultimate-browsing:skill-pointer"
 export const SKILL_POINTERS_DISABLED_FLAG = "omo-senpi-skill-pointers-disabled"
 
@@ -42,12 +43,23 @@ interface SkillPointerMessage {
   readonly content: string
 }
 
+// Research sources are read in the user's browser, so the browser skill rides on every research
+// invocation; ultimate-browsing stays a companion for the hosts that browser cannot open.
+const BROWSER_COMPANION: SkillCompanion = {
+  skillName: "browser",
+  customType: BROWSER_CUSTOM_TYPE,
+  expandedBlockPattern: /<skill\s+name="browser"/i,
+  role: "reads its sources in the user's browser through the browser skill's attached engine",
+  instruction:
+    'arm every web lane with load_skills: ["browser"] and name that SKILL.md path in every web member brief, since team members carry no load_skills',
+}
+
 const ULTIMATE_BROWSING_COMPANION: SkillCompanion = {
   skillName: "ultimate-browsing",
   customType: ULTIMATE_BROWSING_CUSTOM_TYPE,
   expandedBlockPattern: /<skill\s+name="ultimate-browsing"/i,
-  role: "runs its browsing lanes on the ultimate-browsing skill",
-  instruction: 'arm every browsing lane or member with load_skills: ["ultimate-browsing"]',
+  role: "sends the hosts the user's browser cannot open to the ultimate-browsing skill",
+  instruction: 'arm a lane that must reach a blocked host with load_skills: ["ultimate-browsing"]',
 }
 
 // After quoted regions are removed, patterns match independently and overlapping
@@ -93,7 +105,7 @@ const TARGETS: readonly SkillPointerTarget[] = [
     pattern: skillNamePattern(String.raw`(?:ulw|${MASS_ALIAS})[\s-]*research`),
     expandedBlockPattern: /<skill\s+name="ulw-research"/i,
     instruction: "orchestrate team-first maximum-saturation research",
-    companions: [ULTIMATE_BROWSING_COMPANION],
+    companions: [BROWSER_COMPANION, ULTIMATE_BROWSING_COMPANION],
   },
 ]
 

@@ -9,16 +9,18 @@
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
+use crate::menus::MenuItem;
 use crate::protocol_params::{
     AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
-    AxSetValueParams, AxSnapshotParams, CancelParams, CaptureParams, ClipboardText, DragParams, EmptyParams,
-    KeyChordParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams, StopPathStartParams,
-    StopPathStopParams, TypeTextParams,
+    AxSetValueParams, AxSnapshotParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
+    EmptyParams, KeyChordParams, MenuPathParams, MenuSelectParams, ObserveParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
+    StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
-use crate::protocol_results::{AuditEvent, EngineLog, HelloResult, SessionOpenResult, StopPathStatus};
+use crate::protocol_results::{
+    AuditEvent, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
+};
 use crate::types::{
-    AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions,
-    DesktopWindow,
+    AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
 };
 
 /// What a method may do to the desktop or to the engine's input gate.
@@ -86,10 +88,15 @@ method_table! {
     EngineHello = "engine.hello", Read, Public, EmptyParams => HelloResult;
     SessionOpen = "session.open", Exec, HostOnly, DesktopSessionOptions => SessionOpenResult;
     SessionClose = "session.close", Exec, HostOnly, EmptyParams => ();
+    ControlGrant = "control.grant", Exec, HostOnly, ControlGrantParams => ControlStateResult;
+    ControlRevoke = "control.revoke", Exec, HostOnly, EmptyParams => ();
+    ControlState = "control.state", Read, Public, EmptyParams => ControlStateResult;
     Capabilities = "capabilities", Read, Public, EmptyParams => DesktopCapabilities;
     Displays = "displays", Read, Public, EmptyParams => Vec<DesktopDisplay>;
     Windows = "windows", Read, Public, EmptyParams => Vec<DesktopWindow>;
     Capture = "capture", Read, Public, CaptureParams => CaptureResult;
+    CaptureRegion = "captureRegion", Read, Public, CaptureRegionParams => CaptureResult;
+    Observe = "observe", Read, Public, ObserveParams => ObserveResult;
     Click = "click", Exec, Public, PointParams => ();
     MoveMouse = "moveMouse", Exec, Public, PointParams => ();
     Drag = "drag", Exec, Public, DragParams => ();
@@ -97,6 +104,8 @@ method_table! {
     TypeText = "typeText", Exec, Public, TypeTextParams => ();
     KeyChord = "keyChord", Exec, Public, KeyChordParams => ();
     RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => ();
+    MenusItems = "menus.items", Read, Public, MenuPathParams => Vec<MenuItem>;
+    MenusSelect = "menus.select", Exec, Public, MenuSelectParams => ();
     ClipboardRead = "clipboard.read", Read, Public, EmptyParams => ClipboardText;
     ClipboardWrite = "clipboard.write", Exec, Public, ClipboardText => ();
     AxSnapshot = "ax.snapshot", Read, Public, AxSnapshotParams => AxSnapshot;
@@ -131,10 +140,7 @@ impl Method {
     /// reason `unknown`).
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
-        METHODS
-            .iter()
-            .find(|spec| spec.name == name)
-            .map(|spec| spec.method)
+        METHODS.iter().find(|spec| spec.name == name).map(|spec| spec.method)
     }
 }
 

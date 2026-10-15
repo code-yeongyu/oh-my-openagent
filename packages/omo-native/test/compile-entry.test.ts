@@ -157,10 +157,16 @@ describe("compiled omo entry launcher parity", () => {
     expect(buildSenpiArgs(["install", "x"], "/provisioned")).toEqual(["install", "x"])
   })
 
-  test("app-server appends the provisioned plugin after its subcommand", () => {
-    expect(buildSenpiArgs(["app-server", "daemon", "start"], "/provisioned")).toEqual([
-      "app-server", "daemon", "start", "--extension", join("/provisioned", "plugin"),
-    ])
+  test("the retired app-server command is refused before any engine import (#10033)", async () => {
+    const execDir = temp()
+    writeFileSync(join(execDir, "package.json"), JSON.stringify({ version: "1.2.3-test.0" }))
+    const savedExitCode = process.exitCode
+    try {
+      const handled = await runCompiledLauncher(["app-server", "--listen", "stdio://"], execDir)
+      expect({ handled, exitCode: process.exitCode }).toEqual({ handled: true, exitCode: 2 })
+    } finally {
+      process.exitCode = savedExitCode
+    }
   })
 
   test("main commands prepend the provisioned plugin extension", () => {

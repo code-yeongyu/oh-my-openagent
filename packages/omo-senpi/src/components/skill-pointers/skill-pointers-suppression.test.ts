@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import {
+  BROWSER_CUSTOM_TYPE,
   matchedSkillPointerNames,
   SKILL_POINTERS_DISABLED_FLAG,
   ULTIMATE_BROWSING_CUSTOM_TYPE,
@@ -173,6 +174,7 @@ describe("omo-senpi skill-pointers suppression", () => {
       // then
       expectPointerInjections(pi, result, [
         { customType: ULW_RESEARCH_CUSTOM_TYPE, skillName: "ulw-research" },
+        { customType: BROWSER_CUSTOM_TYPE, skillName: "browser" },
         { customType: ULTIMATE_BROWSING_CUSTOM_TYPE, skillName: "ultimate-browsing" },
       ])
     })

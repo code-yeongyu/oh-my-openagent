@@ -1483,3 +1483,29 @@
     }
   }
 }
+
+@layer utilities {
+  /* §16 Dori teaser — a glimpse: the art is clipped at its box's bottom edge and sits low; the only
+     link lifts it one step. Transform + opacity only; the edge mask is the reel's fade, vertical. */
+  .dori-peek-clip {
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, var(--ink-0) 68%, transparent);
+  }
+  .dori-peek {
+    transform: translate3d(0, 26%, 0);
+    opacity: 0.8;
+    transition:
+      transform var(--dur-reveal) var(--ease-out-quart),
+      opacity var(--dur-reveal) var(--ease-out-quart);
+  }
+  .dori-teaser:has(a:hover) .dori-peek,
+  .dori-teaser:has(a:focus-visible) .dori-peek {
+    transform: translate3d(0, 14%, 0);
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dori-peek {
+      transition: none;
+    }
+  }
+}

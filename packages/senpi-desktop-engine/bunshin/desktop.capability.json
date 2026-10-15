@@ -5,10 +5,13 @@
 	"description": "senpi desktop engine: screenshots, native input, accessibility, and the stop path",
 	"ops": [
 		"desktop.engine.hello",
+		"desktop.control.state",
 		"desktop.capabilities",
 		"desktop.displays",
 		"desktop.windows",
 		"desktop.capture",
+		"desktop.captureRegion",
+		"desktop.observe",
 		"desktop.click",
 		"desktop.moveMouse",
 		"desktop.drag",
@@ -16,6 +19,8 @@
 		"desktop.typeText",
 		"desktop.keyChord",
 		"desktop.raiseWindow",
+		"desktop.menus.items",
+		"desktop.menus.select",
 		"desktop.clipboard.read",
 		"desktop.clipboard.write",
 		"desktop.ax.snapshot",
@@ -35,10 +40,13 @@
 	],
 	"effects": {
 		"desktop.engine.hello": "read",
+		"desktop.control.state": "read",
 		"desktop.capabilities": "read",
 		"desktop.displays": "read",
 		"desktop.windows": "read",
 		"desktop.capture": "read",
+		"desktop.captureRegion": "read",
+		"desktop.observe": "read",
 		"desktop.click": "mutate",
 		"desktop.moveMouse": "mutate",
 		"desktop.drag": "mutate",
@@ -46,6 +54,8 @@
 		"desktop.typeText": "mutate",
 		"desktop.keyChord": "mutate",
 		"desktop.raiseWindow": "mutate",
+		"desktop.menus.items": "read",
+		"desktop.menus.select": "mutate",
 		"desktop.clipboard.read": "read",
 		"desktop.clipboard.write": "mutate",
 		"desktop.ax.snapshot": "read",
@@ -65,6 +75,11 @@
 	},
 	"schemas": {
 		"desktop.engine.hello": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.control.state": {
 			"type": "object",
 			"description": "Parameters of a method that takes none: `{}`.",
 			"additionalProperties": false
@@ -139,6 +154,208 @@
 							"minimum": 0,
 							"description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
 							"default": 5000000
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.captureRegion": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"region": {
+					"$ref": "#/definitions/CaptureRegion"
+				},
+				"caps": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/CaptureCaps"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"frameId": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"target",
+				"region"
+			],
+			"description": "`captureRegion`: native-detail zoom preserving the last full input frame.",
+			"additionalProperties": false,
+			"definitions": {
+				"CaptureRegion": {
+					"type": "object",
+					"properties": {
+						"x": {
+							"type": "number",
+							"format": "double"
+						},
+						"y": {
+							"type": "number",
+							"format": "double"
+						},
+						"width": {
+							"type": "number",
+							"format": "double"
+						},
+						"height": {
+							"type": "number",
+							"format": "double"
+						}
+					},
+					"required": [
+						"x",
+						"y",
+						"width",
+						"height"
+					],
+					"description": "Rectangle in the pixels of the last full screenshot, not the zoom image.",
+					"additionalProperties": false
+				},
+				"CaptureCaps": {
+					"type": "object",
+					"properties": {
+						"maxWidth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxHeight": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"coordinateSafe": {
+							"type": "boolean",
+							"description": "Clamp to the coordinate-safe size for models that click in image pixels.",
+							"default": false
+						},
+						"maxBytes": {
+							"type": "integer",
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
+							"default": 5000000
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.observe": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"caps": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/CaptureCaps"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"ax": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/AxSnapshotOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target"
+			],
+			"description": "`observe`: an atomic window screenshot and accessibility snapshot.",
+			"additionalProperties": false,
+			"definitions": {
+				"CaptureCaps": {
+					"type": "object",
+					"properties": {
+						"maxWidth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxHeight": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"coordinateSafe": {
+							"type": "boolean",
+							"description": "Clamp to the coordinate-safe size for models that click in image pixels.",
+							"default": false
+						},
+						"maxBytes": {
+							"type": "integer",
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
+							"default": 5000000
+						}
+					},
+					"additionalProperties": false
+				},
+				"AxSnapshotOptions": {
+					"type": "object",
+					"properties": {
+						"maxDepth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxNodes": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"all": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"default": null
 						}
 					},
 					"additionalProperties": false
@@ -639,6 +856,52 @@
 			"required": [
 				"windowId"
 			],
+			"additionalProperties": false
+		},
+		"desktop.menus.items": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				},
+				"path": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": []
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`menus.items`: the window whose menu is addressed and the path inside it\n(empty lists the menu bar). `menus.select` takes [`MenuSelectParams`].",
+			"additionalProperties": false
+		},
+		"desktop.menus.select": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				},
+				"path": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": []
+				},
+				"deliveryMode": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`menus.select`: the window, the 1..=32-label path to a command, and the\ndelivery. An omitted delivery is background; `foreground` raises and keys\nthe target window and needs this session's live control grant (#9888).",
 			"additionalProperties": false
 		},
 		"desktop.clipboard.read": {

@@ -1,3 +1,36 @@
+## 2026-10-12 - Thread QA rides the neutral senpi qa-shared helpers (#10033)
+
+The thread-tools harness and runner no longer import senpi's app-server-named QA library. `scripts/qa/thread-tools/lib/harness.mjs` resolves `scripts/qa-shared/lib/{env,fake-model,cleanup}.mjs` from the senpi checkout (the prerequisite extraction in senpi #3177) and `run-all.mjs`'s legacy precondition checks the same path, so the suite keeps its coverage instead of silently skipping once the old helper location is removed. The ulw-loop delegation guidance and `docs/reference/mass-ulw-protocol.md` stop naming the retired protocol; the DAG widget's non-TUI suppression test uses the rpc mode fixture. No behavior changes: the harness still drives the real `--mode rpc --multi-session` host.
+
+## 2026-10-11 - The control confirm drops its redundant time floor (#9967)
+
+`control-confirm.ts` no longer refuses a confirm under 3 s of budget: the service facade already throws before asking when under 8 s of run time is left, so the component check never fired in production. The near-duplicate "RPC-mode confirm frame never answered" test is removed; "a client that never answers" keeps that contract.
+
+## 2026-10-11 - The browser skill rides on every ulw-research invocation (#9958)
+
+The skill-pointers companion list for `ulw-research` was `ultimate-browsing` alone, and its instruction asked to arm "every browsing lane or member" with `load_skills` - a team member carries no `load_skills`, and `ultimate-browsing` routes plain page reading to headless extraction, so a research run that loaded the companion still read its sources through fetch. `browser` is now the first companion: its pointer tells the orchestrator to read the `browser` skill in the same turn as `ulw-research`, arm every web lane with `load_skills: ["browser"]`, and name that `SKILL.md` in every web member brief. The `ultimate-browsing` companion stays for the hosts the user's browser cannot open and no longer mentions members. The companion rides behind the keyword, `/skill:ulw-research`, expanded-block and queued paths like the existing one, is skipped only when the input already carries the `browser` skill, and the `skill-pointers-e2e` scenarios assert the hidden `omo-browser:skill-pointer` message on the live engine.
+
+## 2026-10-11 - The computer-use component confirms and revokes the foreground-control grant (#9651 B5b)
+
+`components/computer-use/control-confirm.ts` is the human confirm behind `desktop.control.acquire`. It shows upstream's title "Allow foreground computer control?" with the model's reason and the revocation rules. A headless context (`hasUI === false` or no `ui.confirm`) never prompts, and a refusal, an abort or a client that never answers means no grant.
+
+The confirm is bounded at 45 s, under the default 60 s run budget, and is capped further by the time a shorter run has left. With under 8 s of the run left (the 5 s kept for the grant and the action, plus 3 s to answer), `acquire` throws with that reason instead of asking, and the confirm itself declines to prompt with under 3 s as a backstop. An unanswered confirm therefore reports `{ active: false }` rather than a run timeout. The timeout is also handed to `ui.confirm`, so senpi's rpc dialog clears its pending request and a desktop client can show the deadline. `registration-support.ts` `wireComputerControlEvents` revokes the grant on `agent_end` and on `session_shutdown` (before `session.close`), and so does a failed or interrupted run. A revoke is sent only while a grant this host asked for may be live, so a turn without one adds no no-op event to the engine's audit. The revoke is written to the engine's serial queue without the run waiting for it, so a failed run still settles at its own deadline.
+
+`scripts/qa/computer-control-rpc-e2e.mjs` proves this through senpi's real `--mode rpc` on the engine's fake backend:
+- `no-answer`: the confirm never gets an answer, and no `control.grant` reaches the engine.
+- `declined`: no grant.
+- `approved`: the grant is audited, and the end of the turn revokes it. This is the positive control.
+
+## 2026-10-11 - The engine probe names both waits and loses a dead phase (#9742 follow-up)
+
+The computer-use engine probe's timeout phase names where the handshake stopped. Its `spawned, requests not yet sent` phase could never be reported: the timer is armed inside the Promise executor and both `stdin.write` calls ran synchronously later in that same executor, so by the time any timer callback could fire the requests were always already sent; a write that threw would reject the promise outright and still never surface the phase. The branch and the `requestsSent` flag are gone. The neither-reply label now reads `requests sent, awaiting engine.hello and capabilities`, which is what the probe actually waits for. The phase tests assert the exact timeout message instead of a substring, a new in-process test covers the reachable-but-untested out-of-order engine that answers `capabilities` before `engine.hello`, and the `omo-computer-use` bundle is regenerated.
+
+## 2026-10-10 - Bindings take whatsapp as a native platform name
+
+The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.
+
+`whatsapp` is now a binding platform in all three spellings. Because SQLite cannot widen a CHECK in place, schema v7 rebuilds the `bindings` table with the widened list, carrying every column over verbatim and recreating `bindings_one_active_thread` and `bindings_session` before the old table drops. The rebuild runs with foreign keys off so an extension table referencing `bindings` is neither cascade-deleted nor able to block the migration, and the AUTOINCREMENT high-water mark is carried over so a deleted newest row's key is never reused. Before the version bump commits, `migrate()` runs `PRAGMA foreign_key_check` from TypeScript and throws (rolling back to v6) if the step introduced a violation referencing `bindings`; the `foreign_keys` pragma is restored to its prior value afterwards. A store migrated from v6 keeps its live bindings and accepts a `whatsapp` bind (`store-v7-whatsapp.test.ts`); the tool schema takes the native name and the store keeps it (`bindings.test.ts`).
+
 ## 2026-10-09 - A suspended background child's row stops spinning and counting (#9350)
 
 The live task widget (`components/task/status-row-format.ts` `formatLiveBackgroundRow`) took its spinner frame and elapsed time from the current clock for every row. A parked child therefore read `⠹ ... · suspended · 354m 31s`: it looked like it was working, its time kept climbing, and the row said neither why it stopped nor what the user could do. It also checked residency only, so a child a host parked with a `suspension_reason` while still marked resident rendered as `running`.
@@ -822,3 +855,43 @@ With senpi 2026.9.29-4 adopted (wake, admitExternalMessage, terminal control end
 - `components/task/category-unavailable-warning.ts`: when only an unlisted provider serves a hidden category's chain,
   the one notice per session names it and the exact opt-in line
   (`categories.<name>.model = "<gateway>/<model>"`); `details.unlisted_provider_model` carries it for remote clients.
+
+## 2026-10-11 - Onboarding rides the first real prompt (#9905)
+
+`src/components/onboarding/component.ts` no longer claims first-run state or starts a model
+turn when a session opens. An interactive session with UI receives one hidden
+`omo-onboarding:context` message on its first real `before_agent_start` prompt. The handler
+is not preview-safe and also rejects preview events explicitly. Worker, headless, disabled,
+extension-triggered and delivery-triggered turns cannot claim onboarding.
+
+The TUI shows a static welcome until that prompt. Explicit `--onboard` still starts the
+guided tour immediately in TUI; RPC defers the forced tour to its first user prompt.
+The skill distinguishes task-first context entry from the explicit tour. A
+`Symbol.for("omo.onboard")` latch on `globalThis` makes the forced tour run once per process
+on in-process paths (TUI, socket host, and `--session-runtime in-process`) and across
+`/new`, `/resume`, and `/fork` within one worker. The default stdio `--multi-session`
+worker runtime gives each `open_session` its own realm, so newly opened workers still
+repeat the forced tour; the once-per-host gap is tracked in
+[#9917](https://github.com/code-yeongyu/oh-my-openagent/issues/9917).
+
+The forced latch is set when the tour is claimed, not when it succeeds, and is not reset
+on release. This deliberately prevents later sessions in that process from repeating a
+forced tour whose first turn failed or aborted. A retry in the same session re-claims the
+marker without re-injecting when `getBranch()` already contains `omo-onboarding:context`;
+the earlier context remains in that session's history.
+
+Claim ownership is local to the injecting session and active run. Automatic retry retains
+it; terminal failure, abort, preflight rejection or teardown before completion releases it
+through `state.ts` `releaseOnboarding`. Settlement checks the end event again for late aborts.
+A successful turn retains the install-wide marker, and a forced tour never deletes a marker
+it did not create. `src/extension/types.ts` exposes the host's existing `sessionKind`.
+
+`getBuiltinSkillsRoot()` now resolves source-mode `.ts` modules to
+`packages/omo-senpi/skills/` instead of the wrong parent directory, while built extensions
+continue to resolve `plugin/skills/`. This also fixes source-mode skill paths for
+`skill-pointers`, `init-deep-advisor`, and `omo-native-tools`. Tests check that the emitted
+onboarding skill path exists in source and bundle modes.
+
+This fixes background-session onboarding for desktop #2197 and #2199 without changing
+Senpi or requiring each RPC caller to opt out. The desktop greeting card and pin remain
+downstream work; the independent init-deep advisor startup dialog is tracked in #9904.

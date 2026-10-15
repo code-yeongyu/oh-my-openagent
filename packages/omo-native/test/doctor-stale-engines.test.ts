@@ -39,10 +39,10 @@ describe("omo doctor stale engine detection", () => {
         const orphan = entry({ pid: 75183 })
         const attached = entry({ pid: 12811, ppid: 12806, tty: "ttys002" })
         const rpc = entry({ pid: 4242, command: `bun ${ENGINE} --mode rpc` })
-        const appServer = entry({ pid: 4243, command: `bun ${ENGINE} --mode app-server` })
+        const printMode = entry({ pid: 4243, command: `bun ${ENGINE} --mode print` })
         const unrelated = entry({ pid: 4244, command: "bun /Users/dev/other/dist/cli.js" })
 
-        const result = classifyEngineProcesses([orphan, attached, rpc, appServer, unrelated])
+        const result = classifyEngineProcesses([orphan, attached, rpc, printMode, unrelated])
 
         expect(result.stale.map((process) => process.pid)).toEqual([75183])
         expect(result.attached.map((process) => process.pid)).toEqual([12811])
@@ -110,7 +110,7 @@ describe("omo doctor stale engine detection", () => {
     describe("#when the named pid is an attached or managed engine", () => {
       for (const [label, unsafe] of [
         ["an rpc engine", entry({ pid: 4242, command: `bun ${ENGINE} --mode rpc` })],
-        ["an app-server engine", entry({ pid: 4243, command: `bun ${ENGINE} --mode app-server` })],
+        ["a print engine", entry({ pid: 4243, command: `bun ${ENGINE} --mode print` })],
         ["a live attached engine", entry({ pid: 12811, ppid: 12806 })],
       ] as const) {
         test(`#then ${label} is refused and nothing is signaled`, () => {

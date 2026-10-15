@@ -8,6 +8,7 @@ use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
     FrontWindow, Target,
@@ -113,7 +114,7 @@ impl Backend for MacosBackend {
     }
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
-        self.capture.displays()
+        self.capture.all_displays()
     }
 
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
@@ -163,6 +164,34 @@ impl Backend for MacosBackend {
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         Self::require_input_permission()?;
         self.input.key_chord(target, keys, mode, &self.capture)
+    }
+
+    fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+        Self::require_input_permission()?;
+        crate::ax::menus::items(window, path)
+    }
+
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        delivery: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        Self::require_input_permission()?;
+        let (input, capture) = (&mut self.input, &self.capture);
+        match delivery {
+            DeliveryMode::Background => crate::ax::menus::select(window, path, check_stop, &mut || {
+                input.make_menu_window_key(window, capture)
+            }),
+            // The window is already key inside the foreground scope, so `make_key` only verifies it.
+            DeliveryMode::Foreground => {
+                crate::ax::menus::preflight(window, path, check_stop)?;
+                input.with_menu_window_foreground(window, || {
+                    crate::ax::menus::select(window, path, check_stop, &mut || Ok(()))
+                })
+            }
+        }
     }
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {

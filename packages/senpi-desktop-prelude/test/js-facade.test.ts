@@ -5,6 +5,18 @@ type AsyncBody = new (...parameters: string[]) => (...args: unknown[]) => Promis
 const AsyncFunction: AsyncBody = Object.getPrototypeOf(async () => {}).constructor;
 
 describe("JavaScript computer facade", () => {
+	it("sends display input as a display-hopped chain with its selector preserved", async () => {
+		// Given
+		const kernel = loadJsFacade(() => ({ text: "", details: { value: { id: "all" } } }));
+		// When
+		await kernel.run(`await (await computer.display("all")).click(20, 10);`);
+		// Then
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "display", args: ["all"] }] },
+			{ action: "call", chain: [{ method: "display", args: ["all"] }, { method: "click", args: [20, 10] }] },
+		]);
+	});
+
 	it("sends a window click as one two-step call chain through tool.computer", async () => {
 		// Given
 		const kernel = loadJsFacade(windowResponder);
@@ -157,5 +169,102 @@ describe("JavaScript computer facade", () => {
 
 		// Then
 		expect(kernel.calls).toEqual([{ action: "capabilities" }, { action: "close" }]);
+	});
+
+	it("sends menu.items and menu.select as window-hopped chains with the path forwarded", async () => {
+		// Given
+		const kernel = loadJsFacade(windowResponder);
+
+		// When
+		await kernel.run(`
+			const win = await computer.window({ app: "Code" });
+			await win.menu.items();
+			await win.menu.items(["File"]);
+			await win.menu.select(["File", "Export…", "PDF"]);
+		`);
+
+		// Then
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "window", args: [{ app: "Code" }] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [["File"]] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.select", args: [["File", "Export…", "PDF"]] },
+				],
+			},
+		]);
+	});
+
+	it("forwards a win.menu.select delivery option as a second argument (#9888)", async () => {
+		// Given
+		const kernel = loadJsFacade(windowResponder);
+
+		// When
+		await kernel.run(`
+			const win = await computer.window({ app: "Code" });
+			await win.menu.select(["File", "Save"], { delivery: "foreground" });
+		`);
+
+		// Then
+		expect(kernel.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "window", args: ["w1"] },
+				{ method: "menu.select", args: [["File", "Save"], { delivery: "foreground" }] },
+			],
+		});
+	});
+
+	it("returns the items array from win.menu.items", async () => {
+		// Given
+		const menu = [
+			{ title: "File", path: ["File"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },
+		];
+		const kernel = loadJsFacade((args) => {
+			const chain = Array.isArray(args.chain) ? args.chain : [];
+			if (chain.length === 1 && chain[0].method === "window") {
+				return { text: "", details: { value: WINDOW_SNAPSHOT } };
+			}
+			return { text: "", details: { value: menu } };
+		});
+
+		// When
+		const value = await kernel.run(`return (await computer.window("w1")).menu.items(["File"]);`);
+
+		// Then
+		expect(value).toEqual(menu);
+	});
+
+	it("sends control helpers as one-step call chains (#9651 B5b)", async () => {
+		// Given
+		const kernel = loadJsFacade(() => ({ text: "", details: { value: { active: true } } }));
+
+		// When
+		const acquired = await kernel.run(`return await computer.control.acquire({ reason: "click Run" });`);
+		const state = await kernel.run("return await computer.control.state();");
+		await kernel.run("await computer.control.release();");
+
+		// Then
+		expect({ acquired, state }).toEqual({ acquired: { active: true }, state: { active: true } });
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] },
+			{ action: "call", chain: [{ method: "control.state", args: [] }] },
+			{ action: "call", chain: [{ method: "control.release", args: [] }] },
+		]);
 	});
 });

@@ -11,7 +11,7 @@ export async function reconcileLegacyTerminal(context: LifecycleContext, record:
   }
   if (record.residency_state !== "resident") return { task_id: record.task_id, kind: "resumed" }
   if (newestSessionPath(context, record.task_id) === undefined) {
-    await destroyResidentTask(context, record.task_id, "reconcile_lost")
+    await destroyResidentTask(context, record.task_id, "target_gone")
     return {
       task_id: record.task_id,
       kind: "resumed",

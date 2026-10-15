@@ -15,7 +15,7 @@ import type { AdmissionResult } from "./types"
 /**
  * Residency cap gate (codex residency contract). A resident is a spawned-not-disposed child of the
  * parent session. Under the cap -> admit. At the cap -> LRU-evict the OLDEST terminal, idle resident
- * (skipping any with a queued send) via the destruction port. If nothing is evictable -> reject with
+ * via the destruction port, which parks rather than destroys a queued continuation. If nothing is evictable -> reject with
  * AgentLimitReached naming the residents so the caller can explain why. An unbounded cap
  * ("unlimited" or 0) admits every child and never evicts.
  */
@@ -46,6 +46,15 @@ function residentsFor(context: LifecycleContext, parentSessionId: string): reado
   return residentsOf(context.store.list().records, parentSessionId)
 }
 
+/**
+ * What keeps a FINISHED resident from being parked or evicted: a send being delivered right now. Its
+ * durable queue does not, because parking keeps the queue on the record and a revival delivers it first
+ * (#9861). Registries without the in-flight view keep the older, stricter rule.
+ */
+export function blocksFinishedTeardown(context: LifecycleContext, taskId: string): boolean {
+  return context.registry.hasInFlightSends?.(taskId) ?? context.registry.hasPendingSends(taskId)
+}
+
 /** Reclaim terminal residents that have not been touched during the idle retention window. */
 export async function reclaimIdleResidents(context: LifecycleContext): Promise<readonly string[]> {
   const cutoff = context.now() - context.config.resident_idle_timeout_ms
@@ -55,7 +64,7 @@ export async function reclaimIdleResidents(context: LifecycleContext): Promise<r
       (record.host_pid === context.hostPid || context.registry.get(record.task_id) !== undefined) &&
       TERMINAL_STATUSES.has(record.status) &&
       Date.parse(record.updated_at) <= cutoff &&
-      !context.registry.hasPendingSends(record.task_id),
+      !blocksFinishedTeardown(context, record.task_id),
   )
   // Each resident is reclaimed on its own (omo#9785): one child that is slow to stop never delays the
   // others, and every teardown step is bounded, so the sweep always settles and the next one runs.
@@ -74,7 +83,7 @@ async function reclaimIdleResident(context: LifecycleContext, candidate: TaskRec
       (fresh.host_pid !== context.hostPid && context.registry.get(fresh.task_id) === undefined) ||
       !TERMINAL_STATUSES.has(fresh.status) ||
       Date.parse(fresh.updated_at) > cutoff ||
-      context.registry.hasPendingSends(fresh.task_id)
+      blocksFinishedTeardown(context, fresh.task_id)
     ) return undefined
     if (fresh.killed === true || fresh.status === "cancelled" || fresh.status === "lost") {
       await destroyResidentTask(context, fresh.task_id, "cancel")
@@ -117,11 +126,11 @@ export function startIdleResidentReclaimer(
 }
 
 // Oldest-first scan (updated_at is touched on every steer/revive, so it tracks recency of use). The
-// first terminal resident with no pending send is the LRU victim. EVERY terminal status (including
+// first terminal resident with no in-flight send is the LRU victim; a durable queue forces parking. EVERY terminal status (including
 // lost and cancelled) is reclaimable: a lost child is unreachable and must never pin a slot.
 function lruEvictable(context: LifecycleContext, residents: readonly TaskRecord[]): TaskRecord | undefined {
   return [...residents]
-    .filter((record) => TERMINAL_STATUSES.has(record.status) && !context.registry.hasPendingSends(record.task_id))
+    .filter((record) => TERMINAL_STATUSES.has(record.status) && !blocksFinishedTeardown(context, record.task_id))
     .toSorted((left, right) => left.updated_at.localeCompare(right.updated_at))[0]
 }
 
@@ -186,6 +195,7 @@ export function reclaimOrphanedResident(context: LifecycleContext, observed: Tas
     (fresh) =>
       fresh.residency_state === "resident" &&
       fresh.host_pid === observed.host_pid &&
+      (fresh.host_pid === undefined || fresh.host_pid === context.hostPid || !context.signaller.isAlive(fresh.host_pid)) &&
       fresh.updated_at === observed.updated_at,
   )
 }

@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto"
 import type { TaskRecord } from "../state"
+import { salvageCrashedIsolation } from "../isolation"
 import { type LifecycleContext, nowIso } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { DEFAULT_HOST_SESSION_RETRY_POLICY, isHostSessionRecord } from "./host-session"
-import { isSuspendedResidency } from "./revival-selection"
 import { terminateOldRpc } from "./revive-rollback"
 
 type StopRetry = { token: string; attempt: number; retryAt: number }
@@ -38,7 +38,7 @@ export async function expireSuspendedChild(
   const retry = previous?.token === observed.residency_claim ? previous : undefined
   if (retry !== undefined && context.now() < retry.retryAt) return
   const token = retry?.token ?? randomUUID()
-  const cause = observed.revival_deferred_reason ?? observed.suspension_reason ?? "suspended"
+  const cause = observed.revival_deferred_reason ?? observed.suspension_reason ?? "parent session restarted"
   const reason = observed.error_message?.startsWith("suspended_unresumable:")
     ? observed.error_message
     : `suspended_unresumable:${cause}`
@@ -48,7 +48,8 @@ export async function expireSuspendedChild(
       ? context.store.mutate(observed.task_id, (fresh) => {
           if (
             !parentLive() ||
-            (!isSuspendedResidency(fresh.residency_state) && !isSuspensionExpiry(fresh)) ||
+            (fresh.residency_state === "resident" && fresh.suspension_reason === undefined
+              && fresh.recovery_deadline_at === undefined && !isSuspensionExpiry(fresh)) ||
             (fresh.status !== "pending" && fresh.status !== "running") ||
             fresh.notification.run_epoch !== observed.notification.run_epoch ||
             fresh.residency_claim !== observed.residency_claim ||
@@ -106,6 +107,13 @@ export async function expireSuspendedChild(
     pending.attempt += 1
   }
   if (!isHostSessionRecord(record) && !closed) return
+  if (closed && record.isolation !== undefined && record.isolation.merge_result === undefined && context.isolation !== undefined) {
+    await salvageCrashedIsolation({
+      runtime: context.isolation,
+      stateDir: context.store.stateDir,
+      mutate: (taskId, mutation) => context.store.mutate(taskId, mutation),
+    }, record)
+  }
   const fresh = context.store.load(record.task_id)
   if (
     fresh === null ||
@@ -114,9 +122,19 @@ export async function expireSuspendedChild(
     (fresh.status !== "pending" && fresh.status !== "running")
   )
     return
-  const message = closed
+  const undelivered = fresh.pending_steering?.length ?? 0
+  const closureMessage = closed
     ? `${reason}\nThe child could not be resumed (${cause}); its stop is confirmed.`
     : `${reason}\nThe child could not be resumed (${cause}). Its old session may still be running on an unreachable host; closing it is being retried. There is no at-most-once guarantee if you re-dispatch: the work may run twice while the old run is still live. Check side-effecting work before re-running.`
+  const message = undelivered === 0 ? closureMessage
+    : `${closureMessage}\n${undelivered} queued message${undelivered === 1 ? " was" : "s were"} not delivered.`
+  context.store.mutate(record.task_id, (current) => {
+    const { pending_steering: _undelivered, ...rest } = current
+    return rest
+  })
+  if (undelivered > 0) context.store.appendEvent(record.task_id, {
+    type: "steer_dropped", payload: { count: undelivered, reason: "target_gone" },
+  })
   // Dispose/release before notification. This is NOT a cancellation: externally caused failure
   // must take the normal fail transition so the waiting parent receives one result.
   context.dequeuePending(record.task_id)
@@ -132,18 +150,20 @@ export async function expireSuspendedChild(
     failure_kind: "suspended_unresumable",
     killed: true,
   })
-  context.registry.forget(record.task_id)
+  context.registry.forget(record.task_id, { path: "end" })
   retries.delete(record.task_id)
   if (result.applied)
     context.store.appendEvent(record.task_id, {
       type: "suspended_unresumable",
-      payload: { cause, confirmed_stop: closed },
+      payload: { cause, confirmed_stop: closed, undelivered_messages: undelivered },
     })
 }
 
 async function stopLocalChild(context: LifecycleContext, record: TaskRecord): Promise<boolean> {
   if (context.failedTeardowns.has(record.task_id)) return false
   if (record.execution_mode === "process" && !(await terminateOldRpc(context, record))) return false
-  await destroyResidentTask(context, record.task_id, "cancel")
+  // Expiry owns the queue and the terminal result after the stop. Teardown must not publish a
+  // separate lost result through forget(end) before that result includes the undelivered count.
+  await destroyResidentTask(context, record.task_id, "revive_failure")
   return true
 }

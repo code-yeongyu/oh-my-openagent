@@ -24,6 +24,8 @@ export function installHermeticHome(): HermeticHome {
   markTestInfrastructureDir(home)
   process.env.HOME = home
   process.env.USERPROFILE = home
+  // Both root and package-local preloads must override os.homedir()'s retained host memory root.
+  process.env.OMO_MEMORY_HOME = join(home, ".omo", "memory")
   const agentDir = join(home, ".omo", "agent")
   for (const name of AGENT_DIR_ENV_NAMES) delete process.env[name]
   process.env.PI_CODING_AGENT_DIR = agentDir

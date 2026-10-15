@@ -46,9 +46,17 @@ impl MacCapture {
         self.shooter.permission_granted()
     }
 
+    /// The displays the session's selector names (all, for active).
     pub(crate) fn displays(&self) -> CoreResult<Vec<DesktopDisplay>> {
         self.require_permission()?;
         displays::enumerate(&self.selector)
+    }
+
+    /// Every monitor, whatever the session's selector, so a per-call display
+    /// target can name one the session does not capture by default.
+    pub(crate) fn all_displays(&self) -> CoreResult<Vec<DesktopDisplay>> {
+        self.require_permission()?;
+        displays::enumerate(&DisplaySelector::All)
     }
 
     pub(crate) fn windows(&self) -> CoreResult<Vec<DesktopWindow>> {
@@ -58,7 +66,10 @@ impl MacCapture {
 
     pub(crate) fn capture(&self, target: &Target) -> CoreResult<(RgbaImage, FrameGeometry)> {
         match target {
-            Target::Desktop => self.capture_desktop(),
+            Target::Desktop | Target::Display(_) => {
+                let selector = target.display_selector().unwrap_or_else(|| self.selector.clone());
+                self.capture_desktop(&selector)
+            }
             Target::Window(id) => self.capture_window(id),
         }
     }
@@ -74,8 +85,27 @@ impl MacCapture {
     /// One `screencapture -x -R<rect>` per display, composited. When the tool
     /// is absent or fails with permission granted, the primary display is
     /// captured through CoreGraphics instead.
-    fn capture_desktop(&self) -> CoreResult<(RgbaImage, FrameGeometry)> {
-        let displays = self.displays()?;
+    fn capture_desktop(&self, selector: &DisplaySelector) -> CoreResult<(RgbaImage, FrameGeometry)> {
+        self.require_permission()?;
+        let focused = if *selector == DisplaySelector::Active {
+            match crate::focus::front_window_id() {
+                Ok(Some(id)) => match windows::find(&id.to_string()) {
+                    Ok(window) => Some(window),
+                    Err(error) => {
+                        eprintln!("active capture cannot locate the front window; using primary: {error}");
+                        None
+                    }
+                },
+                Ok(None) => None,
+                Err(error) => {
+                    eprintln!("active capture cannot query focus; using primary: {error}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let displays = selector.select(displays::enumerate(selector)?, focused.as_ref())?;
         let mut regions = Vec::with_capacity(displays.len());
         for display in &displays {
             let image = match self.shooter.run(&display_args(display)) {

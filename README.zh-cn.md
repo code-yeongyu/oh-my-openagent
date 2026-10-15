@@ -41,7 +41,7 @@
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md) | [Русский](README.ru.md)
+[English](README.md) | [简体中文](README.zh-cn.md) | [日本語](README.ja.md) | [Русский](README.ru.md) | [한국어](README.ko.md)
 
 </div>
 
@@ -59,6 +59,8 @@ omo
 Windows 请在 PowerShell 中运行 `irm https://get.omo.dev/install.ps1 | iex`。脚本会为你的系统和 CPU 安装原生 `omo` 到 `~/.local/bin`，并用发布的校验和验证。想用包管理器的话，`bun add -g omo-ai`(或 `npm i -g omo-ai`)安装的是同一个 OmO。包名是 `omo-ai`；npm 上那个无关的 `omo` 包属于别人。Windows CMD、`PATH` 修复、更新和卸载见 [omo.dev/docs/install](https://omo.dev/docs/install)。
 
 打开项目，运行 `omo`，说出要做的事。设置就这么多。
+
+在会话里，`/thinking <level>` 设置模型思考的深度（只输入 `/thinking` 会打开选择器），`Shift+Tab` 依次切换级别，`/efforts <level>` 在有强度分级的模型上直接设置推理强度。想接着之前的工作，用 `/resume`（或 `/sessions`）打开过去的会话；在 shell 里，`omo -c` 继续上一个会话，`omo -r` 打开会话列表。其余命令都在 `/help` 里。
 
 从 OpenCode 版或 LazyCodex 迁移过来？运行一次 `omo setup`。它会把你的提供商密钥、自定义提供商、MCP 服务器、技能和模型选择一并带过来。
 

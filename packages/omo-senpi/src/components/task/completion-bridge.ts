@@ -41,13 +41,14 @@ export function createCompletionObservingStore(backing: TaskRecordStore, deps: C
     save: (record) => backing.save(record),
     replace: (record) => backing.replace(record),
     mutate: (taskId, mutation) => {
-      let becameLost = false
+      let becameTerminal = false
       const record = backing.mutate(taskId, (fresh) => {
         const next = mutation(fresh)
-        becameLost = next.status === "lost" && !TERMINAL_STATUSES.has(fresh.status)
+        becameTerminal = (next.status === "lost" && !TERMINAL_STATUSES.has(fresh.status))
+          || (TERMINAL_STATUSES.has(next.status) && next.notification.run_epoch > fresh.notification.run_epoch)
         return next
       })
-      if (becameLost && record !== null && record.parent_session_id === deps.currentSessionId?.()) {
+      if (becameTerminal && record !== null && record.parent_session_id === deps.currentSessionId?.()) {
         deps.notifier.notifyTerminal({
           record,
           parentState: deps.parentState(),

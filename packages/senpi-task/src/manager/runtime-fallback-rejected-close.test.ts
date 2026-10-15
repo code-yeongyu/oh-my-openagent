@@ -91,7 +91,7 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
       expect(host.sessions().map((session) => session.sessionPath)).toContain(original.sessionPath)
     } finally {
       await manager.getResidentHandle(task.task_id)?.dispose()
-      for (const id of manager.residentTaskIds()) manager.forget(id)
+      for (const id of manager.residentTaskIds()) manager.forget(id, { path: "end" })
       lifecycle.dispose?.()
       manager.workpools.dispose()
     }

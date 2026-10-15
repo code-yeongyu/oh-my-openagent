@@ -11,11 +11,9 @@ use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, Faults, RecordingSin
 use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::frame::FrameGeometry;
-use senpi_desktop_core::protocol_params::{CaptureParams, PointParams};
+use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, PointParams};
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::types::{
-    DesktopCapabilities, DesktopSessionOptions, PointerOptions, Target,
-};
+use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, PointerOptions, Target};
 use senpi_desktop_safety::{Clock, FakeClock, MutatingAction, StopPathId, Supervisor};
 use serde_json::{json, Value};
 
@@ -58,6 +56,12 @@ impl BackendFactory for Factory {
 /// An open session over the fixture with `overlay`'s top-level keys
 /// replaced, and a live, fresh global stop path.
 pub(crate) fn harness(overlay: &Value) -> Harness {
+    harness_with_slot(overlay, crate::grant::ControlSlot::new())
+}
+
+/// A harness whose session shares `slot` with other harnesses, as the
+/// engine's sessions share the process-wide slot.
+pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::ControlSlot>) -> Harness {
     let mut json: Value = serde_json::from_str(FIXTURE).expect("fixture is JSON");
     for (key, value) in overlay.as_object().expect("overlay is an object") {
         json[key] = value.clone();
@@ -72,6 +76,7 @@ pub(crate) fn harness(overlay: &Value) -> Harness {
     let safety = SessionSafety {
         supervisor: Arc::clone(&supervisor),
         audit: Box::new(move |event| recorded.lock().push(event.clone())),
+        control_slot: slot,
     };
     let panics = Panics::default();
     let factory = Factory {
@@ -100,6 +105,11 @@ impl Harness {
         self.worker.process(op, &|| false)
     }
 
+    /// Grants foreground control for this harness's session.
+    pub(crate) fn grant(&mut self, reason: &str) {
+        self.process(grant_control(reason)).expect("grants");
+    }
+
     /// Captures `target` and returns the frame id.
     pub(crate) fn capture(&mut self, target: &str) -> String {
         let params = CaptureParams {
@@ -123,12 +133,25 @@ impl Harness {
     pub(crate) fn audits(&self) -> Vec<AuditEvent> {
         self.audits.lock().clone()
     }
+
+    /// This session's live grant generation, `None` without a grant.
+    pub(crate) fn grant_generation(&self) -> Option<u64> {
+        self.worker.control.as_ref().map(|grant| grant.generation)
+    }
 }
 
 pub(crate) fn delivery(mode: &str) -> Option<PointerOptions> {
     Some(PointerOptions {
         delivery_mode: Some(mode.to_owned()),
         ..PointerOptions::default()
+    })
+}
+
+/// A `control.grant` request for `reason` with a fixed confirmation id.
+pub(crate) fn grant_control(reason: &str) -> Op {
+    Op::ControlGrant(ControlGrantParams {
+        reason: reason.to_owned(),
+        confirmation_id: "confirm-1".to_owned(),
     })
 }
 

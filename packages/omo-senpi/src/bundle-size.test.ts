@@ -112,7 +112,10 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // packages/*/package.json` is empty) and bundle-purity stays green. dev measured 1,483,025 (3,975 bytes of
 // slack left under the previous ceiling); this branch measures 1,489,889 (+6,864) after minification
 // (linux/amd64, node 24 + bun 1.4.2). 1,530,000 keeps ~2.7% headroom rather than the failing value.
-const BUDGET_BYTES = 1_530_000
+// Raised 1,530,000 -> 1,546,000 in the standalone measured budget PR for #9912.
+// Committed dev grew 1,302,597 -> 1,528,440 bytes over 14.06 days; this +16 KB
+// leaves 17,560 bytes of slack (~1-2 days at the observed rates), not weeks.
+const BUDGET_BYTES = 1_546_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

@@ -1,6 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import { markRecordLostForReconciliation, transitionTaskRecord, type TaskRecord, type TaskTransitionAudit } from "../state"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { nowIso, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
@@ -83,7 +84,7 @@ export async function markLost(context: LifecycleContext, record: TaskRecord, me
     if (!holdsClaim(context, fresh, record.residency_claim === undefined ? undefined : record)) return fresh
     const result = markRecordLostForReconciliation(fresh, {
       timestamp: nowIso(context),
-      error_message: message,
+      error_message: withDroppedSteeringNotice(message, fresh.pending_steering?.length ?? 0),
       updateReason: fresh.status === "lost",
     })
     if (!result.applied) return fresh
@@ -92,7 +93,7 @@ export async function markLost(context: LifecycleContext, record: TaskRecord, me
   })
   if (!applied) return
   context.store.appendEvent(record.task_id, { type: "reconcile_lost", payload: { reason: message } })
-  await destroyResidentTask(context, record.task_id, "reconcile_lost")
+  await destroyResidentTask(context, record.task_id, "target_gone")
 }
 
 /** Dispose a terminal record this revival claimed, unless another revival has claimed it since. */

@@ -157,7 +157,7 @@ describe("live-parent suspended child recovery (#9350)", () => {
     expect(f.messages).toHaveLength(1)
   })
 
-  test("a revival claim that wins before threshold cannot also fail", async () => {
+  test("a revival that is still in flight at the deadline ends and rejects its late handle", async () => {
     const f = fixture()
     const id = await f.start()
     const gate = f.holdRevival()
@@ -166,12 +166,15 @@ describe("live-parent suspended child recovery (#9350)", () => {
     f.park(id)
     await started
     const attempted = f.wait("live_parent_recovery_attempt")
+    const ended = f.wait("suspended_unresumable")
     f.advance(300_000)
+    await ended
     gate.resolve()
     await attempted
-    expect(f.store.load(id)?.status).toBe("running")
-    expect(f.store.load(id)?.residency_state).toBe("resident")
-    expect(f.messages).toHaveLength(0)
+    expect(f.store.load(id)?.status).toBe("error")
+    expect(f.store.load(id)?.residency_state).toBe("disposed")
+    expect(f.manager.getResidentHandle(id)).toBeUndefined()
+    expect(f.messages).toHaveLength(1)
   })
 
   test("a threshold claim that wins before revival cannot resurrect", async () => {

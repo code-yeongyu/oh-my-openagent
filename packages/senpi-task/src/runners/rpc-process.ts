@@ -138,7 +138,13 @@ export class RpcProcessRunner {
   private async applyFallbackChain(client: RpcProtocolClient, spec: RpcRunnerSpec): Promise<void> {
     const retryFallback = childRetryFallbackProfile(spec)
     if (retryFallback === undefined) return
-    const outcome = await withDeadline(this.sendFallbackChain(client, retryFallback), this.fallbackChainDeadlineMs)
+    // Past the deadline the first prompt goes out, so a probe answered late must not send the chain after it.
+    const expired = new AbortController()
+    const outcome = await withDeadline(
+      this.sendFallbackChain(client, retryFallback, expired.signal),
+      this.fallbackChainDeadlineMs,
+      expired,
+    )
     if (outcome === "applied") return
     if (outcome === "unsupported") {
       this.noticeFallbackChainUnsupported()
@@ -159,9 +165,11 @@ export class RpcProcessRunner {
   private async sendFallbackChain(
     client: RpcProtocolClient,
     retryFallback: NonNullable<ReturnType<typeof childRetryFallbackProfile>>,
+    expired: AbortSignal,
   ): Promise<"applied" | "unsupported" | { readonly refused: string }> {
     try {
       if (!(await engineAcceptsFallbackChain(client))) return "unsupported"
+      if (expired.aborted) return { refused: "deadline passed" }
       const response = await client.send({ type: "set_retry_fallback", retryFallback })
       return response.success ? "applied" : { refused: `refused: ${response.error}` }
     } catch (error) {
@@ -179,10 +187,13 @@ export class RpcProcessRunner {
   }
 }
 
-async function withDeadline<T>(work: Promise<T>, ms: number): Promise<T | "timeout"> {
+async function withDeadline<T>(work: Promise<T>, ms: number, expired: AbortController): Promise<T | "timeout"> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<"timeout">((resolve) => {
-    timer = setTimeout(() => resolve("timeout"), ms)
+    timer = setTimeout(() => {
+      expired.abort()
+      resolve("timeout")
+    }, ms)
   })
   try {
     return await Promise.race([work, deadline])

@@ -16,6 +16,7 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
       if (request.method === "DELETE") stored = null
       return Response.json(stored)
     }
+    if (path === "/v1/health") return Response.json({ ok: true })
     if (path === "/v1/device/code") return Response.json({
       ...minted, intervalSeconds: 1, expiresAt: new Date(Date.now() + 60_000).toISOString(),
     })

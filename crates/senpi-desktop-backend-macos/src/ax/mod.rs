@@ -3,8 +3,11 @@
 //! core's `AxRegistry`.
 
 mod actions;
+mod date;
 mod foreground;
+pub(crate) mod menus;
 mod point_owner;
+mod popup;
 pub(crate) mod element;
 mod props;
 mod tree;

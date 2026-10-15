@@ -11,7 +11,8 @@ import type {
   TerminateOptions,
 } from "../types"
 import { type RpcStreamingBehavior, isBusyChildRejection } from "./delivery-semantics"
-import { RpcCommandError } from "./errors"
+import { RpcCommandError, RpcRequestTimeout } from "./errors"
+import { startHeartbeat, unresponsiveMessage } from "./heartbeat"
 import { recordTaskChildDeath } from "./crash-record"
 import { classifyChildExit } from "./exit-mapping"
 import { createHandleListeners } from "../rpc-host/handle-listeners"
@@ -101,32 +102,37 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   // live observer reads current state and one that throws cannot keep the handle from settling a turn.
   client.onEvent((event) => listeners.emitEvent(event))
 
-  const heartbeat = setInterval(() => {
-    if (client.exited || child.stdin?.writableEnded || child.stdin?.destroyed) return
-    try {
-      client
-        .send({ type: "get_state" })
-        .then((response) => {
-          lastSeenAt = now()
-          sessionId = readSessionId(response) ?? sessionId
-        })
-        .catch((error: unknown) => {
-          if (client.exited || isHarmlessRpcShutdownError(error)) return
-          log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
-        })
-    } catch (error) {
-      if (client.exited || isHarmlessRpcShutdownError(error)) return
-      log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
-    }
-  }, heartbeatIntervalMs)
-  heartbeat.unref?.()
+  const stopHeartbeat = startHeartbeat({
+    intervalMs: heartbeatIntervalMs,
+    paused: () => outcome !== undefined || client.exited || child.stdin?.writableEnded === true || child.stdin?.destroyed === true,
+    probe: async () => {
+      const response = await client.send({ type: "get_state" })
+      assertOk(response, "get_state")
+      return response
+    },
+    onState: (response) => {
+      lastSeenAt = now()
+      sessionId = readSessionId(response) ?? sessionId
+    },
+    onFailure: (error) => {
+      if (!isHarmlessRpcShutdownError(error)) log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+    },
+    onUnresponsive: () => {
+      settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: unresponsiveMessage(taskId) } })
+      settleExit({ kind: "crashed", facts: { pid: child.pid, code: null, signal: null, stderrTail: "child-unresponsive" } })
+      terminationRequested = true
+      void (options.terminateChild ?? terminateRpcChild)(child).catch((error: unknown) => {
+        log("senpi-task unresponsive child termination failed", { taskId, error: String(error) })
+      })
+    },
+  })
 
   const settleExit = (built: ChildExitOutcome): void => {
     if (outcome) {
       return
     }
     outcome = built
-    clearInterval(heartbeat)
+    stopHeartbeat()
     flush(idleWaiters)
     if (turnOutcome === undefined) settleTurn(settlement.pending() ?? exitTurnOutcome(built, finalText))
     for (const waiter of exitWaiters.splice(0)) {
@@ -175,7 +181,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     try {
       await deliverPrompt(text, streamingBehavior)
     } catch (error) {
-      settleTurn(promptFailureOutcome(error))
+      // A broken pipe can reject the command before close supplies the process-exit facts.
+      // Let close settle that outcome so the manager can confirm it instead of publishing ERROR.
+      if (!client.exited && !(error instanceof RpcRequestTimeout)) settleTurn(promptFailureOutcome(error))
       throw error
     }
   }
@@ -221,7 +229,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     },
     waitForIdle: () =>
       reachedIdle || outcome ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve)),
-    hasExited: () => client.exited,
+    hasExited: () => outcome !== undefined || client.exited,
     waitForOutcome: () =>
       turnOutcome !== undefined
         ? Promise.resolve(turnOutcome)
@@ -235,7 +243,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     exitOutcome: () => outcome,
     waitForExit: () => (outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve))),
     dispose: async () => {
-      clearInterval(heartbeat)
+      stopHeartbeat()
       listeners.clearActive()
       try {
         await client.detach()

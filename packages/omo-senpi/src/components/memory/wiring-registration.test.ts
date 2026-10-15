@@ -93,6 +93,7 @@ async function fixture(): Promise<Fixture> {
     modelRegistry: registry,
   }
   wiring.registerStatic(pi, { ...componentContext(), idleCoordinator: new IdleInjectionCoordinator(() => {}) })
+  await pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Drain nodes before rollout." }, eventCtx)
   return {
     pi,
     wiring,
@@ -114,6 +115,24 @@ async function nudgedThroughToolCall(f: Fixture): Promise<FakeChild> {
 }
 
 describe("kibitzer registration wiring", () => {
+  test("#given the engine's input-before-started event order #when before_agent_start carries the first prompt #then the resident sidecar sees it", async () => {
+    const f = await fixture()
+    const childStarted = f.nextChild()
+
+    await f.pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: "Drain nodes before rollout.", systemPrompt: "BASE" },
+      f.eventCtx,
+    )
+    const child = await childStarted
+    child.settle(completed)
+    await f.wiring.whenIdle()
+    await f.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, f.eventCtx)
+
+    expect(f.specs).toHaveLength(1)
+    expect(f.specs[0]?.taskId).toBe(`kibitzer-${f.sessionId}-1`)
+  })
+
   test("#given a resident child seam and idle coordinator #when tool_call wakes the sidecar and tool_result follows #then one steer and one nudged entry are emitted", async () => {
     const f = await fixture()
 

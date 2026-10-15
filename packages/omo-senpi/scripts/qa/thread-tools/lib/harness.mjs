@@ -3,7 +3,7 @@
  *
  * Design constraints this file exists to satisfy:
  * - ONE harness: scratch dirs, ports, fake model and child tracking come from the
- *   sanctioned senpi QA libs (scripts/qa-app-server/lib/{env,fake-model,cleanup}.mjs),
+ *   sanctioned senpi QA libs (scripts/qa-shared/lib/{env,fake-model,cleanup}.mjs),
  *   never from a second invented implementation.
  * - Assertions read TARGET STATE, not logs: transcripts come from the host's
  *   `get_messages` and UI rows come from the desktop projection's shellSnapshot.
@@ -29,7 +29,7 @@ export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
 export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
 export const DESKTOP_ROOT = process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
 
-const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-app-server", "lib")
+const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-shared", "lib")
 const SENPI_CLI = join(SENPI_ROOT, "packages", "coding-agent", "src", "cli.ts")
 const THREAD_COMPONENTS = join(OMO_ROOT, "packages", "omo-senpi", "src", "components", "thread")
 

@@ -31,6 +31,27 @@ const STORY_SECTIONS = [
 ] as const
 
 test.describe("Landing Page", () => {
+  test("ends with the Dori teaser linking out to sisyphuslabs.ai", async ({ page }) => {
+    // given
+    await page.goto("/")
+    const teaser = page.locator('[data-section="dori-teaser"]')
+    const link = teaser.getByRole("link", { name: "Meet Dori" })
+
+    // when
+    await link.scrollIntoViewIfNeeded()
+
+    // then
+    await expect(teaser.getByRole("heading", { level: 2 })).toHaveText(
+      "Someone's been working while you sleep.",
+    )
+    await expect(link).toHaveAttribute("href", "https://sisyphuslabs.ai")
+    await expect(link).toHaveAttribute("rel", "noopener noreferrer")
+    await expect(teaser.getByRole("img")).toBeVisible()
+    const footerTop = await page.locator("footer").evaluate((el) => el.getBoundingClientRect().top)
+    const teaserBottom = await teaser.evaluate((el) => el.getBoundingClientRect().bottom)
+    expect(teaserBottom).toBeLessThanOrEqual(footerTop + 1)
+  })
+
   test("renders hero section with title and CTA", async ({ page }) => {
     // given
     await page.goto("/")

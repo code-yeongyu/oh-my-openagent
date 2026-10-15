@@ -37,6 +37,39 @@
         "type": "null"
       }
     },
+    "control.grant": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ControlGrantParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
+    "control.revoke": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "control.state": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
     "capabilities": {
       "effect": "read",
       "hostOnly": false,
@@ -85,6 +118,28 @@
       },
       "result": {
         "$ref": "#/definitions/CaptureResult"
+      }
+    },
+    "captureRegion": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/CaptureRegionParams"
+      },
+      "result": {
+        "$ref": "#/definitions/CaptureResult"
+      }
+    },
+    "observe": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ObserveParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ObserveResult"
       }
     },
     "click": {
@@ -159,6 +214,31 @@
       "testOnly": false,
       "params": {
         "$ref": "#/definitions/RaiseWindowParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "menus.items": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuPathParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/MenuItem"
+        }
+      }
+    },
+    "menus.select": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuSelectParams"
       },
       "result": {
         "type": "null"
@@ -474,7 +554,9 @@
     "Cancelled": -32017,
     "CursorRestoreFailed": -32018,
     "FocusRestoreFailed": -32019,
-    "TransactionFailed": -32020
+    "TransactionFailed": -32020,
+    "InputBusy": -32021,
+    "ControlRequired": -32022
   },
   "standardErrors": {
     "parseError": -32700,
@@ -750,6 +832,49 @@
       "description": "Runtime truth about what this host's backend can do right now.\n\nFROZEN field set (IS-2): later todos fill values, never add fields.",
       "additionalProperties": false
     },
+    "ControlGrantParams": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "confirmationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "confirmationId"
+      ],
+      "description": "`control.grant`: `confirmationId` is the host's receipt of the human\nconfirmation it showed; the engine never sees the confirm itself.",
+      "additionalProperties": false
+    },
+    "ControlStateResult": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grantedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "RFC 3339 UTC with milliseconds, matching the audit timestamps."
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "description": "`control.grant` and `control.state` reply: this session's live foreground\ncontrol grant. `reason` and `granted_at` are present exactly when\n`active` is true.",
+      "additionalProperties": false
+    },
     "DesktopDisplay": {
       "type": "object",
       "properties": {
@@ -957,6 +1082,26 @@
           "format": "uint32",
           "minimum": 0
         },
+        "coordinateWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureRegion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "scale": {
           "type": "number",
           "format": "double"
@@ -980,6 +1125,8 @@
         "height",
         "sourceWidth",
         "sourceHeight",
+        "coordinateWidth",
+        "coordinateHeight",
         "scale",
         "target",
         "frameId"
@@ -995,6 +1142,243 @@
         "artifact-only"
       ],
       "description": "How a capture was delivered under the byte budget."
+    },
+    "CaptureRegion": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "width": {
+          "type": "number",
+          "format": "double"
+        },
+        "height": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "description": "Rectangle in the pixels of the last full screenshot, not the zoom image.",
+      "additionalProperties": false
+    },
+    "CaptureRegionParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "region": {
+          "$ref": "#/definitions/CaptureRegion"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureCaps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "region"
+      ],
+      "description": "`captureRegion`: native-detail zoom preserving the last full input frame.",
+      "additionalProperties": false
+    },
+    "ObserveParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureCaps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ax": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AxSnapshotOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "description": "`observe`: an atomic window screenshot and accessibility snapshot.",
+      "additionalProperties": false
+    },
+    "AxSnapshotOptions": {
+      "type": "object",
+      "properties": {
+        "maxDepth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "maxNodes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "all": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "ObserveResult": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/CaptureMode"
+        },
+        "data": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Base64 image bytes when `mode` is inline."
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "artifactPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureRegion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "target": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ax": {
+          "type": "string"
+        },
+        "nodeCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mode",
+        "width",
+        "height",
+        "sourceWidth",
+        "sourceHeight",
+        "coordinateWidth",
+        "coordinateHeight",
+        "scale",
+        "target",
+        "frameId",
+        "ax",
+        "nodeCount",
+        "truncated"
+      ],
+      "description": "One delivered window observation; capture pixels remain the input frame.",
+      "additionalProperties": false
     },
     "PointParams": {
       "type": "object",
@@ -1245,6 +1629,90 @@
       ],
       "additionalProperties": false
     },
+    "MenuPathParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`menus.items`: the window whose menu is addressed and the path inside it\n(empty lists the menu bar). `menus.select` takes [`MenuSelectParams`].",
+      "additionalProperties": false
+    },
+    "MenuItem": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "hasSubmenu": {
+          "type": "boolean"
+        },
+        "shortcut": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "path",
+        "enabled",
+        "checked",
+        "hasSubmenu"
+      ],
+      "description": "One immediate child of a native application menu. `path` holds the native\nlabels, ellipses included; selection accepts normalized labels.",
+      "additionalProperties": false
+    },
+    "MenuSelectParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "deliveryMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`menus.select`: the window, the 1..=32-label path to a command, and the\ndelivery. An omitted delivery is background; `foreground` raises and keys\nthe target window and needs this session's live control grant (#9888).",
+      "additionalProperties": false
+    },
     "ClipboardText": {
       "type": "object",
       "properties": {
@@ -1278,37 +1746,6 @@
       "required": [
         "target"
       ],
-      "additionalProperties": false
-    },
-    "AxSnapshotOptions": {
-      "type": "object",
-      "properties": {
-        "maxDepth": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0,
-          "default": null
-        },
-        "maxNodes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0,
-          "default": null
-        },
-        "all": {
-          "type": [
-            "boolean",
-            "null"
-          ],
-          "default": null
-        }
-      },
       "additionalProperties": false
     },
     "AxSnapshot": {
@@ -1785,10 +2222,15 @@
         "engine.hello",
         "session.open",
         "session.close",
+        "control.grant",
+        "control.revoke",
+        "control.state",
         "capabilities",
         "displays",
         "windows",
         "capture",
+        "captureRegion",
+        "observe",
         "click",
         "moveMouse",
         "drag",
@@ -1796,6 +2238,8 @@
         "typeText",
         "keyChord",
         "raiseWindow",
+        "menus.items",
+        "menus.select",
         "clipboard.read",
         "clipboard.write",
         "ax.snapshot",
@@ -1851,6 +2295,16 @@
           "type": "string",
           "const": "Cancelled",
           "description": "A request aborted by `$/cancel` or a host abort."
+        },
+        {
+          "type": "string",
+          "const": "InputBusy",
+          "description": "Another session holds the foreground control grant. The slot is never\nstolen; the caller can retry after it releases."
+        },
+        {
+          "type": "string",
+          "const": "ControlRequired",
+          "description": "Foreground delivery without this session's live control grant."
         }
       ],
       "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."

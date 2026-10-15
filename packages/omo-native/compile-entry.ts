@@ -34,6 +34,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
+import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -142,6 +143,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     process.exitCode = 2
     return true
   }
+  if (refuseRetiredCommand(args)) return true
   // The compiled binary IS the engine's process, so the host CLI is reached by re-running this
   // executable with `host ...` - an early command that goes to the engine untouched. Spawning a
   // node path here would re-enter omo itself and leave a phantom session behind.

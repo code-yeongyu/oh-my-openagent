@@ -76,7 +76,10 @@
               "scale": 0.25,
               "target": "desktop",
               "frameId": "frame-1",
-              "note": null
+              "note": null,
+              "coordinateWidth": 640,
+              "coordinateHeight": 360,
+              "region": null
             }
           },
           "variable": [
@@ -85,7 +88,8 @@
             "/result/sourceWidth",
             "/result/sourceHeight",
             "/result/scale",
-            "/result/frameId"
+            "/result/frameId",
+            "/result/coordinateHeight"
           ]
         }
       ]
@@ -120,7 +124,10 @@
               "scale": 0.25,
               "target": "desktop",
               "frameId": "frame-1",
-              "note": "over the inline budget"
+              "note": "over the inline budget",
+              "coordinateWidth": 640,
+              "coordinateHeight": 360,
+              "region": null
             }
           },
           "variable": [
@@ -131,7 +138,57 @@
             "/result/frameId",
             "/result/mimeType",
             "/result/artifactPath",
-            "/result/note"
+            "/result/note",
+            "/result/coordinateHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "observe",
+        "params": {
+          "target": "101",
+          "caps": {
+            "maxWidth": 32
+          },
+          "ax": {
+            "maxNodes": 1
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "mode": "inline-png",
+              "data": "image",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 32,
+              "height": 24,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 32,
+              "coordinateHeight": 24,
+              "region": null,
+              "scale": 0.04,
+              "target": "101",
+              "frameId": "frame-3",
+              "note": null,
+              "ax": "window",
+              "nodeCount": 1,
+              "truncated": true
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId",
+            "/result/ax"
           ]
         }
       ]

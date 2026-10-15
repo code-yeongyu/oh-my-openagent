@@ -106,9 +106,10 @@ export function wireEventBridge(
   })
 
   pi.on("session_shutdown", async (payload, eventCtx) => {
+    const liveContext = asLiveContext(eventCtx)
     unsubscribeTaskSnapshots()
     taskRpc.dispose()
-    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    engine.runtime.captureFrom(liveContext)
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()
     statusUi.dispose()
@@ -134,7 +135,22 @@ export function wireEventBridge(
       }))
       : new Set([parentSessionId])
     for (const sessionId of parentSessionIds) {
-      await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
+      const continuing = reason === "new" || reason === "quit"
+        ? engine.manager.list({ scope: "parent-session", session_id: sessionId })
+          .filter(({ record }) => record.killed !== true && (
+            (record.status === "running" && record.runner_kind === "host-session") ||
+            (record.status === "pending" && record.execution_mode === "process" &&
+              engine.settings.process_runner !== "child-process" && engine.settings.resume_children !== false)
+          ))
+        : []
+      const summary = await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
+      const count = continuing.filter(({ record }) =>
+        !summary.failures.some((failure) => failure.task_id === record.task_id)).length
+      if (count > 0) {
+        const notice = `${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`
+        if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
+        else liveContext.ui?.notify(notice, "info")
+      }
     }
   })
 

@@ -11,7 +11,7 @@ for (const property of ["bind-address", "ephemeral-port", "single-use", "state-m
     const address = spyOn(Server.prototype, "address")
     onTestFinished(() => { listen.mockRestore(); address.mockRestore() })
     await loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      accounts: "https://accounts.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
+      accounts: "https://signin.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
       open: async url => {
         const ask = new URL(url)
         const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")

@@ -65,7 +65,8 @@ export function getOmoNativeStateDir(env: TelemetryEnv = process.env): string {
 }
 
 export function getBuiltinSkillsRoot(): string {
-  return fileURLToPath(new URL("../skills/", import.meta.url))
+  // Source entrypoints and generated plugin bundles have different directory depths.
+  return fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "../../../skills/" : "../skills/", import.meta.url))
 }
 
 export function hashSessionId(rawId: string): string {

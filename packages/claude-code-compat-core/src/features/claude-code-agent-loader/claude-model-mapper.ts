@@ -5,7 +5,7 @@ const ANTHROPIC_PREFIX = "anthropic/"
 
 const CLAUDE_CODE_ALIAS_MAP = new Map<string, string>([
   ["sonnet", `${ANTHROPIC_PREFIX}claude-sonnet-4-6`],
-  ["opus", `${ANTHROPIC_PREFIX}claude-opus-4-8`],
+  ["opus", `${ANTHROPIC_PREFIX}claude-opus-5-5`],
   ["haiku", `${ANTHROPIC_PREFIX}claude-haiku-5-5`],
 ])
 

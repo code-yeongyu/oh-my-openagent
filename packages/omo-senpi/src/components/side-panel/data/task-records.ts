@@ -1,3 +1,4 @@
+import { recoveryPresentation } from "@oh-my-opencode/senpi-task"
 import type { PanelChildStatus, PanelChildUpdate } from "../store"
 
 /**
@@ -19,6 +20,8 @@ export interface PanelTaskRecord {
   readonly category?: string
   readonly agent_type?: string
   /** Set while the engine is holding a child rather than running it; absent means it is not parked. */
+  readonly failure_kind?: string
+  readonly error_message?: string
   readonly suspension_reason?: string
   /** "resident" is the only value that means the child is live in this process. */
   readonly residency_state?: string
@@ -57,17 +60,7 @@ const STATUS: Record<string, PanelChildStatus> = {
 function childStatus(record: PanelTaskRecord): PanelChildStatus {
   const mapped = STATUS[record.status] ?? "queued"
   if (mapped !== "running" && mapped !== "queued") return mapped
-  return record.suspension_reason !== undefined || isDetached(record) ? "suspended" : mapped
-}
-
-/** Every residency except `resident` means the child is not live in this process. */
-function isDetached(record: PanelTaskRecord): boolean {
-  return record.residency_state !== undefined && record.residency_state !== "resident"
-}
-
-/** The specific fact first; the residency state is only how an unexplained park shows up. */
-function parkedReason(record: PanelTaskRecord): string | undefined {
-  return record.suspension_reason ?? record.residency_state
+  return recoveryPresentation(record)?.state ?? mapped
 }
 
 /**
@@ -90,8 +83,8 @@ export function panelChildFromRecord(record: PanelTaskRecord): PanelChildUpdate 
     name: label(record),
     ...(record.category === undefined ? {} : { category: record.category }),
     status: childStatus(record),
-    ...(childStatus(record) === "suspended" && parkedReason(record) !== undefined
-      ? { parkedReason: parkedReason(record) }
+    ...(recoveryPresentation(record) !== undefined
+      ? { parkedReason: recoveryPresentation(record)?.cause }
       : {}),
     ...(childHost(record) === undefined ? {} : { host: childHost(record) }),
     startedAt: timestamp(record.started_at) ?? timestamp(record.created_at) ?? 0,

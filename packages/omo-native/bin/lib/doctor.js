@@ -112,7 +112,7 @@ function listProcesses() {
 // executable also serves omo's own commands, internal hosts and bundled scripts, so only a bare launch
 // or engine flags count; those other roles are never engines.
 const BINARY_ENGINE = /[\\/]binary-runtime[\\/][^\\/\s]+[\\/]omo(?:\.exe)?(?=\s|$)\s*(\S*)/
-const BINARY_NON_ENGINE_COMMANDS = new Set(["doctor", "setup", "daemon", "update", "upgrade", "host", "install", "remove", "list", "config", "auth", "app-server", "ulw-loop", "--version", "-v"])
+const BINARY_NON_ENGINE_COMMANDS = new Set(["doctor", "setup", "daemon", "update", "upgrade", "host", "install", "remove", "list", "config", "auth", "ulw-loop", "--version", "-v"])
 
 function isBinaryEngine(command) {
   const match = BINARY_ENGINE.exec(command)
@@ -134,7 +134,7 @@ function isInteractive(entry) {
  * Splits every engine process this machine is running into the three groups that matter:
  *   - stale:   interactive engines reparented to init, i.e. their launcher died underneath them
  *   - attached: interactive engines still owned by a live parent (somebody's session)
- *   - managed:  rpc / app-server engines, which are owned by whatever embeds them
+ *   - managed:  `--mode` engines such as rpc, which are owned by whatever embeds them
  * Only the first group is ever reportable, and even then only as a report.
  */
 export function classifyEngineProcesses(entries) {

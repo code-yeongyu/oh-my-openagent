@@ -109,6 +109,7 @@ export function createMemoryRuntimeWiring(
       cwd: options.cwd(),
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
       resolveModelRegistry,
+      resolveSessionModel,
       env: options.env,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })

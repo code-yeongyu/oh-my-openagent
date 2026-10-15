@@ -249,7 +249,7 @@ describe("facts terminal failure recording", () => {
     expect((await store.readFailures()).entries).toEqual([])
   }, 30_000)
 
-  test("#given the quick category cannot resolve #when a launch is attempted #then a preflight-scoped failure is recorded", async () => {
+  test("#given no user-selected model can resolve #when a launch is attempted #then the queue stays pending without recording an extraction failure", async () => {
     // given
     const { root, identity, queue } = await fixture()
     const runner = new FactsExtractorRunner({
@@ -266,9 +266,8 @@ describe("facts terminal failure recording", () => {
     // then
     expect(result.status).toBe("skipped")
     const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
-    expect(state.entries).toHaveLength(1)
-    expect(state.entries[0]).toMatchObject({ streak: 1, lastReason: "quick_category_unavailable" })
-    expect(state.entries[0]?.lastFailureId).toMatch(/^preflight-[0-9a-f-]{36}$/)
+    expect(state.entries).toEqual([])
+    expect(await queue.listPending()).toHaveLength(1)
     expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
   }, 30_000)
 

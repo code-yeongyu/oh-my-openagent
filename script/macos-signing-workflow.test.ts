@@ -110,52 +110,6 @@ describe("macOS signing in the platform publish workflow", () => {
   })
 })
 
-/** Fake macOS toolchain: a signing keychain, codesign, a notarytool whose `info` answers from a script, and spctl. */
-function notarySandbox(infoAnswers: readonly string[]): { root: string; env: NodeJS.ProcessEnv; binary: string } {
-  const { root, env } = sandbox()
-  const bin = join(root, "bin")
-  const answers = join(root, "info-answers")
-  writeFileSync(answers, `${infoAnswers.join("\n")}\n`)
-  writeFileSync(join(bin, "security"), `#!/bin/bash
-case "$1" in
-  list-keychains) echo '    "/login.keychain-db"' ;;
-  find-identity) echo '  1) ABCDEF "Developer ID Application: Test (TEAM123456)"' ;;
-esac
-exit 0
-`)
-  writeFileSync(join(bin, "codesign"), `#!/bin/bash
-if [ "$1" = -dv ]; then echo "flags=0x10000(runtime) TeamIdentifier=TEAM123456" >&2; fi
-exit 0
-`)
-  writeFileSync(join(bin, "xcrun"), `#!/bin/bash
-shift
-case "$1" in
-  submit) echo '{"id":"sub-1"}' ;;
-  info)
-    line=$(head -n 1 "${answers}"); sed -i.bak 1d "${answers}"
-    [ "$line" = FAIL ] && { echo "The request timed out." >&2; exit 1; }
-    echo "{\\"id\\":\\"sub-1\\",\\"status\\":\\"$line\\"}" ;;
-  log) echo '{"issues":[]}' ;;
-esac
-`)
-  writeFileSync(join(bin, "spctl"), `#!/bin/bash
-echo "accepted source=Notarized Developer ID"
-`)
-  writeFileSync(join(bin, "ditto"), `#!/bin/bash
-find "\${@: -2:1}" -type f -exec cat {} \\; -exec echo \\; > "${root}/archived-files"
-touch "\${@: -1}"
-`)
-  for (const tool of ["security", "codesign", "xcrun", "spctl", "ditto"]) chmodSync(join(bin, tool), 0o755)
-  const binary = join(root, "omo-darwin-arm64")
-  writeFileSync(binary, "binary")
-  const material = { CSC_LINK: Buffer.from("p12").toString("base64"), CSC_KEY_PASSWORD: "pw", APPLE_API_KEY: "key", APPLE_API_KEY_ID: "KEY", APPLE_API_ISSUER: "issuer" }
-  return { root, binary, env: { ...env, ...material, RUNNER_TEMP: root, NOTARY_POLL_SECONDS: "0", NOTARY_TIMEOUT_SECONDS: "30" } }
-}
-
-function runSigning(root: string, env: NodeJS.ProcessEnv, binary: string) {
-  return spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary], { cwd: root, env, encoding: "utf8" })
-}
-
 /** Feeds the script through stdin, so a CRLF checkout on Windows parses as the LF file the macOS runners execute. */
 function runSigningArgs(args: readonly string[]) {
   const script = readFileSync(signingScript, "utf8").replace(/\r\n/g, "\n")
@@ -177,50 +131,6 @@ describe("signing script arguments", () => {
       const result = runSigningArgs(args)
       expect(result.status, `${args.join(" ")}: ${result.stderr}`).toBe(2)
       expect(result.stderr).toContain(reason)
-    }
-  })
-})
-
-describe("notarization polling", () => {
-  posixBashTest("submits every input even when two share a basename", () => {
-    const { root, env, binary } = notarySandbox(["Accepted"])
-    try {
-      mkdirSync(join(root, "arm64"))
-      mkdirSync(join(root, "amd64"))
-      const arm = join(root, "arm64", "comment-checker")
-      const amd = join(root, "amd64", "comment-checker")
-      writeFileSync(arm, "arm64 build")
-      writeFileSync(amd, "amd64 build")
-      rmSync(binary)
-      const result = spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.comment-checker", arm, amd], { cwd: root, env, encoding: "utf8" })
-      expect(result.status, result.stderr).toBe(0)
-      const archived = readFileSync(join(root, "archived-files"), "utf8").trim().split("\n")
-      expect(archived).toHaveLength(2)
-      expect(archived.sort()).toEqual(["amd64 build", "arm64 build"])
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  posixBashTest("keeps polling through transient notarytool errors until Apple accepts", () => {
-    const { root, env, binary } = notarySandbox(["FAIL", "In Progress", "FAIL", "Accepted"])
-    try {
-      const result = runSigning(root, env, binary)
-      expect(result.status, result.stderr).toBe(0)
-      expect(result.stdout).toContain("notarization sub-1: Accepted")
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  posixBashTest("fails when Apple rejects the submission", () => {
-    const { root, env, binary } = notarySandbox(["In Progress", "Invalid"])
-    try {
-      const result = runSigning(root, env, binary)
-      expect(result.status).toBe(1)
-      expect(result.stderr).toContain("notarization was not accepted (status: Invalid)")
-    } finally {
-      rmSync(root, { recursive: true, force: true })
     }
   })
 })

@@ -534,6 +534,10 @@ export function stageSidecarPayload(
 ): string[] {
   mkdirSync(stageDir, { recursive: true })
   const staged = new Set<string>()
+  // The compiled desktop engine is a required input that only needs a stat and a copy: check it before the plugin
+  // build (a full build-omo-native run with submodule fetches) so a missing payload fails closed at once (#9857).
+  const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
+  if (desktopEngine !== null) staged.add(desktopEngine)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
   writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")
@@ -549,8 +553,6 @@ export function stageSidecarPayload(
   }
   stagePluginPayload(stageDir, staged)
   for (const entry of target.nativePrebuilds) stageNativePrebuild(entry, stageDir, staged)
-  const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
-  if (desktopEngine !== null) staged.add(desktopEngine)
   return [...staged].sort()
 }
 

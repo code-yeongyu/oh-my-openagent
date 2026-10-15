@@ -5,7 +5,7 @@ import { configureServiceAuthCommands } from "./commands"
 import { serviceOrigin } from "./protocol"
 
 test.each(["darwin", "win32", "linux"] as const)("browser child on %s receives no credentials in argv or environment", async platform => {
-  const url = "https://accounts.omo.dev/?state=public-state&code_challenge=public-challenge"
+  const url = "https://signin.omo.dev/?state=public-state&code_challenge=public-challenge"
   const childCalls: unknown[] = []
   await openSignInBrowser(url, async (file, args, env) => {
     childCalls.push({ file, args, env })

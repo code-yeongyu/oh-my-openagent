@@ -9,7 +9,7 @@ for (const result of ["false", "reject"]) {
     const api = fakeApi(() => { exchanges++; return Response.json(grant) })
     const store = memorySecrets().store(api)
     await loginLoopback(createSession({ api, store, home: await temporaryHome() }), {
-      accounts: "https://accounts.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
+      accounts: "https://signin.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
       open: async url => {
         const ask = new URL(url)
         const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
@@ -26,7 +26,7 @@ for (const result of ["false", "reject"]) {
   test(`opener ${result} without a callback still allows device fallback`, async () => {
     const api = fakeApi(() => Response.json(grant))
     await expect(loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      accounts: "https://accounts.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
+      accounts: "https://signin.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
       open: async () => {
         if (result === "reject") throw new Error("opener unavailable")
         return false

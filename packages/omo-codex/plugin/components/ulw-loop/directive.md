@@ -105,7 +105,11 @@ degrades color and wide-glyph width. In this repo:
 stream). Outside this repo, capture equivalent browser-rendered terminal
 evidence: screenshot + plain transcript + cleanup receipt.
 
-# Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
+# Bootstrap (COMPLETE EVERY SECTION BEFORE ANY OTHER WORK — NO SKIPPING)
+
+## Task resources
+Before the first task command, create one `RUN_TMP=$(mktemp -d)` per task, tracking its paths under section 3 immediately. Export `TMPDIR="$RUN_TMP" NODE_COMPILE_CACHE="$RUN_TMP/node-compile-cache" BUN_RUNTIME_TRANSPILER_CACHE_PATH="$RUN_TMP/bun-transpiler"` for every command; pass the same environment explicitly to children that do not inherit it. Give independent child tasks their own run roots.
+At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
 
 ## 0. Survey the skills, gather context, then size the work
 First, survey the loaded skill list and read the description of each
@@ -199,7 +203,7 @@ steps.
 
 ## 3. Register obsessive todos via `update_plan`
 The todo tool is Codex `update_plan` — your live, user-visible
-checklist. Translate every action from the plan into one `update_plan`
+checklist. Keep resource-cleanup todos registered earlier. Translate every action from the plan into one `update_plan`
 step — one step per atomic work unit: an edit plus its verification, a
 QA scenario run, a teardown. Keep each step small enough to finish
 within a few tool calls.
@@ -211,6 +215,9 @@ behind reality. Add newly discovered steps the moment they surface
 instead of waiting for the next pass. Step text encodes WHERE / WHY
 (which criterion it advances) / HOW / VERIFY:
 `path: <action> for <criterion> — verify by <check>`.
+ALWAYS add a cleanup todo AT CREATION for each worktree, cache directory (including
+the run root), and QA resource (PID, tmux session, browser context, port, container,
+script or temp path); complete it only after a read-back teardown receipt.
 
 GOOD pair (ordered):
   `test/foo.test.ts: read the validateEmail cases for criterion 2 — verify by noting intent / coverage / pass in the notepad`
@@ -273,19 +280,15 @@ Until every success criterion PASSES with its evidence captured:
    above; auxiliary surface for CLI- or data-shaped criteria), end to
    end, yourself, plus the step-2 tests; a reproduction now passes.
    Paste the artifact path into the notepad.
-5. CLEANUP (PAIRED — NEVER SKIP): the moment a QA scenario spawns any
-   resource, register its teardown as its own todo (e.g.
-   `cleanup: kill server pid for criterion 2 — verify kill -0 fails`).
-   Every runtime artifact the QA spawned in step 4 MUST be torn down
-   before this step completes:
-   server PIDs (`kill <pid>`; verify `kill -0` fails), `tmux` sessions
-   (`tmux kill-session -t ulw-qa-<criterion>`; verify with `tmux ls`),
-   browsers / sessions (`browser.close()` / `session.stop()`), containers
-   (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp
-   sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env
-   vars. Append a one-line cleanup receipt to the notepad next to the
-   artifact, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo;
-   rm -rf /tmp/ulw.aB12cD`. No receipt → criterion stays in_progress.
+5. CLEANUP (PAIRED — NEVER SKIP):
+   Before recording QA, tear down owned server PIDs (`kill <pid>`; verify
+   `kill -0` fails), tmux sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`),
+   browsers / sessions (`browser.close()` / `session.stop()`), containers (`docker rm -f`), ports
+   (`lsof -i :<port>` empty), QA scripts, temp paths and QA-only env vars.
+   Remove QA temp paths inside `$RUN_TMP` per criterion; remove the run root
+   and eligible worktrees at task end under Task resources.
+   Append the read-back receipt beside the artifact in the notepad.
+   No receipt → criterion stays in_progress.
 6. Verify: LSP diagnostics clean on changed files; no test skipped or
    xfail-ed this turn.
 7. Mark completed. Append non-obvious findings / learnings.

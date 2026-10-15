@@ -27,6 +27,16 @@ interface ComputerScrollOptions extends ComputerDeliveryOptions {
 /** Options for capturing a screenshot; `silent` skips the auto-displayed image. */
 interface ComputerScreenshotOptions {
 	silent?: boolean;
+	/** Zoom rejects an id other than this target's latest full screenshot. */
+	frameId?: string;
+}
+
+/** Region in the last full screenshot's pixels; zoom pixels are not input coordinates. */
+interface ComputerCaptureRegion {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
 }
 
 /** Options for an accessibility-tree snapshot. */
@@ -34,6 +44,16 @@ interface ComputerAxOptions {
 	/** Include nodes that are normally pruned as non-interactive. */
 	all?: boolean;
 	maxDepth?: number;
+	maxNodes?: number;
+}
+
+/** One window capture and AX snapshot, committed together. */
+interface ComputerObserveOptions extends ComputerScreenshotOptions, ComputerAxOptions {}
+
+interface ComputerObserveResult extends ComputerScreenshotResult {
+	ax: string;
+	nodeCount: number;
+	truncated: boolean;
 }
 
 /** Accessibility query matched against role, title, and value. */
@@ -58,6 +78,16 @@ interface ComputerBounds {
 	height: number;
 }
 
+/** A native menu item snapshot; selection revalidates the command before dispatch. */
+interface ComputerMenuItem {
+	title: string;
+	path: string[];
+	enabled: boolean;
+	checked: boolean;
+	hasSubmenu: boolean;
+	shortcut?: string | null;
+}
+
 /** One capturable top-level window in global logical desktop coordinates. */
 interface ComputerWindowInfo extends ComputerBounds {
 	/** Opaque backend-defined id; never parse it. */
@@ -70,7 +100,7 @@ interface ComputerWindowInfo extends ComputerBounds {
 	elevated?: boolean | null;
 }
 
-/** Monitor geometry in both desktop coordinates and composite screenshot pixels. */
+/** Monitor geometry in desktop coordinates and `display("all")` composite pixels, not the active capture. */
 interface ComputerDisplay extends ComputerBounds {
 	id: string;
 	name: string;
@@ -92,6 +122,10 @@ interface ComputerScreenshotResult {
 	/** Captured size before downscaling. */
 	sourceWidth: number;
 	sourceHeight: number;
+	/** Input coordinates remain in the last full screenshot, including after zoom. */
+	coordinateWidth: number;
+	coordinateHeight: number;
+	region?: ComputerCaptureRegion;
 	scale: number;
 	/** Full-resolution artifact, when the engine wrote one. */
 	path?: string;
@@ -153,9 +187,11 @@ interface ComputerElement {
 	children(): Promise<ComputerElement[]>;
 }
 
-/** Native input helpers shared by the desktop root and window handles; `x`/`y` are pixels in the most recent screenshot of the same target. */
+/** Native input helpers shared by desktop, display, and window targets; `x`/`y` are pixels of that target's latest screenshot. */
 interface ComputerInputTarget {
 	screenshot(options?: ComputerScreenshotOptions): Promise<ComputerScreenshotResult>;
+	/** Fresh native-detail crop; later clicks still use the last full screenshot's coordinates. */
+	zoom(region: ComputerCaptureRegion, options?: ComputerScreenshotOptions): Promise<ComputerScreenshotResult>;
 	click(x: number, y: number, options?: ComputerClickOptions): Promise<void>;
 	doubleClick(x: number, y: number, options?: Omit<ComputerClickOptions, "count">): Promise<void>;
 	move(x: number, y: number): Promise<void>;
@@ -164,6 +200,11 @@ interface ComputerInputTarget {
 	type(text: string, options?: ComputerDeliveryOptions): Promise<void>;
 	/** Key chord such as `"cmd+shift+p"` or `["cmd", "shift", "p"]`. */
 	press(chord: string | string[], options?: ComputerDeliveryOptions): Promise<void>;
+}
+
+/** A display target; `active` resolves focus again on each capture, `all` composites every display. */
+interface ComputerDisplayTarget extends ComputerInputTarget {
+	readonly id: string;
 }
 
 /** Window handle resolved by `window`/`focusedWindow`; identity fields are a snapshot taken at resolution. */
@@ -175,8 +216,20 @@ interface ComputerWindow extends ComputerInputTarget {
 	readonly bounds: ComputerBounds;
 	readonly focused: boolean;
 	raise(): Promise<void>;
+	readonly menu: {
+		/** Inspect a menu path without activating the application (empty path = the menu bar). */
+		items(path?: string[]): Promise<ComputerMenuItem[]>;
+		/**
+		 * Select one unambiguous enabled leaf command using the window's native menu context. Background (the
+		 * default) refuses an app with several windows; `delivery: "foreground"` raises and keys this window, so
+		 * multi-window apps work, and needs the human-confirmed grant (`computer.control.acquire`) first.
+		 */
+		select(path: string[], options?: { delivery?: "background" | "foreground" }): Promise<void>;
+	};
 	/** Formatted accessibility tree as one string, one node per line with `[ref=eN]` tags. */
 	ax(options?: ComputerAxOptions): Promise<string>;
+	/** Atomic screenshot and AX text of this window; displays screenshot then AX unless silent. */
+	observe(options?: ComputerObserveOptions): Promise<ComputerObserveResult>;
 	find(query: ComputerAxQuery): Promise<ComputerElement[]>;
 	ref(ref: string): Promise<ComputerElement | null>;
 }
@@ -184,6 +237,8 @@ interface ComputerWindow extends ComputerInputTarget {
 /** Desktop helpers shared by the direct `computer` facade and the `desktop` object inside `computer.run`. */
 interface ComputerDesktop extends ComputerInputTarget {
 	displays(): Promise<ComputerDisplay[]>;
+	/** Resolve a display id, `"active"`, or `"all"` without changing the session default (active). */
+	display(selector: string): Promise<ComputerDisplayTarget>;
 	windows(filter?: ComputerWindowFilter): Promise<ComputerWindowInfo[]>;
 	/** Resolve exactly one window by opaque id or filter; ambiguous filters throw listing candidates. */
 	window(selector: string | ComputerWindowFilter): Promise<ComputerWindow>;
@@ -196,8 +251,23 @@ interface ComputerDesktop extends ComputerInputTarget {
 		read(): Promise<string>;
 		write(text: string): Promise<void>;
 	};
+	readonly control: {
+		/** Ask the human for the foreground-control grant; returns `{ active }` (false when headless or refused). */
+		acquire(options: { reason: string }): Promise<ComputerControlState>;
+		/** Release the foreground-control grant; belongs in `finally`. */
+		release(): Promise<void>;
+		/** Read the foreground-control grant state. */
+		state(): Promise<ComputerControlState>;
+	};
 	/** Native backend capabilities, permission state, stop path, and focus guard. */
 	capabilities(): Promise<ComputerCapabilities>;
+}
+
+/** The foreground-control grant state (#9651). */
+interface ComputerControlState {
+	active: boolean;
+	reason?: string | null;
+	grantedAt?: string | null;
 }
 
 /** Scope object passed as the first argument to a computer run function. */

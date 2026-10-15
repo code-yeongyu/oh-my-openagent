@@ -19,6 +19,7 @@ import { isSelfUpdate } from "./update-args.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
 import { printSetupReport } from "./setup-report.js"
+import { refuseRetiredCommand } from "./retired-command.js"
 
 // Identity the engine adopts for this install: what the user sees, where state lives, which
 // environment prefix is read first, what goes on the wire, and which channel to check for
@@ -309,10 +310,8 @@ export async function runLauncher(args = process.argv.slice(2)) {
     process.exitCode = await runSelfUpdate(args)
     return
   }
-  // app-server takes the plugin after its subcommand: a leading --extension never reaches the
-  // engine's app-server dispatch. It loads into every thread, including the daemon's.
   if (command === "app-server") {
-    await spawnSenpi(args.includes("--no-extensions") ? args : [...args, "--extension", join(packageRoot, "plugin")], false)
+    refuseRetiredCommand(args)
     return
   }
   // `host status --all` stays the engine's answer; omo only adds each terminal row's last activity.

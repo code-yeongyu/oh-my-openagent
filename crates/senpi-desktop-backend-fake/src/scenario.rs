@@ -25,6 +25,8 @@ pub struct FakeScenario {
     pub capabilities: DesktopCapabilities,
     /// Accessibility tree root per window id.
     pub ax: BTreeMap<String, FakeAxNode>,
+    /// Menu-bar children per window id; absent means the backend has no menus.
+    pub menus: BTreeMap<String, Vec<FakeMenuNode>>,
     /// Reports every AX element's owner as unknown, like a backend that
     /// cannot map an element to its native window.
     pub ax_owner_unknown: bool,
@@ -45,6 +47,7 @@ impl Default for FakeScenario {
             windows: Vec::new(),
             capabilities: fake_capabilities(0),
             ax: BTreeMap::new(),
+            menus: BTreeMap::new(),
             ax_owner_unknown: false,
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
@@ -157,6 +160,21 @@ pub struct FakeAxNode {
     pub children: Vec<FakeAxNode>,
 }
 
+/// One scripted menu item and its submenu.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FakeMenuNode {
+    pub title: String,
+    #[serde(default = "enabled_by_default")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub checked: bool,
+    #[serde(default)]
+    pub shortcut: Option<String>,
+    #[serde(default)]
+    pub children: Vec<FakeMenuNode>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FakeBounds {
@@ -190,6 +208,8 @@ struct RawScenario {
     #[serde(default)]
     ax: BTreeMap<String, FakeAxNode>,
     #[serde(default)]
+    menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    #[serde(default)]
     ax_owner_unknown: bool,
     #[serde(default = "default_cursor")]
     cursor: Option<DesktopPoint>,
@@ -211,6 +231,7 @@ impl TryFrom<RawScenario> for FakeScenario {
         let mut referenced = raw
             .ax
             .keys()
+            .chain(raw.menus.keys())
             .chain(raw.resize_window.iter().map(|resize| &resize.id));
         if let Some(unknown) = referenced.find(|id| !known(id)) {
             return Err(ScenarioError::UnknownWindow(unknown.clone()));
@@ -222,6 +243,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             windows: raw.windows,
             capabilities,
             ax: raw.ax,
+            menus: raw.menus,
             ax_owner_unknown: raw.ax_owner_unknown,
             cursor: raw.cursor,
             capture_color: raw.capture_color,

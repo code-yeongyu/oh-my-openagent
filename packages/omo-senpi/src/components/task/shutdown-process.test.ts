@@ -54,6 +54,7 @@ for (const path of ["park", "missing-session", "normal", "missing-session-runnin
         ...base, lifecycle,
         manager: {
           ...base.manager,
+          list: (scope: Parameters<typeof base.manager.list>[0]) => base.manager.list(scope),
           residentTaskIds: () => registry.entries().map(handle => handle.task_id),
           get: (id: string) => store.load(id) ?? undefined,
         },

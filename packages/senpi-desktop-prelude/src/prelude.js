@@ -51,10 +51,11 @@
 	};
 
 	const windowFields = ["id", "app", "title", "pid", "bounds", "focused"];
-	const windowValueMethods = ["screenshot", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "raise", "ax"];
+	const windowValueMethods = ["screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "raise", "ax"];
 	const elementFields = ["ref", "role", "nativeRole", "title", "description", "enabled", "focused", "childCount"];
 	const elementValueMethods = ["value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "focus"];
-	const desktopValueMethods = ["displays", "windows", "screenshot", "click", "doubleClick", "move", "drag", "scroll", "type", "press"];
+	const desktopValueMethods = ["displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press"];
+	const displayValueMethods = ["screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press"];
 
 	const copyFields = (target, fields, snapshot) => {
 		for (const field of fields) {
@@ -86,6 +87,10 @@
 		defineValueMethods(win, windowValueMethods, via);
 		defineMethod(win, "find", async query => (await callValue(via(step("find", [query])))).map(makeElement));
 		defineMethod(win, "ref", ref => resolveElement([step("ref", [ref])]));
+		defineMethod(win, "menu", Object.freeze({
+			items: path => callValue(via(step("menu.items", [path]))),
+			select: (path, options) => callValue(via(step("menu.select", options === undefined ? [path] : [path, options]))),
+		}));
 		return Object.freeze(win);
 	};
 	const resolveWindow = async chain => {
@@ -96,6 +101,13 @@
 	const computer = {};
 	defineValueMethods(computer, desktopValueMethods, next => [next]);
 	computer.window = selector => resolveWindow([step("window", [selector])]);
+	computer.display = async selector => {
+		const snapshot = await callValue([step("display", [selector])]);
+		const target = {};
+		copyFields(target, ["id"], snapshot);
+		defineValueMethods(target, displayValueMethods, next => [step("display", [snapshot.id]), next]);
+		return Object.freeze(target);
+	};
 	computer.focusedWindow = () => resolveWindow([step("focusedWindow", [])]);
 	computer.elementAt = (x, y) => resolveElement([step("elementAt", [x, y])]);
 	computer.focusedElement = () => resolveElement([step("focusedElement", [])]);
@@ -103,6 +115,11 @@
 	computer.clipboard = Object.freeze({
 		read: () => callValue([step("clipboard.read", [])]),
 		write: text => callValue([step("clipboard.write", [text])]),
+	});
+	computer.control = Object.freeze({
+		acquire: options => callValue([step("control.acquire", [options])]),
+		release: () => callValue([step("control.release", [])]),
+		state: () => callValue([step("control.state", [])]),
 	});
 	computer.run = async (fnOrCode, options) => {
 		if (typeof fnOrCode !== "function" && typeof fnOrCode !== "string") {
