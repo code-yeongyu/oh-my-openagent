@@ -30,7 +30,7 @@ async function project(disabled: Record<string, boolean>) {
       remove: (id: string) => registry.delete(id),
     }) },
     command: { transform: async (fn: (editor: object) => void) => fn({}) },
-    mcp: { transform: async (fn: (editor: object) => void) => fn({ set: () => undefined }) },
+    mcp: { transform: async (fn: (editor: object) => void) => fn({ get: () => undefined, set: () => undefined }) },
   } as unknown as Parameters<typeof projectV1Surface>[0]["ctx"]
   await projectV1Surface({
     ctx, directory, agentDirectory: join(directory, "agents"),

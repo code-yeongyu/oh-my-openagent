@@ -312,6 +312,18 @@ export async function projectV1Surface(input: {
       const server = mcpServerFromV1(value)
       if (!server) continue
       try {
+        // Native ConfigMcpPlugin runs in the pre-plugin phase, before packages.
+        // Inspect its current entries on EVERY replay: preserve disabled states,
+        // credentials, timeout defaults and config reloads without copying them.
+        // The one explicit migration alias avoids a second direct grep server
+        // while the gateway still uses the temporary grep-app workaround key.
+        const existingName = editor.get(name)
+          ? name
+          : name === "grep_app" && editor.get("grep-app") ? "grep-app" : undefined
+        if (existingName) {
+          log("[oh-my-openagent] host MCP configuration wins; OMO fills gaps only", { server: name, existing: existingName })
+          continue
+        }
         editor.set(name, server)
       } catch (error) {
         log("[oh-my-openagent] mcp registration failed", {
