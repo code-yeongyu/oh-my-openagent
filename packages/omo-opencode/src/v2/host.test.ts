@@ -475,14 +475,24 @@ describe("OpenCode V2 adapter", () => {
       provider: { list: () => Promise<unknown> }
       model: { list: () => Promise<unknown> }
     }
-    catalog.agent.list = async () => ({ data: [{ name: "oh-my-openagent/oracle", mode: "subagent", hidden: false }] })
+    // A native built-in keeps its id ("general") and only decorates the display name ("General");
+    // V1 callers pass the listed name back as `agent`, which the native host resolves by id.
+    catalog.agent.list = async () => ({
+      data: [
+        { name: "oh-my-openagent/oracle", mode: "subagent", hidden: false },
+        { id: "general", name: "General", mode: "subagent", hidden: false },
+      ],
+    })
     catalog.provider.list = async () => ({ data: [{ id: "openai", activation: "enabled" }] })
     catalog.model.list = async () => ({ data: [{ providerID: "openai", modelID: "gpt" }] })
     const v1 = createV1PluginInput(fake.ctx)
     const agents = await v1.client.app.agents()
     const providers = await v1.client.provider.list()
     const models = await v1.client.model.list()
-    expect(agents.data).toEqual([{ name: "oh-my-openagent/oracle", mode: "subagent", hidden: false }])
+    expect(agents.data).toEqual([
+      { name: "oh-my-openagent/oracle", mode: "subagent", hidden: false },
+      { name: "general", mode: "subagent", hidden: false },
+    ])
     expect(providers.data).toEqual({ connected: ["openai"], all: [{ id: "openai", models: { gpt: { id: "gpt" } } }] })
     expect(models.data).toEqual([{ provider: "openai", id: "gpt" }])
   })

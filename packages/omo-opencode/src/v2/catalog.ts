@@ -19,7 +19,9 @@ function rowsFrom(value: unknown): Array<Record<string, unknown>> {
 export function agentsFrom(value: unknown): { data: Array<Record<string, unknown>> } {
   return {
     data: rowsFrom(value).map((agent) => ({
-      name: typeof agent.name === "string" ? agent.name : agent.id,
+      // V1 callers pass `name` back as the prompt agent; V2 resolves agents by id, and built-ins such as
+      // `general` carry a display name ("General") that is not an id.
+      name: typeof agent.id === "string" ? agent.id : agent.name,
       mode: agent.mode,
       hidden: agent.hidden,
       ...(agent.model !== undefined ? { model: agent.model } : {}),
