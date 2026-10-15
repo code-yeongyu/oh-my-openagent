@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { floorClaudeCodeVersion } from "./claude-code-floor.js"
 import { prepareCompileSafeEngine } from "./compile-safe-engine.js"
 import { LAUNCH_SPEC_FILENAME, normalizeLaunchSpecMode } from "./launch-spec-mode.js"
+import { preparePasteEnter } from "./paste-enter.js"
 import { prepareRpcStreamErrors } from "./rpc-stream-errors.js"
 
 // Written inside the engine tree, so reinstalling or upgrading the engine drops it with the tree.
@@ -12,6 +13,7 @@ export function prepareInstalledEngine(senpiRoot) {
   floorClaudeCodeVersion(senpiRoot)
   prepareCompileSafeEngine(senpiRoot)
   prepareRpcStreamErrors(senpiRoot)
+  preparePasteEnter(senpiRoot)
 }
 
 export function writeEnginePreparedStamp(senpiRoot, omoVersion) {
