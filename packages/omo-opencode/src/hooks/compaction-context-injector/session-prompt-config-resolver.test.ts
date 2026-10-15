@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test"
 
 import { _resetForTesting } from "../../features/claude-code-session-state"
 import { clearActiveCompactionPin, setActiveCompactionPin } from "../../shared/compaction-pin-state"
@@ -23,6 +23,15 @@ const fakeCtx = (messages: Array<Record<string, unknown>>) => ({
 })
 
 describe("resolveSessionPromptConfig (compaction-pin-checkpoint)", () => {
+  // Isolation: other suites share the session id "ses_test" and leave module-level
+  // session state behind (CI: a stored model for "ses_test" leaked in and the
+  // stored-model fallback returned it — full-suite interference).
+  beforeEach(() => {
+    _resetForTesting()
+    clearSessionModel("ses_test")
+    clearSessionTools()
+  })
+
   test("skips the compaction marker's pin model and keeps the last working model", async () => {
     const ctx = fakeCtx([
       { info: { agent: "sisyphus", model: { providerID: "kimi-for-coding", modelID: "k3-256k" } } },
