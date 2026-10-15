@@ -61,7 +61,8 @@ export type AutoRetryDispatchOutcome =
     }
   | {
       readonly accepted: false
-      readonly status: "blocked" | "invalid-model" | "failed"
+      /** `superseded`: another dispatch or a newer fallback generation owns the session, so this call acquired nothing. */
+      readonly status: "blocked" | "superseded" | "invalid-model" | "failed"
       readonly reason: string
     }
 
