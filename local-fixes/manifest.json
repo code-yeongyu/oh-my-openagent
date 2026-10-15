@@ -535,6 +535,42 @@
       "markers": ["compaction-recovery-once accepted"],
       "overlapsWith": ["13-compaction-pin-checkpoint"],
       "orderNote": "Rebased onto the activated 36-fix lane without dropping entries 30-36. Original side-branch slot 30 was renumbered to 37. Pair with the opencode-claude-v2 parked-history-boundary-changed fix (original 27fcc05): it stops reuse of the old parked Claude turn after another provider summarized. Tests: compaction-context-injector/loop-regression.test.ts and v2/session-actions.recovery.test.ts. Existing preemptive-compaction timeout/cache-clear and runtime-fallback protections remain carried. Stage only while OpenChamber runs; import source and activate during the closed window."
+    },
+    {
+      "id": "38-v2-native-parent-linkage",
+      "title": "Create v2 child sessions with the native parentID so subagents nest under their parent",
+      "commit": "e9519d4fe73118e456bba99fcea4f0d9f6580321",
+      "patch": "patches/38-v2-native-parent-linkage.patch",
+      "pr": null,
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10173",
+      "why": "The v2 facade's session.create kept body.parentID only in metadata.omoParentID and adapter memory and never passed it to the native create, so every task/call_omo_agent/background subagent session was stored with parent_id NULL and appeared top-level in OpenChamber (ses_ec39f036, ses_ec3a264d, ses_ec3aa4f4 on 2026-10-14). Native parentID is supported since OpenCode v2.0.22 (anomalyco/opencode#52359); the host then places the child at its parent's location and ignores location, so a child that asked for another directory is moved there with session.move.",
+      "markers": [
+        "directory: requestedDirectory })"
+      ],
+      "overlapsWith": [
+        "37-compaction-recovery-control-plane",
+        "19-compaction-aware-timeout-lane-guards",
+        "31-test-host-agent-id"
+      ],
+      "orderNote": "Touches createSession in src/v2/session-actions.ts (fix 37 edits sendPrompt in the same file) and the v2 host.test.ts owner test (fixes 19 and 31). Apply after 37. Tests: v2/host.test.ts. src/v2 comes from upstream PR #9016, not dev; the same change rebased on the #9016 head is https://github.com/mradwankhalil/oh-my-openagent/tree/fix/v2-native-parent-linkage-on-9016 for when #9016 lands."
+    },
+    {
+      "id": "39-v2-agent-native-id",
+      "title": "List v2 agents by native id so task(subagent_type=\"general\") resolves",
+      "commit": "c4972b62907563aaa6fa469021730fd07be7db66",
+      "patch": "patches/39-v2-agent-native-id.patch",
+      "pr": null,
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10174",
+      "why": "The v2 facade's app.agents() reported each agent's display name as its V1 name, but V1 callers pass that name back as the prompt agent and OpenCode v2 resolves agents by id only. Built-ins keep a lowercase id and decorate a display name (general -> \"General\"), so task(subagent_type=\"general\") switched the child to \"General\" and failed with Agent not found: \"General\" (ses_ec3aa4f4, 2026-10-14). The user config agent.general = {color} stub is unrelated: the failure reproduces with no agent config at all.",
+      "markers": [
+        "name: typeof agent.id === \"string\" ? agent.id : agent.name"
+      ],
+      "overlapsWith": [
+        "38-v2-native-parent-linkage",
+        "19-compaction-aware-timeout-lane-guards",
+        "31-test-host-agent-id"
+      ],
+      "orderNote": "One line in src/v2/catalog.ts agentsFrom plus the v2 host.test.ts owner test. Apply after 38 (same test file). Tests: v2/host.test.ts. Rebased on the #9016 head at https://github.com/mradwankhalil/oh-my-openagent/tree/fix/v2-native-parent-linkage-on-9016."
     }
   ],
   "externalFixes": [

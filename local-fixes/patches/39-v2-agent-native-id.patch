@@ -1,0 +1,69 @@
+From c4972b62907563aaa6fa469021730fd07be7db66 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Thu, 15 Oct 2026 03:25:05 +0300
+Subject: [PATCH] fix(opencode-v2): list agents by native id so built-in
+ subagents resolve
+
+The V1 facade's app.agents() reported each V2 agent's display name as its
+V1 `name`. In V1 that field is the identifier callers pass back as the prompt
+`agent`, but OpenCode V2 resolves agents by id only. Built-ins keep a lowercase
+id and decorate a capitalized display name (`general` -> "General"), so
+task(subagent_type="general") resolved to "General", the native host stored
+agent-switched "General", and the run failed with `Agent not found: "General"`.
+
+Report the native id as the V1 name and fall back to the name only when a row
+has no id. Agents whose id already equals their name are unaffected.
+---
+ packages/omo-opencode/src/v2/catalog.ts   |  4 +++-
+ packages/omo-opencode/src/v2/host.test.ts | 14 ++++++++++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/packages/omo-opencode/src/v2/catalog.ts b/packages/omo-opencode/src/v2/catalog.ts
+index f776ea379..0ed07d54b 100644
+--- a/packages/omo-opencode/src/v2/catalog.ts
++++ b/packages/omo-opencode/src/v2/catalog.ts
+@@ -19,7 +19,9 @@ function rowsFrom(value: unknown): Array<Record<string, unknown>> {
+ export function agentsFrom(value: unknown): { data: Array<Record<string, unknown>> } {
+   return {
+     data: rowsFrom(value).map((agent) => ({
+-      name: typeof agent.name === "string" ? agent.name : agent.id,
++      // V1 callers pass `name` back as the prompt agent; V2 resolves agents by id, and built-ins such as
++      // `general` carry a display name ("General") that is not an id.
++      name: typeof agent.id === "string" ? agent.id : agent.name,
+       mode: agent.mode,
+       hidden: agent.hidden,
+       ...(agent.model !== undefined ? { model: agent.model } : {}),
+diff --git a/packages/omo-opencode/src/v2/host.test.ts b/packages/omo-opencode/src/v2/host.test.ts
+index b60af5d03..55bc330d6 100644
+--- a/packages/omo-opencode/src/v2/host.test.ts
++++ b/packages/omo-opencode/src/v2/host.test.ts
+@@ -475,14 +475,24 @@ describe("OpenCode V2 adapter", () => {
+       provider: { list: () => Promise<unknown> }
+       model: { list: () => Promise<unknown> }
+     }
+-    catalog.agent.list = async () => ({ data: [{ name: "oh-my-openagent/oracle", mode: "subagent", hidden: false }] })
++    // A native built-in keeps its id ("general") and only decorates the display name ("General");
++    // V1 callers pass the listed name back as `agent`, which the native host resolves by id.
++    catalog.agent.list = async () => ({
++      data: [
++        { name: "oh-my-openagent/oracle", mode: "subagent", hidden: false },
++        { id: "general", name: "General", mode: "subagent", hidden: false },
++      ],
++    })
+     catalog.provider.list = async () => ({ data: [{ id: "openai", activation: "enabled" }] })
+     catalog.model.list = async () => ({ data: [{ providerID: "openai", modelID: "gpt" }] })
+     const v1 = createV1PluginInput(fake.ctx)
+     const agents = await v1.client.app.agents()
+     const providers = await v1.client.provider.list()
+     const models = await v1.client.model.list()
+-    expect(agents.data).toEqual([{ name: "oh-my-openagent/oracle", mode: "subagent", hidden: false }])
++    expect(agents.data).toEqual([
++      { name: "oh-my-openagent/oracle", mode: "subagent", hidden: false },
++      { name: "general", mode: "subagent", hidden: false },
++    ])
+     expect(providers.data).toEqual({ connected: ["openai"], all: [{ id: "openai", models: { gpt: { id: "gpt" } } }] })
+     expect(models.data).toEqual([{ provider: "openai", id: "gpt" }])
+   })
+-- 
+2.55.0.windows.5
+

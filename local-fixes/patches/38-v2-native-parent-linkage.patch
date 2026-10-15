@@ -1,0 +1,185 @@
+From e9519d4fe73118e456bba99fcea4f0d9f6580321 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Thu, 15 Oct 2026 03:08:03 +0300
+Subject: [PATCH] fix(opencode-v2): forward the native parentID when the
+ adapter creates a child session
+
+The V1 facade's session.create read body.parentID but only stored it as
+metadata.omoParentID and in adapter memory. The native OpenCode V2 create call
+never received parentID, so every session spawned by task / call_omo_agent /
+background agents was persisted with parent_id NULL and showed up as a
+top-level session in the UI. OMO itself did not notice because withParent and
+childSessions rebuilt the link from metadata.
+
+Pass parentID to the native create (supported since OpenCode v2.0.22,
+anomalyco/opencode#52359). The native host places a child at its parent's
+location and ignores location when parentID is set, so a child that asked for a
+different directory (team worktree, task cwd) is moved there with session.move
+right after creation. The metadata and adapter-state bookkeeping are kept.
+---
+ packages/omo-opencode/src/v2/host.test.ts     | 45 ++++++++++++++++---
+ .../omo-opencode/src/v2/session-actions.ts    | 25 ++++++++++-
+ 2 files changed, 61 insertions(+), 9 deletions(-)
+
+diff --git a/packages/omo-opencode/src/v2/host.test.ts b/packages/omo-opencode/src/v2/host.test.ts
+index 319af99f2..b60af5d03 100644
+--- a/packages/omo-opencode/src/v2/host.test.ts
++++ b/packages/omo-opencode/src/v2/host.test.ts
+@@ -28,14 +28,14 @@ function createFakeContext(): {
+   prompts: Array<{ sessionID: string; text: string }>
+   agents: Map<string, { description?: string; mode?: string; system?: string }>
+   pushEvent: (event: unknown) => void
+-  calls: { agent: string[]; model: unknown[]; synthetic: string[]; create: unknown[] }
++  calls: { agent: string[]; model: unknown[]; synthetic: string[]; create: unknown[]; move: unknown[] }
+ } {
+   const hooks: RegisteredHook[] = []
+   const tools: Array<{ name: string; execute: (input: unknown, context: { sessionID: string; id: string; signal: AbortSignal }) => Promise<{ content: string }> }> = []
+   const commands: Array<{ name: string; execute: (input: { sessionID: string; prompt: { text: string }; delivery: "steer" }) => Promise<void> }> = []
+   const mcps: Array<[string, { type: string; url?: string; disabled?: boolean }]> = []
+   const prompts: Array<{ sessionID: string; text: string }> = []
+-  const calls = { agent: [] as string[], model: [] as unknown[], synthetic: [] as string[], create: [] as unknown[] }
++  const calls = { agent: [] as string[], model: [] as unknown[], synthetic: [] as string[], create: [] as unknown[], move: [] as unknown[] }
+   const pendingEvents: unknown[] = []
+   let notifyEvent: (() => void) | undefined
+   const agents = new Map<string, { description?: string; mode?: string; system?: string }>([
+@@ -59,8 +59,9 @@ function createFakeContext(): {
+       },
+       create: async (input: unknown) => {
+         calls.create.push(input)
+-        const body = typeof input === "object" && input !== null ? input as { metadata?: { omoParentID?: string } } : {}
+-        return { id: "created", metadata: body.metadata }
++        const body = typeof input === "object" && input !== null ? input as { parentID?: string; location?: unknown; metadata?: { omoParentID?: string } } : {}
++        // Like the native host, a child lands at its parent's location (the project here), not the requested one.
++        return { id: "created", metadata: body.metadata, location: body.parentID ? { directory: ctx.location.directory } : body.location }
+       },
+       interrupt: async () => undefined,
+       switchAgent: async (input: { agent: string }) => {
+@@ -70,7 +71,9 @@ function createFakeContext(): {
+         calls.model.push(input.model)
+       },
+       update: async () => undefined,
+-      move: async () => undefined,
++      move: async (input: unknown) => {
++        calls.move.push(input)
++      },
+       wait: async () => undefined,
+       generate: async () => ({ text: "" }),
+       command: async () => undefined,
+@@ -523,7 +526,7 @@ describe("OpenCode V2 adapter", () => {
+     await expect((unauthorized.client.session.status as () => Promise<unknown>)()).rejects.toThrow("unauthorized")
+   })
+ 
+-  test("create remembers parentID and prompt applies agent, model, and system", async () => {
++  test("create links the native parent and prompt applies agent, model, and system", async () => {
+     const directory = mkdtempSync(join(tmpdir(), "omo-v2-parent-"))
+     directories.push(directory)
+     const fake = createFakeContext()
+@@ -536,8 +539,10 @@ describe("OpenCode V2 adapter", () => {
+     await (v1.client.session.create as (input: unknown) => Promise<unknown>)({
+       body: { title: "child", parentID: "ses_parent", permission: [{ permission: "question", action: "deny", pattern: "*" }] },
+     })
+-    const created = fake.calls.create[0] as { metadata?: { omoParentID?: string }; permissions?: unknown[] }
++    const created = fake.calls.create[0] as { parentID?: string; metadata?: { omoParentID?: string }; permissions?: unknown[] }
++    expect(created.parentID).toBe("ses_parent")
+     expect(created.metadata?.omoParentID).toBe("ses_parent")
++    expect(fake.calls.move).toEqual([])
+     expect(created.permissions).toEqual([{ action: "question", resource: "*", effect: "deny" }])
+     const children = await (v1.client.session.children as (input: unknown) => Promise<{ data: Array<{ id: string; parentID?: string }> }>)({ path: { id: "ses_parent" } })
+     expect(children.data[0]?.parentID).toBe("ses_parent")
+@@ -551,6 +556,32 @@ describe("OpenCode V2 adapter", () => {
+     expect(fake.prompts[0]?.text).toBe("go")
+   })
+ 
++  test("a child requested in another directory is moved there after native parent linking", async () => {
++    // given
++    const directory = mkdtempSync(join(tmpdir(), "omo-v2-parent-"))
++    const worktree = mkdtempSync(join(tmpdir(), "omo-v2-member-"))
++    directories.push(directory, worktree)
++    const fake = createFakeContext()
++    Object.assign(fake.ctx.location, { directory })
++    const v1 = createV1PluginInput(fake.ctx, {
++      state: createAdapterState(`${directory}/.omo/v2-state`),
++      fetchImpl: async () => jsonResponse({ data: [], cursor: {} }),
++      argv: ["opencode", "serve", "--port", "9"],
++    })
++
++    // when
++    const result = await (v1.client.session.create as (input: unknown) => Promise<{ data?: { directory?: string; parentID?: string } }>)({
++      body: { title: "member", parentID: "ses_parent" },
++      query: { directory: worktree },
++    })
++
++    // then
++    expect((fake.calls.create[0] as { parentID?: string }).parentID).toBe("ses_parent")
++    expect(fake.calls.move).toEqual([{ sessionID: "created", directory: worktree }])
++    expect(result.data?.directory).toBe(worktree)
++    expect(result.data?.parentID).toBe("ses_parent")
++  })
++
+   test("stored tool, synthetic, and idle messages keep the V1 roles", async () => {
+     const fake = createFakeContext()
+     const session = fake.ctx.session as unknown as { context: () => Promise<unknown> }
+diff --git a/packages/omo-opencode/src/v2/session-actions.ts b/packages/omo-opencode/src/v2/session-actions.ts
+index 77fd52df5..f798917d4 100644
+--- a/packages/omo-opencode/src/v2/session-actions.ts
++++ b/packages/omo-opencode/src/v2/session-actions.ts
+@@ -1,3 +1,5 @@
++import { resolve } from "node:path"
++
+ import { storedMessagesToV1 } from "./message-shape"
+ import type { AdapterState } from "./adapter-state"
+ import { SessionHttpError } from "./serve-http"
+@@ -72,6 +74,7 @@ type SessionApi = {
+   update: (input: { sessionID: string; permissions?: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }) => Promise<unknown>
+   remove?: (input: { sessionID: string }) => Promise<unknown>
+   compact?: (input: { sessionID: string }) => Promise<unknown>
++  move?: (input: { sessionID: string; directory: string }) => Promise<unknown>
+ }
+ 
+ export function withParent(session: Record<string, unknown>, state: AdapterState): Record<string, unknown> {
+@@ -88,6 +91,14 @@ function directoryOf(session: Record<string, unknown>): unknown {
+   return isRecord(session.location) ? session.location.directory : undefined
+ }
+ 
++function sameDirectory(left: string, right: string): boolean {
++  const normalize = (value: string) => {
++    const resolved = resolve(value).replaceAll("\\", "/").replace(/\/+$/, "")
++    return process.platform === "win32" ? resolved.toLowerCase() : resolved
++  }
++  return normalize(left) === normalize(right)
++}
++
+ export function childSessions(sessions: Array<Record<string, unknown>>, parentID: string, state: AdapterState): Array<Record<string, unknown>> {
+   const links = state.parents()
+   return sessions.filter((session) => {
+@@ -107,15 +118,25 @@ export async function createSession(api: SessionApi, input: unknown, state: Adap
+   }
+   const model = modelRef(body.model, body.variant)
+   const permissions = permissionsFrom(body.permission)
++  const requestedDirectory = typeof query.directory === "string" ? query.directory : directory
+   const created = await api.create({
++    ...(parentID ? { parentID } : {}),
+     ...(typeof body.title === "string" ? { title: body.title } : {}),
+     ...(typeof body.agent === "string" ? { agent: body.agent } : {}),
+     ...(model ? { model } : {}),
+-    ...(typeof query.directory === "string" ? { location: { directory: query.directory } } : { location: { directory } }),
++    location: { directory: requestedDirectory },
+     ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+     ...(permissions.length > 0 ? { permissions } : {}),
+   })
+-  const session = withParent(isRecord(created) ? created : {}, state)
++  let record = isRecord(created) ? created : {}
++  const placed = directoryOf(record)
++  // The native host creates a child at its parent's location, so a child asked to run elsewhere is moved after creation.
++  if (parentID && typeof record.id === "string" && typeof placed === "string" && !sameDirectory(placed, requestedDirectory) && api.move) {
++    await api.move({ sessionID: record.id, directory: requestedDirectory })
++    const location = { ...(isRecord(record.location) ? record.location : {}), directory: requestedDirectory }
++    record = typeof record.directory === "string" ? { ...record, directory: requestedDirectory, location } : { ...record, location }
++  }
++  const session = withParent(record, state)
+   if (typeof session.id === "string" && parentID) state.recordParent(session.id, parentID)
+   if (typeof session.id === "string") state.noteSession(session)
+   return session
+-- 
+2.55.0.windows.5
+
