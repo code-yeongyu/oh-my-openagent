@@ -1,0 +1,141 @@
+From 2466ef21fbd05df3fbf75fa27959c5e1550e8f48 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Fri, 16 Oct 2026 02:01:49 +0300
+Subject: [PATCH] fix(v2): let host MCP configuration win and built-ins fill
+ gaps
+
+---
+ .../v2/project-config.mcp-precedence.test.ts  | 83 +++++++++++++++++++
+ .../v2/project-config.mcp-registry.test.ts    |  2 +-
+ .../omo-opencode/src/v2/project-config.ts     | 12 +++
+ 3 files changed, 96 insertions(+), 1 deletion(-)
+ create mode 100644 packages/omo-opencode/src/v2/project-config.mcp-precedence.test.ts
+
+diff --git a/packages/omo-opencode/src/v2/project-config.mcp-precedence.test.ts b/packages/omo-opencode/src/v2/project-config.mcp-precedence.test.ts
+new file mode 100644
+index 000000000..314d00444
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/project-config.mcp-precedence.test.ts
+@@ -0,0 +1,83 @@
++/// <reference types="bun-types" />
++import { mkdtempSync, rmSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++import { afterEach, expect, test } from "bun:test"
++
++import { projectV1Surface } from "./project-config"
++
++type Server = Record<string, unknown>
++const directories: string[] = []
++afterEach(() => {
++  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
++})
++
++async function projection(fallbacks: Record<string, Server>) {
++  const directory = mkdtempSync(join(tmpdir(), "omo-mcp-precedence-"))
++  directories.push(directory)
++  let transform: (editor: object) => void = () => undefined
++  const ctx = {
++    agent: { transform: async (fn: (editor: object) => void) => fn({}) },
++    tool: { transform: async (fn: (editor: object) => void) => fn({}) },
++    command: { transform: async (fn: (editor: object) => void) => fn({}) },
++    mcp: { transform: async (fn: (editor: object) => void) => { transform = fn } },
++  } as unknown as Parameters<typeof projectV1Surface>[0]["ctx"]
++  await projectV1Surface({ ctx, directory, agentDirectory: join(directory, "agents"), config: { mcp: fallbacks }, tools: {} })
++  // Native ConfigMcpPlugin is a pre-plugin: each registry replay supplies its
++  // current layered host entries before package-plugin transforms execute.
++  return (host: Record<string, Server>) => {
++    const registry = new Map(Object.entries(host))
++    transform({ get: (name: string) => registry.get(name), set: (name: string, value: Server) => registry.set(name, value) })
++    return registry
++  }
++}
++
++const names = ["context7", "lsp", "websearch", "grep_app"]
++const builtins = Object.fromEntries(names.map((name) => [name, { type: "remote", url: `https://builtin.invalid/${name}`, enabled: true }]))
++const gateway = (name: string, disabled = false): Server => ({ type: "remote", url: `http://127.0.0.1:9650/mcp/${name}`, disabled, headers: { "x-test-marker": "host-owned" }, timeout: { execution: 1234 } })
++
++test("user gateway definitions win intact over all four OMO built-in names", async () => {
++  const replay = await projection(builtins)
++  const host = Object.fromEntries(names.map((name) => [name, gateway(name)]))
++  const registry = replay(host)
++  for (const name of names) expect(registry.get(name)).toBe(host[name])
++  expect(registry.size).toBe(4)
++})
++
++test("explicit user-disabled entries remain disabled, never replaced by enabled built-ins", async () => {
++  const replay = await projection(builtins)
++  const host = { context7: gateway("context7", true), lsp: gateway("lsp", true) }
++  const registry = replay(host)
++  expect(registry.get("context7")).toBe(host.context7)
++  expect(registry.get("lsp")).toBe(host.lsp)
++  expect(registry.get("websearch")?.url).toBe("https://builtin.invalid/websearch")
++})
++
++test("built-ins fill only gaps and registry replay observes host add, update and removal", async () => {
++  const replay = await projection(builtins)
++  expect(replay({}).get("context7")?.url).toBe("https://builtin.invalid/context7")
++  const first = gateway("context7")
++  expect(replay({ context7: first }).get("context7")).toBe(first)
++  const updated = { ...first, url: "http://127.0.0.1:9650/mcp/context7-updated" }
++  expect(replay({ context7: updated }).get("context7")).toBe(updated)
++  expect(replay({}).get("context7")?.url).toBe("https://builtin.invalid/context7")
++})
++
++test("temporary grep-app host alias suppresses OMO's direct grep_app, then original name wins after rename", async () => {
++  const replay = await projection(builtins)
++  const host = gateway("grep-app")
++  const before = replay({ "grep-app": host })
++  expect(before.get("grep-app")).toBe(host)
++  expect(before.has("grep_app")).toBe(false)
++  const after = replay({ grep_app: host })
++  expect(after.get("grep_app")).toBe(host)
++  expect(after.has("grep-app")).toBe(false)
++})
++
++test("unrelated names are not normalized or removed, including explicitly configured pairs", async () => {
++  const replay = await projection({ custom_name: { type: "remote", url: "https://builtin.invalid/custom" }, ...builtins })
++  const host = { "custom-name": gateway("custom-name"), "grep-app": gateway("grep-app"), grep_app: gateway("grep_app") }
++  const registry = replay(host)
++  expect(registry.has("custom_name")).toBe(true)
++  for (const name of Object.keys(host)) expect(registry.get(name)).toBe(host[name as keyof typeof host])
++})
+diff --git a/packages/omo-opencode/src/v2/project-config.mcp-registry.test.ts b/packages/omo-opencode/src/v2/project-config.mcp-registry.test.ts
+index c14024aa7..9c87e406f 100644
+--- a/packages/omo-opencode/src/v2/project-config.mcp-registry.test.ts
++++ b/packages/omo-opencode/src/v2/project-config.mcp-registry.test.ts
+@@ -30,7 +30,7 @@ async function project(disabled: Record<string, boolean>) {
+       remove: (id: string) => registry.delete(id),
+     }) },
+     command: { transform: async (fn: (editor: object) => void) => fn({}) },
+-    mcp: { transform: async (fn: (editor: object) => void) => fn({ set: () => undefined }) },
++    mcp: { transform: async (fn: (editor: object) => void) => fn({ get: () => undefined, set: () => undefined }) },
+   } as unknown as Parameters<typeof projectV1Surface>[0]["ctx"]
+   await projectV1Surface({
+     ctx, directory, agentDirectory: join(directory, "agents"),
+diff --git a/packages/omo-opencode/src/v2/project-config.ts b/packages/omo-opencode/src/v2/project-config.ts
+index 265a03c2a..8800bf871 100644
+--- a/packages/omo-opencode/src/v2/project-config.ts
++++ b/packages/omo-opencode/src/v2/project-config.ts
+@@ -312,6 +312,18 @@ export async function projectV1Surface(input: {
+       const server = mcpServerFromV1(value)
+       if (!server) continue
+       try {
++        // Native ConfigMcpPlugin runs in the pre-plugin phase, before packages.
++        // Inspect its current entries on EVERY replay: preserve disabled states,
++        // credentials, timeout defaults and config reloads without copying them.
++        // The one explicit migration alias avoids a second direct grep server
++        // while the gateway still uses the temporary grep-app workaround key.
++        const existingName = editor.get(name)
++          ? name
++          : name === "grep_app" && editor.get("grep-app") ? "grep-app" : undefined
++        if (existingName) {
++          log("[oh-my-openagent] host MCP configuration wins; OMO fills gaps only", { server: name, existing: existingName })
++          continue
++        }
+         editor.set(name, server)
+       } catch (error) {
+         log("[oh-my-openagent] mcp registration failed", {
+-- 
+2.55.0.windows.5
+

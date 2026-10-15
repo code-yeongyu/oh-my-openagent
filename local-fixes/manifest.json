@@ -610,7 +610,18 @@
       "why": "V1 grep_app_*:false became shared V2 registry deletion, defeating librarian allows and colliding with user server names. Preserve all namespaced shared tools based on native options.namespace metadata, not a spelling exception. MCP execution still uses the host permission engine. Unnamespaced plugin/native disable behavior is unchanged. This does not fix MCP server override precedence or project V1 global deny defaults as host permission rules.",
       "markers": ["preserving shared namespaced MCP tool registration"],
       "overlapsWith": [],
-      "orderNote": "Separate follow-on after fix41 activation; never replace the pinned fix41 stage. New regression RED 2 failures then GREEN 2 passes/10 assertions; adjacent todo tests pass. Rename grep-app back to grep_app only after offline fix42 activation and subsequent live tool verification. Routing override remediation remains owner-decision only."
+      "orderNote": "Owner superseded separate-restart plan: batch with fix41 + fix43, F21, paired context-mode hooks and OpenCode #55756 amendment, one combined offline script and one restart. Keep the original fix41 stage intact until final batch assembly. Regression RED 2 failures then GREEN 2 passes/10 assertions. Rename-back only after fix42+fix43 are active and live-verified with gateway route proof."
+    },
+    {
+      "id": "43-v2-host-mcp-precedence",
+      "title": "Host MCP entries win; OMO injects only missing servers",
+      "commit": "2466ef21fbd05df3fbf75fa27959c5e1550e8f48",
+      "patch": "patches/43-v2-host-mcp-precedence.patch",
+      "pr": null,
+      "why": "The empty V2 scratch config hid user entries from V1 merge precedence, and unconditional editor.set overwrote gateway routes. Native ConfigMcpPlugin runs before package plugins; inspect editor.get on every replay and leave existing entries intact, including disabled states, credentials and timeouts. Suppress the grep_app fallback when host grep-app migration alias exists, avoiding its duplicate direct connection. Do not normalize unrelated names or delete user entries; native execution permissions unchanged.",
+      "markers": ["host MCP configuration wins; OMO fills gaps only"],
+      "overlapsWith": ["42-v2-shared-mcp-registry"],
+      "orderNote": "Depends on native pre-plugin config ordering (core plugin/internal.ts + supervisor.ts). New regressions RED 0/5 then GREEN; expanded adapter suite 29 passes/104 assertions. Stage in final owner batch with fix41/fix42, F21, context-mode hooks and #55756 amendment. No upstream post/PR without owner go. Rename-back is post-restart final batch step, gated by live precedence + visibility verification and exactly-one original-name gateway-route proof."
     }
   ],
   "externalFixes": [
