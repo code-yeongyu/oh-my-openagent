@@ -1,0 +1,182 @@
+From 43cb85a7416514fbe789355c871c58f5f62b36ac Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Thu, 15 Oct 2026 23:32:14 +0300
+Subject: [PATCH] fix(v2): preserve MCP namespaces and identify compatibility
+ hook host
+
+---
+ .../claude-code-hooks/dispatch-hook.test.ts   | 12 +++++++
+ .../hooks/claude-code-hooks/dispatch-hook.ts  | 10 ++++++
+ .../tool-execute-before-mcp-prefix.test.ts    | 18 +++++++++++
+ .../src/plugin/tool-execute-before.ts         |  8 ++---
+ .../src/v2/hook-bridge-tool-routing.test.ts   | 32 +++++++++++++++++++
+ packages/omo-opencode/src/v2/hook-bridge.ts   | 15 +++++++++
+ 6 files changed, 91 insertions(+), 4 deletions(-)
+ create mode 100644 packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts
+
+diff --git a/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.test.ts b/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.test.ts
+index 5c0737fa7..04ee05bf9 100644
+--- a/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.test.ts
++++ b/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.test.ts
+@@ -29,6 +29,18 @@ afterAll(() => {
+ })
+ 
+ describe("dispatchHook", () => {
++  test("identifies the actual hook host without changing tool inputs", async () => {
++    const payload = { tool_name: "WebFetch", tool_input: { url: "https://example.com" } }
++    await dispatchHook({ type: "command", command: "echo hello" }, JSON.stringify(payload), "/tmp")
++    const stdin = mockExecuteHookCommand.mock.calls.at(-1)?.[1]
++    expect(JSON.parse(stdin!)).toEqual({ ...payload, hook_host: "opencode" })
++  })
++
++  test.each(["plain custom input", "[]", "null"])("preserves non-object payload %s", async (stdin: string) => {
++    await dispatchHook({ type: "command", command: "echo hello" }, stdin, "/tmp")
++    expect(mockExecuteHookCommand.mock.calls.at(-1)?.[1]).toBe(stdin)
++  })
++
+   beforeEach(() => {
+     mockExecuteHookCommand.mockClear()
+     capturedOptions.length = 0
+diff --git a/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.ts b/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.ts
+index 345b03686..a0ab88f6a 100644
+--- a/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.ts
++++ b/packages/omo-opencode/src/hooks/claude-code-hooks/dispatch-hook.ts
+@@ -14,6 +14,16 @@ export async function dispatchHook(
+   stdinJson: string,
+   cwd: string
+ ): Promise<CommandResult> {
++  // Claude-compatible envelopes do not imply Claude's tool namespace. Let
++  // shared hooks select OpenCode guidance without guessing from inherited env.
++  try {
++    const input = JSON.parse(stdinJson)
++    if (input && typeof input === "object" && !Array.isArray(input)) {
++      stdinJson = JSON.stringify({ ...input, hook_host: "opencode" })
++    }
++  } catch {
++    // Preserve the existing behavior for non-JSON custom hooks.
++  }
+   if (hook.type === "http") {
+     return executeHttpHook(hook, stdinJson)
+   }
+diff --git a/packages/omo-opencode/src/plugin/tool-execute-before-mcp-prefix.test.ts b/packages/omo-opencode/src/plugin/tool-execute-before-mcp-prefix.test.ts
+index 4b8a98db9..1622af76f 100644
+--- a/packages/omo-opencode/src/plugin/tool-execute-before-mcp-prefix.test.ts
++++ b/packages/omo-opencode/src/plugin/tool-execute-before-mcp-prefix.test.ts
+@@ -19,6 +19,24 @@ function createMockHooks(): CreatedHooks {
+ }
+ 
+ describe("tool-execute-before mcp_ prefix stripping", () => {
++  test.each([
++    "mcp__lsp__get_tool_schema",
++    "mcp__codegraph__codegraph_explore",
++    "mcp__plugin_context-mode_context-mode__ctx_execute",
++    "mcp__oc__execute",
++    "MCP__server__tool",
++  ])("preserves namespaced MCP tool %s", async (tool) => {
++    const handler = createToolExecuteBeforeHandler({
++      ctx: createMockContext(),
++      hooks: createMockHooks(),
++    })
++    const input = { tool, sessionID: "ses_child", callID: "call_namespaced" }
++
++    await handler(input, { args: {} })
++
++    expect(input.tool).toBe(tool)
++  })
++
+   test("should strip mcp_ prefix from mcp_background_output", async () => {
+     // given
+     const handler = createToolExecuteBeforeHandler({
+diff --git a/packages/omo-opencode/src/plugin/tool-execute-before.ts b/packages/omo-opencode/src/plugin/tool-execute-before.ts
+index 3af9adb3f..d3eef1687 100644
+--- a/packages/omo-opencode/src/plugin/tool-execute-before.ts
++++ b/packages/omo-opencode/src/plugin/tool-execute-before.ts
+@@ -49,10 +49,10 @@ export function createToolExecuteBeforeHandler(args: {
+   const { ctx, hooks, backgroundManager } = args
+ 
+   return async (input, output): Promise<void> => {
+-    // Strip mcp_ prefix from tool names — the model may emit mcp_background_output
+-    // but the runtime registry has it as background_output (fixes #2697)
+-    if (/^mcp_/i.test(input.tool)) {
+-      const stripped = input.tool.replace(/^mcp_/i, "")
++    // Repair legacy mcp_background_output, but preserve mcp__server__tool:
++    // removing one underscore from a namespaced MCP name corrupts its identity.
++    if (/^mcp_(?!_)/i.test(input.tool)) {
++      const stripped = input.tool.replace(/^mcp_(?!_)/i, "")
+       log("[tool-execute-before] Stripped mcp_ prefix from tool name", {
+         original: input.tool,
+         resolved: stripped,
+diff --git a/packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts b/packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts
+new file mode 100644
+index 000000000..320cebd41
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts
+@@ -0,0 +1,32 @@
++import { expect, test } from "bun:test"
++import type { Plugin } from "@opencode/plugin"
++import { registerV1Hooks } from "./hook-bridge"
++
++test("v2 context gives catalog precedence over imported legacy tool instructions", async () => {
++  let onContext: (event: any) => Promise<void> = async () => {}
++  const ctx = {
++    session: {
++      hook: async (name: string, handler: typeof onContext) => {
++        if (name === "context") onContext = handler
++      },
++    },
++  } as unknown as Plugin.Context
++  const dispose = await registerV1Hooks(ctx, {
++    "experimental.chat.system.transform": (_input: unknown, output: { system: string[] }) => {
++      output.system.push("Legacy instruction: call mcp__lsp__get_tool_schema")
++    },
++  })
++  try {
++    const event = { sessionID: "child", model: { id: "claude", providerID: "anthropic" }, system: [] as { type: string; text: string }[] }
++    await onContext(event)
++    const guidance = event.system.at(-1)!.text
++    expect(guidance).toContain("Code Mode")
++    expect(guidance).toContain("search")
++    expect(guidance).toContain("execute")
++    expect(guidance).toContain("do not create callable tools")
++    await onContext(event)
++    expect(event.system.filter((part) => part.text === guidance)).toHaveLength(1)
++  } finally {
++    dispose()
++  }
++})
+diff --git a/packages/omo-opencode/src/v2/hook-bridge.ts b/packages/omo-opencode/src/v2/hook-bridge.ts
+index 79807d4e8..a7a28738d 100644
+--- a/packages/omo-opencode/src/v2/hook-bridge.ts
++++ b/packages/omo-opencode/src/v2/hook-bridge.ts
+@@ -7,6 +7,13 @@ import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
+ 
+ type V2Context = Plugin.Context
+ 
++const V2_TOOL_ROUTING = [
++  "OpenCode V2 tool routing (also applies in child sessions): the current tool definitions and Code Mode catalog are authoritative.",
++  "Imported instructions naming bare tools, mcp__server__tool aliases, or legacy get_tool_schema/invoke_tool endpoints do not create callable tools.",
++  "For a Code Mode tool, use execute: discover its exact path and signature with search, then call that tools path inside execute.",
++  "For a directly exposed plugin tool, use its exact exposed name, including any plugin prefix. Do not invent or strip namespaces.",
++].join("\n")
++
+ type V1Handler = (input: unknown, output?: unknown) => Promise<void> | void
+ 
+ export type V1HookMap = Record<string, unknown>
+@@ -174,6 +181,14 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?:
+           if (output.maxOutputTokens !== undefined) event.options.maxTokens = output.maxOutputTokens
+           Object.assign(event.options, output.options)
+         }
++        // Imported Claude/V1 instructions can advertise tools from another host.
++        // Keep this host-boundary clarification last, without accumulating copies.
++        for (let index = event.system.length - 1; index >= 0; index--) {
++          if (event.system[index].type === "text" && event.system[index].text === V2_TOOL_ROUTING) {
++            event.system.splice(index, 1)
++          }
++        }
++        event.system.push({ type: "text", text: V2_TOOL_ROUTING })
+       })
+     })
+   }
+-- 
+2.55.0.windows.5
+

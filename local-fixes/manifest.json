@@ -584,6 +584,21 @@
         "viewSources.set(view, message)"
       ],
       "orderNote": "Independent of 01-39; touches only src/v2/message-shape.ts plus a new test. Cherry-picks cleanly onto integration/opencode-v2 (merge-tree). Tests: src/v2/message-shape.test.ts, hooks/team-mode-status-injector."
+    },
+    {
+      "id": "41-v2-tool-host-namespaces",
+      "title": "Preserve MCP namespaces and identify OpenCode compatibility-hook host",
+      "commit": "43cb85a7416514fbe789355c871c58f5f62b36ac",
+      "patch": "patches/41-v2-tool-host-namespaces.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/3",
+      "why": "Legacy mcp_ repair consumed one underscore of mcp__server__tool, yielding unavailable _server__tool names. Claude-compatible context-mode hooks also emitted Claude tool identifiers inside OpenCode. Preserve double-underscore namespaces, stamp hook_host=opencode, and give the actual V2 catalog precedence over imported legacy fabric instructions.",
+      "markers": [
+        "/^mcp_(?!_)/i",
+        "hook_host: \"opencode\"",
+        "Imported instructions naming bare tools, mcp__server__tool aliases, or legacy get_tool_schema/invoke_tool endpoints do not create callable tools."
+      ],
+      "overlapsWith": ["40-v2-hook-writeback-identity"],
+      "orderNote": "Apply after the v2 bridge and Claude-hook loader fixes. Paired context-mode hooks must honor hook_host: opencode (context-mode fix/opencode-hook-host-20261015). Scoped suite 36 pass; actual dispatcher-to-hook child probe PASS; fresh Claude child calls verified with prompt-delivered staged guidance. Live post-activation verification still required."
     }
   ],
   "externalFixes": [
