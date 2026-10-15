@@ -61,6 +61,7 @@ describe("memory receipts", () => {
     if (process.platform !== "win32") expect((await stat(receiptsPath(dir))).mode & 0o777).toBe(0o600)
   })
 
+  // Windows CI budgets three cold workers and 50 durable appends, not just one lock's 30s wait.
   test("#given appends racing in one process and three child processes #when they finish #then every line is whole", async () => {
     // given
     const dir = await runtimeDir()
@@ -78,7 +79,7 @@ describe("memory receipts", () => {
     expect(written).toHaveLength(50)
     expect(written.every((line) => JSON.parse(line).event === "launched")).toBe(true)
     expect(new Set(written.map((line) => JSON.parse(line).runId)).size).toBe(50)
-  }, 30_000)
+  }, process.platform === "win32" ? 90_000 : 30_000)
 
   test("#given a long or secret-bearing detail #when appended #then it is cut to 400 characters and masked", async () => {
     // given
