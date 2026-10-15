@@ -11,6 +11,7 @@ export interface BuildExtensionOptions {
   memoryMemfsOutputPath?: string
   computerUseOutputPath?: string
   gatewayStoreWorkerOutputPath?: string
+  gatewayRulesExtensionOutputPath?: string
   threadSdkOutputPath?: string
 }
 export function buildExtension(options?: BuildExtensionOptions): Promise<{
@@ -26,11 +27,12 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   toolkitSdkInputs: string[]
   rollbackRuntimeInputs: string[]
   gatewayStoreWorkerInputs: string[]
+  gatewayRulesExtensionInputs: string[]
   threadSdkInputs: string[]
 }>
 export function checkExtensionCurrent(options?: BuildExtensionOptions): Promise<
-  | { ok: true; output: string; gatewayStoreWorkerOutput: string; threadSdkOutput: string }
-  | { ok: false; reason: "missing-output" | "stale-output"; output: string }
+  | { ok: true; output: string; gatewayStoreWorkerOutput: string; gatewayRulesExtensionOutput: string; threadSdkOutput: string }
+  | { ok: false; reason: "missing-output" | "stale-output" | "untracked-output" | "ignored-output"; output: string }
 >
 export const GATEWAY_STORE_WORKER_NAME: "gateway-store-worker.mjs"
 export const THREAD_SDK_RELATIVE_PATH: string

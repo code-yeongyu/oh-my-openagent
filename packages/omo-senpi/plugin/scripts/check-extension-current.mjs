@@ -3,86 +3,38 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { artifactsMatch } from "./build-artifact.mjs"
-import { buildExtension, COMPUTER_PRELUDE_ASSET_NAME, extensionBuildPaths, GATEWAY_STORE_WORKER_NAME, resolveOutputs, THREAD_SDK_RELATIVE_PATH } from "./build-extension-core.mjs"
-import { findStaleRuntimePersona } from "./persona-artifacts.mjs"
+import { buildExtension, COMPUTER_PRELUDE_ASSET_NAME, extensionBuildPaths, resolveOutputs } from "./build-extension-core.mjs"
+import { checkTrackedOutputs } from "./check-tracked-outputs.mjs"
+import { findStaleRuntimePersona, runtimePersonaSources } from "./persona-artifacts.mjs"
 
 export async function checkExtensionCurrent(options = {}) {
-  const {
-    output,
-    taskOutput,
-    memberOutput,
-    supervisorOutput,
-    advisorRuntimeOutput,
-    sidePanelRuntimeOutput,
-    toolkitSdkOutput,
-    rollbackRuntimeOutput,
-    computerUseOutput,
-    memoryDoctorOutput,
-    memoryMemfsOutput,
-    gatewayStoreWorkerOutput,
-    threadSdkOutput,
-  } = resolveOutputs(options)
-  const currentToolkitSdk = await readBuiltEntry(toolkitSdkOutput)
-  if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
-  const currentRollbackRuntime = await readBuiltEntry(rollbackRuntimeOutput)
-  if (currentRollbackRuntime === undefined) return { ok: false, reason: "missing-output", output: rollbackRuntimeOutput }
-  const currentMain = await readBuiltEntry(output)
-  if (currentMain === undefined) return { ok: false, reason: "missing-output", output }
-  const currentTask = await readBuiltEntry(taskOutput)
-  if (currentTask === undefined) return { ok: false, reason: "missing-output", output: taskOutput }
-  const currentMember = await readBuiltEntry(memberOutput)
-  if (currentMember === undefined) return { ok: false, reason: "missing-output", output: memberOutput }
-  const currentSupervisor = await readBuiltEntry(supervisorOutput)
-  if (currentSupervisor === undefined) return { ok: false, reason: "missing-output", output: supervisorOutput }
-  const currentAdvisorRuntime = await readBuiltEntry(advisorRuntimeOutput)
-  if (currentAdvisorRuntime === undefined) return { ok: false, reason: "missing-output", output: advisorRuntimeOutput }
-  const currentSidePanelRuntime = await readBuiltEntry(sidePanelRuntimeOutput)
-  if (currentSidePanelRuntime === undefined) return { ok: false, reason: "missing-output", output: sidePanelRuntimeOutput }
-  const currentMemoryDoctor = await readBuiltEntry(memoryDoctorOutput)
-  const currentMemoryMemfs = await readBuiltEntry(memoryMemfsOutput)
-  if (currentMemoryDoctor === undefined) return { ok: false, reason: "missing-output", output: memoryDoctorOutput }
-  if (currentMemoryMemfs === undefined) return { ok: false, reason: "missing-output", output: memoryMemfsOutput }
-  const currentComputerUse = await readBuiltEntry(computerUseOutput)
-  if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
-  const currentGatewayStoreWorker = await readBuiltEntry(gatewayStoreWorkerOutput)
-  if (currentGatewayStoreWorker === undefined) return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
-  const currentThreadSdk = await readBuiltEntry(threadSdkOutput)
-  if (currentThreadSdk === undefined) return { ok: false, reason: "missing-output", output: threadSdkOutput }
+  // The builder owns the inventory. A hand-maintained second list missed the gateway rules sidecar.
+  const outputs = resolveOutputs(options)
+  const { output } = outputs
+  const current = new Map()
+  for (const [name, outputFile] of Object.entries(outputs)) {
+    const contents = await readBuiltEntry(outputFile)
+    if (contents === undefined) return { ok: false, reason: "missing-output", output: outputFile }
+    current.set(name, contents)
+  }
+
+  // Explicitly redirected builds can live outside Git. Only the canonical checkout promises tracked outputs.
+  const defaults = resolveOutputs({})
+  if (process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined && Object.entries(outputs).every(([name, path]) => path === defaults[name])) {
+    const tracked = checkTrackedOutputs(extensionBuildPaths.repoRoot, [
+      ...Object.values(outputs),
+      join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME),
+      ...runtimePersonaSources(extensionBuildPaths.repoRoot).map(([name]) => join(dirname(output), name)),
+    ])
+    if (tracked !== undefined) return tracked
+  }
 
   const tempRoot = await mkdtemp(join(tmpdir(), "omo-senpi-build-check-"))
-  const expected = {
-    outputPath: join(tempRoot, "omo.js"),
-    taskOutputPath: join(tempRoot, "omo-task.js"),
-    memberOutputPath: join(tempRoot, "omo-member.js"),
-    supervisorOutputPath: join(tempRoot, "memory-run-supervisor.mjs"),
-    advisorRuntimeOutputPath: join(tempRoot, "omo-init-deep-advisor.js"),
-    sidePanelRuntimeOutputPath: join(tempRoot, "omo-side-panel.js"),
-    toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
-    rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
-    memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
-    memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
-    computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
-    gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
-    threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
-  }
+  const expected = resolveOutputs({ outputPath: join(tempRoot, "omo.js") })
   try {
-    await buildExtension(expected)
-    for (const [current, built, outputFile] of [
-      [currentRollbackRuntime, expected.rollbackRuntimeOutputPath, rollbackRuntimeOutput],
-      [currentToolkitSdk, expected.toolkitSdkOutputPath, toolkitSdkOutput],
-      [currentMain, expected.outputPath, output],
-      [currentTask, expected.taskOutputPath, taskOutput],
-      [currentMember, expected.memberOutputPath, memberOutput],
-      [currentSupervisor, expected.supervisorOutputPath, supervisorOutput],
-      [currentAdvisorRuntime, expected.advisorRuntimeOutputPath, advisorRuntimeOutput],
-      [currentSidePanelRuntime, expected.sidePanelRuntimeOutputPath, sidePanelRuntimeOutput],
-      [currentMemoryDoctor, expected.memoryDoctorOutputPath, memoryDoctorOutput],
-      [currentMemoryMemfs, expected.memoryMemfsOutputPath, memoryMemfsOutput],
-      [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
-      [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
-      [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
-    ]) {
-      if (!artifactsMatch(current, await readFile(built, "utf8"))) {
+    await buildExtension(Object.fromEntries(Object.entries(expected).map(([name, path]) => [`${name}Path`, path])))
+    for (const [name, outputFile] of Object.entries(outputs)) {
+      if (!artifactsMatch(current.get(name), await readFile(expected[name], "utf8"))) {
         return { ok: false, reason: "stale-output", output: outputFile }
       }
     }
@@ -93,7 +45,7 @@ export async function checkExtensionCurrent(options = {}) {
     if (currentPrelude !== expectedPrelude) {
       return { ok: false, reason: "stale-output", output: join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME) }
     }
-    return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput, sidePanelRuntimeOutput, computerUseOutput, gatewayStoreWorkerOutput, threadSdkOutput }
+    return { ok: true, ...outputs }
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
