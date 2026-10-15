@@ -144,15 +144,26 @@ async function projectTools(input: {
     }
 
     if (!isRecord(input.disabled)) return
+    // V1 tool defaults are not ownership of the shared V2 MCP registry.
+    // MCP execution already asks the host permission engine per session/agent;
+    // deleting its definition here defeats those permissions (including allows).
+    const sharedNamespacedToolIDs = new Set(editor.list()
+      .filter((registered) => typeof registered.options?.namespace === "string")
+      .map((registered) => registered.id))
     for (const [pattern, enabled] of Object.entries(input.disabled)) {
       if (enabled !== false) continue
       if (!pattern.includes("*")) {
-        editor.remove(pattern)
+        if (!sharedNamespacedToolIDs.has(pattern)) editor.remove(pattern)
         continue
       }
       const prefix = pattern.slice(0, pattern.indexOf("*"))
       for (const registered of editor.list()) {
-        if (registered.id.startsWith(prefix) || registered.name.startsWith(prefix)) editor.remove(registered.id)
+        if (!registered.id.startsWith(prefix) && !registered.name.startsWith(prefix)) continue
+        if (sharedNamespacedToolIDs.has(registered.id)) {
+          log("[oh-my-openagent] preserving shared namespaced MCP tool registration", { tool: registered.id })
+          continue
+        }
+        editor.remove(registered.id)
       }
     }
   })
