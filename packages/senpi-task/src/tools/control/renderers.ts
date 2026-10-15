@@ -76,6 +76,7 @@ function taskSendCallLine(args: TaskSendInput, theme: ControlRenderTheme, width:
   const base = joinRendererTokens([
     "task_send",
     `to:${normalizeRendererText(args.to)}`,
+    ...(args.redispatch === true ? ["redispatch"] : []),
   ])
   if (typeof args.message === "string") return withExcerpt(base, "message", args.message, theme, width)
   return base
@@ -158,6 +159,12 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "warning", text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
+    case "redispatched":
+      return { color: "success", text: `task_send redispatched ${details.task_id} epoch ${details.run_epoch}` }
+    case "invalid_state":
+      return { color: "warning", text: `task_send invalid state ${details.task_id}: ${details.reason}` }
+    case "respawn_failed":
+      return { color: "error", text: `task_send redispatch failed ${details.task_id}: ${details.reason}` }
     case "capacity_deferred":
       return { color: "warning", text: `task_send deferred ${details.task_id}: ${details.reason}` }
     case "not_continuable":

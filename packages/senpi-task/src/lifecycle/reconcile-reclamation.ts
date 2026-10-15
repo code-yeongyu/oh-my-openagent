@@ -217,7 +217,7 @@ export async function reviveClaimed(
 
   let reattached: Awaited<ReturnType<typeof ports.reattach>>
   try {
-    reattached = await ports.reattach(fresh, respawned.handle)
+    reattached = await ports.reattach(fresh, respawned.handle, respawned.ok ? respawned.awaitingInput : undefined)
   } catch (error) {
     reservation.release()
     if (terminalAllowed || context.deferUnresumable) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)

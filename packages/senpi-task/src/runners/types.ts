@@ -105,6 +105,9 @@ export type RpcChildHandle = ChildHandle & {
   readonly spawnSpec?: RpcSpawnSpec
   terminalAssistantMessage?(): RpcTerminalAssistantMessage | undefined
   wasAbortedByUser?(): boolean
+  // Whether the session this handle re-joined is idle (no stream, compaction, or queued work).
+  // `undefined` = unreadable, which must never be read as idle (senpi#3266).
+  sessionIdle?(): Promise<boolean | undefined>
   // Fires when the child starts a run on its own after its turn settled (omo#9069).
   onSelfResumed?(listener: () => void): () => void
   // A revival found the turn already finished in the transcript: settle it with that answer (omo#9069).

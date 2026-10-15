@@ -5,6 +5,7 @@ import {
   type BackgroundMode,
   type TaskRecord,
 } from "../state"
+import { AWAITING_INPUT_REASONS } from "../state/types"
 import { parseTaskId } from "../state/id"
 import {
   parseNotification,
@@ -97,6 +98,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const closingChild = parseOptionalClosingChild(value)
   const residencyClaim = readOptionalString(value, "residency_claim")
   const cancelRequested = parseOptionalCancelRequest(value)
+  const awaitingInput = parseOptionalAwaitingInput(value)
   const provisionalExit = parseOptionalProvisionalExit(value)
 
   return {
@@ -166,8 +168,18 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(closingChild === undefined ? {} : { fallback_closing_child: closingChild }),
     ...(residencyClaim === undefined ? {} : { residency_claim: residencyClaim }),
     ...(cancelRequested === undefined ? {} : { cancel_requested: cancelRequested }),
+    ...(awaitingInput === undefined ? {} : { awaiting_input: awaitingInput }),
     ...(provisionalExit === undefined ? {} : { provisional_exit: provisionalExit }),
   }
+}
+
+function parseOptionalAwaitingInput(record: Record<string, unknown>): TaskRecord["awaiting_input"] {
+  const value = record["awaiting_input"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("awaiting_input is not an object")
+  const reason = readString(value, "reason")
+  if (!(AWAITING_INPUT_REASONS as readonly string[]).includes(reason)) throw new Error(`awaiting_input.reason is not a known reason: ${reason}`)
+  return { reason: reason as NonNullable<TaskRecord["awaiting_input"]>['reason'], since: readString(value, "since") }
 }
 
 function parseOptionalCancelRequest(record: Record<string, unknown>): TaskRecord["cancel_requested"] {

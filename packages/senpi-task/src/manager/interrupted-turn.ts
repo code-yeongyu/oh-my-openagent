@@ -22,6 +22,21 @@ export async function sessionTailNeedsContinuation(
   }
 }
 
+// Why a re-joined IDLE session cannot continue on its own (senpi#3266): its last turn ENDED on an
+// abort, or it never answered at all. `undefined` means the transcript leaves nothing blocking - a
+// completed turn, or nothing readable enough to accuse (a torn or missing tail never flags).
+export async function sessionTailContinuationBlocker(sessionPath: string): Promise<"aborted" | "unfinished" | undefined> {
+  try {
+    const tail = await readConversationTail(sessionPath)
+    if (tail === undefined) return undefined
+    const last = tail.lastMessage
+    if (!messageNeedsContinuation(last)) return undefined
+    return last.role === "assistant" && last.stopReason === "aborted" ? "aborted" : "unfinished"
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * The final answer of a turn that already ENDED in the transcript: the last conversation message is
  * an assistant reply that stopped normally with text and no pending tool call. A child whose turn

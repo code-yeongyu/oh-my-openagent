@@ -7,9 +7,9 @@ import { hostSessionResumePath, readHostDrainingHold } from "../lifecycle/host-s
 import type { RespawnFailureCode, RespawnResult } from "../lifecycle/port"
 import { RunnerError } from "../runners/in-process/runner-error"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import type { TaskRecord } from "../state"
+import type { AwaitingInputReason, TaskRecord } from "../state"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle } from "./child-handle"
-import { sessionTailFinishedText, sessionTailNeedsContinuation } from "./interrupted-turn"
+import { sessionTailContinuationBlocker, sessionTailFinishedText, sessionTailNeedsContinuation } from "./interrupted-turn"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
 import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
@@ -158,7 +158,14 @@ async function respawnProcess(input: {
     // An ATTACHED daemon session is the same live session, mid-turn and all: switching it would
     // reopen what is already open, and a continuation nudge would inject a second prompt into a
     // turn that never stopped. A session the host reopened from its JSONL still gets both.
-    if (joinedLiveHostSession(handle)) return { ok: true, handle: adaptRpcHandle(handle) }
+    // The exception: a session whose last turn ENDED while no parent was attached. An aborted or
+    // unanswered turn that sits IDLE can never move again, and the abort may have been deliberate,
+    // so nothing is nudged - the task is flagged "resumed, waiting for input" instead (senpi#3266).
+    if (joinedLiveHostSession(handle)) {
+      const awaitingInput = await resumedSessionAwaitingInput(handle, sessionPath)
+      const adapted = adaptRpcHandle(handle)
+      return awaitingInput === undefined ? { ok: true, handle: adapted } : { ok: true, handle: adapted, awaitingInput }
+    }
     // A host session with nothing live to re-join and its session directory gone lost its work:
     // report that child by itself instead of resuming an empty session under its task id.
     if (isHostSessionHandle(handle) && !sessionDirPresent) {
@@ -197,6 +204,20 @@ async function respawnProcess(input: {
 
 function isHostSessionHandle(handle: RpcChildHandle): boolean {
   return "kind" in handle && handle.kind === "host-session"
+}
+
+// The flag read for a re-joined daemon session (senpi#3266): only a PROVEN-idle session whose
+// transcript tail blocks continuation is waiting. A busy session is live and never flagged; an
+// unreadable state is not proof of idleness, so it never flags either.
+async function resumedSessionAwaitingInput(
+  handle: RpcChildHandle,
+  sessionPath: string,
+): Promise<{ readonly reason: AwaitingInputReason } | undefined> {
+  const idle = await handle.sessionIdle?.()
+  if (idle !== true) return undefined
+  const blocker = await sessionTailContinuationBlocker(sessionPath)
+  if (blocker === undefined) return undefined
+  return { reason: blocker === "aborted" ? "resumed_turn_aborted" : "resumed_turn_unfinished" }
 }
 
 /**

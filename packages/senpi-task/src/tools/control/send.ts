@@ -7,7 +7,7 @@ import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
 import { renderMemberScopedTaskSendCall, renderTaskSendCall, renderTaskSendResult } from "./renderers"
-import { invalidArguments, mapSendOutcome, notFound } from "./send-results"
+import { invalidArguments, mapRedispatchOutcome, mapSendOutcome, notFound } from "./send-results"
 import { isStructuredMessage, MemberScopedTaskSendParams, TaskSendParams } from "./send-schema"
 import type { MemberScopedTaskSendInput, TaskSendInput } from "./send-schema"
 import { resolveSendTeamRunId, routeStructuredMessage } from "./send-shutdown"
@@ -23,6 +23,7 @@ const DESCRIPTION = [
   "Send a message to a child task or team member, keyed by to.",
   "Plain-text messages always steer a running child immediately.",
   "A plain-text message to a parked in-process or detached RPC child with a transcript and recorded launch spec resumes that session after eligible finished runs. Killed, cancelled, and lost children never revive; unfinished parked children automatically resume or end within the recovery budget.",
+  "redispatch:true (no message) re-dispatches a task flagged 'resumed, waiting for input' onto a fresh live session, replaying its persisted prompt; the old dead session is abandoned.",
   "message is required and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
   "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
@@ -102,6 +103,13 @@ async function sendNow(
   const validation = validateParams(params)
   if (validation !== undefined) return validation
 
+  if (params.redispatch === true) {
+    if (manager.redispatchTask === undefined) return invalidArguments("this manager does not support redispatch")
+    const scopedCaller = params.all_scope === true ? undefined : callerSessionId
+    const outcome = await manager.redispatchTask(params.to, scopedCaller)
+    return mapRedispatchOutcome(manager, outcome, callerSessionId)
+  }
+
   if (typeof params.message === "string") {
     const outcome = await manager.sendToTask({
       idOrName: params.to,
@@ -133,8 +141,11 @@ async function sendNow(
 }
 
 function validateParams(params: TaskSendInput): SendToolResult | undefined {
+  if (params.redispatch === true && params.message !== undefined) {
+    return invalidArguments("redispatch replays the task's persisted prompt; message is forbidden with redispatch:true")
+  }
   const message = params.message
-  if (message === undefined) return invalidArguments("message is required")
+  if (message === undefined && params.redispatch !== true) return invalidArguments("message is required")
   if (isShutdownRejectWithoutReason(message)) {
     return invalidArguments("reason is required when rejecting a shutdown")
   }

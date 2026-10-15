@@ -293,6 +293,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     },
     waitForIdle: () => waiters.waitForIdle(reachedIdle || outcome !== undefined),
     hasExited: () => outcome !== undefined,
+    // A state read that fails is not proof of idleness, and must never flag the reattach: undefined.
+    sessionIdle: async () => {
+      const state = await client.getState().catch(() => undefined)
+      if (state === undefined) return undefined
+      return sessionIsIdle(state)
+    },
     waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
     lastAssistantText: () => finalText,
     terminalAssistantMessage: () => terminalAssistantMessage,

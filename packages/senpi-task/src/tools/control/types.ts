@@ -19,7 +19,7 @@ export type CallerSessionResolver = (ctx: SessionIdCarrier) => string | undefine
 
 // The engine surface each tool drives. Tools NEVER touch the store directly (W1-V seam obligation 2):
 // every mutation goes through these public manager APIs.
-export type SendManager = Pick<TaskManager, "sendToTask" | "list">
+export type SendManager = Pick<TaskManager, "sendToTask" | "list" | "redispatchTask">
 export type CancelManager = Pick<TaskManager, "cancelTask" | "get">
 
 export type SendResultDetails =
@@ -35,6 +35,9 @@ export type SendResultDetails =
     }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
+  | { readonly kind: "redispatched"; readonly task_id: string; readonly run_epoch: number }
+  | { readonly kind: "invalid_state"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "respawn_failed"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
   | { readonly kind: "one_shot_agent"; readonly task_id: string; readonly agent: string; readonly message: string }
   | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }

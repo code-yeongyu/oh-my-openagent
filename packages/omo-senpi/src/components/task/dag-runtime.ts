@@ -1,6 +1,7 @@
 // allow: SIZE_OK - this is the DAG composition root: one manager/store graph must be shared by the
 // tool, scheduler, RPC, TUI, wake, and lifecycle adapters or live runs split into isolated islands.
 import {
+  awaitingInputDetails,
   createChildProgress,
   type ManagedChildEvent,
   type TaskManager,
@@ -357,6 +358,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
           model: record.model,
         },
         Date.parse(record.created_at),
+        Date.now,
+        { awaitingInput: awaitingInputDetails(record) !== undefined },
       )
       activityTaskSubscriptions.set(taskId, deps.engine.manager.subscribeChild(taskId, (event: ManagedChildEvent) => {
         if (!progress.accept(event)) return

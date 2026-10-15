@@ -123,6 +123,7 @@ function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
   if (snapshot.lease !== undefined) parts.push(`lease: ${snapshot.lease}`)
   if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
+  if (snapshot.awaiting_input !== undefined) parts.push(snapshot.awaiting_input.explanation)
   if (snapshot.stop !== undefined) parts.push(snapshot.stop)
   if (snapshot.pid !== undefined) parts.push(`pid ${snapshot.pid}`)
   if (snapshot.lost !== undefined) parts.push(snapshot.lost.explanation)

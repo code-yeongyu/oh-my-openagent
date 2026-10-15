@@ -238,3 +238,37 @@ describe("standalone binary engines", () => {
     expect(result.failed).toBe(false)
   })
 })
+
+describe("app-server daemons left over from an older version (#10033)", () => {
+  const runtime = "/Users/dev/.omo/binary-runtime/5.1.4/omo"
+
+  test("#given an orphaned npm-engine app-server daemon #when reported #then it is named as a removed command, not an orphaned session", () => {
+    const daemon = entry({ command: `bun ${ENGINE} app-server --listen stdio:// --extension ${PLUGIN}` })
+    const { stale } = classifyEngineProcesses([daemon])
+    const lines = formatStaleEngineLines(stale)
+    expect(stale.map((item) => item.pid)).toEqual([75183])
+    // Scripts grep doctor output for `WARN stale engine pid`; a retired daemon is still a stale engine.
+    expect(lines[0]).toStartWith("WARN stale engine pid 75183 ")
+    expect(lines[0]).toContain("app-server daemon started by an older version")
+    expect(lines[0]).not.toContain("orphaned by a signaled launcher")
+    expect(lines.at(-1)).toBe("INFO reap them explicitly by pid: omo doctor --reap 75183")
+  })
+
+  test("#given an orphaned binary-runtime app-server daemon #when reported #then it gets the same removed-command line", () => {
+    const { stale } = classifyEngineProcesses([entry({ command: `${runtime} app-server daemon start` })])
+    expect(formatStaleEngineLines(stale)[0]).toContain("app-server daemon started by an older version")
+  })
+
+  test("#given an ordinary orphaned session whose prompt mentions app-server #when reported #then it keeps the orphaned-session line", () => {
+    const { stale } = classifyEngineProcesses([entry({ command: `bun ${ENGINE} --extension ${PLUGIN} explain app-server` })])
+    expect(formatStaleEngineLines(stale)[0]).toContain("orphaned by a signaled launcher")
+  })
+
+  test("#given an orphaned app-server daemon #when reaped by pid #then it is signalled like any stale engine", () => {
+    const signalled: number[] = []
+    const daemon = entry({ command: `${runtime} app-server` })
+    const result = reapStaleEngines(["75183"], { list: () => [daemon], kill: (pid: number) => { signalled.push(pid) } })
+    expect(signalled).toEqual([75183])
+    expect(result.failed).toBe(false)
+  })
+})

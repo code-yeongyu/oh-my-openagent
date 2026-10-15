@@ -234,7 +234,7 @@ async function reattachLegacyRecord(
   }
   let reattached: Awaited<ReturnType<typeof ports.reattach>>
   try {
-    reattached = await ports.reattach(record, respawned.handle)
+    reattached = await ports.reattach(record, respawned.handle, respawned.ok ? respawned.awaitingInput : undefined)
   } catch (error) {
     reservation.release()
     throw error

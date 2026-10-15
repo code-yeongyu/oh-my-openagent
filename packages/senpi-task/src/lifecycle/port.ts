@@ -3,7 +3,7 @@ import type { TeardownStepDeadline } from "./teardown-budget"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ForgetOptions } from "../manager/types"
-import type { TaskRecord } from "../state"
+import type { AwaitingInputReason, TaskRecord } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
@@ -25,6 +25,7 @@ export type DestroyCause =
   | "revive_failure"
   | "recovery_detach"
   | "target_gone"
+  | "redispatch"
 
 // The teardown surface the destruction port operates against. In production this wraps a live
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle
@@ -90,7 +91,13 @@ export type RespawnFailureCode =
   | "respawn_failed"
 
 export type RespawnResult =
-  | { readonly ok: true; readonly handle: ManagedChildHandle }
+  | {
+      readonly ok: true
+      readonly handle: ManagedChildHandle
+      // The respawn re-joined a session whose last turn ended aborted (or never answered) and idle:
+      // the reattach stamps this on the record so the task reads "resumed, waiting for input" (senpi#3266).
+      readonly awaitingInput?: { readonly reason: AwaitingInputReason }
+    }
   | {
       readonly ok: false
       readonly disposition: "retryable" | "unrecoverable"
@@ -121,7 +128,11 @@ export type CapacityReservation =
   | { readonly ok: true; release(): void }
 
 export type RespawnPort = (record: TaskRecord, resumeSessionPath?: string) => Promise<RespawnResult>
-export type ReattachPort = (record: TaskRecord, handle: ManagedChildHandle) => Promise<ReattachResult>
+export type ReattachPort = (
+  record: TaskRecord,
+  handle: ManagedChildHandle,
+  awaitingInput?: { readonly reason: AwaitingInputReason },
+) => Promise<ReattachResult>
 export type ReserveReattachPort = (record: TaskRecord) => CapacityReservation
 
 export type LifecycleReattachPorts = {

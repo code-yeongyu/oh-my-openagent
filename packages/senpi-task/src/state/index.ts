@@ -1,4 +1,5 @@
 export {
+  AWAITING_INPUT_REASONS,
   BACKGROUND_MODES,
   COST_REPORT_STATUSES,
   DURATION_SOURCE_STATUSES,
@@ -17,6 +18,7 @@ export type {
   IsolationMergeResult,
   IsolationRecord,
   TaskIsolationSpec,
+  AwaitingInputReason,
   BackgroundMode,
   CostReportStatus,
   DurationSourceStatus,
@@ -35,6 +37,7 @@ export type {
   SpawnSpecV1,
   StartQueued,
   SuspensionReason,
+  TaskAwaitingInput,
   TaskNotification,
   CancelRequest,
   TaskRecord,

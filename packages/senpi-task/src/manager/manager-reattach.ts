@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { ReattachResult } from "../lifecycle/port"
-import { nextRunEpoch, type TaskRecord } from "../state"
+import { nextRunEpoch, type AwaitingInputReason, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { discardManagedHandle, releaseSupersededHandle, type ManagedChildHandle } from "./child-handle"
 import { childIdentityOf, hasChildIdentity, isTerminalRecord, nowIso, recordSpawnedRunner } from "./manager-helpers"
@@ -33,6 +33,9 @@ export async function reattachManagedTask(input: {
   readonly detachLive: (taskId: string, handle: ManagedChildHandle, unsubscribe: () => void) => void
   readonly destroyAttached: (taskId: string) => Promise<void>
   readonly armOutcome: (record: TaskRecord, handle: ManagedChildHandle, epoch: number) => void
+  // The respawn that minted this handle re-joined a session whose last turn ended aborted (or never
+  // answered) and idle: the new run is stamped "resumed, waiting for input" (senpi#3266).
+  readonly awaitingInput?: { readonly reason: AwaitingInputReason }
 }): Promise<ReattachResult> {
   const fresh = input.store.load(input.record.task_id)
   if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident" || fresh.killed === true) {
@@ -80,6 +83,7 @@ export async function reattachManagedTask(input: {
       killed: _killed,
       fallback_handoff_epoch: _handoff,
       provisional_exit: _provisionalExit,
+      awaiting_input: _awaitingInput,
       ...rest
     } = fresh
     const epoch = nextRunEpoch(fresh)
@@ -95,6 +99,7 @@ export async function reattachManagedTask(input: {
       notification: { ...fresh.notification, run_epoch: epoch },
       ...(input.handle.pid === undefined ? {} : { pid: input.handle.pid }),
       ...(sessionId === undefined || sessionId.length === 0 ? {} : { child_session_id: sessionId }),
+      ...(input.awaitingInput === undefined ? {} : { awaiting_input: { reason: input.awaitingInput.reason, since: timestamp } }),
     }
     input.store.replace(reattached)
     input.armOutcome(reattached, input.handle, epoch)

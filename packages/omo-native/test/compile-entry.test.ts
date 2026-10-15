@@ -157,7 +157,7 @@ describe("compiled omo entry launcher parity", () => {
     expect(buildSenpiArgs(["install", "x"], "/provisioned")).toEqual(["install", "x"])
   })
 
-  test("the retired app-server command is refused before any engine import (#10033)", async () => {
+  test("the retired app-server command is refused before the engine is imported (legacy state migration may run first) (#10033)", async () => {
     const execDir = temp()
     writeFileSync(join(execDir, "package.json"), JSON.stringify({ version: "1.2.3-test.0" }))
     const savedExitCode = process.exitCode
