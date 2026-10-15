@@ -228,7 +228,7 @@
     "js-yaml": "^5.4.2",
     "jsonc-parser": "^3.3.1",
     "node-pty": "^1.1.0",
-    "omowright": "github:code-yeongyu/omowright#293ca5002cbd4c8b0c104c5934683385ef7e0d3a",
+    "omowright": "github:code-yeongyu/omowright#1a7ba120d19bab8f9cd5aec9fdd5cc2e5f60fd77",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.7",
     "posthog-node": "^5.52.4",
