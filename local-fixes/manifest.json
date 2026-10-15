@@ -599,6 +599,18 @@
       ],
       "overlapsWith": ["40-v2-hook-writeback-identity"],
       "orderNote": "Apply after the v2 bridge and Claude-hook loader fixes. Paired context-mode hooks must honor hook_host: opencode (context-mode fix/opencode-hook-host-20261015). Scoped suite 36 pass; actual dispatcher-to-hook child probe PASS; fresh Claude child calls verified with prompt-delivered staged guidance. Live post-activation verification still required."
+    },
+    {
+      "id": "42-v2-shared-mcp-registry",
+      "title": "Keep shared namespaced MCP tools registered under V1 tool defaults",
+      "commit": "64f4a5e7f96bf3ff3991378ae6afac584446767b",
+      "patch": "patches/42-v2-shared-mcp-registry.patch",
+      "pr": null,
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10237",
+      "why": "V1 grep_app_*:false became shared V2 registry deletion, defeating librarian allows and colliding with user server names. Preserve all namespaced shared tools based on native options.namespace metadata, not a spelling exception. MCP execution still uses the host permission engine. Unnamespaced plugin/native disable behavior is unchanged. This does not fix MCP server override precedence or project V1 global deny defaults as host permission rules.",
+      "markers": ["preserving shared namespaced MCP tool registration"],
+      "overlapsWith": [],
+      "orderNote": "Separate follow-on after fix41 activation; never replace the pinned fix41 stage. New regression RED 2 failures then GREEN 2 passes/10 assertions; adjacent todo tests pass. Rename grep-app back to grep_app only after offline fix42 activation and subsequent live tool verification. Routing override remediation remains owner-decision only."
     }
   ],
   "externalFixes": [
