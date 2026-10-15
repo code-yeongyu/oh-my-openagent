@@ -42,7 +42,7 @@ export function createAutoRetryDispatcher(
   ): Promise<AutoRetryDispatchOutcome> => {
     if (sessionRetryInFlight.has(sessionID)) {
       log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
-      return { accepted: false, status: "blocked", reason: "retry already in flight" }
+      return { accepted: false, status: "superseded", reason: "retry already in flight" }
     }
 
     const retryModelPayload = buildRetryModelPayload(
@@ -68,7 +68,7 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry skipped for stale fallback generation (${source})`, {
         sessionID,
       })
-      return { accepted: false, status: "blocked", reason: "stale fallback generation" }
+      return { accepted: false, status: "superseded", reason: "stale fallback generation" }
     }
     const previousCurrentModel = fallbackState?.currentModel
     const previousPendingFallbackModel = fallbackState?.pendingFallbackModel

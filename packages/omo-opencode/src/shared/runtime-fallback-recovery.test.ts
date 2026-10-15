@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import {
   _resetRuntimeFallbackRecoveryForTesting,
+  awaitLateRuntimeFallbackRecoveryDecision,
   awaitRuntimeFallbackRecoveryDecision,
   openRuntimeFallbackRecoveryClaim,
   registerRuntimeFallbackRecoveryOwner,
@@ -126,5 +127,62 @@ describe("runtime-fallback recovery claims", () => {
 
     // then
     expect(awaitRuntimeFallbackRecoveryDecision(event)).toBeUndefined()
+  })
+  test("#given an open claim #when the last owner is released before settling #then every waiter gets declined", async () => {
+    // given
+    const release = registerRuntimeFallbackRecoveryOwner()
+    const event = { type: "session.error" }
+    openRuntimeFallbackRecoveryClaim(event, "ses_1")
+    const pending = awaitRuntimeFallbackRecoveryDecision(event)
+
+    // when
+    release()
+
+    // then
+    expect(await pending).toBe("declined")
+  })
+
+  test("#given a claim another owner still holds #when one owner is released #then the claim stays open", async () => {
+    // given
+    registerRuntimeFallbackRecoveryOwner()
+    const release = registerRuntimeFallbackRecoveryOwner()
+    const event = { type: "session.error" }
+    openRuntimeFallbackRecoveryClaim(event, "ses_1")
+    let settled: string | undefined
+    awaitLateRuntimeFallbackRecoveryDecision(event)?.then((decision) => { settled = decision })
+
+    // when
+    release()
+    await Promise.resolve()
+
+    // then
+    expect(settled).toBeUndefined()
+    settleRuntimeFallbackRecoveryClaim(event, "retry-owned")
+  })
+
+  test("#given a waiter that timed out #when the owner declines later #then the late waiter receives declined", async () => {
+    // given
+    registerRuntimeFallbackRecoveryOwner()
+    const event = { type: "session.error" }
+    openRuntimeFallbackRecoveryClaim(event, "ses_1")
+    let fireTimeout: (() => void) | undefined
+    const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: Parameters<typeof setTimeout>[0]) => {
+      fireTimeout = callback as () => void
+      return 1 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout)
+    try {
+      const first = awaitRuntimeFallbackRecoveryDecision(event)
+      fireTimeout?.()
+      expect(await first).toBe("timed-out")
+      const late = awaitLateRuntimeFallbackRecoveryDecision(event)
+
+      // when
+      settleRuntimeFallbackRecoveryClaim(event, "declined")
+
+      // then
+      expect(await late).toBe("declined")
+    } finally {
+      timer.mockRestore()
+    }
   })
 })
