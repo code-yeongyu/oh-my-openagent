@@ -15,6 +15,7 @@ export interface ProviderAvailability {
 	minimaxCnCodingPlan: boolean
 	minimaxCodingPlan: boolean
 	vercelAiGateway: boolean
+	atlasCloud: boolean
 	isMaxPlan: boolean
 }
 

@@ -42,6 +42,13 @@ describe("provider availability", () => {
     expect(isProviderAvailable("minimax-coding-plan", availability)).toBe(false)
   })
 
+  test("maps Atlas Cloud install flag to provider ID", () => {
+    const availability = toProviderAvailability(createConfig({ hasAtlasCloud: true }))
+
+    expect(isProviderAvailable("atlascloud", availability)).toBe(true)
+    expect(hasAnyConfiguredProvider(createConfig({ hasAtlasCloud: true }))).toBe(true)
+  })
+
   test("installer warning copy uses ultimate fallback constant", () => {
     expect(getNoModelProvidersWarning()).toBe(
       `No model providers configured. Using ${ULTIMATE_FALLBACK} as fallback.`,

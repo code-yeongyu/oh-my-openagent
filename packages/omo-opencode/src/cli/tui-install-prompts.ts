@@ -85,6 +85,7 @@ export async function promptInstallConfig(
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       hasVercelAiGateway: false,
+      hasAtlasCloud: false,
       codexAutonomous,
     }
   }
@@ -212,6 +213,16 @@ export async function promptInstallConfig(
   })
   if (!vercelAiGateway) return null
 
+  const atlasCloud = await selectOrCancel({
+    message: "Do you have an Atlas Cloud API key?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Kimi, GPT, GLM, DeepSeek, MiniMax, Qwen, and KAT coding models" },
+    ],
+    initialValue: initial.atlasCloud,
+  })
+  if (!atlasCloud) return null
+
   return {
     platform,
     hasOpenCode: true,
@@ -231,6 +242,7 @@ export async function promptInstallConfig(
     hasMinimaxCnCodingPlan: minimaxCnCodingPlan === "yes",
     hasMinimaxCodingPlan: minimaxCodingPlan === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",
+    hasAtlasCloud: atlasCloud === "yes",
     codexAutonomous,
   }
 }

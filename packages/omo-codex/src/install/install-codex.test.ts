@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
@@ -30,6 +30,10 @@ async function listRelativeFiles(root: string, prefix = ""): Promise<string[]> {
 
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
+}
+
+function withoutMarketplaceTimestamp(config: string): string {
+  return config.replace(/^last_updated = "[^"]+"$/gm, 'last_updated = "<timestamp>"')
 }
 
 describe("install-codex", () => {
@@ -124,6 +128,38 @@ describe("install-codex", () => {
     expect(binDir).toBe(explicitBinDir)
   })
 
+  test("#given packaged installer fixture #when installing twice #then Atlas Cloud is registered without changing the selected provider", async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-atlas-provider-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-atlas-provider-bin-"))
+    const repoRoot = await createRepoWithBuiltComponentBins()
+    try {
+      const installOptions = {
+        codexHome,
+        binDir,
+        repoRoot,
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async () => undefined,
+      } as const
+
+      await runCodexInstaller(installOptions)
+      const firstRun = await readFile(join(codexHome, "config.toml"), "utf8")
+      await runCodexInstaller(installOptions)
+      const secondRun = await readFile(join(codexHome, "config.toml"), "utf8")
+
+      expect(withoutMarketplaceTimestamp(secondRun)).toBe(withoutMarketplaceTimestamp(firstRun))
+      expect(secondRun.match(/\[model_providers\.atlascloud\]/g)).toHaveLength(1)
+      expect(secondRun).toContain("[model_providers.atlascloud]")
+      expect(secondRun).toContain('base_url = "https://api.atlascloud.ai/v1"')
+      expect(secondRun).toContain('env_key = "ATLASCLOUD_API_KEY"')
+      expect(secondRun).toContain('wire_api = "responses"')
+      expect(secondRun).not.toMatch(/^model_provider\s*=/m)
+    } finally {
+      await rm(codexHome, { recursive: true, force: true })
+      await rm(binDir, { recursive: true, force: true })
+      await rm(repoRoot, { recursive: true, force: true })
+    }
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
   test("#given codex installer #when installing omo #then registers local marketplace and cached plugin", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-"))
@@ -147,6 +183,11 @@ describe("install-codex", () => {
     expect(configContent).not.toContain('source = "https://github.com/code-yeongyu/lazycodex.git"')
     expect(configContent).not.toContain('ref = "main"')
     expect(configContent).toContain("[plugins.\"omo@sisyphuslabs\"]")
+    expect(configContent).toContain("[model_providers.atlascloud]")
+    expect(configContent).toContain('base_url = "https://api.atlascloud.ai/v1"')
+    expect(configContent).toContain('env_key = "ATLASCLOUD_API_KEY"')
+    expect(configContent).toContain('wire_api = "responses"')
+    expect(configContent).not.toMatch(/^model_provider\s*=/m)
     expect(configContent).toContain("[hooks.state.")
     expect(configContent).not.toContain("code-yeongyu-codex-plugins")
     expect(configContent).not.toContain("[marketplaces.lazycodex]")

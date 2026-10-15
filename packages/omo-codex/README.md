@@ -35,13 +35,36 @@ npx lazycodex-ai install --no-tui --codex-autonomous
 
 To install **both** the Ultimate edition (OpenCode plugin) and the Light edition (this package) at once, use `--platform=both`.
 
-The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. It never enables MultiAgentV2 and never writes or raises subagent thread caps. `agents.max_threads` and `features.multi_agent_v2.max_concurrent_threads_per_session` are not inserted; values LazyCodex wrote in earlier releases (`1000`, `16`) are removed so Codex stock defaults apply. One exception: when the root model prefers `multi_agent_v2` (the `gpt-6-astra` default), the V1-only `agents.max_threads` key is removed whatever its value, because Codex rejects it while V2 is active. Every other user-set value, including your own `max_concurrent_threads_per_session`, is left as is. If an older config used `[features] multi_agent_v2 = false`, the installer preserves that explicit disable as table-form `enabled = false`.
+The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, registers the `sisyphuslabs` marketplace from the local built cache, and registers the `atlascloud` model provider. It never enables MultiAgentV2 and never writes or raises subagent thread caps. `agents.max_threads` and `features.multi_agent_v2.max_concurrent_threads_per_session` are not inserted; values LazyCodex wrote in earlier releases (`1000`, `16`) are removed so Codex stock defaults apply. One exception: when the root model prefers `multi_agent_v2` (the `gpt-6-astra` default), the V1-only `agents.max_threads` key is removed whatever its value, because Codex rejects it while V2 is active. Every other user-set value, including your own `max_concurrent_threads_per_session`, is left as is. If an older config used `[features] multi_agent_v2 = false`, the installer preserves that explicit disable as table-form `enabled = false`.
 
 ### Default model
 
 The managed catalog (`plugin/model-catalog.json`, version `2026-09-08.gpt-6-astra-600k-high`) sets the root model to `gpt-6-astra` with `model_context_window = 600000`, `model_reasoning_effort = "high"`, and `plan_mode_reasoning_effort = "xhigh"`. The 12 bundled agent TOMLs also run on `gpt-6-astra`, each keeping its own reasoning effort. A config still on a managed legacy profile (the gpt-5.5 entries, or `legacy.gpt-5.6-sol-650k-high` for `gpt-5.6-sol` at 650k / high / xhigh) is upgraded to the current values; any other root model you picked yourself is preserved. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
 
-To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
+### Atlas Cloud provider
+
+The installer adds this provider only when no user-owned `[model_providers.atlascloud]` section already exists:
+
+```toml
+[model_providers.atlascloud]
+name = "Atlas Cloud"
+base_url = "https://api.atlascloud.ai/v1"
+env_key = "ATLASCLOUD_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+```
+
+It never writes the API key and does not change the root `model` or `model_provider`. Export the key and opt into the provider for a command:
+
+```bash
+export ATLASCLOUD_API_KEY="your-api-key"
+npx lazycodex-ai install
+codex -m moonshotai/kimi-k3 -c 'model_provider="atlascloud"'
+```
+
+Uninstall removes the canonical installer-managed Atlas Cloud section. If you changed that section, or it existed before installation, the uninstall path preserves it.
+
+To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks and an unchanged installer-managed Atlas Cloud provider block with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
 ### Local dev install (dogfood the source build)
 

@@ -24,6 +24,7 @@ export function isOpenAiOnlyAvailability(availability: ProviderAvailability): bo
     !availability.bailianCodingPlan &&
     !availability.minimaxCnCodingPlan &&
     !availability.minimaxCodingPlan &&
+    !availability.atlasCloud &&
     !availability.vercelAiGateway
   )
 }

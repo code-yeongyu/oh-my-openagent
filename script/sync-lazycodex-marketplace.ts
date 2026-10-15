@@ -14,10 +14,21 @@ const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
   "workflows",
   "pr-source-guidance.yml",
 )
+const LAZYCODEX_ATLAS_README_SOURCE_PATH = join(
+  "packages",
+  "omo-codex",
+  "lazycodex-repository",
+  "README.atlas-cloud.md",
+)
+const LAZYCODEX_ATLAS_ASSET_NAMES = ["atlas-cloud-logo.svg", "atlas-cloud-logo-white.svg"] as const
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
 const MARKETPLACE_ROOT_DESTINATION_PATH = "marketplace.json"
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
 const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
+const LAZYCODEX_README_DESTINATION_PATH = "README.md"
+const ATLAS_README_START = "<!-- atlas-cloud:start -->"
+const ATLAS_README_END = "<!-- atlas-cloud:end -->"
+const ATLAS_README_HEADING = "## ☁️ Atlas Cloud"
 const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
 const GIT_BASH_MCP_PLUGIN_ARG = "./components/git-bash-mcp/dist/cli.js"
 const LSP_TOOLS_MCP_SOURCE_ARG = "../../lsp-tools-mcp/dist/cli.js"
@@ -82,6 +93,7 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     filter: (path) => shouldCopyPluginPath(path, pluginRoot),
   })
   await copyLazycodexRepositoryWorkflow(sourceRoot, lazycodexRoot)
+  await syncLazycodexRepositoryBranding(sourceRoot, lazycodexRoot)
   await copyLazycodexRuntimeDists({
     sourceRoot,
     lazycodexRoot,
@@ -131,6 +143,64 @@ async function copyLazycodexRepositoryWorkflow(sourceRoot: string, lazycodexRoot
   const destinationPath = join(lazycodexRoot, LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH)
   await mkdir(dirname(destinationPath), { recursive: true })
   await writeFile(destinationPath, await readFile(sourcePath, "utf8"))
+}
+
+async function syncLazycodexRepositoryBranding(sourceRoot: string, lazycodexRoot: string): Promise<void> {
+  const fragmentPath = join(sourceRoot, LAZYCODEX_ATLAS_README_SOURCE_PATH)
+  if (!(await isFile(fragmentPath))) return
+
+  const fragment = (await readFile(fragmentPath, "utf8")).trim()
+  if (!fragment.startsWith(ATLAS_README_START) || !fragment.endsWith(ATLAS_README_END)) {
+    throw new Error(`invalid managed Atlas Cloud README fragment at ${fragmentPath}`)
+  }
+
+  const readmePath = join(lazycodexRoot, LAZYCODEX_README_DESTINATION_PATH)
+  if (!(await isFile(readmePath))) {
+    throw new Error(`missing LazyCodex README at ${readmePath}`)
+  }
+  const readme = await readFile(readmePath, "utf8")
+  await writeFile(readmePath, upsertAtlasReadmeFragment(readme, fragment))
+
+  for (const assetName of LAZYCODEX_ATLAS_ASSET_NAMES) {
+    const sourcePath = join(sourceRoot, ".github", "assets", assetName)
+    if (!(await isFile(sourcePath))) throw new Error(`missing Atlas Cloud logo asset at ${sourcePath}`)
+    const destinationPath = join(lazycodexRoot, ".github", "assets", assetName)
+    await mkdir(dirname(destinationPath), { recursive: true })
+    await writeFile(destinationPath, await readFile(sourcePath))
+  }
+}
+
+function upsertAtlasReadmeFragment(readme: string, fragment: string): string {
+  const managedStart = readme.indexOf(ATLAS_README_START)
+  if (managedStart !== -1) {
+    const managedEnd = readme.indexOf(ATLAS_README_END, managedStart)
+    if (managedEnd === -1) throw new Error("LazyCodex README contains an unterminated Atlas Cloud managed section")
+    return joinReadmeSections(
+      readme.slice(0, managedStart),
+      fragment,
+      readme.slice(managedEnd + ATLAS_README_END.length),
+    )
+  }
+
+  const legacyStart = readme.indexOf(ATLAS_README_HEADING)
+  if (legacyStart !== -1) {
+    const nextHeading = readme.indexOf("\n## ", legacyStart + ATLAS_README_HEADING.length)
+    return joinReadmeSections(
+      readme.slice(0, legacyStart),
+      fragment,
+      nextHeading === -1 ? "" : readme.slice(nextHeading),
+    )
+  }
+
+  const maintainerStart = readme.indexOf("\n## 👷 Maintainer")
+  if (maintainerStart !== -1) {
+    return joinReadmeSections(readme.slice(0, maintainerStart), fragment, readme.slice(maintainerStart))
+  }
+  return joinReadmeSections(readme, fragment, "")
+}
+
+function joinReadmeSections(prefix: string, fragment: string, suffix: string): string {
+  return `${[prefix, fragment, suffix].map((part) => part.trim()).filter((part) => part.length > 0).join("\n\n")}\n`
 }
 
 async function rewritePluginMcpManifest(pluginRoot: string): Promise<void> {

@@ -76,6 +76,22 @@ describe("detectCurrentConfig - single package detection", () => {
     expect(result.hasOpencodeGo).toBe(true)
   })
 
+  it("detects an existing Atlas Cloud provider from the OpenCode config", () => {
+    // given
+    writeFileSync(
+      testConfigPath,
+      JSON.stringify({ plugin: ["oh-my-openagent"], provider: { atlascloud: { npm: "@ai-sdk/openai-compatible" } } }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    // when
+    const result = detectCurrentConfig()
+
+    // then
+    expect(result.isInstalled).toBe(true)
+    expect(result.hasAtlasCloud).toBe(true)
+  })
+
   it("uses default provider detection when omo config reading throws a non-Error value", () => {
     // given
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n", "utf-8")

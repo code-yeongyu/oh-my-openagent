@@ -67,6 +67,7 @@ program
   .option("--minimax-cn-coding-plan <value>", "MiniMax Coding Plan (minimaxi.com) subscription: no, yes (default: no)")
   .option("--minimax-coding-plan <value>", "MiniMax Coding Plan (minimax.io) subscription: no, yes (default: no)")
   .option("--vercel-ai-gateway <value>", "Vercel AI Gateway: no, yes (default: no)")
+  .option("--atlas-cloud <value>", "Atlas Cloud API access: no, yes (default: no)")
   .option("--codex-autonomous", "Configure Codex with approval never, full filesystem access, and network enabled")
   .option("--no-codex-autonomous", "Leave existing Codex permission settings unchanged")
   .option("--skip-auth", "Skip authentication setup hints")
@@ -78,7 +79,7 @@ Examples:
   $ omo-agent-toolkit install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Atlas Cloud > Vercel):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.6 Sol for Oracle)
   Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
@@ -89,6 +90,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Baili
   Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)
   MiniMax       minimax-coding-plan/MiniMax-M3 (utility fallback)
   MiniMax CN    minimax-cn-coding-plan/MiniMax-M3 (utility fallback)
+  Atlas Cloud   atlascloud/ models (OpenAI-compatible gateway via ATLASCLOUD_API_KEY)
   Vercel        vercel/ models (universal proxy, always last fallback)
 `)
   .action(async (options: InstallCommandOptions) => {

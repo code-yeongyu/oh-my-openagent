@@ -16,6 +16,7 @@ export type InstallCommandOptions = {
   readonly minimaxCnCodingPlan?: InstallArgs["minimaxCnCodingPlan"]
   readonly minimaxCodingPlan?: InstallArgs["minimaxCodingPlan"]
   readonly vercelAiGateway?: InstallArgs["vercelAiGateway"]
+  readonly atlasCloud?: InstallArgs["atlasCloud"]
   readonly codexAutonomous?: InstallArgs["codexAutonomous"]
   readonly skipAuth?: boolean
 }
@@ -48,6 +49,7 @@ export function resolveInstallArgs(
     minimaxCnCodingPlan: options.minimaxCnCodingPlan,
     minimaxCodingPlan: options.minimaxCodingPlan,
     vercelAiGateway: options.vercelAiGateway,
+    atlasCloud: options.atlasCloud,
     codexAutonomous: options.codexAutonomous,
     skipAuth: options.skipAuth ?? false,
   }

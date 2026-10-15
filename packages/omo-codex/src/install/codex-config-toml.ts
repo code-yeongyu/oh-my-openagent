@@ -13,6 +13,7 @@ import {
 } from "./codex-config-marketplaces"
 import { ensureAutonomousPermissions } from "./codex-config-permissions"
 import { ensureHookTrusted, ensureOmoBuiltinMcpPolicies, ensurePluginEnabled } from "./codex-config-plugins"
+import { ensureAtlasCloudModelProvider } from "./codex-config-model-providers"
 import { applyReasoningOverride, ensureCodexReasoningConfig } from "./codex-config-reasoning"
 import { readCodexModelCatalog } from "./codex-model-catalog"
 import { removeUnsupportedCodexMultiAgentModeConfig } from "./codex-multi-agent-mode-config"
@@ -74,6 +75,7 @@ export async function updateCodexConfig(input: {
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`)
   }
+  config = ensureAtlasCloudModelProvider(config, input)
   config = ensureOmoBuiltinMcpPolicies(config, input)
   for (const state of input.trustedHookStates ?? []) {
     config = ensureHookTrusted(config, state)

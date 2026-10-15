@@ -114,4 +114,13 @@ No affiliation with any project or model mentioned. The Ultragoal and UltraQA id
 
 ## Loved by professionals at
 
+<a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=oh-my-openagent">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/atlas-cloud-logo-white.svg" />
+    <img src="./.github/assets/atlas-cloud-logo.svg" alt="Atlas Cloud" width="163" />
+  </picture>
+</a>
+
+[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=oh-my-openagent) offers OpenAI-compatible inference for coding-agent workflows. [View the coding plan](https://www.atlascloud.ai/console/coding-plan). [Configure Atlas Cloud for OpenCode or Codex](docs/guide/installation.md#atlas-cloud-provider).
+
 [Indent](https://indentcorp.com), makers of Spray (influencer marketing solution), vovushop (cross-border commerce platform) and vreview (AI commerce review marketing solution). [Google](https://google.com). [Microsoft](https://microsoft.com). [Vercel](https://vercel.com). [ELESTYLE](https://elestyle.jp), makers of elepay (multi-mobile payment gateway) and OneQR (mobile application SaaS for cashless solutions). [Deepgram](https://deepgram.com).

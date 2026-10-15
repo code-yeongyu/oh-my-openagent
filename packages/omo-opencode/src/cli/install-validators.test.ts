@@ -20,6 +20,7 @@ function createArgs(overrides: Partial<InstallArgs> = {}): InstallArgs {
     minimaxCnCodingPlan: "no",
     minimaxCodingPlan: "no",
     vercelAiGateway: "no",
+    atlasCloud: "no",
     skipAuth: false,
     ...overrides,
   }
@@ -163,6 +164,14 @@ describe("validateNonTuiArgs", () => {
     // #then
     expect(result.valid).toBe(false)
     expect(result.errors).toContain("Invalid --opencode-go value: maybe (expected: no, yes)")
+  })
+
+  test("enables and validates Atlas Cloud for OpenCode installs", () => {
+    expect(argsToConfig(createArgs({ atlasCloud: "yes" })).hasAtlasCloud).toBe(true)
+
+    const invalid = validateNonTuiArgs(createArgs({ atlasCloud: "maybe" as InstallArgs["atlasCloud"] }))
+    expect(invalid.valid).toBe(false)
+    expect(invalid.errors).toContain("Invalid --atlas-cloud value: maybe (expected: no, yes)")
   })
 
   test("rejects invalid MiniMax Coding Plan values", () => {

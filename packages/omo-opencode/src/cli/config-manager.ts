@@ -8,6 +8,7 @@ export {
 export { fetchNpmDistTags } from "./config-manager/npm-dist-tags"
 export { getPluginNameWithVersion } from "./config-manager/plugin-name-with-version"
 export { addPluginToOpenCodeConfig } from "./config-manager/add-plugin-to-opencode-config"
+export { addAtlasCloudProviderToOpenCodeConfig } from "./config-manager/add-atlas-cloud-provider-to-opencode-config"
 
 export { generateOmoConfig } from "./config-manager/generate-omo-config"
 export { writeOmoConfig } from "./config-manager/write-omo-config"
