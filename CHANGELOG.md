@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Custom OpenCode models keep their configured reasoning-effort choices.** Model capability detection now reads effort values from runtime configuration variants, so unrecognized and self-hosted OpenAI-compatible models can use the reasoning efforts their configuration supports. ([#9140](https://github.com/code-yeongyu/oh-my-openagent/issues/9140))
-
 **Internal: the model-version migration skip bookkeeping is cleaned up.** The set of already-migrated models is now built once per run, and the comment describes the source-keyed rule; behaviour is unchanged. ([#10145](https://github.com/code-yeongyu/oh-my-openagent/pull/10145))
+
+**Custom OpenCode models keep their configured reasoning-effort choices.** Model capability detection now reads effort values from runtime configuration variants, so unrecognized and self-hosted OpenAI-compatible models can use the reasoning efforts their configuration supports. ([#9140](https://github.com/code-yeongyu/oh-my-openagent/issues/9140))
 
 **The [CC] `opus` alias and the retired-model migration no longer land on Opus 4.8.** `mapClaudeModelToOpenCode("opus")` now resolves to the current Opus 5.5 id instead of 4.8, and the config migration that upgrades a retired `anthropic/` entry now targets Opus 5.5, so a default or an automatic migration never puts a user on Opus 4.8 without an explicit pick.
 
