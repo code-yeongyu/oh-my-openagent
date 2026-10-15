@@ -19,6 +19,24 @@ function createMockHooks(): CreatedHooks {
 }
 
 describe("tool-execute-before mcp_ prefix stripping", () => {
+  test.each([
+    "mcp__lsp__get_tool_schema",
+    "mcp__codegraph__codegraph_explore",
+    "mcp__plugin_context-mode_context-mode__ctx_execute",
+    "mcp__oc__execute",
+    "MCP__server__tool",
+  ])("preserves namespaced MCP tool %s", async (tool) => {
+    const handler = createToolExecuteBeforeHandler({
+      ctx: createMockContext(),
+      hooks: createMockHooks(),
+    })
+    const input = { tool, sessionID: "ses_child", callID: "call_namespaced" }
+
+    await handler(input, { args: {} })
+
+    expect(input.tool).toBe(tool)
+  })
+
   test("should strip mcp_ prefix from mcp_background_output", async () => {
     // given
     const handler = createToolExecuteBeforeHandler({

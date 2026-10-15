@@ -14,6 +14,16 @@ export async function dispatchHook(
   stdinJson: string,
   cwd: string
 ): Promise<CommandResult> {
+  // Claude-compatible envelopes do not imply Claude's tool namespace. Let
+  // shared hooks select OpenCode guidance without guessing from inherited env.
+  try {
+    const input = JSON.parse(stdinJson)
+    if (input && typeof input === "object" && !Array.isArray(input)) {
+      stdinJson = JSON.stringify({ ...input, hook_host: "opencode" })
+    }
+  } catch {
+    // Preserve the existing behavior for non-JSON custom hooks.
+  }
   if (hook.type === "http") {
     return executeHttpHook(hook, stdinJson)
   }

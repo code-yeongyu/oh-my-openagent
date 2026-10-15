@@ -49,10 +49,10 @@ export function createToolExecuteBeforeHandler(args: {
   const { ctx, hooks, backgroundManager } = args
 
   return async (input, output): Promise<void> => {
-    // Strip mcp_ prefix from tool names — the model may emit mcp_background_output
-    // but the runtime registry has it as background_output (fixes #2697)
-    if (/^mcp_/i.test(input.tool)) {
-      const stripped = input.tool.replace(/^mcp_/i, "")
+    // Repair legacy mcp_background_output, but preserve mcp__server__tool:
+    // removing one underscore from a namespaced MCP name corrupts its identity.
+    if (/^mcp_(?!_)/i.test(input.tool)) {
+      const stripped = input.tool.replace(/^mcp_(?!_)/i, "")
       log("[tool-execute-before] Stripped mcp_ prefix from tool name", {
         original: input.tool,
         resolved: stripped,

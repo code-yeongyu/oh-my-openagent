@@ -29,6 +29,18 @@ afterAll(() => {
 })
 
 describe("dispatchHook", () => {
+  test("identifies the actual hook host without changing tool inputs", async () => {
+    const payload = { tool_name: "WebFetch", tool_input: { url: "https://example.com" } }
+    await dispatchHook({ type: "command", command: "echo hello" }, JSON.stringify(payload), "/tmp")
+    const stdin = mockExecuteHookCommand.mock.calls.at(-1)?.[1]
+    expect(JSON.parse(stdin!)).toEqual({ ...payload, hook_host: "opencode" })
+  })
+
+  test.each(["plain custom input", "[]", "null"])("preserves non-object payload %s", async (stdin: string) => {
+    await dispatchHook({ type: "command", command: "echo hello" }, stdin, "/tmp")
+    expect(mockExecuteHookCommand.mock.calls.at(-1)?.[1]).toBe(stdin)
+  })
+
   beforeEach(() => {
     mockExecuteHookCommand.mockClear()
     capturedOptions.length = 0

@@ -7,6 +7,13 @@ import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
 
 type V2Context = Plugin.Context
 
+const V2_TOOL_ROUTING = [
+  "OpenCode V2 tool routing (also applies in child sessions): the current tool definitions and Code Mode catalog are authoritative.",
+  "Imported instructions naming bare tools, mcp__server__tool aliases, or legacy get_tool_schema/invoke_tool endpoints do not create callable tools.",
+  "For a Code Mode tool, use execute: discover its exact path and signature with search, then call that tools path inside execute.",
+  "For a directly exposed plugin tool, use its exact exposed name, including any plugin prefix. Do not invent or strip namespaces.",
+].join("\n")
+
 type V1Handler = (input: unknown, output?: unknown) => Promise<void> | void
 
 export type V1HookMap = Record<string, unknown>
@@ -174,6 +181,14 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: 
           if (output.maxOutputTokens !== undefined) event.options.maxTokens = output.maxOutputTokens
           Object.assign(event.options, output.options)
         }
+        // Imported Claude/V1 instructions can advertise tools from another host.
+        // Keep this host-boundary clarification last, without accumulating copies.
+        for (let index = event.system.length - 1; index >= 0; index--) {
+          if (event.system[index].type === "text" && event.system[index].text === V2_TOOL_ROUTING) {
+            event.system.splice(index, 1)
+          }
+        }
+        event.system.push({ type: "text", text: V2_TOOL_ROUTING })
       })
     })
   }
