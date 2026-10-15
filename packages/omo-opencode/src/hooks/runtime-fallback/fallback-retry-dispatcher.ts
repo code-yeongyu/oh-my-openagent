@@ -59,7 +59,8 @@ export async function dispatchFallbackRetry(
     }
     if (!dispatchOutcome.accepted) {
       restoreFallbackState(options.state, snapshot)
-      releaseRecovery()
+      // A superseded refusal acquired nothing: the flags, timeout and pending model belong to the live dispatch.
+      if (dispatchOutcome.status !== "superseded") releaseRecovery()
       log(`[${HOOK_NAME}] Fallback dispatch was not accepted`, {
         sessionID: options.sessionID,
         source: options.source,
