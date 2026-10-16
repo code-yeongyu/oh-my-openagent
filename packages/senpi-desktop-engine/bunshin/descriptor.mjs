@@ -68,7 +68,7 @@ export function desktopDescriptor({ executable, version, bunshinHome, platform =
 		schemas,
 		sidecar: {
 			executable,
-			args: ["--oneshot", "--audit-path", `${bunshinHome}/desktop-audit.jsonl`, "--stop-chord", stopChord],
+			args: ["--enable-daemon", "--oneshot", "--audit-path", `${bunshinHome}/desktop-audit.jsonl`, "--stop-chord", stopChord],
 			protocol: "json-rpc-stdio",
 			timeoutMs: 65000,
 		},

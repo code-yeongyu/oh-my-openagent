@@ -1,3 +1,6 @@
+import { shellQuote } from "@oh-my-opencode/utils/shell-quote"
+
+import { homeRelativePath, type ReflectionChildLog } from "./child-log"
 import { isModelUnreachableDetail } from "./memory-model-attempts"
 
 /**
@@ -8,7 +11,11 @@ import { isModelUnreachableDetail } from "./memory-model-attempts"
  */
 const MODEL_EXHAUSTION_ROSTER = /\battempted:/
 
-export function reflectionRemediation(reason: string | undefined, detail: string | undefined): string {
+export function reflectionRemediation(
+  reason: string | undefined,
+  detail: string | undefined,
+  childLog?: ReflectionChildLog,
+): string {
   if (isModelUnreachableDetail(detail)) {
     return "no memory child can see the reflection model, not even with extensions loaded; set categories.<category>.model (or memory.reflection.category) in omo.json to a model from a core provider, or set memory.reflection.enabled to false"
   }
@@ -32,8 +39,18 @@ export function reflectionRemediation(reason: string | undefined, detail: string
   }
   // bwrap dies inside its own sandbox setup, before the reflection child ever execs, and the run
   // directory is pruned by the time this hint renders - so child-stderr.log is a dead pointer.
-  if (/bwrap:|setting up (uid map|gid map|namespace)/.test(combined)) {
-    return 'the sandbox helper (bwrap) cannot create a user namespace on this host; set memory.reflection.sandbox to "off" in your omo config, or allow unprivileged user namespaces on the host'
+  // Only a real user-namespace refusal gets the namespace remedy; any other bwrap error keeps the
+  // sandbox on, because telling users to disable isolation for an unrelated failure is wrong (#10317).
+  const missingBindSource = /can't find source path (.+?):? no such file or directory/i.exec(`${reason ?? ""} ${detail ?? ""}`)
+  if (missingBindSource) {
+    const path = missingBindSource[1]
+    return `the sandbox could not bind ${path} because that directory does not exist yet; create it with mkdir -p ${shellQuote(path)} and run /reflect again (the sandbox itself is working)`
+  }
+  if (/setting up (uid map|gid map|namespace)|creat(e|ing) (a )?new namespace|user namespace|unshare/.test(combined)) {
+    return 'the sandbox helper (bwrap) cannot create a user namespace on this host; allow unprivileged user namespaces on the host (for example sysctl kernel.unprivileged_userns_clone=1, or the AppArmor userns restriction), and only as a last resort set memory.reflection.sandbox to "off" in your omo config'
+  }
+  if (combined.includes("bwrap:")) {
+    return "the sandbox helper (bwrap) failed while setting up the reflection sandbox; the failure detail above names the bwrap error to fix"
   }
   // Model admission never reached an executable, so none of these may mention SENPI_BIN, and none
   // may point at a child log that no child wrote.
@@ -59,5 +76,20 @@ export function reflectionRemediation(reason: string | undefined, detail: string
   if (combined.includes("api key") || combined.includes("auth_missing")) {
     return "run /login <provider>"
   }
-  return "inspect runtime/reflection-sessions/<runId>/child-stderr.log"
+  return childLogHint(childLog)
+}
+
+/**
+ * The catch-all points at the newest failing run's own stderr log by its absolute path. A run
+ * directory that reconciliation already pruned is named as gone; the stderr tail survives in the
+ * durable failure detail the notice shows next to this hint.
+ */
+function childLogHint(childLog: ReflectionChildLog | undefined): string {
+  if (childLog === undefined) {
+    return "inspect child-stderr.log in the newest failing run directory under the memory identity's runtime/reflection/runs"
+  }
+  const path = homeRelativePath(childLog.path)
+  return childLog.present
+    ? `inspect ${path}`
+    : `the failing run's child-stderr.log (${path}) was already pruned; its stderr tail is kept in the failure detail`
 }
