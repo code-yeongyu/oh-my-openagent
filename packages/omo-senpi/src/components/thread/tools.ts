@@ -1,7 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { fuzzyMatch, workspaceEntries } from "./addressing"
+import { checkNameConflict, fuzzyMatch, normalizeThreadName, workspaceEntries, type ThreadAddressEntry } from "./addressing"
 import { checkInitialSkills } from "./initial-skills"
 import {
   parseThreadParams,
@@ -170,9 +170,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     return output(result)
   }
 
+  // Fuzzy candidates follow the exact ladder's scope: the caller's workspace unless all_scope.
+  const fuzzyCandidates = (entries: ThreadAddressEntry[], allScope: boolean | undefined) => allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
   const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value) => {
     const entries = resolveEntries(options, current)
-    if (value.name !== undefined) { const existing = entries.find((entry) => entry.name.toLowerCase() === value.name?.trim().toLowerCase()); if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.") }
+    if (value.name !== undefined) { const conflict = checkNameConflict(entries, value.name); if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult }
     const skills = value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
     if (skills?.kind === "invalid") return failure("invalid_arguments", `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`, "Pass skill names as listed by the skill index.", { invalid: skills.names })
     const loaded = skills?.kind === "ok" ? skills.names : undefined
@@ -187,7 +189,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => readThread(options, current, value, callerId)) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
   const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
-  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { const entries = value.match === "fuzzy" ? resolveEntries(options, current) : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope)); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
+  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { if (value.match === "fuzzy" && value.all_scope !== true && options.callerWorkspaceRoot().trim() === "") return failure("caller_context_missing", "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.", "Set all_scope to search every workspace, or hand off from a session that knows its workspace."); const entries = value.match === "fuzzy" ? fuzzyCandidates(resolveEntries(options, current), value.all_scope) : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope)); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
     parameters: threadToolParamSchemas.thread_rename,
@@ -200,7 +202,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const name = value.name.trim()
       if (name.length === 0) return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
       const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
-      const existing = visible.find((entry) => entry.thread_id !== resolved.entry.thread_id && entry.name.trim().toLowerCase() === name.toLowerCase())
+      const existing = visible.find((entry) => entry.thread_id !== resolved.entry.thread_id && normalizeThreadName(entry.name) === normalizeThreadName(name))
       if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
       await sessionPort(options, session).setSessionName(routingId(session), name)
       return { kind: "ok", thread_id: resolved.entry.thread_id, name }

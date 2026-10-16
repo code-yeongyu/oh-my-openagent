@@ -203,8 +203,13 @@ impl Backend for FakeBackend {
 
     fn release_all(&mut self) -> CoreResult<()> {
         self.begin(FakeMethod::ReleaseAll)?;
+        self.sink.release_held();
         self.record(SinkOp::ReleaseAll);
         Ok(())
+    }
+
+    fn emergency_release(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EmergencyRelease>> {
+        Some(std::sync::Arc::new(self.sink.clone()))
     }
 
     fn cursor_position(&mut self) -> CoreResult<Option<DesktopPoint>> {

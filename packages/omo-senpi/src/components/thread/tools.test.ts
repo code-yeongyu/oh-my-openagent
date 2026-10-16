@@ -178,6 +178,18 @@ describe("thread session controls", () => {
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 
+  test.each([["alpha", "\uff41\uff4c\uff50\uff48\uff41"], ["alpha beta", "alpha  beta"]])("#given a thread named %p #when another is created or renamed to %p #then both are name_conflict, as addressing would treat the names as equal", async (existing, requested) => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: existing })
+    const run = runner(f)
+
+    // when / then
+    expect(await run("thread_create", { name: requested }, undefined, "call-create")).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(await run("thread_rename", { thread: "peer", name: requested }, undefined, "call-rename")).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(f.setSessionName).not.toHaveBeenCalled()
+  })
+
   test("rename allows keeping its own name", async () => {
     const f = fixture()
     expect(await runner(f)("thread_rename", { thread: "peer", name: "PEER" })).toEqual({ kind: "ok", thread_id: "dur-peer", name: "PEER" })
@@ -344,6 +356,38 @@ describe("thread session controls", () => {
     f.sessions[0] = { ...f.sessions[0], name: "payments worker" }
     f.sessions.push({ sessionId: "route-self", durableSessionId: "dur-self", cwd: process.cwd(), name: "payments work" })
     expect(await runner(f)("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue" }, "dur-self")).toMatchObject({ kind: "ok", thread: { thread_id: "dur-peer" }, resolved_by: "fuzzy" })
+    expect(f.prompt).not.toHaveBeenCalled()
+  })
+
+  test("#given the best fuzzy match is a session in another workspace #when handing off without all_scope #then the best match in this workspace is chosen, and all_scope reaches the other one", async () => {
+    // given
+    const f = fixture()
+    const otherWorkspace = mkdtempSync(join(tmpdir(), "thread-fuzzy-scope-"))
+    directories.push(otherWorkspace)
+    f.sessions[0] = { ...f.sessions[0], name: "unrelated notes" }
+    f.sessions.push({ sessionId: "route-far", durableSessionId: "dur-far", cwd: otherWorkspace, name: "payments work" })
+    f.sessions.push({ sessionId: "route-near", durableSessionId: "dur-near", cwd: process.cwd(), name: "payments worker" })
+    const run = runner(f)
+
+    // when
+    const scoped = await run("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue" }, "dur-self", "call-scoped")
+    const wide = await run("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue", all_scope: true }, "dur-self", "call-wide")
+
+    // then
+    expect(scoped).toMatchObject({ kind: "ok", thread: { thread_id: "dur-near" }, resolved_by: "fuzzy" })
+    expect(wide).toMatchObject({ kind: "ok", thread: { thread_id: "dur-far" }, resolved_by: "fuzzy" })
+  })
+
+  test("#given a caller with no workspace root #when a fuzzy handoff runs without all_scope #then it is caller_context_missing, as the exact ladder answers, not not_found", async () => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-self", durableSessionId: "dur-self", cwd: process.cwd(), name: "self" })
+
+    // when
+    const result = await runner(f, "unknown-caller", "")("thread_handoff", { thread: "peer", match: "fuzzy", message: "continue" }, "dur-self", "call-blank-root")
+
+    // then
+    expect(result).toMatchObject({ kind: "error", error: { code: "caller_context_missing", next_action: expect.stringContaining("all_scope") } })
     expect(f.prompt).not.toHaveBeenCalled()
   })
 

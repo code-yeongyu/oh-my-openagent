@@ -99,6 +99,14 @@ pub(super) const fn listener_step_is_live(run_loop_result: i32, tap_enabled: boo
 struct TapContext<'a> {
     shared: &'a Shared,
     tap: Cell<CfMachPortRef>,
+    calls: TapCalls,
+}
+
+/// Native operations are injected only by this module's callback tests.
+struct TapCalls {
+    enable: unsafe extern "C" fn(CfMachPortRef, bool),
+    keycode: unsafe extern "C" fn(CgEventRef, u32) -> i64,
+    flags: unsafe extern "C" fn(CgEventRef) -> u64,
 }
 
 extern "C" fn tap_callback(
@@ -115,14 +123,15 @@ extern "C" fn tap_callback(
     match classify(event_type) {
         TapAction::ReEnable => {
             // SAFETY: [FFI] the port is live while its callback runs.
-            unsafe { CGEventTapEnable(context.tap.get(), true) };
+            unsafe { (context.calls.enable)(context.tap.get(), true) };
+            context.shared.stop_worker.reenabled(event_type);
         }
         TapAction::KeyDown if !event.is_null() => {
             // SAFETY: [FFI] `event` is the non-null key-down handed to this
             // callback; it is only read.
-            let keycode = unsafe { CGEventGetIntegerValueField(event, KEYCODE_FIELD) };
+            let keycode = unsafe { (context.calls.keycode)(event, KEYCODE_FIELD) };
             // SAFETY: [FFI] as above.
-            let flags = unsafe { CGEventGetFlags(event) };
+            let flags = unsafe { (context.calls.flags)(event) };
             context.shared.key_down(keycode, flags);
         }
         TapAction::KeyDown | TapAction::PassThrough => {}
@@ -166,6 +175,11 @@ pub(super) fn run(shared: &Shared) -> TapRun {
     let context = TapContext {
         shared,
         tap: Cell::new(ptr::null_mut()),
+        calls: TapCalls {
+            enable: CGEventTapEnable,
+            keycode: CGEventGetIntegerValueField,
+            flags: CGEventGetFlags,
+        },
     };
     let user_info = ptr::from_ref(&context).cast_mut().cast::<c_void>();
     // SAFETY: [FFI] a listen-only key-down session tap; `user_info` points at
@@ -236,6 +250,10 @@ pub(super) fn run(shared: &Shared) -> TapRun {
 #[cfg(test)]
 pub(super) use hooks::{Simulate, TestHooks};
 
+#[cfg(test)]
+#[path = "tap/callback_tests.rs"]
+mod callback_tests;
+
 /// Live-test hooks that make the OS-side tap failures happen on demand, on
 /// the tap thread itself.
 #[cfg(test)]
@@ -255,6 +273,7 @@ mod hooks {
 
     #[derive(Debug, Default)]
     pub(in crate::stop_path) struct TestHooks {
+        pub(in crate::stop_path) reenabled: Vec<u32>,
         pub(in crate::stop_path) simulate: Option<Simulate>,
         /// Whether the step right after the last simulation stayed live.
         pub(in crate::stop_path) simulated_step_live: Option<bool>,

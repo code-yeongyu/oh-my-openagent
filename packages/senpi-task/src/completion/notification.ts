@@ -16,6 +16,7 @@ import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 import type { CompletionDetails, ParentNotifierMessage } from "./types"
 import { defaultTranscriptReader } from "../tools/output/transcript"
 import { renderTranscript } from "../tools/output/render"
+import { withParkedSteeringNotice } from "../state/queued-steering"
 
 export const FINAL_RESPONSE_TRANSPORT_LIMIT = 32_000
 
@@ -43,6 +44,7 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
       ? {}
       : { fallback_models: record.fallback_models }),
     ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
+    ...(record.effective_model === undefined ? {} : { effective_model: record.effective_model }),
     duration_ms: durationMs(record),
     ...(runStats === undefined ? {} : { run_stats: runStats }),
     final_response: finalResponse.text,
@@ -77,14 +79,22 @@ export function completionMessageLines(details: readonly CompletionDetails[], wi
   return details.flatMap((detail) => completionDetailLines(detail, width))
 }
 
+// A completed task keeps sends it acknowledged but never delivered (#9861): they wait on the record
+// and go first on the next continuation. Pool assignments belong to their own admitted turn.
+function parkedSteeringCount(record: TaskRecord): number {
+  return (record.pending_steering ?? []).filter((entry) => entry.workpool === undefined).length
+}
+
 function finalResponseForNotification(record: TaskRecord, stateDir: string | undefined): { readonly text: string; readonly file?: string } {
   const entries = record.failure_kind === "suspended_unresumable" && stateDir !== undefined
     ? defaultTranscriptReader({ taskId: record.task_id, stateDir }).entries
     : []
   const tail = entries.length === 0 ? undefined : renderTranscript(entries, { mode: "tail", tailLines: 60 }).text
   const source = record.failure_kind === "suspended_unresumable"
-    ? [record.error_message, record.final_response, tail].filter(Boolean).join("\n\n")
-    : record.final_response ?? record.error_message ?? ""
+    ? [record.error_message, tail, record.final_response].filter(Boolean).join("\n\n")
+    : record.status === "completed"
+      ? withParkedSteeringNotice(record.final_response ?? record.error_message ?? "", parkedSteeringCount(record))
+      : record.final_response ?? record.error_message ?? ""
   if (source.length <= FINAL_RESPONSE_TRANSPORT_LIMIT) return { text: source }
   if (stateDir === undefined) return { text: source.slice(0, FINAL_RESPONSE_TRANSPORT_LIMIT) }
 
@@ -120,6 +130,7 @@ function completionDetailLines(detail: CompletionDetails, width: number | undefi
       category: detail.category,
       agentType: detail.agent_type,
       resolvedModel: detail.resolved_model,
+      effectiveModel: detail.effective_model,
       model: detail.model,
     }),
     fallbackToken(detail),

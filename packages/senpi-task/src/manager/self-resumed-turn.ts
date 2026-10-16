@@ -20,7 +20,7 @@ export type SelfResumedTurnPorts = {
 function reopenable(record: TaskRecord | null, handle: ManagedChildHandle, ports: SelfResumedTurnPorts): record is TaskRecord {
   return (
     record !== null &&
-    (record.status === "completed" || record.status === "error") &&
+    (record.status === "completed" || record.status === "error" || (record.status === "interrupted" && record.stop_reason !== "deadline")) &&
     record.residency_state === "resident" &&
     ports.liveHandle(record.task_id) === handle
   )

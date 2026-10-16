@@ -33,6 +33,8 @@ const STATIC_CODES_EXPECTED = [
 	"chart_without_figure",
 	"chart_svg_no_text",
 	"chart_svg_missing_labels",
+	"report_without_visual",
+	"image_missing_alt",
 	"korean_serif_font",
 	"section_without_citation",
 	"missing_closing_section",

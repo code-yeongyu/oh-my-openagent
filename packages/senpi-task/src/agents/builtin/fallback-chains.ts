@@ -57,6 +57,11 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       variant: "max",
     },
     {
+      providers: ["google", "google-vertex", "opencode"],
+      model: "gemini-4-argon",
+      variant: "high",
+    },
+    {
       providers: ["google", "github-copilot", "opencode"],
       model: "gemini-3.1-pro",
       variant: "high",

@@ -23,9 +23,9 @@ export interface HostRpcClient {
   openSession(options: HostOpenSessionWire): Promise<{ sessionId: string; attached?: boolean }>
   closeSession(sessionId?: string): Promise<void>
   sendExtensionUIResponse(response: RpcExtensionUIResponse): Promise<void>
-  prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp" }): Promise<HostPromptDisposition>
-  steer(message: string): Promise<HostQueuedInputDisposition>
-  followUp(message: string): Promise<HostQueuedInputDisposition>
+  prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp"; clientMessageId?: string }): Promise<HostPromptDisposition>
+  steer(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
+  followUp(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
   abort(): Promise<void>
   getState(): Promise<RpcSessionState>
   getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>

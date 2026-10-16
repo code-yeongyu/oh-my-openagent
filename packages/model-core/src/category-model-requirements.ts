@@ -3,6 +3,10 @@ import type { ModelRequirement } from "./model-requirement-types"
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "visual-engineering": {
     fallbackChain: [
+      // Argon at its lowest accepted thinking level leads (#10187): off/minimal map to null for
+      // this model, so `low` is the floor; Copilot joins once code-yeongyu/senpi#3379 verifies its
+      // thinking control. The rung is unresolvable until the engine catalog carries the model.
+      { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -142,10 +146,14 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   writing: {
-    // Writing runs on Claude only: with none of these models reachable the lane is unavailable instead
-    // of borrowing another family through the session or system default.
+    // Writing runs on its own rungs only: with none of these models reachable the lane is unavailable
+    // instead of borrowing another family through the session or system default.
     requiresAnyModel: true,
     fallbackChain: [
+      // Argon at its lowest accepted thinking level leads (#10187): off/minimal map to null for
+      // this model, so `low` is the floor; Copilot joins once code-yeongyu/senpi#3379 verifies its
+      // thinking control. The rung is unresolvable until the engine catalog carries the model.
+      { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",

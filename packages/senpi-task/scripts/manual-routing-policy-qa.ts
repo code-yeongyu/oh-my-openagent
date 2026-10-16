@@ -30,10 +30,12 @@ function resolved(
 }
 
 const scenarios = {
-  visualPrimary: resolved("visual-engineering", [model("anthropic", "claude-fable-5-1")]),
+  visualPrimary: resolved("visual-engineering", [model("google", "gemini-4-argon")]),
+  visualFableFallback: resolved("visual-engineering", [model("anthropic", "claude-fable-5-1")]),
   visualOpusFallback: resolved("visual-engineering", [model("anthropic", "claude-opus-5")]),
   visualKimiFallback: resolved("visual-engineering", [model("kimi-coding", "k3")]),
-  writingPrimary: resolved("writing", [model("anthropic", "claude-opus-5-5")]),
+  writingPrimary: resolved("writing", [model("google", "gemini-4-argon")]),
+  writingOpus55Fallback: resolved("writing", [model("anthropic", "claude-opus-5-5")]),
   writingOpus46Fallback: resolved("writing", [model("anthropic", "claude-opus-4-6")]),
   quickPrimary: resolved("quick", [model("openai-codex", "gpt-6-luna-fast")]),
   quickDeepseekFallback: resolved("quick", [model("deepseek", "deepseek-flash")]),

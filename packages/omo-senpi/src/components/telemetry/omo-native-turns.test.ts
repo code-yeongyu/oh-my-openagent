@@ -11,6 +11,7 @@ import {
   type KnownProvider,
 } from "./product-identity"
 import { createOmoNativeTurnHandler, maskModel } from "./omo-native-turns"
+import { createSessionSummaryRecorder } from "./omo-native-session-summary"
 
 type CapturedEvent = { readonly name: string; readonly properties: EventTelemetryProperties }
 
@@ -33,9 +34,29 @@ function createRecorder(): {
       client,
       diagnostics: (input) => diagnostics.push(input),
       sessionId: "hashed-session",
+      summary: createSessionSummaryRecorder({
+        captureEvent: () => undefined,
+        sampleRate: 1,
+        store: { read: () => undefined, write: () => undefined, remove: () => undefined, claimOrphans: () => [] },
+      }),
     }),
   }
 }
+
+test("#given a known model routed through an unknown provider #when the summary records it #then the model stays named and only the provider is custom", () => {
+  const rows: EventTelemetryProperties[] = []
+  const summary = createSessionSummaryRecorder({
+    captureEvent: (_name, properties) => rows.push(properties),
+    sampleRate: 0,
+    store: { read: () => undefined, write: () => undefined, remove: () => undefined, claimOrphans: () => [] },
+  })
+  const handle = createOmoNativeTurnHandler({ client: { captureEvent: () => undefined }, sessionId: "s", summary })
+
+  handle(turnEvent({ provider: "my-private-gateway", model: "gpt-5.6-sol" }))
+  summary.finish("s", "quit")
+
+  expect(rows[0]).toMatchObject({ m1_provider: "custom", m1_model: "gpt-5.6-sol", custom_model_turns: 0 })
+})
 
 function turnEvent(input: {
   readonly turnIndex?: number
@@ -102,6 +123,7 @@ describe("OmO Native turn telemetry", () => {
         total_tokens: 40,
         cost_usd: 0.1235,
         turn_index: 7,
+        sample_rate: 1,
       },
     })
     expect(Object.keys(recorder.captured[0]?.properties ?? {}).sort()).toEqual(

@@ -1,4 +1,4 @@
-// gates-static.mjs - deterministic static gates (G1-G15) over a parsed report.
+// gates-static.mjs - deterministic static gates (G1-G17) over a parsed report.
 //
 // Builds one document context (a document-order walk with h2 sections, citation helpers and a
 // defect factory) and hands it to the text, figure and structure gate modules. Every severity
@@ -144,7 +144,7 @@ function buildContext(doc, options) {
 }
 
 /**
- * Run G1-G15 over a parsed report (html-lite root).
+ * Run G1-G17 over a parsed report (html-lite root).
  * @param {object} doc parseHtml(...) result
  * @param {{ palette?: Set<string>, lineageMode?: "inline"|"section", requireSections?: (RegExp|string)[],
  *   baseDir?: string, fs?: { statSync(path: string): { size: number } }, closingPattern?: RegExp|string }} options

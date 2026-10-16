@@ -30,6 +30,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
   test("#given the mirrored fallback table #when compared with the independent transcription #then every provider model variant and order is pinned", () => {
     expect(CATEGORY_FALLBACK_CHAINS).toEqual({
       "visual-engineering": [
+        { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" },
@@ -87,6 +88,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }
       ],
       writing: [
+        { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "low" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" }
       ]

@@ -23,6 +23,7 @@ const DEFAULT_ARTIFACT_DIR: &str = "senpi-desktop";
 /// Owned by the session thread: AX handles are `Rc`, so it never leaves it.
 pub(crate) struct Worker {
     pub(crate) hold_signal: Option<Arc<senpi_desktop_safety::HoldSignal>>,
+    emergency: Option<Arc<dyn senpi_desktop_core::backend::EmergencyRelease>>,
     factory: Box<dyn BackendFactory>,
     pub(crate) backend: CoreResult<Box<dyn Backend>>,
     /// `Some` once `session.open` ran; backend requests need it.
@@ -57,6 +58,7 @@ impl Worker {
         });
         let mut worker = Self {
             hold_signal: None,
+            emergency: None,
             factory,
             backend,
             options: None,
@@ -93,6 +95,12 @@ impl Worker {
             return self.refresh_capabilities();
         }
         self.backend = self.factory.create(&options);
+        self.emergency = self.backend.as_ref().ok().and_then(|backend| backend.emergency_release());
+        if let Some(release) = &self.emergency {
+            if let Err(error) = self.safety.supervisor.register_emergency_release(release) {
+                self.backend = Err(error);
+            }
+        }
         self.registry = AxRegistry::default();
         self.frames = FrameCache::default();
         self.options = Some(options);

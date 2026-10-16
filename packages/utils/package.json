@@ -104,6 +104,10 @@
     "./zip-entry-listing/*": {
       "types": "./src/zip-entry-listing/*.ts",
       "import": "./src/zip-entry-listing/*.ts"
+    },
+    "./shell-quote": {
+      "types": "./src/shell-quote.ts",
+      "import": "./src/shell-quote.ts"
     }
   },
   "types": "./index.d.ts",

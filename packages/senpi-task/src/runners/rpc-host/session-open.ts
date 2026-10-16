@@ -14,6 +14,8 @@ import { createReattachPort } from "./reattach-port"
 import type { OpenedHostSession } from "./session-client"
 import type { TransportRecoveryOptions } from "./transport-recovery"
 import { discardUnstartedRpcHandle } from "../rpc/start-cleanup"
+import { createTaskRecordStore } from "../../store"
+import { InputUncertainError } from "../input-effects"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 const DEFAULT_CLOSE_GRACE_MS = 5_000
@@ -67,6 +69,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
     try {
       await handle.startInitialPrompt(spec.prompt)
     } catch (error) {
+      if (error instanceof InputUncertainError) error = error.cause
       const exitOutcome = handle.exitOutcome()
       try {
         await discardUnstartedRpcHandle(handle)
@@ -91,6 +94,9 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
       if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })
       const opened = await openAdmitted(client, spec, sessionPath)
       const handle = createHostSessionHandle({
+        ...(spec.taskStoreDir === undefined ? {} : {
+          inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
+        }),
         client,
         session: { routingId: opened.sessionId, sessionPath, instanceId: opened.instanceId },
         taskId: spec.task_id,
@@ -110,6 +116,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         }),
       })
       input.liveChildren.add(handle)
+      if (spec.resumeSessionPath !== undefined) await handle.reconcileInputs?.()
       const switchOnPort = handle.switchSession
       if (spec.resumeSessionPath === undefined) await startTurn(handle, spec)
       return Object.assign(handle, {

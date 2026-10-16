@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -118,4 +118,52 @@ describe("reflection park alert", () => {
     expect(told).toBe(true)
     expect(second.notifications).toHaveLength(1)
   })
+
+  test("#given a child failure whose run log exists #when the alert is emitted #then it names that run's absolute child-stderr.log", async () => {
+    // given
+    const dir = await reflectionDir(childExitState())
+    const runDir = join(dir, "runs", "r1")
+    await mkdir(runDir, { recursive: true })
+    await writeFile(join(runDir, "child-stderr.log"), "boom\n")
+    const harness = liveHarness()
+
+    // when
+    await emitReflectionParkAlert(dir, "agent-test", harness.live, harness.once)
+
+    // then
+    const parked = harness.api.entries[0]!.data as ReflectionParkedEntry
+    expect(parked.recommendation).toBe(`inspect ${join(dir, "runs", "r1", "child-stderr.log")}`)
+    expect(parked.recommendation).not.toContain("<runId>")
+    expect(harness.notifications[0]).toContain(join(dir, "runs", "r1", "child-stderr.log"))
+  })
+
+  test("#given a child failure whose run directory was pruned #when the alert is emitted #then it says the log was pruned", async () => {
+    // given
+    const dir = await reflectionDir(childExitState())
+    const harness = liveHarness()
+
+    // when
+    await emitReflectionParkAlert(dir, "agent-test", harness.live, harness.once)
+
+    // then
+    const parked = harness.api.entries[0]!.data as ReflectionParkedEntry
+    expect(parked.recommendation).toContain("already pruned")
+    expect(parked.recommendation).toContain(join(dir, "runs", "r1", "child-stderr.log"))
+    expect(parked.recommendation).not.toContain("<runId>")
+  })
 })
+
+function childExitState(): Record<string, unknown> {
+  const state = parkedState()
+  return {
+    ...state,
+    lastFailure: {
+      runId: "r1",
+      at: PARKED_AT,
+      fingerprint: "child_exit:exit code 1",
+      retryable: false,
+      reason: "child_exit",
+      detail: "exit code 1",
+    },
+  }
+}

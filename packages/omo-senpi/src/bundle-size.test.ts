@@ -115,7 +115,14 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // Raised 1,530,000 -> 1,546,000 in the standalone measured budget PR for #9912.
 // Committed dev grew 1,302,597 -> 1,528,440 bytes over 14.06 days; this +16 KB
 // leaves 17,560 bytes of slack (~1-2 days at the observed rates), not weeks.
-const BUDGET_BYTES = 1_546_000
+// Raised 1,546,000 -> 1,550,000 in a standalone measured budget PR for #10182 (session_summary, #10184).
+// The per-session summary replaces per-turn usage events, so it runs on every assistant turn and every
+// session shutdown in the entry bundle (rollup window, crash-safe rollup store, schema); it cannot move to a
+// lazy sidecar the way /doctor and /memfs did. A table-driven rewrite already trimmed what it could. The
+// dependency manifests are unchanged. Committed dev measures 1,539,513 bytes; the #10184 branch measures
+// 1,547,296 (+7,783) after minification (linux/arm64, node 24 + bun 1.4.2). 1,550,000 is the measured need
+// plus a 2,704-byte margin, so later growth still has to justify itself rather than ride on slack.
+const BUDGET_BYTES = 1_550_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

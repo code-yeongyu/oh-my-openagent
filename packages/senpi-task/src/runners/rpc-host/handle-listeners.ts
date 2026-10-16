@@ -67,6 +67,7 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
   const parkedListeners = new Set<(event: HostSessionParked) => void>()
   const turnResumedListeners = new Set<() => void>()
   const resumedListeners = new Set<() => void>()
+  let earlyResume = false
 
   const registrations: ListenerRegistrations = {
     subscribe: (listener) => {
@@ -85,6 +86,10 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     },
     onSelfResumed: (listener) => {
       resumedListeners.add(listener)
+      if (earlyResume) {
+        queueMicrotask(listener)
+        queueMicrotask(() => { earlyResume = false })
+      }
       return () => resumedListeners.delete(listener)
     },
   }
@@ -107,6 +112,7 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
       for (const listener of turnResumedListeners) listener()
     },
     emitSelfResumed: () => {
+      if (resumedListeners.size === 0) earlyResume = true
       for (const listener of resumedListeners) listener()
     },
     clearActive: () => {

@@ -2,7 +2,6 @@ import type { ChildExitOutcome } from "../types"
 import { sessionExitFacts } from "./exit-mapping"
 import type { HostSessionPort } from "./handle-port"
 import { endSessionOnHost } from "./handle-teardown"
-import { TRANSPORT_LOST_REASON } from "./transport-recovery"
 
 const STOPPED_UNREACHED_REASON = "cancelled while its task host was unreachable"
 
@@ -26,8 +25,6 @@ export interface HandleStop {
   markStopping(): void
   endOnHost(client: HostSessionPort): Promise<void>
   stopUnreached(): void
-  /** The bound ran out before the host took the continuation: lost, and the reopened session ends. */
-  lostOnReopen(): void
   recoveryEnded(adopted: boolean): void
   stopWhenReachable(): Promise<void>
 }
@@ -61,11 +58,6 @@ export function createHandleStop(host: HandleStopHost): HandleStop {
     markStopping,
     endOnHost,
     stopUnreached,
-    lostOnReopen: () => {
-      const reopened = host.port()
-      host.settleExit({ kind: "crashed", facts: sessionExitFacts(TRANSPORT_LOST_REASON) })
-      void endSessionOnHost({ taskId: host.taskId, closeGraceMs: host.closeGraceMs, port: () => reopened }, "terminated")
-    },
     recoveryEnded: (adopted) => {
       if (!requested || host.exited() || host.detached()) return
       if (adopted) void endOnHost(host.port())

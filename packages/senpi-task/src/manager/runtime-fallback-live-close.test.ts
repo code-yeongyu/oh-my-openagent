@@ -7,7 +7,7 @@ import { hostRunnerHarness } from "../runners/rpc-host.test-support"
 import type { ResolvedModelRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
-import { baseSpec, cleanupProjects, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
@@ -62,6 +62,7 @@ describe("runtime fallback over a live daemon session", () => {
       })
       const task = await manager.start(baseSpec())
       if (task.kind !== "started") throw new Error("expected the task to start")
+      await launchSettled(manager, task.task_id)
       const [original] = host.sessions()
       if (original === undefined) throw new Error("expected the failed rung's session")
       store.mutate(task.task_id, record => ({ ...record, pending_steering: [

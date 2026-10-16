@@ -40,6 +40,7 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
   const kind = handle.kind ?? "in-process"
   return {
     task_id: handle.task_id,
+    ...(handle.reconcileInputs === undefined ? {} : { reconcileInputs: handle.reconcileInputs }),
     kind,
     pid: handle.pid,
     abort: () => handle.abort(),
