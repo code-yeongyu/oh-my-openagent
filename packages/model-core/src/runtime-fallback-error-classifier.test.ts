@@ -383,3 +383,165 @@ describe("runtime fallback error classifier", () => {
     }
   })
 })
+
+describe("OpenCode UnknownError scoping (fixes #7706)", () => {
+  test("same messages under non-UnknownError name must NOT hop", () => {
+    //#given
+    const errors = [
+      {
+        name: "ValidationError",
+        data: { message: "Unexpected server error" },
+      },
+      {
+        name: "RuntimeError",
+        message: "authentication expired",
+      },
+      {
+        name: "Error",
+        message: "auth has expired",
+      },
+    ]
+
+    //#when
+    const results = errors.map((error) => 
+      isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
+    )
+
+    //#then
+    expect(results).toEqual([false, false, false])
+  })
+
+  test("OpenCode genuine internal defect with no provider origin must NOT hop", () => {
+    //#given
+    const error = {
+      name: "UnknownError",
+      message: "Unexpected server error. Check server logs for details.",
+    }
+
+    //#when
+    const retryable = isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("auth expiry with 401 NOT in retry_on_errors must NOT hop", () => {
+    //#given
+    const errors = [
+      {
+        name: "UnknownError",
+        message: "authentication expired",
+        statusCode: 401,
+      },
+      {
+        name: "UnknownError",
+        data: { message: "auth has expired" },
+        statusCode: 401,
+      },
+    ]
+
+    //#when
+    const results = errors.map((error) => 
+      isRuntimeFallbackRetryableError(error, [429, 500, 502, 503])
+    )
+
+    //#then
+    expect(results).toEqual([false, false])
+  })
+
+  test("provider-origin UnknownError with 5xx statusCode MUST hop", () => {
+    //#given
+    const errors = [
+      {
+        name: "UnknownError",
+        data: { message: "Unexpected server error" },
+        statusCode: 500,
+      },
+      {
+        name: "UnknownError",
+        message: "unexpected server error",
+        statusCode: 502,
+      },
+      {
+        name: "UnknownError",
+        error: { message: "Unexpected server error" },
+        statusCode: 503,
+      },
+    ]
+
+    //#when
+    const results = errors.map((error) => 
+      isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
+    )
+
+    //#then
+    expect(results).toEqual([true, true, true])
+  })
+
+  test("provider-origin UnknownError with providerID MUST hop", () => {
+    //#given
+    const errors = [
+      {
+        name: "UnknownError",
+        data: { message: "Unexpected server error" },
+        providerID: "anthropic",
+      },
+      {
+        name: "UnknownError",
+        message: "unexpected server error",
+        data: { providerID: "openai" },
+      },
+    ]
+
+    //#when
+    const results = errors.map((error) => 
+      isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
+    )
+
+    //#then
+    expect(results).toEqual([true, true])
+  })
+
+  test("auth expiry WITH 401 in retry_on_errors MUST hop", () => {
+    //#given
+    const errors = [
+      {
+        name: "UnknownError",
+        message: "authentication expired",
+        statusCode: 401,
+      },
+      {
+        name: "UnknownError",
+        data: { message: "auth has expired" },
+        statusCode: 401,
+      },
+      {
+        name: "UnknownError",
+        message: "authentication has expired",
+        statusCode: 401,
+      },
+    ]
+
+    //#when
+    const results = errors.map((error) => 
+      isRuntimeFallbackRetryableError(error, [401, 429])
+    )
+
+    //#then
+    expect(results).toEqual([true, true, true])
+  })
+
+  test("does not treat UnknownError programming failures as retryable", () => {
+    //#given
+    const error = {
+      name: "UnknownError",
+      message: "Cannot read properties of undefined",
+    }
+
+    //#when
+    const retryable = isRuntimeFallbackRetryableError(error, [401, 429, 500])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+})
