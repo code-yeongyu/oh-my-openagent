@@ -61,6 +61,8 @@ describe("omo-native session_summary consent scope", () => {
       const recovering = registerProcess({ agentDir, recorder, cwd: "/repo", options })
       await recovering.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("recovering", "/repo"))
       await recovering.dispatch("turn_end", turnEnd(), inProject("recovering", "/repo"))
+      // The recovery sweep is loaded on demand; the process's own shutdown waits for it to finish.
+      await recovering.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("recovering", "/repo"))
 
       // then
       expect(sentSeqs(recorder, "hashed:scopeless")).toEqual([])
