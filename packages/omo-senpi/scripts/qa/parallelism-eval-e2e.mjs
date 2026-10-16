@@ -14,6 +14,7 @@ import {
 import { createOwnedProcessRegistry, startSenpiRun } from "./team-e2e-runtime.mjs"
 import { findResults, parseEvents } from "./team-e2e-support.mjs"
 import { resolveSenpi } from "./team-e2e.mjs"
+import { telemetryLocalSinkEnv } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -76,14 +77,7 @@ async function main() {
       script: EVAL_SCRIPT,
       mockProviderEntry,
       parseEvents,
-      extraEnv: {
-        DO_NOT_TRACK: "",
-        OMO_DISABLE_POSTHOG: "",
-        OMO_SENPI_DISABLE_POSTHOG: "",
-        OMO_SEND_ANONYMOUS_TELEMETRY: "",
-        OMO_SENPI_SEND_ANONYMOUS_TELEMETRY: "",
-        POSTHOG_HOST: sinkUrl,
-      },
+      extraEnv: telemetryLocalSinkEnv(sinkUrl),
       onPid: (pid) => processes.onSpawn(pid),
       onClose: (pid) => processes.onClose(pid),
     })
