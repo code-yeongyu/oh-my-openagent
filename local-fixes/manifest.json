@@ -196,7 +196,7 @@
       "id": "13-compaction-pin-checkpoint",
       "title": "Checkpoint capture skips the active compaction pin model",
       "commit": "85e32de939e72ebdccfe3a4b731ab96404c834e4",
-      "patch": "local-fixes/patches/13-compaction-pin-checkpoint.patch",
+      "patch": "patches/13-compaction-pin-checkpoint.patch",
       "why": "The compaction-context-injector snapshots the session model before compaction. A compaction marker/summary row tagged with the WORKING agent (not agent=compaction) carries the summarizer pin model (glm-5.3-flash), which every existing exclusion let through - resolveValidatedModel skipped only agent===compaction. The checkpoint then re-injected the pin as the session model after compaction, hijacking continuation onto the summarizer (observed 2026-09-27T20:52Z, ses_f22570befffeKtPFEZc6tHsCBM: kimi session continued on glm-5.3-flash). Fix: preemptive-compaction-trigger records the summarize target in compaction-pin-state; the checkpoint resolver and its stored-model fallback skip any model equal to that pin, so capture keeps the last real working model. Hardened 2026-09-28: deduped imports (tsgo TS2300 x4), restored the 3 resolver tests the original commit deleted, added a guard test for core summary rows on the configured compaction agent (opencode-core-fix compaction-model-override), and regenerated this patch as UTF-8 (was UTF-16LE, unusable by git apply).",
       "markers": [
         "compaction-pin-checkpoint"
@@ -210,7 +210,7 @@
       "id": "14-compaction-part-marker",
       "title": "Marker rows detected by their compaction part, not agent name alone",
       "commit": "62ecde3d0adf5f00b47180d944b6a6f8a8c8b500",
-      "patch": "local-fixes/patches/14-compaction-part-marker.patch",
+      "patch": "patches/14-compaction-part-marker.patch",
       "why": "A compaction marker row carries the WORKING agent plus a compaction PART, but every exclusion (lifecycle isCompactionMessage, resolver resolveValidatedModel, reroute isCompactionArtifact) checked only the agent NAME. The marker sailed through: its pin model poisoned the stored session model (event-session-lifecycle), became the resolvers current prompt config (session-prompt-config-resolver backward scan + resolveLatestSessionPromptConfig), and vetoed the correct working-model checkpoint (recovery validateCheckpointModel). Observed 2026-09-27T23:37Z ses_f22570: kimi session hijacked to glm-5.3-flash primary after compaction; the injector dispatched the hijack prompt while the reroute correctly reissued kimi. Fix: detect marker rows by their compaction part in all three paths.",
       "markers": [
         "compaction-part-marker"
@@ -218,20 +218,22 @@
       "overlapsWith": [
         "13-compaction-pin-checkpoint"
       ],
-      "orderNote": "Independent of 13 (pin-state guard); this fixes the structural detection. Apply after 13."
+      "orderNote": "Independent of 13 (pin-state guard); this fixes the structural detection. Apply after 13.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10120"
     },
     {
       "id": "15-opencode-v2-compaction-event-alias",
       "title": "Bridge v2 compaction/idle event names to the v1 hook surface",
       "commit": "bce3fe471",
       "patch": "patches/15-opencode-v2-compaction-event-alias.patch",
-      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/9016",
+      "pr": null,
       "why": "OpenCode v2 renamed session.compacted to session.compaction.ended and never emits session.idle, so the v1 event handlers behind fixes 01-04 (token-cache clear, post-compaction monitor, manual-compaction continue) silently never fire on v2. The graft aliases compaction.ended to a v1-shaped session.compacted for v1 event handlers and accepts session.execution.succeeded as the terminal idle signal.",
       "markers": [
         "session.execution.succeeded"
       ],
       "overlapsWith": [],
-      "orderNote": "Patches packages/omo-opencode/src/v2/hook-bridge.ts, which only exists after PR #9016 merges. Apply last; no interaction with fixes 01-12 (different files). Numbered 15 because the v1 line claimed #14 (compaction-context-injector working-model fix, session ses_f26289d0)."
+      "orderNote": "Patches packages/omo-opencode/src/v2/hook-bridge.ts, which only exists after PR #9016 merges. Apply last; no interaction with fixes 01-12 (different files). Numbered 15 because the v1 line claimed #14 (compaction-context-injector working-model fix, session ses_f26289d0).",
+      "notOursReference": "https://github.com/code-yeongyu/oh-my-openagent/pull/9016"
     },
     {
       "id": "16-compaction-loop-breaker",
@@ -268,7 +270,7 @@
       "title": "Protect compaction lanes and exhausted fallback retries",
       "commit": "9a6a40824f893f286eaf3e680e15f5bd4d7f4b58",
       "patch": "patches/19-compaction-aware-runtime-fallback.patch",
-      "pr": null,
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/9787",
       "why": "The 2026-10-08 incident let the 30s watchdog and retry-signal handlers abort healthy compaction work or native retries without a replacement, leaving sessions dead and advancing the wrong lane.",
       "markers": [
         "compaction-aware-timeout",
@@ -285,7 +287,7 @@
       "title": "Reuse the last real user prompt for runtime fallback retries",
       "commit": "97f96ddcb20a88214c25b15527a341387bd31ead",
       "patch": "patches/20-retry-source-hygiene.patch",
-      "pr": null,
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/9787",
       "why": "The same incident replayed compaction marker rows and synthetic continue prompts, and bootstrapped the fallback chain from agent config instead of the model on the last real user turn.",
       "markers": [
         "retry-payload-skips-compaction-marker",
@@ -317,13 +319,14 @@
       "title": "Guard the legacy skill permission ask when projected into OpenCode v2",
       "commit": "d117ac603fb02ab74abddea66fd2fe83e075202b",
       "patch": "patches/23-skill-v2-ctx-ask-guard.patch",
-      "pr": null,
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/10067",
       "why": "The V1 skill tool calls ctx.ask, but the v2 host projects it through ctx.tool.transform with a v2 tool context that has no ask(). Optional chaining guards ctx, not a missing method, so every skill load on the v2 lane failed with 'ctx?.ask is not a function' (observed 2026-10-10/11). ask is now called only when the host provides it; a rejection or error from a real ask still propagates, so the V1 gate is unchanged. KNOWN GAP on v2: the per-skill approval prompt is not shown there. The public v2 plugin API has no way to create a permission request from a tool executor (ctx.permission offers list/get/reply/rules and an evaluate hook only), so the skill loads without asking. Each skipped prompt is logged as '[skill] tool context has no ask(); skill permission prompt skipped'. Closing the gap needs a native v2 skill tool with Permission.Service.assert, or a public v2 permission-assert API.",
       "markers": [
         "tool context has no ask(); skill permission prompt skipped"
       ],
       "overlapsWith": [],
-      "orderNote": "Independent of 01-22; touches only packages/omo-opencode/src/tools/skill/tools.ts and its factory test. The marker is the runtime log string, not the typeof guard, so it survives bundling regardless of how the bundler prints the comparison. pr is null because the v2 host (src/v2) is not in upstream dev; the defect is unreachable in released upstream builds."
+      "orderNote": "Independent of 01-22; touches only packages/omo-opencode/src/tools/skill/tools.ts and its factory test. The marker is the runtime log string, not the typeof guard, so it survives bundling regardless of how the bundler prints the comparison. pr is null because the v2 host (src/v2) is not in upstream dev; the defect is unreachable in released upstream builds.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10068"
     },
     {
       "id": "24-agent-writer-self-ingest",
@@ -361,7 +364,7 @@
       "title": "Run the deferred startup check once per process, not per plugin instance",
       "commit": "fe7faf0b77a04e9883193b96de2c5e622d7d38f1",
       "patch": "patches/26-startup-check-once-per-process.patch",
-      "pr": null,
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/10118",
       "why": "The already-checked flag lived in the per-instance closure of createAutoUpdateCheckerHook, so every folder rebuild re-ran the whole deferred startup check (config-error toast, connected-providers fetch, model-capabilities refresh + 3,823-model cache rewrite, npm update check; ~0.85s each) about 5s after any root session.created, fanning out across all live OMO instances (measured 79 capabilities-cache rewrites in 26h; app-layer addendum B.6). The gate now lives on globalThis behind the registered symbol omo.autoUpdateChecker.startupCheckState.v1 in a dependency-leaf module (startup-check-process-state.ts), so it survives per-location plugin module re-imports within one OpenCode process and resets only on process restart. A failed check logs and still closes the gate so failures do not fan out either.",
       "markers": [
         "startup check already completed in this process",
@@ -376,7 +379,7 @@
       "title": "Rewrite the model-capabilities cache only when its content changes",
       "commit": "2422a87e8e4bf2b603db15008b4b82e73f0b57bf",
       "patch": "patches/27-model-capabilities-write-once.patch",
-      "pr": null,
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/10119",
       "why": "refreshModelCapabilitiesCache unconditionally rewrote the multi-megabyte model-capabilities.json on every startup-check run even when the models.dev catalog was unchanged (79 rewrites in 26h across instances; each rewrite is ~0.85s of fs work). createJsonFileCacheStore gains writeIfChanged: serialize, compare with the on-disk file, skip identical writes while still updating the in-memory value and writtenInCurrentProcess. The refresh path uses writeIfChanged; plain write() is unchanged for every other caller.",
       "markers": [
         "unchanged; skipped write",
@@ -501,7 +504,7 @@
       "title": "Do not rewrite the model capabilities cache for an unchanged catalog",
       "commit": "14ac6d49967e778e0bdaa0c90b1a1f5a0b7f5ce2",
       "patch": "patches/35-model-capabilities-catalog-compare.patch",
-      "pr": null,
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/10119",
       "why": "Fix 27 compared the whole serialized snapshot, whose generatedAt is stamped on every fetch, so an unchanged catalog was still rewritten after every fetch. The store takes a comparable() that decides a rewrite; the capabilities cache excludes generatedAt.",
       "markers": [
         "unchanged; skipped write"
@@ -532,8 +535,12 @@
       "patch": "patches/37-compaction-recovery-control-plane.patch",
       "pr": null,
       "why": "X-149: v2 output events were not translated, so productive steps appeared as empty tails; recovery only had a cooldown and skipped config checks on that path. V2 sendPrompt also dropped noReply, exposing its configuration sentinel to the model and potentially to Claude's tool-result steering. Recovery now admits at most one accepted restore per captured checkpoint, validates persistent v2 agent/model on every trigger, invalidates failed compactions, translates actual output, and uses control APIs only for restoration. General noReply is synthetic with resume=false.",
-      "markers": ["compaction-recovery-once accepted"],
-      "overlapsWith": ["13-compaction-pin-checkpoint"],
+      "markers": [
+        "compaction-recovery-once accepted"
+      ],
+      "overlapsWith": [
+        "13-compaction-pin-checkpoint"
+      ],
       "orderNote": "Rebased onto the activated 36-fix lane without dropping entries 30-36. Original side-branch slot 30 was renumbered to 37. Pair with the opencode-claude-v2 parked-history-boundary-changed fix (original 27fcc05): it stops reuse of the old parked Claude turn after another provider summarized. Tests: compaction-context-injector/loop-regression.test.ts and v2/session-actions.recovery.test.ts. Existing preemptive-compaction timeout/cache-clear and runtime-fallback protections remain carried. Stage only while OpenChamber runs; import source and activate during the closed window."
     },
     {

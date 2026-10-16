@@ -106,7 +106,7 @@ mkdirSync(stagedDist, { recursive: true })
 const build = spawnSync("bun", INDEX_BUILD_ARGS, {
   cwd: repo,
   encoding: "utf8",
-  timeout: 300_000,
+   timeout: 110_000,
   shell: process.platform === "win32",
 })
 if (build.status !== 0 || !existsSync(staged)) {

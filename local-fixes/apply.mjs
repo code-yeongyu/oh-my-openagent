@@ -12,7 +12,7 @@
  *
  * Run this after every OMO update (pull / new release) before using the bundle.
  * Safe to run repeatedly: fixes already in history are skipped.
- * Exits non-zero and changes nothing if a fix conflicts — do not improvise on failure.
+ * A failed run can retain earlier picks. Use promote-clone.mjs for preflight and explicit clone recovery.
  */
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
@@ -139,9 +139,7 @@ for (const fix of manifest.fixes) {
       results.push([fix.id, "applied from patch"])
       continue
     } catch {
-      try {
-        git(["checkout", "--", "."])
-      } catch {}
+      // Preserve the failed index/worktree for explicit disposable-clone recovery.
     }
   }
 
@@ -153,8 +151,8 @@ for (const fix of manifest.fixes) {
       `  patch:  ${fix.patch}`,
       `  pr:     ${fix.pr}`,
       "",
-      "  A new OMO release changed the same code. Nothing was left half-applied",
-      "  (the cherry-pick was aborted), but this fix is MISSING until it is resolved.",
+      "  A new OMO release changed the same code. Earlier successful picks can remain.",
+      "  Inspect the index/worktree; use promote-clone.mjs --abort only in the disposable clone.",
       "",
       "  Do NOT improvise, do NOT skip it, do NOT hand-edit generated bundles.",
       "  Escalate with this exact output: manifest.json lists the fix and its PR.",

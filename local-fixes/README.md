@@ -22,8 +22,32 @@ Every run ends with either `All N local fixes are applied and verified` or a non
 
 ## If it fails
 
-It exits non-zero and prints `CONFLICT` with the fix id, its commit, its PR, and the conflicting
-files. The cherry-pick is aborted first, so **nothing is left half-applied**.
+It exits non-zero and prints `CONFLICT` with the fix id, its commit and its PR.
+Earlier successful picks can remain, and failed fallback changes are preserved for inspection.
+Never infer whole-run rollback from a cherry-pick abort.
+
+### Isolated v5.1.34 promotion entrypoint
+
+`bun local-fixes/check-lineage.mjs` checks every path and stable patch ID before mutation.
+`--normalize` converts UTF-16LE fallback patches only after comparing their decoded lineage
+with the recorded commit, then verifies the normalized result again.
+
+In a completely clean, independent clone named `Temp/opencode/omo-v5134-build-*`, use:
+
+```bash
+bun local-fixes/promote-clone.mjs
+# After behavioral gates and preserving the existing staged bundle + lane.json pair:
+bun local-fixes/stage-bundle.mjs --target-checkout "C:/Users/Zephyrus/Documents/ai/oh-my-openagent-fix-v2-int"
+bun local-fixes/verify.mjs "C:/Users/Zephyrus/Documents/ai/oh-my-openagent-fix-v2-int-staged/dist/index.js"
+```
+
+The wrapper also accepts `--target-checkout <live-path>` to explicitly invoke the same final
+staging command after apply and clone-stage verification. It never imports source or activates.
+On failure a journal under `.git/omo-promotion-run.json` records the starting HEAD/branch/path;
+further runs refuse until inspected. `bun local-fixes/promote-clone.mjs --abort` explicitly
+aborts a pending cherry-pick and resets **only this disposable clone** to its recorded HEAD.
+Unknown untracked leftovers are preserved and must be reviewed; no `git clean` is run.
+Shared worktrees and checkouts outside the clone naming/location guard are rejected.
 
 - Do **not** improvise a manual merge.
 - Do **not** skip the fix.
