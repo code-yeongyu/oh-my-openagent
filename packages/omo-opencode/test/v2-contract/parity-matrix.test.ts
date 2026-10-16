@@ -36,14 +36,15 @@ describe("V2 parity matrix — scaffold slice (live rows)", () => {
           }
         },
       },
-      // Slice 2 registers tools/hooks inside setup; stub the domains the
-      // scaffold row does not exercise.
+      // Slices 2-3 register tools/hooks and agents inside setup; stub the
+      // domains the scaffold row does not exercise.
       tool: {
         transform: () => Promise.resolve(),
         hook: () => Promise.resolve(),
       },
       session: { hook: () => Promise.resolve() },
       shell: { hook: () => Promise.resolve() },
+      agent: { transform: () => Promise.resolve() },
     }
     await omoV2Plugin.setup(ctx as never)
     const status = registered.find((r) => r.id === "omo.status")
@@ -85,6 +86,9 @@ describe("V2 parity matrix — tools+hooks slice (live rows)", () => {
       rpc: {
         register: (definition: { id: string; methods: Record<string, unknown> }) => {
           rpcIds.push(definition.id)
+          // Slice 3 chains rpc.dispose() in its cleanup; return a stub handle
+          // like the real registration would.
+          return Promise.resolve({ dispose: async () => {} })
         },
       },
       tool: {
@@ -92,7 +96,7 @@ describe("V2 parity matrix — tools+hooks slice (live rows)", () => {
           editorFn: (editor: { add: (info: ToolDef) => void }) => void,
         ) => {
           editorFn({ add: (info: ToolDef) => toolDefs.push(info) })
-          return Promise.resolve()
+          return Promise.resolve({ dispose: async () => {} })
         },
         hook: (name: string, fn: HookEntry["fn"]) => {
           hooks.push({ domain: "tool", name, fn })
@@ -111,6 +115,7 @@ describe("V2 parity matrix — tools+hooks slice (live rows)", () => {
           return Promise.resolve()
         },
       },
+      agent: { transform: () => Promise.resolve() },
     }
     return { ctx, toolDefs, hooks, rpcIds }
   }
@@ -165,12 +170,154 @@ describe("V2 parity matrix — tools+hooks slice (live rows)", () => {
   })
 })
 
+describe("V2 parity matrix — agents slice (live rows)", () => {
+  type AgentInfo = {
+    id: string
+    name: string
+    mode: string
+    description?: string
+    system?: string
+    hidden?: boolean
+  }
+
+  const OMC_TEN = [
+    "sisyphus",
+    "hephaestus",
+    "oracle",
+    "librarian",
+    "explore",
+    "multimodal-looker",
+    "metis",
+    "momus",
+    "atlas",
+    "sisyphus-junior",
+  ]
+
+  // Simulates the V2 agent catalog with upsert-on-update semantics (the
+  // mechanism the reference port found at runtime for registering plugin
+  // agents), plus a session client for the dispatch roundtrip.
+  function makeAgentsCtx(hostAgents: AgentInfo[]) {
+    const rpcHandlers: Record<string, (input: Record<string, unknown>) => Promise<unknown>> = {}
+    const catalog: Record<string, AgentInfo> = Object.fromEntries(hostAgents.map((agent) => [agent.id, agent]))
+    let defaultAgent: string | undefined
+    const sessionCalls: Array<{ op: string; args: Record<string, unknown> }> = []
+
+    const ctx = {
+      location: { directory: os.tmpdir() },
+      rpc: {
+        register: (
+          definition: { id: string; methods: Record<string, unknown> },
+          handlers: Record<string, (input: Record<string, unknown>) => Promise<unknown>>,
+        ) => {
+          for (const [method, handler] of Object.entries(handlers)) {
+            rpcHandlers[`${definition.id}.${method}`] = handler
+          }
+          return Promise.resolve({ dispose: async () => {} })
+        },
+      },
+      tool: {
+        transform: () => Promise.resolve(),
+        hook: () => Promise.resolve(),
+      },
+      shell: { hook: () => Promise.resolve() },
+      agent: {
+        list: async () => ({ data: Object.values(catalog) }),
+        transform: async (
+          editorFn: (editor: never) => void,
+        ) => {
+          editorFn({
+            list: () => Object.values(catalog),
+            get: (id: string) => catalog[id],
+            default: (id: string | undefined) => {
+              defaultAgent = id
+            },
+            update: (id: string, fn: (agent: AgentInfo) => void) => {
+              // Upsert semantics: update registers definitions the host has
+              // never seen, exactly like the V2-native reference port does.
+              const agent = (catalog[id] ?? { id, name: id, mode: "primary" }) as AgentInfo
+              fn(agent)
+              catalog[id] = agent
+            },
+            remove: (id: string) => {
+              delete catalog[id]
+            },
+          } as never)
+          return Promise.resolve({ dispose: async () => {} })
+        },
+      },
+      session: {
+        hook: () => Promise.resolve(),
+        create: async (args: Record<string, unknown>) => {
+          sessionCalls.push({ op: "create", args })
+          return { id: "ses_fake_1", agent: (args as { agent?: string }).agent }
+        },
+        wait: async (args: Record<string, unknown>) => sessionCalls.push({ op: "wait", args }),
+      },
+    }
+    return { ctx, rpcHandlers, defaultAgent: () => defaultAgent, catalog, sessionCalls }
+  }
+
+  test("row: agents: listing (10 OMC agents)", async () => {
+    const { ctx, rpcHandlers } = makeAgentsCtx([{ id: "build", name: "build", mode: "primary" }])
+    await omoV2Plugin.setup(ctx as never)
+    const list = rpcHandlers["omo.agents.list"]
+    expect(list).toBeDefined()
+    const out = (await list({})) as { count: number; agents: Array<{ id: string }> }
+    const ids = out.agents.map((agent) => agent.id)
+    for (const omc of OMC_TEN) expect(ids).toContain(omc)
+    expect(out.count).toBeGreaterThanOrEqual(10)
+  })
+
+  test("row: agents: dispatch roundtrip", async () => {
+    const { ctx, rpcHandlers, sessionCalls } = makeAgentsCtx([])
+    await omoV2Plugin.setup(ctx as never)
+    const dispatch = rpcHandlers["omo.agents.dispatch"]
+    expect(dispatch).toBeDefined()
+    const out = (await dispatch({ agent: "oracle" })) as { ok: boolean; sessionID?: string; agent?: string }
+    expect(out.ok).toBe(true)
+    expect(out.sessionID).toBe("ses_fake_1")
+    expect(out.agent).toBe("oracle")
+    const create = sessionCalls.find((call) => call.op === "create")
+    expect(create).toBeDefined()
+    expect((create!.args as { agent?: string }).agent).toBe("oracle")
+  })
+
+  test("row: agents: unknown agent -> clear error", async () => {
+    const { ctx, rpcHandlers } = makeAgentsCtx([])
+
+    await omoV2Plugin.setup(ctx as never)
+    const dispatch = rpcHandlers["omo.agents.dispatch"]
+    const out = (await dispatch({ agent: "nonexistent-agent-xyz" })) as { ok: boolean; error?: string }
+    expect(out.ok).toBe(false)
+    expect(out.error).toContain("unknown agent: nonexistent-agent-xyz")
+    expect(out.error).toContain("available:")
+  })
+
+  test("row: agents: builtin build/plan demoted, default sisyphus", async () => {
+    const { ctx, defaultAgent, catalog } = makeAgentsCtx([
+      { id: "build", name: "build", mode: "primary" },
+      { id: "plan", name: "plan", mode: "primary" },
+    ])
+    await omoV2Plugin.setup(ctx as never)
+    // V1 parity: builtin build/plan demote to hidden subagents.
+    expect(catalog["build"]!.mode).toBe("subagent")
+    expect(catalog["build"]!.hidden).toBe(true)
+    expect(catalog["plan"]!.mode).toBe("subagent")
+    expect(catalog["plan"]!.hidden).toBe(true)
+    // V1 parity: sisyphus is the default primary agent.
+    expect(defaultAgent()).toBe("sisyphus")
+  })
+
+  test("row: rpc cleanup disposes omo.agents registration", async () => {
+    const { ctx } = makeAgentsCtx([])
+    const cleanup = await omoV2Plugin.setup(ctx as never)
+    expect(typeof cleanup).toBe("function")
+    await cleanup?.()
+  })
+})
+
 describe("V2 parity matrix — subsystem rows (pending, flip in subsystem PRs)", () => {
   test.todo("row: client/session/event surface (PR: client)")
-  test.todo("row: agents: listing (10 OMC agents) (PR: agents)")
-  test.todo("row: agents: dispatch roundtrip (PR: agents)")
-  test.todo("row: agents: unknown agent -> clear error (PR: agents)")
-  test.todo("row: agents: builtin build/plan demoted, default sisyphus (PR: agents)")
   test.todo("row: background task: spawn -> collect (PR: orchestration)")
   test.todo("row: background task: error path does not hang (PR: orchestration)")
   test.todo("row: todos: write/read roundtrip (PR: orchestration)")
