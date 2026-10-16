@@ -17,6 +17,7 @@ const EXPECTED_EVENTS = [
   "process_crashed",
   "prompt_submitted",
   "session_started",
+  "session_summary",
   "skill_loaded",
   "turn_completed",
 ] as const

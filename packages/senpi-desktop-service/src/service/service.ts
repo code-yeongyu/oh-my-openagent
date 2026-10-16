@@ -153,6 +153,7 @@ export class DesktopService {
 			// A crashed or killed engine has no session left to close.
 			if (!connection.rpc.alive) return;
 			const graceful = async () => {
+				connection.rpc.cancelHolds();
 				await connection.rpc.request("session.close", {});
 				connection.rpc.end();
 				await connection.rpc.exited;

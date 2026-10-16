@@ -17,6 +17,7 @@ async function mcpClient(liveStopPath: boolean): Promise<EngineProcess> {
 	const env: Record<string, string> = { SENPI_DESKTOP_BACKEND: `fake:${TWO_DISPLAYS}` };
 	if (liveStopPath) env.SENPI_DESKTOP_FAKE_STOP_PATH = "live";
 	const client = new EngineProcess(env, [
+		"--enable-daemon",
 		"--mcp",
 		"--endpoint",
 		endpoint(dir),
