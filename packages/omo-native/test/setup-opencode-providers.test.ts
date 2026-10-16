@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -22,13 +22,14 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-type Fixture = { home: string, agentDir: string, configHome: string, dataHome: string, launcher: string }
+type Fixture = { home: string, agentDir: string, configHome: string, dataHome: string, tmp: string, launcher: string }
 
 function fixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), "omo-providers-e2e-"))
   roots.push(root)
   const app = join(root, "app")
   mkdirSync(join(root, "home"), { recursive: true })
+  mkdirSync(join(root, "tmp"), { recursive: true })
   cpSync(join(SOURCE_ROOT, "bin"), join(app, "bin"), { recursive: true })
   write(join(app, "package.json"), JSON.stringify({ name: "omo-ai", version: "test", type: "module" }))
   return {
@@ -36,6 +37,7 @@ function fixture(): Fixture {
     agentDir: join(root, "senpi-agent"),
     configHome: join(root, "config"),
     dataHome: join(root, "data"),
+    tmp: join(root, "tmp"),
     launcher: join(app, "bin", "omo.js"),
   }
 }
@@ -45,9 +47,18 @@ function opencode(item: Fixture, config: unknown, auth?: unknown): void {
   if (auth !== undefined) write(join(item.dataHome, "opencode", "auth.json"), JSON.stringify(auth))
 }
 
-function run(item: Fixture, args: string[]) {
+// The launcher runs from a copied app with no node_modules, so Bun auto-installs the engine's dependencies
+// on first import and extracts them under the temp dir. On Windows those extraction directories outlive the
+// child (#9766 guard: `.typebox`, `.openai`, `.client-bedrock-runtime`), so the child gets its own temp dir
+// inside the fixture root, which teardown removes. The Bun install cache stays the host's: it is a cache, not a temp
+// leak, and a fresh per-file cache would make the first engine-importing case install cold (#10210's timeout).
+function childEnv(item: Fixture): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    TMPDIR: item.tmp,
+    TEMP: item.tmp,
+    TMP: item.tmp,
+    BUN_TMPDIR: item.tmp,
     HOME: item.home,
     USERPROFILE: item.home,
     SENPI_CODING_AGENT_DIR: item.agentDir,
@@ -60,7 +71,11 @@ function run(item: Fixture, args: string[]) {
   delete env.OPENCODE_CONFIG
   delete env.XDG_CACHE_HOME
   delete env.OPENCODE_MODELS_PATH
-  const result = spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env })
+  return env
+}
+
+function run(item: Fixture, args: string[]) {
+  const result = spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env: childEnv(item) })
   if (result.error) throw result.error
   return result
 }
@@ -491,3 +506,21 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
     })
   })
 })
+
+describe("omo setup e2e temp isolation (#9766)", () => {
+  test("#given a setup run #when the child process asks for its temp dir #then it is inside the fixture root that teardown removes", () => {
+    const item = fixture()
+
+    const child = spawnSync(process.execPath, ["-e", "console.log(require('node:os').tmpdir())"], { encoding: "utf8", env: childEnv(item) })
+
+    expect(child.status).toBe(0)
+    expect(realpathSync(child.stdout.trim())).toBe(realpathSync(item.tmp))
+  })
+
+  test("#given a setup run #when the child is spawned #then it keeps the host's warm Bun install cache instead of a cold per-file one (#10210)", () => {
+    const env = childEnv(fixture())
+
+    expect([env.BUN_INSTALL, env.BUN_INSTALL_CACHE_DIR]).toEqual([process.env.BUN_INSTALL, process.env.BUN_INSTALL_CACHE_DIR])
+  })
+})
+

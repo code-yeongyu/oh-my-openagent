@@ -9,7 +9,12 @@ import { join } from "node:path"
 
 import { V1_PERSONA_SEED_SHA256, auditMemoryRepo, isMemoryContentPath, parseLockRecord, readReflectionParkFile, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
 
-import { readReflectionHealth, reflectionParkNextProbeAt, reflectionRemediation } from "../worker"
+import {
+  locateReflectionChildLog,
+  readReflectionHealth,
+  reflectionParkNextProbeAt,
+  reflectionRemediation,
+} from "../worker"
 import { runGit } from "./repo"
 import { estimateSystemTokens, type SystemTokenEstimate } from "./tokens"
 import { defaultIsProcessAlive, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
@@ -233,7 +238,7 @@ export async function checkReflectionHealth(
     }
   }
   const failure = health.lastFailure
-  const hint = reflectionRemediation(failure?.reason, failure?.detail)
+  const hint = reflectionRemediation(failure?.reason, failure?.detail, await locateReflectionChildLog(reflectionDir, failure?.runId))
   const paused = await describeReflectionPark(reflectionDir)
   return {
     name: "reflection-health",

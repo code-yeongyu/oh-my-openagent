@@ -14,6 +14,7 @@ const remove = async () => {
   return true
 }
 Object.defineProperty(Bun, "secrets", { value: { get, set, delete: remove } })
+Object.assign(globalThis, { [Symbol.for("omo.test.serviceAccountsOpen")]: true })
 
 const failure = process.env.OMO_TEST_FETCH_FAILURE
 if (failure === "offline" || failure === "lost-response" || failure === "timeout") {
