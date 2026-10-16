@@ -55,8 +55,8 @@ impl Backend for PanickyFake {
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         self.inner.windows()
     }
-    fn capture(&mut self, target: &Target, caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
-        self.inner.capture(target, caps)
+    fn capture(&mut self, target: &Target, caps: &CaptureCaps, exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
+        self.inner.capture(target, caps, exclude_window_titles)
     }
     fn pointer(
         &mut self,
@@ -91,6 +91,18 @@ impl Backend for PanickyFake {
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         self.inner.raise_window(id)
+    }
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.inner.hold_keys(target, keys, mode, control)
+    }
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.inner.hold_mouse(target, hold, mode, control)
     }
     fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
         self.inner.menu_items(window, path)

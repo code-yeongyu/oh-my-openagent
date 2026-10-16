@@ -8,6 +8,7 @@ import { FakeSessionTable, type FakeDrainedSession, type FakeHostSession } from 
 import { fakeProtocolInfo, probeFakeHost, type FakeHostIdentityOptions } from "./fake-host-probe"
 import { fakeHostTransport, type FakeHostTransport } from "./fake-host-transport"
 import { handleWireLine, writeFrame, type FakeHostCommand, type FakeHostOpenFailure, type FakeHostWarmAnswer } from "./fake-host-wire"
+import { FakeInputAdmissions } from "./fake-input-admissions"
 
 /**
  * In-process unix-socket JSONL daemon: enough of the senpi multi-session wire for a child session
@@ -40,6 +41,7 @@ export interface FakeHostOptions extends FakeHostIdentityOptions {
 }
 
 export interface FakeHost {
+  readonly admissions: FakeInputAdmissions
   readonly socketPath: string
   readonly commands: readonly FakeHostCommand[]
   readonly connections: number
@@ -62,6 +64,9 @@ export interface FakeHost {
   stall(driftMs: number): void
   /** Finish the turn in flight with an assistant answer, exactly as a real session would. */
   completeTurn(routingId: string, text: string): void
+  // The host-side abort of a turn in flight (a user escape, a forced stop): the transcript gains
+  // the aborted assistant row and the session goes idle, exactly as the real host leaves it.
+  abortTurn(routingId: string): void
   evict(sessionPath: string): void
   closeSession(routingId: string, reason: string): void
   holdPath(sessionPath: string, ownerInstanceId: string): void
@@ -90,6 +95,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   let transport: FakeHostTransport
   const drainRetryAfterMs = options.drainRetryAfterMs ?? 2_000
   const table = new FakeSessionTable({ transcripts: options.transcripts === true, sessionProcesses: options.sessionProcesses === true })
+  const admissions = new FakeInputAdmissions()
   const commands: FakeHostCommand[] = []
   const waiters: Array<{ readonly type: string; readonly resolve: (command: FakeHostCommand) => void }> = []
   const sockets = new Set<Socket>()
@@ -111,7 +117,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     }
   }
 
-  const ports = { table, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, failed, record }
+  const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, failed, record }
 
   const settleConnectionWaiters = (): void => {
     for (let index = connectionWaiters.length - 1; index >= 0; index--) {
@@ -177,6 +183,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
 
   return {
     socketPath,
+    admissions,
     commands,
     get connections() {
       return sockets.size
@@ -207,6 +214,16 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     },
     completeTurn: (routingId, text) => {
       const message = { role: "assistant", content: [{ type: "text", text }], stopReason: "stop" }
+      table.appendTranscript(routingId, message)
+      table.setStreaming(routingId, false)
+      sendTo(routingId, { type: "message_end", message })
+      sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message] })
+      sendTo(routingId, { type: "agent_idle" })
+    },
+    // The host-side abort of a turn in flight (a user escape, a forced stop): the transcript gains
+    // the aborted assistant row and the session goes idle, exactly as the real host leaves it.
+    abortTurn: (routingId) => {
+      const message = { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "aborted" }
       table.appendTranscript(routingId, message)
       table.setStreaming(routingId, false)
       sendTo(routingId, { type: "message_end", message })

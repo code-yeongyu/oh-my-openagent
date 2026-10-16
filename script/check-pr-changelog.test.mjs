@@ -117,8 +117,18 @@ describe("gate verdict", () => {
     ["edited released notes", `## [Unreleased]\n\n## [1.1.0]\n${notes.replace("Existing fix.", "Unrelated fix.")}\n\n${history}`, false],
     ["existing release version", `## [Unreleased]\n\n## [1.0.0] - 2026-10-11\n${notes}\n\n${history}`, false],
     ["release after another section", `## [Unreleased]\n\n${history}\n## [1.1.0]\n${notes}\n`, false],
+    ["complete prerelease transition", `## [Unreleased]\n\n## [1.1.0-beta.1] - 2026-10-15\n\n${notes}\n\n${history}`, true],
   ])("%s with shipped code", (_name, after, pass) => {
     expect(checkPrChangelog({ ...facts, before: beforeRelease, after, diff: "" }).pass).toBe(pass)
+  })
+  test("does not count an already released prerelease version as a new release", () => {
+    const releasedBeta = `## [1.1.0-beta.1] - 2026-10-14\nOld beta.\n\n${history}`
+    expect(checkPrChangelog({
+      ...facts,
+      before: `## [Unreleased]\n\n${notes}\n\n${releasedBeta}`,
+      after: `## [Unreleased]\n\n## [1.1.0-beta.1] - 2026-10-15\n\n${notes}\n\n${releasedBeta}`,
+      diff: "",
+    }).pass).toBe(false)
   })
   test.each(["", "### Fixed", "<!-- hidden note -->"])("does not release an empty or heading/comment-only section: %s", (body) => {
     expect(checkPrChangelog({

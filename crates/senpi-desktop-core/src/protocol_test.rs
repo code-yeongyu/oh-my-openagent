@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 
 use super::*;
 use crate::engine_schema;
+use crate::error::DesktopError;
 use crate::methods::{Effect, Exposure, Method, Notification, METHODS};
 
 const SCHEMA_PATH: &str = "schema/engine.schema.json";
@@ -113,8 +114,22 @@ fn error_table_lists_every_error_code_in_ordinal_order() {
     let names = string_set(ERROR_CODES.iter().map(|code| code.as_str()));
     assert_eq!(enum_names(&schema["definitions"]["ErrorCode"]), names);
     let codes: Vec<i64> = ERROR_CODES.into_iter().map(rpc_error_code).collect();
-    assert_eq!(codes, (0..23).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>());
+    assert_eq!(codes, (0..24).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>());
     assert_eq!(schema["errors"]["Cancelled"], json!(-32_017));
+    assert_eq!(schema["errors"]["CaptureUnavailable"], json!(-32_023));
+}
+
+#[test]
+fn capture_unavailable_carries_its_reason_on_the_wire() {
+    // Given
+    let error = DesktopError::capture_unavailable("minimized", "window is minimized");
+    // When
+    let value = serde_json::to_value(&error).unwrap();
+    // Then
+    assert_eq!(value["code"], "CaptureUnavailable");
+    assert_eq!(value["captureUnavailable"], json!({"reason": "minimized"}));
+    assert_eq!(rpc_error_code(error.code), -32_023);
+    assert!(ERROR_CODES.contains(&crate::error::ErrorCode::CaptureUnavailable));
 }
 
 #[test]
@@ -190,7 +205,9 @@ fn protocol_doc() -> String {
         "\n## Errors\n\n\
          An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-level rejection \
          is the standard `-32601 Method not found` with `data: {reason: \"unknown\" | \"hostOnly\" | \
-         \"testOnly\"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`.\n\n\
+         \"testOnly\"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`. \
+         `CaptureUnavailable` also carries `data: {captureUnavailable: {reason}}`; B9 defines the \
+         reason `\"minimized\"` for a window that exists but is minimized.\n\n\
          | ErrorCode | JSON-RPC code |\n|---|---|\n",
     );
     for code in ERROR_CODES {

@@ -15,13 +15,16 @@ use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
+        Arc, Weak,
     },
 };
 
 use parking_lot::Mutex;
 
 use crate::{clock::Clock, reset::UserReset};
+
+mod stop;
+mod emergency;
 
 /// Max age of a stop path's heartbeat before it stops counting (ms).
 pub const HEARTBEAT_FRESH_MS: u64 = 2_000;
@@ -126,7 +129,13 @@ impl StopPathState {
 
 /// Kill-switch state shared by the session loop and every stop path.
 pub struct Supervisor {
+    hold_signals: Mutex<Vec<Weak<crate::HoldSignal>>>,
     suspended: AtomicBool,
+    published: AtomicBool,
+    stop_commit_lock: Mutex<()>,
+    emergency: Mutex<Option<emergency::EmergencyWorker>>,
+    bounded_release: AtomicBool,
+    fatal_exit: Arc<dyn Fn(i32) + Send + Sync>,
     /// Bumped by every stop, so a control grant granted before one is dead.
     stop_epoch: AtomicU64,
     /// Guards every write to `suspended` so the flag and its source agree.
@@ -134,6 +143,7 @@ pub struct Supervisor {
     stop_paths: Mutex<HashMap<StopPathId, StopPathState>>,
     global_failure: Mutex<Option<StopPathFailure>>,
     clock: Arc<dyn Clock>,
+    stop_commit: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl Supervisor {
@@ -141,13 +151,41 @@ impl Supervisor {
     #[must_use]
     pub fn new(clock: Arc<dyn Clock>) -> Self {
         Self {
+            hold_signals: Mutex::new(Vec::new()),
             suspended: AtomicBool::new(false),
+            published: AtomicBool::new(false),
+            stop_commit_lock: Mutex::new(()),
+            emergency: Mutex::new(None),
+            bounded_release: AtomicBool::new(false),
+            fatal_exit: Arc::new(|code| std::process::exit(code)),
             stop_epoch: AtomicU64::new(0),
             stopped_by: Mutex::new(None),
             stop_paths: Mutex::new(HashMap::new()),
             global_failure: Mutex::new(None),
             clock,
+            stop_commit: None,
         }
+    }
+
+    /// A durable owner restores state before sharing this supervisor. The
+    /// commit callback must return only after persistence succeeds; on failure
+    /// its owner must fail closed rather than return and acknowledge the stop.
+    #[must_use]
+    pub fn with_stop_commit(
+        clock: Arc<dyn Clock>,
+        stopped: bool,
+        commit: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
+        let mut supervisor = Self::new(clock);
+        supervisor.stop_commit = Some(Arc::new(commit));
+        supervisor.bounded_release.store(true, Ordering::SeqCst);
+        if stopped {
+            supervisor.suspended.store(true, Ordering::SeqCst);
+            supervisor.published.store(true, Ordering::SeqCst);
+            supervisor.stop_epoch.store(1, Ordering::SeqCst);
+            *supervisor.stopped_by.get_mut() = Some(StopSource::Api);
+        }
+        supervisor
     }
 
     /// The latest global listener start result; success clears a previous failure.
@@ -172,12 +210,15 @@ impl Supervisor {
         self.stop_paths.lock().entry(id).or_default().last_heartbeat_ms = now_ms;
     }
 
-    /// Latch suspension. The first source is kept until [`Self::reset`].
-    pub fn trigger_stop(&self, source: StopSource) {
-        self.stop_epoch.fetch_add(1, Ordering::SeqCst);
-        let mut stopped_by = self.stopped_by.lock();
-        stopped_by.get_or_insert(source);
-        self.suspended.store(true, Ordering::SeqCst);
+    /// Register before checking state or pressing input. Weak registration
+    /// cannot keep a completed request alive; dead registrations are pruned.
+    #[must_use]
+    pub fn hold_signal(&self) -> Arc<crate::HoldSignal> {
+        let signal = crate::HoldSignal::new(self.stop_epoch());
+        let mut signals = self.hold_signals.lock();
+        signals.retain(|signal| signal.strong_count() > 0);
+        signals.push(Arc::downgrade(&signal));
+        signal
     }
 
     /// How many stops this supervisor observed; a control grant's epoch at
@@ -189,8 +230,10 @@ impl Supervisor {
 
     /// Lift suspension. User-only: the proof comes from the host's resume token.
     pub fn reset(&self, _proof: UserReset) {
+        let _commit = self.stop_commit_lock.lock();
         let mut stopped_by = self.stopped_by.lock();
         *stopped_by = None;
+        self.published.store(false, Ordering::SeqCst);
         self.suspended.store(false, Ordering::SeqCst);
     }
 
@@ -204,9 +247,18 @@ impl Supervisor {
     /// enable, so no production build can call it.
     #[cfg(any(test, feature = "test-support"))]
     pub fn reset_for_test(&self) {
+        let _commit = self.stop_commit_lock.lock();
         let mut stopped_by = self.stopped_by.lock();
         *stopped_by = None;
+        self.published.store(false, Ordering::SeqCst);
         self.suspended.store(false, Ordering::SeqCst);
+    }
+
+    /// Replaces the deadline-exceeded process exit, for tests only, so a slow
+    /// test machine records the fatal path instead of killing the test binary.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_fatal_exit_for_test(&mut self, exit: impl Fn(i32) + Send + Sync + 'static) {
+        self.fatal_exit = Arc::new(exit);
     }
 
     #[must_use]
@@ -246,9 +298,19 @@ impl Supervisor {
     /// Whether side-effecting input may fire right now under `policy`.
     #[must_use]
     pub fn input_allowed(&self, policy: &StopPolicy) -> bool {
-        self.status().input_allowed(policy)
+        !self.is_suspended() && self.status().input_allowed(policy)
     }
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "supervisor/persistence_tests.rs"]
+mod persistence_tests;
+
+#[cfg(test)]
+mod stop_timeout_tests;
+
+#[cfg(test)]
+mod emergency_tests;

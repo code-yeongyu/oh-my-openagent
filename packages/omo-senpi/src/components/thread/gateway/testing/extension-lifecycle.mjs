@@ -71,3 +71,12 @@ export function lateReject() {
   void Promise.reject(new Error("late extension rejection"))
   return null
 }
+
+export async function execDuringEnqueue(tx, request) {
+  const pending = tx.enqueue(request)
+  let refused
+  try { tx.exec("INSERT INTO alpha_items VALUES (7, 'inside-savepoint')") }
+  catch (error) { refused = error.code }
+  await pending.catch(() => undefined)
+  return { refused }
+}

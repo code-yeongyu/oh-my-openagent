@@ -142,12 +142,13 @@ export class HostSessionClient {
       case "prompt":
         return client.prompt(
           command.message,
-          command.streamingBehavior === undefined ? {} : { streamingBehavior: command.streamingBehavior },
+          { ...(command.streamingBehavior === undefined ? {} : { streamingBehavior: command.streamingBehavior }),
+            ...(command.clientMessageId === undefined ? {} : { clientMessageId: command.clientMessageId }) },
         ).then(ignoreHostDisposition)
       case "steer":
-        return client.steer(command.message).then(ignoreHostDisposition)
+        return client.steer(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
       case "followUp":
-        return client.followUp(command.message).then(ignoreHostDisposition)
+        return client.followUp(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
       case "abort":
         return client.abort()
       default:

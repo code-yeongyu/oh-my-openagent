@@ -33,7 +33,9 @@ pub enum SessionCall {
 
 pub struct Engine {
     session: Session,
-    stop_paths: StopPaths,
+    stop_paths: Arc<StopPaths>,
+    resume_token: String,
+    shared_agent: bool,
     fake_clock: Option<Arc<FakeClock>>,
     outbox: Arc<Outbox>,
     read_permits: Arc<Semaphore>,
@@ -55,16 +57,51 @@ impl Engine {
         let supervisor = Arc::new(Supervisor::new(clock));
         // Per-process and random; only the `session.open` reply carries it.
         let resume = ResumeToken::new(format!("{}{}", Ulid::generate(), Ulid::generate()));
-        let stop_paths = StopPaths::new(Arc::clone(&supervisor), &config.selection, resume);
+        let stop_paths = Arc::new(StopPaths::new(Arc::clone(&supervisor), &config.selection, resume));
+        Self::start_bound(config, stop_paths, fake_clock, false)
+    }
+
+    fn start_bound(
+        config: EngineConfig,
+        stop_paths: Arc<StopPaths>,
+        fake_clock: Option<Arc<FakeClock>>,
+        shared_agent: bool,
+    ) -> CoreResult<Self> {
+        let factory = config.selection.clone();
+        Self::start_factory(factory, config, stop_paths, fake_clock, shared_agent)
+    }
+
+    #[cfg(any(test, target_os = "macos"))]
+    pub(crate) fn start_session(
+        factory: impl senpi_desktop_session::BackendFactory,
+        config: EngineConfig,
+        stop_paths: Arc<StopPaths>,
+    ) -> CoreResult<Self> {
+        Self::start_factory(factory, config, stop_paths, None, true)
+    }
+
+    fn start_factory(
+        factory: impl senpi_desktop_session::BackendFactory,
+        config: EngineConfig,
+        stop_paths: Arc<StopPaths>,
+        fake_clock: Option<Arc<FakeClock>>,
+        shared_agent: bool,
+    ) -> CoreResult<Self> {
         let outbox = Arc::new(Outbox::default());
         let audited = Arc::clone(&outbox);
         let safety = SessionSafety {
-            supervisor,
+            supervisor: stop_paths.supervisor(),
             audit: Box::new(move |event| audited.push(Notification::Audit, event)),
-            control_slot: senpi_desktop_session::ControlSlot::process_wide(),
+            control_slot: stop_paths.control_slot(),
         };
         Ok(Self {
-            session: Session::start_supervised(config.selection, config.timeouts, safety)?,
+            session: Session::start_supervised(factory, config.timeouts, safety)?,
+            resume_token: if shared_agent {
+                format!("{}{}", Ulid::generate(), Ulid::generate())
+            } else {
+                stop_paths.resume_token().to_owned()
+            },
+            shared_agent,
             stop_paths,
             fake_clock,
             outbox,
@@ -89,9 +126,11 @@ impl Engine {
         self.stop_paths.report().stamp(self.session.capabilities())
     }
 
-    pub const fn stop_paths(&self) -> &StopPaths {
+    pub fn stop_paths(&self) -> &StopPaths {
         &self.stop_paths
     }
+
+    pub const fn shared_agent(&self) -> bool { self.shared_agent }
 
     pub fn outbox(&self) -> &Outbox {
         &self.outbox
@@ -124,7 +163,7 @@ impl Engine {
                 pending: self.session.open(options),
                 // Reported now: the reply outlives `self`.
                 open: Some(OpenReply {
-                    resume_token: self.stop_paths.resume_token().to_owned(),
+                    resume_token: self.resume_token.clone(),
                     report: self.stop_paths.report(),
                 }),
             },

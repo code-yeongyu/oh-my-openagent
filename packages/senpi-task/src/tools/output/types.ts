@@ -2,7 +2,7 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 import type { IsolationDetails } from "../../isolation/details"
 
 import type { TaskManager } from "../../manager"
-import type { StartQueued, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus } from "../../state"
+import type { StartQueued, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus, AwaitingInputReason } from "../../state"
 import type { CallerSessionResolver } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "concurrency">
@@ -28,6 +28,11 @@ export type LostBreadcrumbs = {
   readonly pid?: number
 }
 
+export type AwaitingInputDetails = {
+  readonly reason: AwaitingInputReason
+  readonly explanation: string
+}
+
 export type SuspendedDetails = {
   readonly explanation: string
 }
@@ -41,6 +46,9 @@ export type TaskSnapshot = {
   readonly status: TaskStatus
   readonly residency_state: ResidencyState
   readonly suspended?: SuspendedDetails
+  // A reattach flagged the resumed session as unable to continue on its own (senpi#3266):
+  // "resumed, waiting for input" names why and the one-step actions.
+  readonly awaiting_input?: AwaitingInputDetails
   // A cancel waits for this child's lost connection; it may still be running on its host.
   readonly stop?: string
   // The child has not launched yet: its start-time fallback model is waiting for a lane slot.

@@ -63,6 +63,7 @@ const replies = {
   "engine.hello": { protocolVersion: "9", engineVersion: "0.0.0", buildSha: "fixture", abi: "other/9" },
   capabilities: {
     backend: "fake", capture: false, input: false, ax: false, backgroundWindowInput: false,
+    cursorOverlay: false,
     deliveryModes: [], capturePermission: "denied", inputPermission: "denied", axPermission: "denied",
     displayCount: 0, focusGuard: false, stopPath: "none", screenLocked: false
   }

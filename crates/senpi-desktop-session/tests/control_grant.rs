@@ -6,9 +6,11 @@ use std::sync::Arc;
 
 use senpi_desktop_backend_fake::FakeScenario;
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
-use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, PointParams};
+use senpi_desktop_core::protocol_params::{
+    AxQueryParams, AxRefParams, CaptureParams, ControlGrantParams, PointParams,
+};
 use senpi_desktop_core::protocol_results::ControlStateResult;
-use senpi_desktop_core::types::{DesktopSessionOptions, PointerOptions};
+use senpi_desktop_core::types::{AxQuery, DesktopSessionOptions, PointerOptions};
 use senpi_desktop_safety::{FakeClock, StopPathId, StopSource, Supervisor};
 use senpi_desktop_session::{BackendSelection, ControlSlot, Op, Response, Session, SessionSafety, SessionTimeouts};
 
@@ -62,6 +64,16 @@ fn foreground_click(frame: &str) -> Op {
     })
 }
 
+fn background_click() -> Op {
+    Op::Click(PointParams {
+        target: "desktop".to_owned(),
+        x: 10.0,
+        y: 10.0,
+        frame_id: None,
+        opts: None,
+    })
+}
+
 fn code(result: CoreResult<Response>) -> Option<ErrorCode> {
     result.err().map(|error| error.code)
 }
@@ -79,6 +91,7 @@ async fn capture(session: &Session) -> String {
         .submit(Op::Capture(CaptureParams {
             target: "101".to_owned(),
             caps: None,
+            exclude_window_titles: None,
         }))
         .wait()
         .await
@@ -157,6 +170,87 @@ async fn foreground_delivery_needs_the_grant_and_a_suspension_revokes_it() {
     assert_eq!(
         code(session.submit(foreground_click(&frame)).wait().await),
         Some(ErrorCode::ControlRequired)
+    );
+    session.close().wait().await.expect("closes");
+}
+
+#[tokio::test]
+async fn cursor_only_reconfiguration_preserves_frame_ax_ref_and_grant() {
+    // Given: an open session with a frame, AX ref and live foreground grant.
+    let session = start(&ControlSlot::new());
+    open(&session).await;
+    let frame = capture(&session).await;
+    let queried = session
+        .submit(Op::AxQuery(AxQueryParams {
+            target: "101".to_owned(),
+            query: AxQuery {
+                role: Some("button".to_owned()),
+                limit: Some(1),
+                ..AxQuery::default()
+            },
+        }))
+        .wait()
+        .await
+        .expect("queries");
+    let Response::Nodes(nodes) = queried else {
+        panic!("expected AX nodes, got {queried:?}")
+    };
+    let reference = nodes.first().expect("button exists").ref_.clone();
+    session
+        .submit(grant("cursor-only reconfiguration"))
+        .wait()
+        .await
+        .expect("grants");
+
+    // When: only showCursor changes.
+    session
+        .open(DesktopSessionOptions {
+            show_cursor: false,
+            ..DesktopSessionOptions::default()
+        })
+        .wait()
+        .await
+        .expect("reconfigures");
+
+    // Then: the grant, prior frame and prior AX ref all remain live.
+    assert!(state(&session).await.active);
+    assert_eq!(
+        session.submit(foreground_click(&frame)).wait().await,
+        Ok(Response::Unit)
+    );
+    assert!(matches!(
+        session
+            .submit(Op::AxNode(AxRefParams { ref_: reference }))
+            .wait()
+            .await,
+        Ok(Response::Node(_))
+    ));
+    session.close().wait().await.expect("closes");
+}
+
+#[tokio::test]
+async fn cursor_only_reconfiguration_preserves_a_stop_latch() {
+    // Given: a session whose user stop is latched.
+    let supervisor = live_supervisor();
+    let session = start_with(&ControlSlot::new(), &supervisor);
+    open(&session).await;
+    supervisor.trigger_stop(StopSource::Hotkey);
+
+    // When
+    session
+        .open(DesktopSessionOptions {
+            show_cursor: false,
+            ..DesktopSessionOptions::default()
+        })
+        .wait()
+        .await
+        .expect("reconfigures");
+
+    // Then: display configuration never widens admission.
+    assert!(supervisor.is_suspended());
+    assert_eq!(
+        code(session.submit(background_click()).wait().await),
+        Some(ErrorCode::Suspended)
     );
     session.close().wait().await.expect("closes");
 }

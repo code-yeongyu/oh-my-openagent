@@ -4,6 +4,7 @@
 
 mod burst;
 mod keymap;
+mod holds;
 mod libei;
 mod lifecycle;
 mod preflight;

@@ -84,7 +84,23 @@ export const SUSPENSION_REASONS = [
 
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number]
 
+// Why a task reattached onto a session that cannot continue on its own is waiting (senpi#3266):
+// the resumed turn ENDED on an abort, or it never answered at all. `awaiting_input.since` is the
+// reattach timestamp; the flag clears on a successful delivery, a plain reattach, or terminal.
+export const AWAITING_INPUT_REASONS = [
+  "resumed_turn_aborted",
+  "resumed_turn_unfinished",
+] as const
+
+export type AwaitingInputReason = (typeof AWAITING_INPUT_REASONS)[number]
+
+export type TaskAwaitingInput = {
+  readonly reason: AwaitingInputReason
+  readonly since: string
+}
+
 export type HostSessionIdentity = {
+  readonly effect_seq?: number
   readonly socket: string
   readonly routing_id: string
   readonly session_path: string

@@ -25,6 +25,8 @@ export const DEFECT_CODES = deepFreeze({
 	chart_without_figure: { severity: "major", integrity: false, hint: "Wrap the image or chart in a figure container with a caption." },
 	chart_svg_no_text: { severity: "major", integrity: false, hint: "Give the chart a title, axis labels, units, and value labels as SVG text." },
 	chart_svg_missing_labels: { severity: "minor", integrity: false, hint: "Add the missing title, axis ticks, or unit label to the chart." },
+	report_without_visual: { severity: "major", integrity: false, hint: "Add at least one captioned visual of the findings: a chart from the data table, a rendered Mermaid diagram, or a figure image (references/report-visualization.md)." },
+	image_missing_alt: { severity: "minor", integrity: false, hint: "Give the image an alt attribute that states what it shows, not its file name; mark a purely decorative image alt=\"\" with role=\"presentation\"." },
 	korean_serif_font: { severity: "major", integrity: false, hint: "Use a gothic (sans) Korean family; serif and brush families are banned by the design spec." },
 	section_without_citation: { severity: "major", integrity: false, hint: "Cite at least one source inside this section or merge it into a cited one." },
 	missing_closing_section: { severity: "blocker", integrity: true, hint: "Add the closing section that explains how the report was made (method, sources, gates)." },
@@ -40,7 +42,7 @@ export const DEFECT_CODES = deepFreeze({
 })
 
 const LAYOUT_PREFIX = "layout_"
-/** Codes checkStatic can raise (G1-G15). */
+/** Codes checkStatic can raise (G1-G17). */
 export const STATIC_CODES = Object.freeze(
 	Object.keys(DEFECT_CODES).filter((code) => !code.startsWith(LAYOUT_PREFIX) && code !== "missing_promised_deliverable"),
 )

@@ -7,6 +7,10 @@ import type { ContinueResult } from "./types"
 // buffered message is delivered as a follow-up prompt the moment the child starts.
 export function toContinueResult(outcome: SendOutcome): ContinueResult {
   switch (outcome.kind) {
+    case "uncertain":
+      return outcome
+    case "failed":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: `${outcome.reason}: ${outcome.detail}`, suggestion: outcome.action }
     case "steered":
       return { kind: "continued", task_id: outcome.task_id, status: outcome.status, delivered: outcome.delivered }
     case "revived":

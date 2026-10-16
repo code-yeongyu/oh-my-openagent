@@ -240,8 +240,11 @@ describe("daemon refusals", () => {
     // when
     const [started] = await a.startChildren(1)
 
-    // then - an unusable launch profile is NOT a fallback reason: nothing runs as its own process
-    expect(started?.kind).toBe("start_failed")
+    // then - an unusable launch profile is NOT a fallback reason: nothing runs as its own process.
+    // A refusal that lands after the start report window (#10042) is reported as `starting` and the
+    // record ends `error` once the launch settles; both shapes must end the same way.
+    if (started?.kind === "started") expect(started.starting).toBe(true)
+    else expect(started?.kind).toBe("start_failed")
     expect(world.host.sessions()).toEqual([])
     expect(a.fallbackStarts).toEqual([])
     expect(a.warnings).toEqual([])

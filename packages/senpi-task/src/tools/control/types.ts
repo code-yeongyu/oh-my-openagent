@@ -19,10 +19,12 @@ export type CallerSessionResolver = (ctx: SessionIdCarrier) => string | undefine
 
 // The engine surface each tool drives. Tools NEVER touch the store directly (W1-V seam obligation 2):
 // every mutation goes through these public manager APIs.
-export type SendManager = Pick<TaskManager, "sendToTask" | "list">
+export type SendManager = Pick<TaskManager, "sendToTask" | "list" | "redispatchTask">
 export type CancelManager = Pick<TaskManager, "cancelTask" | "get">
 
 export type SendResultDetails =
+  | { readonly kind: "uncertain"; readonly task_id: string; readonly effect_id: string; readonly reason: string }
+  | { readonly kind: "failed"; readonly task_id: string; readonly effect_id: string; readonly reason: string; readonly detail: string; readonly action: string }
   | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: "steer" }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
@@ -35,11 +37,17 @@ export type SendResultDetails =
     }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
+  | { readonly kind: "redispatched"; readonly task_id: string; readonly run_epoch: number }
+  | { readonly kind: "invalid_state"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "respawn_failed"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
   | { readonly kind: "one_shot_agent"; readonly task_id: string; readonly agent: string; readonly message: string }
   | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string; readonly known_tasks: readonly string[] }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
+  | { readonly kind: "delivering"; readonly to: string; readonly reason: "host_slow" | "aborted" }
+  | { readonly kind: "aborted"; readonly to: string }
+  | { readonly kind: "send_failed"; readonly to: string; readonly reason: string }
   | { readonly kind: "team_message"; readonly team: TeamSendDetails }
   | { readonly kind: "shutdown_requested"; readonly team_run_id: string; readonly member: string }
   | { readonly kind: "shutdown_responded"; readonly team_run_id: string; readonly member: string; readonly approved: boolean }

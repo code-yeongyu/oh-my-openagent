@@ -45,7 +45,7 @@ Difficulty is orthogonal to LIGHT/HEAVY rigor. Select a configured `subagent_typ
 Every worker prompt MUST carry: goal + exact files in scope; the PIN + failing-first proof before production code; constraints + project rules; verification commands; the ONE Manual-QA channel and exact artifact; for git-tracked edits, require `git-master` plus repo and touched-path commit history before commit. Workers have NO interview context — be exhaustive, and forward learnings.
 
 omo-senpi subagent reliability:
-- Senpi's native spawn surface is the `task` tool. Use `task({ prompt, subagent_type | category, run_in_background: true })` for one worker or `task({ tasks: [...], run_in_background: true })` for a parallel batch. Never substitute external app-server threads or another harness.
+- Senpi's native spawn surface is the `task` tool. Use `task({ prompt, subagent_type | category, run_in_background: true })` for one worker or `task({ tasks: [...], run_in_background: true })` for a parallel batch. Never substitute external agent-protocol threads or another harness.
 - Paste only the context the child needs into `prompt`; full parent history is not inherited automatically.
 
 ## Artifacts

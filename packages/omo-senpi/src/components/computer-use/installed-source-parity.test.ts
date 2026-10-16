@@ -22,7 +22,7 @@ test.each(["explicit", "runtime-dir", "sidecar", "package-prebuild", "dev-build"
     const body = `
 import { createInterface } from "node:readline";
 const capabilities = { backend: "fake", capture: true, input: false, ax: false,
- backgroundWindowInput: false, deliveryModes: [], capturePermission: "granted",
+ backgroundWindowInput: false, cursorOverlay: false, deliveryModes: [], capturePermission: "granted",
  inputPermission: "denied", axPermission: "denied", displayCount: 1,
  focusGuard: true, stopPath: "none", screenLocked: false };
 createInterface({ input: process.stdin }).on("line", line => {

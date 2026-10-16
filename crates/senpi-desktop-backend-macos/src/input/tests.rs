@@ -26,6 +26,7 @@ fn window(id: &str, app: &str) -> DesktopWindow {
         width: 800,
         height: 600,
         focused: false,
+        is_on_screen: None,
         elevated: None,
     }
 }

@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use super::validator::{definition, Validator};
 use super::METHOD_NOT_FOUND;
 
-const REQUIRED_CASES: [&str; 9] = [
+const REQUIRED_CASES: [&str; 10] = [
     "hello",
     "capabilities",
     "capture-budget",
@@ -20,6 +20,7 @@ const REQUIRED_CASES: [&str; 9] = [
     "stop-path-ladder",
     "stop-path-policy",
     "cancel",
+    "cursor-display-only",
     "rejections",
 ];
 

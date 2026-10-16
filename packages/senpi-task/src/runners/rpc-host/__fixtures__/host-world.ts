@@ -23,6 +23,7 @@ import { fakeCloseChannel, fakeFallbackRunner } from "./host-world-ports"
 import type { ManualRecoveryClock } from "./manual-recovery-clock"
 import type { HostShardEvents } from "../handle-reattach"
 import { NO_HOST_ENDPOINT } from "../../../lifecycle/host-session"
+import type { hostWorldRecovery } from "./host-world-recovery"
 
 /**
  * A daemon and the parent sessions that share it: one fake host on a private socket, one project
@@ -37,6 +38,7 @@ import { NO_HOST_ENDPOINT } from "../../../lifecycle/host-session"
 export const HOST_CHILD_MODEL = "anthropic/claude-sonnet-4-5"
 
 export interface ParentOptions {
+  readonly liveRecovery?: ReturnType<typeof hostWorldRecovery>
   /** Give the parent a per-child runner the daemon path may fall back to. */
   readonly useFallback?: boolean
   /** How many `open_session` attempts a draining generation gets before the child defers. */
@@ -141,7 +143,9 @@ interface ConnectParentInput {
 
 function connectParent(input: ConnectParentInput): ParentSession {
   const { sessionId, projectDir, socketPath } = input
-  const store = createTaskRecordStore({ project_dir: projectDir })
+  const backing = createTaskRecordStore({ project_dir: projectDir })
+  const recovery = input.options.liveRecovery?.attach(backing, sessionId)
+  const store = recovery?.store ?? backing
   const config = hostSuiteSettings(input.options.settings)
   const warnings: string[] = []
   const waits: number[] = []
@@ -193,6 +197,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
       process: createRpcManagedRunner(launch),
     },
     rpcRespawnRunner: launch,
+    ...(recovery === undefined ? {} : { now: recovery.now }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     planner: () => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } }),
     destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
@@ -200,10 +205,12 @@ function connectParent(input: ConnectParentInput): ParentSession {
   })
   const lifecycle = createTaskLifecycle({
     ...(input.options.hostCloseTimeoutMs === undefined ? {} : { hostCloseTimeoutMs: input.options.hostCloseTimeoutMs }),
+    ...(recovery === undefined ? {} : { hostCloseScheduler: recovery.hostCloseScheduler }),
     hostEndpoint: NO_HOST_ENDPOINT,
     store,
     config,
-    registry: createManagerResidencyRegistry(() => manager),
+    registry: createManagerResidencyRegistry(() => manager, () => recovery === undefined ? undefined : sessionId),
+    ...(recovery === undefined ? {} : { now: recovery.now, onStoreMutation: recovery.onStoreMutation }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
     hostSessionProbe: input.options.productionProbe === true
@@ -226,7 +233,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
       },
     },
     // A suite drives every sweep itself; an unref'd interval would fire inside another test.
-    idleReclaimerScheduler: { setInterval: () => ({ unref: () => undefined }), clearInterval: () => undefined },
+    idleReclaimerScheduler: recovery?.idleReclaimerScheduler ?? { setInterval: () => ({ unref: () => undefined }), clearInterval: () => undefined },
   })
   const records = (): readonly TaskRecord[] =>
     store.list().records.filter((record) => record.parent_session_id === sessionId)
@@ -241,15 +248,16 @@ function connectParent(input: ConnectParentInput): ParentSession {
     startChildren: async (count) => {
       const started: StartResult[] = []
       for (let index = 0; index < count; index += 1) {
-        started.push(
-          await manager.start({
-            prompt: `host child ${sessionId} #${index}`,
-            parent_session_id: sessionId,
-            depth: 1,
-            execution_mode: "process",
-            model: HOST_CHILD_MODEL,
-          }),
-        )
+        const result = await manager.start({
+          prompt: `host child ${sessionId} #${index}`,
+          parent_session_id: sessionId,
+          depth: 1,
+          execution_mode: "process",
+          model: HOST_CHILD_MODEL,
+        })
+        // A slow host returns `starting` (#10042); these scenarios need the child admitted first.
+        if (result.kind === "started" && result.starting === true) await manager.whenLaunched?.(result.task_id)
+        started.push(result)
       }
       return started
     },

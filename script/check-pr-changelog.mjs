@@ -48,7 +48,7 @@ function hasReleaseTransition(before, after) {
   const index = current.findIndex(unreleased)
   if (!old || index < 0 || current[index].body) return false
   const released = current[index + 1]
-  const version = /^## \[(\d+\.\d+\.\d+)\](?:[ \t].*)?$/.exec(released?.heading ?? "")
+  const version = /^## \[(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?)\](?:[ \t].*)?$/.exec(released?.heading ?? "")
   if (!version || previous.some((section) => section.heading.startsWith(`## [${version[1]}]`))) return false
   // A heading alone is not a release: move the complete existing notes, unchanged.
   const visible = old.body.replace(/<!--[\s\S]*?-->/g, "")

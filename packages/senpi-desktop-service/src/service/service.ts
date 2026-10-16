@@ -21,39 +21,10 @@ import {
 	START_TIMEOUT_MESSAGE,
 	START_TIMEOUT_MS,
 } from "./timeouts";
-
-/** `session.open` params, forwarded verbatim; every policy they configure is enforced by the engine. */
-export interface DesktopSessionOpenParams {
-	readonly display?: string | null;
-	readonly macosCanary?: "session" | "off";
-	readonly allowHostRelayOnlyStop?: boolean;
-	readonly auditPath?: string | null;
-	readonly artifactDir?: string | null;
-	readonly screenshotGc?: { readonly staleMs?: number; readonly scanIntervalMs?: number };
-	readonly captureCaps?: {
-		readonly maxWidth?: number | null;
-		readonly maxHeight?: number | null;
-		readonly coordinateSafe?: boolean;
-		readonly maxBytes?: number;
-	};
-}
+import type { Connection, DesiredSession, DesktopSessionOpenParams } from "./session-state";
 
 export interface DesktopServiceOptions {
 	readonly createChild?: ChildFactory;
-}
-
-/** One live engine child. Mutable: the resume token, armed chord, and heartbeat belong to this child only. */
-interface Connection {
-	readonly rpc: RpcClient;
-	resumeToken: string;
-	armedChord: string | undefined;
-	heartbeat: NodeJS.Timeout | undefined;
-}
-
-/** What the host asked for; replayed onto a fresh child after a crash or grace kill. */
-interface DesiredSession {
-	readonly params: DesktopSessionOpenParams;
-	chord: string | undefined;
 }
 
 /**
@@ -95,9 +66,10 @@ export class DesktopService {
 	/** Starts the engine when none runs, then opens (or reconfigures) the desktop session. */
 	open(params: DesktopSessionOpenParams): Promise<DesktopCapabilities> {
 		return this.#serialize(async () => {
-			this.#desired = { params, chord: this.#desired?.chord };
+			const normalized = { ...params, showCursor: params.showCursor ?? true };
+			this.#desired = { params: normalized, chord: this.#desired?.chord };
 			const live = this.#connection;
-			if (live?.rpc.alive === true) return this.#openSession(live, params);
+			if (live?.rpc.alive === true) return this.#openSession(live, normalized);
 			if (live !== undefined) this.#drop(live);
 			return (await this.#start(this.#desired)).capabilities;
 		});
@@ -154,7 +126,7 @@ export class DesktopService {
 	async capabilities(): Promise<DesktopCapabilities> {
 		const result = await this.call("capabilities", {}, { timeoutMs: CAPABILITIES_TIMEOUT_MS });
 		if (!isDesktopCapabilities(result)) throw malformed("capabilities");
-		return result;
+		return { ...result, cursorOverlay: result.cursorOverlay ?? false };
 	}
 
 	/** Reads the live stop-path state; it never arms or latches anything. */

@@ -6,6 +6,8 @@ import type { ManagedChildHandle } from "./child-handle"
 import { subscribeEffectiveModel } from "./observed-model"
 import { subscribeTranscriptLog } from "./transcript-log"
 
+const MOTION_EVENTS: ReadonlySet<string> = new Set(["agent_start", "turn_start", "tool_execution_start"])
+
 /** All observations are attached while the manager owns the handle, including its startup relay. */
 export function subscribeChildFacts(input: {
   readonly handle: ManagedChildHandle
@@ -15,6 +17,9 @@ export function subscribeChildFacts(input: {
   readonly runStats: Map<string, RunStatsTracker>
   readonly fallbackExhaustions: WeakSet<ManagedChildHandle>
   readonly reopen: () => Promise<void>
+  // The child demonstrably moved (a run, turn or tool started): a "resumed, waiting for input"
+  // flag stamped before it no longer holds (senpi#3266).
+  readonly onMotion?: () => void
   readonly onExtensionEvent: (event: ChildExtensionEvent) => void
 }): () => void {
   const { handle, taskId, now, runStats } = input
@@ -23,6 +28,7 @@ export function subscribeChildFacts(input: {
   const effectiveModel = subscribeEffectiveModel(handle, { store: input.store, taskId, now })
   const stats = handle.subscribe((event) => {
     if (event.type === "retry_fallback_exhausted") input.fallbackExhaustions.add(handle)
+    if (MOTION_EVENTS.has(event.type)) input.onMotion?.()
     runStats.get(taskId)?.accept(event)
   })
   const extension = handle.subscribeExtensionEvents?.(input.onExtensionEvent)

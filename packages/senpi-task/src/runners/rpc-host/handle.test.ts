@@ -6,6 +6,7 @@ import { openHostSessionHandle } from "./handle.test-support"
 import type { HostSessionParked } from "./session-client"
 import { sessionClientHarness } from "./session-client.test-support"
 import { TRANSPORT_LOST_REASON } from "./transport-recovery"
+import { InputUncertainError } from "../input-effects"
 
 const harness = sessionClientHarness()
 const { fakeHost, hostClient } = harness
@@ -178,7 +179,7 @@ describe("createHostSessionHandle over a daemon session", () => {
     host.crash()
 
     // then
-    await expect(started).rejects.toMatchObject({ code: "rpc_transport_gone" })
+    await expect(started).rejects.toBeInstanceOf(InputUncertainError)
     expect(await handle.waitForExit()).toEqual({ kind: "crashed", facts: facts(TRANSPORT_LOST_REASON) })
     expect((await handle.waitForOutcome()).status).toBe("error")
     expect(handle.attached).toBe(false)

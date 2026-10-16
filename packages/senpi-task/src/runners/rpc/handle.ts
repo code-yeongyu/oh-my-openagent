@@ -10,7 +10,6 @@ import type {
   RpcTerminalAssistantMessage,
   TerminateOptions,
 } from "../types"
-import { type RpcStreamingBehavior, isBusyChildRejection } from "./delivery-semantics"
 import { RpcCommandError, RpcRequestTimeout } from "./errors"
 import { startHeartbeat, unresponsiveMessage } from "./heartbeat"
 import { recordTaskChildDeath } from "./crash-record"
@@ -19,9 +18,13 @@ import { createHandleListeners } from "../rpc-host/handle-listeners"
 import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
 import { exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
-import { createTurnSettlement, sessionIsIdle } from "./turn-settlement"
+import { createTurnSettlement, sessionIsIdle, type TurnSettlementScheduler } from "./turn-settlement"
+import { createTurnWakeSources } from "./turn-wake-sources"
+import { createInputEffects } from "../input-effects"
+import { createInputDelivery } from "../input-delivery"
 
 export type CreateRpcChildHandleOptions = {
+  readonly inputStore?: import("../../store").TaskRecordStore
   readonly client: RpcProtocolClient
   readonly child: ChildProcess
   readonly taskId: string
@@ -31,6 +34,8 @@ export type CreateRpcChildHandleOptions = {
   readonly childEnv?: NodeJS.ProcessEnv
   /** Stops the child process; defaults to terminateRpcChild. A test passes a fake so it never signals a host process. */
   readonly terminateChild?: (child: ChildProcess, options?: TerminateOptions) => Promise<void>
+  /** Test seam: drives the settle confirmation by hand instead of a real timer. */
+  readonly settlementScheduler?: TurnSettlementScheduler
 }
 
 export type TrackedRpcChildHandle = RpcChildHandle & {
@@ -58,6 +63,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   let lastSeenAt: number | undefined
   let outcome: ChildExitOutcome | undefined
   let terminationRequested = false
+  let tornDown = false
   // Wall clock on purpose: the injected `now` is the heartbeat's clock, and tests observe its calls.
   const startedAt = Date.now()
 
@@ -69,11 +75,21 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     for (const waiter of outcomeWaiters.splice(0)) waiter(settled)
   }
 
+  const wakeSources = createTurnWakeSources()
   const settlement = createTurnSettlement({
     settle: settleTurn,
     abortedByUser: () => abortedByUser,
     baseline: () => turnBaseline,
     finalText: () => finalText,
+    probe: async () => {
+      const response = await client.send({ type: "get_state" })
+      // A non-success reply is unreadable state, not a busy session: the settlement bounds its re-arms.
+      return response.success === true && response.command === "get_state" ? (response.data as object) : undefined
+    },
+    settleConfirmMs: heartbeatIntervalMs,
+    wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
+    disposed: () => tornDown,
+    scheduleConfirmation: options.settlementScheduler,
   })
 
   const resumedListeners = new Set<() => void>()
@@ -97,6 +113,13 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       }
     }
     settlement.observe(event)
+    // Goal/monitor wake records ride the SAME stream as agent events here: the protocol client
+    // only diverts permission-shaped extension events, so a raw `extension_event` reaches this
+    // funnel. The tracker reads `name`; a record that names nothing it tracks is ignored.
+    if ((event as { readonly type?: string }).type === "extension_event") {
+      wakeSources.observe(event)
+      settlement.reconfirmHeld()
+    }
   })
   // Subscribers run after the handle has recorded the event (as on dev, and as the host handle does), so a
   // live observer reads current state and one that throws cannot keep the handle from settling a turn.
@@ -149,10 +172,14 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     settleExit(built)
   })
 
-  const runCommand = async (command: Parameters<RpcProtocolClient["send"]>[0], label: string): Promise<void> => {
+  const writeCommand = async (command: Parameters<RpcProtocolClient["send"]>[0], label: string): Promise<void> => {
     const response = await client.send(command)
     assertOk(response, label)
   }
+  const inputEffects = createInputEffects({
+    taskId, store: options.inputStore,
+    send: command => writeCommand(command, command.type),
+  })
 
   const beginTurn = (): void => {
     if (outcome !== undefined) return
@@ -163,32 +190,19 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     terminalAssistantMessage = undefined
     abortedByUser = false
     turnBaseline = finalText
+    wakeSources.resetTurn()
   }
 
-  // Deliver with explicit queueing semantics, retrying as followUp when the child answers
-  // "busy". Without this a mid-run delivery is rejected outright and aborts the child.
-  const deliverPrompt = async (text: string, streamingBehavior: RpcStreamingBehavior): Promise<void> => {
-    try {
-      await runCommand({ type: "prompt", message: text, streamingBehavior }, "prompt")
-    } catch (error) {
-      if (streamingBehavior === "followUp" || !isBusyChildRejection(error)) throw error
-      await runCommand({ type: "prompt", message: text, streamingBehavior: "followUp" }, "prompt")
-    }
-  }
-
-  const runPrompt = async (text: string, streamingBehavior: RpcStreamingBehavior = "steer"): Promise<void> => {
-    beginTurn()
-    try {
-      await deliverPrompt(text, streamingBehavior)
-    } catch (error) {
+  const delivery = createInputDelivery({
+    effects: inputEffects, beginTurn, promptFailed: error => {
       // A broken pipe can reject the command before close supplies the process-exit facts.
       // Let close settle that outcome so the manager can confirm it instead of publishing ERROR.
       if (!client.exited && !(error instanceof RpcRequestTimeout)) settleTurn(promptFailureOutcome(error))
-      throw error
-    }
-  }
+    },
+  })
 
   return {
+    reconcileInputs: inputEffects.reconcile,
     task_id: taskId,
     get sessionId() {
       return sessionId
@@ -198,19 +212,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     },
     // task_send is documented to ALWAYS steer into the addressed child, so a steer that the
     // host rejects as busy degrades to followUp queueing rather than failing the delivery.
-    steer: async (text) => {
-      beginTurn()
-      try {
-        await runCommand({ type: "steer", message: text }, "steer")
-      } catch (error) {
-        if (!isBusyChildRejection(error)) throw error
-        await deliverPrompt(text, "followUp")
-      }
-    },
-    followUp: (text) => runPrompt(text, "followUp"),
+    steer: delivery.steer,
+    followUp: (text) => delivery.runPrompt(text, "followUp"),
     abort: () => {
       abortedByUser = true
-      return runCommand({ type: "abort" }, "abort")
+      return writeCommand({ type: "abort" }, "abort")
     },
     subscribe: (listener: ChildEventListener) => {
       const unsubscribe = listeners.registrations.subscribe(listener)
@@ -243,7 +249,10 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     exitOutcome: () => outcome,
     waitForExit: () => (outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve))),
     dispose: async () => {
+      inputEffects.stopRetrying()
+      tornDown = true
       stopHeartbeat()
+      settlement.cancelConfirmation()
       listeners.clearActive()
       try {
         await client.detach()
@@ -252,10 +261,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       }
     },
     terminate: (terminateOptions?: TerminateOptions) => {
+      inputEffects.stopRetrying()
       terminationRequested = true
       return (options.terminateChild ?? terminateRpcChild)(child, terminateOptions)
     },
-    startInitialPrompt: (text) => runPrompt(text),
+    startInitialPrompt: (text) => delivery.runPrompt(text),
   }
 }
 

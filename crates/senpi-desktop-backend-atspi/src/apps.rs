@@ -44,6 +44,7 @@ pub(crate) fn windows<B: AtSpiBus>(bus: &mut B) -> CoreResult<Vec<DesktopWindow>
                 width: extents.width.unsigned_abs(),
                 height: extents.height.unsigned_abs(),
                 focused,
+                is_on_screen: None,
                 elevated: None,
             });
             if windows.len() == MAX_WINDOWS {

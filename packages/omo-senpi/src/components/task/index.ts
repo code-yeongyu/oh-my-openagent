@@ -24,6 +24,7 @@ import {
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { createLateSendOutcomeDeliverer } from "./late-send-outcome"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
 import { registerDagCommands } from "./dag-commands"
@@ -237,6 +238,7 @@ function registerTaskTools(
     ...createTaskSendTool({
       manager,
       resolveCallerSessionId,
+      deliverLateOutcome: createLateSendOutcomeDeliverer(pi, () => engine.runtime.sessionId()),
       teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
     }),
   })

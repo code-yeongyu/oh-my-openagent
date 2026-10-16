@@ -20,9 +20,9 @@ describe("collectGitDiffStats", () => {
         if (file !== "git") throw new Error(`unexpected file: ${file}`)
         const subcommand = args[0]
 
-        if (subcommand === "diff") return "1\t2\tfile.ts\n"
-        if (subcommand === "status") return " M file.ts\n?? new-file.ts\n"
-        if (subcommand === "ls-files") return "new-file.ts\n"
+        if (subcommand === "diff") return "1\t2\tfile.ts\0"
+        if (subcommand === "status") return " M file.ts\0?? new-file.ts\0"
+        if (subcommand === "ls-files") return "new-file.ts\0"
 
         throw new Error(`unexpected args: ${args.join(" ")}`)
       }) as typeof childProcess.execFileSync
@@ -64,19 +64,19 @@ describe("collectGitDiffStats", () => {
 
     const [diffCallFile, diffCallArgs, diffCallOpts] = diffCall!
     expect(diffCallFile).toBe("git")
-    expect(diffCallArgs).toEqual(["diff", "--numstat", "HEAD"])
+    expect(diffCallArgs).toEqual(["diff", "--numstat", "-z", "-M", "HEAD"])
     expect(diffCallOpts.cwd).toBe(directory)
     expect(diffCallArgs.join(" ")).not.toContain(directory)
 
     const [statusCallFile, statusCallArgs, statusCallOpts] = statusCall!
     expect(statusCallFile).toBe("git")
-    expect(statusCallArgs).toEqual(["status", "--porcelain"])
+    expect(statusCallArgs).toEqual(["status", "--porcelain", "-z", "--find-renames", "--untracked-files=all"])
     expect(statusCallOpts.cwd).toBe(directory)
     expect(statusCallArgs.join(" ")).not.toContain(directory)
 
     const [untrackedCallFile, untrackedCallArgs, untrackedCallOpts] = untrackedCall!
     expect(untrackedCallFile).toBe("git")
-    expect(untrackedCallArgs).toEqual(["ls-files", "--others", "--exclude-standard"])
+    expect(untrackedCallArgs).toEqual(["ls-files", "-z", "--others", "--exclude-standard"])
     expect(untrackedCallOpts.cwd).toBe(directory)
     expect(untrackedCallArgs.join(" ")).not.toContain(directory)
 

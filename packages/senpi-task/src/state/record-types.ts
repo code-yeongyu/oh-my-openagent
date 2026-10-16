@@ -8,6 +8,7 @@ import type {
   ResidencyState,
   RunnerKind,
   SuspensionReason,
+  TaskAwaitingInput,
   TaskIsolationSpec,
   TaskStatus,
 } from "./types"
@@ -104,6 +105,8 @@ export type TaskRecordInput = {
 }
 
 export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
+  readonly effect_seq?: number
+  readonly uncertain_inputs?: readonly import("../runners/input-effects").IdentifiedInput[]
   readonly isolation?: IsolationRecord
   readonly task_id: string
   readonly status: TaskStatus
@@ -147,6 +150,9 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly suspension_reason?: SuspensionReason
   // With `suspension_reason: "revival_deferred"`: the reconcile outcome's reason (capacity, lock_contended, ...).
   readonly revival_deferred_reason?: string
+  // The reattach found the resumed session's last turn ended aborted (or never answered) and idle:
+  // nothing can continue it but the user. Cleared by a successful delivery, a plain reattach, or terminal (senpi#3266).
+  readonly awaiting_input?: TaskAwaitingInput
   // One parked episode's absolute deadline; retry writes and parent restarts must not extend it.
   readonly recovery_deadline_at?: number
   readonly runner_kind?: RunnerKind

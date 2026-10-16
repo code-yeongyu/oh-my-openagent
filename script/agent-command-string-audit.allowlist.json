@@ -67,7 +67,7 @@
     "packages/omo-native/bin/lib/setup-opencode-models.js: omo doctor",
     "packages/omo-native/category-coverage-entry.ts: omo doctor",
     "packages/omo-native/changes.md: /bin/omo x2",
-    "packages/omo-native/changes.md: omo doctor x17",
+    "packages/omo-native/changes.md: omo doctor x19",
     "packages/omo-native/compile-entry.ts: omo ulw-loop",
     "packages/omo-native/config-doctor-runtime.ts: omo doctor",
     "packages/omo-native/test/bun-bin-shim-node-modules-bin.test.ts: /bin/omo x3",
@@ -80,7 +80,7 @@
     "packages/omo-native/test/doctor-edition.test.ts: omo doctor",
     "packages/omo-native/test/doctor-migration.test.ts: omo doctor",
     "packages/omo-native/test/doctor-pi-config.test.ts: omo doctor",
-    "packages/omo-native/test/doctor-stale-engines.test.ts: omo doctor x3",
+    "packages/omo-native/test/doctor-stale-engines.test.ts: omo doctor x4",
     "packages/omo-native/test/doctor-transient-memory.test.ts: omo doctor",
     "packages/omo-native/test/doctor.test.ts: omo doctor x2",
     "packages/omo-native/test/gateway.test.ts: omo doctor",
@@ -97,5 +97,8 @@
     "script/qa/codex-marketplace-e2e.sh: =omo",
     "script/verify-omo-ai-payload.mjs: omo doctor",
     "script/qa/omo-native-parity-smoke.mjs: omo doctor"
+  ],
+  "literal-label": [
+    "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo"
   ]
 }

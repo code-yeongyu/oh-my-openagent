@@ -8,9 +8,11 @@ mod cgevent;
 mod global;
 mod guard;
 mod held;
+mod holds;
 mod keys;
 mod menu_key;
 mod post;
+mod release;
 
 #[cfg(test)]
 mod tests;
@@ -37,6 +39,7 @@ pub(crate) struct MacInput {
     source: CGEventSource,
     held: Held,
     canary: canary::CanaryState,
+    overlay: crate::overlay::Overlay,
     /// `(pid, wid)` of the last window made key without raising, so key focus
     /// can be handed back afterwards.
     last_activated: Option<(libc::pid_t, u32)>,
@@ -53,8 +56,14 @@ impl MacInput {
             source: cgevent::event_source()?,
             held: Held::default(),
             canary: canary::CanaryState::new(canary),
+            overlay: crate::overlay::Overlay::default(),
             last_activated: None,
         })
+    }
+
+    pub(crate) fn with_overlay(mut self, overlay: crate::overlay::Overlay) -> Self {
+        self.overlay = overlay;
+        self
     }
 
     /// Whether the receipt canary failed (drives `background_window_input`).
@@ -107,7 +116,7 @@ impl MacInput {
         capture: &MacCapture,
     ) -> CoreResult<()> {
         match target {
-            Target::Desktop | Target::Display(_) => global::pointer(&self.source, &mut self.held, event),
+            Target::Desktop | Target::Display(_) => global::pointer(&self.source, &mut self.held, event, &self.overlay),
             Target::Window(id) => {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
@@ -123,12 +132,12 @@ impl MacInput {
                             skylight::activate_without_raise(pid, wid)?;
                             self.last_activated = Some((pid, wid));
                         }
-                        background::pointer(&self.source, &mut self.held, pid, wid, &window, event)
+                        background::pointer(&self.source, &mut self.held, pid, wid, &window, event, &self.overlay)
                     }
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
                         crate::ax::ensure_points_owned(&window, pid, wid, &event)?;
-                        global::pointer(&self.source, &mut self.held, event)
+                        global::pointer(&self.source, &mut self.held, event, &self.overlay)
                     }),
                 }
             }
@@ -229,31 +238,6 @@ impl MacInput {
         }
     }
 
-    /// Posts the release of every key and button still held, through the route
-    /// it was pressed on, and reports the first failure without stopping.
-    pub(crate) fn release_all(&mut self) -> CoreResult<()> {
-        let mut first_error = None;
-        for key in self.held.take_keys() {
-            let release = keys::post_key(
-                &self.source,
-                &mut self.held,
-                key.code,
-                key.text.as_deref(),
-                false,
-                core_graphics::event::CGEventFlags::CGEventFlagNull,
-                key.route,
-            );
-            if let Err(error) = release {
-                first_error.get_or_insert(error);
-            }
-        }
-        for button in self.held.take_buttons() {
-            if let Err(error) = global::release_button(&self.source, &button) {
-                first_error.get_or_insert(error);
-            }
-        }
-        first_error.map_or(Ok(()), Err)
-    }
 }
 
 fn resolve_window(capture: &MacCapture, id: &str) -> CoreResult<DesktopWindow> {

@@ -70,7 +70,7 @@ fn live_session_without_portals_reports_capture_unavailable() {
     preconditions();
     let mut backend = WaylandBackend::new(DisplaySelector::All);
 
-    let captured = backend.capture(&Target::Desktop, &CaptureCaps::default());
+    let captured = backend.capture(&Target::Desktop, &CaptureCaps::default(), &[]);
     let caps = backend.capabilities();
 
     let error = captured.expect_err("no Screenshot portal exists");

@@ -45,6 +45,7 @@ export function classifyWorktree(input: ClassificationInput): WorktreeClassifica
 
   if (record.locked) return { path: record.path, ref, decision: "KEEP", reason: "locked" }
   if (!input.pathExists) return { path: record.path, ref, decision: "PRUNE" }
+  if (input.current) return { path: record.path, ref, decision: "KEEP", reason: "current" }
   if (input.external) return { path: record.path, ref, decision: "KEEP", reason: "external" }
   if (!input.merged && !input.agedOut) {
     return { path: record.path, ref, decision: "KEEP", reason: "unmerged" }

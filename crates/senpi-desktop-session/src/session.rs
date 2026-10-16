@@ -29,6 +29,7 @@ enum Message {
     Op {
         op: Op,
         reply: Reply,
+        signal: Arc<senpi_desktop_safety::HoldSignal>,
     },
     /// Drops the backend, acknowledges, and ends the thread.
     Close {
@@ -39,6 +40,7 @@ enum Message {
 /// A persistent, serialized desktop session. Dropping it without
 /// [`Session::close`] ends the thread once its queue drains.
 pub struct Session {
+    supervisor: Arc<senpi_desktop_safety::Supervisor>,
     /// `None` once `close` was requested: every later request fails `Closed`.
     queue: Mutex<Option<flume::Sender<Message>>>,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
@@ -73,6 +75,7 @@ impl Session {
         let (queue, requests) = flume::unbounded();
         let (ready_tx, ready_rx) = flume::bounded(1);
         let shared = Arc::clone(&capabilities);
+        let supervisor = Arc::clone(&safety.supervisor);
         thread::Builder::new()
             .name(THREAD_NAME.to_owned())
             .spawn(move || {
@@ -86,6 +89,7 @@ impl Session {
             .recv()
             .map_err(|_| DesktopError::internal(format!("{THREAD_NAME} died while building the backend")))?;
         Ok(Self {
+            supervisor,
             queue: Mutex::new(Some(queue)),
             capabilities,
             timeouts,
@@ -99,7 +103,8 @@ impl Session {
         self.capabilities.lock().clone()
     }
 
-    /// Re-creates the backend for `options.display` and opens the session.
+    /// Opens or reconfigures the session. Cursor-only changes preserve the
+    /// backend, refs, frames, stop latch and control grant.
     /// The reply is [`Response::Capabilities`].
     pub fn open(&self, options: DesktopSessionOptions) -> Pending {
         self.enqueue(|reply| Message::Open { options, reply })
@@ -107,7 +112,14 @@ impl Session {
 
     /// Enqueues `op` behind every earlier request.
     pub fn submit(&self, op: Op) -> Pending {
-        self.enqueue(|reply| Message::Op { op, reply })
+        let signal = self.supervisor.hold_signal();
+        let mut pending = self.enqueue(|reply| Message::Op {
+            op,
+            reply,
+            signal: Arc::clone(&signal),
+        });
+        pending.cancellation = Some(crate::cancel_on_drop::CancelOnDrop(signal));
+        pending
     }
 
     /// Releases the backend after every earlier request. Idempotent: a second
@@ -152,14 +164,16 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
             // its receiver: its request must not reach the desktop.
             Message::Open { reply, .. } | Message::Op { reply, .. } if reply.is_disconnected() => continue,
             Message::Open { options, reply } => (reply, guarded(|| Ok(Response::Capabilities(worker.open(options))))),
-            Message::Op { op, reply } => {
+            Message::Op { op, reply, signal } => {
                 // `$/cancel` or a deadline drops the waiter: that is the
                 // request's cancellation signal while it runs.
+                worker.hold_signal = Some(signal);
                 worker.dispatch(
                     op,
                     &|| reply.is_disconnected(),
                     |result| reply.send(result).is_ok(),
                 );
+                worker.hold_signal = None;
                 continue;
             }
         };
@@ -177,6 +191,7 @@ pub(crate) fn guarded<T>(request: impl FnOnce() -> CoreResult<T>) -> CoreResult<
 /// The reply to one enqueued request. Dropping it abandons the request: if
 /// the session thread has not started it yet, it never runs.
 pub struct Pending {
+    cancellation: Option<crate::cancel_on_drop::CancelOnDrop>,
     kind: PendingKind,
     deadline: Instant,
     budget: Duration,
@@ -191,6 +206,7 @@ enum PendingKind {
 impl Pending {
     fn new(kind: PendingKind, budget: Duration) -> Self {
         Self {
+            cancellation: None,
             kind,
             deadline: Instant::now() + budget,
             budget,
@@ -205,6 +221,7 @@ impl Pending {
     /// The request's own error, `Timeout` past the deadline, or `Internal`
     /// when the session thread ended without replying.
     pub async fn wait(self) -> CoreResult<Response> {
+        let _cancellation = self.cancellation;
         let timed_out = |what: &str| DesktopError::timeout(format!("{what} within {} ms", self.budget.as_millis()));
         let lost = || DesktopError::internal(format!("{THREAD_NAME} ended without replying"));
         match self.kind {

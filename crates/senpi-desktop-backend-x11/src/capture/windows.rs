@@ -83,6 +83,7 @@ pub(crate) fn focused(server: &impl XServer) -> CoreResult<Option<DesktopWindow>
         width: placement.width,
         height: placement.height,
         focused: true,
+        is_on_screen: None,
         elevated: None,
     }))
 }
@@ -134,6 +135,7 @@ impl<S: XServer> Enumeration<'_, S> {
             width: placement.width,
             height: placement.height,
             focused: self.active == Some(id),
+            is_on_screen: None,
             elevated: None,
         }
     }

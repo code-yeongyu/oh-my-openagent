@@ -20,6 +20,8 @@ export interface HandleTeardownHost extends HostTeardownInput {
   clearActive(): void
   stopHeartbeat(): void
   settle(classified: SessionExitClassification): void
+  /** Extra teardown work the owning handle registers (settlement timers, trackers). */
+  onTornDown?(): void
 }
 
 export interface HandleTeardown {
@@ -45,6 +47,7 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
     if (INTENT_STRENGTH[next] > INTENT_STRENGTH[host.intent()]) host.markIntent(next)
     ending ??= (async () => {
       host.stopHeartbeat()
+      host.onTornDown?.()
       await endSessionOnHost(host, next)
       const intent = host.intent()
       const reason = intent === "terminated" ? "terminated" : "client_close"
@@ -58,6 +61,7 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
       host.markDetached()
       host.clearActive()
       host.stopHeartbeat()
+      host.onTornDown?.()
       await host.port().detach()
     },
     close: () => endOnHost("closed"),

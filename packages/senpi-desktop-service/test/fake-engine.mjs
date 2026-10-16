@@ -34,6 +34,7 @@ const capabilities = {
 	input: true,
 	ax: true,
 	backgroundWindowInput: true,
+	...(process.env.FAKE_ENGINE_CURSOR_OMITTED === "1" ? {} : { cursorOverlay: false }),
 	deliveryModes: ["background", "foreground"],
 	capturePermission: "granted",
 	inputPermission: "granted",

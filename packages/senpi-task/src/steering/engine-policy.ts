@@ -97,6 +97,7 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
     run_stats: _stats,
     terminal_at: _terminalAt,
     provisional_exit: _provisionalExit,
+    awaiting_input: _awaitingInput,
     ...rest
   } = record
   return {

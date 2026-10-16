@@ -33,6 +33,9 @@ type EventBridgeDeps = {
 // re-observe owned-member liveness, reclaim mailbox reservations, redeliver unnotified completions,
 // await TTL cleanup (its retention predicate keeps anything with an undelivered notification, so
 // cleanup cannot delete what the previous step just queued), then poll owned leads and sync status.
+
+// Below senpi's per-handler session_shutdown budget, leaving room for the suspension that follows.
+const SHUTDOWN_LAUNCH_SETTLE_MS = 5_000
 export function wireEventBridge(
   pi: SenpiExtensionAPI,
   ctx: ComponentContext,
@@ -115,6 +118,9 @@ export function wireEventBridge(
     statusUi.dispose()
     state.leadPollers.shutdown()
     await state.resumptionChannels.emitShutdown()
+    // A first launch still being admitted gets a bounded chance to land, so suspension parks it like
+    // any resident child; one still unadmitted is parked to relaunch on resume and never outlives the session (#10042).
+    await engine.manager.settleLaunchesForShutdown?.(SHUTDOWN_LAUNCH_SETTLE_MS)
     const shutdownEvent = payload as SessionShutdownEvent
     const parentSessionId = engine.runtime.sessionId()
     const reason = shutdownEvent.reason

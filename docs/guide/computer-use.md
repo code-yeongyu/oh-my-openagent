@@ -10,6 +10,8 @@ The tool's parameters and permission classification are in [the computer tool re
 
 Computer use is on by default on macOS, Linux and Windows hosts: the `computer` tool is registered in every OmO Native session, and nothing touches your desktop until the agent (or you) activates it. The agent finds the tool with `tool_search` for `computer`, or calls it by name. After activation, JavaScript and Python eval kernels also receive a `computer` global.
 
+On macOS, a display-only virtual cursor shows where the agent is working without moving your physical pointer. Its default-ON setting is intentional: the overlay is visible in your own screen recordings and screen shares. Agents never see any session's cursor overlay in screenshots or window lists. On macOS 14 or later, native screenshots exclude known cursor-helper windows while other sessions' cursors remain visible. A capture is refused if a helper cannot be identified or excluded; it never falls back to unfiltered pixels when exclusion is required. Set `computer.showCursor: false` to keep it off, or use `/computer cursor off` for this session.
+
 You control it with these commands:
 
 | Command | Effect |
@@ -17,6 +19,7 @@ You control it with these commands:
 | `/computer` or `/computer status` | Report whether the tool is enabled and active, the engine state, the stop path, and the current capabilities (backend, capture/input/accessibility permissions, screen lock) |
 | `/computer on` | Enable and activate computer use for this session |
 | `/computer off` | Deactivate computer use for this session |
+| `/computer cursor on` or `/computer cursor off` | Show or hide the display-only macOS virtual cursor without disabling computer use |
 | `/computer stop` | Suspend desktop input and release held keys and buttons |
 | `/computer resume` | Lift a suspension; only you can do this, the model has no action that reaches it |
 
@@ -77,7 +80,7 @@ Background delivery depends on the target toolkit and the requested action. Chro
 
 ## Configure it
 
-Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your account, or `.omo/omo.jsonc` in a project. The closest project layer wins. You may place it under `"[native]"` or at the shared top level; either way it is effective only in OmO Native. All keys are **snake_case** and optional:
+Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your account, or `.omo/omo.jsonc` in a project. The closest project layer wins. You may place it under `"[native]"` or at the shared top level; either way it is effective only in OmO Native. All keys are optional. Most use **snake_case**; the virtual-cursor setting is `showCursor`:
 
 ```jsonc
 {
@@ -95,6 +98,7 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `enabled` | `true` on macOS, Linux and Windows | Register the `computer` tool and `/computer` controls |
+| `showCursor` | `true` | Show the macOS virtual cursor in your own recordings/shares; it is excluded from agent captures and lists |
 | `display` | `"active"` | `active` follows the focused window's monitor (primary fallback); `all` composites every display; otherwise one display id from `computer.displays()` |
 | `max_width` | `3840` | Largest screenshot width in pixels; bigger captures are scaled down |
 | `max_height` | `2400` | Largest screenshot height in pixels |
@@ -166,6 +170,6 @@ Computer use is experimental on every OS. These are the known gaps:
 
 ## Engine modes and bunshin
 
-The engine supports `--stdio` (JSON-RPC over NDJSON), `--serve <socket>` (daemon), `--oneshot` (one request forwarded to the daemon), `--resume` (user-controlled stop recovery), `--mcp` (MCP stdio server), `--selftest` and `--schema`. In `--mcp` mode, `tools/list` offers engine methods as `desktop_<method>` tools; capture results include MCP images, and input still goes through the same safety gate. Never expose the user-only resume operation as a model tool.
+The engine supports `--stdio` (JSON-RPC over NDJSON), `--serve <socket>` (daemon), `--oneshot` (one request forwarded to the daemon), `--resume` (user-controlled stop recovery), `--mcp` (MCP stdio server), `--selftest` and `--schema`. `--serve`, `--oneshot` and `--mcp` run only with `--enable-daemon`; the flag prevents an accidental daemon and is not a security boundary. On macOS the engine refuses every mode when it is its own responsible process (a disclaimed spawn, a launchd job, or a host that fork-execs it through a shell): start it as an ordinary child of the app or terminal that holds the computer-use grants. In `--mcp` mode, `tools/list` offers engine methods as `desktop_<method>` tools; capture results include MCP images, and input still goes through the same safety gate. Never expose the user-only resume operation as a model tool.
 
 The descriptor in `packages/senpi-desktop-engine/bunshin/descriptor.mjs` uses the `--oneshot` bridge. `bun script/install-bunshin-desktop-capability.mjs` installs it into the bunshin agent capability directory for a locally available engine; use `--engine <path>` for a specific binary or `--remove` to uninstall the descriptor. Installing a descriptor does not itself start an agent or grant desktop permissions.

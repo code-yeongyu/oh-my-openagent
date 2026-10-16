@@ -56,6 +56,7 @@ pub(crate) fn enumerate(displays: &[DesktopDisplay], own: IntegrityRid) -> CoreR
             width,
             height,
             focused: window.is_focused().unwrap_or(false),
+            is_on_screen: None,
             elevated: pid.and_then(|pid| process_elevated(pid, own)),
         });
     }
@@ -97,7 +98,8 @@ pub(crate) fn focused() -> CoreResult<Option<DesktopWindow>> {
     };
     Ok(Some(DesktopWindow {
         id, pid, x, y, width, height,
-        title: String::new(), app: String::new(), focused: true, elevated: None,
+        title: String::new(), app: String::new(), focused: true,
+        is_on_screen: None, elevated: None,
     }))
 }
 

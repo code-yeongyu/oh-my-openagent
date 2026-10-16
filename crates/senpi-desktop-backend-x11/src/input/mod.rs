@@ -9,6 +9,7 @@ mod connection_events;
 mod connection_pointer;
 mod focus;
 mod held;
+mod holds;
 mod keys;
 mod send_event;
 mod server;

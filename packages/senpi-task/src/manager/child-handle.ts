@@ -30,6 +30,7 @@ export type ManagedChildListener = (event: ManagedChildEvent) => void
 // handle surfaces are normalized here: a promise-returning dispose, an optional pid/sessionId, and a
 // single waitForOutcome() that yields the unified RunnerOutcome for either runner.
 export type ManagedChildHandle = {
+  reconcileInputs?(): Promise<void>
   readonly task_id: string
   // Which runner owns this child. `pid` cannot answer that: a daemon session has no pid either.
   // Absent only on handles built before the field shipped (they are in-process by construction).
@@ -104,6 +105,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
   return {
     task_id: handle.task_id,
     kind: "kind" in handle && handle.kind === "host-session" ? "host-session" : "rpc",
+    ...(handle.reconcileInputs === undefined ? {} : { reconcileInputs: handle.reconcileInputs }),
     ...(hostSession === undefined ? {} : { hostSession }),
     get sessionId() {
       return handle.sessionId

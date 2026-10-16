@@ -84,7 +84,7 @@ function legacyMissing() {
   ].filter(([, value]) => value === undefined)
   if (unset.length > 0) return unset.map(([name, , what]) => `${name} (unset: the path of ${what})`)
   const needed = [
-    [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-app-server", "lib", "env.mjs"), "senpi source checkout"],
+    [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-shared", "lib", "env.mjs"), "senpi source checkout"],
     [join(senpiRoot, "node_modules"), "senpi checkout not installed: bun install"],
     ...["ai", "agent", "tui"].map((pkg) => [join(senpiRoot, "packages", pkg, "dist", "index.js"), "senpi checkout not built: bun run build"]),
     [desktopRoot, "desktop checkout"],

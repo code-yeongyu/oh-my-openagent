@@ -47,6 +47,10 @@ export async function destroyResidentTask(
     }
     return
   }
+  if (cause === "redispatch") {
+    await tearDownForRedispatch(context, taskId)
+    return
+  }
   const claimedEviction = cause === "evict" ? (context.registry.tryClaimEviction?.(taskId) ?? true) : false
   if (cause === "evict" && !claimedEviction) return
   try {
@@ -106,6 +110,24 @@ export async function destroyResidentTask(
   } finally {
     if (claimedEviction) context.registry.releaseEviction?.(taskId)
   }
+}
+
+// senpi#3266 re-dispatch: the old child is ended (an in-process abort, a process kill, a daemon
+// session's abort + close_session) but the RECORD is not: it stays resident under this host and run
+// epoch, because the manager attaches the fresh child to it next. Like a runtime-fallback handoff,
+// no residency transition and no registry forget is written here; the manager owns the hand-over.
+async function tearDownForRedispatch(context: LifecycleContext, taskId: string): Promise<void> {
+  context.kernelToolBindings?.release(taskId)
+  const handle = context.registry.get(taskId)
+  if (handle === undefined) return
+  try {
+    await teardownHandle(context, handle, false)
+    context.failedTeardowns.delete(taskId)
+  } catch (error) {
+    context.failedTeardowns.add(taskId)
+    throw error
+  }
+  context.store.appendEvent(taskId, { type: "destroyed", payload: { cause: "redispatch" } })
 }
 
 async function confirmClosingChildGone(context: LifecycleContext, taskId: string): Promise<void> {

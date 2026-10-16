@@ -14,7 +14,7 @@ function rejectionReason(chain: readonly ComputerCallStep[]): string {
 }
 
 describe("isReadOnlyComputerCall", () => {
-	it.each(["screenshot", "click", "doubleClick", "move", "drag", "scroll", "type", "press"])(
+	it.each(["screenshot", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse"])(
 		"classifies a display %s hop by its input policy",
 		(method) => {
 			// When
@@ -33,6 +33,11 @@ describe("isReadOnlyComputerCall", () => {
 
 	it("returns false when a window click chain mutates", () => {
 		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "click" }])).toBe(false);
+	});
+
+	it.each(["holdKeys", "holdMouse"])("requires exec for %s on desktop and window targets", (method) => {
+		expect(isReadOnlyComputerCall([{ method }])).toBe(false);
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method }])).toBe(false);
 	});
 
 	it("returns false when clipboard.write is the only step", () => {

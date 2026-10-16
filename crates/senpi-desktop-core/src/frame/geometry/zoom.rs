@@ -73,6 +73,7 @@ impl FrameGeometry {
             FrameKind::Window {
                 captured_width,
                 captured_height,
+                ..
             } => window.is_some_and(|window| {
                 window.width == captured_width && window.height == captured_height
             }),

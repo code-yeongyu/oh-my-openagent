@@ -26,6 +26,8 @@ export const DESKTOP_METHODS: MethodPolicies = {
 	scroll: "exec",
 	type: "exec",
 	press: "exec",
+	holdKeys: "exec",
+	holdMouse: "exec",
 	elementAt: "read",
 	focusedElement: "read",
 	ref: "read",
@@ -47,6 +49,8 @@ export const DISPLAY_METHODS: MethodPolicies = {
 	scroll: "exec",
 	type: "exec",
 	press: "exec",
+	holdKeys: "exec",
+	holdMouse: "exec",
 };
 
 /** Helpers callable on a window handle resolved through `desktop.window(id)`. */
@@ -61,6 +65,8 @@ export const WINDOW_METHODS: MethodPolicies = {
 	scroll: "exec",
 	type: "exec",
 	press: "exec",
+	holdKeys: "exec",
+	holdMouse: "exec",
 	raise: "exec",
 	ax: "read",
 	find: "read",

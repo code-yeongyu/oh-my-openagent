@@ -19,6 +19,7 @@ import type {
   CancelOutcome,
   DestructionPort,
   InterruptOutcome,
+  RedispatchOutcome,
   SendInput,
   SendOutcome,
 } from "../steering"
@@ -155,6 +156,9 @@ export type StartResult =
       // absent for a queued start that has not launched yet (#9722).
       readonly effective_model?: ResolvedModelRecord
       readonly queue_position?: number
+      // The task host has not admitted the child yet; its start outcome arrives on the record (#10042).
+      // run_epoch and resolved_model are then the plan's: a start-time fallback may still move both.
+      readonly starting?: true
       readonly name_warning?: string
       // Where an isolated child is working. The merge outcome is NOT here: it does not exist yet.
       readonly isolation?: IsolationStartedDetails
@@ -212,6 +216,7 @@ export type ResidencyDenied =
 export type ContinueDelivery = "steer" | "followUp" | "revive"
 
 export type ContinueResult =
+  | Extract<SendOutcome, { kind: "uncertain" }>
   | {
       readonly kind: "continued"
       readonly task_id: string
@@ -301,12 +306,20 @@ export type TaskManager = {
   readonly concurrency?: TaskConcurrency
   findTaskByChildSession?(sessionId: string): TaskRecord | undefined
   start(spec: ManagerStartSpec): Promise<StartResult>
+  // Settles once the task's in-flight launch settles (a `starting` result keeps launching, #10042).
+  whenLaunched?(taskId: string): Promise<void>
+  /** Bounded wait for in-flight first launches at session shutdown; later admissions are discarded. */
+  settleLaunchesForShutdown?(boundMs: number): Promise<void>
   startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
+  // senpi#3266: one-step re-dispatch of a flagged "resumed, waiting for input" task onto a fresh
+  // live session, replaying its persisted prompt under the same task identity and a new run epoch.
+  // Optional: minimal manager fakes (and the DAG test doubles) never serve a redispatch.
+  redispatchTask?(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome>
   get(taskId: string): TaskRecord | undefined
   hasPendingSends?(taskId: string): boolean
   hasInFlightSends?(taskId: string): boolean

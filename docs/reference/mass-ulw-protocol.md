@@ -280,7 +280,7 @@ runs a wholesale-replace reducer that swaps the stored task list on every payloa
 was shaped so `omo.dag.updated` slots into that exact pattern:
 
 - One NEW `extension_event` name to register: `omo.dag.updated`. No new transport, no new
-  capability; app-server delivery is thread-scoped and already reaches the app.
+  capability; Native RPC host delivery is thread-scoped and already reaches the app.
 - One wholesale-replace reducer: on each payload, replace the run list for `parent_session_id`
   with `runs`. No per-event state, no seq tracking, no merge logic. Surface `truncated_runs` when
   present.
