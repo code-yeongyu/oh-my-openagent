@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 
 import type { TelemetryCaptureMessage } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -12,8 +12,9 @@ import type {
   ComputerUseTelemetryObservation,
   ComputerUseTelemetryObservers,
 } from "./omo-native-computer-use"
-import { createOmoNativeTelemetryComponent } from "./omo-native-component"
-import { OMO_NATIVE_PROPERTY_ALLOWLISTS, OMO_NATIVE_SCHEMA_VERSION } from "./product-identity"
+import { CONSENT_CACHE_MS, createOmoNativeTelemetryComponent } from "./omo-native-component"
+import * as parallelSummaryModule from "./omo-native-parallel-summary"
+import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, OMO_NATIVE_SCHEMA_VERSION } from "./product-identity"
 import { rollupDir } from "./session-summary-store"
 import {
   FIXED_NOW,
@@ -24,15 +25,7 @@ import {
   withTempAgentDir,
 } from "./telemetry.test-support"
 
-const SHARED_KEYS = [
-  "$process_person_profile",
-  "install_id",
-  "package_version",
-  "platform",
-  "product_name",
-  "schema_version",
-  "surface",
-] as const
+const SHARED_KEYS = Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS)
 
 function context(sessionId: string): Record<string, unknown> {
   return {
@@ -515,10 +508,72 @@ describe("OmO Native telemetry component integration", () => {
     })
   })
 
+  // #10226 H1: every event the opted-out process sees must stop at the consent gate. Deriving a session
+  // hash alone persists the hashing salt, so the gate has to hold before any hash is taken, not only
+  // before a send.
+  for (const [label, env] of [
+    ["OMO_DISABLE_TELEMETRY=1", { OMO_DISABLE_TELEMETRY: "1" }],
+    ["DO_NOT_TRACK=1", { DO_NOT_TRACK: "1" }],
+  ] as const) {
+    test(`#given an opted-out process (${label}) #when it sees every event kind and is killed #then it derives no session hash, writes no file, and the next enabled process sends nothing of it`, async () => {
+      await withTempAgentDir(async (agentDir) => {
+        writeInventory(agentDir)
+        const stateDir = join(agentDir, "omo-senpi", "omo-native")
+        const recorder = createTransportRecorder()
+        const hashed: string[] = []
+        const register = (extraEnv: Record<string, string>) => {
+          const pi = new FakeExtensionAPI()
+          createOmoNativeTelemetryComponent({
+            rawTurnSampleRate: 1,
+            env: { ...createEnabledEnv(agentDir), ...extraEnv },
+            hashSessionId: (raw) => {
+              hashed.push(raw)
+              return `hashed:${raw}`
+            },
+            isConfigEnabled: () => true,
+            now: FIXED_NOW,
+            osProvider: createOsProvider("gate-host"),
+            scheduleConsentCheck: () => () => undefined,
+            stateDir,
+            transportFactory: recorder.factory,
+          }).register(pi, { config: pi, logger: createSilentLogger() })
+          return pi
+        }
+
+        // given: the opted-out process runs a full turn cycle and dies without session_shutdown
+        const optedOut = register(env)
+        const session = context("opted-out")
+        await optedOut.dispatch("session_start", { type: "session_start", reason: "startup" }, session)
+        await optedOut.dispatch("input", { type: "input", inputId: "input-1", text: "ulw plan", source: "interactive" }, session)
+        await optedOut.dispatch("input_disposition", { type: "input_disposition", inputId: "input-1", disposition: "started" }, session)
+        await optedOut.dispatch("turn_end", turnEnd(), session)
+        await optedOut.dispatch("tool_result", toolResult(), session)
+        await optedOut.dispatch("turn_end", turnEnd(), session)
+        killWithoutShutdown(stateDir)
+
+        // then: nothing was derived, written, or sent, not even the legacy daily-active ping
+        expect(hashed).toEqual([])
+        expect(existsSync(stateDir) ? readdirSync(stateDir, { recursive: true }) : []).toEqual([])
+        expect(recorder.messages).toEqual([])
+
+        // when: an enabled process starts, records a turn and quits
+        const optedIn = register({})
+        await optedIn.dispatch("session_start", { type: "session_start", reason: "startup" }, context("opted-in"))
+        await optedIn.dispatch("turn_end", turnEnd(), context("opted-in"))
+        await optedIn.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, context("opted-in"))
+
+        // then: only the enabled session reached the wire
+        expect(nativeMessages(recorder.messages).filter(({ properties }) => properties?.$session_id === "hashed:opted-out")).toEqual([])
+        expect(rollupFiles(stateDir)).toEqual([])
+      })
+    })
+  }
+
   // #10229: opt-out used to silence only the opted-out process. Its rollup file still reached disk on
   // every turn, and the next opted-in process recovered it and sent it.
   for (const [label, optOut] of [
     ["DO_NOT_TRACK=1", { env: { DO_NOT_TRACK: "1" }, configEnabled: true }],
+    ["OMO_DISABLE_TELEMETRY=1", { env: { OMO_DISABLE_TELEMETRY: "1" }, configEnabled: true }],
     ["config telemetry disabled", { env: {}, configEnabled: false }],
     ["OMO_DISABLE_POSTHOG=1", { env: { OMO_DISABLE_POSTHOG: "1" }, configEnabled: true }],
     ["OMO_SENPI_SEND_ANONYMOUS_TELEMETRY=0", { env: { OMO_SENPI_SEND_ANONYMOUS_TELEMETRY: "0" }, configEnabled: true }],
@@ -611,6 +666,116 @@ describe("OmO Native telemetry component integration", () => {
       await later.dispatch("session_start", { type: "session_start", reason: "startup" }, context("later"))
       await later.dispatch("turn_end", turnEnd(), context("later"))
       expect(recorder.messages.filter(({ event, properties }) => event === "session_summary" && properties?.$session_id === "hashed:midway")).toEqual([])
+    })
+  })
+
+  // The fan-in drops an event only when `$session_id` is the opted-out sentinel. That is enough: when
+  // consent is off at start no session client exists at all, and a mid-session withdrawal is caught by
+  // the consent read before each write. Here every later event keeps the live session's real hash in
+  // `$session_id` (so the sentinel drop cannot fire) while other producers hash to the sentinel, and
+  // still nothing leaves the process after the withdrawal.
+  test("#given a sampled session that withdraws consent mid-way #when every producer fires again #then nothing is sent after the withdrawal and no message carries the sentinel", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createTransportRecorder()
+      const computer = computerObservers()
+      let consent = true
+      let clock = 1_000_000
+      const pi = new FakeExtensionAPI()
+      createOmoNativeTelemetryComponent({
+        computerUseTelemetryObservers: computer.registry,
+        consentNow: () => clock,
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => consent,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("withdraw-host"),
+        rawTurnSampleRate: 1,
+        scheduleConsentCheck: () => () => undefined,
+        stateDir: join(agentDir, "omo-senpi", "omo-native"),
+        transportFactory: recorder.factory,
+      }).register(pi, { config: pi, logger: createSilentLogger() })
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context("withdrawn"))
+      await pi.dispatch("turn_end", turnEnd(), context("withdrawn"))
+      expect(nativeMessages(recorder.messages).map(({ event }) => event)).toContain("turn_completed")
+      const sentBefore = recorder.messages.length
+
+      // when
+      consent = false
+      clock += 60_000
+      await pi.dispatch("turn_end", turnEnd(), context("withdrawn"))
+      await pi.dispatch("tool_result", toolResult(), context("withdrawn"))
+      computer.publish({ kind: "activation", sessionId: "withdrawn", active: true, source: "tool_call", platform: "linux", backend: "x11" })
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, context("withdrawn"))
+
+      // then
+      expect(recorder.messages.slice(sentBefore)).toEqual([])
+      expect(recorder.messages.filter((message) => JSON.stringify(message).includes("opted-out"))).toEqual([])
+    })
+  })
+
+  // #10328: every native event type, not only the ones today's producers happen to emit, must stop at
+  // the fan-in once consent is withdrawn mid-session. The names come from the facade's own allowlist
+  // (the list `isOmoNativeEventName` reads), so a new event type is covered without editing this test.
+  test("#given a consented session whose consent is withdrawn mid-way #when every facade event type is captured through the fan-in #then each one reached the transport before and none reaches it after", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given: the fan-in the component hands its producers
+      writeInventory(agentDir)
+      const recorder = createTransportRecorder()
+      let consent = true
+      let clock = 1_000_000
+      let fanIn: ((name: string, properties: Record<string, unknown>) => void) | undefined
+      const original = parallelSummaryModule.registerOmoNativeParallelSummary
+      const spy = spyOn(parallelSummaryModule, "registerOmoNativeParallelSummary").mockImplementation((pi, options) => {
+        fanIn = options.captureEvent as unknown as (name: string, properties: Record<string, unknown>) => void
+        return original(pi, options)
+      })
+      const pi = new FakeExtensionAPI()
+      try {
+        createOmoNativeTelemetryComponent({
+          consentNow: () => clock,
+          env: createEnabledEnv(agentDir),
+          hashSessionId: (raw) => `hashed:${raw}`,
+          isConfigEnabled: () => consent,
+          now: FIXED_NOW,
+          osProvider: createOsProvider("every-type-host"),
+          rawTurnSampleRate: 0,
+          scheduleConsentCheck: () => () => undefined,
+          stateDir: join(agentDir, "omo-senpi", "omo-native"),
+          transportFactory: recorder.factory,
+        }).register(pi, { config: pi, logger: createSilentLogger() })
+      } finally {
+        spy.mockRestore()
+      }
+      if (fanIn === undefined) throw new Error("the component never handed its fan-in to the parallel-summary producer")
+      const capture = fanIn
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context("every-type"))
+      const eventTypes = Object.keys(OMO_NATIVE_PROPERTY_ALLOWLISTS)
+      const sentFor = (name: string, from: number) => recorder.messages.slice(from).filter(({ event }) => event === name)
+
+      // then (control): while consented, each type reaches the transport through this exact path
+      const deliveredWhileConsented: string[] = []
+      for (const name of eventTypes) {
+        const from = recorder.messages.length
+        capture(name, { $session_id: "hashed:every-type" })
+        if (sentFor(name, from).length > 0) deliveredWhileConsented.push(name)
+      }
+      expect(deliveredWhileConsented).toEqual(eventTypes)
+
+      // when: consent is withdrawn and the consent cache has expired
+      consent = false
+      clock += CONSENT_CACHE_MS + 1
+      const sentBefore = recorder.messages.length
+      const attempted: string[] = []
+      for (const name of eventTypes) {
+        capture(name, { $session_id: "hashed:every-type" })
+        attempted.push(name)
+      }
+
+      // then
+      expect(attempted).toHaveLength(Object.keys(OMO_NATIVE_PROPERTY_ALLOWLISTS).length)
+      expect(recorder.messages.slice(sentBefore).map(({ event }) => event)).toEqual([])
     })
   })
 

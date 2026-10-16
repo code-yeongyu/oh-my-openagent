@@ -157,6 +157,21 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
   process_crashed: PROCESS_CRASHED_SCHEMA,
 } as const)
 
+// Properties the event client stamps on EVERY event (telemetry-core shared block plus the omo-native
+// attribution). They bypass the per-event allowlists, so this table is their only published contract.
+export const OMO_NATIVE_COMMON_PROPERTY_SCHEMAS = Object.freeze({
+  "$process_person_profile": BOOLEAN_PROPERTY,
+  ci: BOOLEAN_PROPERTY,
+  event_id: STRING_PROPERTY,
+  install_hash: STRING_PROPERTY,
+  machine_hash: STRING_PROPERTY,
+  package_version: STRING_PROPERTY,
+  platform: enumProperty(["omo-senpi"] as const),
+  product_name: enumProperty(["omo-native"] as const),
+  schema_version: NUMBER_PROPERTY,
+  surface: enumProperty(["cli", "desktop"] as const),
+} as const)
+
 export const OMO_NATIVE_PROPERTY_ALLOWLISTS = Object.freeze(Object.fromEntries(
   Object.entries(OMO_NATIVE_EVENT_SCHEMAS).map(([eventName, properties]) => [
     eventName,
