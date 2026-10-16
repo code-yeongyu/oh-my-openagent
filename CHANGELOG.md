@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Background tasks let runtime fallback decide who recovers a session error before starting a replacement or finalizing the task.** Exhausted and refused retries release recovery ownership, model-less retry errors can finish the task, and a slow decision never starts a competing replacement. ([#9683](https://github.com/code-yeongyu/oh-my-openagent/pull/9683), [#9787](https://github.com/code-yeongyu/oh-my-openagent/pull/9787))
 
+## [5.1.35] - 2026-10-16
+
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
 
 **Memory items sync without losing concurrent edits, even from a stale device.** The sync item model captures a device's edits against the exact snapshot it saw, so a stale capture merges as a concurrent edit instead of silently dropping work or throwing; two captures from one device on one baseline lose nothing, multiline and quoted frontmatter values render as valid YAML on every replica, and path keys that would split one file into several (empty segments, trailing slashes, backslashes, drive letters) are rejected instead of canonicalized. Nothing syncs to a server yet. ([#10203](https://github.com/code-yeongyu/oh-my-openagent/pull/10203))
