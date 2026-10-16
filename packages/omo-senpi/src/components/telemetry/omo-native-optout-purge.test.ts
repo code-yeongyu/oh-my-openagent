@@ -43,6 +43,24 @@ describe("omo-native session_summary opt-out purge", () => {
     })
   }
 
+  // A killed owner never removes its registry entry; once an unrelated process holds its pid, a pid probe alone
+  // reads the killed owner as alive and its queue would stay on disk. PID 1 is always held by another process.
+  test("#given a killed owner whose pid now belongs to an unrelated live process #when an opted-out process starts #then the owner's queue is gone", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      writeInventory(agentDir)
+      const stateDir = join(agentDir, "omo-senpi", "omo-native")
+      const recorder = createTransportRecorder()
+      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:reused", scope: { cwd: "/repo" }, claimed: true, ownerPid: 1 })
+      expect(contentFiles(stateDir).length).toBeGreaterThan(0)
+
+      // when
+      registerProcess({ agentDir, recorder, env: { DO_NOT_TRACK: "1" }, cwd: "/repo", options: { isConfigEnabled: () => true } })
+
+      // then
+      expect(summaryFiles(stateDir)).toEqual([])
+    })
+  })
+
   test("#given dead owners' orphans from an opted-out project and an opted-in one #when an opted-out process in the first project starts #then its orphans are dropped unsent and the other project's are kept", async () => {
     await withTempAgentDir(async (agentDir) => {
       writeInventory(agentDir)

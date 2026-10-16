@@ -69,23 +69,24 @@ export function contentFiles(stateDir: string): string[] {
   })
 }
 
-export function seedDeadOwnerQueue(stateDir: string, input: { readonly sessionHash: string; readonly scope: ConsentScope; readonly claimed?: boolean }): void {
-  const storage = createSummaryStorage({ stateDir, owner: DEAD_OWNER, isPidAlive: () => false })
+export function seedDeadOwnerQueue(stateDir: string, input: { readonly sessionHash: string; readonly scope: ConsentScope; readonly claimed?: boolean; readonly ownerPid?: number }): void {
+  const owner = { pid: input.ownerPid ?? DEAD_PID, bootId: "killed" }
+  const storage = createSummaryStorage({ stateDir, owner, isPidAlive: () => false })
   const window = openWindow(FIXED_NOW.getTime(), 0)
   addTurn(window, summaryTurn(), FIXED_NOW.getTime())
   const record = {
     consent: "enabled" as const, scope: input.scope, sessionHash: input.sessionHash, sessionRole: "root" as const,
-    owner: DEAD_OWNER, heartbeatAt: Date.now() - OWNER_STALE_MS - 60_000, epoch: "0123456789abcdef", seq: 3, sampleRate: 0, windowId: randomUUID(), window,
+    owner, heartbeatAt: Date.now() - OWNER_STALE_MS - 60_000, epoch: "0123456789abcdef", seq: 3, sampleRate: 0, windowId: randomUUID(), window,
   }
   const key = storage.windowKey(input.sessionHash)
   storage.writeWindow(key, record)
   storage.writePending({
-    consent: "enabled", scope: input.scope, uuid: randomUUID(), sessionHash: input.sessionHash, owner: DEAD_OWNER,
+    consent: "enabled", scope: input.scope, uuid: randomUUID(), sessionHash: input.sessionHash, owner,
     createdAt: Date.now(), properties: { summary_seq: 2 },
   })
   if (input.claimed === true) {
     const path = join(summaryDir(stateDir), `${key}.json`)
-    renameSync(path, `${path}.claimed-${DEAD_PID}-killed`)
+    renameSync(path, `${path}.claimed-${owner.pid}-killed`)
   }
 }
 
