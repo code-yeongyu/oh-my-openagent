@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process"
+import { randomUUID } from "node:crypto"
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs"
 import type { Socket } from "node:net"
 import { dirname } from "node:path"
@@ -109,7 +110,7 @@ export class FakeSessionTable {
   appendTranscript(routingId: string, entry: Readonly<Record<string, unknown>>): void {
     const session = this.#byRouting(routingId)
     if (session === undefined || !this.#transcripts) return
-    appendFileSync(session.sessionPath, `${JSON.stringify({ type: "message", message: entry })}\n`)
+    appendFileSync(session.sessionPath, `${JSON.stringify({ type: "message", id: randomUUID(), message: entry })}\n`)
   }
 
   /** The connection went away: retained sessions stay, the rest end with it. */

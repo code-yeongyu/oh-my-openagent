@@ -64,6 +64,7 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
           category: details.snapshot.category,
           agentType: details.snapshot.agent_type,
           resolvedModel: details.snapshot.resolved_model,
+          effectiveModel: details.snapshot.effective_model,
         }) ?? `model:${normalizeRendererText(details.snapshot.model)}`
       const statusLabel = details.snapshot.suspended?.explanation ?? normalizeRendererText(details.snapshot.status)
       return {
@@ -114,8 +115,9 @@ export function taskOutputModelText(snapshot: TaskSnapshot): string {
     snapshot.resolved_model !== undefined &&
     snapshot.effective_model.provider === snapshot.resolved_model.provider &&
     snapshot.effective_model.model_id === snapshot.resolved_model.model_id
-  if (effective === undefined || sameModel) return `model ${planned}`
-  return `model ${effective} (planned ${planned})`
+  const operatorMark = snapshot.effective_model?.switched_by_operator === true ? " (switched by operator)" : ""
+  if (effective === undefined || sameModel) return `model ${planned}${operatorMark}`
+  return `model ${effective}${operatorMark} (planned ${planned})`
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

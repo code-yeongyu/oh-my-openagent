@@ -22,11 +22,16 @@ const expectedNativeEvents = new Set([
   "kibitzer_summary",
   "parallelism_summary",
   "process_crashed",
+  "session_summary",
 ])
 
 // Session-conditional events the scripted scenario cannot produce: `kibitzer_summary` is emitted only
 // when the memory sidecar actually woke, which needs recall enabled and a committed memory corpus, and
-// `process_crashed` only when an earlier process left a crash record on disk. They
+// `process_crashed` only when an earlier process left a crash record on disk. `session_summary` is held
+// here only until a live capture proves it: by the code it is flushed at the drive's clean shutdown (after
+// the third settled turn the drive ends stdin, and session_shutdown flushes the open window, registered
+// ahead of the session client the same way `parallelism_summary` is), so it should become required once a
+// real capture shows it. They
 // stay in the coverage check above (a dropped or misspelled event still fails) but are not required to
 // appear in a capture, because demanding one here would only be satisfiable by faking the emission.
 const conditionalNativeEvents = new Set([
@@ -35,6 +40,7 @@ const conditionalNativeEvents = new Set([
   "computer_use_engine_error",
   "kibitzer_summary",
   "process_crashed",
+  "session_summary",
 ])
 
 export function assertAllowlistCoverage(allowlists) {

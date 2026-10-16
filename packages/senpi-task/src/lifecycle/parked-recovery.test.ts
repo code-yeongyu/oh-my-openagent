@@ -146,7 +146,7 @@ describe("parked recovery contract (#9861)", () => {
       f.advance(295_000)
       await ended
       expect(f.store.load(id)?.status).toBe("error")
-      expect(f.store.load(id)?.error_message).toContain(reason)
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ cause: reason })
       expect(f.store.load(id)?.fallback_closing_child?.requires_confirmation).toBe(true)
       expect(f.messages).toHaveLength(1)
       expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ confirmed_stop: false })
@@ -163,7 +163,7 @@ describe("parked recovery contract (#9861)", () => {
       f.park(id)
       await ended
       expect(f.store.load(id)?.status).toBe("error")
-      expect(f.store.load(id)?.error_message).toContain(reason)
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ cause: reason })
       expect(f.messages).toHaveLength(1)
       expect(f.state.respawns).toBe(1)
     })

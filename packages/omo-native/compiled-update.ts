@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process"
+import { realpathSync } from "node:fs"
 import { updateUsageAnswer } from "./bin/lib/update-args.js"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
@@ -6,6 +8,10 @@ const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)
 const RELEASE_TARGET = /^(?:darwin|linux|windows)-(?:x64|arm64)(?:-musl)?(?:-baseline)?$/
 
 export type FetchReleases = () => Promise<unknown>
+export type PackageOwner = { readonly manager: "pacman" | "dpkg" | "rpm" | "brew" | "nix"; readonly pkg: string }
+export type ProbeOwner = (path: string, platform: NodeJS.Platform) => PackageOwner | undefined
+/** Runs one ownership query; undefined when the tool is missing, fails, or prints nothing. */
+export type RunOwnerQuery = (command: string, args: readonly string[]) => string | undefined
 export type CompiledUpdateResult = { readonly output: string; readonly exitCode: number; readonly stream?: "stdout" | "stderr" }
 
 // omo-ai publishes betas as `5.0.0-0.beta.90` while the GitHub release is tagged `v5.0.0-beta.90`.
@@ -63,6 +69,44 @@ export function replaceCommand(url: string, destination: string, platform: NodeJ
   return `curl -fsSL ${posixQuote(url)} -o ${next} && chmod +x ${next} && mv -f ${next} ${posixQuote(destination)}`
 }
 
+const runOwnerQuery: RunOwnerQuery = (command, args) => {
+  const result = spawnSync(command, args, { encoding: "utf8", timeout: 3_000, windowsHide: true })
+  if (result.error !== undefined || result.status !== 0) return undefined
+  return result.stdout.trim() || undefined
+}
+
+/**
+ * The system package manager that owns `path`, or undefined. Fails open: a missing tool, a failed or slow
+ * query, or an unowned path all fall back to the plain replace command (#9585).
+ */
+export function probePackageOwner(path: string, platform: NodeJS.Platform, run: RunOwnerQuery = runOwnerQuery): PackageOwner | undefined {
+  let resolved = path
+  try { resolved = realpathSync(path) } catch { /* keep the given path */ }
+  const nix = /^\/nix\/store\/[0-9a-z]{32}-([^/]+)\//.exec(resolved)
+  if (nix !== null) return { manager: "nix", pkg: nix[1] }
+  const cellar = /\/Cellar\/([^/]+)\//.exec(resolved)
+  if (cellar !== null) return { manager: "brew", pkg: cellar[1] }
+  if (platform !== "linux") return undefined
+  const pacman = run("pacman", ["-Qqo", resolved])
+  if (pacman !== undefined) return { manager: "pacman", pkg: pacman.split("\n")[0] }
+  const dpkg = run("dpkg-query", ["-S", resolved])?.split(":")[0]
+  if (dpkg) return { manager: "dpkg", pkg: dpkg.split(",")[0].trim() }
+  const rpm = run("rpm", ["-qf", "--qf", "%{NAME}", resolved])
+  if (rpm !== undefined) return { manager: "rpm", pkg: rpm.split("\n")[0] }
+  return undefined
+}
+
+function ownedUpdateLine(owner: PackageOwner): string {
+  const how = {
+    pacman: `update it with pacman or your AUR helper, e.g. \`yay -Syu ${owner.pkg}\``,
+    dpkg: `update it with apt, e.g. \`sudo apt install --only-upgrade ${owner.pkg}\``,
+    rpm: `update it with dnf, e.g. \`sudo dnf upgrade ${owner.pkg}\``,
+    brew: `update it with \`brew upgrade ${owner.pkg}\``,
+    nix: "update it through nix",
+  }[owner.manager]
+  return `omo: installed via ${owner.manager} (${owner.pkg}); ${how}`
+}
+
 export const fetchGitHubReleases: FetchReleases = async () => {
   const response = await fetch(RELEASES_API, {
     headers: { Accept: "application/vnd.github+json", "User-Agent": "omo" },
@@ -80,9 +124,14 @@ export async function compiledUpdate(options: {
   readonly arch: string
   readonly fetchReleases: FetchReleases
   readonly args?: readonly string[]
+  readonly probeOwner?: ProbeOwner
 }): Promise<CompiledUpdateResult> {
   const usage = options.args === undefined ? undefined : updateUsageAnswer(options.args)
   if (usage !== undefined) return { output: usage.text, exitCode: usage.exitCode, stream: usage.stream }
+  // A binary a package manager owns must not get a curl-and-mv replace command: it either fails on a
+  // root-owned path or leaves the manager tracking a file it no longer installed.
+  const owner = options.probeOwner?.(options.destination, options.platform)
+  if (owner !== undefined) return { output: ownedUpdateLine(owner), exitCode: 1, stream: "stderr" }
   const asset = releaseAssetName(options.releaseTarget, options.platform, options.arch)
   const current = releaseVersionOf(options.omoAiVersion)
   let target: string | undefined

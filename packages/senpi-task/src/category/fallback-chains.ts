@@ -26,6 +26,11 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 //     covers the ChatGPT login there.
 export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   "visual-engineering": [
+    // Argon at its lowest accepted thinking level leads (#10187, owner decision 2026-10-15):
+    // the catalog maps off/minimal to null for this model, so `low` is the floor. Copilot waits for
+    // code-yeongyu/senpi#3379 (its row exposes no thinking control). A pinned engine whose catalog
+    // has no Argon row leaves this rung unresolvable, so the chain behaves as before until adoption.
+    { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-fable-5-1",
@@ -161,6 +166,11 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     }
   ],
   writing: [
+    // Argon at its lowest accepted thinking level leads (#10187, owner decision 2026-10-15):
+    // the catalog maps off/minimal to null for this model, so `low` is the floor. Copilot waits for
+    // code-yeongyu/senpi#3379 (its row exposes no thinking control). A pinned engine whose catalog
+    // has no Argon row leaves this rung unresolvable, so the chain behaves as before until adoption.
+    { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5-5",

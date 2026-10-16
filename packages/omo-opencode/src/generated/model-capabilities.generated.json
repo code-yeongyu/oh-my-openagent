@@ -2,6 +2,28 @@
   "generatedAt": "2026-07-29T03:28:21.339Z",
   "sourceUrl": "https://models.dev/api.json",
   "models": {
+    "gemini-4-argon": {
+      "id": "gemini-4-argon",
+      "family": "gemini",
+      "reasoning": true,
+      "temperature": false,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "audio",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1048576,
+        "output": 65535
+      }
+    },
     "glm-5": {
       "id": "glm-5",
       "family": "glm",

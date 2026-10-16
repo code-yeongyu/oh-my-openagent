@@ -29,7 +29,10 @@ import {
   hasMoreFallbacks,
   shouldRetryError,
 } from "../../shared/model-error-classifier"
-import { awaitRuntimeFallbackRecoveryDecision } from "../../shared/runtime-fallback-recovery"
+import {
+  awaitLateRuntimeFallbackRecoveryDecision,
+  awaitRuntimeFallbackRecoveryDecision,
+} from "../../shared/runtime-fallback-recovery"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -2183,7 +2186,16 @@ The fallback retry session is now created and can be inspected directly.
       const sessionID = task.sessionId
       const attemptID = task.currentAttemptID
       const decision = await runtimeFallbackDecision
-      if (task.status !== "running" || task.sessionId !== sessionID || task.currentAttemptID !== attemptID) return
+      const isSameAttempt = () =>
+        task.status === "running" && task.sessionId === sessionID && task.currentAttemptID === attemptID
+      if (!isSameAttempt()) return
+      if (decision === "timed-out") {
+        // A timeout is not a refusal. Keep listening: a late `declined` still ends the task with this error.
+        void awaitLateRuntimeFallbackRecoveryDecision(args.event)?.then(async (lateDecision) => {
+          if (lateDecision !== "declined" || !isSameAttempt()) return
+          await this.recoverDeclinedSessionError(task, errorInfo, errorName, errorMessage)
+        })
+      }
       if (decision !== "declined") {
         task.consecutiveErroredIdlePolls = 0
         log("[background-agent] session.error recovery not declined by runtime-fallback; keeping task running:", {
@@ -2197,6 +2209,15 @@ The fallback retry session is now created and can be inspected directly.
       }
     }
 
+    await this.recoverDeclinedSessionError(task, errorInfo, errorName, errorMessage)
+  }
+
+  private async recoverDeclinedSessionError(
+    task: BackgroundTask,
+    errorInfo: { name?: string; message?: string; statusCode?: number },
+    errorName: string | undefined,
+    errorMessage: string | undefined,
+  ): Promise<void> {
     if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {
       return
     }

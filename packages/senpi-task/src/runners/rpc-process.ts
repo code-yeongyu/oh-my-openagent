@@ -9,6 +9,8 @@ import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-adm
 import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
+import { createTaskRecordStore } from "../store"
+import { InputUncertainError } from "./input-effects"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 /** senpi capability: a single-session `--mode rpc` process accepts `set_retry_fallback` before its first turn. */
@@ -78,6 +80,9 @@ export class RpcProcessRunner {
       client,
       child,
       taskId: spec.task_id,
+      ...(spec.taskStoreDir === undefined ? {} : {
+        inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
+      }),
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
       childEnv: descriptor.env,
@@ -92,8 +97,10 @@ export class RpcProcessRunner {
         await handle.startInitialPrompt(spec.prompt)
       } else {
         await resume
+        await handle.reconcileInputs?.()
       }
     } catch (error) {
+      if (error instanceof InputUncertainError) error = error.cause
       // Capture this BEFORE cleanup: a rejected prompt can leave the child alive, and the cleanup
       // termination must never be recorded as the cause of the rejection.
       const exitOutcome = handle.exitOutcome()

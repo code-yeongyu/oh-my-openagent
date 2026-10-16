@@ -30,6 +30,13 @@ export type HostSessionReattach = (
 ) => Promise<HostSessionReattached | HostSessionReattachRefused | undefined>
 
 /** A command met a dead transport: the senpi client's loss error, or the session client already emptied. */
+/** The RPC client's own deadline message: the peer accepted the connection and never answered. */
+export const RPC_RESPONSE_TIMEOUT_PREFIX = "Timeout waiting for response to "
+
+export function isRpcResponseTimeout(error: unknown): error is Error {
+  return error instanceof Error && error.message.startsWith(RPC_RESPONSE_TIMEOUT_PREFIX)
+}
+
 export function isTransportLossError(error: unknown): boolean {
   if (!(error instanceof Error) || !("code" in error)) return false
   return error.code === "rpc_transport_gone" || error.code === "session_detached"

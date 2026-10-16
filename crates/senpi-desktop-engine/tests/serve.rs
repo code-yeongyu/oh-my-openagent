@@ -38,6 +38,7 @@ fn serve_shares_one_session_across_successive_clients_and_exits_when_idle() {
     let socket = dir.join("engine.sock");
     let mut child = Command::new(BINARY)
         .args([
+            "--enable-daemon",
             "--serve",
             socket.to_str().expect("utf-8 path"),
             "--idle-ms",

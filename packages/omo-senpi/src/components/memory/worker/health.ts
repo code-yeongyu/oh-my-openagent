@@ -22,6 +22,7 @@ export interface ReflectionHealth {
   readonly streak: number
   readonly fingerprint: string
   readonly lastFailure?: {
+    readonly runId?: string
     readonly reason: string
     readonly detail?: string
     readonly finishedAt: string
@@ -114,6 +115,7 @@ export async function readReflectionHealth(
       ? {}
       : {
           lastFailure: {
+            ...(lastFailure.runId === undefined ? {} : { runId: lastFailure.runId }),
             reason: lastFailure.reason ?? "failed",
             ...(lastFailure.detail === undefined ? {} : { detail: lastFailure.detail }),
             finishedAt: lastFailure.finishedAt,

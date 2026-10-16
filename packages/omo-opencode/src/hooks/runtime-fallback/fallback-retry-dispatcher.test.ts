@@ -4,6 +4,7 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createFallbackState } from "./fallback-state"
 import { createFallbackTimeoutHelpers } from "./auto-retry-timeout"
+import { createAutoRetryDispatcher } from "./auto-retry-dispatch"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
 function createContext(toastMessages: string[]): RuntimeFallbackPluginInput {
@@ -64,7 +65,7 @@ function createRejectedDispatchHelpers(dispatchCalls: string[]): AutoRetryHelper
 }
 
 describe("dispatchFallbackRetry", () => {
-  test("refused dispatch releases an existing recovery claim state", async () => {
+  test("a dispatch refused by the prompt gate releases the recovery state it held", async () => {
     const deps = createDeps([])
     const sessionID = "session-refused"
     const state = createFallbackState("openai/gpt-5.4")
@@ -82,6 +83,41 @@ describe("dispatchFallbackRetry", () => {
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
     expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
     expect(cleared).toBe(true)
+  })
+
+  test("#given another dispatch owns the session #when a competing dispatch is refused #then the winner keeps its flags, timeout and pending model", async () => {
+    // given
+    const deps = createDeps([])
+    const sessionID = "session-competing"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "openai/gpt-5.5"
+    state.pendingFallbackModel = "openai/gpt-5.5"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const clearedTimeouts: string[] = []
+    const autoRetryWithFallback = createAutoRetryDispatcher(deps, () => {}, (id) => { clearedTimeouts.push(id) })
+    const helpers: AutoRetryHelpers = {
+      ...createRejectedDispatchHelpers([]),
+      clearSessionFallbackTimeout: (id) => { clearedTimeouts.push(id) },
+      autoRetryWithFallback,
+    }
+
+    // when
+    await dispatchFallbackRetry(deps, helpers, {
+      sessionID, state, fallbackModels: ["openai/gpt-5.5", "anthropic/claude-opus-5-5"], source: "message.updated",
+    })
+
+    // then
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(clearedTimeouts).toEqual([])
+    expect(state.pendingFallbackModel).toBe("openai/gpt-5.5")
+    expect(state.currentModel).toBe("openai/gpt-5.5")
+    expect(state.fallbackIndex).toBe(0)
+    expect(state.attemptCount).toBe(1)
   })
 
   for (const refusal of [false, true]) {

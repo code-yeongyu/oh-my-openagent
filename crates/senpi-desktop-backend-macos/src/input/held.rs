@@ -38,41 +38,51 @@ pub(super) struct HeldButton {
 }
 
 #[derive(Default, Debug)]
-pub(super) struct Held {
+struct State {
     keys: Vec<HeldKey>,
     buttons: Vec<HeldButton>,
 }
 
+#[derive(Clone, Default, Debug)]
+pub(super) struct Held(std::sync::Arc<parking_lot::Mutex<State>>);
+
 impl Held {
     pub(super) fn key_down(&mut self, key: HeldKey) {
-        self.keys.push(key);
+        self.0.lock().keys.push(key);
     }
 
     pub(super) fn key_up(&mut self, route: KeyRoute, code: u16) {
-        self.keys
+        self.0.lock().keys
             .retain(|held| !(held.route == route && held.code == code));
     }
 
     pub(super) fn button_down(&mut self, button: HeldButton) {
-        self.buttons.push(button);
+        self.0.lock().buttons.push(button);
     }
 
     pub(super) fn button_up(&mut self, route: &ButtonRoute, button: MouseButton) {
-        self.buttons
+        self.0.lock().buttons
             .retain(|held| !(same_route(&held.route, route) && held.button == button));
     }
 
+    #[cfg(test)]
     pub(super) fn take_keys(&mut self) -> Vec<HeldKey> {
-        std::mem::take(&mut self.keys)
-    }
-
-    pub(super) fn take_buttons(&mut self) -> Vec<HeldButton> {
-        std::mem::take(&mut self.buttons)
+        std::mem::take(&mut self.0.lock().keys)
     }
 
     #[cfg(test)]
+    pub(super) fn take_buttons(&mut self) -> Vec<HeldButton> {
+        std::mem::take(&mut self.0.lock().buttons)
+    }
+
     pub(super) fn is_empty(&self) -> bool {
-        self.keys.is_empty() && self.buttons.is_empty()
+        let state = self.0.lock();
+        state.keys.is_empty() && state.buttons.is_empty()
+    }
+
+    pub(super) fn snapshot(&self) -> (Vec<HeldKey>, Vec<HeldButton>) {
+        let state = self.0.lock();
+        (state.keys.clone(), state.buttons.clone())
     }
 }
 

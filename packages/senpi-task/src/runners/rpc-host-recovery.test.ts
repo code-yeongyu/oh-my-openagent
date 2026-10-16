@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
 
 import { HOST_SESSION_REATTACH_TAG } from "./rpc-host/reattach"
 import { HostSessionClient } from "./rpc-host/session-client"
 import { isHostSessionHandle } from "./rpc-host"
 import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import type { RpcRunnerSpec } from "./types"
-import { TRANSPORT_LOST_REASON } from "./rpc-host/transport-recovery"
 
 // omo#8563: the runner owns the two recoveries a daemon child needs. A lost transport is
 // re-ensured and the same session path reopened (bounded backoff), and a host that is above its
@@ -89,7 +89,7 @@ describe("RpcHostRunner transport recovery", () => {
     for (const { client } of served) await client.detach()
   })
 
-  test("#given a reattached child whose continuation times out #when recovery cannot deliver #then it reports lost and settles the turn without reporting resumed (omo#9403)", async () => {
+  test("#given a reattached child whose continuation times out #when recovery cannot deliver #then it parks for contextual respawn without a terminal result", async () => {
     const failureMessage = "Timeout waiting for response to prompt. Stderr: "
     // given - the client the runner creates for the new host never answers a prompt
     const host = await fakeHost()
@@ -118,39 +118,40 @@ describe("RpcHostRunner transport recovery", () => {
     process.on("unhandledRejection", onUnhandled)
     try {
       const handle = await runner.start(childSpec())
-      const settled = handle.waitForOutcome?.()
-      if (settled === undefined) throw new Error("a host-session handle reports its turn outcome")
+      if (!isHostSessionHandle(handle)) throw new Error("expected a host-session handle")
+      const parked = Promise.withResolvers<string>()
+      handle.onParked((event) => parked.resolve(event.reason))
 
       // when
       await host.restart()
-      const outcome = await settled
-      await new Promise((resolve) => setImmediate(resolve))
+      expect(await bounded(parked.promise)).toBe("daemon_unavailable")
+      await handle.dispose()
 
       // then
-      expect(outcome).toMatchObject({
-        status: "error",
-        failure: { kind: "child-prompt-failed", message: failureMessage },
-      })
       expect(recoveryOutcomes).toEqual(["lost"])
       expect(unhandled).toEqual([])
       expect(handle.exitOutcome()).toBeUndefined()
-      await handle.terminate()
     } finally {
       process.off("unhandledRejection", onUnhandled)
     }
   })
 
-  test("#given a child mid-turn #when the daemon never comes back #then the child ends crashed with transport lost after the retries", async () => {
+  test("#given a child mid-turn #when the daemon never comes back #then the child parks after the retries", async () => {
     // given
     const host = await fakeHost()
     const runner = runnerOver(host, NO_WAIT)
     const handle = await runner.start(childSpec())
+    if (!isHostSessionHandle(handle)) throw new Error("expected a host-session handle")
+    const parked = Promise.withResolvers<string>()
+    handle.onParked((event) => parked.resolve(event.reason))
 
     // when
     host.crash()
 
     // then
-    expect(await handle.waitForExit()).toMatchObject({ kind: "crashed", facts: { stderrTail: TRANSPORT_LOST_REASON } })
+    expect(await bounded(parked.promise)).toBe("daemon_unavailable")
+    expect(handle.exitOutcome()).toBeUndefined()
+    await handle.dispose()
   })
 })
 

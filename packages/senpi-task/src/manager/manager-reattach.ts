@@ -37,7 +37,7 @@ export async function reattachManagedTask(input: {
   // answered) and idle: the new run is stamped "resumed, waiting for input" (senpi#3266).
   readonly awaitingInput?: { readonly reason: AwaitingInputReason }
 }): Promise<ReattachResult> {
-  const fresh = input.store.load(input.record.task_id)
+  let fresh = input.store.load(input.record.task_id)
   if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident" || fresh.killed === true) {
     await letGoOfRejected(input.handle)
     return { ok: false, kind: "failed", reason: "task ownership claim is not held by this host" }
@@ -64,6 +64,8 @@ export async function reattachManagedTask(input: {
   try {
     unsubscribe = input.attachLive(fresh, input.handle)
     attached = true
+    const reconciled = input.store.load(fresh.task_id)
+    if (reconciled !== null) fresh = reconciled
     if (isTerminalRecord(fresh)) {
       // The result stays, but the child now lives behind THIS handle: a daemon session reopened on a
       // newer generation answers under a new instance and routing id, so its identity is restamped.

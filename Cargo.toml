@@ -10,6 +10,7 @@ members = [
     "crates/senpi-desktop-backend-wayland",
     "crates/senpi-desktop-backend-win32",
     "crates/senpi-desktop-engine",
+    "crates/senpi-desktop-xpc",
 ]
 resolver = "2"
 

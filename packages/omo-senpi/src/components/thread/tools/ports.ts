@@ -96,8 +96,6 @@ export type ThreadToolSurfaceOptions = {
    * whether or not this process ever saw it alive.
    */
   readonly sessionsDirectory?: () => string
-  /** The agent dir whose `skills` directory `thread_create`'s `skills` are looked up in; defaults to `resolveAgentHome`. */
-  readonly agentDir?: () => string
   readonly ensureHost?: () => Promise<void>
   /**
    * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes

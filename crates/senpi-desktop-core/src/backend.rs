@@ -86,6 +86,12 @@ pub enum PointerEvent {
 }
 
 pub trait Backend: Send {
+    /// Independent release ownership, usable without borrowing a busy backend.
+    /// Owners register this before admitting input into bounded fatal-stop mode.
+    fn emergency_release(&self) -> Option<std::sync::Arc<dyn EmergencyRelease>> {
+        None
+    }
+
     fn permission_denied(&mut self, _permission: TccPermission) -> DesktopError {
         DesktopError::permission_denied("input permission is not granted")
     }
@@ -224,6 +230,11 @@ pub trait Backend: Send {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         Ok(false)
     }
+}
+
+/// Replays only tracked downs. Must not wait for the backend's input scope.
+pub trait EmergencyRelease: Send + Sync {
+    fn release_all(&self) -> CoreResult<()>;
 }
 
 /// The native window that owns an accessibility element.

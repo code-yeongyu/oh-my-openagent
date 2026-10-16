@@ -29,7 +29,7 @@ fn hotkey(chord: &str) -> Result<Hotkey, StopPathError> {
 fn shared(chord: &str) -> (Shared, Arc<FakeClock>) {
     let clock = Arc::new(FakeClock::new(1_000));
     let supervisor = Arc::new(Supervisor::new(clock.clone()));
-    (Shared::new(supervisor, hotkey(chord).unwrap()), clock)
+    (Shared::new(supervisor, hotkey(chord).unwrap()).unwrap(), clock)
 }
 
 #[test]
@@ -123,6 +123,10 @@ fn the_callback_re_enables_on_both_disable_notices_and_reads_only_key_downs() {
 fn the_chord_latches_a_hotkey_stop() {
     let (shared, _clock) = shared(DEFAULT_STOP_CHORD);
     shared.key_down(ESCAPE, CONTROL | OPTION | COMMAND);
+    let mut control = shared.control.lock();
+    shared.changed.wait_while_for(&mut control, |control| control.stops == 0, Duration::from_secs(5));
+    assert_eq!(control.stops, 1);
+    drop(control);
     let status = shared.supervisor.status();
     assert!(status.suspended);
     assert_eq!(status.stopped_by, Some(StopSource::Hotkey));

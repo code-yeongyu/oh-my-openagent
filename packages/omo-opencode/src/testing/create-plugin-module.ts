@@ -140,6 +140,7 @@ function startupToastBody(input: {
   readonly error?: string
   readonly migratedFrom: readonly string[]
   readonly skippedConflictCount: number
+  readonly targetBackupPaths: readonly string[]
 }): Record<string, unknown> | undefined {
   const summary = input.migratedFrom.length === 0
     ? ""
@@ -148,10 +149,11 @@ function startupToastBody(input: {
     ? ""
     : ` Kept ${input.skippedConflictCount} existing value${input.skippedConflictCount === 1 ? "" : "s"}.`
   const diagnostics = input.diagnostics.length === 0 ? "" : ` ${input.diagnostics.join(" ")}`
+  const backups = input.targetBackupPaths.length === 0 ? "" : ` Previous config saved as ${input.targetBackupPaths.join(", ")}.`
   if (input.error !== undefined) {
-    return { title: "Configuration migration failed", message: `${input.error}${diagnostics}`, variant: "error" }
+    return { title: "Configuration migration failed", message: `${input.error}${backups}${diagnostics}`, variant: "error" }
   }
-  if (summary.length > 0) return { title: "Configuration migrated", message: `${summary}${conflicts}${diagnostics}`, variant: "success" }
+  if (summary.length > 0 || backups.length > 0) return { title: "Configuration migrated", message: `${summary}${conflicts}${backups}${diagnostics}`.trim(), variant: "success" }
   if (diagnostics.length > 0) return { title: "Configuration diagnostics", message: input.diagnostics.join(" "), variant: "warning" }
   return undefined
 }
@@ -175,6 +177,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       journalResumed: startupMigration.journalResumed,
       migratedFrom: startupMigration.migratedFrom,
       skippedConflictCount: startupMigration.skippedConflictCount,
+      targetBackupPaths: startupMigration.targetBackupPaths,
     })
     if (startupMigration.error !== undefined) {
       console.warn(`[config-migration] legacy configuration changes were not applied: ${startupMigration.error}`)
@@ -184,6 +187,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       ...(startupMigration.error === undefined ? {} : { error: startupMigration.error }),
       migratedFrom: startupMigration.migratedFrom,
       skippedConflictCount: startupMigration.skippedConflictCount,
+      targetBackupPaths: startupMigration.targetBackupPaths,
     })
     if (toast !== undefined) showStartupToast(input.client, toast, deps.log)
 

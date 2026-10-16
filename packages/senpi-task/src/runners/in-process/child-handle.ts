@@ -87,6 +87,9 @@ export type RunnerOutcome =
   | { readonly status: "completed"; readonly finalResponse: string; readonly model?: string }
   | { readonly status: "error"; readonly failure: RunnerFailure; readonly killed?: boolean; readonly model?: string }
   | { readonly status: "cancelled" }
+  // Another client's user abort (F10a): the run is resumable, its partial text is kept, and no
+  // failure ever fires for it.
+  | { readonly status: "interrupted"; readonly finalResponse?: string; readonly abortedBy?: string }
 
 export type ChildCompletionPolicy = "final-text" | "turn"
 

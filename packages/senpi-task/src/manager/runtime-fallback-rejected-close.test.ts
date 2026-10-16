@@ -6,7 +6,7 @@ import { hostRunnerHarness } from "../runners/rpc-host.test-support"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import { adaptRpcHandle } from "./child-handle"
-import { baseSpec, cleanupProjects, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
@@ -70,6 +70,7 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
     })
     const task = await manager.start(baseSpec({ execution_mode: "process" }))
     if (task.kind !== "started") throw new Error("expected the task to start")
+    await launchSettled(manager, task.task_id)
     const [original] = host.sessions()
     if (original === undefined) throw new Error("expected the failed rung's session")
     host.withholdReply("close_session")

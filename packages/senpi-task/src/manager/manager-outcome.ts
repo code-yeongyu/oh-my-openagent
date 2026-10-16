@@ -234,6 +234,22 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
           return
         }
 
+        // A foreign user abort interrupted the run (F10a): terminal and resumable with its partial
+        // text kept, and never a failure - no fail transition, so no failure notification fires
+        // and no runtime fallback is attempted.
+        if (outcome.status === "interrupted") {
+          ports.releaseSlot(taskId, model, epoch)
+          const settlingInterrupted = settleIsolationFor(ports, owned, false)
+          if (settlingInterrupted !== undefined) await settlingInterrupted
+          persistTerminal(taskId, owned, timestamp, {
+            type: "interrupt",
+            timestamp,
+            ...(outcome.finalResponse === undefined ? {} : { final_response: outcome.finalResponse }),
+            ...(runStats === undefined ? {} : { run_stats: runStats }),
+          })
+          return
+        }
+
         ports.releaseSlot(taskId, model, epoch)
         const settling = settleIsolationFor(ports, owned, outcome.status === "completed" && outcome.finalResponse.length > 0)
         if (settling !== undefined) await settling

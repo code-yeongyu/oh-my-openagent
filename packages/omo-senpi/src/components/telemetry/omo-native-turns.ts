@@ -7,12 +7,15 @@ import {
   KNOWN_MODELS,
   KNOWN_PROVIDERS,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
+  maskProviderAndModel,
 } from "./product-identity"
+import type { SessionSummaryRecorder } from "./omo-native-session-summary"
 
 export type OmoNativeTurnHandlerOptions = {
   readonly client: Pick<EventTelemetryClient, "captureEvent">
   readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
   readonly sessionId: string
+  readonly summary: SessionSummaryRecorder
 }
 
 type TurnCompletedProperty = (typeof OMO_NATIVE_PROPERTY_ALLOWLISTS.turn_completed)[number]
@@ -46,9 +49,31 @@ export function createOmoNativeTurnHandler(
       total_tokens: total.value,
       cost_usd: roundToFourDecimals(costTotal.value),
       turn_index: event.turnIndex,
+      sample_rate: options.summary.sampleRate,
     } satisfies Record<TurnCompletedProperty, string | number>
 
-    if (![input, output, cacheRead, cacheWrite, reasoning, total, costTotal].every(({ valid }) => valid)) {
+    const usageValid = [input, output, cacheRead, cacheWrite, reasoning, total, costTotal].every(({ valid }) => valid)
+    const summaryModel = maskProviderAndModel(event.message.provider, event.message.model)
+    options.summary.recordTurn(options.sessionId, {
+      turnIndex: event.turnIndex,
+      provider: summaryModel.provider,
+      modelId: summaryModel.model_id,
+      inputTokens: input.value,
+      outputTokens: output.value,
+      cacheReadTokens: cacheRead.value,
+      cacheWriteTokens: cacheWrite.value,
+      reasoningTokens: reasoning.value,
+      totalTokens: total.value,
+      costUsd: costTotal.value,
+      usageValid,
+      stopReason: stopReasonOf(event.message),
+      toolResultCount: Array.isArray(event.toolResults) ? event.toolResults.length : 0,
+      toolErrorCount: Array.isArray(event.toolResults)
+        ? event.toolResults.filter((result) => asRecord(result)?.["isError"] === true).length
+        : 0,
+    })
+
+    if (!usageValid) {
       options.diagnostics?.({
         event: "telemetry_event_property_rejected",
         source: "omo-native-turns",
@@ -56,8 +81,15 @@ export function createOmoNativeTurnHandler(
         errorKind: "error",
       })
     }
-    options.client.captureEvent("turn_completed", properties)
+    if (options.summary.isRawTurnSampled(options.sessionId)) {
+      options.client.captureEvent("turn_completed", properties)
+    }
   }
+}
+
+function stopReasonOf(message: unknown): string | undefined {
+  const reason = asRecord(message)?.["stopReason"]
+  return typeof reason === "string" ? reason : undefined
 }
 
 export function maskModel(provider: string, modelId: string): { provider: string; model_id: string } {

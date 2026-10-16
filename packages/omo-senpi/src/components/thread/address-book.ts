@@ -1,11 +1,11 @@
-import { readdirSync, readFileSync } from "node:fs"
+import { readdirSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 
 import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import type { ThreadStatus } from "./contracts"
 import type { EndpointKind } from "./endpoint-registry"
 import type { GatewayAddressEntry } from "./gateway/engine"
-import { parseSessionLines, readSessionFacts, summarizeSessionEntries, threadTitle, type SessionFacts } from "./session-facts"
+import { readSessionFacts, threadTitle, type SessionFacts } from "./session-facts"
 
 export type HostSessionStatus = "opening" | "open" | "closing" | "closed"
 
@@ -279,28 +279,14 @@ export function toGatewayAddressEntries(entries: readonly AddressEntry[]): Gatew
   }))
 }
 
-/** One session file's durable identity, or null when the file is unreadable or has no header. */
+/**
+ * One session file's durable identity, or null when the file is unreadable or has no header. Read
+ * through `readSessionFacts` (two bounded windows), so listing a dead endpoint never reads a whole
+ * transcript; only `thread_read` does.
+ */
 export function readDiskSession(path: string, sourceHost: string | null): DiskSession | null {
-  let content: string
-  try {
-    content = readFileSync(path, "utf8")
-  } catch {
-    return null
-  }
-
-  const facts = readSessionFacts(path)
-  if (facts === null) return null
-  const { name, first_user_text: firstUserText } = summarizeSessionEntries(parseSessionLines(content))
-  return {
-    durable_id: facts.durable_id,
-    name,
-    cwd: facts.cwd,
-    created_at: facts.created_at,
-    updated_at: facts.updated_at,
-    session_path: path,
-    source_host: sourceHost,
-    ...(firstUserText === null ? {} : { first_user_text: firstUserText }),
-  }
+  const session = diskSessionFromFacts(path)
+  return session === null ? null : { ...session, source_host: sourceHost }
 }
 
 export type FindDiskSessionsOptions = {

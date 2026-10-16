@@ -20,6 +20,8 @@ export interface ComputerUseRuntimeOptions {
   readonly engineChild?: (enginePath: string | undefined) => ChildFactory
   readonly onEngineError: (code: ComputerUseEngineErrorCode) => void
   readonly onPermissionRequired?: TrackedDesktopServiceOptions["onPermissionRequired"]
+  /** True when the session runs in full access; foreground control is then granted without a confirm. */
+  readonly fullAccess?: () => boolean
 }
 
 /**
@@ -36,7 +38,7 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
     onPermissionRequired: options.onPermissionRequired,
   })
   const handle = new ComputerHandle({ service, settings: () => options.settings })
-  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool, confirmControl: confirmComputerControl }
+  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool, confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }) }
   return {
     handle,
     service,

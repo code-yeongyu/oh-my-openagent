@@ -20,14 +20,26 @@ export type RuntimeFallbackRecoveryDecision = "retry-owned" | "declined" | "time
 
 export const RUNTIME_FALLBACK_RECOVERY_DECISION_TIMEOUT_MS = 20_000
 
+type SettledDecision = Exclude<RuntimeFallbackRecoveryDecision, "timed-out">
+
 type RecoveryClaim = {
   readonly sessionID: string
-  decision: RuntimeFallbackRecoveryDecision | undefined
-  readonly waiters: Array<(decision: RuntimeFallbackRecoveryDecision) => void>
+  decision: SettledDecision | undefined
+  readonly waiters: Array<(decision: SettledDecision) => void>
 }
 
 const recoveryClaims = new WeakMap<object, RecoveryClaim>()
+const unsettledClaims = new Set<RecoveryClaim>()
 let registeredOwners = 0
+
+function settleClaim(claim: RecoveryClaim, decision: SettledDecision): void {
+  if (claim.decision !== undefined) return
+  claim.decision = decision
+  unsettledClaims.delete(claim)
+  for (const resolve of claim.waiters.splice(0)) {
+    resolve(decision)
+  }
+}
 
 /** Called by the runtime-fallback hook for its lifetime. Without an owner no claim is ever opened. */
 export function registerRuntimeFallbackRecoveryOwner(): () => void {
@@ -37,26 +49,25 @@ export function registerRuntimeFallbackRecoveryOwner(): () => void {
     if (released) return
     released = true
     registeredOwners = Math.max(0, registeredOwners - 1)
+    if (registeredOwners > 0) return
+    // No owner is left to decide, so nothing will settle the open claims: decline them now instead of
+    // leaving each waiter to its timeout and the task to polling.
+    for (const claim of [...unsettledClaims]) settleClaim(claim, "declined")
   }
 }
 
 /** Called by the event dispatcher before any hook sees the event. */
 export function openRuntimeFallbackRecoveryClaim(event: object, sessionID: string): void {
   if (registeredOwners === 0 || recoveryClaims.has(event)) return
-  recoveryClaims.set(event, { sessionID, decision: undefined, waiters: [] })
+  const claim: RecoveryClaim = { sessionID, decision: undefined, waiters: [] }
+  recoveryClaims.set(event, claim)
+  unsettledClaims.add(claim)
 }
 
 /** Called by the runtime-fallback hook once it has finished handling the event. */
-export function settleRuntimeFallbackRecoveryClaim(
-  event: object,
-  decision: RuntimeFallbackRecoveryDecision,
-): void {
+export function settleRuntimeFallbackRecoveryClaim(event: object, decision: SettledDecision): void {
   const claim = recoveryClaims.get(event)
-  if (!claim || claim.decision !== undefined) return
-  claim.decision = decision
-  for (const resolve of claim.waiters.splice(0)) {
-    resolve(decision)
-  }
+  if (claim) settleClaim(claim, decision)
 }
 
 /**
@@ -74,7 +85,7 @@ export function awaitRuntimeFallbackRecoveryDecision(
   if (claim.decision !== undefined) return Promise.resolve(claim.decision)
 
   return new Promise((resolve) => {
-    const onDecision = (decision: RuntimeFallbackRecoveryDecision) => {
+    const onDecision = (decision: SettledDecision) => {
       clearTimeout(timer)
       resolve(decision)
     }
@@ -91,6 +102,20 @@ export function awaitRuntimeFallbackRecoveryDecision(
   })
 }
 
+/**
+ * The decision the hook settles after a waiter already timed out. Resolves once the claim is settled,
+ * including by the last owner's release, so a late `declined` can still finalize the task.
+ */
+export function awaitLateRuntimeFallbackRecoveryDecision(event: object): Promise<SettledDecision> | undefined {
+  const claim = recoveryClaims.get(event)
+  if (!claim) return undefined
+  if (claim.decision !== undefined) return Promise.resolve(claim.decision)
+  return new Promise((resolve) => {
+    claim.waiters.push(resolve)
+  })
+}
+
 export function _resetRuntimeFallbackRecoveryForTesting(): void {
   registeredOwners = 0
+  unsettledClaims.clear()
 }

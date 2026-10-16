@@ -1,3 +1,7 @@
+## 2026-10-15 - Setup e2e tests keep the child's temp files inside the fixture (#10163)
+
+`setup-opencode-providers.test.ts` runs the real launcher from a copied app that has no `node_modules`, so Bun auto-installs the engine's dependencies on first import and extracts them under the temp dir. On Windows those extraction directories (`.typebox`, `.openai`, `.client-bedrock-runtime`) outlived the child and tripped the #9766 temp-leak guard in other PRs' Windows shard. The child now gets `TMPDIR`/`TEMP`/`TMP`/`BUN_TMPDIR` inside the fixture root, which teardown removes. The Bun install cache stays the host's: a cache is not a temp leak, and a fresh per-file cache made the first engine-importing case install about 52k files cold (6.1 s instead of 0.14 s on macOS), which would have made the #10210 Windows timeout worse. One case asserts that the child's `os.tmpdir()` is the fixture's tmp dir, another that the child keeps the host's Bun install cache.
+
 ## 2026-10-14 - omo setup carries OpenCode's catalog providers, not only custom blocks (#10158)
 
 Thanks to @taxilian for the report on #8485. OpenCode serves every provider in its models.dev catalog as soon as it has a key. `omo setup` only carried omo's builtins and `provider.<id>` blocks, so a key for a catalog provider like `neuralwatt` was dropped as "a provider omo does not serve", and an OpenCode default model on it was not carried either.

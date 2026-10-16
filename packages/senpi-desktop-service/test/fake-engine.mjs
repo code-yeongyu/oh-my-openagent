@@ -10,6 +10,8 @@
 //   "release"     - reply, then flush every held reply
 //   "hang"        - never reply, ignore $/cancel
 //   "cancellable" - never reply until $/cancel names this id, then reply Cancelled
+//   "release-fails" - never reply until $/cancel names this id, then reply InputFailed with the
+//                   engine's merged "input release also failed" text (a hold whose key-up failed)
 //   "notify"      - emit one audit and one stopPath.changed notification, then reply
 //   "exit"        - exit with code 7 without replying
 //   otherwise     - reply { method, params, pid }
@@ -65,6 +67,7 @@ const fail = (id, code, message, rpcCode = -32000) =>
 	send({ id, error: { code: rpcCode, message, data: { code, hint: null } } });
 const held = [];
 const cancellable = new Set();
+const releaseFails = new Set();
 
 function handle(request) {
 	const { id, method, params } = request;
@@ -109,6 +112,9 @@ function handle(request) {
 			return reply(id, null);
 		case "$/cancel":
 			if (cancellable.delete(params.id)) fail(params.id, "Cancelled", "request was cancelled by $/cancel");
+			if (releaseFails.delete(params.id)) {
+				fail(params.id, "Cancelled", "the hold request was cancelled; input release also failed: key up for shift failed");
+			}
 			return;
 	}
 	if (desktop !== undefined && params?.fake === undefined) {
@@ -131,6 +137,8 @@ function handle(request) {
 			return;
 		case "cancellable":
 			return cancellable.add(id);
+		case "release-fails":
+			return releaseFails.add(id);
 		case "notify":
 			send({ method: "audit", params: { action: method, target: "screen", delivery: "background", durationMs: 3 } });
 			send({ method: "stopPath.changed", params: status() });

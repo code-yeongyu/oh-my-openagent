@@ -12,7 +12,7 @@ import type { SenpiModelRegistryPort, SenpiModelPort } from "@oh-my-opencode/sen
 import type { ComponentLogger } from "../../extension/types"
 import { AGENT_DIR_ENV_NAMES, resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import type { MemoryIdentityContext } from "./context"
+import { ensureIdentityRuntimeDirs, type MemoryIdentityContext } from "./context"
 import { createReflectionRunIdFactory } from "./reflection-run-id"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
 import {
@@ -49,7 +49,7 @@ export interface MemoryIdentityRuntime {
   readonly store: ReflectionReservationStore
   readonly reservationPort: ReflectionReservationPort
   readonly runner: SenpiSubprocessRunner
-  launch(run: ReservedRun): void
+  launch(run: ReservedRun): Promise<void>
   reconcile(): Promise<void>
 }
 
@@ -125,13 +125,33 @@ export function createIdentityRuntime(
       new TranscriptJournal({ journalDir: join(identity.identityPaths.transcripts, conversationId) }).getState(),
     ...(deps.liveSession === undefined ? {} : { liveSession: deps.liveSession }),
   })
-  const launch = (run: ReservedRun): void => {
-    void runner.launch(run).then((result) => {
-      if (result.launch !== undefined) launch(result.launch)
-    }).catch((error: unknown) => {
-      deps.logger?.warn("memory reflection launch failed", { error: describe(error) })
+  // #7012: identities created before newer layout entries never got runtime/reflection-sessions
+  // (and other runtime dirs), and the lazy sandbox binds them writable, so bwrap died with
+  // "Can't find source path". Backfill every identity runtime dir once per runtime, before the
+  // runner can build the sandbox or spawn. Ported from #7236 by @AceRothstein71.
+  // A failed backfill must never be cached: forget it so the next launch retries, tell the user
+  // why in plain words with the next step, and still launch (the sandbox creates each directory it
+  // binds itself, so reflection keeps working for every directory that can exist).
+  let runtimeDirsReady: Promise<void> | undefined
+  const ensureRuntimeDirsOnce = (): Promise<void> => {
+    runtimeDirsReady ??= ensureIdentityRuntimeDirs(identity.identityPaths).catch((error: unknown) => {
+      runtimeDirsReady = undefined
+      deps.logger?.warn(
+        `memory reflection could not create its runtime directories under ${identity.identityPaths.root}: ${describe(error)}. Check that this directory is writable (permissions, free disk space); reflection keeps running and retries on the next run.`,
+      )
     })
+    return runtimeDirsReady
   }
+  const launch = (run: ReservedRun): Promise<void> =>
+    ensureRuntimeDirsOnce()
+      .then(() => runner.launch(run))
+      .then((result) => {
+        if (result.launch !== undefined) void launch(result.launch)
+      })
+      .catch((error: unknown) => {
+        deps.logger?.warn("memory reflection launch failed", { error: describe(error) })
+      })
+
   const runtime: MemoryIdentityRuntime = {
     identity,
     store,

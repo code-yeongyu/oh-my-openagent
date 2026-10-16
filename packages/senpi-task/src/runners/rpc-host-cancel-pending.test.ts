@@ -203,7 +203,7 @@ describe("a pending cancel always ends the run", () => {
 
     // when - the next session start, with the host answering the close
     world.host.allowReply("close_session")
-    const again = world.connect(parent.sessionId, { ...lane.options, hostCloseTimeoutMs: 50 })
+    const again = world.connect(parent.sessionId, lane.options)
     await again.lifecycle.reconcileOnSessionStart(parent.sessionId)
 
     // then

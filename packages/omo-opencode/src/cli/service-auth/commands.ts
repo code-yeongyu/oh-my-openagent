@@ -108,7 +108,43 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   }
 }
 
-export function configureServiceAuthCommands(program: Command): void {
+/** The one switch for OmO service accounts (#10262): set to true when accounts open to everyone. */
+export const SERVICE_ACCOUNTS_OPEN: boolean = false
+
+export const SERVICE_ACCOUNTS_CLOSED_MESSAGE = "OmO accounts aren't available yet."
+
+const SERVICE_AUTH_COMMANDS = ["login", "logout", "whoami"] as const
+
+// The sign-in suites exercise the real flow through the launcher; their in-process preload opens
+// the commands here, which nothing a user can set (no env var, flag or config) reaches.
+const testOpenKey = Symbol.for("omo.test.serviceAccountsOpen")
+
+function serviceAccountsOpen(): boolean {
+  return SERVICE_ACCOUNTS_OPEN || (globalThis as Record<symbol, unknown>)[testOpenKey] === true
+}
+
+function refuseClosedServiceAuth(): never {
+  console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
+  process.exit(1)
+}
+
+function configureClosedServiceAuthCommands(program: Command): void {
+  for (const name of SERVICE_AUTH_COMMANDS) {
+    const command = program.command(name, { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
+      .action(() => {
+        console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
+        process.exitCode = 1
+      })
+    // `omo help <name>` calls the subcommand's help() directly, bypassing its action.
+    command.help = refuseClosedServiceAuth
+  }
+}
+
+export function configureServiceAuthCommands(program: Command, open = serviceAccountsOpen()): void {
+  if (!open) {
+    configureClosedServiceAuthCommands(program)
+    return
+  }
   program.command("login").description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")

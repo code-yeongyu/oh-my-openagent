@@ -1,4 +1,4 @@
-import { isServerRunning, runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
+import { escapeTmuxFormat, isServerRunning, runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
 import { log } from "../logger"
 import { shellSingleQuote } from "../shell-quote"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
@@ -83,7 +83,7 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
   const environmentArgs = buildPaneEnvironmentArgs()
   if (teammatePanes.length === 0) {
-    return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
+    return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", escapeTmuxFormat(getPaneWorkingDirectory(member))]
   }
 
   return [
@@ -97,7 +97,7 @@ function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, memb
     "-F",
     "#{pane_id}",
     "-c",
-    getPaneWorkingDirectory(member),
+    escapeTmuxFormat(getPaneWorkingDirectory(member)),
   ]
 }
 

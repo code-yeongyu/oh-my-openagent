@@ -23,6 +23,8 @@ export type SendManager = Pick<TaskManager, "sendToTask" | "list" | "redispatchT
 export type CancelManager = Pick<TaskManager, "cancelTask" | "get">
 
 export type SendResultDetails =
+  | { readonly kind: "uncertain"; readonly task_id: string; readonly effect_id: string; readonly reason: string }
+  | { readonly kind: "failed"; readonly task_id: string; readonly effect_id: string; readonly reason: string; readonly detail: string; readonly action: string }
   | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: "steer" }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }

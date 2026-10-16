@@ -1,5 +1,5 @@
 // gates-figures.mjs - visual gates: G2 palette, G8 chart without figure, G9 chart svg text,
-// G10 Korean serif/brush fonts.
+// G10 Korean serif/brush fonts, G16 report without any visual, G17 image without alt text.
 //
 // Each gate is { codes, skip?(ctx), run(ctx) -> Defect[] } over the context built by
 // gates-static.mjs. Plain Node ESM, sibling imports only.
@@ -27,14 +27,30 @@ function pixels(value) {
 	return match ? Number(match[1]) : null
 }
 
+function fromStyle(node, prop) {
+	return pixels(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, "i").exec(node.attrs.style ?? "")?.[1])
+}
+
+function viewBoxSize(node) {
+	const box = String(node.attrs.viewbox ?? "").trim().split(/[\s,]+/).map(Number)
+	return box.length === 4 && box.every(Number.isFinite) ? { width: box[2], height: box[3] } : null
+}
+
 /** Largest declared dimension: width/height attributes or style, else the viewBox. */
 function declaredSize(node) {
-	const style = node.attrs.style ?? ""
-	const fromStyle = (prop) => pixels(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, "i").exec(style)?.[1])
-	const sizes = [pixels(node.attrs.width), pixels(node.attrs.height), fromStyle("width"), fromStyle("height")].filter((n) => n !== null)
+	const sizes = [pixels(node.attrs.width), pixels(node.attrs.height), fromStyle(node, "width"), fromStyle(node, "height")].filter((n) => n !== null)
 	if (sizes.length) return Math.max(...sizes)
-	const box = String(node.attrs.viewbox ?? "").trim().split(/[\s,]+/).map(Number)
-	return box.length === 4 && box.every(Number.isFinite) ? Math.max(box[2], box[3]) : null
+	const box = viewBoxSize(node)
+	return box ? Math.max(box.width, box.height) : null
+}
+
+/**
+ * True when any declared dimension is zero, so the element cannot render visibly. Each axis reads its inline
+ * style first, then its attribute, then the viewBox. An undeclared axis is not zero: the browser sizes it.
+ */
+function hasZeroDimension(node) {
+	const box = viewBoxSize(node)
+	return ["width", "height"].some((axis) => (fromStyle(node, axis) ?? pixels(node.attrs[axis]) ?? box?.[axis] ?? null) === 0)
 }
 
 function isIcon(ctx, node) {
@@ -82,6 +98,19 @@ function missingChartLabels(raw) {
 	if (ticks < MIN_TICKS) missing.push(`numeric ticks (${ticks} < ${MIN_TICKS})`)
 	if (!texts.some((text) => /\p{L}/u.test(text.value) && !NUMERIC.test(text.value))) missing.push("text label")
 	return missing
+}
+
+const DECORATIVE_ROLE = /^(?:presentation|none)$/i
+
+/** An image explicitly marked decorative: empty alt plus role=presentation|none or aria-hidden=true. */
+function isDecorative(node) {
+	if (node.tag !== "img" || node.attrs.alt === undefined || String(node.attrs.alt).trim()) return false
+	return DECORATIVE_ROLE.test(String(node.attrs.role ?? "").trim()) || String(node.attrs["aria-hidden"] ?? "").trim() === "true"
+}
+
+/** A rendered diagram (Mermaid marks its root with aria-roledescription) has node labels, not axes and ticks. */
+function isDiagram(node) {
+	return Boolean(node.attrs["aria-roledescription"])
 }
 
 function colorUses(ctx) {
@@ -147,11 +176,30 @@ export const figureGates = [
 			for (const node of visuals(ctx)) {
 				if (node.tag !== "svg") continue
 				if (!((declaredSize(node) ?? 0) >= CHART_MIN || ctx.util.closest(node, isFigure(ctx)))) continue
+				if (isDiagram(node)) {
+					if (!svgTexts(node.raw ?? "").length) defects.push(ctx.defect("chart_svg_no_text", node, `${label(node)} diagram has no <text> labels (render Mermaid with htmlLabels off)`))
+					continue
+				}
 				const missing = missingChartLabels(node.raw ?? "")
 				if (missing === null) defects.push(ctx.defect("chart_svg_no_text", node, `${label(node)} chart has no <text> and no <title>`))
 				else if (missing.length) defects.push(ctx.defect("chart_svg_missing_labels", node, `${label(node)} chart is missing: ${missing.join(", ")}`))
 			}
 			return defects
+		},
+	},
+	{
+		codes: ["report_without_visual"],
+		run(ctx) {
+			if (visuals(ctx).some((node) => !hasZeroDimension(node) && !isDecorative(node))) return []
+			return [ctx.defect("report_without_visual", ctx.body, "the report has no chart, diagram, or figure image")]
+		},
+	},
+	{
+		codes: ["image_missing_alt"],
+		run(ctx) {
+			return visuals(ctx)
+				.filter((node) => node.tag === "img" && !String(node.attrs.alt ?? "").trim() && !isDecorative(node))
+				.map((node) => ctx.defect("image_missing_alt", node, `${label(node)} has no alt text`))
 		},
 	},
 	{
