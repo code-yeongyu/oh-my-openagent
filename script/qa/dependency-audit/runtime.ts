@@ -3,6 +3,7 @@ import { chmod, copyFile, mkdir, mkdtemp, readdir, realpath, rm, stat } from "no
 import { hostname } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { z } from "zod"
+import { withTelemetryOptOut } from "../../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { AuditError, normalizeReceipt, type CaptureOptions } from "./contracts"
 
 export const REPO = resolve(import.meta.dir, "../../..")
@@ -54,17 +55,17 @@ export async function createRuntime(options: CaptureOptions): Promise<Runtime> {
     await chmod(binary, 0o755)
     const [sha256, sourceHash, stats] = await Promise.all([hashFile(binary), hashFile(resolve(options.binary)), stat(binary)])
     if (sha256 !== sourceHash) throw new AuditError("copy", "binary hash changed during copy")
-    const env = {
+    const env = withTelemetryOptOut({
       PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home, TMPDIR: join(root, "tmp"), TMP: join(root, "tmp"), TEMP: join(root, "tmp"),
       XDG_CONFIG_HOME: join(home, "config"), XDG_DATA_HOME: join(home, "data"), XDG_STATE_HOME: join(home, "state"), XDG_CACHE_HOME: join(home, "cache"),
       OMO_CODING_AGENT_DIR: agent, SENPI_CODING_AGENT_DIR: agent, PI_CODING_AGENT_DIR: agent,
-      OMO_OFFLINE: "1", SENPI_OFFLINE: "1", PI_OFFLINE: "1", DO_NOT_TRACK: "1",
+      OMO_OFFLINE: "1", SENPI_OFFLINE: "1", PI_OFFLINE: "1",
       OMO_DISABLE_POSTHOG: "1", OMO_SENPI_DISABLE_POSTHOG: "1", OMO_SEND_ANONYMOUS_TELEMETRY: "0", OMO_SENPI_SEND_ANONYMOUS_TELEMETRY: "0",
       OMO_RPC_CLIENT_CAPABILITIES: "extension_events",
       TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "en_US.UTF-8",
       AWS_ACCESS_KEY_ID: "AKIAAUDITFAKE00000000", AWS_SECRET_ACCESS_KEY: "audit-fake-secret", AWS_REGION: "us-east-1",
       AWS_DEFAULT_REGION: "us-east-1", AWS_EC2_METADATA_DISABLED: "true", AWS_BEDROCK_FORCE_HTTP1: "1",
-    }
+    })
     await Bun.write(join(agent, "settings.json"), JSON.stringify({ defaultProvider: "audit-local", defaultModel: "audit-v1", retry: { enabled: false }, installTelemetry: false, autoCompactEnabled: false }))
     await Bun.write(join(home, ".omo/omo.json"), JSON.stringify({ telemetry: { enabled: false }, memory: { enabled: false } }))
     const provision = requireSuccess(await run([binary, "--version"], { cwd, env }))
