@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
-import { createEventTelemetryClient, createTelemetryClient } from "./index"
+import { gunzipSync } from "node:zlib"
+
+import { createDefaultPostHogTransport, createEventTelemetryClient, createTelemetryClient } from "./index"
 import type {
   TelemetryCaptureMessage,
   TelemetryDiagnosticInput,
@@ -71,6 +73,120 @@ function createClient(recorder: Recorder, diagnostics: TelemetryDiagnosticInput[
   })
 }
 
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+describe("event telemetry client event ids", () => {
+  test("#given two captures in the same millisecond #when they reach the transport #then each carries a distinct, increasing uuidv7 event_id mirrored to uuid", () => {
+    // given
+    const recorder = createRecorder()
+    const client = createClient(recorder)
+
+    // when
+    client.captureEvent("session_started", { reason: "startup" })
+    client.captureEvent("session_started", { reason: "reload" })
+
+    // then
+    const [first, second] = recorder.messages
+    const firstId = first?.properties?.event_id
+    const secondId = second?.properties?.event_id
+    expect(typeof firstId === "string" && UUID_V7.test(firstId)).toBe(true)
+    expect(typeof secondId === "string" && UUID_V7.test(secondId)).toBe(true)
+    expect(String(secondId) > String(firstId)).toBe(true)
+    expect(first?.uuid).toBe(String(firstId))
+    expect(second?.uuid).toBe(String(secondId))
+  })
+
+  test("#given a product or a caller that supplies event_id #when an event is captured #then the client-minted id wins", () => {
+    // given
+    const recorder = createRecorder()
+    const client = createEventTelemetryClient({
+      distinctId: "machine-hash",
+      env: { POSTHOG_API_KEY: "test-key" },
+      product: { ...PRODUCT, additionalProperties: { event_id: "spoofed-by-product" } },
+      propertyAllowlist: { session_started: ["event_id"] },
+      schemaVersion: 1,
+      source: "test",
+      transportFactory: recorder.factory,
+    })
+
+    // when
+    client.captureEvent("session_started", { event_id: "spoofed-by-caller" })
+
+    // then
+    const message = recorder.messages[0]
+    expect(String(message?.properties?.event_id)).toMatch(UUID_V7)
+    expect(message?.uuid).toBe(String(message?.properties?.event_id))
+  })
+
+  test("#given onCapture #when an event is captured #then the observer sees the same event_id the transport received", () => {
+    // given
+    const recorder = createRecorder()
+    const observed: TelemetryCaptureMessage[] = []
+    const client = createEventTelemetryClient({
+      distinctId: "machine-hash",
+      env: { POSTHOG_API_KEY: "test-key" },
+      onCapture: (payload) => observed.push(payload),
+      product: PRODUCT,
+      propertyAllowlist: ALLOWLIST,
+      schemaVersion: 1,
+      source: "test",
+      transportFactory: recorder.factory,
+    })
+
+    // when
+    client.captureEvent("session_started", { reason: "startup" })
+
+    // then
+    expect(observed[0]?.uuid).toBe(recorder.messages[0]?.uuid)
+    expect(observed[0]?.properties?.event_id).toBe(recorder.messages[0]?.properties?.event_id)
+  })
+
+  test("#given the real PostHog transport and a local sink #when an event is flushed #then the batch body's uuid equals properties.event_id", async () => {
+    // given
+    const bodies: unknown[] = []
+    const sink = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      async fetch(request) {
+        const bytes = new Uint8Array(await request.arrayBuffer())
+        const text = request.headers.get("content-encoding") === "gzip"
+          ? gunzipSync(bytes).toString("utf8")
+          : new TextDecoder().decode(bytes)
+        bodies.push(JSON.parse(text))
+        return Response.json({ status: 1 })
+      },
+    })
+    const client = createEventTelemetryClient({
+      distinctId: "machine-hash",
+      env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: `http://127.0.0.1:${sink.port}` },
+      product: PRODUCT,
+      propertyAllowlist: ALLOWLIST,
+      schemaVersion: 1,
+      source: "test",
+      transportFactory: createDefaultPostHogTransport,
+    })
+
+    try {
+      // when
+      client.captureEvent("session_started", { reason: "startup" })
+      await client.flush()
+    } finally {
+      await client.shutdown()
+      sink.stop(true)
+    }
+
+    // then
+    const batch = bodies.flatMap((body) => {
+      const items = typeof body === "object" && body !== null ? Reflect.get(body, "batch") : undefined
+      return Array.isArray(items) ? items : []
+    })
+    expect(batch).toHaveLength(1)
+    const [wire] = batch
+    expect(String(wire.properties.event_id)).toMatch(UUID_V7)
+    expect(wire.uuid).toBe(wire.properties.event_id)
+  })
+})
+
 describe("event telemetry client", () => {
   test("#given allowlisted and unknown properties #when an event is captured #then unknown keys are dropped with a diagnostic", () => {
     // given
@@ -101,7 +217,9 @@ describe("event telemetry client", () => {
     expect(recorder.messages).toEqual([{
       distinctId: "machine-hash",
       event: "session_started",
+      uuid: expect.stringMatching(UUID_V7),
       properties: {
+        event_id: expect.stringMatching(UUID_V7),
         $process_person_profile: false,
         $session_id: "session-hash",
         active: true,
@@ -193,6 +311,7 @@ describe("event telemetry client", () => {
     })
     // and: every authored-payload guard is untouched by the geoip change
     expect(recorder.messages[0]?.properties).toEqual({
+      event_id: expect.stringMatching(UUID_V7),
       $process_person_profile: false,
       $session_id: "session-hash",
       package_version: "5.0.0",
@@ -317,6 +436,7 @@ describe("event telemetry client", () => {
     // then
     expect(recorder.messages).toHaveLength(1)
     expect(recorder.messages[0]?.properties).toEqual({
+      event_id: expect.stringMatching(UUID_V7),
       $process_person_profile: false,
       package_version: "5.0.0",
       platform: "omo-senpi",

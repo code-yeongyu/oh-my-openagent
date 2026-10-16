@@ -33,6 +33,7 @@ function createRecorder(): {
     handle: createOmoNativeTurnHandler({
       client,
       diagnostics: (input) => diagnostics.push(input),
+      isConsented: () => true,
       sessionId: "hashed-session",
       summary: createSessionSummaryRecorder({
         captureEvent: () => undefined,
@@ -50,12 +51,45 @@ test("#given a known model routed through an unknown provider #when the summary 
     sampleRate: 0,
     store: { read: () => undefined, write: () => undefined, remove: () => undefined, claimOrphans: () => [] },
   })
-  const handle = createOmoNativeTurnHandler({ client: { captureEvent: () => undefined }, sessionId: "s", summary })
+  const handle = createOmoNativeTurnHandler({ client: { captureEvent: () => undefined }, isConsented: () => true, sessionId: "s", summary })
 
   handle(turnEvent({ provider: "my-private-gateway", model: "gpt-5.6-sol" }))
   summary.finish("s", "quit")
 
   expect(rows[0]).toMatchObject({ m1_provider: "custom", m1_model: "gpt-5.6-sol", custom_model_turns: 0 })
+})
+
+// Sampling is decided per session, long before a turn is sent. Consent must be read again at send time:
+// a session that was sampled while opted in and is then opted out must not send a raw turn.
+test("#given a sampled session whose consent is withdrawn between sampling and send #when the turn ends #then no turn_completed is sent", () => {
+  // given
+  const sent: string[] = []
+  let consent = true
+  const summary = createSessionSummaryRecorder({
+    captureEvent: () => undefined,
+    sampleRate: 1,
+    store: { read: () => undefined, write: () => undefined, remove: () => undefined, claimOrphans: () => [] },
+  })
+  const handle = createOmoNativeTurnHandler({
+    client: { captureEvent: (name) => sent.push(name) },
+    isConsented: () => consent,
+    sessionId: "sampled",
+    summary: {
+      ...summary,
+      isRawTurnSampled: (sessionHash) => {
+        const sampled = summary.isRawTurnSampled(sessionHash)
+        consent = false
+        return sampled
+      },
+    },
+  })
+
+  // when
+  handle(turnEvent())
+
+  // then
+  expect(consent).toBe(false)
+  expect(sent).toEqual([])
 })
 
 function turnEvent(input: {

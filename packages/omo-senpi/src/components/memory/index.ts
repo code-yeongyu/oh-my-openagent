@@ -182,7 +182,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
           binding,
         })
         memoryModuleSupervisor.acquire()
-        pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding)
+        // Disposable bookkeeping: a session closed without a conversation leaves no file (senpi#3263).
+        pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })
         // Bind-time reconcile floats past the bind by design, but its rejection must not
         // float: an unhandled rejection is attributed to whatever code is running when it lands.
         void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {

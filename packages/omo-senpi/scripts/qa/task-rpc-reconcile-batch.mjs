@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { isAbsolute, join, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 import {
   captureChild, captureCommand, dumpRunProcesses, RECONCILE_WATCHDOG_MS, runProcesses, sampleFseventsd, withinDeadline,
 } from "./task-rpc-diagnostics.mjs"
@@ -26,13 +27,13 @@ export async function runOne(repo, label, outDir, bun) {
   await sample("start")
   const child = spawn(bun.path, [script, "--worker", repo, "--run-root", root], {
     cwd: repo, detached: true, stdio: ["ignore", "pipe", "pipe"],
-    env: {
+    env: withTelemetryOptOut({
       ...process.env, TMPDIR: root, PI_OFFLINE: "1", OMO_SENPI_QA: "1", OMO_QA_BUN_BIN: bun.path,
       OMO_RECONCILE_STAGES: "1",
       BUN_INSTALL_CACHE_DIR: join(root, "bun-cache"),
       BUN_RUNTIME_TRANSPILER_CACHE_PATH: join(root, "transpiler-cache"),
       NODE_COMPILE_CACHE: join(root, "node-cache"), XDG_CACHE_HOME: join(root, "cache"),
-    },
+    }),
   })
   receipt.driverPid = child.pid
   const capture = captureChild(child)

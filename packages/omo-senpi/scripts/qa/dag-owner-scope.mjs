@@ -9,6 +9,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, seedSandbox, credentialDigest } from "./drive.mjs"
 import { SESSION_A, SESSION_B, seedRun, snapshot } from "./dag-owner-scope-fixture.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, "../../../..")
@@ -178,11 +179,11 @@ export async function run(options) {
     assert.throws(() => process.kill(dead.pid, 0), { code: "ESRCH" })
     facts.holders = { deadPid: dead.pid, deadExit: dead.status, deadSignalZero: "ESRCH", livePid: process.pid }
     writeFileSync(join(sandbox.root, "extension.mjs"), `import { createTaskComponent } from ${JSON.stringify(taskBundle)};\nimport { registerFixture } from ${JSON.stringify(join(here, "dag-owner-scope-fixture.mjs"))};\nexport default (pi) => registerFixture(pi, createTaskComponent);\n`)
-    env = { PATH: process.env.PATH, HOME: sandbox.homeDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+    env = withTelemetryOptOut({ PATH: process.env.PATH, HOME: sandbox.homeDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome,
       XDG_DATA_HOME: sandbox.xdgDataHome, XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "xdg-state"),
       SENPI_CODING_AGENT_DIR: sandbox.agentDir, PI_CODING_AGENT_DIR: sandbox.agentDir, OMO_AGENT_DIR: sandbox.agentDir,
-      OMO_DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1", TERM: "xterm-256color",
-      OMO_DAG_SCOPE_FIXTURE: JSON.stringify({ stateDir, receipt, deadPid: dead.pid, livePid: process.pid }) }
+      TERM: "xterm-256color",
+      OMO_DAG_SCOPE_FIXTURE: JSON.stringify({ stateDir, receipt, deadPid: dead.pid, livePid: process.pid }) })
     const initial = join(sandbox.agentDir, "sessions", "synthetic.jsonl")
     const ordinary = ["unrelated", "control"].includes(options.scenario)
     seedSession(initial, ordinary ? SESSION_B : SESSION_A, sandbox.cwd)

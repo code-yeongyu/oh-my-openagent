@@ -353,4 +353,51 @@ Reader
     expect(result.agents.planner?.maxDepth).toBe(2)
     expect(result.agents.planner?.maxTurns).toBe(9)
   })
+
+  test("#given a category named after a builtin agent and no agents entry #when loading #then a diagnostic names the ignored category key and the agents key to use", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(
+      join(fixture.project, ".omo", "omo.json"),
+      JSON.stringify({ categories: { "plan-consultant": { models: [{ model: "provider/sonnet" }] } } }),
+    )
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.diagnostics).toContainEqual({
+      kind: "category_shadows_agent",
+      path: "(merged omo config)",
+      message: 'categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": [{"model":"provider/sonnet"}] } }',
+      issuePaths: ["categories.plan-consultant"],
+    })
+  })
+
+  test("#given a category whose name matches no agent #when loading #then no category-shadow diagnostic is produced", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(join(fixture.project, ".omo", "omo.json"), JSON.stringify({ categories: { quick: { model: "provider/quick" } } }))
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "category_shadows_agent")).toEqual([])
+  })
+
+  test("#given a category named after a user-defined markdown agent #when loading #then the category-shadow diagnostic names that agent", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(join(fixture.project, ".senpi", "agents", "agents", "finder.md"), agentMarkdown("provider/finder", "find things"))
+    writeText(join(fixture.project, ".omo", "omo.json"), JSON.stringify({ categories: { finder: { model: "provider/other" } } }))
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "category_shadows_agent").map((diagnostic) => diagnostic.message)).toEqual([
+      'categories."finder" is not read for subagent_type "finder" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "finder": { "models": ["provider/other"] } }',
+    ])
+  })
 })

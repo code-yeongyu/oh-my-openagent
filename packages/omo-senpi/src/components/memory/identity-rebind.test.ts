@@ -65,6 +65,7 @@ describe("memory identity rebind", () => {
     expect(pi.entries).toEqual([{
       customType: MEMORY_BINDING_CUSTOM_TYPE,
       data: { identity: sessionIdentity.id, repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash, boundAt: 456 },
+      options: { startupBookkeeping: true },
     }])
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
     memoryModuleSupervisor.release()
@@ -96,6 +97,7 @@ describe("memory identity rebind", () => {
     expect(pi.entries).toEqual([{
       customType: MEMORY_BINDING_CUSTOM_TYPE,
       data: { identity: boundIdentity.id, repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash, boundAt: 456 },
+      options: { startupBookkeeping: true },
     }])
     expect(ctx.logs.filter((entry) => entry.level === "info" && entry.message.includes("rebound"))).toHaveLength(1)
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)

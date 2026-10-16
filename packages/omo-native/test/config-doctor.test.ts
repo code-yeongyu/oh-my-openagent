@@ -52,6 +52,14 @@ describe("omo doctor config lines", () => {
     ])
   })
 
+  test("#given a user category named after a builtin agent #when the config report runs #then one WARN line names the ignored category key and the agents key to use", () => {
+    const home = homeWithUserConfig(`{ "categories": { "plan-consultant": { "models": [{ "model": "provider/sonnet" }] }, "quick": { "model": "provider/quick" } } }`)
+
+    expect(configDoctorLines({ cwd: home, env: { HOME: home } })).toEqual([
+      'WARN config: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": [{"model":"provider/sonnet"}] } }',
+    ])
+  })
+
   test("#given the launcher loads the staged runtime #when it resolves #then the launcher returns the runtime's lines unchanged", async () => {
     const home = homeWithUserConfig(`{ "agents": { "oracle": { "model": "openai/gpt-6", "temperature": "hot" } } }`)
 

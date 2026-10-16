@@ -1,6 +1,7 @@
 import {
   KNOWN_MODELS,
   KNOWN_PROVIDERS,
+  OMO_NATIVE_COMMON_PROPERTY_SCHEMAS,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
 } from "../../packages/omo-senpi/src/components/telemetry/product-identity.ts"
 
@@ -54,7 +55,7 @@ export function assertAllowlistCoverage(allowlists) {
 
 assertAllowlistCoverage(OMO_NATIVE_PROPERTY_ALLOWLISTS)
 const nativeEvents = new Set(Object.keys(OMO_NATIVE_PROPERTY_ALLOWLISTS))
-const sharedKeys = new Set(["$process_person_profile", "package_version", "platform", "product_name", "schema_version", "surface", "install_id"])
+const sharedKeys = new Set(Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS))
 const sdkAddedKeys = new Set(["$lib", "$lib_version", "$geoip_disable", "$is_server"])
 const sdkWireKeys = new Set(["distinct_id", "uuid"])
 const knownModels = new Set(Object.values(KNOWN_MODELS).flat())
@@ -111,7 +112,9 @@ export function privacyScan(events, checks) {
     const allowed = new Set([...OMO_NATIVE_PROPERTY_ALLOWLISTS[event.event], ...sharedKeys, ...sdkAddedKeys, ...sdkWireKeys])
     if ("$is_server" in event.properties && event.properties.$is_server !== true) throw new Error("invalid SDK server attribution")
     if (event.properties.surface !== "cli" && event.properties.surface !== "desktop") throw new Error("invalid attribution surface")
-    if (typeof event.properties.install_id !== "string" || !/^[a-f0-9]{64}$/.test(event.properties.install_id)) throw new Error("invalid attribution install_id")
+    if (typeof event.properties.install_hash !== "string" || !/^[a-f0-9]{64}$/.test(event.properties.install_hash)) throw new Error("invalid attribution install_hash")
+    if ("install_id" in event.properties) throw new Error("raw install_id must never ship")
+    if (event.distinct_id !== undefined && event.distinct_id !== event.properties.install_hash) throw new Error("distinct_id must equal install_hash")
     for (const key of Object.keys(event.properties)) {
       if (!allowed.has(key)) throw new Error(`property-allowlist: ${event.event}.${key} is not documented or SDK-added`)
       if (key.startsWith("$") && !OMO_NATIVE_PROPERTY_ALLOWLISTS[event.event].includes(key) && !sharedKeys.has(key) && !sdkAddedKeys.has(key)) {
