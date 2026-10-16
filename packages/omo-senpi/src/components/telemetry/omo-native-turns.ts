@@ -14,6 +14,8 @@ import type { SessionSummaryRecorder } from "./omo-native-session-summary"
 export type OmoNativeTurnHandlerOptions = {
   readonly client: Pick<EventTelemetryClient, "captureEvent">
   readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
+  /** The consent gate, read at send time: sampling is decided per session, long before a turn ends. */
+  readonly isConsented: () => boolean
   readonly sessionId: string
   readonly summary: SessionSummaryRecorder
 }
@@ -81,7 +83,7 @@ export function createOmoNativeTurnHandler(
         errorKind: "error",
       })
     }
-    if (options.summary.isRawTurnSampled(options.sessionId)) {
+    if (options.summary.isRawTurnSampled(options.sessionId) && options.isConsented()) {
       options.client.captureEvent("turn_completed", properties)
     }
   }
