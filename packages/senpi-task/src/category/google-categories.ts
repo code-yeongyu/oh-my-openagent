@@ -114,7 +114,7 @@ Approach:
 export const GOOGLE_CATEGORIES = [
   {
     name: "visual-engineering",
-    config: { model: "anthropic/claude-fable-5-1", variant: "max" },
+    config: { model: "google/gemini-4-argon", variant: "low" },
     description: "Visual design, UI/UX, frontend, styling, animation, and design systems",
     promptAppend: VISUAL_CATEGORY_PROMPT_APPEND,
   },

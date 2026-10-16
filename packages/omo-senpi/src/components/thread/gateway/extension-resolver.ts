@@ -1,6 +1,6 @@
 import { join } from "node:path"
 
-import { createLiveThreadSurface } from "../live-surface"
+import { createLazyLiveThreadSurface } from "../lazy-live-surface"
 import { createGatewayResolver } from "../tools/gateway-services"
 import { hostView } from "../tools/internals"
 import { UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "../tools/ports"
@@ -14,7 +14,7 @@ const NOTHING_LIVE = async () => ({ sessions: [], hosts: [], disk: [] })
  * falls back to the live-and-disk address book.
  */
 export function createExtensionResolver(agentDir: string): GatewayResolve {
-  const host = createLiveThreadSurface(undefined, { env: { ...process.env, OMO_CODING_AGENT_DIR: agentDir } })
+  const host = createLazyLiveThreadSurface(undefined, { env: { ...process.env, OMO_CODING_AGENT_DIR: agentDir } })
   const surface: Omit<ThreadToolSurfaceOptions, "store"> = {
     host,
     stateDirectory: agentDir,
