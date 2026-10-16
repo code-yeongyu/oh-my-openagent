@@ -18,6 +18,14 @@ mod selftest;
 mod serve;
 mod settle;
 mod stop_path;
+#[cfg(any(test, target_os = "macos"))]
+mod sessions;
+#[cfg(target_os = "macos")]
+mod xpc;
+#[cfg(target_os = "macos")]
+mod stop_latch;
+#[cfg(all(test, target_os = "macos"))]
+mod xpc_test_harness;
 
 use clap::Parser;
 use std::process::ExitCode;
@@ -29,9 +37,35 @@ use crate::engine::Engine;
 
 const USAGE_ERROR: u8 = 2;
 
+#[cfg(test)]
+#[path = "sessions/tests.rs"]
+mod xpc_tests;
+
 fn main() -> ExitCode {
+    // This exact, opt-in transport alone uses message authentication instead
+    // of inherited responsibility. Clap rejects all combinations with old modes.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--xpc-agent")) {
+        return match Cli::parse().mode() {
+            Mode::XpcAgent { name } => run_xpc(&name),
+            _ => fail("invalid XPC agent mode"),
+        };
+    }
+    // The #10207 gate runs before every mode, the private overlay helper included.
+    if let Err(refusal) = check_launch() {
+        return fail(&refusal);
+    }
+    // The private helper must own the main thread before Tokio or a session
+    // starts. It is not a desktop RPC method and creates no input backend.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--cursor-overlay")) {
+        return cursor_overlay();
+    }
     match Cli::parse().mode() {
+        Mode::XpcAgent { .. } => fail("--xpc-agent must be the first argument"),
         Mode::Schema => print_schema(),
+        Mode::DaemonDisabled { flag } => {
+            eprintln!("senpi-desktop-engine: {flag} is off by default; pass --enable-daemon to use it");
+            ExitCode::from(USAGE_ERROR)
+        }
         Mode::Oneshot { endpoint, serve_args } => match endpoint.map_or_else(client::default_endpoint, Ok) {
             Ok(endpoint) => {
                 match oneshot::run(|request| client::exchange_or_start(&endpoint, &serve_args, request)) {
@@ -90,6 +124,39 @@ fn main() -> ExitCode {
                 .map_err(|error| format!("--serve {endpoint}: {error}"))
         }),
     }
+}
+
+#[cfg(target_os = "macos")]
+fn run_xpc(name: &str) -> ExitCode {
+    block_on(xpc::run(name))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn run_xpc(_: &str) -> ExitCode {
+    fail("XPC agent mode requires macOS 13 or newer")
+}
+
+#[cfg(target_os = "macos")]
+fn check_launch() -> Result<(), String> {
+    senpi_desktop_backend_macos::check_launch()
+}
+
+#[cfg(not(target_os = "macos"))]
+const fn check_launch() -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn cursor_overlay() -> ExitCode {
+    match senpi_desktop_backend_macos::run_cursor_overlay() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => fail(&format!("cursor overlay: {error}")),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn cursor_overlay() -> ExitCode {
+    fail("cursor overlay is unavailable on this platform")
 }
 
 fn print_schema() -> ExitCode {

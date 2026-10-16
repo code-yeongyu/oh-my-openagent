@@ -1,6 +1,6 @@
 computer → host desktop facade, experimental (present while the `computer` tool is active)
     Drives the REAL desktop: windows, screenshots, native input, OS accessibility (AX), clipboard. Not a browser; no DOM.
-    Find it with tool_search ("computer") or call `computer` by name; the global appears in the NEXT cell. The user controls it with `/computer on|off|status|stop|resume`.
+    Find it with tool_search ("computer") or call `computer` by name; the global appears in the NEXT cell. The user controls it with `/computer on|off|status|stop|resume` and `/computer cursor on|off` (default on, display-only).
     Every helper is one `tool.computer({ action: "call", chain })` call. Permission tiers: inspection needs `computer:read`, input and mutation need `computer:exec`; a denied call throws.
     JS: `await` every helper. Python: sync, same names, keyword args become the trailing options object, `win.raise_()` stands in for `raise`.
 computer.displays() → ComputerDisplay[]
@@ -23,6 +23,8 @@ computer.doubleClick(x, y, opts?) / computer.move(x, y) / computer.drag([[x, y],
     Scroll direction is semantic and the same on every OS: positive dy moves the view toward the end of the content (negative toward the start), positive dx toward the right edge; the natural-scrolling setting does not change it.
 computer.type(text, { delivery? }?) / computer.press("cmd+shift+p" | keys[], { delivery? }?) → None
     Same helpers on a window handle: win.type, win.press.
+computer.holdKeys(keys[], { duration, delivery? }) / computer.holdMouse(x, y, { duration, button?, keys?, delivery?, frameId? }) → None
+    Exec tier, also available on window and display handles and the desktop object inside computer.run. Duration is finite seconds in 0..=100; holdKeys refuses an empty list. Mouse coordinates use the latest full screenshot, never a zoom. Input is always released before the call settles, including errors, cancellation, deadlines and the user's safety stop; keys release in reverse order. Foreground delivery still needs the human-confirmed control grant. Existing run and engine deadlines can interrupt a hold early; give long holds an adequate run budget. Older engines refuse unsupported hold methods without affecting press/click.
 win.raise() → None
     Brings the window to the front (exec tier). Unavailable on Wayland.
 win.menu.items(path?) → ComputerMenuItem[]
@@ -49,7 +51,7 @@ computer.control.release() → None
 computer.control.state() → { active, reason?, grantedAt? }
 computer.run(fnOrCode, { args?, read_only?, timeout? }?) → value
     One multi-step JS run in the persistent desktop session. Functions receive `{ desktop, wait, assert }` (`desktop` = same helpers) and cannot capture cell closures; `args` pass JSON data, functions, RegExp. Python passes a JS code string only. `read_only: true` needs `computer:read` and blocks mutation; `timeout` is seconds. Not sandboxed.
-computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, … }
+computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, … }
     `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor.
 computer.close() → None
     Ends the desktop session; later calls fail.

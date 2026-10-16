@@ -178,6 +178,16 @@ export class TaskConcurrency {
     this.#dispatch()
   }
 
+  // Re-key a held lease to the task's next run epoch without freeing its slot: a re-dispatch keeps
+  // the lane occupancy its abandoned run held, so no queued waiter can take the slot in between.
+  transferLease(taskId: string, fromEpoch: number, toEpoch: number): boolean {
+    const lease = this.#leases.get(leaseKeyOf(taskId, fromEpoch))
+    if (lease === undefined || this.leaseState(taskId, toEpoch) !== undefined) return false
+    this.#leases.delete(leaseKeyOf(taskId, fromEpoch))
+    this.#leases.set(leaseKeyOf(taskId, toEpoch), { ...lease, runEpoch: toEpoch })
+    return true
+  }
+
   // Every lease a task holds or has parked, at any epoch: a task that can never run again (cancelled)
   // owns no lane slot, whichever run took it (omo#9403).
   releaseTask(taskId: string): void {

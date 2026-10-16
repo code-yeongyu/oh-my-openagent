@@ -43,6 +43,17 @@ function completedTranscript(project: string): string {
   return path
 }
 
+// The transcript an aborted turn leaves: the last entry is the assistant row the abort ended with.
+function abortedTranscript(project: string): string {
+  const path = join(project, "aborted.jsonl")
+  const entries = [
+    { type: "message", message: { role: "user", content: "do the work" } },
+    { type: "message", message: { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "aborted" } },
+  ]
+  writeFileSync(path, entries.map((entry) => `${JSON.stringify(entry)}\n`).join(""))
+  return path
+}
+
 // Extension bookkeeping a live senpi session appends after its last message - the hooks' stop state
 // when a turn stops, and the rules scan / memory binding a host writes when it reopens the session.
 // None of them is part of the conversation.
@@ -73,6 +84,7 @@ function hostRunner(
   calls: HostRespawnCalls,
   openDisposition: "attached" | "reopened",
   onFollowUp?: (text: string) => void,
+  options: { readonly sessionIdle?: boolean } = {},
 ) {
   return {
     start: (spec: RpcRunnerSpec): Promise<RpcChildHandle> => {
@@ -90,6 +102,7 @@ function hostRunner(
         waitForExit: () =>
           Promise.resolve({ kind: "clean" as const, facts: { pid: undefined, code: 0, signal: null, stderrTail: "" } }),
         lastSeen: () => undefined,
+        ...(options.sessionIdle === undefined ? {} : { sessionIdle: () => Promise.resolve(options.sessionIdle) }),
         followUp: (text: string) => {
           calls.followUps.push(text)
           onFollowUp?.(text)
@@ -646,6 +659,174 @@ describe("respawn of a daemon-hosted child", () => {
     // then
     expect(result.ok).toBe(true)
     expect(calls.followUps).toEqual([])
+  })
+  test("#given an idle attached session whose last turn was aborted #when respawn re-joins it #then the result flags it resumed_turn_aborted instead of leaving the task on starting (senpi#3266)", async () => {
+    // given - the daemon still holds the session, but the turn it re-joins ENDED on an abort:
+    // nothing is in flight and no continuation may be guessed, so the child can never move again
+    const project = tempProject()
+    const transcript = abortedTranscript(project)
+    const identity: HostSessionIdentity = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routing_id: "routing-awaiting-aborted",
+      session_path: transcript,
+      instance_id: "instance-1",
+    }
+    const calls: HostRespawnCalls = { specs: [], switched: [], followUps: [] }
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, identity),
+      sessionPath: transcript,
+      stateDir: project,
+      runners: unusedManagedRunners(),
+      rpcRunner: hostRunner(calls, "attached", undefined, { sessionIdle: true }),
+    })
+
+    // then - flagged, and never nudged: an abort may have been deliberate
+    expect(result.ok).toBe(true)
+    expect(result.ok ? result.awaitingInput : undefined).toEqual({ reason: "resumed_turn_aborted" })
+    expect(calls.followUps).toEqual([])
+    expect(calls.switched).toEqual([])
+  })
+
+  test("#given an idle attached session whose last turn never answered #when respawn re-joins it #then the result flags it resumed_turn_unfinished", async () => {
+    // given - the turn neither completed nor carries an abort marker; it simply never ran
+    const project = tempProject()
+    const transcript = interruptedTranscript(project)
+    const identity: HostSessionIdentity = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routing_id: "routing-awaiting-unfinished",
+      session_path: transcript,
+      instance_id: "instance-1",
+    }
+    const calls: HostRespawnCalls = { specs: [], switched: [], followUps: [] }
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, identity),
+      sessionPath: transcript,
+      stateDir: project,
+      runners: unusedManagedRunners(),
+      rpcRunner: hostRunner(calls, "attached", undefined, { sessionIdle: true }),
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(result.ok ? result.awaitingInput : undefined).toEqual({ reason: "resumed_turn_unfinished" })
+    expect(calls.followUps).toEqual([])
+  })
+
+  test("#given an attached session that is still streaming #when its transcript tail was aborted #then the live session is never flagged", async () => {
+    // given - acceptance: a task resumed onto a live, working session is never flagged, even when
+    // the committed tail happens to end on an abort (the current turn is what streams)
+    const project = tempProject()
+    const transcript = abortedTranscript(project)
+    const identity: HostSessionIdentity = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routing_id: "routing-awaiting-live",
+      session_path: transcript,
+      instance_id: "instance-1",
+    }
+    const calls: HostRespawnCalls = { specs: [], switched: [], followUps: [] }
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, identity),
+      sessionPath: transcript,
+      stateDir: project,
+      runners: unusedManagedRunners(),
+      rpcRunner: hostRunner(calls, "attached", undefined, { sessionIdle: false }),
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(result.ok ? result.awaitingInput : "not-ok").toBeUndefined()
+  })
+
+  test("#given an attached session whose idle state cannot be read #when the transcript tail was aborted #then it is not flagged on a guess", async () => {
+    // given - a state read that fails is not proof of idleness: no sessionIdle answer, no flag
+    const project = tempProject()
+    const transcript = abortedTranscript(project)
+    const identity: HostSessionIdentity = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routing_id: "routing-awaiting-unknown",
+      session_path: transcript,
+      instance_id: "instance-1",
+    }
+    const calls: HostRespawnCalls = { specs: [], switched: [], followUps: [] }
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, identity),
+      sessionPath: transcript,
+      stateDir: project,
+      runners: unusedManagedRunners(),
+      rpcRunner: hostRunner(calls, "attached"),
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(result.ok ? result.awaitingInput : "not-ok").toBeUndefined()
+  })
+
+  test("#given an idle attached session whose last turn completed #when respawn re-joins it #then nothing is flagged", async () => {
+    // given
+    const project = tempProject()
+    const transcript = completedTranscript(project)
+    const identity: HostSessionIdentity = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routing_id: "routing-awaiting-completed",
+      session_path: transcript,
+      instance_id: "instance-1",
+    }
+    const calls: HostRespawnCalls = { specs: [], switched: [], followUps: [] }
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, identity),
+      sessionPath: transcript,
+      stateDir: project,
+      runners: unusedManagedRunners(),
+      rpcRunner: hostRunner(calls, "attached", undefined, { sessionIdle: true }),
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(result.ok ? result.awaitingInput : "not-ok").toBeUndefined()
+  })
+
+  test("#given a real host holding a session whose turn was aborted while detached #when respawn re-joins it #then the real idle read flags resumed_turn_aborted and no continuation is sent", async () => {
+    // given - the whole wire: real RpcHostRunner, real get_state idle read, real JSONL tail
+    const project = tempProject()
+    const host = await harness.fakeHost({ transcripts: true })
+    const runner = recordingRunner(host)
+    const first = await runner.start(childSpec({ state_dir: project }))
+    const sessionPath = host.sessions()[0]?.sessionPath ?? ""
+    const routingId = host.sessions()[0]?.routingId ?? ""
+    await first.dispose()
+    host.abortTurn(routingId)
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, realIdentity(host, sessionPath), REAL_MODEL),
+      sessionPath,
+      stateDir: project,
+      runners: unusedManagedRunners(),
+      rpcRunner: runner,
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    const resumed = runner.handles[1]
+    expect(resumed !== undefined && isHostSessionHandle(resumed) ? resumed.openDisposition : undefined).toBe("attached")
+    expect(result.ok ? result.awaitingInput : undefined).toEqual({ reason: "resumed_turn_aborted" })
+    expect(prompts(host)).toEqual([{ streamingBehavior: "steer" }])
   })
 
   test("#given a host that is draining an old generation #when open_session reports session_path_in_use #then respawn defers as host_draining with the advertised delay", async () => {

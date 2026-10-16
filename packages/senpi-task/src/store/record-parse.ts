@@ -5,9 +5,11 @@ import {
   type BackgroundMode,
   type TaskRecord,
 } from "../state"
+import { AWAITING_INPUT_REASONS } from "../state/types"
 import { parseTaskId } from "../state/id"
 import {
   parseNotification,
+  parseOptionalEffectiveModel,
   parseOptionalIsolation,
   parseOptionalHostSession,
   parseOptionalOwner,
@@ -25,6 +27,7 @@ import {
 } from "./start-failure-parse"
 import { parseRunStats } from "./run-stats-parse"
 import { parseOptionalProvisionalExit } from "./provisional-exit-parse"
+import { parseUncertainInputs } from "./input-effects-parse"
 import {
   isRecord,
   readNumber,
@@ -60,6 +63,10 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const finalResponse = readOptionalString(value, "final_response")
   const isolation = parseOptionalIsolation(value)
   const errorMessage = readOptionalString(value, "error_message")
+  const stopReason = readOptionalString(value, "stop_reason")
+  if (stopReason !== undefined && stopReason !== "deadline") throw new Error("stop_reason must be deadline")
+  const deadline = value["deadline"]
+  if (deadline !== undefined && !isRecord(deadline)) throw new Error("deadline is not an object")
   const startedAt = readOptionalString(value, "started_at")
   const terminalAt = readOptionalString(value, "terminal_at")
   const killed = readOptionalBoolean(value, "killed")
@@ -70,7 +77,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const fallbackAttempts = parseOptionalResolvedModelArray(value, "fallback_attempts")
   const resolvedModel = parseOptionalResolvedModel(value, "resolved_model")
   const resolvedTier = isRecord(value["resolved_model"]) ? readOptionalString(value["resolved_model"], "service_tier") : undefined
-  const effectiveModel = parseOptionalResolvedModel(value, "effective_model")
+  const effectiveModel = parseOptionalEffectiveModel(value)
   const effectiveTier = isRecord(value["effective_model"]) ? readOptionalString(value["effective_model"], "service_tier") : undefined
   const spawnSpec = parseOptionalSpawnSpec(value)
   const owner = parseOptionalOwner(value)
@@ -96,9 +103,13 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const closingChild = parseOptionalClosingChild(value)
   const residencyClaim = readOptionalString(value, "residency_claim")
   const cancelRequested = parseOptionalCancelRequest(value)
+  const awaitingInput = parseOptionalAwaitingInput(value)
   const provisionalExit = parseOptionalProvisionalExit(value)
 
   return {
+    ...(value.effect_seq === undefined ? {} : { effect_seq: readNumber(value, "effect_seq") }),
+    ...(value.last_effect_id === undefined ? {} : { last_effect_id: readString(value, "last_effect_id") }),
+    ...(value.uncertain_inputs === undefined ? {} : { uncertain_inputs: parseUncertainInputs(value.uncertain_inputs) }),
     task_id: parseTaskId(readString(value, "task_id")),
     status,
     residency_state: readResidencyState(value),
@@ -144,6 +155,8 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(isolation === undefined ? {} : { isolation }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
+    ...(stopReason === undefined ? {} : { stop_reason: stopReason }),
+    ...(deadline === undefined ? {} : { deadline }),
     ...(failureKind === undefined ? {} : { failure_kind: failureKind }),
     ...(failureReason === undefined ? {} : { failure_reason: failureReason }),
     ...(killed === undefined ? {} : { killed }),
@@ -165,8 +178,18 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(closingChild === undefined ? {} : { fallback_closing_child: closingChild }),
     ...(residencyClaim === undefined ? {} : { residency_claim: residencyClaim }),
     ...(cancelRequested === undefined ? {} : { cancel_requested: cancelRequested }),
+    ...(awaitingInput === undefined ? {} : { awaiting_input: awaitingInput }),
     ...(provisionalExit === undefined ? {} : { provisional_exit: provisionalExit }),
   }
+}
+
+function parseOptionalAwaitingInput(record: Record<string, unknown>): TaskRecord["awaiting_input"] {
+  const value = record["awaiting_input"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("awaiting_input is not an object")
+  const reason = readString(value, "reason")
+  if (!(AWAITING_INPUT_REASONS as readonly string[]).includes(reason)) throw new Error(`awaiting_input.reason is not a known reason: ${reason}`)
+  return { reason: reason as NonNullable<TaskRecord["awaiting_input"]>['reason'], since: readString(value, "since") }
 }
 
 function parseOptionalCancelRequest(record: Record<string, unknown>): TaskRecord["cancel_requested"] {

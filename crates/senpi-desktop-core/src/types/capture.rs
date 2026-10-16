@@ -89,6 +89,14 @@ pub struct CaptureResult {
     pub target: String,
     pub frame_id: String,
     pub note: Option<String>,
+    /// The captured window's on-Screen state (macOS B9; absent for desktop
+    /// captures and backends that cannot tell).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_on_screen: Option<bool>,
+    /// `true` when this capture ran through the legacy `screencapture`
+    /// fallback instead of the ScreenCaptureKit worker (B9).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_capture: bool,
 }
 
 /// One delivered window observation; capture pixels remain the input frame.

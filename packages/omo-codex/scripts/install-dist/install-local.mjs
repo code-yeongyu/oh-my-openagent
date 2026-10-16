@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:4db5a98bf382e58a89b56055512793d4bc6f240d8cbbc9ef5b5436489c7806c3:9caee560115d9e4c1cceedc4e7d98a44b5555d61f3d069b250240f76ef5b4af8
+// omo-codex-install:d6461760b0b2f0e272b51bfe2d55e5280cc505338f455df43303564f2465006c:3cb54cd0b22fe0bced6a100c92fc2b9f2eddc93cb6a82a57257140c4f8171750
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -9984,7 +9984,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.33",
+    version: "5.1.34",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19396,6 +19396,7 @@ var nonNegativeInteger = number2().int().nonnegative();
 var OmoComputerSettingsLayerSchema = object({
   enabled: boolean2().describe("Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"),
   display: string2().min(1),
+  showCursor: boolean2().describe("Show the display-only macOS cursor overlay (default: true; false hides it)"),
   max_width: positiveInteger,
   max_height: positiveInteger,
   screenshot_max_bytes: positiveInteger,

@@ -111,7 +111,16 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
     )
   }
 
+  // A member must be live to be addressable: wait out a start the task host is still admitting (#10042).
+  if (result.starting === true) await input.manager.whenLaunched?.(result.task_id)
   const record = input.manager.get(result.task_id)
+  if (result.starting === true && record !== undefined && record.status !== "running" && record.status !== "pending") {
+    throw new SenpiTeamRuntimeError(
+      `member '${member.name}' failed to start: ${record.error_message ?? record.status}`,
+      "member_start_rejected",
+      input.teamRunId,
+    )
+  }
   const sessionId = input.manager.getResidentHandle(result.task_id)?.sessionId ?? record?.child_session_id
   const status = projectMemberStatus(record?.status ?? (result.status === "pending" ? "pending" : "running"))
   const resolvedModel = result.resolved_model ?? record?.resolved_model

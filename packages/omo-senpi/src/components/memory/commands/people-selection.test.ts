@@ -4,7 +4,8 @@ import { parseMemoryFile, parsePeopleCard } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke } from "./commands.test-support"
-import { OBSERVATIONS_PER_LEVEL, registerPeopleCommand, selectObservations } from "./people"
+import { registerPeopleCommand } from "./people"
+import { OBSERVATIONS_PER_LEVEL, selectObservations } from "./people-runtime"
 import { JANE_CARD, LIMITS, peopleFixture } from "./people.test-support"
 
 describe("observation selection", () => {

@@ -1,3 +1,13 @@
+## 2026-10-16 - Adopt senpi 2026.10.16
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.15 to 2026.10.16: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer/dev pins with their `senpi-tui` and `senpi-ai` aliases, the pin and package-shape assertions, and the engine-catalog note in the `senpi-task` coverage test. `bun.lock` resolves the senpi entries at 2026.10.16 (refreshed with `bun install --no-cache`). `packages/omo-native/bin/lib/provider-map.json` is re-derived from the installed engine's `builtinProviders()`: the builtin and OAuth provider ids are unchanged, only its derivation comment moves, and the committed Senpi plugin bundle (`omo.js`, which embeds that comment) is rebuilt on Linux (bun 1.4.2, the version `ci.yml` pins) with `bun run build:senpi-plugin`.
+
+## 2026-10-15 - Adopt senpi 2026.10.15
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.13 to 2026.10.15: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer/dev pins with their `senpi-tui` and `senpi-ai` aliases, the pin and package-shape assertions, and the engine-catalog note in the `senpi-task` coverage test. `bun.lock` resolves the senpi entries at 2026.10.15 (refreshed with `bun install --no-cache`), and the committed Senpi plugin bundle (`omo.js`, whose embedded pin moves) is rebuilt on Linux (bun 1.4.2, the version `ci.yml` pins) with `bun run build:senpi-plugin`.
+
+`packages/omo-native/bin/lib/provider-map.json` is re-derived from the installed engine's `builtinProviders()`: the builtin ids are unchanged, and `anthropic` is no longer an OAuth provider, because senpi 2026.10.15 removed the direct Anthropic subscription login (senpi#3259). `oauthLogins` now sends a Claude OAuth credential found in another harness to `/login anthropic-subscription`, the Claude Agent SDK lane senpi moves those subscriptions to, instead of reporting it unsupported. The guidance and import tests follow.
+
 ## 2026-10-13 - Adopt senpi 2026.10.13
 
 Every `@code-yeongyu/senpi` pin moves from 2026.10.12 to 2026.10.13: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer/dev pins with their `senpi-tui` and `senpi-ai` aliases, and the pin and package-shape assertions. `bun.lock` resolves the senpi entries at 2026.10.13 (refreshed with `bun install --no-cache`), and the committed Senpi plugin bundle (`omo.js`, whose embedded pin moves) is rebuilt on Linux (node 24, bun 1.4.2), the toolchain CI checks it with.
@@ -432,6 +442,24 @@ GPT-6 Astra followed the task tool's wording literally and handed few-call readi
 ## 2026-10-03 - Adopt senpi 2026.10.3
 
 Every `@code-yeongyu/senpi` pin moves from 2026.10.2 to 2026.10.3: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine fixes MCP tools failing with `MCP server <name> is disabled` once a child session ends (#9461, senpi#2524 and senpi#2608); the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-14 - omo.dev/download stays off in production, checks SHA256SUMS and shows what each release lacks (#9473)
+
+The download page from 2026-10-03 now exists only in a site built with `OMO_WEB_DESKTOP_DOWNLOAD=1`. `next.config.ts` inlines the value into every bundle (the page, the prerendered landing page, the sitemap and the proxy), so one build input turns everything on or off and a Worker variable changes nothing. Without it, `/download` (every locale) is a 404, the hero's desktop button is not rendered, `/desktop` does not redirect and the sitemap leaves the page out. Production deploys do not set it, so merging changes nothing on omo.dev; launching means adding it to the build step of `web-deploy.yml`.
+
+The page reads each channel's `manifest.json`, then that release's `SHA256SUMS`, under one 5s deadline, and offers only installers whose manifest SHA-256 equals their `SHA256SUMS` line. A `SHA256SUMS` that cannot be read, names a file twice, or matches no installer offers nothing. An installer must live on the download host inside its release's own folder (`/<channel>/<version>/`), with no port or credentials in the URL and a plain file name; anything else is dropped without hiding the rest of the release. A 401 or 403 from the host (it serves releases to the public only after launch) shows the launch notice like a 404. Ready and launch-notice answers are reused for a minute per Worker isolate (`createChannelReader`), so page views and crawlers share one pair of requests; an unavailable answer is never kept.
+
+The desktop release command publishes the macOS disk images only for now, so a system with no installer in the release gets a "Not in this release yet" row and no verify command. Installers are listed by system and preferred kind (.deb before AppImage), and when a release has both Linux packages a note says which to pick (.deb for Ubuntu and Debian, AppImage elsewhere: it needs FUSE and updates itself).
+
+Tests: `lib/desktop-download.test.ts` covers the `SHA256SUMS` cross-check, the URL and file-name rules, the 401/403/404 mapping and the reader cache. `e2e/download.spec.ts` adds a macOS-only release, a tampered `SHA256SUMS` and a gated host (its server is built with the flag and started without it). The new `e2e/download-flag-off.spec.ts` runs on a build without the flag (`playwright.flag-off.config.ts`, first in `test:e2e`) and checks every entry point stays closed. This entry supersedes the 2026-10-03 entry's ungated hero button, redirect and sitemap entry.
+
+## 2026-10-03 - omo.dev/download serves the desktop installers with OS detection and checksums (#9473)
+
+omo.dev had no page for the desktop app: the landing page offered only the command-line installer. `/download` (all four locales) now reads the stable and beta `manifest.json` files from the download host on the server, so the page needs no CORS and stays crawlable. The browser detects the OS (`navigator.userAgentData`, with the user agent as a fallback) and, where the browser answers, the CPU, then shows one primary button for the visitor's system. Every installer is listed with its size and full SHA-256, and a "Verify your download" section gives the checksum command for macOS, Windows and Linux plus a link to the release's SHA256SUMS. A Mac whose browser hides its CPU gets Apple silicon first and an Intel link beside it; a Linux visitor is never handed an x64 build when only that exists for another CPU.
+
+An installer or release-notes link that is not on the download host (or has no valid SHA-256) is dropped, so the page cannot link GitHub Releases. With no stable manifest published the page shows "Coming" with the launch date instead of an installer; a broken host shows an unavailable state with the command-line install. The Beta switch appears once both channels have a release, and `/download?channel=beta` always works. The hero gains a "Download the desktop app" button, `/desktop` redirects to `/download` (308, locale kept), and `/download` is in the sitemap.
+
+`lib/desktop-download.test.ts` covers installer choice and the manifest boundary. `e2e/download.spec.ts` drives the page against a fixture download host (`e2e/support/download-fixture-server.ts`) for Apple silicon, Intel, Windows, Linux, a hidden-CPU Mac, a phone, a missing Linux build, before launch and a host outage. Both fail on `dev`, where `/download` does not exist.
 
 ## 2026-10-03 - LazyCodex spawns a project's own registered agent roles (lazycodex#171, lazycodex#164)
 

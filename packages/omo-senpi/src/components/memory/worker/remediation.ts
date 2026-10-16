@@ -1,3 +1,4 @@
+import { homeRelativePath, type ReflectionChildLog } from "./child-log"
 import { isModelUnreachableDetail } from "./memory-model-attempts"
 
 /**
@@ -8,7 +9,11 @@ import { isModelUnreachableDetail } from "./memory-model-attempts"
  */
 const MODEL_EXHAUSTION_ROSTER = /\battempted:/
 
-export function reflectionRemediation(reason: string | undefined, detail: string | undefined): string {
+export function reflectionRemediation(
+  reason: string | undefined,
+  detail: string | undefined,
+  childLog?: ReflectionChildLog,
+): string {
   if (isModelUnreachableDetail(detail)) {
     return "no memory child can see the reflection model, not even with extensions loaded; set categories.<category>.model (or memory.reflection.category) in omo.json to a model from a core provider, or set memory.reflection.enabled to false"
   }
@@ -59,5 +64,20 @@ export function reflectionRemediation(reason: string | undefined, detail: string
   if (combined.includes("api key") || combined.includes("auth_missing")) {
     return "run /login <provider>"
   }
-  return "inspect runtime/reflection-sessions/<runId>/child-stderr.log"
+  return childLogHint(childLog)
+}
+
+/**
+ * The catch-all points at the newest failing run's own stderr log by its absolute path. A run
+ * directory that reconciliation already pruned is named as gone; the stderr tail survives in the
+ * durable failure detail the notice shows next to this hint.
+ */
+function childLogHint(childLog: ReflectionChildLog | undefined): string {
+  if (childLog === undefined) {
+    return "inspect child-stderr.log in the newest failing run directory under the memory identity's runtime/reflection/runs"
+  }
+  const path = homeRelativePath(childLog.path)
+  return childLog.present
+    ? `inspect ${path}`
+    : `the failing run's child-stderr.log (${path}) was already pruned; its stderr tail is kept in the failure detail`
 }

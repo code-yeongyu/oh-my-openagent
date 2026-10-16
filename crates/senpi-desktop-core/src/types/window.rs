@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use super::DisplaySelector;
 
 /// One capturable top-level window in global logical desktop coordinates.
+/// `is_on_screen` distinguishes an on-Space window from a same-app window on
+/// another Space: both resolve as capture targets, but only an on-screen one
+/// is user-visible right now.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopWindow {
@@ -24,6 +27,10 @@ pub struct DesktopWindow {
     pub height: u32,
     /// Whether the window currently holds input focus.
     pub focused: bool,
+    /// Whether the window is on the active Space. `None` on backends that
+    /// cannot tell (X11/Win32/Wayland report every listed window on screen).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_on_screen: Option<bool>,
     /// Whether the owning process runs above the engine's integrity level
     /// (Windows); `None` where the platform has no such notion.
     pub elevated: Option<bool>,
@@ -95,4 +102,15 @@ pub struct PointerOptions {
 pub struct DesktopPoint {
     pub x: f64,
     pub y: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DesktopWindow;
+
+    #[test]
+    fn desktop_window_retains_the_eq_trait_contract() {
+        fn require_eq<T: Eq>() {}
+        require_eq::<DesktopWindow>();
+    }
 }

@@ -13,6 +13,7 @@ export { ElementHandle, WindowHandle } from "./run/handles";
 export { type ComputerRunHost, type ComputerRunRequest, type ExecuteTool, runComputerCode } from "./run/runtime";
 export type { ScreenshotOptions, ScreenshotResult } from "./run/screenshot";
 export type { ObserveOptions, ObservationResult } from "./run/observe";
+export type { HoldOptions, HoldMouseOptions } from "./run/input-target";
 export {
 	acquiringEngineChildFactory,
 	type AcquiringEngineChildOptions,
@@ -27,7 +28,8 @@ export {
 	DesktopServiceError,
 	type DesktopServiceErrorCode,
 } from "./service/rpc-client";
-export { DesktopService, type DesktopServiceOptions, type DesktopSessionOpenParams } from "./service/service";
+export { DesktopService, type DesktopServiceOptions } from "./service/service";
+export type { DesktopSessionOpenParams } from "./service/session-state";
 export {
 	CAPABILITIES_TIMEOUT_MS,
 	CLOSE_TIMEOUT_MS,

@@ -21,12 +21,12 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 |-------|---------------|------|------|--------------------------|---------|
 | **Sisyphus** | claude-opus-5-5 max | (model default) | primary | kimi-k3 → gpt-5.6-sol medium → glm-5.2 → big-pickle | Main orchestrator, plans + delegates; `thinking: { type: "enabled", budgetTokens: 32000 }` |
 | **Hephaestus** | gpt-5.6-sol medium | (model default) | primary | GPT-5.6 Sol only (`requiresProvider`: openai \| chatgpt-subscription \| github-copilot \| opencode) | Autonomous deep worker |
-| **Oracle** | gpt-5.6-sol xhigh (high on Copilot) | 0.1 | subagent | gemini-3.1-pro high → claude-opus-5-5 max → glm-5.2 | Read-only consultation |
+| **Oracle** | gpt-5.6-sol xhigh (high on Copilot) | 0.1 | subagent | gemini-4-argon high → gemini-3.1-pro high → claude-opus-5-5 max → glm-5.2 | Read-only consultation |
 | **Librarian** | gpt-6-luna-fast | 0.1 | subagent | claude-haiku-5-5 medium → qwen3.7-plus → minimax-m3 → minimax-m2.7 → gpt-5.4-nano | External docs/code search |
 | **Explore** | gpt-6-luna-fast | 0.1 | subagent | claude-haiku-5-5 medium → qwen3.7-plus → minimax-m3 → minimax-m2.7 → gpt-5.4-nano | Contextual grep |
 | **Multimodal-Looker** | gpt-5.6-sol low | 0.1 | subagent | kimi-k3 → glm-4.6v → gpt-5-nano | PDF/image analysis |
 | **Metis** | claude-fable-5-1 max | **0.3** | subagent | claude-opus-5-5 max → kimi-k3 max | Pre-planning consultant |
-| **Momus** | gpt-5.6-terra high | 0.1 | subagent | gpt-5.6-sol xhigh (high on Copilot) → claude-opus-5-5 max → gemini-3.1-pro high → glm-5.2 | Plan reviewer |
+| **Momus** | gpt-5.6-terra high | 0.1 | subagent | gpt-5.6-sol xhigh (high on Copilot) → claude-opus-5-5 max → gemini-4-argon high → gemini-3.1-pro high → glm-5.2 | Plan reviewer |
 | **Atlas** | claude-sonnet-5 | 0.1 | primary | kimi-k3 → gpt-5.6-sol medium → minimax-m3 → MiniMax-M3 → minimax-m2.7 | Todo-list orchestrator |
 | **Prometheus** | claude-fable-5 xhigh | (override-only) | primary | kimi-k3 max | Strategic planner (interview); built via `buildPrometheusAgentConfig` (not in `agentSources`) |
 | **Sisyphus-Junior** | claude-sonnet-5 | 0.1 (`SISYPHUS_JUNIOR_DEFAULTS`) | subagent | kimi-k3 → gpt-5.6-sol medium → minimax-m3 → MiniMax-M3 → minimax-m2.7 → big-pickle | Category-spawned executor |

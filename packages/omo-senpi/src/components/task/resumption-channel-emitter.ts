@@ -50,7 +50,7 @@ export function createResumptionChannelEmitter(
 ): ResumptionChannelEmitter {
   const resolveOwnedTeamMember = deps.isOwnedTeamMember ?? isOwnedTeamMemberTask
   let active = false
-  let lastCount = 0
+  let lastIds = ""
   let pending = Promise.resolve()
 
   function enqueue(operation: () => Promise<void> | void): Promise<void> {
@@ -81,11 +81,16 @@ export function createResumptionChannelEmitter(
     return channels
   }
 
+  // senpi reads `items` (WakeSourceStateItem: id, description, startedAtMs); `channels` stays for
+  // existing readers. A change is a change of WHICH children are live, not only how many.
+  const idsOf = (channels: readonly ResumptionChannel[]) => channels.map((channel) => channel.id).join("\u0000")
+
   function publish(channels: readonly ResumptionChannel[]): void {
-    lastCount = channels.length
+    lastIds = idsOf(channels)
     deps.pi.events?.emit(RESUMPTION_CHANNEL_STATE_EVENT, {
       source: RESUMPTION_CHANNEL_SOURCE,
       activeCount: channels.length,
+      items: channels,
       channels,
     })
   }
@@ -94,7 +99,7 @@ export function createResumptionChannelEmitter(
     emitIfChanged: () => enqueue(async () => {
       if (!active) return
       const channels = await snapshot()
-      if (channels.length === lastCount) return
+      if (idsOf(channels) === lastIds) return
       publish(channels)
     }),
     emitSessionStart: () => {

@@ -1,3 +1,81 @@
+## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
+
+- `agents/builtin/fallback-chains.ts` (mirrored from `model-core/src/agent-model-requirements.ts`, where `oracle` and `momus` get the same rung): a `{google, google-vertex, opencode}/gemini-4-argon` rung at `high` goes directly before the `gemini-3.1-pro` rung of `plan-reviewer`. The previous rung stays for Copilot (off the Argon rung until code-yeongyu/senpi#3379) and for engine pins without the Argon row. The GPT heads are unchanged: a blind eval put Argon ahead of the previous pro model in 16/16 judgments but behind the GPT heads on correctness, with a median latency of 57 s vs 15 s.
+- `agents/builtin/argon-plan-reviewer.test.ts` resolves the chain against Google, Vertex, pre-Argon and Copilot-only registries.
+- `omo-senpi` telemetry vocabulary gains `qwen3.7-plus` on `opencode-go` and `bailian-coding-plan`, the one agent-chain rung that exported as `custom`; `telemetry/agent-chain-vocabulary.test.ts` now covers every agent-chain rung the way `product-identity.test.ts` covers the category chains.
+
+## 2026-10-15 - Argon (low) leads visual-engineering and writing (#10187)
+
+- `category/fallback-chains.ts`, `model-core/src/category-model-requirements.ts`: a `{google, google-vertex, opencode}/gemini-4-argon` rung at `low` (the catalog maps `off`/`minimal` to null for this model) is prepended to both chains; every existing rung keeps its order. Copilot is left off the rung until code-yeongyu/senpi#3379 verifies its thinking control. `category/google-categories.ts` / `kimi-categories.ts` (and the omo-opencode mirrors) move both defaults to `google/gemini-4-argon` at `low`.
+- Stacking: the pinned engine (2026.10.15 after #10183; 2026.10.13 before) carries no google `gemini-4-argon` catalog row yet (the release predates code-yeongyu/senpi#3293), so on Senpi the rung is unresolvable and both categories resolve to the previous head until a pin adopts #3293 (plus #3382, #3384). The OpenCode edition reads OpenCode's own provider list and resolves Argon as soon as Google is connected. `category/argon-tier1.test.ts` runs the real pinned catalog and asserts whichever branch applies, and asserts the primary hit on a registry that serves the model.
+- `omo-senpi` telemetry vocabulary lists `gemini-4-argon` on google, google-vertex, github-copilot and opencode so the rung never exports as `custom`; `category_config` depth suffixes for the two categories shift by one until adoption (the previous head is now rung two).
+- `omo-opencode/src/generated/model-capabilities.generated.json` gains the models.dev `gemini-4-argon` entry only (the snapshot-backed guard requires every chain model).
+
+## 2026-10-14 - A terminal provider error ends the task even when agent_idle never arrives (#3262)
+
+A turn that ended on a terminal provider error (a stream-start timeout, a permanent 4xx, an
+exhausted retry budget) had its `agent_end` (willRetry:false) outcome HELD for `agent_idle` by
+`createTurnSettlement`. senpi's own settlement machinery skips `agent_idle` whenever a deferred
+continuation claim may still start a turn (`agent-session.ts` `_emitAgentIdleAfterDeferredTurns`):
+a claim that neither starts nor reports leaves no `agent_idle` AND no continuation, so the held
+outcome never settled, `waitForOutcome()` pended forever, the record stayed `running`, and the
+task went stale. The parent never learned the child failed.
+
+`runners/rpc/turn-settlement.ts` now confirms a held ERROR outcome instead of waiting blind: a
+bounded settle-confirmation (unref'd, `settleConfirmMs`) probes the session's own state
+(`sessionIsIdle`) and settles the held error - with the provider's own text - only once the
+session is truly idle with no session-scoped wake. A busy probe answer re-arms the check. A probe
+that cannot read the state (a non-success `get_state` reply) re-arms too, but only up to
+`maxUnreadableProbes` (default 3) CONSECUTIVE unreadable answers, then settles the known error
+instead of re-arming forever; any readable answer resets the count. A probe that rejects settles
+the held error anyway (the failure text is already known) - unless the handle was disposed while
+the probe was in flight, or a wake source came live before the answer landed, so a `task_cancel`
+racing a held error is never misreported as failed. `agent_idle` remains the preferred edge and
+cancels the confirmation; `agent_start` drops the held outcome for the new turn; a user abort
+still settles at once. Callers that pass no probe keep the historical agent_idle-only behavior.
+
+Session-scoped lifecycles are not force-failed: `runners/rpc/turn-wake-sources.ts` (new) tracks
+the wake sources a child's own lifecycle publishes. senpi#3208's `rpc-wait-surface.ts`
+`publishGoalContinuationEvent` calls `pi.rpc?.emit(name, data)` (verified on the pinned engine
+`@code-yeongyu/senpi@2026.10.13`: `dist/core/extensions/builtin/goal/rpc-wait-surface.js`), so
+`goal_continuation_timer_state` reaches RPC clients as raw `extension_event` records - never
+through the permission-shaped extension channel (`createChildExtensionEvents` admits ONLY
+`computer.permission_required`). Both runners already fan raw `extension_event` records into
+their handle-level event streams (the process client diverts only permission-shaped frames; the
+host's `isAgentSessionEvent` is the engine's loose tag check), so the tracker observes that
+funnel in `runners/rpc/handle.ts` and `runners/rpc-host/handle.ts` (`onSessionEvent`); the
+permission lane is untouched. Armed goal continuation timers are tracked PER KIND and are
+TURN-SCOPED (`resetTurn` clears them when a new turn begins): an armed timer of ANY kind
+(`monitor`, `userGrace`, senpi#3319's `providerRetry`) is a live wake, and an `armed: false`
+clears only its own kind. Terminal monitor watches (`terminal_monitor_state` /
+`terminal_monitor_ended`) are SESSION-LIFETIME: only the engine's own state records clear them,
+so a monitor armed in an earlier turn still protects a later turn that ends on a terminal error.
+A wake source that drops while an error outcome is held re-offers the confirmation through the
+settlement's `reconfirmHeld()`: the disarm event re-arms the probe instead of leaving the outcome
+held past the timer. (`wake_source_state` records never reach RPC clients on the pinned engine -
+they go out on `pi.events` only - so that tracking branch was dropped.)
+
+Both runners wire it with the heartbeat interval as the confirm budget: the RPC-process child
+(`runners/rpc/handle.ts`, probing `get_state`) and the daemon-session child
+(`runners/rpc-host/handle.ts`, probing `client.getState()`). The confirmation is cancelled with
+handle teardown (`runners/rpc-host/handle-teardown.ts` `onTornDown`, which also marks the
+settlement disposed).
+
+`turn-settlement.test.ts` / `turn-wake-sources.test.ts` / `handle-wake-sources.test.ts` pin it: a
+terminal stream-start timeout settles failed with the provider text when idle never arrives; a
+goal timer or a terminal monitor - including one armed in an EARLIER turn - keeps it running; a
+busy-then-idle probe settles only on the idle answer; unreadable probes settle after the bound
+and a readable answer resets the count; a probe orphaned by dispose or outrun by a fresh wake
+source never reports failed; agent_idle settles at once without probing; a rejecting probe still
+settles the known error. Every new test drives the confirmation through an injected scheduler
+(`turn-settlement.test-support.ts`) - no fixed sleeps.
+
+## 2026-10-14 - A task resumed onto an aborted or unanswered session is flagged waiting for input (senpi#3266)
+
+A revival that re-joined a daemon session whose last turn ended aborted (or never answered) left the task on "starting" forever: `respawnProcess` early-returned every attached host session, skipping any check of whether the re-joined session can still move on its own. Respawn now combines the re-joined session's idleness (`RpcChildHandle.sessionIdle`, where an unreadable state is never treated as idle) with a transcript-tail classifier (`sessionTailContinuationBlocker`: an aborted turn, or a prompt that was never answered), and the reattach stamps `awaiting_input: { reason, since }` on the record - never on a terminal one, and stripped by a plain reattach or a steering revive. `task_output` renders the flag as "resumed, waiting for input" naming the cause and the two one-step actions; the live progress row leaves "starting" for the same words through a synthesized `task_awaiting_input` event, or from creation-time state when the record was already flagged. The one-step actions: `task_cancel` works as before, and `task_send` with `redispatch:true` (a message is forbidden with it) drives the new optional `TaskManager.redispatchTask`, which abandons the dead session and replays the persisted prompt on a fresh child under the same task identity and a new run epoch. Fakes that do not serve redispatch report `invalid_arguments`.
+
+Re-dispatch tears the old child down through the destruction port's new `redispatch` cause: the handle is ended (in-process abort, process kill, daemon `close_session`) but no residency transition is written, so the record stays `resident` under the same host and epoch and the fresh child reattaches to it. The earlier `cancel` cause ended with the residency `dispose`, which the reattach then refused (`ownership claim is not held`), leaving a running, disposed, still-flagged record with no child. The abandoned run's lane lease moves to the new epoch in place (`TaskConcurrency.transferLease`), so no queued task takes the slot in between; a run without a lease must win a free slot first or gets `capacity_deferred` with nothing torn down. A re-dispatch is serialized per task under a record lock and re-reads the record after the teardown, so a second re-dispatch or a cancel that lands meanwhile spawns nothing. A launch or attach that fails after the old child is gone ends the task `error` with the reason instead of leaving it running. `redispatch` honors `all_scope`; refusals (`invalid_state`, `scope_denied`, `respawn_failed`) are error results, and `not_found` lists the caller's tasks. The flag is withdrawn when the child demonstrably moves (an `agent_start`, `turn_start` or `tool_execution_start`) or a plain `task_send` is delivered, and every status surface (task_output, the RPC task snapshot, the live rows) reads it through one projection, `awaitingInputDetails`, which hides it on terminal records.
+
 ## 2026-10-10 - Seed-from-disk subprocess tests wait on signals, not a 5 s budget (#9890)
 
 The three `manager-claim.test.ts` "seeds from disk" cases start a fresh Bun process on `__fixtures__/seed-floor-child.ts`. They ran under bun's implicit 5 s per-test default, so under full-suite load a cold start alone could fail them. The fixture now prints `READY` after its imports load and `DONE` when its work finishes. The new `__fixtures__/signalled-child.ts` helper waits on those signals and the child's exit, with an explicit hang ceiling (20 s, 60 s on Windows) that is only a guard. On the deadline it kills exactly the child it spawned, by its own pid, and fails with the phase it reached plus the child's stdout and stderr. `signalled-child.test.ts` proves that path with a child that never signals. Under a parallel load of 40 runs at concurrency 8 beside a full senpi-task suite, each run took 13-17 s and all passed.

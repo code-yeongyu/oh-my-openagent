@@ -29,6 +29,7 @@ async fn capture(session: &Session, target: &str) -> CaptureResult {
         .submit(Op::Capture(CaptureParams {
             target: target.into(),
             caps: None,
+            exclude_window_titles: None,
         }))
         .wait()
         .await
@@ -113,6 +114,7 @@ async fn per_call_display_frames_survive_other_target_captures_without_reopening
         .submit(Op::Capture(CaptureParams {
             target: "display:missing".into(),
             caps: None,
+            exclude_window_titles: None,
         }))
         .wait()
         .await

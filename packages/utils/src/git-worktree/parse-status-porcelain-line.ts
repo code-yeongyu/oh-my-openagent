@@ -5,7 +5,7 @@ export interface ParsedGitStatusPorcelainLine {
 	status: GitFileStatus
 }
 
-function toGitFileStatus(statusToken: string): GitFileStatus {
+export function toGitFileStatus(statusToken: string): GitFileStatus {
 	if (statusToken === "A" || statusToken === "??") return "added"
 	if (statusToken === "D") return "deleted"
 	return "modified"

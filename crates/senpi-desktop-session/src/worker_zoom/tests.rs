@@ -17,6 +17,7 @@ fn full(worker: &mut Worker, target: &str) -> CaptureResult {
                     max_width: Some(32),
                     ..CaptureCaps::default()
                 }),
+                exclude_window_titles: None,
             }),
             &|| false,
         )

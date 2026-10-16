@@ -6,10 +6,12 @@ import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
+import { registerInitialSkills } from "./initial-skills"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
-import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
+import { createLazyLiveThreadSurface } from "./lazy-live-surface"
+import { defaultThreadStateDirectory } from "./live-surface-paths"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -157,6 +159,8 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     if (session === undefined) return
     void registrant.start(session).catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint registration failed: ${error instanceof Error ? error.message : String(error)}`))
   })
+  // A session thread_create opened runs on a host, so its initial skills ride with the control endpoint.
+  registerInitialSkills(pi, ctx)
   pi.on("session_before_compact", () => registrant.noteCompaction(true))
   pi.on("session_compact", () => registrant.noteCompaction(false))
   // A steer into a session waiting on a question is `not_steerable` (`decision.ts`): the answer comes
@@ -183,7 +187,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
   return {
     name: "thread",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      const host = options.host ?? createLiveThreadSurface(pi)
+      const host = options.host ?? createLazyLiveThreadSurface(pi)
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
       const agentDir = options.agentDir ?? (() => resolveAgentHome({ env: process.env }))
       const runtimeInstance = hostInstanceOf(pi)

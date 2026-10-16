@@ -32,10 +32,11 @@ Defines the senpi `computer` tool: its permission tiers, settings, the `/compute
 ## Handle, activation, and `/computer`
 
 - `new ComputerHandle({service, settings})` holds the per-session state shared by the tool, the command, and the host extension. `service` is a `DesktopService`; construct it with `engineChildFactory(settings.enginePath)` to honor the override.
-- `activate(context)` opens the engine session and arms `stopHotkey` through `ensureStopPath`. The host calls it on tool_search promotion, on a by-name call, and on `/computer on`, and `execute` calls it before every action. It is idempotent: `session.open` is re-sent only when its params change, because re-opening resets captures and AX refs. `onActivationChange(cb)` reports `true` or `false`, and the host turns that into the active-tool set.
+- `activate(context)` opens the engine session and arms `stopHotkey` through `ensureStopPath`. The host calls it on tool_search promotion, on a by-name call, and on `/computer on`, and `execute` calls it before every action. It is idempotent: `session.open` is re-sent only when its params change. Cursor-only changes are applied in place; substantive changes reset captures and AX refs. `onActivationChange(cb)` reports `true` or `false`, and the host turns that into the active-tool set.
 - `stop()` and `resume()` are the user-only stop surface. They work without a TUI, so the host can bind them to an rpc-reachable command. The resume token stays inside the service. Both return `undefined` when no engine runs.
-- `runComputerCommand(args, handle, context)` implements `/computer on|off|status|stop|resume` and returns text.
+- `runComputerCommand(args, handle, context)` implements `/computer on|off|status|stop|resume` plus `/computer cursor on|off`, and returns text.
   - `on` and `off` override `computer.enabled` for this session only. `off` closes the engine, and later activations fail with `ComputerDisabledError`.
+  - `cursor on|off` overrides only the display-only virtual cursor for this session. It never activates computer use, rearms input, changes delivery mode, or changes a control grant.
   - `status` prints `enabled`, `active`, the engine state, the capabilities (`stopPath=`, `focusGuard=`, and the capture, input, and AX permissions), and the permission tiers. It never starts an engine.
 - `isSupportedHost(platform)` is true on darwin, linux, and win32 (any arch). A missing prebuild, such as on Windows arm64, surfaces through the engine locator's `native-unavailable` diagnostic.
 
@@ -44,6 +45,7 @@ Defines the senpi `computer` tool: its permission tiers, settings, the `/compute
 - `session.open` params come from the settings, the active model, and the session directory:
   - `auditPath` is `<sessionDir>/.computer-audit.jsonl` when `auditLog.enabled` is true, and `null` otherwise.
   - `artifactDir` is `os.tmpdir()`.
+  - `showCursor` is the resolved display preference. Cursor-only changes reconfigure the live backend without invalidating frames, AX refs, stop state, or control grants.
   - The GC knobs are passed through. With GC off, `staleMs` is `Number.MAX_SAFE_INTEGER`, so nothing is ever stale.
   - `captureCaps` carries `maxWidth`, `maxHeight`, `maxBytes`, and `coordinateSafe`.
 - `coordinateSafe` ports oh-my-pi's `usesCoordinateSafeImageSizing`. It is true when `compat.supportsImageDetailOriginal === false` or the model is in the Claude family (anthropic API, anthropic provider, or `claude` in the id). The engine then clamps captures to its coordinate-safe size.
@@ -55,12 +57,13 @@ Defines the senpi `computer` tool: its permission tiers, settings, the `/compute
 | Key | Default |
 |---|---|
 | `enabled` | `isSupportedHost()` |
+| `showCursor` | `true`; set `false` or use `/computer cursor off` to hide it |
 | `display` | `"active"` (focused monitor, primary fallback); `"all"` composites every display, or use a display id |
 | `maxWidth` / `maxHeight` | `3840` / `2400` |
 | `screenshotMaxBytes` | `5000000` |
 | `stopHotkey` | `ctrl+alt+cmd+escape` on macOS, else `ctrl+alt+shift+escape` |
 | `allowHostRelayOnlyStop` | `false` |
-| `macosCanary` | `"session"` (`"session"` or `"off"`; `session.open` has no field for it yet) |
+| `macosCanary` | `"session"` (`"session"` or `"off"`) |
 | `auditLog.enabled` | `true` |
 | `screenshotGc.enabled` / `.staleMs` / `.scanIntervalMs` | `true` / `43200000` / `1800000` |
 | `enginePath` | unset (the located binary) |

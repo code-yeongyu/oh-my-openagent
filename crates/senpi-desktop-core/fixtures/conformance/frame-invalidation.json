@@ -11,7 +11,8 @@
         "id": 1,
         "method": "session.open",
         "params": {
-          "allowHostRelayOnlyStop": true
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false
         }
       },
       "expect": [
@@ -27,6 +28,7 @@
                 "input": true,
                 "ax": true,
                 "backgroundWindowInput": true,
+                "cursorOverlay": false,
                 "deliveryModes": [
                   "background",
                   "foreground"

@@ -49,8 +49,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: darwin-arm64, runner: macos-15, rust_target: aarch64-apple-darwin, binary: senpi-desktop-engine }
-          - { host: darwin-x64, runner: macos-15, rust_target: x86_64-apple-darwin, binary: senpi-desktop-engine }
+          - { host: darwin-arm64, runner: macos-15, rust_target: aarch64-apple-darwin, clang_arch: arm64, binary: senpi-desktop-engine }
+          - { host: darwin-x64, runner: macos-15, rust_target: x86_64-apple-darwin, clang_arch: x86_64, binary: senpi-desktop-engine }
           - { host: linux-x64, runner: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu, binary: senpi-desktop-engine }
           - { host: win32-x64, runner: windows-latest, rust_target: x86_64-pc-windows-msvc, binary: senpi-desktop-engine.exe }
     steps:
@@ -66,6 +66,40 @@ jobs:
           rustup toolchain install "$toolchain" --profile minimal
           rustup default "$toolchain"
           rustup target add "${{ matrix.rust_target }}"
+
+      - name: Build and sign Darwin capture helper
+        if: startsWith(matrix.host, 'darwin-')
+        timeout-minutes: 75
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
+          CLANG_ARCH: ${{ matrix.clang_arch }}
+        run: |
+          set -euo pipefail
+          HELPER_DIR="${RUNNER_TEMP}/desktop-capture-helper"
+          HELPER="${HELPER_DIR}/senpi-desktop-capture-helper"
+          mkdir -p "$HELPER_DIR"
+          /usr/bin/clang -arch "$CLANG_ARCH" \
+            -x objective-c -std=c11 -fobjc-arc -O2 -Wall \
+            -mmacosx-version-min=13.0 \
+            -framework AppKit -framework ScreenCaptureKit -framework CoreVideo \
+            crates/senpi-desktop-backend-macos/native/senpi-desktop-capture-helper.m \
+            -o "$HELPER"
+          # The helper carries the engine's identifier (build.rs signs dev builds the same way). The
+          # engine stages it at a fresh temp path on every start, so TCC charges Screen Recording to the
+          # responsible process (the app that launched OmO), not to the helper. It is signed, not
+          # notarized: the engine writes it unquarantined into a private directory at runtime, so
+          # Gatekeeper never assesses it.
+          bash .github/scripts/macos-sign-and-notarize.sh --sign-only \
+            --identifier ai.sisyphuslabs.senpi-desktop-engine "$HELPER"
+          test -s "$HELPER"
+          codesign -dv --verbose=2 "$HELPER" 2>&1 | grep -qx "Identifier=ai.sisyphuslabs.senpi-desktop-engine" \
+            || { echo "::error::the capture helper is not signed with the engine identifier" >&2; exit 1; }
+          echo "SENPI_DESKTOP_CAPTURE_HELPER_SIGNED=$HELPER_DIR" >> "$GITHUB_ENV"
 
       - name: Build desktop engine
         env:

@@ -18,6 +18,8 @@
 		"desktop.scroll",
 		"desktop.typeText",
 		"desktop.keyChord",
+		"desktop.holdKeys",
+		"desktop.holdMouse",
 		"desktop.raiseWindow",
 		"desktop.menus.items",
 		"desktop.menus.select",
@@ -53,6 +55,8 @@
 		"desktop.scroll": "mutate",
 		"desktop.typeText": "mutate",
 		"desktop.keyChord": "mutate",
+		"desktop.holdKeys": "mutate",
+		"desktop.holdMouse": "mutate",
 		"desktop.raiseWindow": "mutate",
 		"desktop.menus.items": "read",
 		"desktop.menus.select": "mutate",
@@ -114,12 +118,22 @@
 							"type": "null"
 						}
 					]
+				},
+				"excludeWindowTitles": {
+					"type": [
+						"array",
+						"null"
+					],
+					"items": {
+						"type": "string"
+					},
+					"description": "Titles of windows to exclude from a display capture."
 				}
 			},
 			"required": [
 				"target"
 			],
-			"description": "`capture`: one target (`desktop` or a window id) under optional caps.",
+			"description": "`capture`: one target (`desktop` or a window id) under optional caps.\n`excludeWindowTitles` applies to display captures only: every window with\na matching title is left out of the screenshot (B9, macOS ScreenCaptureKit;\nempty elsewhere and ignored by older engines).",
 			"additionalProperties": false,
 			"definitions": {
 				"CaptureCaps": {
@@ -846,6 +860,182 @@
 				}
 			}
 		},
+		"desktop.holdKeys": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"keys": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"duration": {
+					"type": "number",
+					"format": "double"
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"keys",
+				"duration"
+			],
+			"description": "`holdKeys`: keys are always released before the request settles.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.holdMouse": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"x": {
+					"type": "number",
+					"format": "double"
+				},
+				"y": {
+					"type": "number",
+					"format": "double"
+				},
+				"duration": {
+					"type": "number",
+					"format": "double"
+				},
+				"button": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"keys": {
+					"type": [
+						"array",
+						"null"
+					],
+					"items": {
+						"type": "string"
+					}
+				},
+				"frameId": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"x",
+				"y",
+				"duration"
+			],
+			"description": "`holdMouse`: coordinates address the latest full capture, never a zoom.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
 		"desktop.raiseWindow": {
 			"type": "object",
 			"properties": {
@@ -1233,6 +1423,7 @@
 	"sidecar": {
 		"executable": "<abs path to senpi-desktop-engine>",
 		"args": [
+			"--enable-daemon",
 			"--oneshot",
 			"--audit-path",
 			"<$BUNSHIN_HOME>/desktop-audit.jsonl",

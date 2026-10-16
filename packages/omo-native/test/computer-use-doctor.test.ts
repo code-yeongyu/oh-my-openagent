@@ -48,6 +48,7 @@ function readyReport(overrides: Partial<Extract<ComputerUseDoctorReport, { kind:
       input: true,
       ax: true,
       backgroundWindowInput: true,
+      cursorOverlay: true,
       deliveryModes: ["background", "foreground"],
       capturePermission: "granted",
       inputPermission: "granted",
@@ -71,7 +72,7 @@ const replies = {
   "engine.hello": { protocolVersion: "1", engineVersion: "0.1.0", buildSha: "fixture", abi: "senpi-desktop/1" },
   capabilities: {
     backend: "quartz", displayServer: "Quartz WindowServer", capture: true, input: true, ax: true,
-    backgroundWindowInput: true, deliveryModes: ["background", "foreground"],
+    backgroundWindowInput: true, cursorOverlay: true, deliveryModes: ["background", "foreground"],
     capturePermission: "granted", inputPermission: "granted", axPermission: "granted",
     displayCount: 2, focusGuard: true, stopPath: "global", screenLocked: false
   }

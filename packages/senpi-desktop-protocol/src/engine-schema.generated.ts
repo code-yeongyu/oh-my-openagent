@@ -27,6 +27,8 @@ export const ENGINE_METHODS = [
 	"scroll",
 	"typeText",
 	"keyChord",
+	"holdKeys",
+	"holdMouse",
 	"raiseWindow",
 	"menus.items",
 	"menus.select",
@@ -85,6 +87,7 @@ export const ERROR_CODES = [
 	"TransactionFailed",
 	"InputBusy",
 	"ControlRequired",
+	"CaptureUnavailable",
 ] as const;
 
 export type EngineMethod = (typeof ENGINE_METHODS)[number];

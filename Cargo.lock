@@ -1938,6 +1938,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-screen-capture-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74b7c5390f477482f001bc354d6571a70db7e4f8d5288e860c45521fbce11394"
+dependencies = [
+ "block2",
+ "libc",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-foundation",
+]
+
+[[package]]
 name = "objc2-security"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2444,6 +2458,7 @@ dependencies = [
 name = "senpi-desktop-backend-macos"
 version = "0.0.0"
 dependencies = [
+ "block2",
  "core-graphics",
  "foreign-types",
  "image",
@@ -2454,9 +2469,12 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-foundation",
+ "objc2-screen-capture-kit",
  "parking_lot",
  "senpi-desktop-core",
  "senpi-desktop-safety",
+ "serde",
+ "serde_json",
  "tempfile",
  "xcap",
 ]
@@ -2529,6 +2547,9 @@ name = "senpi-desktop-engine"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "core-graphics",
+ "libc",
+ "objc2-app-kit",
  "parking_lot",
  "schemars",
  "senpi-desktop-backend-fake",
@@ -2539,9 +2560,11 @@ dependencies = [
  "senpi-desktop-core",
  "senpi-desktop-safety",
  "senpi-desktop-session",
+ "senpi-desktop-xpc",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror",
  "tokio",
  "ulid",
@@ -2551,9 +2574,12 @@ dependencies = [
 name = "senpi-desktop-safety"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "parking_lot",
+ "senpi-desktop-backend-fake",
  "senpi-desktop-core",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2577,6 +2603,26 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulid",
+]
+
+[[package]]
+name = "senpi-desktop-xpc"
+version = "0.0.0"
+dependencies = [
+ "block2",
+ "flume",
+ "libc",
+ "objc2-core-foundation",
+ "parking_lot",
+ "senpi-desktop-backend-fake",
+ "senpi-desktop-core",
+ "senpi-desktop-safety",
+ "senpi-desktop-session",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

@@ -28,6 +28,7 @@ pub struct FakeBackend {
     pub(crate) capture_color: Rgba<u8>,
     delays: DelayMs,
     pub(crate) resize_window: Option<ResizeWindow>,
+    pub(crate) legacy_capture: bool,
     pub(crate) ax_tree: AxTree,
     pub(crate) ax_owner_unknown: bool,
     pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
@@ -39,7 +40,12 @@ impl FakeBackend {
     pub fn new(scenario: FakeScenario) -> Self {
         let faults = Faults::default();
         for failure in &scenario.fail_next {
-            faults.fail_next(failure.method, failure.code);
+            let error = match &failure.reason {
+                Some(reason) => DesktopError::new(failure.code, format!("injected {:?} failure", failure.method))
+                    .with_capture_unavailable_reason(reason),
+                None => DesktopError::new(failure.code, format!("injected {:?} failure", failure.method)),
+            };
+            faults.fail_next_with(failure.method, error);
         }
         Self {
             ax_tree: AxTree::build(&scenario.ax),
@@ -53,6 +59,7 @@ impl FakeBackend {
             capture_color: Rgba(scenario.capture_color),
             delays: scenario.delay_ms,
             resize_window: scenario.resize_window,
+            legacy_capture: scenario.legacy_capture,
             sink: RecordingSink::default(),
             faults,
         }

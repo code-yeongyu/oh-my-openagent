@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import createMiddleware from "next-intl/middleware"
 import { locales, type Locale } from "./i18n/config"
 import { routing } from "./i18n/routing"
+import { desktopDownloadEnabled } from "./lib/desktop-download"
 
 const handleI18nRouting = createMiddleware(routing)
 const oldHosts = new Set(["www.omo.dev"])
@@ -19,6 +20,8 @@ const installGuidePaths = new Set([
   "docs/guide/install",
   "docs/guide/install.md",
 ])
+
+const desktopPaths = new Set(["desktop"])
 
 function getLocaleSegment(segment: string | undefined): Locale | null {
   if (!segment) return null
@@ -45,6 +48,16 @@ function getInstallGuidePath(pathname: string): string | null {
   return locale ? `/${locale}/docs/install` : "/docs/install"
 }
 
+function getDownloadPath(pathname: string): string | null {
+  const segments = pathname.split("/").filter(Boolean)
+  const locale = getLocaleSegment(segments[0])
+  const routeSegments = locale ? segments.slice(1) : segments
+
+  if (!desktopPaths.has(routeSegments.join("/"))) return null
+
+  return locale ? `/${locale}/download` : "/download"
+}
+
 export default function proxy(request: NextRequest): NextResponse {
   const forwardedHost = request.headers.get("x-forwarded-host")
   const requestHost = request.headers.get("host")
@@ -69,6 +82,12 @@ export default function proxy(request: NextRequest): NextResponse {
   const installGuidePath = getInstallGuidePath(request.nextUrl.pathname)
   if (installGuidePath) {
     redirectUrl.pathname = installGuidePath
+    shouldRedirect = true
+  }
+
+  const downloadPath = desktopDownloadEnabled() ? getDownloadPath(request.nextUrl.pathname) : null
+  if (downloadPath) {
+    redirectUrl.pathname = downloadPath
     shouldRedirect = true
   }
 

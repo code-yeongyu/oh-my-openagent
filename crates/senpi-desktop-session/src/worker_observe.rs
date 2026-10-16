@@ -24,7 +24,7 @@ impl Worker {
         let window = self.window(&target)?;
         let budget = self.capture_budget(params.caps.as_ref())?;
         check_cancel(cancelled)?;
-        let (image, mut geometry) = self.backend()?.capture(&target, budget.caps())?;
+        let (image, mut geometry) = self.backend()?.capture(&target, budget.caps(), &[])?;
         let screenshot = plan_screenshot(image, &mut geometry, &budget)?;
         check_cancel(cancelled)?;
         let mut registry = self.registry.clone();
@@ -32,9 +32,10 @@ impl Worker {
         let backend = self.backend()?.ax().ok_or_else(DesktopError::ax_unsupported)?;
         let snapshot = ax::snapshot(backend, &mut registry, &window, &options)?;
         check_cancel(cancelled)?;
+        let legacy_capture = geometry.is_legacy_capture();
         let mut frames = self.frames.clone();
         let frame_id = frames.record(&target, geometry);
-        let Response::Capture(capture) = capture_response(screenshot, &target, frame_id, None) else {
+        let Response::Capture(capture) = capture_response(screenshot, &target, frame_id, None, window.is_on_screen, legacy_capture) else {
             return Err(DesktopError::internal("capture response has no frame"));
         };
         self.refresh_capabilities();

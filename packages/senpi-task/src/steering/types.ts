@@ -6,7 +6,7 @@ import type { TaskRecordStore } from "../store"
 
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
-export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure" | "reconcile_lost" | "recovery_detach"
+export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure" | "reconcile_lost" | "recovery_detach" | "redispatch"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
@@ -27,6 +27,9 @@ export type SteeringPort = {
   tryBeginSend?(taskId: string): boolean
   endSend?(taskId: string): void
   isEvicting?(taskId: string): boolean
+  // True while the task's launch is still being admitted by its host (#10042): no live handle yet, and
+  // the launch drains whatever is queued once the child starts.
+  isLaunching?(taskId: string): boolean
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
@@ -70,6 +73,8 @@ export type SendInput = {
 export const DEFAULT_SEND_DELIVERY: SendDelivery = "followUp"
 
 export type SendOutcome =
+  | { readonly kind: "uncertain"; readonly task_id: string; readonly effect_id: string; readonly reason: string }
+  | { readonly kind: "failed"; readonly task_id: string; readonly effect_id: string; readonly reason: string; readonly detail: string; readonly action: string }
   | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: SendDelivery }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
@@ -113,6 +118,16 @@ export type CancelOutcome =
   | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus; readonly undelivered_messages?: number }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was cancelled. */
   | { readonly kind: "stale"; readonly task_id: string; readonly status: TaskStatus; readonly run_epoch: number; readonly reason: string }
+  | { readonly kind: "not_found"; readonly reason: string }
+
+// senpi#3266: the result of re-dispatching a flagged "resumed, waiting for input" task onto a
+// fresh live session. `redispatched` carries the NEW run epoch the task now runs under.
+export type RedispatchOutcome =
+  | { readonly kind: "redispatched"; readonly task_id: string; readonly run_epoch: number }
+  | { readonly kind: "invalid_state"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "respawn_failed"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {

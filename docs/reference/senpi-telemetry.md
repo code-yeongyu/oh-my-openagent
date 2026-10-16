@@ -21,8 +21,8 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `session_started` | `$os_version` | `string` | - |
 | `session_started` | `arch` | `string` | - |
 | `session_started` | `cpu_count` | `number` | - |
-| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
-| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
+| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `session_started` | `memory_bucket` | `string` | `lt_8_gb`, `8_15_gb`, `16_31_gb`, `32_63_gb`, `64_plus_gb` |
 | `session_started` | `model_count` | `number` | - |
 | `session_started` | `provider_count` | `number` | - |
@@ -49,12 +49,65 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `turn_completed` | `cache_write_tokens` | `number` | - |
 | `turn_completed` | `cost_usd` | `number` | - |
 | `turn_completed` | `input_tokens` | `number` | - |
-| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
 | `turn_completed` | `output_tokens` | `number` | - |
-| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
+| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `turn_completed` | `reasoning_tokens` | `number` | - |
+| `turn_completed` | `sample_rate` | `number` | - |
 | `turn_completed` | `total_tokens` | `number` | - |
 | `turn_completed` | `turn_index` | `number` | - |
+| `session_summary` | `$session_id` | `string` | - |
+| `session_summary` | `aborted_turns` | `number` | - |
+| `session_summary` | `cache_read_tokens` | `number` | - |
+| `session_summary` | `cache_write_tokens` | `number` | - |
+| `session_summary` | `cost_usd` | `number` | - |
+| `session_summary` | `custom_model_turns` | `number` | - |
+| `session_summary` | `ended_by` | `string` | `checkpoint`, `shutdown`, `reload`, `recovered` |
+| `session_summary` | `error_turns` | `number` | - |
+| `session_summary` | `first_turn_index` | `number` | - |
+| `session_summary` | `input_tokens` | `number` | - |
+| `session_summary` | `invalid_usage_turns` | `number` | - |
+| `session_summary` | `is_final` | `boolean` | - |
+| `session_summary` | `last_turn_index` | `number` | - |
+| `session_summary` | `m1_cost_usd` | `number` | - |
+| `session_summary` | `m1_input_tokens` | `number` | - |
+| `session_summary` | `m1_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m1_output_tokens` | `number` | - |
+| `session_summary` | `m1_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m1_total_tokens` | `number` | - |
+| `session_summary` | `m1_turns` | `number` | - |
+| `session_summary` | `m2_cost_usd` | `number` | - |
+| `session_summary` | `m2_input_tokens` | `number` | - |
+| `session_summary` | `m2_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m2_output_tokens` | `number` | - |
+| `session_summary` | `m2_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m2_total_tokens` | `number` | - |
+| `session_summary` | `m2_turns` | `number` | - |
+| `session_summary` | `m3_cost_usd` | `number` | - |
+| `session_summary` | `m3_input_tokens` | `number` | - |
+| `session_summary` | `m3_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m3_output_tokens` | `number` | - |
+| `session_summary` | `m3_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m3_total_tokens` | `number` | - |
+| `session_summary` | `m3_turns` | `number` | - |
+| `session_summary` | `model_count` | `number` | - |
+| `session_summary` | `other_cost_usd` | `number` | - |
+| `session_summary` | `other_total_tokens` | `number` | - |
+| `session_summary` | `other_turns` | `number` | - |
+| `session_summary` | `output_tokens` | `number` | - |
+| `session_summary` | `raw_turns_sampled` | `boolean` | - |
+| `session_summary` | `reasoning_tokens` | `number` | - |
+| `session_summary` | `sample_rate` | `number` | - |
+| `session_summary` | `session_role` | `string` | `main`, `child`, `dag_child`, `member` |
+| `session_summary` | `summary_seq` | `number` | - |
+| `session_summary` | `tool_error_count` | `number` | - |
+| `session_summary` | `tool_result_count` | `number` | - |
+| `session_summary` | `total_tokens` | `number` | - |
+| `session_summary` | `total_tokens_max` | `number` | - |
+| `session_summary` | `total_tokens_p50` | `number` | - |
+| `session_summary` | `total_tokens_p95` | `number` | - |
+| `session_summary` | `turns` | `number` | - |
+| `session_summary` | `window_ms` | `number` | - |
 | `skill_loaded` | `$session_id` | `string` | - |
 | `skill_loaded` | `skill_name` | `string` | `ast-grep`, `browser`, `coding-agent-sessions`, `dag-library`, `data-scientist`, `debugging`, `frontend`, `git-master`, `give-me-tips`, `hyperplan`, `init-deep`, `lsp-setup`, `mass-ulw`, `onboarding`, `programming`, `refactor`, `remove-ai-slops`, `review-work`, `ulw-execute`, `ultimate-browsing`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`, `visual-qa`, `visualize` |
 | `delegation_started` | `$session_id` | `string` | - |
@@ -76,7 +129,7 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `computer_use_permission_denied` | `scope` | `string` | `os`, `tier` |
 | `computer_use_engine_error` | `$session_id` | `string` | - |
 | `computer_use_engine_error` | `backend` | `string` | `quartz`, `x11`, `wayland`, `win32`, `fake`, `unavailable`, `other` |
-| `computer_use_engine_error` | `code` | `string` | `PermissionDenied`, `CaptureFailed`, `InputFailed`, `BackgroundUnavailable`, `WindowNotFound`, `InvalidTarget`, `InvalidKey`, `InvalidCoordinateFrame`, `StaleRef`, `AxUnsupported`, `AxFailed`, `Timeout`, `Closed`, `Internal`, `StopPathUnavailable`, `Suspended`, `ScreenLocked`, `Cancelled`, `CursorRestoreFailed`, `FocusRestoreFailed`, `TransactionFailed`, `InputBusy`, `ControlRequired`, `native-unavailable`, `quarantined`, `abi-mismatch`, `other` |
+| `computer_use_engine_error` | `code` | `string` | `PermissionDenied`, `CaptureFailed`, `InputFailed`, `BackgroundUnavailable`, `WindowNotFound`, `InvalidTarget`, `InvalidKey`, `InvalidCoordinateFrame`, `StaleRef`, `AxUnsupported`, `AxFailed`, `Timeout`, `Closed`, `Internal`, `StopPathUnavailable`, `Suspended`, `ScreenLocked`, `Cancelled`, `CursorRestoreFailed`, `FocusRestoreFailed`, `TransactionFailed`, `InputBusy`, `ControlRequired`, `CaptureUnavailable`, `native-unavailable`, `quarantined`, `abi-mismatch`, `other` |
 | `computer_use_engine_error` | `host_platform` | `string` | `darwin`, `linux`, `win32`, `other` |
 | `kibitzer_summary` | `$session_id` | `string` | - |
 | `kibitzer_summary` | `buffered_cooldown` | `number` | - |
@@ -146,11 +199,11 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `delegation_completed` | `execution_mode` | `string` | `in-process`, `process` |
 | `delegation_completed` | `fallback_attempts` | `number` | - |
 | `delegation_completed` | `input_tokens` | `number` | - |
-| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
 | `delegation_completed` | `model_source` | `string` | `category`, `explicit`, `agent`, `none` |
 | `delegation_completed` | `output_tokens` | `number` | - |
 | `delegation_completed` | `owner_kind` | `string` | `plain_child`, `dag_node`, `team_member`, `unknown` |
-| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
+| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `delegation_completed` | `reasoning_effort` | `string` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `other`, `none` |
 | `delegation_completed` | `run_epoch` | `number` | - |
 | `delegation_completed` | `start_reason` | `string` | `initial_spawn`, `runtime_fallback`, `session_resume`, `dag_retry`, `revive_after_completed`, `revive_after_error`, `revive_after_cancelled`, `revive_after_interrupted`, `revive_after_lost`, `unknown` |
@@ -224,6 +277,12 @@ counts when evaluating rollout coverage.
 ### Reasoning tokens caveat
 
 `turn_completed` reports `reasoning_tokens`. That field is optional and is a subset of `output_tokens`, not an addition to it. Never add `reasoning_tokens` to `output_tokens` when computing totals, or you double count.
+
+### Session summaries and raw-turn sampling
+
+`session_summary` carries a session's assistant turns, summed per window. A window closes every 50 turns or 30 minutes (`ended_by: checkpoint`), on a reload (`ended_by: reload`, not final) and when the session ends (`ended_by: shutdown`). The open window is kept in `<state>/rollups/<session>.json` after every turn; if the process dies, the next OmO process to record a turn sends it once with `ended_by: recovered` and leaves a placeholder so the session, resumed in any process, continues its numbering. Only `ended_by: shutdown` rows have `is_final: true`; a recovered row is not final because the session may be resumed, and a session that is never resumed has no final row. Leftover rollup, temporary and claim files of dead processes are removed, and rollups older than 14 days are dropped. A session keeps one `summary_seq` sequence across reloads and recovery, so `($session_id, summary_seq)` is unique and summing every row of a session gives its exact totals. The three most used models get their own `m1_*` to `m3_*` totals and the rest are summed into `other_*`. `session_role` is `main` for a user's session and `child`, `dag_child` or `member` for omo-spawned work, whose cost `delegation_completed` already counts; filter on it to avoid counting delegated work twice.
+
+Raw `turn_completed` rows go to PostHog only for a fixed share of sessions (`sample_rate` 0.05), chosen from the session hash so a sampled session sends every one of its turns. PostHog is today's only sink, so this sample is what keeps per-turn events from dominating its volume, while `session_summary` carries exact totals for every session. When the first-party collector ships, every turn goes to the collector through its own path and only this direct PostHog path stays sampled. Weight raw PostHog rows by `1 / sample_rate`, or use `session_summary` for exact totals. Rows from clients older than this change have no `sample_rate` and were never sampled.
 
 ### Delegation and category config events
 
@@ -333,4 +392,5 @@ A structural allowlist enforces this rather than relying on discipline: any prop
 ## Local retention
 
 OmO Native does not retain a local history or preview file of sent telemetry payloads.
+The only telemetry file it keeps is the open `session_summary` window of each live session under `<state>/rollups/`: numbers and masked model names only, rewritten after every turn and deleted when the session ends or once a later process has sent it as `recovered`.
 The event schema and opt-out controls above are the public audit surface.

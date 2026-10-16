@@ -43,6 +43,31 @@ describe("record-parse launch evidence", () => {
     expect(parseTaskRecord(persisted({}), "record.json")).not.toHaveProperty("isolation")
   })
 
+  test("awaiting_input survives JSON roundtrip (senpi#3266)", () => {
+    const awaiting = { reason: "resumed_turn_aborted", since: "2026-10-14T00:00:00.000Z" } as const
+    const stored = JSON.parse(JSON.stringify(persisted({ awaiting_input: awaiting })))
+    expect(parseTaskRecord(stored, "record.json").awaiting_input).toEqual(awaiting)
+  })
+
+  test.each([
+    { reason: "resumed_turn_unfinished", since: "2026-10-14T00:00:00.000Z" },
+  ])("awaiting_input reason %o survives JSON roundtrip", (awaiting) => {
+    const stored = JSON.parse(JSON.stringify(persisted({ awaiting_input: awaiting })))
+    expect(parseTaskRecord(stored, "record.json").awaiting_input).toEqual(awaiting)
+  })
+
+  test.each([
+    { awaiting_input: { reason: "resumed_turn_confused", since: "2026-10-14T00:00:00.000Z" } },
+    { awaiting_input: { reason: "resumed_turn_aborted" } },
+    { awaiting_input: "resumed_turn_aborted" },
+  ])("malformed awaiting_input is rejected", (override) => {
+    expect(() => parseTaskRecord(persisted(override), "record.json")).toThrow()
+  })
+
+  test("legacy records omit awaiting_input", () => {
+    expect(parseTaskRecord(persisted({}), "record.json")).not.toHaveProperty("awaiting_input")
+  })
+
   test("settled isolation merge results round-trip without changing artifact paths", () => {
     const isolation = {
       backend: "apfs", merged_dir: "/clone", base_dir: "/base", mode: "patch", apply: true,

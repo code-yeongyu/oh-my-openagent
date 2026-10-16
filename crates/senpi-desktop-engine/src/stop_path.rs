@@ -113,29 +113,32 @@ struct State {
     global_failure: Option<StopPathFailure>,
     /// Preserve non-permission platform diagnostics such as missing portals.
     global_failure_reason: Option<String>,
-    /// `computer.allowHostRelayOnlyStop` of the latest `session.open`.
-    policy: StopPolicy,
-    announced: Announced,
 }
 
 pub struct StopPaths {
     supervisor: Arc<Supervisor>,
     resume: ResumeToken,
-    state: Mutex<State>,
+    state: Arc<Mutex<State>>,
+    policy: Mutex<StopPolicy>,
+    announced: Mutex<Announced>,
+    #[cfg(test)]
+    control_slot: Arc<senpi_desktop_session::ControlSlot>,
 }
 
 impl StopPaths {
     pub fn new(supervisor: Arc<Supervisor>, selection: &BackendSelection, resume: ResumeToken) -> Self {
-        let announced = Announced::from(supervisor.status());
+        let announced = Announced::from(supervisor.published_status());
         Self {
-            state: Mutex::new(State {
+            #[cfg(test)]
+            control_slot: senpi_desktop_session::ControlSlot::new(),
+            state: Arc::new(Mutex::new(State {
                 host_relay: HostRelay::new(),
                 global: global_listener(selection),
                 global_failure: None,
                 global_failure_reason: None,
-                policy: StopPolicy::default(),
-                announced,
-            }),
+            })),
+            policy: Mutex::new(StopPolicy::default()),
+            announced: Mutex::new(announced),
             supervisor,
             resume,
         }
@@ -145,8 +148,32 @@ impl StopPaths {
         self.resume.as_str()
     }
 
+    #[cfg(any(test, target_os = "macos"))]
+    pub(crate) fn session_view(&self) -> Self {
+        Self {
+            supervisor: Arc::clone(&self.supervisor),
+            resume: ResumeToken::new(self.resume.as_str().to_owned()),
+            state: Arc::clone(&self.state),
+            policy: Mutex::new(StopPolicy::default()),
+            announced: Mutex::new(Announced::from(self.supervisor.published_status())),
+            #[cfg(test)]
+            control_slot: Arc::clone(&self.control_slot),
+        }
+    }
+
+    pub fn supervisor(&self) -> Arc<Supervisor> {
+        Arc::clone(&self.supervisor)
+    }
+
+    pub fn control_slot(&self) -> Arc<senpi_desktop_session::ControlSlot> {
+        #[cfg(test)]
+        { Arc::clone(&self.control_slot) }
+        #[cfg(not(test))]
+        { senpi_desktop_session::ControlSlot::process_wide() }
+    }
+
     pub fn set_policy(&self, policy: StopPolicy) {
-        self.state.lock().policy = policy;
+        *self.policy.lock() = policy;
     }
 
     /// `stopPath.start`: (re)starts the Global listener if there is one, then
@@ -202,8 +229,8 @@ impl StopPaths {
     }
 
     pub fn status(&self) -> StopPathStatus {
-        let status = self.supervisor.status();
-        let policy = self.state.lock().policy;
+        let status = self.supervisor.published_status();
+        let policy = *self.policy.lock();
         StopPathStatus {
             suspended: status.suspended,
             global_live: status.global_live,
@@ -241,13 +268,14 @@ impl StopPaths {
 
     /// The current status when it differs from the last one announced.
     pub fn transition(&self) -> Option<StopPathStatus> {
-        let current = Announced::from(self.supervisor.status());
-        let mut state = self.state.lock();
-        if state.announced == current {
+        if self.supervisor.stop_pending() { return None; }
+        let current = Announced::from(self.supervisor.published_status());
+        let mut announced = self.announced.lock();
+        if *announced == current {
             return None;
         }
-        state.announced = current;
-        drop(state);
+        *announced = current;
+        drop(announced);
         Some(self.status())
     }
 }

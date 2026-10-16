@@ -16,11 +16,15 @@ pub use display::{DesktopCapabilities, DesktopDisplay, DisplaySelector};
 pub use window::{DesktopPoint, DesktopWindow, FrontWindow, PointerOptions, Target};
 
 /// `session.open` parameters supplied by the host.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DesktopSessionOptions {
     pub display: Option<String>,
     pub macos_canary: MacosCanaryMode,
+    /// Display-only virtual cursor; never changes input admission.
+    #[serde(default = "default_show_cursor")]
+    #[schemars(default = "default_show_cursor")]
+    pub show_cursor: bool,
     /// Accept a heartbeating host relay as the only stop path.
     pub allow_host_relay_only_stop: bool,
     /// Audit JSONL file; `None` turns auditing off.
@@ -29,6 +33,25 @@ pub struct DesktopSessionOptions {
     pub artifact_dir: Option<PathBuf>,
     pub screenshot_gc: ScreenshotGc,
     pub capture_caps: CaptureCaps,
+}
+
+const fn default_show_cursor() -> bool {
+    true
+}
+
+impl Default for DesktopSessionOptions {
+    fn default() -> Self {
+        Self {
+            display: None,
+            macos_canary: MacosCanaryMode::default(),
+            show_cursor: default_show_cursor(),
+            allow_host_relay_only_stop: false,
+            audit_path: None,
+            artifact_dir: None,
+            screenshot_gc: ScreenshotGc::default(),
+            capture_caps: CaptureCaps::default(),
+        }
+    }
 }
 
 /// Whether macOS verifies background delivery before the session's first input.

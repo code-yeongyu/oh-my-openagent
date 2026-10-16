@@ -48,6 +48,7 @@ const CapabilitiesSchema = z.object({
   input: z.boolean(),
   ax: z.boolean(),
   backgroundWindowInput: z.boolean(),
+  cursorOverlay: z.boolean().default(false),
   deliveryModes: z.array(z.string()),
   capturePermission: z.string(),
   inputPermission: z.string(),

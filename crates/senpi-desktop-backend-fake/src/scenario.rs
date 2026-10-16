@@ -38,6 +38,9 @@ pub struct FakeScenario {
     pub resize_window: Option<ResizeWindow>,
     /// Failures queued at load time, as if `fail_next` had been called.
     pub fail_next: Vec<ScriptedFailure>,
+    /// Marks every capture's frame geometry `legacyCapture` (B9 fallback
+    /// shape), so the wire carries the flag.
+    pub legacy_capture: bool,
 }
 
 impl Default for FakeScenario {
@@ -54,6 +57,7 @@ impl Default for FakeScenario {
             delay_ms: DelayMs::default(),
             resize_window: None,
             fail_next: Vec::new(),
+            legacy_capture: false,
         }
     }
 }
@@ -126,11 +130,14 @@ pub struct ResizeWindow {
     pub height: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScriptedFailure {
     pub method: FakeMethod,
     pub code: ErrorCode,
+    /// `CaptureUnavailable` reason token, e.g. `"minimized"`.
+    #[serde(default)]
+    pub reason: Option<String>,
 }
 
 /// One scripted accessibility element and its subtree.
@@ -221,6 +228,8 @@ struct RawScenario {
     resize_window: Option<ResizeWindow>,
     #[serde(default)]
     fail_next: Vec<ScriptedFailure>,
+    #[serde(default)]
+    legacy_capture: bool,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -250,6 +259,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             delay_ms: raw.delay_ms,
             resize_window: raw.resize_window,
             fail_next: raw.fail_next,
+            legacy_capture: raw.legacy_capture,
         })
     }
 }

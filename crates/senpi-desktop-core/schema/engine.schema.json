@@ -208,6 +208,28 @@
         "type": "null"
       }
     },
+    "holdKeys": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/HoldKeysParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "holdMouse": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/HoldMouseParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
     "raiseWindow": {
       "effect": "exec",
       "hostOnly": false,
@@ -556,7 +578,8 @@
     "FocusRestoreFailed": -32019,
     "TransactionFailed": -32020,
     "InputBusy": -32021,
-    "ControlRequired": -32022
+    "ControlRequired": -32022,
+    "CaptureUnavailable": -32023
   },
   "standardErrors": {
     "parseError": -32700,
@@ -614,6 +637,11 @@
               "$ref": "#/definitions/MacosCanaryMode"
             }
           ]
+        },
+        "showCursor": {
+          "type": "boolean",
+          "description": "Display-only virtual cursor; never changes input admission.",
+          "default": true
         },
         "allowHostRelayOnlyStop": {
           "type": "boolean",
@@ -768,6 +796,10 @@
         "backgroundWindowInput": {
           "type": "boolean"
         },
+        "cursorOverlay": {
+          "type": "boolean",
+          "description": "Whether the display-only virtual cursor is live now."
+        },
         "deliveryModes": {
           "type": "array",
           "items": {
@@ -812,6 +844,10 @@
         },
         "screenLocked": {
           "type": "boolean"
+        },
+        "legacyCapture": {
+          "type": "boolean",
+          "description": "Captures run through the legacy `screencapture` path, not the\nScreenCaptureKit worker (B9: macOS < 14, helper missing, or the\nhelper failed to start)."
         }
       },
       "required": [
@@ -820,6 +856,7 @@
         "input",
         "ax",
         "backgroundWindowInput",
+        "cursorOverlay",
         "deliveryModes",
         "capturePermission",
         "inputPermission",
@@ -829,7 +866,7 @@
         "stopPath",
         "screenLocked"
       ],
-      "description": "Runtime truth about what this host's backend can do right now.\n\nFROZEN field set (IS-2): later todos fill values, never add fields.",
+      "description": "Runtime truth about what this host's backend can do right now.\n\nSchema-backed field set; additions update Rust, generated schema and TS together.",
       "additionalProperties": false
     },
     "ControlGrantParams": {
@@ -993,6 +1030,13 @@
           "type": "boolean",
           "description": "Whether the window currently holds input focus."
         },
+        "isOnScreen": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether the window is on the active Space. `None` on backends that\ncannot tell (X11/Win32/Wayland report every listed window on screen)."
+        },
         "elevated": {
           "type": [
             "boolean",
@@ -1011,7 +1055,7 @@
         "height",
         "focused"
       ],
-      "description": "One capturable top-level window in global logical desktop coordinates.",
+      "description": "One capturable top-level window in global logical desktop coordinates.\n`is_on_screen` distinguishes an on-Space window from a same-app window on\nanother Space: both resolve as capture targets, but only an on-screen one\nis user-visible right now.",
       "additionalProperties": false
     },
     "CaptureParams": {
@@ -1029,12 +1073,22 @@
               "type": "null"
             }
           ]
+        },
+        "excludeWindowTitles": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Titles of windows to exclude from a display capture."
         }
       },
       "required": [
         "target"
       ],
-      "description": "`capture`: one target (`desktop` or a window id) under optional caps.",
+      "description": "`capture`: one target (`desktop` or a window id) under optional caps.\n`excludeWindowTitles` applies to display captures only: every window with\na matching title is left out of the screenshot (B9, macOS ScreenCaptureKit;\nempty elsewhere and ignored by older engines).",
       "additionalProperties": false
     },
     "CaptureResult": {
@@ -1117,6 +1171,17 @@
             "string",
             "null"
           ]
+        },
+        "isOnScreen": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "The captured window's on-Screen state (macOS B9; absent for desktop\ncaptures and backends that cannot tell)."
+        },
+        "legacyCapture": {
+          "type": "boolean",
+          "description": "`true` when this capture ran through the legacy `screencapture`\nfallback instead of the ScreenCaptureKit worker (B9)."
         }
       },
       "required": [
@@ -1349,6 +1414,17 @@
             "string",
             "null"
           ]
+        },
+        "isOnScreen": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "The captured window's on-Screen state (macOS B9; absent for desktop\ncaptures and backends that cannot tell)."
+        },
+        "legacyCapture": {
+          "type": "boolean",
+          "description": "`true` when this capture ran through the legacy `screencapture`\nfallback instead of the ScreenCaptureKit worker (B9)."
         },
         "ax": {
           "type": "string"
@@ -1615,6 +1691,100 @@
         "target",
         "keys"
       ],
+      "additionalProperties": false
+    },
+    "HoldKeysParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "duration": {
+          "type": "number",
+          "format": "double"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "keys",
+        "duration"
+      ],
+      "description": "`holdKeys`: keys are always released before the request settles.",
+      "additionalProperties": false
+    },
+    "HoldMouseParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "duration": {
+          "type": "number",
+          "format": "double"
+        },
+        "button": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keys": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y",
+        "duration"
+      ],
+      "description": "`holdMouse`: coordinates address the latest full capture, never a zoom.",
       "additionalProperties": false
     },
     "RaiseWindowParams": {
@@ -2237,6 +2407,8 @@
         "scroll",
         "typeText",
         "keyChord",
+        "holdKeys",
+        "holdMouse",
         "raiseWindow",
         "menus.items",
         "menus.select",
@@ -2305,6 +2477,11 @@
           "type": "string",
           "const": "ControlRequired",
           "description": "Foreground delivery without this session's live control grant."
+        },
+        {
+          "type": "string",
+          "const": "CaptureUnavailable",
+          "description": "The capture target exists but cannot be captured right now; `data`\nsays why (e.g. `{ \"reason\": \"minimized\" }`)."
         }
       ],
       "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."
@@ -2497,6 +2674,16 @@
               "type": "null"
             }
           ]
+        },
+        "captureUnavailable": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureUnavailableData"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -2534,6 +2721,19 @@
         "screen_recording",
         "accessibility"
       ]
+    },
+    "CaptureUnavailableData": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "description": "Why a `CaptureUnavailable` capture was refused. `reason` is an open token\nset: B9 introduces `\"minimized\"` and later waves add more.",
+      "additionalProperties": false
     },
     "MethodRejectionData": {
       "type": "object",

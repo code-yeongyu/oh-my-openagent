@@ -46,9 +46,10 @@ export function createDesktopFacade(scope: RunScope) {
 	const root = new InputTarget(scope, "desktop", DESKTOP_METHODS);
 	return {
 		capabilities: (): Promise<DesktopCapabilities> =>
-			method("capabilities", async ({ call }) =>
-				expectResult("capabilities", await call("capabilities", {}), isDesktopCapabilities),
-			),
+			method("capabilities", async ({ call }) => {
+				const capabilities = expectResult("capabilities", await call("capabilities", {}), isDesktopCapabilities);
+				return { ...capabilities, cursorOverlay: capabilities.cursorOverlay ?? false };
+			}),
 		displays: (): Promise<readonly DesktopDisplay[]> =>
 			method("displays", async ({ call }) =>
 				expectResult("displays", await call("displays", {}), listOf(isDisplay)),
@@ -94,6 +95,8 @@ export function createDesktopFacade(scope: RunScope) {
 		scroll: root.scroll.bind(root),
 		type: root.type.bind(root),
 		press: root.press.bind(root),
+		holdKeys: root.holdKeys.bind(root),
+		holdMouse: root.holdMouse.bind(root),
 		/** The element under a point in global logical desktop coordinates (not screenshot pixels). */
 		elementAt: (x: number, y: number): Promise<ElementHandle | null> =>
 			method("elementAt", () => element("ax.elementAt", { target: "desktop", x, y })),

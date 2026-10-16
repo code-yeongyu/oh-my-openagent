@@ -51,6 +51,7 @@ pub(super) fn setup() -> (Worker, Arc<Mutex<State>>) {
             width: 64,
             height: 48,
             focused: true,
+            is_on_screen: None,
             elevated: None,
         },
         active: "1".into(),
@@ -78,6 +79,7 @@ impl Backend for ZoomBackend {
         &mut self,
         target: &Target,
         caps: &CaptureCaps,
+        _exclude_window_titles: &[String],
     ) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let mut state = self.0.lock();
         state.captures.push(target.clone());

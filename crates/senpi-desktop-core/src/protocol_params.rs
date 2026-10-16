@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::RequestId;
+pub use crate::protocol_holds::{HoldKeysParams, HoldMouseParams};
 use crate::types::{AxQuery, AxSnapshotOptions, CaptureCaps, CaptureRegion, DesktopPoint, PointerOptions};
 
 /// Parameters of a method that takes none: `{}`.
@@ -12,11 +13,17 @@ use crate::types::{AxQuery, AxSnapshotOptions, CaptureCaps, CaptureRegion, Deskt
 pub struct EmptyParams {}
 
 /// `capture`: one target (`desktop` or a window id) under optional caps.
+/// `excludeWindowTitles` applies to display captures only: every window with
+/// a matching title is left out of the screenshot (B9, macOS ScreenCaptureKit;
+/// empty elsewhere and ignored by older engines).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureParams {
     pub target: String,
     pub caps: Option<CaptureCaps>,
+    /// Titles of windows to exclude from a display capture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclude_window_titles: Option<Vec<String>>,
 }
 
 /// `observe`: an atomic window screenshot and accessibility snapshot.

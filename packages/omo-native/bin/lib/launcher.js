@@ -310,10 +310,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     process.exitCode = await runSelfUpdate(args)
     return
   }
-  if (command === "app-server") {
-    refuseRetiredCommand(args)
-    return
-  }
+  if (refuseRetiredCommand(args)) return
   // `host status --all` stays the engine's answer; omo only adds each terminal row's last activity.
   if (isHostStatusAll(args, process.env)) {
     process.exitCode = await runHostStatusAll(args, {
