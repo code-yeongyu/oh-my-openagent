@@ -5,7 +5,8 @@
 // queue (an opted-in start recovers and sends it), so the opt-out lanes cannot pass on a malformed seed.
 import { createServer } from "node:http"
 import { gunzipSync } from "node:zlib"
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -78,6 +79,8 @@ async function main() {
     everyRunExitedZero: Object.values(lanes).every((lane) => lane.status === 0),
     everySeedWasOnDisk: Object.values(lanes).every((lane) => lane.filesBefore.length >= 3),
     leakedPidsZero: Object.values(lanes).every((lane) => lane.leakedPids === 0),
+    noSandboxProcessSurvives: Object.values(lanes).every((lane) => lane.sandboxProcessesLeft === 0),
+    noSandboxRpcDirSurvives: Object.values(lanes).every((lane) => lane.rpcDirsLeft === 0),
     sandboxesRemoved: Object.values(lanes).every((lane) => lane.sandboxRemoved),
     realSenpiUntouched,
   }
@@ -98,6 +101,8 @@ async function runLane(senpiBin, name, lane) {
   let filesBefore = []
   let filesAfter = []
   let leakedPids = 0
+  let sandboxProcessesLeft = -1
+  let rpcDirsLeft = -1
   try {
     seedSandbox(sandbox)
     mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
@@ -131,6 +136,10 @@ async function runLane(senpiBin, name, lane) {
   } finally {
     leakedPids = await processes.cleanup()
     await sink.close()
+    // The run pre-warms a detached RPC host supervisor that outlives the CLI process (it is no child the
+    // registry tracks) and writes back into the sandbox; it is stopped before the sandbox is removed.
+    sandboxProcessesLeft = await stopSandboxProcesses(sandbox.root)
+    rpcDirsLeft = removeSandboxRpcDirs(sandbox.root)
     rmSync(sandbox.root, { recursive: true, force: true })
   }
   const events = sink.requests.flatMap((request) => request.body?.batch ?? [request.body].filter((body) => body?.event))
@@ -143,6 +152,8 @@ async function runLane(senpiBin, name, lane) {
     filesBefore,
     filesAfter,
     leakedPids,
+    sandboxProcessesLeft,
+    rpcDirsLeft,
     sandboxRemoved: !existsSync(sandbox.root),
   }
 }
@@ -169,6 +180,78 @@ function seedDeadOwnerQueue(root, scope) {
   }), { mode: 0o600 })
   writeFileSync(join(root, `${SEEDED}-claimed.json.claimed-${DEAD.pid}-${DEAD.bootId}`), JSON.stringify({ ...record, sessionHash: `${SEEDED}-claimed` }), { mode: 0o600 })
   writeFileSync(join(root, "owners", `${DEAD.pid}.json`), JSON.stringify(DEAD), { mode: 0o600 })
+}
+
+function sandboxPids(root) {
+  const listing = execFileSync("ps", ["-axww", "-o", "pid=,command="], { encoding: "utf8", windowsHide: true })
+  return listing.split("\n").flatMap((line) => {
+    const match = /^\s*(\d+)\s+(.*)$/.exec(line)
+    return match !== null && match[2].includes(root) && Number(match[1]) !== process.pid ? [Number(match[1])] : []
+  })
+}
+
+function signal(pids, name) {
+  for (const pid of pids) {
+    try {
+      process.kill(pid, name)
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error
+    }
+  }
+}
+
+// TERM, then KILL whatever still holds the sandbox after a bounded wait; returns how many survive both.
+async function stopSandboxProcesses(root) {
+  signal(sandboxPids(root), "SIGTERM")
+  for (let attempt = 0; attempt < 50 && sandboxPids(root).length > 0; attempt += 1) {
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100))
+  }
+  signal(sandboxPids(root), "SIGKILL")
+  for (let attempt = 0; attempt < 20 && sandboxPids(root).length > 0; attempt += 1) {
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100))
+  }
+  return sandboxPids(root).length
+}
+
+// The host's socket directories live outside the sandbox (short paths for sun_path); only those whose
+// metadata names this sandbox are removed. Returns how many could not be removed.
+function removeSandboxRpcDirs(root) {
+  let left = 0
+  for (const base of new Set(["/tmp", "/private/tmp"])) {
+    for (const name of safeList(base)) {
+      if (!name.startsWith("omo-rpc-")) continue
+      const dir = join(base, name)
+      const owned = safeList(dir).some((file) => file.endsWith(".meta.json") && readText(join(dir, file)).includes(root))
+      if (!owned) continue
+      rmSync(dir, { recursive: true, force: true })
+      if (existsSync(dir)) left += 1
+    }
+  }
+  return left
+}
+
+const ABSENT = new Set(["ENOENT", "ENOTDIR", "EACCES", "EPERM"])
+
+function isAbsent(error) {
+  return error instanceof Error && "code" in error && ABSENT.has(error.code)
+}
+
+function safeList(dir) {
+  try {
+    return readdirSync(dir)
+  } catch (error) {
+    if (!isAbsent(error)) throw error
+    return []
+  }
+}
+
+function readText(path) {
+  try {
+    return readFileSync(path, "utf8")
+  } catch (error) {
+    if (!isAbsent(error)) throw error
+    return ""
+  }
 }
 
 function listFiles(root) {
@@ -217,6 +300,8 @@ function summarize(lanes) {
       ended_by: event.properties?.ended_by,
     })),
     leakedPids: lane.leakedPids,
+    sandboxProcessesLeft: lane.sandboxProcessesLeft,
+    rpcDirsLeft: lane.rpcDirsLeft,
     sandboxRemoved: lane.sandboxRemoved,
     stderrTail: lane.status === 0 ? "" : lane.stderrTail,
   }]))
