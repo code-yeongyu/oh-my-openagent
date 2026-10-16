@@ -17,7 +17,7 @@ write_snapshot() {
   mkdir -p .omo
   SHA=$(git rev-parse HEAD)
   FILES=$(git ls-files -z | node -e 'let c=0;process.stdin.on("data",d=>{for(let i=0;i<d.length;i++)if(d[i]===0)c++});process.stdin.on("end",()=>process.stdout.write(String(c)))')
-  LOC=$(git ls-files -z -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.rs' '*.java' '*.kt' '*.swift' '*.rb' '*.php' '*.c' '*.cpp' '*.cs' '*.scala' '*.lua' '*.ex' '*.exs' '*.zig' '*.dart' | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}')
+  LOC=$(git ls-files -z -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.rs' '*.java' '*.kt' '*.swift' '*.rb' '*.php' '*.c' '*.cpp' '*.cs' '*.scala' '*.lua' '*.ex' '*.exs' '*.zig' '*.dart' | xargs -0 cat 2>/dev/null | wc -l | tr -d ' ')
   NOW=$(node -e 'console.log(Date.now())')
   USER_MODE_CHOICE="${USER_MODE_CHOICE:-}" && if [ "$USER_MODE_CHOICE" = "committed" ]; then MODE=committed; elif [ "$USER_MODE_CHOICE" = "local" ]; then MODE=local; elif git ls-files --error-unmatch AGENTS.md >/dev/null 2>&1; then MODE=committed; else MODE=local; fi
   cat > .omo/init-deep.json <<EOF
