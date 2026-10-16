@@ -4,6 +4,7 @@ import { log } from "../shared/logger"
 import type { AdapterState } from "./adapter-state"
 import { toV1Event } from "./event-shape"
 import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
+import { createOmoDelegationRouting } from "./delegation-routing"
 
 type V2Context = Plugin.Context
 
@@ -192,6 +193,13 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: 
       })
     })
   }
+
+  // Independent of legacy transforms: OMO routing remains present when none
+  // were registered, and runs after them. Native/custom agents are unchanged.
+  const routeDelegation = createOmoDelegationRouting()
+  await ctx.session.hook("context", (event) => {
+    routeDelegation(event)
+  })
 
   if (chatHeaders) {
     await ctx.session.hook("model.request", (event) => {
