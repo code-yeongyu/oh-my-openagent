@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**OpenCode edition: Sisyphus names GPT-6.1 Sol and GPT-6 Luna as themselves.** On `gpt-6.1-sol` (and its `-fast`, dashed and Venice `gpt-61-sol` ids) and on `gpt-6-luna`, the Sisyphus and Sisyphus-Junior GPT prompts introduced the model as "a GPT-family model"; they now say "GPT-6.1 Sol" and "GPT-6 Luna". ([#10291](https://github.com/code-yeongyu/oh-my-openagent/issues/10291), [#10292](https://github.com/code-yeongyu/oh-my-openagent/pull/10292))
+
 **The memory sync device keyring refuses a few more malformed inputs instead of failing late.** A keyring record can no longer carry the snapshot tag as its type, deeply nested JSON (over 64 levels) is refused with a typed error instead of a stack overflow, the wrap associated data goes through the one RFC 8785 serializer and refuses a non-integer epoch, and a low-order X25519 point is refused with the normal "does not open" error. Follow-up to the review of [#10194](https://github.com/code-yeongyu/oh-my-openagent/pull/10194) ([#10274](https://github.com/code-yeongyu/oh-my-openagent/pull/10274)).
 
 **Background task reattachment now recovers the real result instead of starting duplicate work.** A parent that reloads or loses its host connection checks whether the child is still running before reading its transcript. Finished turns are adopted once, interrupted turns continue once, and a turn stopped by its deadline stays interrupted until an explicit `task_send`. ([#10012](https://github.com/code-yeongyu/oh-my-openagent/issues/10012), [#10013](https://github.com/code-yeongyu/oh-my-openagent/issues/10013), [#10078](https://github.com/code-yeongyu/oh-my-openagent/pull/10078)).
