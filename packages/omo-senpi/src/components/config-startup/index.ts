@@ -15,6 +15,7 @@ import {
   type ConfigMigrationPathOperations,
 } from "@oh-my-opencode/omo-opencode/config-migration"
 import { DEVIN_SWE2_SERVED_LANES, isUnservedDevinSWE2Selector } from "@oh-my-opencode/model-core"
+import { categoryShadowedAgentNames, categoryShadowMessage } from "@oh-my-opencode/senpi-task/category-shadow"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"
 import { createOpenCodeRoutingNoticePlan } from "./opencode-routing-notice"
@@ -176,6 +177,11 @@ export function notificationMessages(
   })
   if (config.diagnostics.length > 0) messages.push({
     message: `OmO Native: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,
+    type: "warning",
+  })
+  const shadowed = categoryShadowedAgentNames(config.config)
+  if (shadowed.length > 0) messages.push({
+    message: `OmO Native: ${shadowed.map((name) => categoryShadowMessage(config.config, name)).join("; ")}`,
     type: "warning",
   })
   const unserved = unservedDevinSelectors(config.config)
