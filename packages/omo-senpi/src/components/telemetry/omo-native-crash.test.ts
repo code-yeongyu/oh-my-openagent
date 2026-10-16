@@ -7,7 +7,7 @@ import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { crashClaimDir } from "./process-crash-records"
 import { createOmoNativeSessionComponent } from "./omo-native-session"
-import { OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
+import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
 import {
   FIXED_NOW,
   createEnabledEnv,
@@ -52,7 +52,7 @@ const TUI_RECORD = JSON.stringify({
   detection: "unclean_exit",
   uptimeMs: 420_000,
   bunVersion: "1.4.2",
-  senpiVersion: "2026.9.27-2",
+  senpiVersion: "2026.9.27",
   productVersion: "5.0.1",
 })
 
@@ -101,7 +101,7 @@ describe("OmO Native process_crashed", () => {
           uptime_ms: 420_000,
           uptime_bucket: "1_10m",
           crashed_bun_version: "1.4.2",
-          crashed_engine_version: "2026.9.27-2",
+          crashed_engine_version: "2026.9.27",
           crashed_omo_version: "5.0.1",
           $os: "darwin",
           arch: "arm64",
@@ -111,9 +111,9 @@ describe("OmO Native process_crashed", () => {
           detection: "supervisor",
           signal: "SIGSEGV",
           uptime_bucket: "10_60m",
-          crashed_bun_version: "unknown",
         }),
       ])
+      expect(crashes(first)[1]?.properties).not.toHaveProperty("crashed_bun_version")
       expect(crashes(second)).toEqual([])
     })
   })
@@ -244,13 +244,51 @@ describe("OmO Native process_crashed", () => {
       // then
       const [crash] = crashes(messages)
       expect(Object.keys(crash?.properties ?? {}).sort()).toEqual([
-        "$os", "$process_person_profile", "arch", "crashed_bun_version", "crashed_engine_version", "crashed_omo_version",
-        "detection", "install_id", "package_version", "platform", "process_kind", "product_name", "schema_version",
-        "shard_kind", "signal", "surface", "uptime_bucket", "uptime_ms",
-      ])
+        "$os", "arch", "detection", "process_kind", "shard_kind", "signal", "uptime_bucket", "uptime_ms",
+        ...Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS),
+      ].sort())
       expect(crash?.properties?.shard_kind).toBe("p")
       const wire = JSON.stringify(crash)
       for (const secret of ["0123456789abcdef", endpoint, socket, "hashed:"]) expect(wire).not.toContain(secret)
+    })
+  })
+
+  it("#given crash-time versions of every shape #when reported #then only the collector semver shape ships, anything else is omitted", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      const shapes: readonly [string, boolean][] = [
+        ["1.2.3", true],
+        ["5.1.33", true],
+        ["1.2.3-beta.1", true],
+        ["0.0.34-nightly.20261001.679", true],
+        ["0.0.43-preview.20260928.2413", true],
+        ["0.0.34-dfa.39", true],
+        ["5.1.34-2", true],
+        ["0.0.34-12", true],
+        ["5.1.34-abc", false],
+        ["5.1.34-1234567", false],
+        ["1.2.3-yeongyu-macbook-pro.local", false],
+        ["1.2.3+build.host", false],
+        ["123456789012345678901234567890123456789012345678901234567890.2.3", false],
+      ]
+      const records = shapes.map(([version], index) =>
+        JSON.stringify({ at: RECENT, kind: "print", code: 1, uptimeMs: 1_000 + index, bunVersion: version, senpiVersion: version, productVersion: version }))
+      writeRecords(agentDir, [], records)
+      const messages: TelemetryCaptureMessage[] = []
+
+      // when
+      await startProcess(agentDir, messages)
+
+      // then
+      const reported = crashes(messages)
+      expect(reported).toHaveLength(shapes.length)
+      for (const [index, [version, ships]] of shapes.entries()) {
+        const properties = reported.find(({ properties }) => properties?.["uptime_ms"] === 1_000 + index)?.properties ?? {}
+        for (const key of ["crashed_bun_version", "crashed_engine_version", "crashed_omo_version"]) {
+          expect(`${version} ${key} ${properties[key] ?? "omitted"}`).toBe(`${version} ${key} ${ships ? version : "omitted"}`)
+        }
+      }
+      for (const [version, ships] of shapes) if (!ships) expect(JSON.stringify(messages)).not.toContain(version)
     })
   })
 
@@ -271,10 +309,11 @@ describe("OmO Native process_crashed", () => {
       const [crash] = crashes(messages)
       const allowed = new Set<string>([
         ...OMO_NATIVE_PROPERTY_ALLOWLISTS.process_crashed,
-        "$process_person_profile", "install_id", "package_version", "platform", "product_name", "schema_version", "surface",
+        ...Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS),
       ])
       expect(Object.keys(crash?.properties ?? {}).filter((key) => !allowed.has(key))).toEqual([])
-      expect(crash?.properties).toMatchObject({ exit_code: 1, signal: "none", crashed_engine_version: "unknown" })
+      expect(crash?.properties).toMatchObject({ exit_code: 1, signal: "none" })
+      expect(crash?.properties).not.toHaveProperty("crashed_engine_version")
       expect(JSON.stringify(crash)).not.toContain("/Users/someone")
     })
   })

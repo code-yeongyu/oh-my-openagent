@@ -1,4 +1,5 @@
 import { getTelemetryApiKey, getTelemetryHost } from "./env"
+import { createEventId } from "./event-id"
 import { createDefaultPostHogTransport, isTelemetryClientEnabled } from "./posthog-client"
 import type {
   TelemetryCaptureMessage,
@@ -139,15 +140,20 @@ export function createEventTelemetryClient(
         projected[key] = typeof value === "string" ? value.slice(0, 64) : value
       }
 
+      // event_id is minted here so a product cannot supply it through properties; PostHog dedupes on
+      // `uuid`, so mirroring it there makes a direct and a relayed delivery of one event collapse. A caller
+      // re-sending a persisted event (session_summary pending files) passes its stable uuid, which then
+      // doubles as event_id so the collector dedupes the re-send too.
       const uuid = options?.uuid
       if (uuid !== undefined && !EVENT_UUID.test(uuid)) {
         report("telemetry_event_property_rejected", new Error("invalid event uuid"))
       }
+      const eventId = uuid !== undefined && EVENT_UUID.test(uuid) ? uuid : createEventId()
       const payload: TelemetryCaptureMessage = {
         distinctId: input.distinctId,
         event: name,
-        properties: { ...projected, ...sharedProperties },
-        ...(uuid !== undefined && EVENT_UUID.test(uuid) ? { uuid } : {}),
+        uuid: eventId,
+        properties: { ...projected, ...sharedProperties, event_id: eventId },
         ...(isValidDate(options?.timestamp) ? { timestamp: options.timestamp } : {}),
       }
       try {

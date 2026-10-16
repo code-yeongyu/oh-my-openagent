@@ -14,7 +14,6 @@ function properties(overrides = {}) {
     $process_person_profile: false,
     $session_id: "hashed-session",
     eval_execution_event_bus_available: true,
-    non_eval_wave_size_histogram: "0:0:0:0:0:0:0:0",
     package_version: "5.0.0-beta.7",
     platform: "omo-senpi",
     product_name: "omo-native",

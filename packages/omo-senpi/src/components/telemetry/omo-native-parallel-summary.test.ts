@@ -6,6 +6,7 @@ import type { EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { registerOmoNativeParallelSummary } from "./omo-native-parallel-summary"
 import { OMO_NATIVE_PROPERTY_ALLOWLISTS } from "./product-identity"
+import { wireViolations } from "./telemetry-wire.test-support"
 import { MAX_TRACKED_CALLS } from "./wave-assembler"
 
 type Captured = { readonly name: string; readonly properties: EventTelemetryProperties }
@@ -183,9 +184,9 @@ describe("omo-native parallelism summary emission", () => {
     })
   })
 
-  describe("#given the wave size histogram", () => {
-    describe("#when waves of several sizes are summarized", () => {
-      test("#then it is positionally encoded, unlabelled, and short enough to survive truncation", async () => {
+  describe("#given waves of several sizes", () => {
+    describe("#when they are summarized", () => {
+      test("#then each size bucket is its own bounded integer counter, the string histogram is gone, and the row validates against the artifact", async () => {
         // given
         const fx = fixture()
         await toolCall(fx, "s1", { toolCallId: "a", toolName: "bash", startMs: 1_000, endMs: 1_100 })
@@ -194,10 +195,10 @@ describe("omo-native parallelism summary emission", () => {
         // when
         await shutdown(fx, "s1")
         // then
-        const histogram = fx.captured[0]?.properties.non_eval_wave_size_histogram
-        expect(histogram).toBe("1:1:0:0:0:0:0:0")
-        expect(String(histogram)).not.toContain("=")
-        expect(String(histogram).length).toBeLessThan(64)
+        const properties = fx.captured[0]?.properties ?? {}
+        expect(properties).toMatchObject({ wave_size_1: 1, wave_size_2_3: 1, wave_size_4_7: 0, wave_size_8_plus: 0 })
+        expect(properties).not.toHaveProperty("non_eval_wave_size_histogram")
+        expect(wireViolations("parallelism_summary", properties)).toEqual([])
       })
     })
   })
@@ -223,7 +224,7 @@ describe("omo-native parallelism summary emission", () => {
         const paired = Number(properties?.non_eval_joined_calls)
         const sinks = paired + Number(properties?.incomplete_calls) + Number(properties?.dropped_calls) + Number(properties?.clock_anomalies)
         expect(sinks).toBe(observed)
-        expect(String(properties?.non_eval_wave_size_histogram).length).toBeLessThan(64)
+        expect(wireViolations("parallelism_summary", properties ?? {})).toEqual([])
       })
     })
   })

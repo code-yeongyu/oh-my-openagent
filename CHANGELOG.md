@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Usage data now follows a published per-field schema and sends less.** `session_started` no longer sends your time zone name, only its UTC offset in minutes; names of custom providers and models are never sent (only a count, or `custom`); and a crash report omits any version that is unknown or not a plain release version such as `5.1.33` or `5.1.33-beta.2`, so a dev build carrying a machine name never leaves the computer. ([#10209](https://github.com/code-yeongyu/oh-my-openagent/pull/10209))
+
 **Turning telemetry off now also stops the session summary from being kept on disk.** Since the session summary arrived on dev, a session with telemetry off still recorded its per-turn totals locally, and if it crashed, a later session with telemetry on could send them. A session with telemetry off now writes nothing, a mid-session opt-out deletes what it wrote within seconds, and a leftover file is sent only if its own project still has telemetry on when it is recovered. No published release contained the earlier behavior. ([#10229](https://github.com/code-yeongyu/oh-my-openagent/issues/10229))
 
 **Team-mode panes open in the worktree path exactly as written.** The member's worktree path was passed to tmux `split-window -c`, which expands its argument as a tmux format, so `#{...}` in a model-supplied `team_create` path changed the directory a pane opened in, and `#(...)` is tmux's shell-exec format. The path now has every `#` doubled, the same escaping the subagent pane titles use. ([#10233](https://github.com/code-yeongyu/oh-my-openagent/issues/10233))

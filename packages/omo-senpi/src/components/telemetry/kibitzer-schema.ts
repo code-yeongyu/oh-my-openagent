@@ -1,5 +1,12 @@
+import { ALL_KNOWN_MODEL_IDS } from "./model-vocabulary"
+
 const NUMBER_PROPERTY = Object.freeze({ type: "number" } as const)
 const STRING_PROPERTY = Object.freeze({ type: "string" } as const)
+/** `maskKibitzerModel`: a shipped model id, `custom`, or `none` when no wake ran a model. */
+const MODEL_TOP_PROPERTY = Object.freeze({
+  type: "string",
+  values: Object.freeze([...ALL_KNOWN_MODEL_IDS, "custom", "none"]),
+} as const)
 
 /**
  * Privacy schema for `kibitzer_summary`: counts, durations and a masked model id only. Nudge paths
@@ -15,7 +22,7 @@ export const KIBITZER_SUMMARY_SCHEMA = Object.freeze({
   first_nudge_wake: NUMBER_PROPERTY,
   generations: NUMBER_PROPERTY,
   input_tokens: NUMBER_PROPERTY,
-  model_top: STRING_PROPERTY,
+  model_top: MODEL_TOP_PROPERTY,
   nudge_gap_ms_median: NUMBER_PROPERTY,
   nudge_gap_ms_p90: NUMBER_PROPERTY,
   nudges_delivered: NUMBER_PROPERTY,

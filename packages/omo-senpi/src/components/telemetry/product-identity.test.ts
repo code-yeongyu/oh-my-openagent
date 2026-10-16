@@ -3,6 +3,8 @@ import { existsSync, readFileSync, rmSync, unlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { mkdtempSync } from "node:fs"
+import { createHash } from "node:crypto"
+import os from "node:os"
 import {
   BUILTIN_CATEGORY_NAMES,
   BUILTIN_SKILL_NAMES,
@@ -20,13 +22,14 @@ import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
+  MACHINE_HASH_SUNSET,
   getOmoNativeAttribution,
   getOmoNativeStateDir,
   hashSessionId,
   maskProviderAndModel,
   withOmoNativeAttribution,
 } from "./product-identity"
-import { MAX_TRACKED_CALLS } from "./wave-assembler"
+import { ALL_KNOWN_MODEL_IDS } from "./model-vocabulary"
 import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
 import { UNCONFIGURED_POSTHOG_API_KEY, getTelemetryApiKey, isConfiguredTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
@@ -44,6 +47,8 @@ const originalAttributionEnv = {
   OMO_NATIVE_INSTALL_ID: process.env.OMO_NATIVE_INSTALL_ID,
 } as const
 const temporaryRoots: string[] = []
+const BEFORE_SUNSET = new Date("2026-12-14T23:59:59.999Z")
+const AT_SUNSET = new Date("2026-12-15T00:00:00.000Z")
 
 afterEach(() => {
   for (const [name, value] of Object.entries({ ...originalAgentDirs, ...originalAttributionEnv })) {
@@ -207,22 +212,6 @@ describe("OmO Native product identity", () => {
     expect([...BUILTIN_CATEGORY_NAMES].sort()).toEqual(categoryNames.sort())
   })
 
-  test("#given the tracked-call cap #when the widest wave histogram is encoded #then it stays inside the 64 character privacy limit", () => {
-    // given: the wave assembler tracks at most MAX_TRACKED_CALLS (2000) calls, so no bucket count exceeds 4 digits
-    const bucketCount = 8
-    const widestBucketValue = String(MAX_TRACKED_CALLS)
-
-    // when: the fixed buckets (1, 2, 3, 4, 5_8, 9_16, 17_32, 33plus) are positionally encoded without labels
-    const worstCaseHistogram = Array.from({ length: bucketCount }, () => widestBucketValue).join(":")
-
-    // then: the encoded string is 39 characters, well under the wrapper's silent 64 character truncation
-    expect(widestBucketValue).toHaveLength(4)
-    expect(worstCaseHistogram).toHaveLength(bucketCount * 4 + (bucketCount - 1))
-    expect(worstCaseHistogram.length).toBeLessThanOrEqual(64)
-    expect(OMO_NATIVE_EVENT_SCHEMAS.parallelism_summary.non_eval_wave_size_histogram.type).toBe("string")
-    expect(OMO_NATIVE_PROPERTY_ALLOWLISTS.parallelism_summary).toContain("non_eval_wave_size_histogram")
-  })
-
   test("#given the native event schemas #when inspected #then delegation_completed and category_config exist with exactly the planned property sets and enum vocabularies", () => {
     // given: the two events the task-execution insights are built on
     const delegation = OMO_NATIVE_EVENT_SCHEMAS.delegation_completed
@@ -237,12 +226,18 @@ describe("OmO Native product identity", () => {
       "stats_status", "status", "task_send_queued_count", "task_send_running_count", "task_seq",
       "token_status", "tool_calls", "total_tokens", "turns",
     ].sort())
+    const categoryKeys = BUILTIN_CATEGORY_NAMES.flatMap((name) => {
+      const base = `cat_${name.replaceAll("-", "_")}`
+      return [`${base}_state`, `${base}_provider`, `${base}_model`, `${base}_reasoning`, `${base}_depth`]
+    })
     expect(Object.keys(categoryConfig).sort()).toEqual([
-      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep_high",
-      "cat_deep_low", "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
-      "cat_visual_engineering", "cat_writing", "combo_fingerprint", "config_generation", "source",
+      "$session_id", "builtin_overridden_count", ...categoryKeys, "combo_fingerprint", "config_generation", "source",
       "user_category_count",
     ].sort())
+    expect(categoryConfig.cat_quick_state?.values).toEqual(["set", "disabled", "unavailable", "absent"])
+    expect(categoryConfig.cat_quick_provider?.values).toEqual([...KNOWN_PROVIDERS, "other"])
+    expect(categoryConfig.cat_quick_model?.values).toEqual([...ALL_KNOWN_MODEL_IDS, "other"])
+    expect(categoryConfig.cat_quick_reasoning?.values).toEqual([...delegation.reasoning_effort.values])
 
     // and: every discriminating string is a closed vocabulary
     expect(delegation.status.values).toEqual(["completed", "error", "cancelled", "interrupted", "lost"])
@@ -272,8 +267,9 @@ describe("OmO Native product identity", () => {
     }
     expect(categoryConfig.config_generation).toEqual({ type: "number" })
 
-    // and: session_started now carries the honestly-labeled timezone signal
-    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.timezone).toEqual({ type: "string" })
+    // and: session_started carries a bounded UTC offset, never a zone name
+    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.utc_offset_minutes).toEqual({ type: "number" })
+    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started).not.toHaveProperty("timezone")
   })
 
   test("#given computer-use telemetry schemas #when inspected #then every property and string value is closed", () => {
@@ -301,7 +297,7 @@ describe("OmO Native product identity", () => {
   })
 
   test("#given the shared schema version #when the native clients are configured #then one exported constant carries it", () => {
-    expect(OMO_NATIVE_SCHEMA_VERSION).toBe(3)
+    expect(OMO_NATIVE_SCHEMA_VERSION).toBe(4)
   })
 
   test("#given no env attribution #when attribution is resolved #then surface is cli and a 64-hex install id is persisted once", () => {
@@ -312,11 +308,12 @@ describe("OmO Native product identity", () => {
     const first = getOmoNativeAttribution()
 
     expect(first.surface).toBe("cli")
-    expect(first.install_id).toMatch(/^[0-9a-f]{64}$/)
-    // and: the id is stable across reads and stored 0600 next to the session-id salt
-    expect(getOmoNativeAttribution().install_id).toBe(first.install_id)
+    expect(first.install_hash).toMatch(/^[0-9a-f]{64}$/)
+    // and: the id is stable across reads and stored next to the session-id salt
+    expect(getOmoNativeAttribution().install_hash).toBe(first.install_hash)
     const stored = readFileSync(join(agentDir, "omo-senpi", "omo-native", "install-id"), "utf8").trim()
-    expect(stored).toBe(first.install_id)
+    expect(stored).toMatch(/^[0-9a-f]{64}$/)
+    expect(createHash("sha256").update(stored).digest("hex")).toBe(first.install_hash)
   })
 
   test("#given a desktop host env #when attribution is resolved #then the env pin wins over the local file", () => {
@@ -329,10 +326,54 @@ describe("OmO Native product identity", () => {
       SENPI_CODING_AGENT_DIR: agentDir,
     }
 
-    expect(getOmoNativeAttribution({ env })).toEqual({ surface: "desktop", install_id: envInstallId })
+    expect(getOmoNativeAttribution({ env, now: AT_SUNSET })).toEqual({
+      surface: "desktop",
+      install_hash: createHash("sha256").update(envInstallId).digest("hex"),
+      ci: false,
+    })
     // and: a malformed env id is ignored rather than trusted
-    expect(getOmoNativeAttribution({ env: { ...env, OMO_NATIVE_INSTALL_ID: "not-hex" } }).install_id)
-      .toMatch(/^[0-9a-f]{64}$/)
+    const fromFile = getOmoNativeAttribution({ env: { ...env, OMO_NATIVE_INSTALL_ID: "not-hex" } }).install_hash
+    expect(fromFile).toMatch(/^[0-9a-f]{64}$/)
+    expect(fromFile).not.toBe(createHash("sha256").update("not-hex").digest("hex"))
+  })
+
+  test("#given a CI env #when attribution is resolved #then ci reflects whether CI is truthy", () => {
+    const agentDir = useTemporaryAgentDir()
+    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir }
+
+    expect(getOmoNativeAttribution({ env: { ...env, CI: "true" } }).ci).toBe(true)
+    expect(getOmoNativeAttribution({ env: { ...env, CI: "1" } }).ci).toBe(true)
+    expect(getOmoNativeAttribution({ env }).ci).toBe(false)
+    expect(getOmoNativeAttribution({ env: { ...env, CI: "false" } }).ci).toBe(false)
+    expect(getOmoNativeAttribution({ env: { ...env, CI: "0" } }).ci).toBe(false)
+    expect(getOmoNativeAttribution({ env: { ...env, CI: "" } }).ci).toBe(false)
+  })
+
+  test("#given a persisted install id #when attribution is resolved #then install_hash is sha256 of it and the raw id never ships", () => {
+    const agentDir = useTemporaryAgentDir()
+    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir }
+
+    const attribution = getOmoNativeAttribution({ env, now: BEFORE_SUNSET })
+
+    const stored = readFileSync(join(agentDir, "omo-senpi", "omo-native", "install-id"), "utf8").trim()
+    expect(attribution.install_hash).toBe(createHash("sha256").update(stored).digest("hex"))
+    expect(attribution).not.toHaveProperty("install_id")
+    expect(getOmoNativeAttribution({ env, now: AT_SUNSET }).install_hash).toBe(attribution.install_hash)
+  })
+
+  test("#given the machine_hash transition window #when attribution is resolved on either side of the sunset #then machine_hash is the legacy hostname hash before it and absent after", () => {
+    const agentDir = useTemporaryAgentDir()
+    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir }
+    const osProvider = { ...os, hostname: () => "transition-host" }
+
+    const before = getOmoNativeAttribution({ env, now: BEFORE_SUNSET, osProvider })
+    const after = getOmoNativeAttribution({ env, now: AT_SUNSET, osProvider })
+
+    expect(MACHINE_HASH_SUNSET).toBe("2026-12-15")
+    expect(before.machine_hash).toMatch(/^[0-9a-f]{64}$/)
+    expect(before.machine_hash).toBe(createHash("sha256").update("omo-senpi:transition-host").digest("hex"))
+    expect(after).not.toHaveProperty("machine_hash")
+    expect(after.install_hash).toBe(before.install_hash)
   })
 
   test("#given a product config #when attribution is attached #then additionalProperties carry it and existing product extras survive", () => {
@@ -348,13 +389,15 @@ describe("OmO Native product identity", () => {
           OMO_CODING_AGENT_DIR: agentDir,
           SENPI_CODING_AGENT_DIR: agentDir,
         },
+        now: AT_SUNSET,
       },
     )
 
     expect(attributed.additionalProperties).toEqual({
       custom_flag: true,
       surface: "desktop",
-      install_id: "c".repeat(64),
+      install_hash: createHash("sha256").update("c".repeat(64)).digest("hex"),
+      ci: false,
     })
   })
 

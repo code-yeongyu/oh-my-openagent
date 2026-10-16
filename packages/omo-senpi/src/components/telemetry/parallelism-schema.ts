@@ -35,9 +35,13 @@ export const PARALLELISM_SUMMARY_SCHEMA = Object.freeze({
   modeled_wallclock_saved_ms: NUMBER_PROPERTY,
   non_eval_joined_calls: NUMBER_PROPERTY,
   non_eval_saved_round_trips: NUMBER_PROPERTY,
-  non_eval_wave_size_histogram: STRING_PROPERTY,
   non_eval_waves_multi: NUMBER_PROPERTY,
   non_eval_waves_total: NUMBER_PROPERTY,
   schema_kind: enumProperty(["parallelism_v1", "parallelism_v2"] as const),
   upper_bound_saved_ms: NUMBER_PROPERTY,
+  // Non-eval waves by size: 1, 2-3, 4-7 and 8+ calls (bounded integer counters, no string histogram).
+  wave_size_1: NUMBER_PROPERTY,
+  wave_size_2_3: NUMBER_PROPERTY,
+  wave_size_4_7: NUMBER_PROPERTY,
+  wave_size_8_plus: NUMBER_PROPERTY,
 })

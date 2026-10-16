@@ -62,14 +62,14 @@ describe("eval tool bucket classification", () => {
     expect(polluted.nonEval.wavesTotal).toBe(nonEvalOnly.nonEval.wavesTotal)
     expect(polluted.nonEval.wavesMulti).toBe(nonEvalOnly.nonEval.wavesMulti)
     expect(polluted.nonEval.joinedCalls).toBe(nonEvalOnly.nonEval.joinedCalls)
-    expect(polluted.nonEval.waveSizeHistogram).toBe(nonEvalOnly.nonEval.waveSizeHistogram)
+    expect(polluted.nonEval.waveSizeBuckets).toEqual(nonEvalOnly.nonEval.waveSizeBuckets)
     expect(polluted.evalOuterJoinedCalls).toBe(6)
     expect(polluted.mixedNonEvalJoinedCalls).toBe(3)
 
     expect(polluted.nonEval.wavesTotal).toBe(3)
     expect(polluted.nonEval.wavesMulti).toBe(2)
     expect(polluted.nonEval.joinedCalls).toBe(6)
-    expect(polluted.nonEval.waveSizeHistogram).toBe("1:1:1:0:0:0:0:0")
+    expect(polluted.nonEval.waveSizeBuckets).toEqual({ size1: 1, size2to3: 2, size4to7: 0, size8plus: 0 })
   })
 
   test("#given eval waves #when summarized #then their count and duration are reported in their own buckets", () => {
@@ -88,12 +88,11 @@ describe("eval tool bucket classification", () => {
     expect(summary.nonEval.wavesTotal).toBe(1)
   })
 
-  test("#given wave sizes across every histogram bucket #when encoded #then counts are positional without labels", () => {
-    const sizes = [1, 2, 3, 4, 6, 12, 20, 40]
+  test("#given wave sizes on every bucket edge #when counted #then 1, 2-3, 4-7 and 8+ each get exactly their waves", () => {
+    const sizes = [1, 2, 3, 4, 7, 8, 40]
     const summary = summarizeWaveBuckets(sizes.map((size) => wave(Array.from({ length: size }, () => "bash"))))
 
-    expect(summary.nonEval.waveSizeHistogram).toBe("1:1:1:1:1:1:1:1")
-    expect(summary.nonEval.waveSizeHistogram).not.toContain("=")
+    expect(summary.nonEval.waveSizeBuckets).toEqual({ size1: 1, size2to3: 2, size4to7: 2, size8plus: 2 })
   })
 
   test("#given malformed waves #when classified #then no throw and no misclassification", () => {
@@ -113,6 +112,6 @@ describe("eval tool bucket classification", () => {
     const second = summarizeWaveBuckets(waves)
 
     expect(second).toEqual(first)
-    expect(summarizeWaveBuckets([]).nonEval.waveSizeHistogram).toBe("0:0:0:0:0:0:0:0")
+    expect(summarizeWaveBuckets([]).nonEval.waveSizeBuckets).toEqual({ size1: 0, size2to3: 0, size4to7: 0, size8plus: 0 })
   })
 })

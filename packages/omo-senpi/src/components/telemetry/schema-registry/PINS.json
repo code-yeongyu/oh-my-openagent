@@ -1,0 +1,10 @@
+{
+  "source": "sisyphuslabs/omo-telemetry packages/schema-registry",
+  "source_commit": "5c4503de6c393e970d2b16b47831b3ed1a821db4",
+  "note": "Vendored byte-identical. Update by copying all three files from the collector and refreshing these hashes; telemetry-artifact.test.ts fails on any difference. semconv-map.sha256 is the collector's canonical-body pin, which the artifacts record as semconv_map_sha256.",
+  "files": {
+    "artifact.schema.json": "38e9dfc60903d817e61134980042286c6c02ad84137b81e5e8420b7ad430a11e",
+    "semconv-map.json": "ac50ef26f3b1bfbc7acb7a1fee1505558d171bcff7bc610def43ef200a068633",
+    "semconv-map.sha256": "8b39a59c499486a8b52fba716c4467e20af74d38b308a6c42c4496c3f812ef1c"
+  }
+}

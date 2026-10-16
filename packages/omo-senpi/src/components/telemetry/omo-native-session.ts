@@ -2,7 +2,6 @@ import {
   createEventTelemetryClient,
   getDailyActiveCaptureState,
   getDefaultTelemetryOsProvider,
-  getTelemetryDistinctId,
   isTelemetryClientEnabled,
   type EventTelemetryClient,
   type EventTelemetrySetTimeout,
@@ -20,13 +19,14 @@ import { loadSenpiOmoConfig } from "../config-resolution"
 import { getSenpiTelemetryStateDir, recordSenpiDailyActive } from "./index"
 import { createCategoryConfigCapture } from "./omo-native-category-config"
 import { captureProcessCrashes } from "./omo-native-crash"
+import { providerPropertyName } from "./model-vocabulary"
 import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
+  getOmoNativeAttribution,
   getOmoNativeStateDir,
   hashSessionId,
-  withOmoNativeAttribution,
 } from "./product-identity"
 import { readOmoNativeInventory, type OmoNativeInventoryDiagnostic } from "./session-inventory"
 import { resolveSessionModelRegistry } from "./session-model-registry"
@@ -45,8 +45,8 @@ export type OmoNativeSessionOptions = {
   readonly now?: Date
   readonly osProvider?: TelemetryOsProvider
   readonly setTimeoutFn?: EventTelemetrySetTimeout
-  /** Device-reported IANA zone. Injected in tests; the host default reads the runtime's resolved zone. */
-  readonly timeZone?: () => string
+  /** The device's UTC offset in minutes (east positive). Injected in tests; the host default reads the clock. */
+  readonly utcOffsetMinutes?: () => number
   readonly transportFactory?: TelemetryTransportFactory
 }
 
@@ -70,11 +70,12 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
 
         const osProvider = options.osProvider ?? getDefaultTelemetryOsProvider()
         const sessionId = extractSessionId(eventCtx) ?? "unknown"
+        const attribution = getOmoNativeAttribution({ env, now: options.now, osProvider })
         client = createEventTelemetryClient({
           diagnostics: options.diagnostics,
-          distinctId: getTelemetryDistinctId(product.machineIdPrefix, osProvider),
+          distinctId: attribution.install_hash,
           env,
-          product: withOmoNativeAttribution(product, { env }),
+          product: { ...product, additionalProperties: { ...product.additionalProperties, ...attribution } },
           propertyAllowlist: OMO_NATIVE_PROPERTY_ALLOWLISTS,
           schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
           setTimeoutFn: options.setTimeoutFn,
@@ -99,7 +100,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
 
         const inventory = readOmoNativeInventory(resolveAgentHome({ env }), options.diagnostics)
         const reason = sessionReason(payload)
-        const timezone = readTimeZone(options.timeZone)
+        const utcOffsetMinutes = readUtcOffsetMinutes(options.utcOffsetMinutes, options.now)
         client.captureEvent("session_started", {
           $session_id: sessionHash,
           $os: osProvider.platform(),
@@ -109,10 +110,11 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           memory_bucket: memoryBucket(osProvider.totalmem()),
           provider_count: inventory.providerCount,
           model_count: inventory.modelCount,
-          providers: inventory.providers,
+          ...Object.fromEntries(inventory.knownProviders.map((id) => [providerPropertyName(id), true])),
+          custom_provider_count: inventory.customProviderCount,
           reason,
           session_role: resolveTelemetrySessionRole(pi, env),
-          ...(timezone === undefined ? {} : { timezone }),
+          ...(utcOffsetMinutes === undefined ? {} : { utc_offset_minutes: utcOffsetMinutes }),
           ...(inventory.defaultProvider === undefined ? {} : { default_provider: inventory.defaultProvider }),
           ...(inventory.defaultModel === undefined ? {} : { default_model: inventory.defaultModel }),
         })
@@ -200,11 +202,16 @@ function loadCategoryConfig(
   }
 }
 
-// A runtime without ICU data (or a host that refuses the lookup) simply ships no timezone.
-function readTimeZone(provider: (() => string) | undefined): string | undefined {
+// Every real offset lies in UTC-12:00..UTC+14:00 (the artifact's bounds); anything else, a fractional
+// value or a throwing clock ships no offset rather than one the collector would reject.
+const MIN_UTC_OFFSET_MINUTES = -720
+const MAX_UTC_OFFSET_MINUTES = 840
+
+function readUtcOffsetMinutes(provider: (() => number) | undefined, now: Date | undefined): number | undefined {
   try {
-    const zone = (provider ?? (() => Intl.DateTimeFormat().resolvedOptions().timeZone))()
-    return zone.length > 0 && zone.length <= 64 ? zone : undefined
+    const offset = (provider ?? (() => -(now ?? new Date()).getTimezoneOffset()))()
+    if (!Number.isInteger(offset) || offset < MIN_UTC_OFFSET_MINUTES || offset > MAX_UTC_OFFSET_MINUTES) return undefined
+    return offset === 0 ? 0 : offset
   } catch {
     return undefined
   }

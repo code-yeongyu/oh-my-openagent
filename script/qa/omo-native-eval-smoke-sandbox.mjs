@@ -23,7 +23,7 @@ export function isolatedEnvironment(sandbox) {
     TMPDIR: sandbox.root, TMP: sandbox.root, TEMP: sandbox.root,
     OMO_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_SESSION_DIR: sandbox.sessionDir,
     ...(processIsolation ? { SENPI_CODEMODE_JS_ISOLATION: "process" } : {}),
-    PI_OFFLINE: "1", PI_TELEMETRY: "0",
+    PI_OFFLINE: "1", PI_TELEMETRY: "0", DO_NOT_TRACK: "1",
   }
 }
 

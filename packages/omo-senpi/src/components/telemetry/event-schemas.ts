@@ -5,7 +5,7 @@ import { CATEGORY_CONFIG_SCHEMA } from "./category-config-schema"
 import { PROCESS_CRASHED_SCHEMA } from "./crash-schema"
 import { buildDelegationCompletedSchema } from "./delegation-schema"
 import { KIBITZER_SUMMARY_SCHEMA } from "./kibitzer-schema"
-import { KNOWN_MODELS, KNOWN_PROVIDERS } from "./model-vocabulary"
+import { KNOWN_MODELS, KNOWN_PROVIDERS, providerPropertyName } from "./model-vocabulary"
 import { PARALLELISM_SUMMARY_SCHEMA } from "./parallelism-schema"
 import { SESSION_SUMMARY_SCHEMA } from "./session-summary-schema"
 import { TELEMETRY_SESSION_ROLES } from "./session-role"
@@ -68,17 +68,19 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     "$os_version": STRING_PROPERTY,
     arch: STRING_PROPERTY,
     cpu_count: NUMBER_PROPERTY,
+    custom_provider_count: NUMBER_PROPERTY,
     default_model: enumProperty([...new Set(Object.values(KNOWN_MODELS).flat()), "custom"] as const),
     default_provider: enumProperty([...KNOWN_PROVIDERS, "custom"] as const),
     memory_bucket: enumProperty(["lt_8_gb", "8_15_gb", "16_31_gb", "32_63_gb", "64_plus_gb"] as const),
     model_count: NUMBER_PROPERTY,
     provider_count: NUMBER_PROPERTY,
-    providers: STRING_PROPERTY,
+    // One flag per connected built-in provider; user-defined providers only count in custom_provider_count.
+    ...(Object.fromEntries(KNOWN_PROVIDERS.map((id) => [providerPropertyName(id), BOOLEAN_PROPERTY])) as Readonly<Record<string, typeof BOOLEAN_PROPERTY>>),
     reason: enumProperty(["startup", "reload", "new", "resume", "fork"] as const),
     session_role: enumProperty(TELEMETRY_SESSION_ROLES),
-    // Device-reported IANA zone. A timezone signal, never a country signal: countries share zones,
-    // span zones, and users override them. Country comes from PostHog's server-side GeoIP.
-    timezone: STRING_PROPERTY,
+    // The device's UTC offset in minutes, never the zone name: an offset is not a country signal
+    // either. Country comes from PostHog's server-side GeoIP.
+    utc_offset_minutes: NUMBER_PROPERTY,
   }),
   prompt_submitted: Object.freeze({
     "$session_id": STRING_PROPERTY,
@@ -159,6 +161,21 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
   }),
   category_config: CATEGORY_CONFIG_SCHEMA,
   process_crashed: PROCESS_CRASHED_SCHEMA,
+} as const)
+
+// Properties the event client stamps on EVERY event (telemetry-core shared block plus the omo-native
+// attribution). They bypass the per-event allowlists, so this table is their only published contract.
+export const OMO_NATIVE_COMMON_PROPERTY_SCHEMAS = Object.freeze({
+  "$process_person_profile": BOOLEAN_PROPERTY,
+  ci: BOOLEAN_PROPERTY,
+  event_id: STRING_PROPERTY,
+  install_hash: STRING_PROPERTY,
+  machine_hash: STRING_PROPERTY,
+  package_version: STRING_PROPERTY,
+  platform: enumProperty(["omo-senpi"] as const),
+  product_name: enumProperty(["omo-native"] as const),
+  schema_version: NUMBER_PROPERTY,
+  surface: enumProperty(["cli", "desktop"] as const),
 } as const)
 
 export const OMO_NATIVE_PROPERTY_ALLOWLISTS = Object.freeze(Object.fromEntries(

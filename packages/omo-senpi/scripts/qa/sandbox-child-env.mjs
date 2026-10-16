@@ -28,6 +28,8 @@ const HOST_INTERNAL_ENV_PREFIX = "SENPI_RPC_HOST_"
  * SENPI_CODING_AGENT_DIR, so overriding one lane alone put QA children on the production host
  * (oh-my-openagent#8967). The memory root moves to `memory` beside the agent dir, so a child never
  * reads or writes the caller's ~/.omo/memory (its OMO_MEMORY_HOME override, or the default).
+ * DO_NOT_TRACK is forced on so QA traffic never reaches the production analytics project; a driver
+ * that proves telemetry against a local sink overrides it after this spread.
  */
 export function isolatedChildEnv(baseEnv, agentDir) {
   const env = { ...baseEnv }
@@ -37,6 +39,7 @@ export function isolatedChildEnv(baseEnv, agentDir) {
   for (const name of [...HOST_ROUTING_ENV_NAMES, ...SESSION_IDENTITY_ENV_NAMES]) delete env[name]
   for (const name of AGENT_DIR_ENV_NAMES) env[name] = agentDir
   env.OMO_MEMORY_HOME = join(dirname(agentDir), "memory")
+  env.DO_NOT_TRACK = "1"
   return env
 }
 

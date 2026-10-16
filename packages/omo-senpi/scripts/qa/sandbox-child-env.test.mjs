@@ -32,10 +32,21 @@ describe("isolatedChildEnv", () => {
 			OMO_CODING_AGENT_DIR: "/tmp/sbx/agent",
 			SENPI_CODING_AGENT_DIR: "/tmp/sbx/agent",
 			PI_CODING_AGENT_DIR: "/tmp/sbx/agent",
+			// A QA child never reports to the production analytics project; a driver that proves
+			// telemetry against a local sink opts back in explicitly after this spread.
+			DO_NOT_TRACK: "1",
 			// Beside the agent dir, joined with the platform separator (`\tmp\sbx\memory` on Windows).
 			OMO_MEMORY_HOME: join(dirname("/tmp/sbx/agent"), "memory"),
 		});
 		expect(caller.OMO_CODING_AGENT_DIR).toBe("/home/u/.omo/agent");
+	});
+});
+
+describe("isolatedChildEnv telemetry", () => {
+	test("forces DO_NOT_TRACK on even when the caller exports an opt-in value", () => {
+		const env = isolatedChildEnv({ PATH: "/bin", DO_NOT_TRACK: "0" }, "/tmp/sbx/agent");
+
+		expect(env.DO_NOT_TRACK).toBe("1");
 	});
 });
 

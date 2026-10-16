@@ -28,7 +28,6 @@ export const EXPECTED_PARALLELISM_PROPERTY_KEYS = Object.freeze([
   "modeled_wallclock_saved_ms",
   "non_eval_joined_calls",
   "non_eval_saved_round_trips",
-  "non_eval_wave_size_histogram",
   "non_eval_waves_multi",
   "non_eval_waves_total",
   "package_version",
@@ -37,6 +36,10 @@ export const EXPECTED_PARALLELISM_PROPERTY_KEYS = Object.freeze([
   "schema_kind",
   "schema_version",
   "upper_bound_saved_ms",
+  "wave_size_1",
+  "wave_size_2_3",
+  "wave_size_4_7",
+  "wave_size_8_plus",
 ])
 
 export function analyzeParallelismRequests(requests) {
