@@ -271,6 +271,7 @@ export function createAutoRetryDispatcher(
           }
         }
       }
+      deps.onRetryDispatchSettled?.(sessionID, retryDispatched || retryMayHaveBeenAccepted)
     }
   }
 }

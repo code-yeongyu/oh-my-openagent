@@ -62,6 +62,7 @@ export function createRuntimeFallbackHook(
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    deferredSessionErrors: new Map(),
   }
 
   const helpers = factories.createAutoRetryHelpers(deps)
@@ -93,6 +94,22 @@ export function createRuntimeFallbackHook(
     sessionID !== undefined
     && (deps.sessionRetryInFlight.has(sessionID) || deps.sessionAwaitingFallbackResult.has(sessionID))
 
+  const deferredSessionErrors = deps.deferredSessionErrors ?? new Map<string, object[]>()
+  const isDeferred = (sessionID: string | undefined, event: object): boolean =>
+    sessionID !== undefined && (deferredSessionErrors.get(sessionID)?.includes(event) ?? false)
+
+  // A session.error that arrived while a retry dispatch was in flight was skipped, and its claim waits for that
+  // dispatch. An accepted retry owns the error. A refused one leaves nothing recovering, so the claim is declined
+  // and the background task ends with this error instead of losing it. If another dispatch has taken the session
+  // over by then, that dispatch settles the claim when it finishes.
+  deps.onRetryDispatchSettled = (sessionID, accepted) => {
+    const events = deferredSessionErrors.get(sessionID)
+    if (!events) return
+    if (!accepted && deps.sessionRetryInFlight.has(sessionID)) return
+    deferredSessionErrors.delete(sessionID)
+    for (const event of events) settleRuntimeFallbackRecoveryClaim(event, accepted ? "retry-owned" : "declined")
+  }
+
   const handleEvent = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     ensureInterval()
 
@@ -115,12 +132,18 @@ export function createRuntimeFallbackHook(
     } finally {
       if (input.event.type === "session.error") {
         const sessionID = resolveSessionEventID(input.event.properties as Record<string, unknown> | undefined)
-        settleRuntimeFallbackRecoveryClaim(input.event, ownsRecovery(sessionID) ? "retry-owned" : "declined")
+        if (!isDeferred(sessionID, input.event)) {
+          settleRuntimeFallbackRecoveryClaim(input.event, ownsRecovery(sessionID) ? "retry-owned" : "declined")
+        }
       }
     }
   }
 
   const dispose = () => {
+    for (const events of deferredSessionErrors.values()) {
+      for (const event of events) settleRuntimeFallbackRecoveryClaim(event, "declined")
+    }
+    deferredSessionErrors.clear()
     releaseRecoveryOwner()
     if (cleanupInterval) {
       clearInterval(cleanupInterval)
