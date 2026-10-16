@@ -143,7 +143,9 @@ describe("Gatekeeper check after notarization", () => {
   posixBashTest("fails when the ticket never arrives within the window", () => {
     const { root, env, binary } = notarySandbox(["Accepted"], [NOT_YET])
     try {
-      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "1", GATEKEEPER_POLL_SECONDS: "0.2" }, binary)
+      // The deadline is whole seconds from `date +%s`: a 1 s window that starts late in a second can expire
+      // during the first check, so 2 s is the smallest window that always leaves room for a second check.
+      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "2", GATEKEEPER_POLL_SECONDS: "0.2" }, binary)
       expect(result.status).toBe(1)
       expect(result.stderr).toContain("Gatekeeper does not accept")
       expect(spctlCalls(root)).toBeGreaterThan(1)
