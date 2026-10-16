@@ -121,6 +121,14 @@ export function getOmoNativeAttribution(input: OmoNativeAttributionInput = {}): 
   return { surface, install_id }
 }
 
+/** The install id as attribution resolves it, but never created: an install without one has nothing to forget. */
+export function readOmoNativeInstallId(input: OmoNativeAttributionInput = {}): string | undefined {
+  const env = input.env ?? process.env
+  const envInstallId = env["OMO_NATIVE_INSTALL_ID"]?.trim() ?? ""
+  if (INSTALL_ID_PATTERN.test(envInstallId)) return envInstallId
+  return readInstallId(join(input.stateDir ?? getOmoNativeStateDir(env), INSTALL_ID_FILE_NAME))
+}
+
 /** Attach the shared attribution to a product config; the fixed identity keys still win downstream. */
 export function withOmoNativeAttribution(
   product: TelemetryProductConfig,

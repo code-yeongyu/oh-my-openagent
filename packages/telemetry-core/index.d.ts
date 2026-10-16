@@ -206,3 +206,19 @@ export declare function writeTelemetryDiagnostic(
 ): void;
 export declare function cleanupTelemetryDiagnostics(options: WriteTelemetryDiagnosticOptions): void;
 export declare function recordDailyActive(input: RecordDailyActiveInput): Promise<void>;
+
+export declare const DEFAULT_TELEMETRY_COLLECTOR_ENDPOINT: "https://t.omo.dev";
+export type RequestTelemetryForgetInput = {
+  readonly installId: string;
+  readonly legacyDistinctId?: string;
+  readonly env?: TelemetryEnv;
+  readonly fetchFn?: typeof fetch;
+  readonly timeoutMs?: number;
+};
+export type TelemetryForgetResult =
+  | { readonly status: "sent"; readonly httpStatus: number; readonly response: unknown }
+  | { readonly status: "skipped"; readonly reason: "invalid_install_id" }
+  | { readonly status: "failed"; readonly reason: "http"; readonly httpStatus: number; readonly response: unknown }
+  | { readonly status: "failed"; readonly reason: "network" };
+export declare function resolveTelemetryCollectorEndpoint(env: TelemetryEnv): string;
+export declare function requestTelemetryForget(input: RequestTelemetryForgetInput): Promise<TelemetryForgetResult>;
