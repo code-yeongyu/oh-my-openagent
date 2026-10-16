@@ -117,8 +117,18 @@ describe("gate verdict", () => {
     ["edited released notes", `## [Unreleased]\n\n## [1.1.0]\n${notes.replace("Existing fix.", "Unrelated fix.")}\n\n${history}`, false],
     ["existing release version", `## [Unreleased]\n\n## [1.0.0] - 2026-10-11\n${notes}\n\n${history}`, false],
     ["release after another section", `## [Unreleased]\n\n${history}\n## [1.1.0]\n${notes}\n`, false],
+    ["complete prerelease transition", `## [Unreleased]\n\n## [1.1.0-beta.1] - 2026-10-15\n\n${notes}\n\n${history}`, true],
   ])("%s with shipped code", (_name, after, pass) => {
     expect(checkPrChangelog({ ...facts, before: beforeRelease, after, diff: "" }).pass).toBe(pass)
+  })
+  test("does not count an already released prerelease version as a new release", () => {
+    const releasedBeta = `## [1.1.0-beta.1] - 2026-10-14\nOld beta.\n\n${history}`
+    expect(checkPrChangelog({
+      ...facts,
+      before: `## [Unreleased]\n\n${notes}\n\n${releasedBeta}`,
+      after: `## [Unreleased]\n\n## [1.1.0-beta.1] - 2026-10-15\n\n${notes}\n\n${releasedBeta}`,
+      diff: "",
+    }).pass).toBe(false)
   })
   test.each(["", "### Fixed", "<!-- hidden note -->"])("does not release an empty or heading/comment-only section: %s", (body) => {
     expect(checkPrChangelog({
@@ -126,6 +136,42 @@ describe("gate verdict", () => {
       before: `## [Unreleased]\n${body}\n\n${history}`,
       after: `## [Unreleased]\n\n## [1.1.0]\n${body}\n\n${history}`,
     }).pass).toBe(false)
+  })
+})
+
+describe("own-PR link on added Unreleased paragraphs", () => {
+  const link = (n) => `[#${n}](https://github.com/code-yeongyu/oh-my-openagent/pull/${n})`
+  const before = "## [Unreleased]\n\n**Old fix.** Existing text (${link(1)}).\n\n## [1.0.0]\nOld note.\n".replace("${link(1)}", link(1))
+  const facts = { changedFiles: ["packages/omo-native/compile-entry.ts"], policy, before }
+  const add = (paragraph) => ({
+    after: `## [Unreleased]\n\n${paragraph}\n\n**Old fix.** Existing text (${link(1)}).\n\n## [1.0.0]\nOld note.\n`,
+    diff: `@@ -0,0 +3,2 @@\n+${paragraph}\n+`,
+  })
+  test("refuses an added paragraph with no link to its own PR", () => {
+    const result = checkPrChangelog({ ...facts, ...add("**New fix.** No link here."), prNumber: 123 })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toContain("#123")
+  })
+  test("passes an added paragraph that links its own PR", () => {
+    expect(checkPrChangelog({ ...facts, ...add(`**New fix.** Linked (${link(123)}).`), prNumber: 123 }).pass).toBe(true)
+  })
+  test("refuses an added paragraph that links only a different PR", () => {
+    expect(checkPrChangelog({ ...facts, ...add(`**New fix.** Linked (${link(99)}).`), prNumber: 123 }).pass).toBe(false)
+  })
+  test("accepts an edit of an existing paragraph without its own link", () => {
+    const after = `## [Unreleased]\n\n**Old fix.** Existing text (${link(1)}, ${link(2)}).\n\n## [1.0.0]\nOld note.\n`
+    const diff = `@@ -3 +3 @@\n-**Old fix.** Existing text (${link(1)}).\n+**Old fix.** Existing text (${link(1)}, ${link(2)}).`
+    expect(checkPrChangelog({ ...facts, after, diff, prNumber: 123 }).pass).toBe(true)
+  })
+  test("checks an entry written directly under a heading", () => {
+    const { after } = add("### Fixed\n**New fix.** No link here.")
+    const diff = "@@ -0,0 +3,3 @@\n+### Fixed\n+**New fix.** No link here.\n+"
+    expect(checkPrChangelog({ ...facts, after, diff, prNumber: 123 }).pass).toBe(false)
+    const linked = add(`### Fixed\n**New fix.** Linked (${link(123)}).`).after
+    expect(checkPrChangelog({ ...facts, after: linked, diff: diff.replace("No link here.", `Linked (${link(123)}).`), prNumber: 123 }).pass).toBe(true)
+  })
+  test("keeps the old verdict when no PR number is known", () => {
+    expect(checkPrChangelog({ ...facts, ...add("**New fix.** No link here.") }).pass).toBe(true)
   })
 })
 
@@ -162,6 +208,10 @@ test("CLI uses the PR merge base, includes deleted sources, and accepts a real n
     const advancedBase = git("rev-parse", "HEAD")
     git("checkout", "-q", head)
     expect(run(advancedBase).status).toBe(0)
+    const runPr = (pr) => spawnSync(process.execPath, [script, "--repo", repo, "--base", advancedBase, "--pr", pr], { encoding: "utf8", cwd: "/tmp" })
+    expect(runPr("7").status).toBe(1)
+    expect(runPr("7").stdout).toContain("pull/7")
+    expect(runPr("not-a-number").status).toBe(1)
     expect(run("--invalid-option").status).toBe(1)
     expect(run(base, "{}").status).toBe(1)
   } finally {

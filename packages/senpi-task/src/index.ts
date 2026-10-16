@@ -55,6 +55,7 @@ export type {
   Messageability,
   PendingSteeringEntry,
   ResidencyState,
+  EffectiveModelRecord,
   ResolvedModelRecord,
   ResolvedModelSource,
   SpawnSpecV1,

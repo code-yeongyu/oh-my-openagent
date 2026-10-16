@@ -31,6 +31,7 @@ export type DestroyCause =
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle
 // code ever calls abort/dispose/terminate on it - that is the single-writer rule.
 export type ResidentHandle = {
+  reconcileInputs?(): Promise<void>
   readonly task_id: string
   // "host-session" is a SESSION of the shared daemon: it has no pid, so nothing may signal it.
   readonly kind: "in-process" | "rpc" | "host-session"

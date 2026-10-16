@@ -24,6 +24,13 @@ env:
   GENERATED_LABEL: lazycodex-generated
   PACKAGE_LABEL_COLOR: ededed
 
+concurrency:
+  # Only PR Automation Signal runs are grouped: a newer signal for the same PR head supersedes the older run. Every
+  # other trigger (CLA signing/recheck comments, any other comment, issues, dispatch, schedule, merge_group) keys on its
+  # own run id, so nothing can cancel or replace a run that is recording a CLA signature or a manual recheck.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && format('signal-{0}:{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
+
 jobs:
   resolve-pr:
     if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'

@@ -196,6 +196,16 @@ export function makeManager(options: {
   return { manager, store, inProcess, process: processRunner, project }
 }
 
+/**
+ * Waits until a started task's launch settled: its child is up and the manager tracks the live handle.
+ * `start` reports a launch slower than its report window as still starting, so a test that uses the
+ * child's session or emits records to it right after `start` must wait here first.
+ */
+export async function launchSettled(manager: { whenLaunched?(taskId: string): Promise<void> }, taskId: string): Promise<void> {
+  if (manager.whenLaunched === undefined) throw new Error("the manager exposes no whenLaunched")
+  await manager.whenLaunched(taskId)
+}
+
 export function baseSpec(overrides: Partial<ManagerStartSpec> = {}): ManagerStartSpec {
   return {
     prompt: "do the thing",

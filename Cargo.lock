@@ -2548,6 +2548,7 @@ version = "0.0.0"
 dependencies = [
  "clap",
  "core-graphics",
+ "libc",
  "objc2-app-kit",
  "parking_lot",
  "schemars",
@@ -2559,9 +2560,11 @@ dependencies = [
  "senpi-desktop-core",
  "senpi-desktop-safety",
  "senpi-desktop-session",
+ "senpi-desktop-xpc",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror",
  "tokio",
  "ulid",
@@ -2571,9 +2574,12 @@ dependencies = [
 name = "senpi-desktop-safety"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "parking_lot",
+ "senpi-desktop-backend-fake",
  "senpi-desktop-core",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2597,6 +2603,26 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulid",
+]
+
+[[package]]
+name = "senpi-desktop-xpc"
+version = "0.0.0"
+dependencies = [
+ "block2",
+ "flume",
+ "libc",
+ "objc2-core-foundation",
+ "parking_lot",
+ "senpi-desktop-backend-fake",
+ "senpi-desktop-core",
+ "senpi-desktop-safety",
+ "senpi-desktop-session",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
