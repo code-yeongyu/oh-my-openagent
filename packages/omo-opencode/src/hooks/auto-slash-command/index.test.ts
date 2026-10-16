@@ -551,5 +551,51 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("<auto-slash-command>")
       expect(output.parts[0].text).toContain("Lazy loaded skill content here")
     })
+    it("must-fix 1: fenced block stays byte-identical and real mid-sentence command expands", async () => {
+      // given skill my-skill and a part with a fenced decoy plus a real mid-sentence command
+      const skill = createTestSkill("my-skill", "MY SKILL TEMPLATE CONTENT")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const sessionID = `test-session-mustfix1-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const fence = ["```", "/other-cmd x", "```"].join(String.fromCharCode(10))
+      const original = [fence, "please use /my-skill now"].join(String.fromCharCode(10))
+      const output = createMockOutput(original)
+
+      // when hook processes the message
+      await hook["chat.message"](input, output)
+
+      // then fence bytes unchanged and only the real span is replaced
+      const text = output.parts[0].text ?? ""
+      expect(text).toContain(fence)
+      expect(text).toContain("please use ")
+      expect(text).toContain("<auto-slash-command>")
+      expect(text).toContain("MY SKILL TEMPLATE CONTENT")
+      expect(text).not.toContain("please use /my-skill now")
+    })
+
+    it("must-fix 2: command.execute.before with unrelated /path prose preserves prose via unshift", async () => {
+      // given skill my-skill and prose containing an unrelated path
+      const skill = createTestSkill("my-skill", "MY SKILL TEMPLATE CONTENT")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const input: CommandExecuteBeforeInput = {
+        command: "my-skill",
+        sessionID: `test-session-mustfix2-${Date.now()}-${Math.random()}`,
+        arguments: "",
+      }
+      const original = "Review the logs in /var/log and report"
+      const output: CommandExecuteBeforeOutput = {
+        parts: [{ type: "text", text: original }],
+      }
+
+      // when hook processes the command
+      await hook["command.execute.before"](input, output)
+
+      // then original sentence byte-identical and template prepended
+      expect(output.parts).toHaveLength(2)
+      expect(output.parts[1].text).toBe(original)
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("MY SKILL TEMPLATE CONTENT")
+    })
+
   })
 })
