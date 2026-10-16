@@ -2,7 +2,7 @@ import type { FallbackState, HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
 import { log } from "../../shared/logger"
-import { extractAutoRetrySignal } from "./error-classifier"
+import { classifyErrorType, extractAutoRetrySignal } from "./error-classifier"
 import { canPrepareFallback, createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
@@ -56,7 +56,15 @@ export function createSessionStatusHandler(
       // retryable error patterns directly. This handles providers like Gemini whose
       // retry status message may not contain "retrying in" text alongside the error.
       const messageLower = retryMessage.toLowerCase()
-      const matchesRetryablePattern = RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(messageLower))
+      // Claude subscription 429s say "session limit" / "weekly limit", not
+      // "retrying in". Reuse the quota classifier used by session.error so
+      // native retries cannot bypass an otherwise eligible fallback chain.
+      const matchesQuotaRetryStatus = classifyErrorType(retryMessage) === "quota_exceeded"
+      const matchesRetryablePattern = matchesQuotaRetryStatus
+        || RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(messageLower))
+      if (matchesQuotaRetryStatus) {
+        log(`[${HOOK_NAME}] quota retry status accepted for fallback`, { sessionID })
+      }
       if (!matchesRetryablePattern) {
         // Diagnostic: capture the actual retry message content so we can extend
         // RETRYABLE_ERROR_PATTERNS if a provider emits a phrasing we don't yet match.
