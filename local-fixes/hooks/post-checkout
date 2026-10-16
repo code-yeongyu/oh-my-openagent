@@ -15,7 +15,7 @@ is_branch_checkout="$3"
 # Only act on real branch switches.
 [ "$is_branch_checkout" = "1" ] || exit 0
 
-expected="local/bundle-all"
+expected="integration/opencode-v2"
 current=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 [ "$current" = "$expected" ] && exit 0

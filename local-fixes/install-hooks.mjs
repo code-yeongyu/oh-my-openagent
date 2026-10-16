@@ -63,5 +63,5 @@ try {
 }
 
 console.log(`Installed: ${target}`)
-console.log("Guard active: leaving local/bundle-all now prints a warning.")
+console.log("Guard active: leaving integration/opencode-v2 now prints a warning.")
 console.log("Verify any time with:  bun run fixes:verify")
