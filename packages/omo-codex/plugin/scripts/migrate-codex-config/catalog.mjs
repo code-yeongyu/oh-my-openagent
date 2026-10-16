@@ -3,22 +3,22 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const FALLBACK_CATALOG = {
-	version: "fallback.gpt-5.6-sol-650k-high",
+	version: "fallback.gpt-6-astra-600k-high",
 	current: {
-		model: "gpt-5.6-sol",
-		model_context_window: 650_000,
+		model: "gpt-6-astra",
+		model_context_window: 600_000,
 		model_reasoning_effort: "high",
 		plan_mode_reasoning_effort: "xhigh",
 	},
 	roles: {
 		default: {
-			model: "gpt-5.6-sol",
-			model_context_window: 650_000,
+			model: "gpt-6-astra",
+			model_context_window: 600_000,
 			model_reasoning_effort: "high",
 			plan_mode_reasoning_effort: "xhigh",
 		},
-		verifier: { model: "gpt-5.6-sol", model_reasoning_effort: "high" },
-		worker: { model: "gpt-5.6-sol", model_reasoning_effort: "high" },
+		verifier: { model: "gpt-6-astra", model_reasoning_effort: "high" },
+		worker: { model: "gpt-6-astra", model_reasoning_effort: "high" },
 	},
 	managedProfiles: [
 		{
@@ -40,6 +40,15 @@ export const FALLBACK_CATALOG = {
 			},
 		},
 		{ version: "legacy.gpt-5.5-272k", match: { model: "gpt-5.5", model_context_window: 272_000 } },
+		{
+			version: "legacy.gpt-5.6-sol-650k-high",
+			match: {
+				model: "gpt-5.6-sol",
+				model_context_window: 650_000,
+				model_reasoning_effort: "high",
+				plan_mode_reasoning_effort: "xhigh",
+			},
+		},
 	],
 };
 

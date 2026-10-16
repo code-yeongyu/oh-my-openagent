@@ -65,6 +65,15 @@ describe("runTaskCancel", () => {
     expect(result.details.kind).toBe("not_found")
   })
 
+  test("#given a cancel the engine refuses as naming an earlier run #when reported #then it is a no-op carrying the record's real status", async () => {
+    const { manager } = makeManager({})
+    const stale = { ...manager, cancelTask: async () => ({ kind: "stale" as const, task_id: "st_0000abcd", status: "completed" as const, run_epoch: 3, reason: "Task st_0000abcd: the handle names an earlier run of this task." }) }
+
+    const result = await runTaskCancel(stale, { task_id: "st_0000abcd" })
+
+    expect(result.details).toEqual({ kind: "noop", task_id: "st_0000abcd", status: "completed", reason: "Task st_0000abcd: the handle names an earlier run of this task." })
+  })
+
   test("#given no identifier #when cancelled #then invalid_arguments is returned", async () => {
     const { manager } = makeManager({})
 

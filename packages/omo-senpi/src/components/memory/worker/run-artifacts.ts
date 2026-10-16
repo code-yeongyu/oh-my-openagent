@@ -42,6 +42,22 @@ export interface RunOutcome {
     readonly signal: string | null
   }
   readonly timedOut: boolean
+  /** Published by recovery from a validated worktree tip, not by a supervisor that saw the child exit. */
+  readonly recoveredFromWorktree?: true
+}
+
+export const CHILD_EXIT_FILENAME = "child-exit.json"
+
+/** Written by the child bootstrap the moment the model child exits, before it reports to the supervisor. */
+export interface RunChildExit {
+  readonly version: 1
+  readonly runId: string
+  readonly attempt: number
+  readonly code: number | null
+  readonly signal: string | null
+  readonly finishedAt: string
+  /** The bootstrap's clock had reached the hard deadline, so its own enforcement may have ended the child. */
+  readonly timedOut: boolean
 }
 
 export function runOutcomeMatchesLedger(
@@ -58,14 +74,20 @@ export async function readRunJson<T>(path: string): Promise<T> {
 export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o600): Promise<void> {
   const temporary = `${path}.tmp-${process.pid}-${randomUUID()}`
   const file = await open(temporary, "wx", mode)
+  let renamed = false
   try {
-    await file.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8")
-    await file.sync()
+    try {
+      await file.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8")
+      await file.sync()
+    } finally {
+      await file.close()
+    }
+    await rename(temporary, path)
+    renamed = true
+    await syncDirectory(dirname(path))
   } finally {
-    await file.close()
+    if (!renamed) await unlinkRunArtifact(temporary)
   }
-  await rename(temporary, path)
-  await syncDirectory(dirname(path))
 }
 
 async function syncDirectory(path: string): Promise<void> {

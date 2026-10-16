@@ -8,6 +8,7 @@ describe("shared GPT prompt identities", () => {
   for (const [model, identityKey] of [
     ["openai/gpt-5.5", "gpt-5.5"],
     ["openai/gpt-5.6-sol", "gpt-5.6-sol"],
+    ["github-copilot/gpt-6-astra", "gpt-6-astra"],
   ] as const) {
     test(`selects the ${identityKey} identity contract`, () => {
       // given a supported GPT model routed through the shared prompt family
@@ -20,7 +21,7 @@ describe("shared GPT prompt identities", () => {
     })
   }
 
-  for (const model of ["openai/gpt-5.5", "openai/gpt-5.6-sol"]) {
+  for (const model of ["openai/gpt-5.5", "openai/gpt-5.6-sol", "github-copilot/gpt-6-astra"]) {
     test(`routes ${model} through the shared Atlas GPT prompt source`, () => {
       // given a supported GPT model
 

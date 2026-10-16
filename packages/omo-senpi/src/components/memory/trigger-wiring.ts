@@ -47,7 +47,7 @@ export interface ReflectionTriggerWiringOptions {
   /** Launch action. Todo 23's detached worker plugs in here; the default is a no-op. */
   readonly onLaunch?: (request: ReflectionRequest) => void
   /**
-   * Accepted-compaction observer. The memorian gate drops that session's pending nudges here: they
+   * Accepted-compaction observer. Kibitzer delivery drops that session's held nudges here: they
    * judged a transcript the compaction has just replaced. Kept on THIS seam rather than a second
    * session_compact handler so both consumers see exactly the same accepted events.
    */

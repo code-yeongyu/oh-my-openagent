@@ -18,7 +18,8 @@ import type { DagNode, DagNodeError, DagNodeErrorCode, DagNodeId, DagRunId } fro
 export type DagNodeSendResult = {
   readonly nodeId: DagNodeId
   readonly taskId: string
-  readonly delivery: "steer" | "revive" | "queued"
+  readonly delivery: "steer" | "revive" | "queued" | "uncertain"
+  readonly effectId?: string
   readonly queuePosition?: number
   /** Present only for a revive: resolves once the revived child's new outcome has been folded. */
   readonly settled?: Promise<void>
@@ -92,6 +93,11 @@ function foldSendOutcome(
   const runId = record.runId
   const nodeId = node.id
   switch (outcome.kind) {
+    case "uncertain":
+      return { nodeId, taskId, delivery: "uncertain", effectId: outcome.effect_id }
+    case "failed":
+      throw new DagNodeControlError({ code: "node_not_continuable",
+        message: `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`, runId, nodeIds: [nodeId] })
     case "queued":
       // The steering engine persisted the message on the child's record; the node itself did not
       // change state, and dag.node.steered has no vocabulary for an undelivered message.
@@ -110,6 +116,16 @@ function foldSendOutcome(
         settled: watchRevived?.(nodeId, taskId) ?? watchRevivedTask(options, nodeId, taskId),
       }
     }
+    case "delivery_uncertain":
+      throw new DagNodeControlError({
+        code: "node_not_continuable",
+        message: `dag node "${nodeId}" has uncertain delivery for task ${taskId}: ${outcome.reason} ${outcome.suggestion}`,
+        runId,
+        nodeIds: [nodeId],
+      })
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
     case "capacity_deferred":
       throw new DagNodeControlError({
         code: "node_not_continuable",
@@ -132,6 +148,7 @@ function foldSendOutcome(
         nodeIds: [nodeId],
       })
     case "not_continuable":
+    case "stale":
       throw new DagNodeControlError({
         code: "node_not_continuable",
         message: `dag node "${nodeId}" cannot be continued: ${outcome.reason} Retry the node to run it again.`,

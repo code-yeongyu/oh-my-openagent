@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
+  REFLECTION_SNAPSHOT_MAX_BYTES,
   captureCursorSnapshot,
   deriveState,
   finalizeCursor,
@@ -24,6 +25,10 @@ export type TranscriptJournalOptions = {
   readonly journalDir: string
   readonly now?: () => Date
   readonly lock?: JournalLock
+  /** Byte budget for one reflection payload; the remainder is carried into later captures. */
+  readonly snapshotMaxBytes?: number
+  /** Replaces the state rename, so a test can simulate a rename the platform refuses. */
+  readonly renameFile?: (from: string, to: string) => Promise<void>
 }
 
 export type AppendResult = { readonly appended: number; readonly skipped: number }
@@ -68,7 +73,13 @@ function parseState(raw: string | null): ReflectionTranscriptState {
     if (!parsed || typeof parsed !== "object") return initialReflectionState()
     const state = parsed as Record<string, unknown>
     const reflectedThroughByteOffset = optionalNonNegativeInteger(state.reflected_through_byte_offset)
+    const unreflectedBytes = optionalNonNegativeInteger(state.unreflected_bytes)
+    const consecutiveFailures = optionalNonNegativeInteger(state.consecutive_failures)
+    const nextEligibleAt = optionalString(state.next_eligible_at)
     return {
+      ...(unreflectedBytes === undefined ? {} : { unreflected_bytes: unreflectedBytes }),
+      ...(consecutiveFailures === undefined ? {} : { consecutive_failures: consecutiveFailures }),
+      ...(nextEligibleAt === undefined ? {} : { next_eligible_at: nextEligibleAt }),
       schema_version: "v3_assistant_steps",
       reflected_through_message_id: optionalString(state.reflected_through_message_id),
       ...(reflectedThroughByteOffset === undefined ? {} : { reflected_through_byte_offset: reflectedThroughByteOffset }),
@@ -93,8 +104,10 @@ export class TranscriptJournal {
   readonly lockPath: string
   private readonly now: () => Date
   private readonly lock: JournalLock
+  private readonly snapshotMaxBytes: number
 
   constructor(readonly options: TranscriptJournalOptions) {
+    this.snapshotMaxBytes = options.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
     this.transcriptPath = join(options.journalDir, "transcript.jsonl")
     this.statePath = join(options.journalDir, "state.json")
     this.lockPath = join(options.journalDir, "state.lock")
@@ -103,23 +116,23 @@ export class TranscriptJournal {
   }
 
   async reconcile(messages: readonly TranscriptProjection[]): Promise<AppendResult> {
-    return this.locked(async () => {
-      const capturedAt = this.now().toISOString()
-      return this.appendUnlocked(
-        messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)),
-      )
-    })
+    const capturedAt = this.now().toISOString()
+    return this.append(messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)))
   }
 
+  /** A journal is created by its first entry: appending nothing to a journal that does not exist writes nothing (#9737). */
   async append(entries: readonly TranscriptEntry[]): Promise<AppendResult> {
+    if (entries.length === 0 && !(await this.exists())) return { appended: 0, skipped: 0 }
     return this.locked(() => this.appendUnlocked(entries))
   }
 
   async readEntries(): Promise<TranscriptEntry[]> {
+    if (!(await this.exists())) return []
     return this.locked(() => this.readEntriesUnlocked())
   }
 
   async getState(): Promise<ReflectionTranscriptState> {
+    if (!(await this.exists())) return deriveState(initialReflectionState(), [])
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
@@ -136,11 +149,18 @@ export class TranscriptJournal {
     })
   }
 
-  async captureReflectionSnapshot(signal?: AbortSignal): Promise<ReflectionSnapshot | null> {
+  async captureReflectionSnapshot(
+    signal?: AbortSignal,
+    options: { readonly maxBytes?: number } = {},
+  ): Promise<ReflectionSnapshot | null> {
+    signal?.throwIfAborted()
+    if (!(await this.exists())) return null
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
-      const snapshot = captureCursorSnapshot(entries, state)
+      const snapshot = captureCursorSnapshot(entries, state, {
+        maxBytes: options.maxBytes ?? this.snapshotMaxBytes,
+      })
       if (snapshot === null) return null
       signal?.throwIfAborted()
       await this.writeStateUnlocked(
@@ -212,6 +232,16 @@ export class TranscriptJournal {
     return this.readStateUnlocked()
   }
 
+  async recordReflectionFailure(): Promise<void> {
+    await this.locked(async () => {
+      const entries = await this.readEntriesUnlocked()
+      const state = await this.readStateUnlocked()
+      const failures = (state.consecutive_failures ?? 0) + 1
+      const delay = Math.min(300_000, 5_000 * 2 ** (failures - 1))
+      await this.writeStateUnlocked({ ...state, consecutive_failures: failures, next_eligible_at: new Date(this.now().getTime() + delay).toISOString() }, entries)
+    })
+  }
+
   async finalizeReflection(snapshot: ReflectionSnapshot, success: boolean): Promise<void> {
     await this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
@@ -221,6 +251,15 @@ export class TranscriptJournal {
         entries,
       )
     })
+  }
+
+  private async exists(): Promise<boolean> {
+    try {
+      return (await stat(this.options.journalDir)).isDirectory()
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") return false
+      throw error
+    }
   }
 
   private async locked<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -260,7 +299,6 @@ export class TranscriptJournal {
       raw = await readFile(this.transcriptPath, "utf8")
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error
-      await writeFile(this.transcriptPath, "", { encoding: "utf8", flag: "a" })
       return []
     }
     return raw
@@ -294,6 +332,16 @@ export class TranscriptJournal {
     }, entries)
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
-    await rename(temporaryPath, this.statePath)
+    try {
+      await (this.options.renameFile ?? rename)(temporaryPath, this.statePath)
+    } catch (error) {
+      // A refused rename must not strand the temporary copy beside state.json.
+      try {
+        await rm(temporaryPath, { force: true })
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "state rename failed and its temporary file could not be removed")
+      }
+      throw error
+    }
   }
 }

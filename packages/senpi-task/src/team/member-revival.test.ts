@@ -32,6 +32,7 @@ import {
   taskSettings,
   tempProjectDir,
 } from "./__fixtures__/runtime-fakes"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 afterEach(() => {
   cleanupProjects()
@@ -143,6 +144,7 @@ async function givenTeamWithSuspendedMember() {
     }),
   })
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry: new FakeRegistry(),
     config: settings(),
@@ -154,7 +156,7 @@ async function givenTeamWithSuspendedMember() {
 }
 
 describe("team member revival across session resume", () => {
-  test("#given a completed resident member whose process died unexpectedly #when reattach is disabled #then reconcile records the killed residency instead of silently suspending it", async () => {
+  test("#given a completed resident member whose process died unexpectedly #when reattach is disabled #then reconcile detaches it without respawn", async () => {
     // given
     const h = await givenTeamWithSuspendedMember()
     h.store.mutate(h.taskId, (record) => {
@@ -162,6 +164,7 @@ describe("team member revival across session resume", () => {
       return { ...withoutHost, status: "completed", residency_state: "resident", pid: 9_001 }
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store: h.store,
       registry: new FakeRegistry(),
       config: settings({ reattach_on_reconcile: false }),
@@ -176,16 +179,14 @@ describe("team member revival across session resume", () => {
     // then
     expect(result.outcomes).toContainEqual({
       task_id: h.taskId,
-      kind: "lost",
-      reason: "reattach disabled for crashed resident",
+      kind: "resumed",
+      reason: "terminal resident detached",
     })
     expect(h.store.load(h.taskId)).toMatchObject({
       status: "completed",
-      residency_state: "disposed",
-      killed: true,
-      error_message: "reattach disabled for crashed resident",
+      residency_state: "rpc_detached",
     })
-    expect(readEvents(h.store, h.taskId)).toContain("reconcile_lost")
+    expect(readEvents(h.store, h.taskId)).not.toContain("reconcile_lost")
   })
 
   test("#given a suspended team member record #when the owning session reconciles #then it revives with launch inputs from the trusted resolver and keeps its mailbox identity", async () => {

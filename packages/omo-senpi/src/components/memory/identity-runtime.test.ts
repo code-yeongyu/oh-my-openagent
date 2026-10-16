@@ -103,7 +103,13 @@ describe("memory identity runtime", () => {
 async function renderReflectionSandboxAgentDir(envShape: {
   readonly omo?: string
   readonly senpi?: string
-}): Promise<{ readonly fakeHome: string; readonly renderedArgs: readonly string[] }> {
+  /** Environment the reflection child would inherit before the runtime transforms it. */
+  readonly inheritedChildEnv?: NodeJS.ProcessEnv
+}): Promise<{
+  readonly fakeHome: string
+  readonly renderedArgs: readonly string[]
+  readonly childEnv: NodeJS.ProcessEnv
+}> {
   // given: an isolated identity root, a fake sandbox-exec/bwrap on PATH so the seatbelt profile or
   // bwrap args render, and a fake absolute inner command so the sandbox does not degrade.
   const root = await mkdtemp(join(tmpdir(), "omo-memory-agent-dir-"))
@@ -167,7 +173,7 @@ async function renderReflectionSandboxAgentDir(envShape: {
       command: join(binDir, "senpi-fake"),
       args: [],
       cwd: paths.worktrees,
-      env: { PATH: "" },
+      env: { PATH: "", ...(envShape.inheritedChildEnv ?? {}) },
       detached: true,
       paths: {
         sessionDir: paths.reflectionSessions,
@@ -178,7 +184,7 @@ async function renderReflectionSandboxAgentDir(envShape: {
         prompt: join(paths.reflectionSessions, "prompt.md"),
       },
     })
-    return { fakeHome, renderedArgs: transformed.args }
+    return { fakeHome, renderedArgs: transformed.args, childEnv: transformed.env }
   } finally {
     for (const [key, value] of Object.entries(snapshot)) {
       if (value === undefined) delete process.env[key]
@@ -240,6 +246,56 @@ describe("memory identity runtime agent-dir resolution", () => {
       // join(realHome, ".senpi", "agent"), which a fresh fakeHome can never equal on any host,
       // sentinel present or absent - so this discriminates on CI runners too, not just here.
       expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(join(fakeHome, ".omo")))).toBe(true)
+    },
+    30_000,
+  )
+
+  test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
+    "#given a rendered reflection sandbox #when the child environment is transformed #then every agent-dir variable pins the granted directory",
+    async () => {
+      // given
+      const omoAgentDir = await mkdtemp(join(tmpdir(), "omo-pinned-agent-dir-"))
+      roots.push(omoAgentDir)
+
+      // when
+      const { renderedArgs, childEnv } = await renderReflectionSandboxAgentDir({ omo: omoAgentDir })
+
+      // then: the child cannot re-resolve its agent dir from the reflection worktree cwd, and the
+      // pin names the SAME directory the sandbox granted - a pin outside the grant is the EPERM
+      // the credential lock reported.
+      expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(omoAgentDir))).toBe(true)
+      expect(childEnv.OMO_CODING_AGENT_DIR).toBe(omoAgentDir)
+      expect(childEnv.SENPI_CODING_AGENT_DIR).toBe(omoAgentDir)
+      expect(childEnv.PI_CODING_AGENT_DIR).toBe(omoAgentDir)
+    },
+    30_000,
+  )
+
+  test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
+    "#given an inherited agent-dir variable pointing elsewhere #when the reflection child environment is built #then the pin wins and no second home is granted",
+    async () => {
+      // given: the parent leaked an agent dir the sandbox never granted (the engine reads the first
+      // DEFINED name across OMO_/SENPI_/PI_, so a stale value would otherwise beat the pin).
+      const grantedAgentDir = await mkdtemp(join(tmpdir(), "omo-granted-agent-dir-"))
+      const staleAgentDir = await mkdtemp(join(tmpdir(), "omo-stale-agent-dir-"))
+      roots.push(grantedAgentDir, staleAgentDir)
+
+      // when
+      const { renderedArgs, childEnv } = await renderReflectionSandboxAgentDir({
+        omo: grantedAgentDir,
+        inheritedChildEnv: {
+          OMO_CODING_AGENT_DIR: staleAgentDir,
+          SENPI_CODING_AGENT_DIR: staleAgentDir,
+          PI_CODING_AGENT_DIR: staleAgentDir,
+        },
+      })
+
+      // then
+      expect(childEnv.OMO_CODING_AGENT_DIR).toBe(grantedAgentDir)
+      expect(childEnv.SENPI_CODING_AGENT_DIR).toBe(grantedAgentDir)
+      expect(childEnv.PI_CODING_AGENT_DIR).toBe(grantedAgentDir)
+      expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(grantedAgentDir))).toBe(true)
+      expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(staleAgentDir))).toBe(false)
     },
     30_000,
   )

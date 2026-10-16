@@ -69,4 +69,28 @@ describe("isReplyListenerDaemonProcess", () => {
     expect(await probe).toBe(true)
     expect(procReadCalls).toBe(0)
   })
+
+  test("#given windows where ps does not exist #when probing a daemon pid #then the command line still identifies it", async () => {
+    const spawnedCommands: string[][] = []
+
+    const result = await isReplyListenerDaemonProcessWithDeps(1234, {
+      platform: "win32",
+      spawn: (command) => {
+        spawnedCommands.push(command)
+        if (command[0] === "ps") {
+          throw Object.assign(new Error("spawn ps ENOENT"), { code: "ENOENT" })
+        }
+        return {
+          exitCode: 0,
+          exited: Promise.resolve(0),
+          stdout: createOutputStream(
+            '"C:\\\\Program Files\\\\nodejs\\\\node.exe" daemon.js --openclaw-reply-listener-daemon',
+          ),
+        }
+      },
+    })
+
+    expect(result).toBe(true)
+    expect(spawnedCommands.some((command) => command[0] === "ps")).toBe(false)
+  })
 })

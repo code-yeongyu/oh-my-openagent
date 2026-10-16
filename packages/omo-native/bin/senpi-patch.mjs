@@ -1,47 +1,35 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
+import { ensureBunBinShim } from "./lib/bun-bin-shim.js"
+import { prepareInstalledEngine, preparePluginLaunchSpec, writeEnginePreparedStamp } from "./lib/engine-prepare.js"
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
+
+// `bun add -g` has just linked the bin back to omo.js, whose `#!/usr/bin/env node` cannot start
+// where node is not on PATH; this postinstall runs right after that link (on bun when node is
+// missing), so it restores the bun launcher shim before anything launches `omo` (#9293). Quiet and
+// fail-open, and a no-op outside a POSIX bun-global install, so it runs before the engine work.
+ensureBunBinShim({ scriptPath: join(packageRoot, "bin", "omo.js") })
 const require = createRequire(join(packageRoot, "package.json"))
-let senpiRoot
+let senpiRoot = process.env.OMO_SENPI_PATCH_ROOT
 try {
-  const searchPaths = require.resolve.paths("@code-yeongyu/senpi") ?? []
-  for (const searchPath of searchPaths) {
-    const candidate = join(searchPath, "@code-yeongyu", "senpi")
-    if (existsSync(join(candidate, "package.json"))) {
-      senpiRoot = candidate
-      break
+  if (senpiRoot === undefined) {
+    const searchPaths = require.resolve.paths("@code-yeongyu/senpi") ?? []
+    for (const searchPath of searchPaths) {
+      const candidate = join(searchPath, "@code-yeongyu", "senpi")
+      if (existsSync(join(candidate, "package.json"))) {
+        senpiRoot = candidate
+        break
+      }
     }
+    if (senpiRoot === undefined) throw new Error("package root not found in module graph")
   }
-  if (senpiRoot === undefined) throw new Error("package root not found in module graph")
 } catch (error) {
   throw new Error("omo-ai: unable to resolve the installed @code-yeongyu/senpi package", { cause: error })
 }
 
-const transforms = {
-  "dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js": [
-    [
-      'throw new SessionTurnAttributionError("Claude SDK OAuth result arrived before replay claim");',
-      'throw new SessionTurnAttributionError(describeUnclaimedResult(message));',
-    ],
-    [
-      'function handleMessage(registry, entry, message) {',
-      'function describeUnclaimedResult(message) {\n    const errors = Array.isArray(message.errors) ? message.errors : [];\n    const detail = errors.length > 0 ? String(errors[0]) : typeof message.result === "string" ? message.result : typeof message.error === "string" ? message.error : typeof message.terminal_reason === "string" ? message.terminal_reason : undefined;\n    return `Claude SDK OAuth query result${typeof message.subtype === "string" ? ` (${message.subtype})` : ""}${detail ? `: ${detail}` : ""}`;\n}\nfunction handleMessage(registry, entry, message) {',
-    ],
-  ],
-}
-
-for (const [relative, replacements] of Object.entries(transforms)) {
-  const path = join(senpiRoot, relative)
-  if (!existsSync(path)) throw new Error(`omo-ai: installed Senpi target is missing: ${relative}`)
-  let source = readFileSync(path, "utf8")
-  if (source.includes("describeUnclaimedResult")) continue
-  for (const [from, to] of replacements) {
-    if (source.includes(to)) continue
-    if (!source.includes(from)) throw new Error(`omo-ai: unsupported Senpi ${relative}`)
-    source = source.replace(from, to)
-  }
-  writeFileSync(path, source)
-}
+preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
+prepareInstalledEngine(senpiRoot)
+writeEnginePreparedStamp(senpiRoot, JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).version)

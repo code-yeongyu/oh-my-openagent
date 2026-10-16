@@ -103,10 +103,10 @@ describe("readCodexGoalSnapshotInput", () => {
 
 	it("reads from sample fixture path", async () => {
 		// given
-		const filePath = join(process.cwd(), "test", "fixtures", "codex-goal-snapshot.json");
+		const filePath = new URL("./fixtures/codex-goal-snapshot.json", import.meta.url);
 
 		// when
-		const snapshot = await readCodexGoalSnapshotInput(filePath);
+		const snapshot = await readCodexGoalSnapshotInput(filePath.pathname);
 
 		// then
 		expect(snapshot?.available).toBe(true);
@@ -120,6 +120,15 @@ describe("readCodexGoalSnapshotInput", () => {
 });
 
 describe("reconcileCodexGoalSnapshot", () => {
+	it("preserves objective whitespace in driver advice while normalizing comparison", () => {
+		const expectedObjective = "  exact   objective\nwith spacing  ";
+		const result = reconcileCodexGoalSnapshot(
+			parseCodexGoalSnapshot({ goal: { objective: "different", status: "active" } }),
+			{ expectedObjective },
+		);
+
+		expect(result.warnings[0]).toContain(`expected "${expectedObjective}"`);
+	});
 	it("returns ok=true when snapshot matches expected", () => {
 		// when
 		const reconciliation = reconcileCodexGoalSnapshot(
@@ -132,7 +141,7 @@ describe("reconcileCodexGoalSnapshot", () => {
 		expect(reconciliation.errors).toHaveLength(0);
 	});
 
-	it("reports error when objective mismatches", () => {
+	it("reports warning when objective mismatches", () => {
 		// when
 		const reconciliation = reconcileCodexGoalSnapshot(
 			{ available: true, objective: "X", status: "active", raw: null },
@@ -140,20 +149,70 @@ describe("reconcileCodexGoalSnapshot", () => {
 		);
 
 		// then
-		expect(reconciliation.ok).toBe(false);
-		expect(reconciliation.errors.length).toBeGreaterThan(0);
+		expect(reconciliation.ok).toBe(true);
+		expect(reconciliation.errors).toHaveLength(0);
+		expect(reconciliation.warnings.join(" ")).toContain("driver_objective_differs");
+		expect(reconciliation.nextActions).toEqual([]);
+		expect(reconciliation.unacknowledgedObjective).toBe("X");
 	});
 
-	it("reports error when status mismatches", () => {
+	it("#given the differing objective was acknowledged #when reconciled again #then it is silent", () => {
+		const reconciliation = reconcileCodexGoalSnapshot(
+			{ available: true, objective: " X  \n", status: "active", raw: null },
+			{ expectedObjective: "Y", acknowledgedObjectives: ["X"] },
+		);
+
+		expect(reconciliation.warnings).toEqual([]);
+		expect(reconciliation.nextActions).toEqual([]);
+		expect(reconciliation.unacknowledgedObjective).toBeUndefined();
+	});
+
+	it("#given no driver snapshot #when reconciled #then create_goal is a next action, not a warning", () => {
+		const reconciliation = reconcileCodexGoalSnapshot(null, { expectedObjective: "Y" });
+
+		expect(reconciliation.nextActions.join(" ")).toContain("create_goal");
+		expect(reconciliation.warnings).toEqual([]);
+	});
+
+	it("#given a completed or limited driver #when reconciled #then the advice is a next action", () => {
+		const completed = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "Y", status: "complete", raw: null },
+			{ expectedObjective: "Y" },
+		);
+		const limited = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "Y", status: "usage_limited", raw: null },
+			{ expectedObjective: "Y" },
+		);
+
+		expect(completed.nextActions.join(" ")).toContain("create_goal");
+		expect(limited.nextActions.join(" ")).toContain("/goal resume");
+		expect([...completed.warnings, ...limited.warnings]).toEqual([]);
+	});
+
+	it("accepts a parsable snapshot without objective as advisory", () => {
 		// when
 		const reconciliation = reconcileCodexGoalSnapshot(
-			{ available: true, objective: "X", status: "active", raw: null },
-			{ expectedObjective: "X", allowedStatuses: ["complete"] },
+			{ available: true, status: "active", raw: { goal: { status: "active" } } },
+			{ expectedObjective: "X" },
 		);
 
 		// then
-		expect(reconciliation.ok).toBe(false);
-		expect(reconciliation.errors.length).toBeGreaterThan(0);
+		expect(reconciliation.ok).toBe(true);
+		expect(reconciliation.errors).toHaveLength(0);
+	});
+
+	it("accepts limited driver statuses", () => {
+		// when
+		const reconciliation = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "X", status: "budget_limited", raw: null },
+			{ expectedObjective: "X" },
+		);
+
+		// then
+		expect(reconciliation.ok).toBe(true);
+		expect(reconciliation.errors).toHaveLength(0);
+		expect(reconciliation.nextActions.join(" ")).toContain("/goal resume");
+		expect(reconciliation.warnings).toEqual([]);
 	});
 });
 
@@ -162,7 +221,7 @@ describe("formatCodexGoalReconciliation", () => {
 		// given
 		const reconciliation = reconcileCodexGoalSnapshot(
 			{ available: true, objective: "X", status: "active", raw: null },
-			{ expectedObjective: "Y", allowedStatuses: ["complete"] },
+			{ expectedObjective: "Y" },
 		);
 
 		// when

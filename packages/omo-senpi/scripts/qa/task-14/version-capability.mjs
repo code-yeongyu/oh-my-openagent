@@ -105,6 +105,8 @@ try {
   let refusal
   let adopted
   try { adopted = await ensureHost({ socket, agentDir: join(root, "agent") }) } catch (error) { refusal = error }
+  // An engine carrying senpi #2242 hands back an attach hold; never keep one past this probe.
+  adopted?.release?.()
 
   // The fixture must still be the socket owner: refusal means "hands off", not "replace".
   const fixtureSurvived = unmanaged.pid !== undefined && processAlive(unmanaged.pid)

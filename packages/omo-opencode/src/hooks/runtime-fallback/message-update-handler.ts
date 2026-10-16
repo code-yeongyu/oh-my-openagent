@@ -78,6 +78,8 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     }
 
     if (sessionID && role === "assistant" && error) {
+      const isContentFilterError = extractErrorName(error)?.toLowerCase().replace(/[_-]/g, "") === "contentfiltererror"
+      const shouldOverrideRetry = Boolean(retrySignal && timeoutEnabled) || isContentFilterError
       let state = sessionStates.get(sessionID)
       const pendingFallbackModel = state?.pendingFallbackModel
       const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
@@ -97,13 +99,13 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       if (wasAwaitingFallbackResult) {
         sessionAwaitingFallbackResult.delete(sessionID)
       }
-      if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
+      if (sessionRetryInFlight.has(sessionID) && !retrySignal && !isContentFilterError) {
         log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
         return
       }
 
-      if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
-        log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
+      if (shouldOverrideRetry && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
+        log(`[${HOOK_NAME}] Overriding active retry due to provider retry signal or content-filter error`, {
           sessionID,
           model,
         })
@@ -191,8 +193,8 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         sessionLastAccess.set(sessionID, Date.now())
 
         if (state.pendingFallbackModel) {
-          if (retrySignal && timeoutEnabled) {
-            log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
+          if (shouldOverrideRetry) {
+            log(`[${HOOK_NAME}] Clearing pending fallback due to provider retry signal or content-filter error`, {
               sessionID,
               pendingFallbackModel: state.pendingFallbackModel,
             })

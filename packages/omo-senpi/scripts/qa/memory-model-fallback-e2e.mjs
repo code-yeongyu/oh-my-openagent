@@ -86,6 +86,7 @@ function writeCompletionHold(completions) {
   const path = join(sandbox.root, "completion-hold.js")
   writeFileSync(path, `
 import { mkdirSync, readdirSync, watch } from "node:fs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 export default function holdUntilReflectionCompletes(pi) {
   pi.on("agent_settled", () => {
@@ -122,7 +123,7 @@ async function runParent(parentProvider, childShim, prompt, extraExtensions = []
   ], {
     cwd: sandbox.cwd,
     env: {
-      ...process.env,
+      ...isolatedChildEnv(process.env, sandbox.agentDir),
       SENPI_BIN: childShim,
       SENPI_CODING_AGENT_DIR: sandbox.agentDir,
       XDG_CONFIG_HOME: sandbox.xdgConfigHome,

@@ -17,6 +17,12 @@ export interface MemoryRepoAccess {
 export interface MemoryIdentityContext {
   readonly identity: string
   readonly identityPaths: MemoryIdentityPaths
+  /**
+   * `<memory>/agents/<id>`: where this identity's memory lives once it owns a `repo/`. Equal to
+   * `identityPaths.root` for every durable run, and the promotion target of a transient one
+   * (transient-identity.ts).
+   */
+  readonly durableRoot: string
   readonly repoAccess: MemoryRepoAccess
   readonly binding: MemorySessionBinding
   readonly ledger: MemoryPendingLedger
@@ -26,11 +32,13 @@ export function createMemoryIdentityContext(input: {
   readonly identity: string
   readonly identityPaths: MemoryIdentityPaths
   readonly binding: MemorySessionBinding
+  readonly durableRoot?: string
 }): MemoryIdentityContext {
   let repoAccess: MemoryRepoAccess | undefined
   return {
     identity: input.identity,
     identityPaths: input.identityPaths,
+    durableRoot: input.durableRoot ?? input.identityPaths.root,
     binding: input.binding,
     ledger: { pendingCompaction: false, configRestartNotified: false },
     get repoAccess(): MemoryRepoAccess {
@@ -60,6 +68,5 @@ export async function ensureIdentityRuntimeDirs(paths: MemoryIdentityPaths): Pro
     paths.factsQueue,
     paths.facts,
     paths.notices,
-    paths.toolReceipts,
   ].map((path) => mkdir(path, { recursive: true })))
 }

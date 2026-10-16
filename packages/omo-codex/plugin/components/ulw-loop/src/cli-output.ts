@@ -16,7 +16,7 @@ export const ULW_LOOP_HELP = `Usage:
   omo-agent-toolkit ulw-loop add-goal --title "..." --objective "..." [--json]
   omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "..." --objective "..." --evidence "..." --codex-goal-json <...> [--json]
 
-All subcommands accept [--session-id <id>] to isolate state under .omo/ulw-loop/<id>/; without it, Codex session env is used when present.
+Every state subcommand needs a session scope: [--session-id <id>] or the session env (OMO_ULW_LOOP_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID / PI_SESSION_ID); state lives under .omo/ulw-loop/<id>/ and the unscoped root is never used implicitly. status --json exposes the currentAttemptDir; put all quality-gate artifacts under it.
 Every subcommand accepts --help | -h to print its own usage line.`;
 
 export function subcommandHelp(subcommand: string): string {

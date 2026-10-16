@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -6,15 +7,16 @@ import {
   rmSync,
   statSync,
   type Stats,
-  writeFileSync,
 } from "node:fs"
 import { join } from "node:path"
 
 import { parseTaskId, transitionTaskRecord } from "../state"
 import type { TaskId, TaskRecord } from "../state"
-import { appendTaskEvent, closeAppendFd, type AppendFdCache } from "./event-log"
+import { appendTaskEvent, closeAppendFd, taskEventLogPath, type AppendFdCache } from "./event-log"
+import { holdsTombstone, removeExpungeOwner, readExpungeOwnerFile, restoreTombstone, takeOverTombstone, writeExpungeOwner } from "./expunge-owner"
 import { withTaskRecordLock } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
+import { writeRecord } from "./record-write"
 import { resolveStateDir } from "./state-dir"
 import type {
   ListTaskRecordsResult,
@@ -24,7 +26,13 @@ import type {
   TaskRecordStore,
 } from "./types"
 
-type WriteRecordMode = "create" | "replace"
+export { TaskRecordCollisionError } from "./record-write"
+
+export type TaskRecordStoreOptions = {
+  // Test seam: the rename-retry branch is win32-only, so tests inject the platform instead of
+  // running only on Windows CI. Production omits this and reads process.platform.
+  readonly platform?: NodeJS.Platform
+}
 
 type CacheEntry = {
   readonly record: TaskRecord
@@ -33,20 +41,9 @@ type CacheEntry = {
   readonly warnings: readonly string[]
 }
 
-export class TaskRecordCollisionError extends Error {
-  readonly taskId: TaskId
-  readonly path: string
-
-  constructor(input: { readonly taskId: TaskId; readonly path: string }) {
-    super(`Task record already exists: ${input.taskId}`)
-    this.name = "TaskRecordCollisionError"
-    this.taskId = input.taskId
-    this.path = input.path
-  }
-}
-
-export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
+export function createTaskRecordStore(config: StateDirConfig, options: TaskRecordStoreOptions = {}): TaskRecordStore {
   const stateDir = resolveStateDir(config)
+  const platform = options.platform ?? process.platform
   const cache = new Map<string, CacheEntry>()
   const appendFds: AppendFdCache = new Map()
 
@@ -61,14 +58,15 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
   return {
     stateDir,
     save(record) {
-      writeRecord(stateDir, record, "create")
-      cacheSet(taskPath(stateDir, parseTaskId(record.task_id)))
+      const path = taskPath(stateDir, parseTaskId(record.task_id))
+      writeRecord(path, record, "create", platform)
+      cacheSet(path)
     },
     replace(record) {
       const taskId = parseTaskId(record.task_id)
       const path = taskPath(stateDir, taskId)
       withTaskRecordLock(path, () => {
-        writeRecord(stateDir, record, "replace")
+        writeRecord(path, record, "replace", platform)
         cacheSet(path)
       })
     },
@@ -79,7 +77,7 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
         const current = readRecord(path)
         if (current === null) return null
         const next = mutation(current)
-        if (next !== current) writeRecord(stateDir, next, "replace")
+        if (next !== current) writeRecord(path, next, "replace", platform)
         cacheSet(path)
         return next
       })
@@ -101,7 +99,7 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
         if (record === null) throw new Error(`Task record not found: ${taskId}`)
         const result = transitionTaskRecord(record, transition)
         appendTaskEvent(stateDir, parsedTaskId, { type: result.audit.type, payload: result.audit }, appendFds)
-        if (result.applied) writeRecord(stateDir, result.record, "replace")
+        if (result.applied) writeRecord(path, result.record, "replace", platform)
         cacheSet(path)
         return result
       })
@@ -111,7 +109,7 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
       const path = taskPath(stateDir, parsedTaskId)
       withTaskRecordLock(path, () => removeRecord(stateDir, parsedTaskId, cache, appendFds))
     },
-    tombstoneIfExpired(taskId, shouldRetain) {
+    tombstoneIfExpired(taskId, shouldRetain, owner) {
       const parsedTaskId = parseTaskId(taskId)
       const path = taskPath(stateDir, parsedTaskId)
       // The lock file lives beside the record, so the tasks dir must exist even when the record
@@ -123,22 +121,41 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
         const current = readRecord(path)
         if (current === null) return { kind: "missing" } as const
         if (shouldRetain(current)) return { kind: "retained" } as const
+        if (owner !== undefined) writeExpungeOwner(tombstonePath(stateDir, parsedTaskId), owner)
         renameSync(path, tombstonePath(stateDir, parsedTaskId))
         cache.delete(path)
         return { kind: "tombstoned", record: current } as const
       })
     },
-    completeExpunge(taskId) {
+    completeExpunge(taskId, owner) {
       const parsedTaskId = parseTaskId(taskId)
-      // Phase 2 (and crash recovery): the record is already tombstoned - committed to deletion,
-      // invisible to load/list, never resurrected - so this is idempotent and needs no lock.
+      const tombstone = tombstonePath(stateDir, parsedTaskId)
+      // Phase 2 (and crash recovery): the tombstone is committed to deletion and invisible to load/list.
+      // An owned attempt first confirms, under the record lock, that the tombstone is still its own.
+      if (owner !== undefined && !holdsTombstone(taskPath(stateDir, parsedTaskId), tombstone, owner)) return false
       removeRecord(stateDir, parsedTaskId, cache, appendFds)
-      rmSync(tombstonePath(stateDir, parsedTaskId), { force: true })
+      rmSync(tombstone, { force: true })
+      removeExpungeOwner(tombstone)
+      return true
+    },
+    loadExpunging(taskId) {
+      return readRecord(tombstonePath(stateDir, parseTaskId(taskId)))
+    },
+    restoreExpunging(taskId, owner) {
+      const parsedTaskId = parseTaskId(taskId)
+      const path = taskPath(stateDir, parsedTaskId)
+      if (restoreTombstone(path, tombstonePath(stateDir, parsedTaskId), owner)) cache.delete(path)
+    },
+    readExpungeOwner(taskId) {
+      return readExpungeOwnerFile(tombstonePath(stateDir, parseTaskId(taskId)))
+    },
+    takeOverExpunging(taskId, from, to) {
+      const parsedTaskId = parseTaskId(taskId)
+      return takeOverTombstone(taskPath(stateDir, parsedTaskId), tombstonePath(stateDir, parsedTaskId), from, to)
     },
     listExpunging() {
       const tasksDir = join(stateDir, "tasks")
-      mkdirSync(tasksDir, { recursive: true })
-      return readdirSync(tasksDir)
+      return readDirectoryNames(tasksDir)
         .filter((entry) => entry.endsWith(TOMBSTONE_SUFFIX))
         .map((entry) => entry.slice(0, entry.length - TOMBSTONE_SUFFIX.length))
         .filter(isParseableTaskId)
@@ -159,7 +176,7 @@ function removeRecord(
   // (2) completion spill file
   rmSync(join(stateDir, "completion-results", `${taskId}.txt`), { force: true })
   // (3) task event log
-  const logPath = join(stateDir, "logs", `${taskId}.jsonl`)
+  const logPath = taskEventLogPath(stateDir, String(taskId))
   rmSync(logPath, { force: true })
   closeAppendFd(logPath, appendFds)
   // (4) record LAST
@@ -170,12 +187,11 @@ function removeRecord(
 
 function listRecords(stateDir: string, cache: Map<string, CacheEntry>): ListTaskRecordsResult {
   const tasksDir = join(stateDir, "tasks")
-  mkdirSync(tasksDir, { recursive: true })
   const records: TaskRecord[] = []
   const diagnostics: TaskRecordDiagnostic[] = []
   const seen = new Set<string>()
 
-  for (const file of readdirSync(tasksDir).filter((entry) => entry.endsWith(".json")).toSorted()) {
+  for (const file of readDirectoryNames(tasksDir).filter((entry) => entry.endsWith(".json")).toSorted()) {
     const path = join(tasksDir, file)
     seen.add(path)
     try {
@@ -201,6 +217,15 @@ function listRecords(stateDir: string, cache: Map<string, CacheEntry>): ListTask
   }
 
   return { records, diagnostics }
+}
+
+function readDirectoryNames(directory: string): string[] {
+  try {
+    return readdirSync(directory)
+  } catch (error) {
+    if (isEnoent(error)) return []
+    throw error
+  }
 }
 
 function readCached(path: string, cache: Map<string, CacheEntry>): TaskRecord | null {
@@ -234,29 +259,6 @@ function readRecord(path: string, warnings: string[] = []): TaskRecord | null {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
     throw error
   }
-}
-
-function writeRecord(stateDir: string, record: TaskRecord, mode: WriteRecordMode): void {
-  const tasksDir = join(stateDir, "tasks")
-  mkdirSync(tasksDir, { recursive: true })
-  const taskId = parseTaskId(record.task_id)
-  const path = taskPath(stateDir, taskId)
-  const payload = JSON.stringify(record)
-  if (mode === "create") {
-    try {
-      writeFileSync(path, payload, { encoding: "utf8", flag: "wx" })
-      return
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "EEXIST") {
-        throw new TaskRecordCollisionError({ taskId, path })
-      }
-      throw error
-    }
-  }
-
-  const tmpPath = `${path}.${process.pid}.tmp`
-  writeFileSync(tmpPath, payload, "utf8")
-  renameSync(tmpPath, path)
 }
 
 const TOMBSTONE_SUFFIX = ".json.expunging"

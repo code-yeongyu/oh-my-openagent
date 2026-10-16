@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-48 -48 1236 746" width="312" height="188" fill="none" role="img" aria-label="OpenGateway">
+  <title>OpenGateway</title>
+  <g id="logo" stroke="#4F46E5" fill="#4F46E5">
+    <rect id="node-in" x="36" y="36" width="420" height="578" rx="89" fill="none" stroke-width="72"/>
+    <rect id="bar-in" x="72" y="272" width="277" height="106" stroke="none"/>
+    <path id="node-out" d="M684 213 L684 125 A89 89 0 0 1 773 36 L1015 36 A89 89 0 0 1 1104 125 L1104 525 A89 89 0 0 1 1015 614 L773 614 A89 89 0 0 1 684 525 L684 436" fill="none" stroke-width="72" stroke-linecap="butt"/>
+    <g id="arrow">
+      <rect id="arrow-shaft" x="420" y="272" width="394" height="106" stroke="none"/>
+      <path id="arrow-head" d="M833 220 L970 325 L833 430 Z" stroke-width="38" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

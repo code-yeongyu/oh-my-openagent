@@ -42,4 +42,33 @@ describe("resolveRecentPromptContextForSession", () => {
     expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(result.tools).toEqual({ edit: true })
   })
+
+  test("#given a flat assistant message with a variant #when resolving recent prompt context #then the model keeps the variant", async () => {
+    // given
+    const ctx = unsafeTestValue<PluginInput>({
+      client: {
+        session: {
+          messages: mock(async () => ({
+            data: [
+              {
+                id: "m2",
+                info: {
+                  providerID: "openai",
+                  modelID: "gpt-5.5",
+                  variant: "max",
+                  time: { created: 2 },
+                },
+              },
+            ],
+          })),
+        },
+      },
+    })
+
+    // when
+    const result = await resolveRecentPromptContextForSession(ctx, "ses_atlas_flat")
+
+    // then
+    expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.5", variant: "max" })
+  })
 })

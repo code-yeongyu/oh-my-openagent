@@ -123,7 +123,6 @@ Every implementation `task()` prompt MUST include all six sections:
 ## 3. REQUIRED TOOLS
 - Read: [files to inspect]
 - Grep/Glob/LSP: [queries or symbols]
-- codegraph_explore: Use first when codegraph tools are available and useful
 - context7: Use when current library docs affect implementation
 - ast-grep skill: Use for structural search or rewrite
 ## 4. MUST DO
@@ -177,7 +176,7 @@ Everything else is parallel. Fire one `task()` per independent checkbox in the s
 
 ```typescript
 task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
-task(category="deep", load_skills=["programming"], run_in_background=false, prompt="...task B...")
+task(category="deep-low", load_skills=["programming"], run_in_background=false, prompt="...task B...")
 task(category="quick", load_skills=["git-master"], run_in_background=false, prompt="...task C...")
 ```
 

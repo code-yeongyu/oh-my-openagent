@@ -7,6 +7,7 @@ import {
   PLUGIN_NAME,
   getOpenCodeConfigDir,
   getOpenCodeConfigPaths,
+  isPluginTupleEntry,
   log,
   parseJsonc,
 } from "../../../shared"
@@ -38,6 +39,19 @@ interface TuiPluginInfo {
   hasPackageTuiEntry: boolean
   hasNamedTuiEntry: boolean
   hasCanonicalNamedTuiEntry: boolean
+  managedEntryCount: number
+}
+
+export function tuiPluginSpecName(entry: unknown): string | null {
+  if (typeof entry === "string") return entry
+  if (isPluginTupleEntry(entry)) return entry[0]
+  return null
+}
+
+function isOmoSourceFileSpec(name: string): boolean {
+  const normalized = name.toLowerCase().replaceAll("\\", "/")
+  if (!normalized.startsWith("file://")) return false
+  return /\/(omo(?:-[^/]*)?|oh-my-opencode|oh-my-openagent)\/(src|dist)\/index\.(ts|js)$/.test(normalized)
 }
 
 function fileEntryPackageJsonPath(entry: string): string {
@@ -71,7 +85,8 @@ function packageNameFromServerEntry(entry: unknown): string | null {
 }
 
 function isPackagePluginEntry(entry: unknown): boolean {
-  return packageNameFromServerEntry(entry) !== null
+  const name = tuiPluginSpecName(entry)
+  return name !== null && packageNameFromServerEntry(name) !== null
 }
 
 function packageExportsTuiForServerEntry(entry: unknown): boolean | null {
@@ -108,22 +123,41 @@ export function isServerPluginEntry(entry: unknown): entry is string {
 }
 
 export function isTuiPluginEntry(entry: unknown): boolean {
-  return typeof entry === "string" && (isPackagePluginEntry(entry) || (entry.startsWith("file:") && isOurFilePluginEntry(entry)))
+  const name = tuiPluginSpecName(entry)
+  if (name === null) return false
+  return isPackagePluginEntry(name) || (name.startsWith("file:") && isOurFilePluginEntry(name))
 }
 
 export function isNamedTuiPluginEntry(entry: unknown): boolean {
+  const name = tuiPluginSpecName(entry)
+  if (name === null) return false
   const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
   const legacyPrefix = `${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}`
-  return typeof entry === "string"
-    && (entry === canonicalPrefix
-      || entry.startsWith(`${canonicalPrefix}@`)
-      || entry === legacyPrefix
-      || entry.startsWith(`${legacyPrefix}@`))
+  return name === canonicalPrefix
+    || name.startsWith(`${canonicalPrefix}@`)
+    || name === legacyPrefix
+    || name.startsWith(`${legacyPrefix}@`)
+}
+
+/**
+ * Every `tui.json` entry that belongs to this plugin, whatever spec it carries:
+ * the bare package name, any tag or version spec, the legacy package name, the
+ * `<pkg>/tui` subpath older installers wrote, our `file:` dev entries, and the
+ * `file://.../(src|dist)/index.(ts|js)` source specs `addPluginToOpenCodeConfig`
+ * already treats as ours — in string or `[name, options]` tuple form. The
+ * installer replaces all of them with the single entry it writes.
+ */
+export function isOmoManagedTuiEntry(entry: unknown): boolean {
+  const name = tuiPluginSpecName(entry)
+  if (name === null) return false
+  return isNamedTuiPluginEntry(name) || isTuiPluginEntry(name) || isOmoSourceFileSpec(name)
 }
 
 function isCanonicalNamedTuiPluginEntry(entry: unknown): boolean {
+  const name = tuiPluginSpecName(entry)
+  if (name === null) return false
   const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
-  return typeof entry === "string" && (entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`))
+  return name === canonicalPrefix || name.startsWith(`${canonicalPrefix}@`)
 }
 
 export function detectServerPluginRegistration(): ServerPluginInfo {
@@ -141,7 +175,14 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
   try {
     const parsed = parseJsonc<OpenCodeConfigShape>(readFileSync(configPath, "utf-8"))
     const plugins = parsed.plugin ?? []
-    const serverEntry = plugins.find(isServerPluginEntry)
+    let serverEntry: string | undefined
+    for (const entry of plugins) {
+      const name = tuiPluginSpecName(entry)
+      if (name !== null && isServerPluginEntry(name)) {
+        serverEntry = name
+        break
+      }
+    }
     return {
       registered: serverEntry !== undefined,
       configPath,
@@ -167,6 +208,7 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
       hasPackageTuiEntry: false,
       hasNamedTuiEntry: false,
       hasCanonicalNamedTuiEntry: false,
+      managedEntryCount: 0,
     }
   }
 
@@ -180,6 +222,7 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
       hasPackageTuiEntry: plugins.some(isPackagePluginEntry),
       hasNamedTuiEntry: plugins.some(isNamedTuiPluginEntry),
       hasCanonicalNamedTuiEntry: plugins.some(isCanonicalNamedTuiPluginEntry),
+      managedEntryCount: plugins.filter(isOmoManagedTuiEntry).length,
     }
   } catch (error) {
     log("[tui-plugin-config] Failed to inspect TUI plugin config", {
@@ -193,6 +236,7 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
       hasPackageTuiEntry: false,
       hasNamedTuiEntry: false,
       hasCanonicalNamedTuiEntry: false,
+      managedEntryCount: 0,
     }
   }
 }
@@ -258,6 +302,27 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
       name,
       status: "warn",
       message: "TUI plugin package does not expose ./tui",
+      details: details.length > 0 ? details : undefined,
+      issues,
+    }
+  }
+
+  if (tui.managedEntryCount > 1) {
+    const desiredEntry = server.entry ?? PLUGIN_NAME
+    issues.push({
+      title: "TUI plugin is registered more than once in tui.json",
+      description:
+        `tui.json lists ${tui.managedEntryCount} entries for ${PLUGIN_NAME} `
+        + "(bare name, version/tag spec, legacy name, /tui subpath, or file:). "
+        + "OpenCode loads each one, so the plugin runs twice.",
+      fix: `Re-run the installer (\`npx oh-my-openagent install\`) to keep a single "${desiredEntry}" entry in ${tui.configPath}.`,
+      affects: ["TUI startup", "plugin loading"],
+      severity: "warning",
+    })
+    return {
+      name,
+      status: "warn",
+      message: "TUI plugin is registered more than once in tui.json",
       details: details.length > 0 ? details : undefined,
       issues,
     }

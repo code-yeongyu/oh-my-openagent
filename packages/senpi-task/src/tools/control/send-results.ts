@@ -1,5 +1,32 @@
 import type { SendManager, SendToolResult } from "./types"
-import { toolResult } from "./tool-result"
+import { toolErrorResult, toolResult } from "./tool-result"
+import type { RedispatchOutcome } from "../../steering"
+
+export function mapRedispatchOutcome(manager: SendManager, outcome: RedispatchOutcome, callerSessionId: string | undefined): SendToolResult {
+  switch (outcome.kind) {
+    case "redispatched":
+      return toolResult(`Re-dispatched ${outcome.task_id} onto a fresh live session (run epoch ${outcome.run_epoch}); its persisted prompt is replaying.`, {
+        kind: "redispatched",
+        task_id: outcome.task_id,
+        run_epoch: outcome.run_epoch,
+      })
+    case "invalid_state":
+      return toolErrorResult(outcome.reason, { kind: "invalid_state", task_id: outcome.task_id, reason: outcome.reason })
+    case "respawn_failed":
+      return toolErrorResult(outcome.reason, { kind: "respawn_failed", task_id: outcome.task_id, reason: outcome.reason })
+    case "capacity_deferred":
+      return toolResult(outcome.reason, { kind: "capacity_deferred", task_id: outcome.task_id, reason: outcome.reason })
+    case "scope_denied":
+      return toolErrorResult(outcome.reason, {
+        kind: "scope_denied",
+        task_id: outcome.task_id,
+        owning_session_id: outcome.owning_session_id,
+        reason: outcome.reason,
+      })
+    case "not_found":
+      return notFound(manager, outcome.reason, callerSessionId)
+  }
+}
 
 export function invalidArguments(reason: string): SendToolResult {
   return toolResult(reason, { kind: "invalid_arguments", reason })
@@ -39,6 +66,14 @@ function resolveListedTask(manager: SendManager, to: string): ReturnType<SendMan
 
 export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTask"]>>): SendToolResult {
   switch (outcome.kind) {
+    case "uncertain":
+      return toolResult(`${outcome.reason} Effect id: ${outcome.effect_id}`, outcome)
+    case "failed":
+      return toolErrorResult(`${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`, outcome)
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
+      return toolErrorResult(outcome.reason, outcome)
     case "steered": {
       if (outcome.delivered !== "steer") {
         throw new Error(`task_send invariant violated: expected steer delivery, received ${outcome.delivered}`)
@@ -56,6 +91,14 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         task_id: outcome.task_id,
         run_epoch: outcome.run_epoch,
       })
+    case "delivery_uncertain":
+      return toolResult(`${outcome.reason} ${outcome.suggestion}`, {
+        kind: "delivery_uncertain",
+        task_id: outcome.task_id,
+        run_epoch: outcome.run_epoch,
+        reason: outcome.reason,
+        suggestion: outcome.suggestion,
+      })
     case "capacity_deferred":
       return toolResult(outcome.reason, { kind: "capacity_deferred", task_id: outcome.task_id, reason: outcome.reason })
     case "queued":
@@ -71,6 +114,11 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         reason: outcome.reason,
         suggestion: outcome.suggestion,
       })
+    case "stale": {
+      // task_send never names a run, so only a handle-fenced caller reaches this; keep the tool's result shapes.
+      const suggestion = "Fetch the task's current run before sending."
+      return toolResult(`${outcome.reason} ${suggestion}`, { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion })
+    }
     case "one_shot_agent":
       return toolResult(outcome.message, {
         kind: "one_shot_agent",

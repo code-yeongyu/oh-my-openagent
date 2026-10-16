@@ -83,6 +83,7 @@ function fixture(): Fixture {
     terminalObservers: observers,
   })
   engine.runtime.captureFrom({
+    modelRegistry: createTeamServiceTestModelRegistry(),
     mode: "tui",
     ui: {
       notify: () => undefined,
@@ -102,7 +103,7 @@ async function spawn(engine: TaskEngine, name: string): Promise<string> {
     prompt: `work ${name}`,
     parent_session_id: "parent-session",
     depth: 0,
-    model: "anthropic/claude-opus-5",
+    model: "anthropic/claude-opus-5-5",
     name,
   })
   if (result.kind !== "started") throw new Error(`spawn failed: ${result.kind}`)
@@ -168,7 +169,7 @@ describe("task engine terminal edge observation", () => {
         root_session_id: "previous-session",
         depth: 0,
         execution_mode: "in-process",
-        model: "anthropic/claude-opus-5",
+        model: "anthropic/claude-opus-5-5",
         notify_on_terminal: true,
       }),
       status: "running",

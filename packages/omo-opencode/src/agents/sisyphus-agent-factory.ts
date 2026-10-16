@@ -32,12 +32,13 @@ import {
   isGlmModel,
   isGpt5_5Model,
   isGpt5_6Model,
+  isGpt6Model,
   isGptModel,
   isGptNativeSisyphusModel,
   isGrok45Model,
   isGrok46Model,
+  isKimiK2CodeModel,
   isKimiK2Model,
-  isKimiK27Model,
   isKimiK3Model,
 } from "./types";
 
@@ -66,9 +67,9 @@ export type SisyphusPromptFamily =
 
 export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily {
   if (isKimiK3Model(model)) return "kimi-k3";
-  if (isKimiK27Model(model)) return "kimi-k2-7";
+  if (isKimiK2CodeModel(model)) return "kimi-k2-7";
   if (isKimiK2Model(model)) return "kimi-k2-6";
-  if (isGpt5_5Model(model) || isGpt5_6Model(model)) return "gpt-5-5";
+  if (isGpt5_5Model(model) || isGpt5_6Model(model) || isGpt6Model(model)) return "gpt-5-5";
   if (isGptNativeSisyphusModel(model)) return "gpt-5-4";
   if (isClaudeFable5Model(model)) return "claude-fable-5";
   if (isClaudeOpus5Model(model)) return "claude-opus-5";

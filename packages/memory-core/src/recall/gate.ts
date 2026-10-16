@@ -1,27 +1,42 @@
-// Memorian gate output contract: the judge child speaks only through the nudge
-// tool, which appends NDJSON {path, hint} lines. The parent is authoritative:
-// every line is re-parsed fail-closed (a malformed line drops, never poisons the
-// batch, following parseFactsExtractionJsonl's precedent inverted to skip
-// instead of throw) and re-validated against the candidate set, the session
-// ledger, the hint shape and the configured cap.
+// Kibitzer output contract: the resident in-process sidecar speaks only through the nudge
+// tool, whose closure records each accepted nudge against the paths it was offered. The parent is
+// authoritative: every collected nudge is re-validated against the candidate set, the session
+// ledger, the hint shape and the configured cap (defence in depth - the closure already
+// enforced the same rules at call time).
 //
 // Accepted nudges wait in a per-session pending file until the next turn injects
-// them. The payload is self-describing ({ version, sessionId, compactionEpoch,
-// writtenAt, nudges }) so a filename collision from session-id sanitization can
-// never hand one session another session's nudges, so a payload nobody consumed
-// expires instead of surfacing days later, and so a verdict about a transcript a
-// compaction has since rewritten is rejected AT CONSUMPTION rather than raced
-// against by the writer.
+// them. The payload is self-describing ({ version, sessionId, writtenAt, nudges })
+// so a filename collision from session-id sanitization can never hand one session
+// another session's nudges, and so a payload nobody consumed expires instead of
+// surfacing days later. A compaction retracts the session's payload through
+// `delete` at the moment it is accepted; nothing is stamped on the payload for it.
 
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { sanitizeSessionFilename } from "./ledger"
+import { containsSecretLikeMaterial } from "../sync/redact"
 
 export const PENDING_NUDGES_VERSION = 1
 
 /** Hint budget: one factual sentence. Internal, deliberately not a config knob. */
 export const NUDGE_HINT_MAX_CHARS = 200
+
+/** Decision commentary is not a memory fact. Internal, deliberately not a config knob. */
+const NUDGE_DECISION_LANGUAGE_PATTERN = /\b(?:no\s+stored\s+memory|clears\s+the\s+bar|not?\s+relevant|memor(?:y|ies)\s+(?:(?:is|are)\s+(?:unrelated\s+to|not\s+about)|(?:does|do)\s+not\s+(?:cover|address|pertain))|memor(?:y|ies)\s+covers?\s+.*\s+not\s+the)\b/i
+
+// The nudge block is reference material about a stored note, never a line of instruction: the
+// primary agent's own task stands and it decides what to do with the note. A hint that speaks TO
+// the agent is therefore rejected at admission. Three shapes carry that voice: the second person,
+// an imperative (or negated imperative) opening the sentence, and a Korean request/imperative
+// ending. Only the OPENING is scanned for imperative verbs, so an observation that quotes a rule
+// mid-sentence ("the note records that publish must follow the guard") stays valid.
+const NUDGE_SECOND_PERSON_PATTERN = /\b(?:you|your|yours|yourself)\b/i
+const NUDGE_IMPERATIVE_OPENING_PATTERN = /^[\s"'`\u00ab\u2018\u2019\u201c\u201d]*(?:do\s+not|don['\u2019]t|never|always|make\s+sure|ensure|verify|check|run|use|read|stop|avoid|remember|keep|prefer|skip|consider)\b/i
+/** 세요/십시오 (and the 십시요 misspelling), 하라/해라, 합니다 and a trailing ...지 마(라); the plain form a note is
+ * written in (...한다 / ...이다) is untouched. */
+const NUDGE_KOREAN_REQUEST_ENDING_PATTERN = /(?:세요|십시오|십시요|하라|해라|합니다|지\s*마(?:라)?)\s*[.!]?$/
+const NUDGE_KOREAN_PROHIBITION_PATTERN = /하지\s*마/
 
 /** Pending payloads older than this are junk from an abandoned session. */
 const PENDING_TTL_MS = 24 * 60 * 60_000
@@ -36,28 +51,12 @@ export interface RecallNudge {
 export interface PendingNudgesFile {
   readonly version: typeof PENDING_NUDGES_VERSION
   readonly sessionId: string
-  /**
-   * The session's compaction epoch when the judge's verdict was written. A payload is only valid
-   * while the live epoch still equals it: any bump means the judged transcript was replaced.
-   * Absent only in pre-release payloads, which take() therefore treats as stale.
-   */
-  readonly compactionEpoch?: number
   readonly writtenAt: string
   readonly nudges: readonly RecallNudge[]
 }
 
-export interface PendingNudgesWriteOptions {
-  /** The session's compaction epoch as captured by the launch that produced these nudges. */
-  readonly epoch: number
-}
-
-export interface PendingNudgesTakeOptions {
-  /** The session's live compaction epoch, read by the consumer at injection time. */
-  readonly currentEpoch: number
-}
-
 export interface ValidateNudgesOptions {
-  /** Paths the parent offered the judge this turn; anything else is fabricated. */
+  /** Paths the parent offered the sidecar (or its read-only memory search returned); anything else is fabricated. */
   readonly candidates: ReadonlySet<string>
   /** Paths already surfaced in this session; they never repeat. */
   readonly surfaced: ReadonlySet<string>
@@ -65,29 +64,56 @@ export interface ValidateNudgesOptions {
   readonly maxItems: number
 }
 
+/** Why a hint cannot be admitted, in the order the rules are checked. */
+export type InvalidHintReason = "empty" | "too-long" | "multiline" | "decision-commentary" | "addresses-agent"
+
+/**
+ * The full nudge contract, used at ADMISSION - the sidecar's nudge tool (which names the reason
+ * back to the judge) and the parent's `validateNudges` over freshly judged output. `undefined`
+ * means the hint may be delivered.
+ */
+export function describeInvalidHint(hint: string): InvalidHintReason | undefined {
+  return describeHintShape(hint) ?? (addressesAgent(hint) ? "addresses-agent" : undefined)
+}
+
+/**
+ * Hint budget predicate: one factual sentence, non-empty, at most `NUDGE_HINT_MAX_CHARS`, on a
+ * single line, without nudge-decision commentary.
+ *
+ * This is the REPLAY half of the contract, and deliberately not `describeInvalidHint`: pending
+ * payloads and stored `omo-kibitzer:nudged` entries were admitted under whatever contract held when
+ * they were accepted, so reading them back (`parseNudge` below, omo-senpi's notice renderers) must
+ * not retroactively drop a nudge that was phrased as an instruction. Admission is where the
+ * nudge-only rule bites.
+ */
+export function isValidHint(hint: string): boolean {
+  return describeHintShape(hint) === undefined
+}
+
+function describeHintShape(hint: string): Exclude<InvalidHintReason, "addresses-agent"> | undefined {
+  if (hint.length === 0) return "empty"
+  if (hint.length > NUDGE_HINT_MAX_CHARS) return "too-long"
+  if (/[\r\n]/.test(hint)) return "multiline"
+  if (NUDGE_DECISION_LANGUAGE_PATTERN.test(hint)) return "decision-commentary"
+  return undefined
+}
+
+function addressesAgent(hint: string): boolean {
+  const trimmed = hint.trim()
+  return NUDGE_SECOND_PERSON_PATTERN.test(trimmed)
+    || NUDGE_IMPERATIVE_OPENING_PATTERN.test(trimmed)
+    || NUDGE_KOREAN_REQUEST_ENDING_PATTERN.test(trimmed)
+    || NUDGE_KOREAN_PROHIBITION_PATTERN.test(trimmed)
+}
+
 /**
  * Parse the nudge NDJSON file fail-closed per line: an unparsable or
  * non-conforming line is dropped and the remaining lines still count.
  */
-export function parseNudgeLines(raw: string): RecallNudge[] {
-  const nudges: RecallNudge[] = []
-  for (const line of raw.split(/\r?\n/)) {
-    if (line.trim().length === 0) continue
-    let value: unknown
-    try {
-      value = JSON.parse(line)
-    } catch {
-      continue
-    }
-    const nudge = parseNudge(value)
-    if (nudge !== undefined) nudges.push(nudge)
-  }
-  return nudges
-}
 
 /**
- * Parent-side validation of judge output. Order is preserved so the cap keeps
- * the judge's own priority.
+ * Parent-side validation of sidecar output, against the full admission contract
+ * (`describeInvalidHint`). Order is preserved so the cap keeps the sidecar's own priority.
  */
 export function validateNudges(
   nudges: readonly RecallNudge[],
@@ -103,7 +129,7 @@ export function validateNudges(
     if (seen.has(nudge.path)) continue
     if (!options.candidates.has(nudge.path)) continue
     if (options.surfaced.has(nudge.path)) continue
-    if (!isValidHint(nudge.hint)) continue
+    if (describeInvalidHint(nudge.hint) !== undefined) continue
     seen.add(nudge.path)
     accepted.push({ path: nudge.path, hint: nudge.hint })
   }
@@ -122,11 +148,7 @@ export class PendingNudges {
     this.dir = dir
   }
 
-  async write(
-    sessionId: string,
-    nudges: readonly RecallNudge[],
-    options: PendingNudgesWriteOptions,
-  ): Promise<void> {
+  async write(sessionId: string, nudges: readonly RecallNudge[]): Promise<void> {
     if (nudges.length === 0) return
 
     const target = this.sessionFilePath(sessionId)
@@ -135,7 +157,6 @@ export class PendingNudges {
     const payload: PendingNudgesFile = {
       version: PENDING_NUDGES_VERSION,
       sessionId,
-      compactionEpoch: options.epoch,
       writtenAt: new Date().toISOString(),
       nudges: nudges.map((nudge) => ({ path: nudge.path, hint: nudge.hint })),
     }
@@ -148,16 +169,8 @@ export class PendingNudges {
    * Consume the session's pending nudges. The embedded sessionId must match:
    * a mismatch means a sanitized-filename collision, so the file is left for its
    * real owner. An expired payload is dropped and deleted.
-   *
-   * Staleness is decided HERE, not by the writer. A compaction accepted at any
-   * point after the judge started - including inside the writer's own
-   * mkdir/prune/write/rename window - bumps the session's epoch, so a payload
-   * stamped with anything but the live epoch judged a transcript that no longer
-   * exists and is deleted unread. That makes correctness independent of who wins
-   * the write-versus-compaction race. An epoch-less payload can only come from a
-   * pre-release write and is treated the same way.
    */
-  async take(sessionId: string, options: PendingNudgesTakeOptions): Promise<RecallNudge[]> {
+  async take(sessionId: string): Promise<RecallNudge[]> {
     const target = this.sessionFilePath(sessionId)
     let raw: string
     try {
@@ -174,14 +187,14 @@ export class PendingNudges {
     if (payload.sessionId !== sessionId) return []
 
     await removeQuietly(target)
-    if (payload.compactionEpoch !== options.currentEpoch) return []
     const writtenAt = Date.parse(payload.writtenAt)
     if (!Number.isFinite(writtenAt) || Date.now() - writtenAt > PENDING_TTL_MS) return []
     return payload.nudges.map((nudge) => ({ path: nudge.path, hint: nudge.hint }))
   }
 
   /**
-   * Targeted retraction of one session's payload, for a writer dropping its own just-written file.
+   * Targeted retraction of one session's payload: delivery retracts its own file once every held
+   * nudge is delivered, and a compaction retracts the session's file at the moment it is accepted.
    * The embedded sessionId is verified exactly as take() verifies it: sanitizeSessionFilename maps
    * distinct session ids onto one filename, so an unguarded unlink would let one session retract
    * another session's nudges. A mismatch leaves the file for its real owner. Best-effort otherwise,
@@ -229,17 +242,13 @@ export class PendingNudges {
   }
 }
 
-function isValidHint(hint: string): boolean {
-  if (hint.length === 0 || hint.length > NUDGE_HINT_MAX_CHARS) return false
-  return !/[\r\n]/.test(hint)
-}
-
 function parseNudge(value: unknown): RecallNudge | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined
   const record = value as Record<string, unknown>
   const { path, hint } = record
   if (typeof path !== "string" || path.length === 0) return undefined
   if (typeof hint !== "string" || hint.length === 0) return undefined
+  if (!isValidHint(hint) || containsSecretLikeMaterial(hint)) return undefined
   return { path, hint }
 }
 
@@ -254,7 +263,6 @@ function parsePendingFile(raw: string): PendingNudgesFile | undefined {
   const record = value as Record<string, unknown>
   if (record.version !== PENDING_NUDGES_VERSION) return undefined
   if (typeof record.sessionId !== "string" || record.sessionId.length === 0) return undefined
-  if (record.compactionEpoch !== undefined && typeof record.compactionEpoch !== "number") return undefined
   if (typeof record.writtenAt !== "string") return undefined
   if (!Array.isArray(record.nudges)) return undefined
   const nudges: RecallNudge[] = []
@@ -266,7 +274,6 @@ function parsePendingFile(raw: string): PendingNudgesFile | undefined {
   return {
     version: PENDING_NUDGES_VERSION,
     sessionId: record.sessionId,
-    ...(record.compactionEpoch === undefined ? {} : { compactionEpoch: record.compactionEpoch }),
     writtenAt: record.writtenAt,
     nudges,
   }

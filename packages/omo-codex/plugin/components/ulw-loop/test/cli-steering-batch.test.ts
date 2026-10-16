@@ -9,6 +9,7 @@ import { parseSteeringProposals } from "../src/cli-steering.js";
 import { ulwLoopGoalsPath } from "../src/paths.js";
 import { writePlan } from "../src/plan-io.js";
 import type { UlwLoopPlan } from "../src/types.js";
+import { CLI_TEST_SCOPE } from "./fixtures/cli-session.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
 
@@ -45,9 +46,11 @@ describe("parseSteeringProposals", () => {
 	it("#given kind and proposals-json #when steering through CLI #then rejects conflict without mutation", async () => {
 		const repo = await mkdtemp(join(tmpdir(), "ug-cli-steer-batch-conflict-"));
 		const out: string[] = [];
+		const originalOmoSessionId = process.env["OMO_ULW_LOOP_SESSION_ID"];
 		try {
-			await writePlan(repo, plan());
-			const before = await readFile(ulwLoopGoalsPath(repo), "utf8");
+			process.env["OMO_ULW_LOOP_SESSION_ID"] = CLI_TEST_SCOPE.sessionId;
+			await writePlan(repo, plan(), CLI_TEST_SCOPE);
+			const before = await readFile(ulwLoopGoalsPath(repo, CLI_TEST_SCOPE), "utf8");
 			vi.spyOn(process, "cwd").mockReturnValue(repo);
 			vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 				out.push(chunk.toString());
@@ -58,8 +61,10 @@ describe("parseSteeringProposals", () => {
 			expect(await ulwLoopCommand(["steer", "--kind", "annotate_ledger", "--evidence", "flag", "--rationale", "flag", "--proposals-json", '[{"kind":"annotate_ledger","evidence":"batch","rationale":"batch"}]', "--json"])).toBe(1);
 
 			expect(JSON.parse(out.join(""))).toHaveProperty("error.code", "ULW_LOOP_STEERING_BATCH_CONFLICT");
-			expect(await readFile(ulwLoopGoalsPath(repo), "utf8")).toBe(before);
+			expect(await readFile(ulwLoopGoalsPath(repo, CLI_TEST_SCOPE), "utf8")).toBe(before);
 		} finally {
+			if (originalOmoSessionId === undefined) delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+			else process.env["OMO_ULW_LOOP_SESSION_ID"] = originalOmoSessionId;
 			vi.restoreAllMocks();
 			await rm(repo, { recursive: true, force: true });
 		}

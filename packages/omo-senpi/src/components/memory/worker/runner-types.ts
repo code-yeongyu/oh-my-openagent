@@ -1,6 +1,8 @@
 import type {
   MemoryIdentity,
+  ReflectionFailureSignal,
   ReflectionOutcome,
+  ReflectionParkTransition,
   ReflectionTranscriptState,
   ReservedRun,
 } from "@oh-my-opencode/memory-core"
@@ -17,13 +19,17 @@ export interface ReflectionReservationLockOptions {
   readonly waitTimeoutMs?: number
 }
 
+export interface ReflectionReservationCompleteOptions extends ReflectionReservationLockOptions {
+  readonly failure?: ReflectionFailureSignal
+}
+
 export interface ReflectionReservationPort {
   readState(options?: ReflectionReservationLockOptions): Promise<{ readonly active?: ReservedRun }>
   complete(
     runId: string,
     outcome: ReflectionOutcome,
-    options?: ReflectionReservationLockOptions,
-  ): Promise<{ readonly outcome: ReflectionOutcome; readonly launch?: ReservedRun }>
+    options?: ReflectionReservationCompleteOptions,
+  ): Promise<{ readonly outcome: ReflectionOutcome; readonly launch?: ReservedRun; readonly park?: ReflectionParkTransition }>
 }
 
 export interface ReflectionRunResult {
@@ -33,6 +39,7 @@ export interface ReflectionRunResult {
   readonly detail?: string
   readonly completion: ReflectionCompletionRecord
   readonly launch?: ReservedRun
+  readonly park?: ReflectionParkTransition
 }
 
 export interface ReflectionRunner {

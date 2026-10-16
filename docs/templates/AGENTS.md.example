@@ -16,9 +16,9 @@ or changing files.
 
 - Use `explore` for fast codebase search, policy lookup, and path discovery.
 - Use `librarian` for docs, external references, and examples from other repos.
-- Use `oracle` for architecture review, risk checks, and debugging analysis.
-- Use `sisyphus` or `sisyphus-junior` for execution work that needs file edits.
-- Use `prometheus` for plans that need user approval before implementation.
+- Use `task(category: "architect")` for architecture review, risk checks, and debugging analysis.
+- Use a category task for execution work that needs file edits.
+- Use `/ulw-plan` for plans that need user approval before implementation.
 
 ## Calling Conventions
 
@@ -47,5 +47,5 @@ or changing files.
 ## Project Scratch Space
 
 Use `./.omo/session-work/` for temporary clones, downloaded references, logs, and
-agent scratch files. Keep generated evidence under `./.omo/evidence/` when the
-project wants durable QA records.
+agent scratch files. Keep generated evidence under `./.omo/evidence/` (gitignored)
+and summarize it in the PR rather than committing it.

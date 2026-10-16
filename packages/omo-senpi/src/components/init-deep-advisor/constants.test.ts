@@ -6,20 +6,19 @@ import {
   CANDIDATE_MAX_DEPTH,
   CANDIDATE_MIN_FILES,
   CANDIDATE_MIN_LOC,
-  CHURN_LOC_RATIO_THRESHOLD,
   COMMIT_DISTANCE_THRESHOLD,
   COOLDOWN_DAYS,
-  DAYS_SINCE_THRESHOLD,
   EXCLUDED_DIR_NAMES,
-  MISSING_COVERAGE_RATIO_THRESHOLD,
   SOURCE_EXTENSIONS,
   TOUCHED_RATIO_THRESHOLD,
 } from "./constants"
 
+// These defaults have no independent owner test: the behavioural suites use values on either side
+// (depth 4, 600 LOC, 40 commits, 0.20 vs 0.05) or derive their expectation from the constant. The 0.50
+// coverage ratio, the 0.25 churn ratio and the 90-day age are owned by coverage.test.ts and drift.test.ts.
 describe("frozen advisor constants", () => {
   test("#given the frozen plan values #when reading coverage constants #then they match exactly", () => {
     // given / when / then
-    expect(MISSING_COVERAGE_RATIO_THRESHOLD).toBe(0.5)
     expect(CANDIDATE_MIN_FILES).toBe(8)
     expect(CANDIDATE_MIN_LOC).toBe(500)
     expect(CANDIDATE_MAX_DEPTH).toBe(3)
@@ -29,8 +28,6 @@ describe("frozen advisor constants", () => {
     // given / when / then
     expect(COMMIT_DISTANCE_THRESHOLD).toBe(30)
     expect(TOUCHED_RATIO_THRESHOLD).toBe(0.15)
-    expect(CHURN_LOC_RATIO_THRESHOLD).toBe(0.25)
-    expect(DAYS_SINCE_THRESHOLD).toBe(90)
     expect(COOLDOWN_DAYS).toBe(7)
   })
 

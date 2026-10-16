@@ -195,8 +195,8 @@ describe("#given git_env_prefix with commit footer", () => {
 		})
 	})
 
-	describe("#when both env prefix and co-author are enabled", () => {
-		it("#then the injected commit example carries fixture and co-author trailer together", () => {
+	describe("#when the deprecated co-author flag is enabled alongside the footer", () => {
+		it("#then the injected commit example carries the fixture but never a co-author trailer", () => {
 			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
 				commit_footer: FOOTER_FIXTURE,
 				include_co_authored_by: true,
@@ -206,12 +206,22 @@ describe("#given git_env_prefix with commit footer", () => {
 			const examples = bashCommitExampleLines(result)
 			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
 
-			// one example carries both the dynamic fixture and the git trailer
-			expect(
-				injected.some(
-					(line) => line.includes("Co-authored-by: ") && line.startsWith("GIT_MASTER=1 git commit"),
-			),
-			).toBe(true)
+			// the fixture still reaches a prefixed commit example
+			expect(injected.some((line) => line.startsWith("GIT_MASTER=1 git commit"))).toBe(true)
+			// no GitHub-resolvable identity is ever emitted
+			expect(result).not.toMatch(/Co-authored-by:/i)
+			expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
+		})
+	})
+
+	describe("#when no config is provided", () => {
+		it("#then no attribution section is injected at all", () => {
+			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE))
+
+			expect(result).not.toContain("Commit Footer")
+			expect(result).not.toContain("Ultraworked with")
+			expect(result).not.toMatch(/Co-authored-by:/i)
+			expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
 		})
 	})
 })

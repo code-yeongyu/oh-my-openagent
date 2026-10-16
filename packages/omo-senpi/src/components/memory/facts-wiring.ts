@@ -1,5 +1,5 @@
 // Facts queue wiring: publishes a durable queue entry on successful settle and
-// re-lists leftover entries at session_start so a crashed extractor run is relaunchable.
+// reconciles old artifacts at session_start without launching leftover work.
 // Journal wiring is NOT extended here: it keeps its existing AppendResult contract.
 
 import { join } from "node:path"
@@ -13,12 +13,14 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { ComponentLogger } from "../../extension/types"
+import type { FactsModelSelection } from "./facts-runner-types"
 
 const DISABLED: FactsEnqueueResult = { enqueued: false, reason: "no-new-entries" }
 
 export interface FactsExtractorPort {
-  launchPending(signal?: AbortSignal): Promise<unknown>
+  launchPending(signal?: AbortSignal, selection?: FactsModelSelection): Promise<unknown>
   reconcilePending(signal?: AbortSignal): Promise<unknown>
+  cancelActive?(): Promise<void>
 }
 
 export interface MemoryFactsWiringOptions {
@@ -36,14 +38,15 @@ export interface MemoryFactsWiringOptions {
 export interface MemoryFactsWiring {
   /** Enqueue the un-enqueued delta for a settled conversation. Never throws. */
   enqueueSettled(conversationId: string, signal?: AbortSignal): Promise<FactsEnqueueResult>
-  /** Enqueue, count the settle gate, and fire one all-pending launch at the threshold. */
-  onSettled(conversationId: string): Promise<FactsEnqueueResult>
+  /** Enqueue the settled conversation delta. */
+  onSettled(conversationId: string, selection?: FactsModelSelection): Promise<FactsEnqueueResult>
   /** Leftover queue entries a crashed run left behind, ready for relaunch. */
   reconcilePending(): Promise<FactsQueueEntry[]>
-  /** Fire facts-run reconciliation without blocking session_start on the child. */
-  reconcileExtractor(): void
-  /** Shutdown drain step (c): launch pending work only when the settle threshold is already met. */
-  launchIfThresholdMet(signal?: AbortSignal): Promise<boolean>
+  /** Recover old artifacts and reset first-turn admission for a bound session, without a child. */
+  reconcileExtractor(conversationId?: string): void
+  /** Explicit user action (unpark) launches pending work immediately. */
+  launchExtractor(): void
+  cancelActive(): Promise<void>
   /** Terminal SUCCESS only: drops the batch and advances the consumed watermark. */
   markConsumed(entries: readonly FactsQueueEntry[]): Promise<void>
 }
@@ -56,11 +59,12 @@ export function createMemoryFactsWiring(options: MemoryFactsWiringOptions): Memo
     ...(options.now === undefined ? {} : { now: options.now }),
   })
   let settles = 0
+  const settledSessions = new Set<string>()
 
-  const fire = (operation: "launch" | "reconcile", signal?: AbortSignal): void => {
+  const fire = (operation: "launch" | "reconcile", signal?: AbortSignal, selection?: FactsModelSelection): void => {
     if (signal?.aborted === true) return
     const promise = operation === "launch"
-      ? options.extractor?.launchPending(signal)
+      ? options.extractor?.launchPending(signal, selection)
       : options.extractor?.reconcilePending(signal)
     void promise?.catch((error) => {
       options.logger?.warn(`facts extractor ${operation} failed`, { error: String(error) })
@@ -87,13 +91,15 @@ export function createMemoryFactsWiring(options: MemoryFactsWiringOptions): Memo
       }
     },
 
-    async onSettled(conversationId: string): Promise<FactsEnqueueResult> {
+    async onSettled(conversationId: string, selection?: FactsModelSelection): Promise<FactsEnqueueResult> {
+      const pending = settledSessions.has(conversationId) ? [] : await wiring.reconcilePending()
       const result = await wiring.enqueueSettled(conversationId)
       if (!options.factsEnabled()) return result
+      settledSessions.add(conversationId)
       settles += 1
-      if (settles >= Math.max(1, options.debounceSettles?.() ?? 4)) {
+      if (pending.length > 0 || settles >= Math.max(1, options.debounceSettles?.() ?? 4)) {
         settles = 0
-        fire("launch")
+        fire("launch", undefined, selection)
       }
       return result
     },
@@ -108,22 +114,17 @@ export function createMemoryFactsWiring(options: MemoryFactsWiringOptions): Memo
       }
     },
 
-    reconcileExtractor(): void {
+    reconcileExtractor(conversationId?: string): void {
+      if (conversationId !== undefined) settledSessions.delete(conversationId)
       if (options.factsEnabled()) fire("reconcile")
     },
 
-    async launchIfThresholdMet(signal?: AbortSignal): Promise<boolean> {
-      if (isAborted(signal) || !options.factsEnabled()) return false
-      if (settles < Math.max(1, options.debounceSettles?.() ?? 4)) return false
-      if (isAborted(signal) || options.extractor === undefined) return false
-      settles = 0
-      try {
-        if (isAborted(signal)) return false
-        await options.extractor.launchPending(signal)
-      } catch (error) {
-        options.logger?.warn("facts extractor launch failed", { error: String(error) })
-      }
-      return true
+    launchExtractor(): void {
+      if (options.factsEnabled()) fire("launch")
+    },
+
+    async cancelActive(): Promise<void> {
+      await options.extractor?.cancelActive?.()
     },
 
     async markConsumed(entries: readonly FactsQueueEntry[]): Promise<void> {

@@ -19,7 +19,7 @@ export function transformToolName(toolName: string): string {
     return SPECIAL_TOOL_MAPPINGS[lower]
   }
 
-  if (trimmed.includes("-") || trimmed.includes("_")) {
+  if (/[-_\s]/.test(trimmed)) {
     return toPascalCase(trimmed)
   }
 

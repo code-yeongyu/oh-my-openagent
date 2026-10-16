@@ -2,7 +2,7 @@ import type { SkillInvocationState } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 
-// Session-scoped state feeding the senpi-task invocation gate for plan-gated agents (metis/momus).
+// Session-scoped state feeding the senpi-task invocation gate for plan-gated agents (plan-consultant/plan-reviewer).
 // Three observation channels, deliberately separated because they carry different trust levels:
 // - invoked: a `read` tool result on skills/<name>/SKILL.md or an expanded `<skill name="...">`
 //   block; feeds only the forbids check (ulw-execute), never the requires check.
@@ -11,7 +11,7 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 //   cannot arm the gate. Two sub-channels, both user-input only: the explicit skill token
 //   (`ulw-plan`/`ulw plan`, or an expanded skill block naming it), and an own-words request for a
 //   plan before coding - the clause the ulw-plan SKILL.md contract promises in both editions and
-//   which previously had no implementation, denying metis/momus to users who simply asked for a
+//   which previously had no implementation, denying plan-consultant/plan-reviewer to users who simply asked for a
 //   plan. Input whose `source` is "extension" is programmatically injected by an extension and is
 //   therefore agent-manufacturable, so it never feeds this channel.
 // - plan artifact: a successful read/write/edit on a .omo/plans/*.md path at ANY root (worktrees

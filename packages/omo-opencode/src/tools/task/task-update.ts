@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin";
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool";
 import { join } from "path";
 import type { OhMyOpenCodeConfig } from "../../config/schema";
+import type { TaskObject, TaskUpdateInput } from "./types";
 import { TaskObjectSchema, TaskUpdateInputSchema } from "./types";
 import {
   getTaskDir,
@@ -68,6 +69,52 @@ Properly managed dependencies enable maximum parallel execution.`,
   });
 }
 
+function applyTaskUpdate(taskPath: string, input: TaskUpdateInput): TaskObject | null {
+  const task = readJsonSafe(taskPath, TaskObjectSchema);
+
+  if (!task) {
+    return null;
+  }
+
+  if (input.subject !== undefined) {
+    task.subject = input.subject;
+  }
+  if (input.description !== undefined) {
+    task.description = input.description;
+  }
+  if (input.status !== undefined) {
+    task.status = input.status;
+  }
+  if (input.activeForm !== undefined) {
+    task.activeForm = input.activeForm;
+  }
+  if (input.owner !== undefined) {
+    task.owner = input.owner;
+  }
+
+  if (input.addBlocks) {
+    task.blocks = [...new Set([...task.blocks, ...input.addBlocks])];
+  }
+
+  if (input.addBlockedBy) {
+    task.blockedBy = [...new Set([...task.blockedBy, ...input.addBlockedBy])];
+  }
+
+  if (input.metadata !== undefined) {
+    task.metadata = { ...task.metadata, ...input.metadata };
+    Object.keys(task.metadata).forEach((key) => {
+      if (task.metadata?.[key] === null) {
+        delete task.metadata[key];
+      }
+    });
+  }
+
+  const updatedTask = TaskObjectSchema.parse(task);
+  writeJsonAtomic(taskPath, updatedTask);
+
+  return updatedTask;
+}
+
 async function handleUpdate(
   args: Record<string, unknown>,
   config: Partial<OhMyOpenCodeConfig>,
@@ -82,64 +129,28 @@ async function handleUpdate(
     }
 
     const taskDir = getTaskDir(config);
-    const lock = acquireLock(taskDir);
+    const lock = await acquireLock(taskDir);
 
     if (!lock.acquired) {
-      return JSON.stringify({ error: "task_lock_unavailable" });
+      return JSON.stringify({ error: "task_lock_unavailable", retryable: true });
     }
 
+    let updatedTask: TaskObject | null = null;
     try {
-      const taskPath = join(taskDir, `${taskId}.json`);
-      const task = readJsonSafe(taskPath, TaskObjectSchema);
-
-      if (!task) {
-        return JSON.stringify({ error: "task_not_found" });
-      }
-
-      if (validatedArgs.subject !== undefined) {
-        task.subject = validatedArgs.subject;
-      }
-      if (validatedArgs.description !== undefined) {
-        task.description = validatedArgs.description;
-      }
-      if (validatedArgs.status !== undefined) {
-        task.status = validatedArgs.status;
-      }
-      if (validatedArgs.activeForm !== undefined) {
-        task.activeForm = validatedArgs.activeForm;
-      }
-      if (validatedArgs.owner !== undefined) {
-        task.owner = validatedArgs.owner;
-      }
-
-      const addBlocks = args.addBlocks as string[] | undefined;
-      if (addBlocks) {
-        task.blocks = [...new Set([...task.blocks, ...addBlocks])];
-      }
-
-      const addBlockedBy = args.addBlockedBy as string[] | undefined;
-      if (addBlockedBy) {
-        task.blockedBy = [...new Set([...task.blockedBy, ...addBlockedBy])];
-      }
-
-      if (validatedArgs.metadata !== undefined) {
-        task.metadata = { ...task.metadata, ...validatedArgs.metadata };
-        Object.keys(task.metadata).forEach((key) => {
-          if (task.metadata?.[key] === null) {
-            delete task.metadata[key];
-          }
-        });
-      }
-
-      const validatedTask = TaskObjectSchema.parse(task);
-      writeJsonAtomic(taskPath, validatedTask);
-
-      await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
-
-      return JSON.stringify({ task: validatedTask });
+      updatedTask = applyTaskUpdate(join(taskDir, `${taskId}.json`), validatedArgs);
     } finally {
       lock.release();
     }
+
+    if (!updatedTask) {
+      return JSON.stringify({ error: "task_not_found" });
+    }
+
+    // Todo sync talks to the OpenCode session API and needs no mutual exclusion, so it runs
+    // outside the critical section to keep the hold window at one read-modify-write.
+    await syncTaskTodoUpdate(ctx, updatedTask, context.sessionID);
+
+    return JSON.stringify({ task: updatedTask });
   } catch (error) {
     if (error instanceof Error && error.message.includes("Required")) {
       return JSON.stringify({

@@ -31,9 +31,8 @@ export const AST_GREP_SERVER_NAME = "ast_grep" as const;
 export const AST_GREP_SERVER_VERSION = "0.1.0" as const;
 const DEFAULT_PROTOCOL_VERSION = "2024-11-05";
 
-// 10 minutes: matches the mcp-stdio-core default already shipped for the
-// senpi-hosted memory MCP (omo-senpi/src/mcp/memory-server.ts), and the senpi
-// host auto-reconnects a degraded stdio server, so an idle exit costs one
+// 10 minutes: matches the mcp-stdio-core default, and the senpi host
+// auto-reconnects a degraded stdio server, so an idle exit costs one
 // backoff-delayed respawn rather than a broken session.
 export const DEFAULT_AST_GREP_IDLE_TIMEOUT_MS = 10 * 60_000;
 const IDLE_TIMEOUT_ENV_KEY = "OMO_AST_GREP_IDLE_TIMEOUT_MS";

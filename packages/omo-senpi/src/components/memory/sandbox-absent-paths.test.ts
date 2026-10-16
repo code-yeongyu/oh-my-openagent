@@ -18,6 +18,17 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
+/**
+ * Helper to handle potentially async transforms. In tests with custom sync probes,
+ * the result is sync; unwrap it if needed for type safety.
+ */
+function unwrapTransformResult(result: ReflectionSpawnArgs | Promise<ReflectionSpawnArgs>): ReflectionSpawnArgs {
+  if (result instanceof Promise) {
+    throw new Error("Transform returned a Promise in a sync context - did you forget to await?")
+  }
+  return result
+}
+
 function fixture(): { readonly root: string; readonly worktree: string; readonly gitCommonDir: string; readonly payload: string } {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-sandbox-absent-")))
   roots.push(root)
@@ -72,7 +83,7 @@ describe("reflection sandbox with not-yet-created paths", () => {
       env: { PATH: process.env.PATH },
       ...darwin,
     })
-    const profile = transform(spawnArgs(setup.worktree)).args[1]
+    const profile = unwrapTransformResult(transform(spawnArgs(setup.worktree))).args[1]
 
     // then
     expect(transform.wasSandboxed).toBe(true)
@@ -100,10 +111,10 @@ describe("reflection sandbox with not-yet-created paths", () => {
       env: { PATH: process.env.PATH },
       ...darwin,
     })
-    const profile = transform(spawnArgs(setup.worktree)).args[1]
+    const profile = unwrapTransformResult(transform(spawnArgs(setup.worktree))).args[1]
 
     // then
-    expect(profile).toContain(`(allow file-read* (literal ${JSON.stringify(absentPayload)}))`)
+    expect(profile).toContain(`(allow file-read* (literal ${JSON.stringify(absentPayload)})`)
     expect(profile).toContain(`(deny file-read* (subpath ${JSON.stringify(absentForeignRoot)}))`)
     // A foreign-agent deny that collapsed to an existing ancestor would silently stop protecting
     // the sibling agent's memory, so assert the ancestor is never the denied subpath.
@@ -126,8 +137,9 @@ describe("reflection sandbox with not-yet-created paths", () => {
       env: { PATH: process.env.PATH },
       platform: "linux",
       which: () => "/usr/bin/bwrap",
+      probe: () => ({ usable: true }),
     })
-    const args = transform(spawnArgs(setup.worktree)).args
+    const args = unwrapTransformResult(transform(spawnArgs(setup.worktree))).args
 
     // then
     expect(transform.wasSandboxed).toBe(true)

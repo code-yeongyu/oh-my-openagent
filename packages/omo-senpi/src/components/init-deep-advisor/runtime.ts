@@ -1,11 +1,9 @@
-import { execFileSync } from "node:child_process"
-
 import type { ExtensionContext } from "@code-yeongyu/senpi"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { computeEligibility } from "./eligibility"
-import { gitHead } from "./git-helpers"
+import { gitHead, run } from "./git-helpers"
 import { buildProposedData } from "./proposed-data"
 import type { EligibilityResult, SuggestedMode } from "./proposed-data"
 import {
@@ -94,11 +92,7 @@ function handleChoice(
 
 function suggestedMode(root: string): SuggestedMode {
   try {
-    execFileSync("git", ["ls-files", "--error-unmatch", "AGENTS.md"], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    })
+    run(root, ["ls-files", "--error-unmatch", "AGENTS.md"])
     return "committed"
   } catch {
     return "local"

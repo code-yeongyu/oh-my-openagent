@@ -51,15 +51,23 @@ export function createMutationNotifyingStore(
       if (result.applied) edge.settle(result.record)
       return result
     },
-    tombstoneIfExpired: (taskId, shouldRetain) => {
-      const result = backing.tombstoneIfExpired(taskId, shouldRetain)
+    tombstoneIfExpired: (taskId, shouldRetain, owner) => {
+      const result = backing.tombstoneIfExpired(taskId, shouldRetain, owner)
       if (result.kind === "tombstoned") onMutation()
       return result
     },
-    completeExpunge: (taskId) => {
-      backing.completeExpunge(taskId)
+    completeExpunge: (taskId, owner) => {
+      const deleted = backing.completeExpunge(taskId, owner)
       onMutation()
+      return deleted
     },
     listExpunging: () => backing.listExpunging(),
+    loadExpunging: (taskId) => backing.loadExpunging(taskId),
+    restoreExpunging: (taskId, owner) => {
+      backing.restoreExpunging(taskId, owner)
+      onMutation()
+    },
+    readExpungeOwner: (taskId) => backing.readExpungeOwner(taskId),
+    takeOverExpunging: (taskId, from, to) => backing.takeOverExpunging(taskId, from, to),
   }
 }

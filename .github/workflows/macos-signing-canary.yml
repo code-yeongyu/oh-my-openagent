@@ -1,0 +1,88 @@
+name: macos-signing-canary
+run-name: "macOS signing canary (${{ inputs.release_tag }})"
+
+# Proves the Developer ID and notarization secrets without cutting a release: it
+# re-signs an existing release's Darwin assets with the release signing script and
+# uploads the notarized copies as a short-lived workflow artifact. Nothing is published.
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release whose Darwin assets are re-signed (e.g. v5.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: macos-15
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download Darwin release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p .omo/canary
+          gh release download "$RELEASE_TAG" --dir .omo/canary \
+            --pattern omo-darwin-arm64 --pattern omo-darwin-x64 \
+            --pattern senpi-desktop-engine-darwin-arm64 --pattern senpi-desktop-engine-darwin-x64
+          chmod +x .omo/canary/*
+
+      - name: Sign and notarize with the release script
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: "true"
+        run: |
+          set -euo pipefail
+          bash .github/scripts/macos-sign-and-notarize.sh \
+            --identifier ai.sisyphuslabs.omo \
+            --entitlements .github/scripts/omo-bun-executable.entitlements \
+            .omo/canary/omo-darwin-arm64 .omo/canary/omo-darwin-x64
+          bash .github/scripts/macos-sign-and-notarize.sh \
+            --identifier ai.sisyphuslabs.senpi-desktop-engine \
+            .omo/canary/senpi-desktop-engine-darwin-arm64 .omo/canary/senpi-desktop-engine-darwin-x64
+
+      - name: Run the signed binaries
+        run: |
+          set -euo pipefail
+          HOME="$(mktemp -d)"
+          export HOME
+          .omo/canary/omo-darwin-arm64 --version
+          .omo/canary/senpi-desktop-engine-darwin-arm64 --selftest
+          for file in .omo/canary/*; do
+            codesign -dv --verbose=2 "$file" 2>&1 | grep -E '^(Identifier|CodeDirectory|Authority|TeamIdentifier|Timestamp)='
+          done
+
+      - name: Upload notarized canary binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-signing-canary
+          path: .omo/canary/*
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_SUMMARY_TITLE: macOS signing canary (${{ inputs.release_tag }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Re-signs the release's Darwin assets with the Developer ID certificate and notarizes them.
+            - Requires Gatekeeper to report source=Notarized Developer ID for every file.
+            - Uploads the notarized copies as a 3-day artifact; nothing is published.
+          JOB_SUMMARY_NEXT: Check the signing step first (missing secrets, notarytool status and log), then the run step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

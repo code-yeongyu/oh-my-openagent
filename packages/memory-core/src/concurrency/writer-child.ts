@@ -98,7 +98,17 @@ async function locked<T>(operation: () => Promise<T>): Promise<T> {
 
     if (mode === "kill-holder" && acquisition === 2) {
       process.stdout.write("kill-ready\n")
-      await new Promise<never>(() => {})
+      // Hold the lock until the parent SIGKILLs this process. The parent owns our stdin pipe (it
+      // spawns us with a piped stdin, already resumed above), so if the parent dies first the
+      // kernel closes it and we exit here like a crashed owner - deliberately skipping the
+      // release in `finally`. Never park on a bare unsettled promise: Bun does not exit on an
+      // unsettled top-level await, it busy-polls a handle-less loop at one full core (#7335).
+      await new Promise<void>((resolve) => {
+        process.stdin.once("end", resolve)
+        process.stdin.once("close", resolve)
+        process.stdin.once("error", resolve)
+      })
+      process.exit(0)
     }
     return await operation()
   } finally {

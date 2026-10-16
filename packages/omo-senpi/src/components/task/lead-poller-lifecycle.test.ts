@@ -47,7 +47,7 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
     coordinator: options.withCoordinator === false
       ? undefined
       : {
-          enqueue: (injection) => injected.push(injection),
+          enqueue: (injection) => { injected.push(injection); return true },
           scheduleFlush: () => { scheduled += 1 },
           flushSoon: () => { soon += 1 },
         },
@@ -313,6 +313,31 @@ describe("lead poller lifecycle", () => {
     // then
     expect(h.intervalDisposals).toBe(1)
     expect(h.created[0]?.poller.shutdowns).toBe(1)
+  })
+
+  test("#given no owned teams #when the sync runs #then the poll stands down until kick re-arms it", async () => {
+    // given
+    const h = harness()
+    h.setTeams([])
+
+    // when
+    await h.lifecycle.tick()
+
+    // then: the 1 Hz interval is disposed and further syncs stay in standby
+    expect(h.intervalDisposals).toBe(1)
+    const armed = h.intervals.length
+    await h.lifecycle.tick()
+    expect(h.intervals.length).toBe(armed)
+
+    // when: a team appears and the tool layer kicks
+    h.setTeams([ownedTeam("run-new")])
+    h.lifecycle.kick()
+
+    // then: the poll re-arms and the new team is picked up
+    expect(h.intervals.length).toBe(armed + 1)
+    await h.lifecycle.tick()
+    expect(h.created.some((entry) => entry.input.teamRunId === "run-new")).toBe(true)
+    h.lifecycle.shutdown()
   })
 })
 

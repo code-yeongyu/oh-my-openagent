@@ -39,6 +39,23 @@ describe("logBindReconcileFailure", () => {
     ])
   })
 
+  test("#given the session was replaced mid-bind #when bind-time reconcile fails #then it logs a recoverable skip", () => {
+    const { logger, calls } = collectingLogger()
+    logBindReconcileFailure(
+      logger,
+      new Error(
+        "This extension ctx is stale after session replacement or reload. Do not use a captured pi or command ctx after ctx.newSession(), ctx.fork(), ctx.switchSession(), or ctx.reload().",
+      ),
+    )
+    expect(calls).toEqual([
+      {
+        level: "info",
+        message: "memory bind-time reconcile skipped",
+        details: { reason: "session replaced before the bind completed" },
+      },
+    ])
+  })
+
   test("#given an unexpected failure #when bind-time reconcile fails #then warn severity is kept", () => {
     const { logger, calls } = collectingLogger()
     logBindReconcileFailure(logger, new TypeError("boom"))

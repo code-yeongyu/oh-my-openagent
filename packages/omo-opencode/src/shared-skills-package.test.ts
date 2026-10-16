@@ -27,9 +27,13 @@ describe("shared skills package manifest", () => {
           types: "./index.d.ts",
           import: "./index.mjs",
         },
+        "./skill-source-filter": {
+          types: "./skill-source-filter.d.ts",
+          import: "./skill-source-filter.mjs",
+        },
       },
       types: "./index.d.ts",
-      files: ["index.d.ts", "index.mjs", "skills"],
+      files: ["index.d.ts", "index.mjs", "skills", "skill-source-filter.d.ts", "skill-source-filter.mjs"],
     })
   })
 

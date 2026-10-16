@@ -3,6 +3,8 @@ import { mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
+import { resolveStateDir } from "./state-dir"
+
 const cleanupRoots: string[] = []
 const claimRaceChildFixturePath = resolve(import.meta.dir, "__fixtures__", "claim-race-child.ts")
 const frozenNowMs = 0x10 * 0x10000
@@ -79,7 +81,7 @@ describe("claimTaskRecord cross-process race", () => {
       String(frozenNowMs),
       "50",
       tag,
-    ], { stdin: "pipe", stdout: "pipe", stderr: "pipe" }))
+    ], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...process.env } }))
     const stdout = children.map((child) => readChildStdout(child.stdout))
     const stderr = children.map((child) => new Response(child.stderr).text())
 
@@ -98,7 +100,7 @@ describe("claimTaskRecord cross-process race", () => {
     const ids = results.flatMap((result) => result.ids)
     expect(ids).toHaveLength(100)
     expect(new Set(ids).size).toBe(100)
-    expect(readdirSync(join(project, ".omo", "senpi-task", "tasks"))).toHaveLength(100)
+    expect(readdirSync(join(resolveStateDir({ project_dir: project }), "tasks"))).toHaveLength(100)
     expect(results.reduce((total, result) => total + result.retries, 0)).toBeGreaterThanOrEqual(1)
     for (const output of stderrOutput) expect(output).not.toContain("already exists")
   })

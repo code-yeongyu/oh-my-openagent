@@ -1,8 +1,8 @@
 /**
  * Generic process-table parsing shared by every sweep family.
  *
- * A family is a classifier over this table (see `./codegraph-family` and
- * `./lsp-proxy-family`) plus a kill plan executed by `./sweeper`.
+ * A family is a classifier over this table (see `./lsp-proxy-family`) plus a
+ * kill plan executed by `./sweeper`.
  */
 
 export interface ProcessInfo {
@@ -10,9 +10,6 @@ export interface ProcessInfo {
   readonly pid: number
   readonly ppid: number
 }
-
-/** Backward-compatible alias: the codegraph family was the first consumer. */
-export type CodegraphProcessInfo = ProcessInfo
 
 export function parsePosixProcessTable(output: string): ProcessInfo[] {
   const processes: ProcessInfo[] = []

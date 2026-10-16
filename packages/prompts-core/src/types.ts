@@ -4,6 +4,7 @@ export type ModelVariant =
   | "gemini"
   | "kimi"
   | "glm"
+  | "swe-2"
   | "planner"
   | "codex"
   | "opus-4-7"

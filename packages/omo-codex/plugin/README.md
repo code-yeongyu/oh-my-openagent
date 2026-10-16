@@ -13,7 +13,11 @@ Internally each component remains isolated under `components/`:
 - `components/ulw-loop`
 - `components/telemetry`
 
-The root plugin manifest exports one Codex plugin named `omo`, with aggregate hooks, skills, and plugin-scoped MCP servers for `grep_app`, `context7`, `codegraph`, `git_bash`, and `lsp`. AST-aware search ships as the `ast-grep` skill, not as an MCP server.
+The root plugin manifest exports one Codex plugin named `omo`, with aggregate hooks, skills, and plugin-scoped MCP servers for `grep_app`, `context7`, `git_bash`, and `lsp`. AST-aware search ships as the `ast-grep` skill, not as an MCP server.
+
+## Default model
+
+`model-catalog.json` (version `2026-09-08.gpt-6-astra-600k-high`) is the managed default the installer and the SessionStart config migration apply: `gpt-6-astra`, 600k context window, `high` reasoning, `xhigh` plan-mode reasoning. Managed legacy profiles, including `legacy.gpt-5.6-sol-650k-high` for configs still on `gpt-5.6-sol`, are upgraded to the current values; a root model outside the catalog is preserved. Neither the installer nor the migration writes or raises subagent thread caps (`agents.max_threads`, `features.multi_agent_v2.max_concurrent_threads_per_session`). They remove only the values LazyCodex itself wrote earlier (`1000`, `16`), with one exception: on a `multi_agent_v2`-preferred model such as `gpt-6-astra`, the V1-only `agents.max_threads` key is removed whatever its value, since Codex rejects it under V2. Every other user-set value is left alone.
 
 ## Telemetry
 

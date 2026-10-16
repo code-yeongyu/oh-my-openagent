@@ -1,5 +1,5 @@
 import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./framework/types"
-import { getAllCheckDefinitions, getCodexCheckDefinitions, gatherSystemInfo, gatherToolsSummary, gatherCodexSummary } from "./checks"
+import { getAllCheckDefinitions, getCodexCheckDefinitions, gatherSystemInfo, gatherToolsSummary, gatherCodexSummary, gatherEditionDistTags, resolveLatestVersion } from "./checks"
 import { EXIT_CODES } from "./framework/constants"
 import { formatDoctorOutput, formatJsonOutput } from "./framework/formatter"
 
@@ -51,6 +51,7 @@ function buildTimeoutResult(start: number, options: DoctorOptions): DoctorResult
     tools: { lspServers: [], astGrepCli: false, commentChecker: false, ghCli: { installed: false, authenticated: false, username: null }, mcpBuiltin: [], mcpUser: [] },
     summary: { total: 1, passed: 0, failed: 1, warnings: 0, skipped: 0, duration: Math.round(performance.now() - start) },
     exitCode: EXIT_CODES.FAILURE,
+    latestVersion: null,
   }
 
   if (options.json) {
@@ -74,6 +75,7 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
     gatherSystemInfo(),
     gatherToolsSummary(),
     target === "codex" ? gatherCodexSummary() : Promise.resolve(undefined),
+    gatherEditionDistTags(target),
   ])
 
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -85,9 +87,10 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   let systemInfo: Awaited<ReturnType<typeof gatherSystemInfo>>
   let tools: Awaited<ReturnType<typeof gatherToolsSummary>>
   let codex: Awaited<ReturnType<typeof gatherCodexSummary>> | undefined
+  let distTags: Awaited<ReturnType<typeof gatherEditionDistTags>>
 
   try {
-    ;[results, systemInfo, tools, codex] = await Promise.race([checksPromise, timeoutPromise])
+    ;[results, systemInfo, tools, codex, distTags] = await Promise.race([checksPromise, timeoutPromise])
   } catch (error) {
     clearTimeout(timer)
     if (error instanceof DoctorTimeoutError) {
@@ -110,6 +113,7 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
     exitCode,
     target,
     codex,
+    latestVersion: resolveLatestVersion({ target, systemInfo, codex, distTags }),
   }
 
   if (options.json) {

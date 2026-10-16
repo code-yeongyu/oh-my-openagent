@@ -104,7 +104,7 @@ describe("createSessionHooks", () => {
     expect(result.interactiveBashSession).toBeNull()
   })
 
-  it("skips codegraph bootstrap when disabled hooks exclude it", () => {
+  it("skips ast-grep sg provision when disabled hooks exclude it", () => {
     // given
     const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({})
 
@@ -114,21 +114,17 @@ describe("createSessionHooks", () => {
       pluginConfig,
       modelCacheState: mockModelCacheState,
       backgroundManager: mockBackgroundManager,
-      isHookEnabled: (hookName) => hookName !== "codegraph-bootstrap",
+      isHookEnabled: (hookName) => hookName !== "ast-grep-sg-provision",
       safeHookEnabled: true,
     })
 
     // then
-    expect(result.codegraphBootstrap).toBeNull()
+    expect(result.astGrepSgProvision).toBeNull()
   })
 
-  it("keeps codegraph bootstrap registered when the hook is enabled", () => {
+  it("keeps ast-grep sg provision registered when the hook is enabled", () => {
     // given
-    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
-      codegraph: {
-        enabled: false,
-      },
-    })
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({})
 
     // when
     const result = createSessionHooks({
@@ -136,11 +132,11 @@ describe("createSessionHooks", () => {
       pluginConfig,
       modelCacheState: mockModelCacheState,
       backgroundManager: mockBackgroundManager,
-      isHookEnabled: (hookName) => hookName === "codegraph-bootstrap",
+      isHookEnabled: (hookName) => hookName === "ast-grep-sg-provision",
       safeHookEnabled: true,
     })
 
     // then
-    expect(result.codegraphBootstrap).not.toBeNull()
+    expect(result.astGrepSgProvision).not.toBeNull()
   })
 })

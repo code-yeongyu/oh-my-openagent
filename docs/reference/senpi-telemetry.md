@@ -2,9 +2,11 @@
 
 ## What this is
 
-OmO Native is the anonymous product analytics pipeline for the omo-senpi adapter. It is enabled by default and uses an opt-out model: every switch in the opt-out matrix below turns it fully off. Telemetry sends to the PostHog project configured in the packaged default; setting `POSTHOG_API_KEY` overrides that project key.
+OmO Native, the standalone edition, ships an anonymous product analytics pipeline. It is enabled by default and uses an opt-out model: every switch in the opt-out matrix below turns it fully off. Telemetry sends to the PostHog project configured in the packaged default; setting `POSTHOG_API_KEY` overrides that project key.
 
 The payloads carry only booleans, buckets, counters, and allowlisted enum values. No free-form text ever leaves your machine. The exact schema is machine-generated below; if the generator and this document ever disagree, a drift test fails in CI.
+
+The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `delegation_started.name` and `delegation_completed.agent_type` carry the new ids, and this is a breaking value change for anyone querying the old ones. Events emitted before the rename carry metis/momus. <!-- retired-name-allowed -->
 
 <!-- BEGIN GENERATED SCHEMA -->
 ## Event schema
@@ -19,8 +21,8 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `session_started` | `$os_version` | `string` | - |
 | `session_started` | `arch` | `string` | - |
 | `session_started` | `cpu_count` | `number` | - |
-| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
-| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
+| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `session_started` | `memory_bucket` | `string` | `lt_8_gb`, `8_15_gb`, `16_31_gb`, `32_63_gb`, `64_plus_gb` |
 | `session_started` | `model_count` | `number` | - |
 | `session_started` | `provider_count` | `number` | - |
@@ -41,27 +43,118 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `prompt_submitted` | `prompt_length_bucket` | `string` | `lt_100`, `100_500`, `500_2000`, `gte_2000` |
 | `prompt_submitted` | `queue_mode` | `string` | `immediate`, `follow_up`, `steer`, `other` |
 | `prompt_submitted` | `real_prompt_ordinal_bucket` | `string` | `1`, `2_3`, `4_10`, `11_25`, `26_plus` |
-| `prompt_submitted` | `suppression_reason` | `string` | `none`, `no_keyword`, `extension_source`, `embedded_directive`, `skill_expansion`, `skill_name_only` |
+| `prompt_submitted` | `suppression_reason` | `string` | `none`, `no_keyword`, `identifier_reference`, `negated_mention`, `extension_source`, `child_session`, `embedded_directive`, `skill_expansion`, `skill_name_only` |
 | `turn_completed` | `$session_id` | `string` | - |
 | `turn_completed` | `cache_read_tokens` | `number` | - |
 | `turn_completed` | `cache_write_tokens` | `number` | - |
 | `turn_completed` | `cost_usd` | `number` | - |
 | `turn_completed` | `input_tokens` | `number` | - |
-| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
 | `turn_completed` | `output_tokens` | `number` | - |
-| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
+| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `turn_completed` | `reasoning_tokens` | `number` | - |
+| `turn_completed` | `sample_rate` | `number` | - |
 | `turn_completed` | `total_tokens` | `number` | - |
 | `turn_completed` | `turn_index` | `number` | - |
+| `session_summary` | `$session_id` | `string` | - |
+| `session_summary` | `aborted_turns` | `number` | - |
+| `session_summary` | `cache_read_tokens` | `number` | - |
+| `session_summary` | `cache_write_tokens` | `number` | - |
+| `session_summary` | `cost_usd` | `number` | - |
+| `session_summary` | `custom_model_turns` | `number` | - |
+| `session_summary` | `ended_by` | `string` | `checkpoint`, `shutdown`, `reload`, `recovered` |
+| `session_summary` | `error_turns` | `number` | - |
+| `session_summary` | `first_turn_index` | `number` | - |
+| `session_summary` | `input_tokens` | `number` | - |
+| `session_summary` | `invalid_usage_turns` | `number` | - |
+| `session_summary` | `is_final` | `boolean` | - |
+| `session_summary` | `last_turn_index` | `number` | - |
+| `session_summary` | `m1_cost_usd` | `number` | - |
+| `session_summary` | `m1_input_tokens` | `number` | - |
+| `session_summary` | `m1_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m1_output_tokens` | `number` | - |
+| `session_summary` | `m1_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m1_total_tokens` | `number` | - |
+| `session_summary` | `m1_turns` | `number` | - |
+| `session_summary` | `m2_cost_usd` | `number` | - |
+| `session_summary` | `m2_input_tokens` | `number` | - |
+| `session_summary` | `m2_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m2_output_tokens` | `number` | - |
+| `session_summary` | `m2_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m2_total_tokens` | `number` | - |
+| `session_summary` | `m2_turns` | `number` | - |
+| `session_summary` | `m3_cost_usd` | `number` | - |
+| `session_summary` | `m3_input_tokens` | `number` | - |
+| `session_summary` | `m3_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m3_output_tokens` | `number` | - |
+| `session_summary` | `m3_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m3_total_tokens` | `number` | - |
+| `session_summary` | `m3_turns` | `number` | - |
+| `session_summary` | `model_count` | `number` | - |
+| `session_summary` | `other_cost_usd` | `number` | - |
+| `session_summary` | `other_total_tokens` | `number` | - |
+| `session_summary` | `other_turns` | `number` | - |
+| `session_summary` | `output_tokens` | `number` | - |
+| `session_summary` | `raw_turns_sampled` | `boolean` | - |
+| `session_summary` | `reasoning_tokens` | `number` | - |
+| `session_summary` | `sample_rate` | `number` | - |
+| `session_summary` | `session_role` | `string` | `main`, `child`, `dag_child`, `member` |
+| `session_summary` | `summary_seq` | `number` | - |
+| `session_summary` | `tool_error_count` | `number` | - |
+| `session_summary` | `tool_result_count` | `number` | - |
+| `session_summary` | `total_tokens` | `number` | - |
+| `session_summary` | `total_tokens_max` | `number` | - |
+| `session_summary` | `total_tokens_p50` | `number` | - |
+| `session_summary` | `total_tokens_p95` | `number` | - |
+| `session_summary` | `turns` | `number` | - |
+| `session_summary` | `window_ms` | `number` | - |
 | `skill_loaded` | `$session_id` | `string` | - |
-| `skill_loaded` | `skill_name` | `string` | `ast-grep`, `coding-agent-sessions`, `dag-library`, `data-scientist`, `debugging`, `frontend`, `git-master`, `give-me-tips`, `hyperplan`, `init-deep`, `lsp-setup`, `mass-ulw`, `onboarding`, `programming`, `refactor`, `remove-ai-slops`, `review-work`, `ulw-execute`, `ultimate-browsing`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`, `visual-qa` |
+| `skill_loaded` | `skill_name` | `string` | `ast-grep`, `browser`, `coding-agent-sessions`, `dag-library`, `data-scientist`, `debugging`, `frontend`, `git-master`, `give-me-tips`, `hyperplan`, `init-deep`, `lsp-setup`, `mass-ulw`, `onboarding`, `programming`, `refactor`, `remove-ai-slops`, `review-work`, `ulw-execute`, `ultimate-browsing`, `ultrawork`, `ulw-loop`, `ulw-plan`, `ulw-research`, `visual-qa`, `visualize` |
 | `delegation_started` | `$session_id` | `string` | - |
 | `delegation_started` | `background` | `boolean` | - |
 | `delegation_started` | `batch_size_bucket` | `string` | `1`, `2_4`, `5_plus` |
 | `delegation_started` | `kind` | `string` | `category`, `subagent` |
-| `delegation_started` | `name` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `architect`, `unspecified-high`, `writing`, `explore`, `librarian`, `metis`, `momus`, `custom` |
+| `delegation_started` | `name` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep-low`, `deep-high`, `quick`, `unspecified-low`, `unspecified-high`, `architect`, `writing`, `explore`, `librarian`, `plan-consultant`, `plan-reviewer`, `custom` |
 | `feature_used` | `$session_id` | `string` | - |
 | `feature_used` | `feature` | `string` | `goal_tool`, `team_create`, `memory_tool` |
+| `computer_use_activation` | `$session_id` | `string` | - |
+| `computer_use_activation` | `active` | `boolean` | - |
+| `computer_use_activation` | `backend` | `string` | `quartz`, `x11`, `wayland`, `win32`, `fake`, `unavailable`, `other` |
+| `computer_use_activation` | `host_platform` | `string` | `darwin`, `linux`, `win32`, `other` |
+| `computer_use_activation` | `source` | `string` | `tool_call`, `command_on`, `command_off`, `other` |
+| `computer_use_permission_denied` | `$session_id` | `string` | - |
+| `computer_use_permission_denied` | `backend` | `string` | `quartz`, `x11`, `wayland`, `win32`, `fake`, `unavailable`, `other` |
+| `computer_use_permission_denied` | `host_platform` | `string` | `darwin`, `linux`, `win32`, `other` |
+| `computer_use_permission_denied` | `permission` | `string` | `capture`, `input`, `ax`, `read`, `exec` |
+| `computer_use_permission_denied` | `scope` | `string` | `os`, `tier` |
+| `computer_use_engine_error` | `$session_id` | `string` | - |
+| `computer_use_engine_error` | `backend` | `string` | `quartz`, `x11`, `wayland`, `win32`, `fake`, `unavailable`, `other` |
+| `computer_use_engine_error` | `code` | `string` | `PermissionDenied`, `CaptureFailed`, `InputFailed`, `BackgroundUnavailable`, `WindowNotFound`, `InvalidTarget`, `InvalidKey`, `InvalidCoordinateFrame`, `StaleRef`, `AxUnsupported`, `AxFailed`, `Timeout`, `Closed`, `Internal`, `StopPathUnavailable`, `Suspended`, `ScreenLocked`, `Cancelled`, `CursorRestoreFailed`, `FocusRestoreFailed`, `TransactionFailed`, `InputBusy`, `ControlRequired`, `CaptureUnavailable`, `native-unavailable`, `quarantined`, `abi-mismatch`, `other` |
+| `computer_use_engine_error` | `host_platform` | `string` | `darwin`, `linux`, `win32`, `other` |
+| `kibitzer_summary` | `$session_id` | `string` | - |
+| `kibitzer_summary` | `buffered_cooldown` | `number` | - |
+| `kibitzer_summary` | `buffered_no_new_candidate` | `number` | - |
+| `kibitzer_summary` | `cache_read_tokens` | `number` | - |
+| `kibitzer_summary` | `cache_write_tokens` | `number` | - |
+| `kibitzer_summary` | `candidates_total` | `number` | - |
+| `kibitzer_summary` | `first_nudge_wake` | `number` | - |
+| `kibitzer_summary` | `generations` | `number` | - |
+| `kibitzer_summary` | `input_tokens` | `number` | - |
+| `kibitzer_summary` | `model_top` | `string` | - |
+| `kibitzer_summary` | `nudge_gap_ms_median` | `number` | - |
+| `kibitzer_summary` | `nudge_gap_ms_p90` | `number` | - |
+| `kibitzer_summary` | `nudges_delivered` | `number` | - |
+| `kibitzer_summary` | `offers_total` | `number` | - |
+| `kibitzer_summary` | `output_tokens` | `number` | - |
+| `kibitzer_summary` | `slot_wait_ms_total` | `number` | - |
+| `kibitzer_summary` | `tool_calls_total` | `number` | - |
+| `kibitzer_summary` | `wake_duration_ms_total` | `number` | - |
+| `kibitzer_summary` | `wake_span_ms` | `number` | - |
+| `kibitzer_summary` | `wakes_deadline` | `number` | - |
+| `kibitzer_summary` | `wakes_failed` | `number` | - |
+| `kibitzer_summary` | `wakes_tool_budget` | `number` | - |
+| `kibitzer_summary` | `wakes_total` | `number` | - |
+| `kibitzer_summary` | `wakes_with_nudge` | `number` | - |
 | `parallelism_summary` | `$session_id` | `string` | - |
 | `parallelism_summary` | `clock_anomalies` | `number` | - |
 | `parallelism_summary` | `dropped_calls` | `number` | - |
@@ -93,11 +186,11 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `parallelism_summary` | `schema_kind` | `string` | `parallelism_v1`, `parallelism_v2` |
 | `parallelism_summary` | `upper_bound_saved_ms` | `number` | - |
 | `delegation_completed` | `$session_id` | `string` | - |
-| `delegation_completed` | `agent_type` | `string` | `explore`, `librarian`, `metis`, `momus`, `custom`, `none` |
+| `delegation_completed` | `agent_type` | `string` | `explore`, `librarian`, `plan-consultant`, `plan-reviewer`, `custom`, `none` |
 | `delegation_completed` | `background_mode` | `string` | `foreground`, `background`, `promoted`, `unknown` |
 | `delegation_completed` | `cache_read_tokens` | `number` | - |
 | `delegation_completed` | `cache_write_tokens` | `number` | - |
-| `delegation_completed` | `category` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `architect`, `unspecified-high`, `writing`, `custom`, `none` |
+| `delegation_completed` | `category` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep-low`, `deep-high`, `quick`, `unspecified-low`, `unspecified-high`, `architect`, `writing`, `custom`, `none` |
 | `delegation_completed` | `config_generation` | `number` | - |
 | `delegation_completed` | `cost_status` | `string` | `reported`, `unavailable`, `invalid` |
 | `delegation_completed` | `cost_usd` | `number` | - |
@@ -106,11 +199,11 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `delegation_completed` | `execution_mode` | `string` | `in-process`, `process` |
 | `delegation_completed` | `fallback_attempts` | `number` | - |
 | `delegation_completed` | `input_tokens` | `number` | - |
-| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-haiku-4-5`, `claude-opus-5`, `claude-sonnet-5`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gpt-5.6-sol`, `gpt-5.6-terra`, `grok-4.6`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `gpt-5.6-luna-fast`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `custom` |
+| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
 | `delegation_completed` | `model_source` | `string` | `category`, `explicit`, `agent`, `none` |
 | `delegation_completed` | `output_tokens` | `number` | - |
 | `delegation_completed` | `owner_kind` | `string` | `plain_child`, `dag_node`, `team_member`, `unknown` |
-| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `bailian-coding-plan`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai-coding-plan`, `custom` |
+| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `delegation_completed` | `reasoning_effort` | `string` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `other`, `none` |
 | `delegation_completed` | `run_epoch` | `number` | - |
 | `delegation_completed` | `start_reason` | `string` | `initial_spawn`, `runtime_fallback`, `session_resume`, `dag_retry`, `revive_after_completed`, `revive_after_error`, `revive_after_cancelled`, `revive_after_interrupted`, `revive_after_lost`, `unknown` |
@@ -127,7 +220,8 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `category_config` | `builtin_overridden_count` | `number` | - |
 | `category_config` | `cat_architect` | `string` | - |
 | `category_config` | `cat_artistry` | `string` | - |
-| `category_config` | `cat_deep` | `string` | - |
+| `category_config` | `cat_deep_high` | `string` | - |
+| `category_config` | `cat_deep_low` | `string` | - |
 | `category_config` | `cat_quick` | `string` | - |
 | `category_config` | `cat_ultrabrain` | `string` | - |
 | `category_config` | `cat_unspecified_high` | `string` | - |
@@ -138,7 +232,27 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `category_config` | `config_generation` | `number` | - |
 | `category_config` | `source` | `string` | `startup`, `reload`, `new`, `resume`, `fork` |
 | `category_config` | `user_category_count` | `number` | - |
+| `process_crashed` | `$os` | `string` | - |
+| `process_crashed` | `arch` | `string` | - |
+| `process_crashed` | `crashed_bun_version` | `string` | - |
+| `process_crashed` | `crashed_engine_version` | `string` | - |
+| `process_crashed` | `crashed_omo_version` | `string` | - |
+| `process_crashed` | `detection` | `string` | `supervisor`, `parent`, `unclean_exit`, `unknown` |
+| `process_crashed` | `exit_code` | `number` | - |
+| `process_crashed` | `process_kind` | `string` | `interactive`, `print`, `json`, `rpc-host`, `task-child`, `unknown` |
+| `process_crashed` | `shard_kind` | `string` | `p`, `i`, `none`, `unknown` |
+| `process_crashed` | `signal` | `string` | `SIGSEGV`, `SIGBUS`, `SIGILL`, `SIGTRAP`, `SIGABRT`, `SIGFPE`, `SIGKILL`, `SIGTERM`, `SIGHUP`, `SIGINT`, `SIGQUIT`, `SIGSYS`, `other`, `none`, `unknown` |
+| `process_crashed` | `uptime_bucket` | `string` | `lt_1m`, `1_10m`, `10_60m`, `1_6h`, `6_24h`, `24h_plus` |
+| `process_crashed` | `uptime_ms` | `number` | - |
 <!-- END GENERATED SCHEMA -->
+
+### Computer-use events
+
+`computer_use_activation` records session-scoped activation transitions. `tool_call` means the host activated `computer` or `computer_actions` for a by-name call or after tool discovery; `command_on` and `command_off` are explicit `/computer` commands. Repeating an already-active activation does not emit another row.
+
+`computer_use_permission_denied` separates OS capability blocks from OmO permission rules. `scope = os` reports which fixed capability is unavailable (`capture`, `input`, or `ax`) after activation. `scope = tier` reports a denied `computer:read` or `computer:exec` request. It never includes the permission rule, feedback, tool arguments, screen state, or requested action.
+
+`computer_use_engine_error` reports the frozen desktop protocol error code, startup diagnostics (`native-unavailable`, `quarantined`, `abi-mismatch`), or `other`. Error messages, recovery hints, engine paths, coordinates, window data, application names, and typed text stay local. Backend and `host_platform` values are allowlisted; unknown values become `other`. The field is named `host_platform` because the shared telemetry envelope already owns `platform = omo-senpi`.
 
 ### Parallelism v2 interpretation
 
@@ -163,6 +277,12 @@ counts when evaluating rollout coverage.
 ### Reasoning tokens caveat
 
 `turn_completed` reports `reasoning_tokens`. That field is optional and is a subset of `output_tokens`, not an addition to it. Never add `reasoning_tokens` to `output_tokens` when computing totals, or you double count.
+
+### Session summaries and raw-turn sampling
+
+`session_summary` carries a session's assistant turns, summed per window. A window closes every 50 turns or 30 minutes (`ended_by: checkpoint`), on a reload (`ended_by: reload`, not final) and when the session ends (`ended_by: shutdown`). The open window is kept in `<state>/rollups/<session>.json` after every turn; if the process dies, the next OmO process to record a turn sends it once with `ended_by: recovered` and leaves a placeholder so the session, resumed in any process, continues its numbering. Only `ended_by: shutdown` rows have `is_final: true`; a recovered row is not final because the session may be resumed, and a session that is never resumed has no final row. Leftover rollup, temporary and claim files of dead processes are removed, and rollups older than 14 days are dropped. A session keeps one `summary_seq` sequence across reloads and recovery, so `($session_id, summary_seq)` is unique and summing every row of a session gives its exact totals. The three most used models get their own `m1_*` to `m3_*` totals and the rest are summed into `other_*`. `session_role` is `main` for a user's session and `child`, `dag_child` or `member` for omo-spawned work, whose cost `delegation_completed` already counts; filter on it to avoid counting delegated work twice.
+
+Raw `turn_completed` rows go to PostHog only for a fixed share of sessions (`sample_rate` 0.05), chosen from the session hash so a sampled session sends every one of its turns. PostHog is today's only sink, so this sample is what keeps per-turn events from dominating its volume, while `session_summary` carries exact totals for every session. When the first-party collector ships, every turn goes to the collector through its own path and only this direct PostHog path stays sampled. Weight raw PostHog rows by `1 / sample_rate`, or use `session_summary` for exact totals. Rows from clients older than this change have no `sample_rate` and were never sampled.
 
 ### Delegation and category config events
 
@@ -194,6 +314,16 @@ Every cost or time dashboard must publish its coverage column alongside the aggr
 #### Country queries and delayed delivery
 
 GeoIP country is derived server side from the transport's sending IP at delivery time. For rows delivered late, that IP belongs to whatever network the draining host is on, not the network where the task executed. Country queries must therefore exclude rows with `start_reason = 'session_resume'` or `stats_status = 'unavailable'`. VPNs, proxies, mobile routing, and missing GeoIP data further limit accuracy; treat country as approximate.
+
+### Process crash events
+
+A process that dies natively cannot report its own death, so `process_crashed` is sent by the NEXT OmO process to start, once per crash. The crash is recorded locally at the time it happens: the RPC host supervisor records its child's exit (`detection = 'supervisor'`), a task runner records a process-mode child it did not ask to stop (`detection = 'parent'`), and an interactive or print process that ends without running any exit handler leaves a lifetime marker that the next start turns into a record (`detection = 'unclean_exit'`). An unclean exit proves the death but not its cause, so its `signal` is `unknown`, and it also counts a `SIGKILL` from outside (an OOM kill, `kill -9`) as a crash.
+
+- `crashed_bun_version`, `crashed_engine_version`, and `crashed_omo_version` are the versions of the process that died, not the reporter's. Per-version crash rates must group on them, never on `package_version`, which belongs to the reporting process. A value that is not version-shaped, or was not recorded (records written before the field existed), is `unknown`.
+- `uptime_ms` for an unclean exit runs to the last one-minute heartbeat, so it is short by up to a minute. Exit-code crashes carry `signal = 'none'` plus `exit_code`.
+- `shard_kind` names the kind of RPC host that crashed: `p` is a per-session task host, `i` is a Desktop per-thread host, and `none` is the legacy machine-wide host or a process that was not a host. `unknown` means an endpoint directory that names no socket of its own. Every host's endpoint directory is read, and the same record written by two hosts is reported once for each host. The shard key, socket path and owning session never leave the machine.
+- Records older than 14 days are never sent, and at most 20 crashes are sent per start; the rest wait for later starts. The event timestamp is the report time, not the crash time.
+- Opting out sends nothing and leaves the local records unread. Crash records never carry a stack, a path, a prompt, or session content.
 
 ## Identity model
 
@@ -242,6 +372,7 @@ The following never leaves your machine:
 - Prompt or response text, prompt fragments, or exact prompt lengths (only coarse buckets)
 - File paths, the working directory, or repository and project names
 - Git identities or environment variable values
+- Computer-use screenshots, window titles, application names, coordinates, typed text, tool code or arguments, permission feedback, engine paths, and error messages
 - Raw hostnames or IP addresses in the application-authored payload (the transport connection still exposes its sending IP to PostHog for geoip enrichment)
 - Custom (non-builtin) skill names
 - Custom provider names, which are always masked to `custom` — including the name of a self-hosted, proxy, or internal gateway
@@ -261,4 +392,5 @@ A structural allowlist enforces this rather than relying on discipline: any prop
 ## Local retention
 
 OmO Native does not retain a local history or preview file of sent telemetry payloads.
+The only telemetry file it keeps is the open `session_summary` window of each live session under `<state>/rollups/`: numbers and masked model names only, rewritten after every turn and deleted when the session ends or once a later process has sent it as `recovered`.
 The event schema and opt-out controls above are the public audit surface.
