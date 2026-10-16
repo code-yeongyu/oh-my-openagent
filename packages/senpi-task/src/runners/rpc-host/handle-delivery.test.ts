@@ -33,7 +33,7 @@ describe("host session delivery semantics", () => {
 
     // then
     expect(prompts(port.sent)).toEqual([
-      { type: "prompt", message: "do the daemon child work", streamingBehavior: "steer" },
+      { type: "prompt", message: "do the daemon child work", streamingBehavior: "steer", clientMessageId: "st_29_delivery:0:1" },
     ])
     await handle.dispose()
   })
@@ -47,7 +47,7 @@ describe("host session delivery semantics", () => {
     await handle.steer("keep going")
 
     // then
-    expect(prompts(port.sent)).toEqual([{ type: "prompt", message: "keep going", streamingBehavior: "followUp" }])
+    expect(prompts(port.sent)).toEqual([{ type: "prompt", message: "keep going", streamingBehavior: "followUp", clientMessageId: "st_29_delivery:0:2" }])
     await handle.dispose()
   })
 

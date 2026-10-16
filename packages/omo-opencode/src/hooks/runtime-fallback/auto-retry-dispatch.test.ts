@@ -571,7 +571,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     // then
     expect(outcome).toEqual({
       accepted: false,
-      status: "blocked",
+      status: "superseded",
       reason: "stale fallback generation",
     })
     expect(promptCalls.count).toBe(0)
@@ -635,7 +635,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     // then
     expect(staleOutcome).toEqual({
       accepted: false,
-      status: "blocked",
+      status: "superseded",
       reason: "stale fallback generation",
     })
     expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)

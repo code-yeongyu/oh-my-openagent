@@ -127,6 +127,46 @@ describe("BackgroundManager session.error arbitration with runtime-fallback", ()
     }
   })
 
+  test("#given the decision timed out #when runtime-fallback declines later #then the task ends with the original error", async () => {
+    // given
+    const { manager, task } = createHarness()
+    registerRuntimeFallbackRecoveryOwner()
+    await manager["concurrencyManager"].acquire(CONCURRENCY_KEY)
+    const event = sessionError(ORIGINAL_ERROR)
+    openRuntimeFallbackRecoveryClaim(event, SESSION_ID)
+    let fireTimeout: (() => void) | undefined
+    const realSetTimeout = globalThis.setTimeout
+    const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: Parameters<typeof setTimeout>[0], ms?: number) => {
+      if (ms === 20_000) {
+        fireTimeout = callback as () => void
+        return 1 as unknown as ReturnType<typeof setTimeout>
+      }
+      return realSetTimeout(callback as () => void, ms)
+    }) as typeof setTimeout)
+    try {
+      const handled = manager["handleSessionErrorEvent"]({
+        event, task, errorInfo: ORIGINAL_ERROR,
+        errorName: ORIGINAL_ERROR.name, errorMessage: ORIGINAL_ERROR.message,
+      })
+      fireTimeout?.()
+      await handled
+      const statusAfterTimeout = task.status
+
+      // when
+      settleRuntimeFallbackRecoveryClaim(event, "declined")
+      await flush()
+
+      // then
+      expect(statusAfterTimeout).toBe("running")
+      expect(task.status).toBe("error")
+      expect(task.error).toContain("no provider available")
+      expect(manager["concurrencyManager"].getCount(CONCURRENCY_KEY)).toBe(0)
+    } finally {
+      timer.mockRestore()
+      await manager.shutdown()
+    }
+  })
+
   for (const changed of ["session", "attempt"]) {
     test(`declined old error cannot finalize a newer ${changed}`, async () => {
       const { manager, task, replacementCalls } = createHarness()

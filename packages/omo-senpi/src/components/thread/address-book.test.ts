@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import * as fs from "node:fs"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -12,7 +13,7 @@ import {
   type AddressBookHost,
   type DiskSession,
 } from "./address-book"
-import { readSessionFacts, SESSION_FACTS_WINDOW_BYTES, THREAD_TITLE_MAX_CHARS } from "./session-facts"
+import { readSessionFacts, SESSION_FACTS_LAST_LINE_MAX_BYTES, SESSION_FACTS_WINDOW_BYTES, THREAD_TITLE_MAX_CHARS } from "./session-facts"
 import { summary } from "./tools/internals"
 
 const scratch: string[] = []
@@ -216,6 +217,26 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
   test("#given a transcript larger than two read windows #when its facts are read #then the header, first user message and the /name plus last timestamp in the tail are all found", () => {
     const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000c", { name: "long-one", padding: (SESSION_FACTS_WINDOW_BYTES * 3) / 1024 })
     expect(readSessionFacts(path)).toEqual({ durable_id: "019a0000-0000-7000-8000-00000000000c", cwd: "/work/project", created_at: HEADER_TIME, updated_at: LAST_TIME, name: "long-one", first_user_text: FIRST_USER })
+  })
+
+  test("#given a transcript of many MB #when a dead endpoint's session is read for listing #then only bounded windows are read, never the whole file", () => {
+    // given
+    const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000d", { name: "huge-one", padding: 8 * 1024 })
+    const whole = spyOn(fs, "readFileSync")
+    const reads = spyOn(fs, "readSync")
+    try {
+      // when
+      const session = readDiskSession(path, "/gone.sock")
+
+      // then
+      expect(session).toMatchObject({ durable_id: "019a0000-0000-7000-8000-00000000000d", name: "huge-one", first_user_text: FIRST_USER, created_at: HEADER_TIME, updated_at: LAST_TIME, source_host: "/gone.sock" })
+      expect(whole.mock.calls.filter(([target]) => target === path)).toEqual([])
+      const bytes = reads.mock.results.reduce((sum, result) => sum + (typeof result.value === "number" ? result.value : 0), 0)
+      expect(bytes).toBeLessThanOrEqual(2 * SESSION_FACTS_WINDOW_BYTES + SESSION_FACTS_LAST_LINE_MAX_BYTES + 2)
+    } finally {
+      whole.mockRestore()
+      reads.mockRestore()
+    }
   })
 
   test("#given a terminal endpoint listing its one session by durable id #when assembled #then the entry is a tui thread on that endpoint", () => {

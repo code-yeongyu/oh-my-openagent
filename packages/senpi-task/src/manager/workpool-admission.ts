@@ -157,6 +157,8 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
 
 function refusal(outcome: Exclude<SendOutcome, { kind: "revived" }>): WorkpoolError {
   switch (outcome.kind) {
+    case "uncertain": return new WorkpoolError("delivery_uncertain", `${outcome.reason} Effect id: ${outcome.effect_id}`)
+    case "failed": return new WorkpoolError("worker_not_continuable", `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`)
     case "delivery_uncertain": case "admission_refused": case "cwd_unavailable": case "config_generation_mismatch": case "scope_denied":
       return new WorkpoolError(outcome.kind, outcome.reason)
     case "capacity_deferred": return new WorkpoolError("admission_refused", outcome.reason)

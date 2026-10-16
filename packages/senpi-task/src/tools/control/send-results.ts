@@ -66,6 +66,10 @@ function resolveListedTask(manager: SendManager, to: string): ReturnType<SendMan
 
 export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTask"]>>): SendToolResult {
   switch (outcome.kind) {
+    case "uncertain":
+      return toolResult(`${outcome.reason} Effect id: ${outcome.effect_id}`, outcome)
+    case "failed":
+      return toolErrorResult(`${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`, outcome)
     case "admission_refused":
     case "cwd_unavailable":
     case "config_generation_mismatch":

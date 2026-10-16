@@ -1,6 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { HostSessionFacts, HostSessionPort } from "./handle-port"
+import type { HostTurnReconciliation } from "./reconcile-turn"
 import type { HostParkReason } from "./session-client"
 import {
   type HostSessionReattach,
@@ -51,6 +52,7 @@ export interface ReattachSubject extends HostShardEvents {
   readonly adopt: (next: HostSessionReattached) => void
   // A turn in flight at the loss runs again on the new port: re-joined still streaming, or re-prompted.
   readonly turnResumed: () => void
+  readonly reconcile: (reopened: boolean) => Promise<HostTurnReconciliation>
   readonly continueTurn: (prompt: string) => Promise<void>
   readonly giveUp: (refusal?: HostParkReason) => void
 }
@@ -95,10 +97,12 @@ export async function recoverLostTransport(subject: ReattachSubject, reattach: H
   })
   const rejoined = next.attached ? "attached" : "resumed"
   if (!turnWasInFlight) return report(rejoined, next.session.instanceId)
-  if (next.attached && (await stillStreaming(next.client, taskId))) {
+  const reconciled = await subject.reconcile(!next.attached)
+  if (reconciled === "streaming") {
     observe(taskId, subject.turnResumed)
     return report(rejoined, next.session.instanceId)
   }
+  if (reconciled !== "continued") return report(rejoined, next.session.instanceId)
   // A reopened session is not a resumed turn until the continuation actually lands. Reporting
   // before this await counted refused/timed-out deliveries as successful recoveries (omo#9403).
   try {
@@ -118,16 +122,6 @@ function observe(taskId: string, notify: () => void): void {
     notify()
   } catch (error) {
     log("senpi-task host session reattach observer failed", { taskId, error: String(error) })
-  }
-}
-
-async function stillStreaming(client: HostSessionPort, taskId: string): Promise<boolean> {
-  try {
-    const state = await client.getState()
-    return state.isStreaming === true
-  } catch (error) {
-    log("senpi-task host session reattach state read failed", { taskId, error: String(error) })
-    return false
   }
 }
 

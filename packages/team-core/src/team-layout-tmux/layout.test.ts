@@ -196,6 +196,24 @@ describe("team-layout-tmux", () => {
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
   })
 
+  test("#given a worktree path holding tmux format syntax #when panes are split #then -c gets every # doubled so tmux keeps the path literal (#10233)", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/#{session_name}/#(touch c)" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "./w/#{pane_id}" },
+    ]
+
+    // when
+    await createTeamLayout("run-format-path", members, tmuxMgr as never)
+
+    // then
+    const directories = getCommands()
+      .filter((args) => args[0] === "split-window")
+      .map((args) => args[args.indexOf("-c") + 1])
+    expect(directories).toEqual(["/tmp/##{session_name}/##(touch c)", "./w/##{pane_id}"])
+  })
+
   test("#given env auth set #when createTeamLayout runs #then send-keys attach commands omit secrets while split-window forwards pane env", async () => {
     // given — fixtures assembled at runtime (never literals) so static secret
     // scanners don't flag a username/password pair (GitGuardian false-positive,

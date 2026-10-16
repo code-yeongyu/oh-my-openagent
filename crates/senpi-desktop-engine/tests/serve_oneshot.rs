@@ -32,6 +32,7 @@ impl Daemon {
     fn command(&self, args: &[&str]) -> Command {
         let mut command = Command::new(BINARY);
         command
+            .arg("--enable-daemon")
             .args(args)
             .args(["--endpoint", self.socket.to_str().expect("utf-8 path")])
             .env("SENPI_DESKTOP_BACKEND", format!("fake:{TWO_DISPLAYS}"))
