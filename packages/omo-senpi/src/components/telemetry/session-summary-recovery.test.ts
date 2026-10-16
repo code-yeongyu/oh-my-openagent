@@ -4,8 +4,9 @@ import { join } from "node:path"
 
 import { CHECKPOINT_MAX_TURNS } from "./omo-native-session-summary"
 import { CORRUPT } from "./session-summary-files"
+import { purgeOptedOutQueue } from "./session-summary-optout-purge"
 import { withRecoveryOps } from "./session-summary-recovery-storage"
-import { OWNER_STALE_MS, SUMMARY_TTL_MS, purgeUnconsentedQueue, summaryDir } from "./session-summary-storage"
+import { OWNER_STALE_MS, SUMMARY_TTL_MS, summaryDir } from "./session-summary-storage"
 import { createTempStateDirs, createTestRecorder, rows, summaryTurn } from "./session-summary.test-support"
 
 // Protocol contract (plan todo 8): a window is claimed only when its heartbeat is older than 5 minutes AND
@@ -152,9 +153,9 @@ describe("session_summary recovery hygiene", () => {
     expect(later.published.map(({ properties }) => properties.dropped_events)).toEqual([0])
   })
 
-  test("#given queued records from an opted-out scope #when an opted-out session purges the queue #then they are deleted at rest and opted-in ones stay", () => {
+  test("#given a dead owner's queued records from an opted-out scope #when an opted-out session purges the queue #then they are deleted at rest and opted-in ones stay", () => {
     const dir = stateDirs.make()
-    const storage = createTestRecorder({ dir, startAt: T0 }).storage
+    const storage = createTestRecorder({ dir, pid: 191_919, startAt: T0 }).storage
     const pending = (uuid: string, cwd: string) => ({
       consent: "enabled" as const, scope: { cwd }, uuid, sessionHash: `h-${cwd}`, owner: storage.owner, createdAt: T0, properties: { turns: 1 },
     })
@@ -167,7 +168,7 @@ describe("session_summary recovery hygiene", () => {
     storage.writeWindow("w-off", window("/off"))
     storage.writeWindow("w-on", window("/on"))
 
-    purgeUnconsentedQueue(dir, (scope) => scope.cwd !== "/off")
+    purgeOptedOutQueue({ stateDir: dir, isScopeConsented: (scope) => scope.cwd !== "/off", isPidAlive: (pid) => pid === process.pid })
 
     expect(storage.pendingUuids()).toEqual(["0395eae0-1111-4222-8333-944455556662"])
     expect(storage.windowKeys()).toEqual(["w-on"])

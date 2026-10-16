@@ -629,11 +629,9 @@ describe("OmO Native telemetry component integration", () => {
       const stateDir = join(agentDir, "omo-senpi", "omo-native")
       const recorder = createTransportRecorder()
       let consent = true
-      let clock = 1_000_000
       const pi = new FakeExtensionAPI()
       createOmoNativeTelemetryComponent({
         rawTurnSampleRate: 0,
-        consentNow: () => clock,
         env: createEnabledEnv(agentDir),
         hashSessionId: (raw) => `hashed:${raw}`,
         isConfigEnabled: () => consent,
@@ -647,9 +645,8 @@ describe("OmO Native telemetry component integration", () => {
       await pi.dispatch("turn_end", turnEnd(), context("midway"))
       expect(rollupFiles(stateDir)).toHaveLength(1)
 
-      // when: telemetry is turned off, one more turn ends after the consent cache expired, and the process dies
+      // when: telemetry is turned off, one more turn ends, and the process dies
       consent = false
-      clock += 60_000
       await pi.dispatch("turn_end", turnEnd(), context("midway"))
 
       // then: the session deleted its own rollup on the first write after opting out
@@ -888,17 +885,15 @@ describe("OmO Native telemetry component integration", () => {
     })
   })
 
-  test("#given many turns inside the consent cache window #when they end #then the omo config is read once, and again only after the window", async () => {
+  test("#given several turns #when they end #then consent is read for the session's cwd before each one", async () => {
     await withTempAgentDir(async (agentDir) => {
       writeInventory(agentDir)
       const recorder = createTransportRecorder()
-      let clock = 1_000_000
       const reads: Array<string | undefined> = []
       const pi = new FakeExtensionAPI()
       pi.cwd = "/cached"
       createOmoNativeTelemetryComponent({
         rawTurnSampleRate: 0,
-        consentNow: () => clock,
         env: createEnabledEnv(agentDir),
         hashSessionId: (raw) => `hashed:${raw}`,
         isConfigEnabled: (cwd) => {
@@ -917,13 +912,11 @@ describe("OmO Native telemetry component integration", () => {
       // when: five turns end at the same instant
       const before = reads.length
       for (let index = 0; index < 5; index += 1) await pi.dispatch("turn_end", turnEnd(), ctx)
-      const duringWindow = reads.length - before
-      clock += 60_000
-      await pi.dispatch("turn_end", turnEnd(), ctx)
 
       // then
-      expect(duringWindow).toBeLessThanOrEqual(1)
-      expect(reads.length - before - duringWindow).toBe(1)
+      const during = reads.slice(before)
+      expect(during.length).toBeGreaterThanOrEqual(5)
+      expect(new Set(during)).toEqual(new Set(["/cached"]))
     })
   })
 

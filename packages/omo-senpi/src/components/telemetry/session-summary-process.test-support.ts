@@ -24,6 +24,7 @@ const storage: SummaryStorage = mode === "die-before-pending"
   : realStorage
 
 const summary = createSessionSummaryRecorder({
+  consentScope: () => ({ cwd: "/repo" }),
   storage,
   sessionRole: "root",
   sampleRate: () => 0.05,

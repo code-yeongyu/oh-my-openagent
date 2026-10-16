@@ -81,7 +81,7 @@ export function createTestRecorder(input: TestRecorderInput): TestRecorder {
   })
   const summary = createSessionSummaryRecorder({
     ...(input.isConsented === undefined ? {} : { isConsented: input.isConsented }),
-    ...(input.consentScope === undefined ? {} : { consentScope: () => input.consentScope ?? {} }),
+    consentScope: () => input.consentScope ?? { cwd: "/repo" },
     ...(input.isScopeConsented === undefined ? {} : { isScopeConsented: input.isScopeConsented }),
     storage,
     publish: async (event) => {

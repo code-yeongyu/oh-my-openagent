@@ -26,8 +26,8 @@ export type SessionSummaryOptions = {
    * the session's own window file is deleted so no later process can send it. Defaults to consented.
    */
   readonly isConsented?: (check?: { readonly fresh?: boolean }) => boolean
-  /** The scope `isConsented` reads right now; stamped into every persisted record. */
-  readonly consentScope?: () => ConsentScope
+  /** The scope `isConsented` reads right now; stamped into every persisted record. Without a cwd nothing is ever sent. */
+  readonly consentScope: () => ConsentScope
   /**
    * Consent for the scope a persisted record came from, read when it is about to be sent or resumed:
    * consent at send time wins over the mark written while the session was still opted in.
@@ -81,7 +81,7 @@ export function createSessionSummaryRecorder(options: SessionSummaryOptions): Se
   const { storage } = options
   const now = options.now ?? storage.now
   const isConsented = options.isConsented ?? (() => true)
-  const consentScope = options.consentScope ?? (() => ({}))
+  const { consentScope } = options
   const isScopeConsented = options.isScopeConsented ?? (() => true)
   // A normal turn loads nothing: the sidecar is loaded when a window closes, a sweep has work, or a session
   // continues a window another process wrote (only the sidecar can tell whether that owner is alive).
