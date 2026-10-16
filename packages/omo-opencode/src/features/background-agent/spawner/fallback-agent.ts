@@ -1,4 +1,5 @@
 import { getAgentToolRestrictions } from "../../../shared"
+import { canUseCallOmoAgent } from "../../../shared/delegated-agent-tool-policy"
 import type { TaskPromptBody } from "./task-prompt-body"
 
 export const FALLBACK_AGENT = "general"
@@ -34,7 +35,8 @@ export function buildFallbackBody(
     agent: fallbackAgent,
     tools: {
       task: false,
-      call_omo_agent: true,
+      call_omo_agent: originalBody.tools.call_omo_agent !== false
+        && canUseCallOmoAgent(originalBody.model),
       question: false,
       ...getAgentToolRestrictions(fallbackAgent, options),
     },

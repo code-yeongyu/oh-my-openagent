@@ -34,7 +34,7 @@ export async function registerSyncSessionSideEffects(input: {
     fallbackChain: input.fallbackChain,
     category: input.args.category,
     system: input.systemContent,
-    tools: buildSyncPromptTools(input.agentToUse, userPermission),
+    tools: buildSyncPromptTools(input.agentToUse, userPermission, input.categoryModel, input.parentContext.model),
     modelFallbackControllerAccessor: input.executorCtx.modelFallbackControllerAccessor,
   })
 
