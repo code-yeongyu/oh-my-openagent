@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { maxSendMs, postWithRetry, type OtlpFetch } from "./otlp-http"
+import { maxSendMs, postWithRetry, type AttemptGate, type OtlpFetch } from "./otlp-http"
 import {
   claimBatch,
   deleteFile,
@@ -123,6 +123,20 @@ export class BatchSender {
     }
   }
 
+  /**
+   * Re-asserts the claim by renaming it to a fresh lease right before each attempt. Rename is the
+   * mutual exclusion: if the lease expired while this process was stalled and another process took
+   * the batch, the rename fails and this process never sends it. Withdrawn consent deletes it unsent.
+   */
+  #gate(): AttemptGate {
+    if (!this.#input.consent()) return "withdrawn"
+    const current = this.#inFlight
+    const renewed = current === undefined ? null : renewClaim(this.#input.ctx, current)
+    if (renewed === null) return "lost"
+    this.#inFlight = renewed
+    return "send"
+  }
+
   async #send(claimed: string): Promise<void> {
     const ctx = this.#input.ctx
     this.#inFlight = claimed
@@ -149,6 +163,7 @@ export class BatchSender {
         ingestKey: this.#input.ingestKey,
         abort: this.#abort.signal,
         requestTimeoutMs: this.#input.requestTimeoutMs,
+        beforeAttempt: () => this.#gate(),
       }, request.signal, request.body)
       const current = this.#inFlight ?? claimed
       if (outcome.kind === "accepted") {
@@ -159,6 +174,10 @@ export class BatchSender {
         }
       } else if (outcome.kind === "rejected") {
         dropFile(ctx, current, "rejected")
+      } else if (outcome.kind === "withdrawn") {
+        deleteFile(ctx.dir, current)
+      } else if (outcome.kind === "lost") {
+        return
       } else if (!this.#stopped) {
         releaseClaim(ctx, current)
         if (outcome.kind === "retry_later") this.#input.report("telemetry_otlp_send_failed")

@@ -35,6 +35,8 @@ export type CreateOtlpTelemetryTransportInput = {
   readonly flushAt?: number
   readonly flushIntervalMs?: number
   readonly sweepIntervalMs?: number
+  /** Runs `run` every `ms`; the default is an unref'd `setInterval`, so the timers never keep the host alive. */
+  readonly scheduleEvery?: (run: () => Promise<void>, ms: number) => { readonly cancel: () => void }
   readonly shutdownTimeoutMs?: number
   readonly capBytes?: number
   readonly maxAgeMs?: number

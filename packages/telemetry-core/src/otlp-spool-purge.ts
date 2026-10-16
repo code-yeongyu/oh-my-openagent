@@ -2,7 +2,7 @@ import { lstatSync, readdirSync, realpathSync, rmdirSync, type Stats, unlinkSync
 import { isAbsolute, join, relative } from "node:path"
 
 import { isSpoolFileName, QUARANTINE_DIR } from "./otlp-spool-dir"
-import type { TelemetrySpoolEntryKind } from "./types"
+import type { TelemetryDiagnosticInput, TelemetrySpoolEntryKind } from "./types"
 
 /**
  * `refused`: the directory failed verification and nothing was deleted. `incomplete`: the sweep ran
@@ -16,6 +16,17 @@ export type PurgeReport = {
   readonly onSkipped: (kind: TelemetrySpoolEntryKind) => void
   /** A regular spool file of the current user whose unlink failed while the entry stayed the same. */
   readonly onFailed: (code: string) => void
+}
+
+/** Each entry the purge leaves behind becomes one diagnostic, by kind or errno code, never by path. */
+export function diagnosticPurgeReport(
+  diagnostics: ((input: TelemetryDiagnosticInput) => void) | undefined,
+  source: string,
+): PurgeReport {
+  return {
+    onSkipped: (entryKind) => diagnostics?.({ event: "telemetry_spool_purge_skipped", source, entryKind }),
+    onFailed: (errorCode) => diagnostics?.({ event: "telemetry_spool_purge_failed", source, errorCode }),
+  }
 }
 
 /** Test seams for what an unprivileged test cannot stage: an entry swapped mid-purge, a file of another user. */

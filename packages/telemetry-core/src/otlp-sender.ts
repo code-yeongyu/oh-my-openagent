@@ -18,33 +18,17 @@ import {
   type SpoolContext,
 } from "./otlp-spool-dir"
 import { SpoolCap } from "./otlp-spool-cap"
-import { type PurgeReport, purgeSpool } from "./otlp-spool-purge"
-import { abortableSleep, delay } from "./otlp-sleep"
+import { diagnosticPurgeReport as purgeReport, purgeSpool } from "./otlp-spool-purge"
+import { isPidAlive } from "./otlp-pid-alive"
+import { abortableSleep, delay, everyUnref } from "./otlp-sleep"
 import type { CreateOtlpTelemetryTransportInput, OtlpTelemetryTransport } from "./otlp-transport-types"
 import type { SpoolWriter } from "./otlp-wal"
-import type { TelemetryCaptureMessage, TelemetryDiagnosticEvent, TelemetrySpoolEntryKind } from "./types"
+import type { TelemetryCaptureMessage, TelemetryDiagnosticEvent } from "./types"
 
 const SEAL_BYTES = 200 * 1024
 const LEASE_RENEW_INTERVAL_MS = 60_000
 const SHUTDOWN_CLEANUP_RESERVE_MS = 200
 const DROP_REASONS: readonly DropReason[] = ["evicted", "expired", "rejected", "corrupt", "write_failed"]
-
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error instanceof Error && "code" in error && error.code === "EPERM"
-  }
-}
-
-/** Each entry the purge leaves behind becomes one diagnostic, by kind or errno code, never by path. */
-function purgeReport(diagnostics: CreateOtlpTelemetryTransportInput["diagnostics"], source: string): PurgeReport {
-  return {
-    onSkipped: (entryKind: TelemetrySpoolEntryKind) => diagnostics?.({ event: "telemetry_spool_purge_skipped", source, entryKind }),
-    onFailed: (errorCode: string) => diagnostics?.({ event: "telemetry_spool_purge_failed", source, errorCode }),
-  }
-}
 
 /**
  * The collector transport; null whenever any opt-out applies. An opt-out creates nothing on disk and
@@ -80,7 +64,7 @@ class OtlpSender {
   readonly #batches: BatchSender
   readonly #cap: SpoolCap
   readonly #unreported: Record<DropReason, number> = { evicted: 0, expired: 0, rejected: 0, corrupt: 0, write_failed: 0 }
-  readonly #timers: ReturnType<typeof setInterval>[] = []
+  readonly #timers: { readonly cancel: () => void }[] = []
   #droppedSince200 = 0
   #stopped = false
 
@@ -135,24 +119,32 @@ class OtlpSender {
       capture: (message) => this.#capture(message),
       flush: () => this.#flush(),
       shutdown: () => this.#shutdown(),
-      sweep: () => this.#guard("telemetry_spool_sweep_failed", () => sweepSpool(this.#ctx)),
+      sweep: () => this.#guard("telemetry_spool_sweep_failed", () => {
+        sweepSpool(this.#ctx)
+        this.#cap.enforce()
+      }),
       droppedEvents: () => this.#droppedSince200,
     }
   }
 
   #start(): Promise<void> {
-    const flushTimer = setInterval(() => void this.#flush(), this.#input.flushIntervalMs ?? 10_000)
-    const sweepTimer = setInterval(() => {
-      this.transport.sweep()
-      void this.#batches.pump()
-    }, this.#input.sweepIntervalMs ?? 60_000)
-    flushTimer.unref?.()
-    sweepTimer.unref?.()
-    this.#timers.push(flushTimer, sweepTimer)
-    return Promise.resolve().then(() => {
-      this.transport.sweep()
-      return this.#batches.pump()
-    })
+    const every = this.#input.scheduleEvery ?? everyUnref
+    this.#timers.push(
+      every(() => this.#flush(), this.#input.flushIntervalMs ?? 10_000),
+      every(() => this.#sweepTick(), this.#input.sweepIntervalMs ?? 60_000),
+    )
+    return Promise.resolve().then(() => this.#sweepTick())
+  }
+
+  /** Start and every 60 s: recover what dead or stalled processes left, cap the spool, replay; purge if consent ended. */
+  #sweepTick(): Promise<void> {
+    if (this.#stopped) return Promise.resolve()
+    if (!this.#consent()) {
+      this.#purge()
+      return Promise.resolve()
+    }
+    this.transport.sweep()
+    return this.#batches.pump()
   }
 
   #report(event: TelemetryDiagnosticEvent, error?: unknown): void {
@@ -257,7 +249,7 @@ class OtlpSender {
 
   async #shutdown(): Promise<void> {
     if (this.#stopped) return
-    for (const timer of this.#timers) clearInterval(timer)
+    for (const timer of this.#timers) timer.cancel()
     // The cap is measured from this call: the deadline is armed before the flush runs, so the
     // flush's synchronous seal and claim work counts against the cap instead of delaying its start,
     // and it fires early enough to leave room for releasing the in-flight claim and closing files.
