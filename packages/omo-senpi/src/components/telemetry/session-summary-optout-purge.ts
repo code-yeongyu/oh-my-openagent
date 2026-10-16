@@ -2,17 +2,15 @@ import { linkSync } from "node:fs"
 import { join } from "node:path"
 
 import { CORRUPT, listNames, readJsonOrCorrupt, removeFile } from "./session-summary-files"
-import { createOwnerRegistry, currentProcessOwner, parseOwner, processIsAlive } from "./session-summary-owner"
+import { parseOwner } from "./session-summary-owner"
+import type { RecoveryStorage } from "./session-summary-recovery-storage"
 import {
-  createSummaryStorage,
   isRecordSendable,
   parsePendingRecord,
   parseWindowRecord,
-  summaryDir,
   type ConsentScope,
   type PendingRecord,
   type ReadResult,
-  type SummaryStorage,
   type WindowRecord,
 } from "./session-summary-storage"
 
@@ -20,24 +18,18 @@ import {
  * Run by an opted-out process at startup and shutdown. Every record a DEAD owner left that may not be sent
  * now (no `enabled` mark, or its scope is opted out) is deleted: windows, pending events, claims and temps,
  * and dead owners' registry entries. Files of live owners are theirs: each re-checks its own consent. Nothing
- * here registers this process as an owner or writes a file.
+ * here registers this process as an owner or writes a file. It needs owner liveness and the recovery-only
+ * storage operations, so it ships in the recovery sidecar with them.
  */
 export function purgeOptedOutQueue(input: {
-  readonly stateDir: string
+  readonly storage: RecoveryStorage
   readonly isScopeConsented: (scope: ConsentScope) => boolean
-  readonly isPidAlive?: (pid: number) => boolean
-  /** The queue to purge; defaults to the one under `stateDir`. Injected by tests that interleave a live writer. */
-  readonly storage?: SummaryStorage
 }): void {
-  const dir = summaryDir(input.stateDir)
-  const self = currentProcessOwner()
-  const isPidAlive = input.isPidAlive ?? processIsAlive
-  const registry = createOwnerRegistry({ dir, owner: self, isPidAlive })
-  const storage = input.storage ?? createSummaryStorage({ stateDir: input.stateDir, owner: self, isPidAlive })
+  const { storage } = input
   const sendable = (record: Parameters<typeof isRecordSendable>[0]) => isRecordSendable(record, input.isScopeConsented)
 
   for (const leftover of storage.leftovers()) {
-    if (registry.isAlive(leftover.owner)) continue
+    if (storage.isOwnerAlive(leftover.owner)) continue
     const value = readJsonOrCorrupt(leftover.path)
     const record = value === undefined || value === CORRUPT
       ? undefined
@@ -49,7 +41,7 @@ export function purgeOptedOutQueue(input: {
   // A record a live owner holds, or one that may still be sent, is kept. The decision is re-made on the copy the
   // claim (an atomic rename) actually took, so a live writer's rewrite between the read and the delete survives.
   const kept = (record: ReadResult<WindowRecord | PendingRecord>): boolean =>
-    record !== undefined && record !== CORRUPT && (registry.isAlive(record.owner) || sendable(record))
+    record !== undefined && record !== CORRUPT && (storage.isOwnerAlive(record.owner) || sendable(record))
 
   for (const key of storage.windowKeys()) {
     const record = storage.readWindow(key)
@@ -65,9 +57,10 @@ export function purgeOptedOutQueue(input: {
     if (claimed !== undefined) settleClaim(claimed.claimPath, kept(claimed.record))
   }
 
-  for (const name of listNames(join(dir, "owners"))) {
-    const owner = parseOwner(readJsonOrCorrupt(join(dir, "owners", name)))
-    if (owner !== undefined && owner.pid !== self.pid) registry.isAlive(owner)
+  // Asking about a dead owner removes its registry entry.
+  for (const name of listNames(join(storage.dir, "owners"))) {
+    const owner = parseOwner(readJsonOrCorrupt(join(storage.dir, "owners", name)))
+    if (owner !== undefined && owner.pid !== storage.owner.pid) storage.isOwnerAlive(owner)
   }
 }
 

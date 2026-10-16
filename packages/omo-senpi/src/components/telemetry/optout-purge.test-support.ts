@@ -2,9 +2,11 @@ import { expect } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import type { TelemetryCaptureMessage } from "@oh-my-opencode/telemetry-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createOmoNativeTelemetryComponent, type OmoNativeTelemetryComponentOptions } from "./omo-native-component"
+import type { LoadSummaryRecovery } from "./session-summary-lazy-recovery"
 import { createSummaryStorage, summaryDir, OWNER_STALE_MS, type ConsentScope } from "./session-summary-storage"
 import { addTurn, openWindow } from "./session-summary-window"
 import { summaryTurn } from "./session-summary.test-support"
@@ -98,15 +100,16 @@ export function killWithoutShutdown(stateDir: string): void {
   }
 }
 
-export function registerProcess(input: {
+export async function registerProcess(input: {
   readonly agentDir: string
   readonly recorder: RecordedTransport
   readonly env?: Record<string, string>
   readonly cwd?: string
   readonly options?: Partial<OmoNativeTelemetryComponentOptions>
-}): FakeExtensionAPI {
+}): Promise<FakeExtensionAPI> {
   const pi = new FakeExtensionAPI()
   if (input.cwd !== undefined) pi.cwd = input.cwd
+  let purged: Promise<void> = Promise.resolve()
   createOmoNativeTelemetryComponent({
     rawTurnSampleRate: 0,
     env: { ...createEnabledEnv(input.agentDir), ...input.env },
@@ -115,8 +118,13 @@ export function registerProcess(input: {
     osProvider: createOsProvider("optout-host"),
     stateDir: join(input.agentDir, "omo-senpi", "omo-native"),
     transportFactory: input.recorder.factory,
+    onOptOutPurge: (purge) => {
+      purged = purge
+    },
     ...input.options,
   }).register(pi, { config: pi, logger: createSilentLogger() })
+  // An opted-out start purges in the background; the process is registered once that purge settled.
+  await purged
   return pi
 }
 
@@ -129,6 +137,66 @@ export function expectNoRepeatedSummaryKey(recorder: RecordedTransport, sessionH
   expect(keys).toHaveLength(rows)
   expect(keys.every((key) => !key.startsWith("undefined:"))).toBe(true)
   expect(new Set(keys).size).toBe(keys.length)
+}
+
+export type WatchedTransport = RecordedTransport & {
+  /** Resolves once `count` session_summary rows for the session were captured; rejects after `timeoutMs`. */
+  readonly summariesSent: (sessionHash: string, count: number, timeoutMs?: number) => Promise<void>
+}
+
+// A checkpoint is sent after the turn handler returned (the send step loads with the recovery sidecar), so a
+// test waits for the captured row itself instead of for the dispatch.
+export function createWatchedTransport(): WatchedTransport {
+  const messages: TelemetryCaptureMessage[] = []
+  const waiters = new Set<() => void>()
+  const recorded: RecordedTransport = {
+    messages,
+    factory: () => ({
+      capture(message) {
+        messages.push(message)
+        for (const wake of waiters) wake()
+      },
+      flush: async () => undefined,
+      shutdown: async () => undefined,
+    }),
+  }
+  return {
+    ...recorded,
+    summariesSent: (sessionHash, count, timeoutMs = 2_000) => new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        waiters.delete(check)
+        reject(new Error(`expected ${count} session_summary rows for ${sessionHash}, saw ${sentSeqs(recorded, sessionHash).length}`))
+      }, timeoutMs)
+      function check(): void {
+        if (sentSeqs(recorded, sessionHash).length < count) return
+        clearTimeout(timer)
+        waiters.delete(check)
+        resolve()
+      }
+      waiters.add(check)
+      check()
+    }),
+  }
+}
+
+// The send step (which retires a pending file on acknowledgment) runs after the turn handler returned. Tests load
+// the real sidecar through this wrapper and await the very send promises it started.
+export function trackedSidecar(): { readonly load: LoadSummaryRecovery; readonly sendsSettled: () => Promise<void> } {
+  const sends: Promise<void>[] = []
+  const load: LoadSummaryRecovery = () => import("./session-summary-recovery").then((sidecar) => ({
+    ...sidecar,
+    sendSummaryRecord: (...args: Parameters<typeof sidecar.sendSummaryRecord>) => {
+      const send = sidecar.sendSummaryRecord(...args)
+      sends.push(send)
+      return send
+    },
+  }))
+  return {
+    load,
+    sendsSettled: async () => {
+      await Promise.all(sends)
+    },
+  }
 }
 
 export function sentSeqs(recorder: RecordedTransport, sessionHash: string): unknown[] {

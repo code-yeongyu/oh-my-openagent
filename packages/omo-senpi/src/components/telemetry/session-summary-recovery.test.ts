@@ -6,7 +6,8 @@ import { CHECKPOINT_MAX_TURNS } from "./omo-native-session-summary"
 import { CORRUPT } from "./session-summary-files"
 import { purgeOptedOutQueue } from "./session-summary-optout-purge"
 import { withRecoveryOps } from "./session-summary-recovery-storage"
-import { OWNER_STALE_MS, SUMMARY_TTL_MS, summaryDir } from "./session-summary-storage"
+import { currentProcessOwner } from "./session-summary-owner"
+import { OWNER_STALE_MS, SUMMARY_TTL_MS, createSummaryStorage, summaryDir } from "./session-summary-storage"
 import { createTempStateDirs, createTestRecorder, rows, summaryTurn } from "./session-summary.test-support"
 
 // Protocol contract (plan todo 8): a window is claimed only when its heartbeat is older than 5 minutes AND
@@ -168,7 +169,8 @@ describe("session_summary recovery hygiene", () => {
     storage.writeWindow("w-off", window("/off"))
     storage.writeWindow("w-on", window("/on"))
 
-    purgeOptedOutQueue({ stateDir: dir, isScopeConsented: (scope) => scope.cwd !== "/off", isPidAlive: (pid) => pid === process.pid })
+    const purger = createSummaryStorage({ stateDir: dir, owner: currentProcessOwner(), isPidAlive: (pid) => pid === process.pid })
+    purgeOptedOutQueue({ storage: withRecoveryOps(purger), isScopeConsented: (scope) => scope.cwd !== "/off" })
 
     expect(storage.pendingUuids()).toEqual(["0395eae0-1111-4222-8333-944455556662"])
     expect(storage.windowKeys()).toEqual(["w-on"])

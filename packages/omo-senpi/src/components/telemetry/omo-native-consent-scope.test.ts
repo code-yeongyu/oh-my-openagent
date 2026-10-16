@@ -27,7 +27,7 @@ describe("omo-native session_summary consent scope", () => {
       const home = join(agentDir, "home")
       const project = join(home, "project")
       writeProjectTelemetry(project, true)
-      const pi = registerProcess({ agentDir, recorder, cwd: project, env: { HOME: home }, options: { scheduleConsentCheck: () => () => undefined } })
+      const pi = await registerProcess({ agentDir, recorder, cwd: project, env: { HOME: home }, options: { scheduleConsentCheck: () => () => undefined } })
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("flip", project))
       await pi.dispatch("turn_end", turnEnd(), inProject("flip", project))
       expect(contentFiles(stateDir)).toHaveLength(1)
@@ -51,14 +51,14 @@ describe("omo-native session_summary consent scope", () => {
       const options = { isConfigEnabled: () => true, scheduleConsentCheck: () => () => undefined }
 
       // given: a host without a cwd records two turns and dies
-      const scopeless = registerProcess({ agentDir, recorder, options })
+      const scopeless = await registerProcess({ agentDir, recorder, options })
       await scopeless.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("scopeless"))
       await scopeless.dispatch("turn_end", turnEnd(), inProject("scopeless"))
       await scopeless.dispatch("turn_end", turnEnd(), inProject("scopeless"))
       killWithoutShutdown(stateDir)
 
       // when
-      const recovering = registerProcess({ agentDir, recorder, cwd: "/repo", options })
+      const recovering = await registerProcess({ agentDir, recorder, cwd: "/repo", options })
       await recovering.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("recovering", "/repo"))
       await recovering.dispatch("turn_end", turnEnd(), inProject("recovering", "/repo"))
       // The recovery sweep is loaded on demand; the process's own shutdown waits for it to finish.
@@ -81,7 +81,7 @@ describe("omo-native session_summary consent scope", () => {
           isConfigEnabled: (cwd: string | undefined) => cwd !== "/project-a" || projectEnabled,
           scheduleConsentCheck: () => () => undefined,
         }
-        const pi = registerProcess({ agentDir, recorder, cwd: "/project-a", options })
+        const pi = await registerProcess({ agentDir, recorder, cwd: "/project-a", options })
         await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("cwdless", "/project-a"))
         await pi.dispatch("turn_end", turnEnd(), inProject("cwdless", "/project-a"))
 

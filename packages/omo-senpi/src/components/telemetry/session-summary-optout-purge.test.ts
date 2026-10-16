@@ -3,11 +3,13 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { purgeOptedOutQueue } from "./session-summary-optout-purge"
+import { withRecoveryOps } from "./session-summary-recovery-storage"
 import { createSummaryStorage, OWNER_STALE_MS, summaryDir, type WindowRecord } from "./session-summary-storage"
 import { createTempStateDirs } from "./session-summary.test-support"
 
 const LIVE = { pid: 424_242, bootId: "live" }
 const DEAD = { pid: 0x7fff_fff0, bootId: "killed" }
+const PURGER = { pid: process.pid, bootId: "purger" }
 
 function windowRecord(owner: typeof LIVE, heartbeatAt: number, cwd: string): WindowRecord {
   return {
@@ -25,13 +27,14 @@ describe("purgeOptedOutQueue against a live writer", () => {
       const dir = dirs.make()
       const isPidAlive = (pid: number) => pid === LIVE.pid
       const live = createSummaryStorage({ stateDir: dir, owner: LIVE, isPidAlive })
+      const purger = withRecoveryOps(createSummaryStorage({ stateDir: dir, owner: PURGER, isPidAlive }))
       const stale = windowRecord(DEAD, Date.now() - OWNER_STALE_MS - 60_000, "/off")
       live.writeWindow("race", windowRecord(LIVE, Date.now(), "/on"))
       // The purge's read returns the dead owner's record that was there a moment ago.
-      const storage = { ...live, readWindow: (key: string) => (key === "race" ? stale : live.readWindow(key)) }
+      const storage = { ...purger, readWindow: (key: string) => (key === "race" ? stale : purger.readWindow(key)) }
 
       // when
-      purgeOptedOutQueue({ stateDir: dir, isScopeConsented: () => false, isPidAlive, storage })
+      purgeOptedOutQueue({ storage, isScopeConsented: () => false })
 
       // then
       const onDisk = JSON.parse(readFileSync(join(summaryDir(dir), "race.json"), "utf8"))

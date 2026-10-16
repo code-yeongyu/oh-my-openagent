@@ -40,7 +40,8 @@ import {
   type NativeCaptureState,
 } from "./omo-native-summary-wiring"
 import { isTelemetryHostWarmup, resolveTelemetrySessionRole } from "./session-role-resolver"
-import { purgeOptedOutQueue } from "./session-summary-optout-purge"
+import type { LoadSummaryRecovery } from "./session-summary-lazy-recovery"
+import { startOptOutPurge } from "./session-summary-optout-start"
 import type { ConsentScope } from "./session-summary-storage"
 import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
@@ -70,6 +71,10 @@ export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
   readonly consentNow?: () => number
   /** Periodic consent check while a summary window is on disk; defaults to an unref'd interval. */
   readonly scheduleConsentCheck?: (check: () => void) => () => void
+  /** Loads the recovery sidecar (sweep, send step, opt-out purge); defaults to `#omo-telemetry-recovery-runtime`. */
+  readonly loadRecovery?: LoadSummaryRecovery
+  /** Receives the opt-out purge started at registration; tests await it. */
+  readonly onOptOutPurge?: (purge: Promise<void>) => void
 }
 
 /** A consent read is reused for this long on the per-turn path; the periodic check always reads fresh. */
@@ -122,7 +127,15 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       let consentCwd = typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : undefined
       const consentedAtRegistration = readConsent(consentCwd)
       // An opted-out process deletes what dead processes left for it at once, not only when it quits.
-      if (!consentedAtRegistration) purgeQueue(stateDir, isScopeConsented, options)
+      const purgeQueue = () => startOptOutPurge({
+        stateDir,
+        isScopeConsented,
+        load: options.loadRecovery ?? (() => import("#omo-telemetry-recovery-runtime")),
+        ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
+        ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+      })
+      const startupPurge = consentedAtRegistration ? undefined : purgeQueue()
+      if (startupPurge !== undefined) options.onOptOutPurge?.(startupPurge)
       let cached = { cwd: consentCwd, at: consentNow(), value: consentedAtRegistration }
       const currentConsent = (fresh: boolean): boolean => {
         const at = consentNow()
@@ -177,6 +190,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
           ...(options.rawTurnSampleRate === undefined ? {} : { rawTurnSampleRate: options.rawTurnSampleRate }),
           ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
           ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+          ...(options.loadRecovery === undefined ? {} : { loadRecovery: options.loadRecovery }),
         })
         : undefined
       // The first capture is when recovery runs: the capture path is installed by then.
@@ -186,7 +200,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       pi.on("session_shutdown", async (payload, eventCtx) => {
         consentCwd = cwdOf(eventCtx) ?? consentCwd
         if (summary === undefined) {
-          purgeQueue(stateDir, isScopeConsented, options)
+          await settleWithin(Promise.resolve(startupPurge).then(purgeQueue), SUMMARY_SHUTDOWN_WAIT_MS)
           return
         }
         const reason = isRecord(payload) && typeof payload.reason === "string" ? payload.reason : undefined
@@ -393,28 +407,6 @@ function forwardValidatedCapture(transport: TelemetryTransport, message: Telemet
   }
   transport.capture(message)
   return undefined
-}
-
-// Records dead processes left that may not be sent now are deleted even by a session that records nothing.
-function purgeQueue(
-  stateDir: string,
-  isScopeConsented: (scope: ConsentScope) => boolean,
-  options: OmoNativeTelemetryComponentOptions,
-): void {
-  try {
-    purgeOptedOutQueue({
-      stateDir,
-      isScopeConsented,
-      ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
-    })
-  } catch (error) {
-    options.diagnostics?.({
-      event: "telemetry_activity_state_write_failed",
-      source: "omo-native-component",
-      error,
-      errorKind: error instanceof Error ? "error" : "non_error",
-    })
-  }
 }
 
 function reportCaptureFailure(options: OmoNativeTelemetryComponentOptions, error: unknown): void {
