@@ -17,6 +17,7 @@ import { createSandbox, seedSandbox } from "./drive.mjs"
 import { changedRealPaths, classifyRealSenpiChanges, parseJsonEvents, snapshotDir } from "./task-e2e-analysis.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-lane-spill-mock-provider.ts")
@@ -388,7 +389,7 @@ async function main() {
   const beforeSnapshot = snapshotRealAgentDirs()
   const providedAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
 
-  const probe = spawnSync(senpiBin, ["--version"], { encoding: "utf8", timeout: 30_000 })
+  const probe = spawnSync(senpiBin, ["--version"], { encoding: "utf8", timeout: 30_000, env: withTelemetryOptOut(process.env) })
   if (probe.error !== undefined) {
     const skip = { result: "SKIP", reason: "senpi-binary-unavailable", providedAgentDir }
     writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(skip, null, 2)}\n`)

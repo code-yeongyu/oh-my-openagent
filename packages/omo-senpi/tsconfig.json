@@ -8,7 +8,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["ESNext"],
-    "types": ["bun-types"]
+    "types": ["bun-types", "node"],
+    "typeRoots": ["./node_modules/@types", "./node_modules"]
   },
   "include": ["src/**/*"]
 }

@@ -25,6 +25,10 @@
       "types": "./src/category/coverage.ts",
       "import": "./src/category/coverage.ts"
     },
+    "./category-shadow": {
+      "types": "./src/agents/category-shadow.ts",
+      "import": "./src/agents/category-shadow.ts"
+    },
     "./dag": {
       "types": "./src/dag/index.ts",
       "import": "./src/dag/index.ts"

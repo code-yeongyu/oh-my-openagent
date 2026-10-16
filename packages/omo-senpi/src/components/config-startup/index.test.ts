@@ -360,6 +360,47 @@ describe("notificationMessages", () => {
     }])
   })
 
+  test("#given categories named after a builtin and a configured agent #when notices are built #then one warning names each ignored category key and its agents key", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: { "plan-consultant": { model: "omo-mock/mock-1" }, scout: { model: "omo-mock/mock-2" }, quick: { model: "omo-mock/mock-3" } },
+        agents: { scout: { description: "Project scout" } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([{
+      message: 'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }',
+      type: "warning",
+    }])
+  })
+
+  test("#given a category named after an agent that already sets its own models #when notices are built #then no category-shadow warning is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: { explore: { model: "a/b" } },
+        agents: { explore: { models: ["x/y"] } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([])
+  })
+
   test("#given only canonical and custom agent keys #when notices are built #then no alias-deprecated notice is produced", () => {
     // given
     const config: SenpiOmoConfigResult = {

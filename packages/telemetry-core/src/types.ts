@@ -1,4 +1,4 @@
-import type { PostHog } from "posthog-node"
+import type { PostHog, PostHogOptions } from "posthog-node"
 
 export type TelemetryCaptureMessage = Parameters<PostHog["capture"]>[0]
 export type TelemetryCaptureProperties = NonNullable<TelemetryCaptureMessage["properties"]>
@@ -8,9 +8,11 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_activity_state_write_failed"
   | "telemetry_capture_failed"
   | "telemetry_cpu_info_unavailable"
+  | "telemetry_drop_flush_failed"
   | "telemetry_event_property_dropped"
   | "telemetry_event_property_rejected"
   | "telemetry_event_rejected"
+  | "telemetry_events_dropped_by_consent"
   | "telemetry_posthog_import_failed"
   | "telemetry_posthog_init_failed"
   | "telemetry_shutdown_failed"
@@ -22,6 +24,7 @@ export type TelemetryDiagnosticInput = {
   readonly source: string
   readonly error?: unknown
   readonly errorKind?: TelemetryDiagnosticErrorKind
+  readonly count?: number
 }
 
 export type TelemetryProductConfig = {
@@ -61,7 +64,11 @@ export type TelemetryTransportOptions = {
   readonly disableRemoteConfig: boolean
   readonly flushAt: number
   readonly flushInterval: number
+  readonly fetch?: TelemetryFetch
 }
+
+/** The SDK's public network seam: every batch it sends, timer, size or shutdown flush, goes through it. */
+export type TelemetryFetch = NonNullable<PostHogOptions["fetch"]>
 
 export type TelemetryTransport = {
   readonly capture: (message: TelemetryCaptureMessage) => void

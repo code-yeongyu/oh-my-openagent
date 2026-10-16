@@ -1422,6 +1422,7 @@ The shared base and Senpi use an object:
 | `OMO_DEBUG` | Set to `1` (any non-empty value) to print omo-senpi component `info` diagnostics on stderr. Unset, those lines are silent. `warn` and `error` still print. Component logs never go to stdout. |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry |
 | `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1`, `true`, or `yes` to disable PostHog |
+| `OMO_DISABLE_TELEMETRY` | Set to `1`, `true`, or `yes` to disable anonymous telemetry in every omo package |
 | `OMO_CODEX_DISABLE_POSTHOG` | Set to `1`, `true`, or `yes` to disable PostHog telemetry for the `omo-codex` adapter. Global `OMO_DISABLE_POSTHOG` also disables Codex telemetry. |
 | `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, `no`, or `yes` to disable anonymous telemetry for `omo-codex` |
 | `OMO_CODEX_GIT_BASH_PATH` | Native Windows Codex installs only. Absolute path to Git Bash, for example `C:\Program Files\Git\bin\bash.exe`, when `where bash` cannot find it |

@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
+
 // Set identity before importing senpi: core/brand consumes SENPI_BRAND once, then scrubs it.
 // Mirrors omo-native/bin/lib/launcher.js; the isolated agent home is the only substitution.
 export function isolatedEnvironment(sandbox, packageRoot) {
@@ -30,8 +32,7 @@ export function isolatedEnvironment(sandbox, packageRoot) {
   env.OMO_BIN = join(nativeRoot, "bin/omo.js")
   for (const key of ["TMPDIR", "TMP", "TEMP"]) env[key] = join(sandbox, "tmp")
   env.PI_OFFLINE = "1"
-  env.DO_NOT_TRACK = "1"
-  return env
+  return withTelemetryOptOut(env)
 }
 
 export function processGroupMembers(groupId) {

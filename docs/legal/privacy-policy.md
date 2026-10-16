@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 21, 2026
+Last updated: October 16, 2026
 
 This Privacy Policy explains how oh-my-opencode and oh-my-openagent collect, use, and protect information related to the published CLI package, the OpenCode plugin, and the project website or repository materials where they apply.
 
@@ -96,3 +96,5 @@ We may update this Privacy Policy from time to time. Material updates will be re
 ## 9. Contact
 
 Questions about this Privacy Policy should be raised through the project repository issue tracker or the maintainer contact channels published in the repository.
+
+To request erasure of the telemetry recorded for your machine, or for any question that involves your telemetry identifier, use the repository's [private vulnerability reporting form](https://github.com/code-yeongyu/oh-my-openagent/security/advisories/new) (Security tab, "Report a vulnerability") instead of a public issue, and put the identifier only in that private report.
