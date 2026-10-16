@@ -14,6 +14,7 @@ type MigrationReport = {
   readonly diagnostics: readonly string[]
   readonly movePlan: readonly { readonly from: string; readonly to: string }[]
   readonly status: string
+  readonly targetBackupPath?: string
   readonly targetPath?: string
   readonly transform?: Readonly<Record<string, unknown>>
 }
@@ -23,6 +24,7 @@ function reports(result: ReturnType<typeof runOpenCodeStartupMigration>): readon
     diagnostics: entry.diagnostics,
     movePlan: entry.preview?.backupMoves ?? [],
     status: entry.status,
+    ...(entry.targetBackupPath === undefined ? {} : { targetBackupPath: entry.targetBackupPath }),
     ...(entry.preview === undefined ? {} : { targetPath: entry.preview.targetPath, transform: entry.preview.transform }),
   }))
 }
@@ -31,6 +33,7 @@ function printText(report: readonly MigrationReport[], output: (line: string) =>
   for (const entry of report) {
     output(`status: ${entry.status}`)
     if (entry.targetPath !== undefined) output(`target: ${entry.targetPath}`)
+    if (entry.targetBackupPath !== undefined) output(`backup: ${entry.targetBackupPath}`)
     if (entry.transform !== undefined) output(`transform: ${JSON.stringify(entry.transform, null, 2)}`)
     if (entry.movePlan.length > 0) output(`move-plan: ${JSON.stringify(entry.movePlan, null, 2)}`)
     for (const diagnostic of entry.diagnostics) output(`conflict: ${diagnostic}`)
@@ -56,6 +59,7 @@ export function runConfigMigrate(options: ConfigMigrateOptions = {}): number {
     migratedFrom: result.migratedFrom,
     migrations: report,
     skippedConflictCount: result.skippedConflictCount,
+    targetBackupPaths: result.targetBackupPaths,
   }
 
   if (options.json) {
@@ -64,6 +68,7 @@ export function runConfigMigrate(options: ConfigMigrateOptions = {}): number {
     output(`Configuration migration failed: ${result.error}`)
   } else {
     if (result.journalResumed) output("Recovered pending migration journal.")
+    if (result.resumedTargetBackupPath !== undefined) output(`backup: ${result.resumedTargetBackupPath}`)
     printText(report, output)
     if (report.every((entry) => entry.status === "skipped")) output("Nothing to migrate.")
   }

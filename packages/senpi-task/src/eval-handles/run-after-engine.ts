@@ -44,6 +44,12 @@ class RunAfterEngine {
     return new EvalHandleHostError("eval_handle_stale", `${ref.id} moved to epoch ${this.#record.notification.run_epoch}; fetch its current handle`)
   }
 
+  /** An acknowledgement loss leaves the live task unresolved, not delivered. */
+  uncertain(ref: HandleRef, status: string): HandleSnapshot {
+    if (this.verdict !== "live") throw this.stale(ref)
+    return taskSnapshot(this.#record, ref, status)
+  }
+
   /** The reply for a message the engine delivered (or revived the task with). */
   delivered(ref: HandleRef, deliveredStatus: string | undefined): HandleSnapshot {
     if (this.verdict === "rolledBack") {
