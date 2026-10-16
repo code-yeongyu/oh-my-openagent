@@ -1,151 +1,177 @@
-import { normalizeSDKResponse } from "../shared"
+import { normalizeSDKResponse } from "../shared";
+import {
+	formatGatewayTelemetryLine,
+	preferGatewayInferenceTelemetry,
+} from "../shared/gateway-inference-telemetry";
 
 type ReadyNotificationContext = {
-  client: {
-    session: {
-      get?: (input: { path: { id: string } }) => Promise<unknown>
-      messages?: (input: { path: { id: string }; query: { directory: string } }) => Promise<unknown>
-    }
-  }
-  directory: string
-}
+	client: {
+		session: {
+			get?: (input: { path: { id: string } }) => Promise<unknown>;
+			messages?: (input: {
+				path: { id: string };
+				query: { directory: string };
+			}) => Promise<unknown>;
+		};
+	};
+	directory: string;
+};
 
 type SessionInfo = {
-  title?: string
-}
+	title?: string;
+};
 
 type SessionMessagePart = {
-  type?: string
-  text?: string
-}
+	type?: string;
+	text?: string;
+};
 
 type SessionMessage = {
-  info?: {
-    role?: string
-    error?: unknown
-  }
-  parts?: SessionMessagePart[]
-}
+	info?: {
+		role?: string;
+		error?: unknown;
+		cost?: number;
+		modelID?: string;
+		tokens_per_second?: number;
+		usage?: Record<string, unknown>;
+	};
+	parts?: SessionMessagePart[];
+};
 
 type ReadyNotificationInput = {
-  sessionID: string
-  baseTitle: string
-  baseMessage: string
-}
+	sessionID: string;
+	baseTitle: string;
+	baseMessage: string;
+};
 
 function extractMessageText(message: SessionMessage | undefined): string {
-  return (message?.parts ?? [])
-    .filter((part) => part.type === "text" && typeof part.text === "string")
-    .map((part) => part.text?.trim() ?? "")
-    .filter(Boolean)
-    .join("\n")
+	return (message?.parts ?? [])
+		.filter((part) => part.type === "text" && typeof part.text === "string")
+		.map((part) => part.text?.trim() ?? "")
+		.filter(Boolean)
+		.join("\n");
 }
 
 function collapseWhitespace(text: string): string {
-  return text
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .join(" ")
+	return text
+		.split(/\r?\n/g)
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.join(" ");
 }
 
 function getLastNonEmptyLine(text: string): string {
-  const lines = text
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter(Boolean)
+	const lines = text
+		.split(/\r?\n/g)
+		.map((line) => line.trim())
+		.filter(Boolean);
 
-  return lines.at(-1) ?? ""
+	return lines.at(-1) ?? "";
 }
 
-function findLastMessage(messages: SessionMessage[], role: "user" | "assistant"): SessionMessage | undefined {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const message = messages[index]
-    if (message.info?.role !== role) continue
-    if (role === "assistant" && message.info?.error) continue
-    if (!extractMessageText(message)) continue
-    return message
-  }
+function findLastMessage(
+	messages: SessionMessage[],
+	role: "user" | "assistant",
+): SessionMessage | undefined {
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const message = messages[index];
+		if (message.info?.role !== role) continue;
+		if (role === "assistant" && message.info?.error) continue;
+		if (!extractMessageText(message)) continue;
+		return message;
+	}
 
-  return undefined
+	return undefined;
 }
 
 async function readSessionTitle(
-  ctx: ReadyNotificationContext,
-  sessionID: string,
+	ctx: ReadyNotificationContext,
+	sessionID: string,
 ): Promise<string> {
-  if (typeof ctx.client.session.get !== "function") {
-    return sessionID
-  }
+	if (typeof ctx.client.session.get !== "function") {
+		return sessionID;
+	}
 
-  try {
-    const response = await ctx.client.session.get({ path: { id: sessionID } })
-    const sessionInfo = normalizeSDKResponse(response, null as SessionInfo | null, {
-      preferResponseOnMissingData: true,
-    })
+	try {
+		const response = await ctx.client.session.get({ path: { id: sessionID } });
+		const sessionInfo = normalizeSDKResponse(
+			response,
+			null as SessionInfo | null,
+			{
+				preferResponseOnMissingData: true,
+			},
+		);
 
-    if (sessionInfo?.title && sessionInfo.title.trim().length > 0) {
-      return sessionInfo.title.trim()
-    }
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
-  }
+		if (sessionInfo?.title && sessionInfo.title.trim().length > 0) {
+			return sessionInfo.title.trim();
+		}
+	} catch (error) {
+		if (!(error instanceof Error)) {
+			throw error;
+		}
+	}
 
-  return sessionID
+	return sessionID;
 }
 
 async function readSessionMessages(
-  ctx: ReadyNotificationContext,
-  sessionID: string,
+	ctx: ReadyNotificationContext,
+	sessionID: string,
 ): Promise<SessionMessage[]> {
-  if (typeof ctx.client.session.messages !== "function") {
-    return []
-  }
+	if (typeof ctx.client.session.messages !== "function") {
+		return [];
+	}
 
-  try {
-    const response = await ctx.client.session.messages({
-      path: { id: sessionID },
-      query: { directory: ctx.directory },
-    })
+	try {
+		const response = await ctx.client.session.messages({
+			path: { id: sessionID },
+			query: { directory: ctx.directory },
+		});
 
-    const messages = normalizeSDKResponse(response, [] as SessionMessage[], {
-      preferResponseOnMissingData: true,
-    })
+		const messages = normalizeSDKResponse(response, [] as SessionMessage[], {
+			preferResponseOnMissingData: true,
+		});
 
-    return Array.isArray(messages) ? messages : []
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
-    return []
-  }
+		return Array.isArray(messages) ? messages : [];
+	} catch (error) {
+		if (!(error instanceof Error)) {
+			throw error;
+		}
+		return [];
+	}
 }
 
 export async function buildReadyNotificationContent(
-  ctx: ReadyNotificationContext,
-  input: ReadyNotificationInput,
+	ctx: ReadyNotificationContext,
+	input: ReadyNotificationInput,
 ): Promise<{ title: string; message: string }> {
-  const [sessionTitle, messages] = await Promise.all([
-    readSessionTitle(ctx, input.sessionID),
-    readSessionMessages(ctx, input.sessionID),
-  ])
+	const [sessionTitle, messages] = await Promise.all([
+		readSessionTitle(ctx, input.sessionID),
+		readSessionMessages(ctx, input.sessionID),
+	]);
 
-  const lastUserText = collapseWhitespace(extractMessageText(findLastMessage(messages, "user")))
-  const lastAssistantLine = getLastNonEmptyLine(
-    extractMessageText(findLastMessage(messages, "assistant")),
-  )
+	const lastUserText = collapseWhitespace(
+		extractMessageText(findLastMessage(messages, "user")),
+	);
+	const lastAssistant = findLastMessage(messages, "assistant");
+	const lastAssistantLine = getLastNonEmptyLine(
+		extractMessageText(lastAssistant),
+	);
+	const gatewayLine = lastAssistant
+		? formatGatewayTelemetryLine(preferGatewayInferenceTelemetry(lastAssistant))
+		: "";
 
-  const detailLines = [
-    lastUserText ? `User: ${lastUserText}` : "",
-    lastAssistantLine ? `Assistant: ${lastAssistantLine}` : "",
-  ].filter(Boolean)
+	const detailLines = [
+		lastUserText ? `User: ${lastUserText}` : "",
+		lastAssistantLine ? `Assistant: ${lastAssistantLine}` : "",
+		gatewayLine,
+	].filter(Boolean);
 
-  return {
-    title: `${input.baseTitle} · ${sessionTitle}`,
-    message: detailLines.length > 0
-      ? [input.baseMessage, ...detailLines].join("\n")
-      : input.baseMessage,
-  }
+	return {
+		title: `${input.baseTitle} · ${sessionTitle}`,
+		message:
+			detailLines.length > 0
+				? [input.baseMessage, ...detailLines].join("\n")
+				: input.baseMessage,
+	};
 }
