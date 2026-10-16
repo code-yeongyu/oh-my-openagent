@@ -2,6 +2,8 @@ import { existsSync } from "node:fs"
 import { dirname, isAbsolute } from "node:path"
 import type { Socket } from "node:net"
 
+import { s1For } from "./fake-host-s1"
+import { admitInput, handleS1Command } from "./fake-host-s1-commands"
 import type { FakeSessionTable } from "./fake-host-sessions"
 import type { FakeInputAdmissions } from "./fake-input-admissions"
 
@@ -59,6 +61,7 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
   const type = typeof payload.type === "string" ? payload.type : "unknown"
   const routingId = typeof payload.sessionId === "string" ? payload.sessionId : undefined
   ports.record({ type, sessionId: routingId, payload })
+  const s1 = s1For(ports.table, ports.identity)
   if (["prompt", "steer", "follow_up"].includes(type) && typeof payload.clientMessageId === "string") {
     const session = ports.table.view().find(candidate => candidate.routingId === routingId)
     const answer = ports.admissions.admit(session?.sessionPath ?? "", payload)
@@ -67,21 +70,25 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
       return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
         error: "client_message_id_conflict: different payload", errorCode: "client_message_id_conflict" })
     }
+    let disposition = answer.disposition
     if (!answer.replayed && routingId !== undefined && typeof payload.message === "string") {
       ports.table.appendTranscript(routingId, { role: "user", content: payload.message })
       if (type === "prompt") ports.table.setStreaming(routingId, true)
+      if (type === "prompt" && s1.active) s1.publish(routingId, { cause: "prompt", by: "client" })
+      disposition = admitInput(s1, payload, routingId) ?? disposition
     }
     if (ports.withheld.has(type)) return
     const failure = ports.failed.get(type)
     if (failure !== undefined) return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
     return writeFrame(socket, { type: "response", id: payload.id, command: type, success: true,
-      data: { disposition: answer.disposition, replayed: answer.replayed } })
+      data: { disposition, replayed: answer.replayed } })
   }
   if (ports.withheld.has(type)) return
   const failure = ports.failed.get(type)
   if (failure !== undefined) {
     return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
   }
+  if (handleS1Command(s1, socket, payload, type, routingId)) return
   const ok = (data: unknown): void =>
     writeFrame(socket, { type: "response", id: payload.id, command: type, success: true, data })
   switch (type) {
@@ -92,6 +99,8 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
     case "list_sessions":
       return ok({ sessions: ports.table.rows(payload.include_workers === true) })
     case "close_session": {
+      if (s1.active) s1.publish(routingId ?? "", { cause: "close", by: "client" }, "closed", "client_close")
+      s1.forget(routingId ?? "")
       ports.table.close(routingId ?? "")
       ok({})
       return writeFrame(socket, { type: "session_closed", sessionId: routingId, reason: "client_close" })
@@ -100,6 +109,7 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
       if (routingId !== undefined && typeof payload.message === "string") {
         ports.table.appendTranscript(routingId, { role: "user", content: payload.message })
         ports.table.setStreaming(routingId, true)
+        if (s1.active) s1.publish(routingId, { cause: "prompt", by: "client" })
       }
       return ok({})
     case "get_state": {
@@ -108,6 +118,7 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
         sessionId: `durable-${payload.sessionId}`,
         isStreaming: routingId !== undefined && ports.table.isStreaming(routingId),
         ...(model === undefined ? {} : { model }),
+        ...(s1.active && routingId !== undefined ? { ordered: s1.queue(routingId).map(input => ({ ...input })) } : {}),
       })
     }
     case "get_entries":
@@ -149,6 +160,8 @@ function openSession(ports: FakeHostWirePorts, socket: Socket, payload: Readonly
     })
   }
   rememberOpenedModel(ports, opened.routingId, payload)
+  const s1 = s1For(ports.table, ports.identity)
+  if (s1.active) s1.publish(opened.routingId, opened.attached ? { cause: "attach", by: "client" } : { cause: "open", by: "client" })
   writeFrame(socket, {
     type: "response",
     id: payload.id,

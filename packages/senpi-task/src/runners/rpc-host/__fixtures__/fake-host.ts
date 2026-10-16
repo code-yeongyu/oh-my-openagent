@@ -6,6 +6,7 @@ import { join } from "node:path"
 import type { SenpiHostProtocolInfo } from "../../../lazy/senpi-barrel"
 import { FakeSessionTable, type FakeDrainedSession, type FakeHostSession } from "./fake-host-sessions"
 import { fakeProtocolInfo, probeFakeHost, type FakeHostIdentityOptions } from "./fake-host-probe"
+import { s1For } from "./fake-host-s1"
 import { fakeHostTransport, type FakeHostTransport } from "./fake-host-transport"
 import { handleWireLine, writeFrame, type FakeHostCommand, type FakeHostOpenFailure, type FakeHostWarmAnswer } from "./fake-host-wire"
 import { FakeInputAdmissions } from "./fake-input-admissions"
@@ -117,6 +118,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     }
   }
 
+  const s1 = s1For(table, () => identity)
   const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, failed, record }
 
   const settleConnectionWaiters = (): void => {
@@ -148,7 +150,8 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       socket.on("error", () => undefined)
       socket.on("close", () => {
         sockets.delete(socket)
-        table.detach(socket)
+        s1.hub.drop(socket)
+        for (const session of table.detach(socket)) s1.publish(session.routingId, { cause: "detach", by: "client" })
         settleConnectionWaiters()
       })
     }))
@@ -219,6 +222,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       sendTo(routingId, { type: "message_end", message })
       sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message] })
       sendTo(routingId, { type: "agent_idle" })
+      s1.settled(routingId, false)
     },
     // The host-side abort of a turn in flight (a user escape, a forced stop): the transcript gains
     // the aborted assistant row and the session goes idle, exactly as the real host leaves it.
@@ -227,8 +231,9 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       table.appendTranscript(routingId, message)
       table.setStreaming(routingId, false)
       sendTo(routingId, { type: "message_end", message })
-      sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message] })
+      sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message], ...s1.abortFieldsFor(routingId) })
       sendTo(routingId, { type: "agent_idle" })
+      s1.settled(routingId, true)
     },
     evict: (sessionPath) => {
       const parked = table.park(sessionPath)
