@@ -100,11 +100,12 @@ export function createOnboardingComponent(
         }
       })
 
-      // Deliberately not previewSafe: previews must never acquire install-wide state.
       pi.on("before_agent_start", (event, ctx) => {
-        if (!isRecord(event) || event.trigger !== "prompt" || event.preview === true || !eligible(ctx)) return
+        if (!isRecord(event) || event.trigger !== "prompt" || !eligible(ctx)) return
         const forced = force()
-        if (!claim(ctx, forced)) return
+        if (event.preview === true) {
+          if (pending !== undefined || (!forced && dependencies.isOnboardingComplete(stateDir))) return
+        } else if (!claim(ctx, forced)) return
         if (ctx.sessionManager.getBranch().some((entry) =>
           entry.type === "custom_message" && entry.customType === "omo-onboarding:context")) return
         return {
@@ -116,7 +117,7 @@ export function createOnboardingComponent(
               : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour}`,
           },
         }
-      })
+      }, { previewSafe: true })
 
       pi.on("agent_start", (_event, ctx) => {
         if (ownsRun(ctx) && pending) {

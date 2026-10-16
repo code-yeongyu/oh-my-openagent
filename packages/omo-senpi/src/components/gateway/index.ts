@@ -8,6 +8,7 @@ import { gatewayDatabasePath } from "../thread/gateway/paths"
 import { createGatewayStore } from "../thread/gateway/store"
 import type { GatewayRulesStore } from "./prompt"
 import { createGatewayRulesPromptHandler } from "./prompt"
+import { peekGatewayRulesBlock } from "./peek-block"
 import { GATEWAY_RULES_EXTENSION_NAME, GATEWAY_RULES_MIGRATIONS } from "./store-extension/migrations"
 
 export { createGatewayRulesPromptHandler, type GatewayRulesPromptOptions, type GatewayRulesStore } from "./prompt"
@@ -29,12 +30,19 @@ export function createGatewayComponent(options: GatewayComponentOptions = {}): O
   return {
     name: "gateway",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      let store: GatewayRulesStore | undefined
+      let store: { readonly client: GatewayRulesStore; readonly path: string } | undefined
       let settled = false
       let registrationWarned = false
       const handler = createGatewayRulesPromptHandler({
+        previewBlockForSession: async (sessionId) => {
+          if (store !== undefined) return await peekGatewayRulesBlock(store.path, sessionId)
+          if (settled || !hasScopes((options.loadGatewaySection ?? defaultGatewaySection)())) return undefined
+          const path = gatewayDatabasePath((options.agentDir ?? defaultAgentDir)())
+          if (!existsSync(path) || (options.resolveModuleUrl ?? defaultResolveModuleUrl)() === undefined) return undefined
+          return await peekGatewayRulesBlock(path, sessionId)
+        },
         ensureStore: async () => {
-          if (store !== undefined) return store
+          if (store !== undefined) return store.client
           if (settled) return undefined
           const section = (options.loadGatewaySection ?? defaultGatewaySection)()
           if (!hasScopes(section)) {
@@ -61,12 +69,12 @@ export function createGatewayComponent(options: GatewayComponentOptions = {}): O
             }
             return undefined
           }
-          store = created
-          return store
+          store = { client: created, path: gatewayDatabasePath(agentDir) }
+          return store.client
         },
         onLookupError: (message) => ctx.logger.warn(message),
       })
-      pi.on("before_agent_start", handler)
+      pi.on("before_agent_start", handler, { previewSafe: true })
     },
   }
 }

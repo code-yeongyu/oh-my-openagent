@@ -1,3 +1,7 @@
+## 2026-10-17 - Gateway, onboarding and task-host hooks allow prompt previews (#10356)
+
+All three before-agent-start handlers register as preview-safe. Gateway previews read committed operating rules through a read-only connection without starting a worker, registering migrations, or changing warning and activation latches. Onboarding previews compute the same addition without claiming the completion marker, changing widgets, or consuming the forced-tour flag. Task-host previews return without capturing runtime context, registering a store, or warming or launching a host. AST and composed-extension audits cover literal and dynamic registrations; component tests cover semantic and durable state preservation, and a real-engine test checks prefix readiness.
+
 ## 2026-10-12 - Thread QA rides the neutral senpi qa-shared helpers (#10033)
 
 The thread-tools harness and runner no longer import senpi's app-server-named QA library. `scripts/qa/thread-tools/lib/harness.mjs` resolves `scripts/qa-shared/lib/{env,fake-model,cleanup}.mjs` from the senpi checkout (the prerequisite extraction in senpi #3177) and `run-all.mjs`'s legacy precondition checks the same path, so the suite keeps its coverage instead of silently skipping once the old helper location is removed. The ulw-loop delegation guidance and `docs/reference/mass-ulw-protocol.md` stop naming the retired protocol; the DAG widget's non-TUI suppression test uses the rpc mode fixture. No behavior changes: the harness still drives the real `--mode rpc --multi-session` host.

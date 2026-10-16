@@ -105,7 +105,10 @@ export function wireHostPrewarm(
     return undefined
   }
   if (mode === "first-turn") {
-    for (const event of FIRST_TURN_EVENTS) pi.on(event, (_payload, eventCtx) => warmOnEdge(eventCtx))
+    for (const event of FIRST_TURN_EVENTS) pi.on(event, (payload, eventCtx) => {
+      if (typeof payload === "object" && payload !== null && "preview" in payload && payload.preview === true) return undefined
+      return warmOnEdge(eventCtx)
+    }, event === "before_agent_start" ? { previewSafe: true } : undefined)
   }
   if (mode === "intent") pi.on("message_update", (payload, eventCtx) => (startsDelegation(payload) ? warmOnEdge(eventCtx) : undefined))
   return handle
