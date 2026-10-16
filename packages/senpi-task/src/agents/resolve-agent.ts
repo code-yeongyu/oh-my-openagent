@@ -135,9 +135,13 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     )
   }
 
-  if (definition.categories !== undefined) {
+  // A user category named exactly after the agent routes that agent when the definition declares
+  // no categories of its own: user config is the final authority, and the builtin chain below
+  // stays the fallback when the named category is absent or resolves nothing.
+  const categoryNames = definition.categories ?? userNamedCategory(name, options.omoConfig)
+  if (categoryNames !== undefined) {
     const selection = resolveAgentCategoryModel({
-      categories: definition.categories,
+      categories: categoryNames,
       omoConfig: options.omoConfig ?? {},
       registry,
       configuredTuning,
@@ -154,7 +158,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
         },
       )
     }
-    attemptedModel = attemptedModel ?? firstCategoryDefaultModel(definition.categories, options.omoConfig)
+    attemptedModel = attemptedModel ?? firstCategoryDefaultModel(categoryNames, options.omoConfig)
   }
 
   if (availableModels !== undefined && fallbackChain !== undefined) {
@@ -209,6 +213,11 @@ function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
     ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
     ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),
   }
+}
+
+function userNamedCategory(name: string, omoConfig: OmoConfig | undefined): readonly string[] | undefined {
+  const categories = omoConfig?.categories
+  return categories !== undefined && Object.hasOwn(categories, name) ? [name] : undefined
 }
 
 function firstConfiguredModel(definition: AgentDefinition): string | undefined {

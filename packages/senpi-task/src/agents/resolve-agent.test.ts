@@ -388,4 +388,45 @@ describe("resolveAgent retired curated ids", () => {
     // then
     expect(result).toEqual({ kind: "not_found", agent: "missing", availableAgents: ["plan-reviewer"] })
   })
+
+  test("#given a user category named after the plan-consultant agent #when resolved #then the user category chain supplies the model", () => {
+    // given
+    const models = registry([
+      model("anthropic-subscription", "claude-sonnet-5-5"),
+      model("meta", "muse-wonder-1.0"),
+      model("anthropic-subscription", "claude-fable-5-1"),
+      model("opencode-go", "kimi-k3"),
+    ])
+    const omoConfig = {
+      categories: {
+        "plan-consultant": {
+          models: [
+            { model: "anthropic-subscription/claude-sonnet-5-5", reasoning: "medium" },
+            { model: "meta/muse-wonder-1.0", reasoning: "high" },
+          ],
+        },
+      },
+    }
+
+    // when
+    const result = expectResolved(resolveAgent("plan-consultant", BUILTIN_AGENTS, models, { omoConfig }))
+
+    // then
+    expect(result.model).toBe("anthropic-subscription/claude-sonnet-5-5")
+    expect(result.fallback_models?.map((record) => record.display)).toContain("meta/muse-wonder-1.0")
+  })
+
+  test("#given no user category named after the plan-consultant agent #when resolved #then the builtin agent chain still heads the model", () => {
+    // given
+    const models = registry([
+      model("anthropic-subscription", "claude-sonnet-5-5"),
+      model("anthropic-subscription", "claude-fable-5-1"),
+    ])
+
+    // when
+    const result = expectResolved(resolveAgent("plan-consultant", BUILTIN_AGENTS, models, { omoConfig: {} }))
+
+    // then
+    expect(result.model).toBe("anthropic-subscription/claude-fable-5-1")
+  })
 })
