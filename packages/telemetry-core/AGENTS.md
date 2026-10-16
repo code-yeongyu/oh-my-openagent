@@ -21,9 +21,26 @@ Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed machine id, 
 | `constants.ts` | `DEFAULT_POSTHOG_HOST`, `DEFAULT_POSTHOG_API_KEY` |
 | `types.ts` | `TelemetryProductConfig`, `TelemetryClient`, `TelemetryTransport(Factory)`, `TelemetryOsProvider`, … |
 
+## OPENTELEMETRY HOST (`@oh-my-opencode/telemetry-core/otlp` subpath, NOT in the main barrel)
+
+The collector transport (telemetry-collector plan, todo 21). Kept off the main barrel so PostHog-only consumers never load the OTLP code. Nothing wires it yet (todo 22 adds `telemetry.sink`).
+
+| Module | Role |
+|--------|------|
+| `otel-minimal-logs.ts` / `otel-minimal-trace.ts` / `otel-time.ts` | Minimal in-house `LoggerProvider`/`TracerProvider` behind `@opentelemetry/api` + `api-logs` (spike 13 (g) fallback: the stock SDK missed the startup budget). `telemetry.sdk.name = omo-otel-minimal`. AlwaysOn sampling (never ParentBased); span events, links, exception text and status messages are never recorded. Reads no `OTEL_*` variable. |
+| `otel-providers.ts` | `createTelemetryProviders()`: one WAL processor per signal; registers only the AsyncLocalStorage context manager and the W3C propagator globally, never a provider. `getActiveTraceContext()`. |
+| `otel-resource.ts` | `createTelemetryResource()`: the D-P Resource (`service.*`, `os.type` win32->windows, `host.arch` x64->amd64, `omo.*`). |
+| `otlp-wal.ts` | `SpoolWriter` + `WalLogRecordProcessor`/`WalSpanProcessor`: each record is appended synchronously (no fsync) as a length-prefixed OTLP frame to `active-<signal>-<pid>-<boot_id>.otlp` BEFORE anything is queued. File and dir are created on the first consented append only. |
+| `otlp-spool-file.ts` | Spool format: header frame `[format=1][signal]` + ResourceLogs/ResourceSpans (Resource + Scope); `readSpoolRequest()` builds the one Export*ServiceRequest per file from the FILE's header. Torn tail frames are ignored. |
+| `otlp-spool-dir.ts` | Seal (`batch-<signal>-<uuidv7>.otlp`), rename-based claims (`.sending-<boot_id>-<lease_ms>`, 5 min lease), sweep (expired leases, dead-owner active files idle >= 5 min, 14-day expiry by batch id), quarantine. Owner-only moves (seal, claim release) are hard link + unlink (a crash leftover second link is swept); every competing move (claim, renewal, lease reclaim) is a rename. |
+| `otlp-spool-cap.ts` | 5 MB cap with oldest-first eviction; caches sealed-batch sizes and lists the directory only when last scan + bytes sealed since could pass the cap. |
+| `otlp-http.ts` | One POST per file: protobuf, gzip > 8 KB, `X-OmO-Ingest-Key`, 256 KB cap; retry 429/502/503/504/network with 1,2,4,8,16 s + jitter (Retry-After wins, cap 60 s); 400/401/413 never retried; 2xx incl. partial_success settles. |
+| `otlp-batch-sender.ts` / `otlp-sender.ts` | `createOtlpTelemetryTransport()`: a `TelemetryTransport` (returns null under any opt-out incl. `OTEL_SDK_DISABLED=true`); seals at 20 records or 10 s, `omo.client_dropped` at the next flush, `droppedEvents()` since the last 200, `sampling.rawTurnRate = 1`, 2 s shutdown cap, `consent()` checked before every append and send. `OMO_TELEMETRY_ENDPOINT` overrides; `OTEL_EXPORTER_OTLP_*` is ignored. |
+| `otlp-proto/` | Generated code from opentelemetry-proto `v1.7.0`, vendored byte-identical from the collector repo (`SHA256SUMS` pinned by a test). Never edit by hand. |
+
 ## DEPENDENCIES & CONSUMERS
 
-- **Depends on:** `@oh-my-opencode/utils` (`writeFileAtomically`, `resolveXdgDataDir`) + `posthog-node` (^5).
+- **Depends on:** `@oh-my-opencode/utils` (`writeFileAtomically`, `resolveXdgDataDir`) + `posthog-node` (^5). The OTLP subpath adds exact pins `@opentelemetry/api` 1.9.1, `api-logs` 0.223.0, `context-async-hooks` 2.12.0, `core` 2.12.0 and `@bufbuild/protobuf` 2.16.0 (upgrades go through the collector's conformance fixtures, never renovate).
 - **Consumed by BOTH editions:** `omo-opencode/src/shared/posthog*.ts`; `omo-codex/src/telemetry/*` and `omo-codex/plugin/components/telemetry/*`.
 
 ## NOTES

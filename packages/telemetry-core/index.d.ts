@@ -26,9 +26,14 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_event_property_rejected"
   | "telemetry_event_rejected"
   | "telemetry_events_dropped_by_consent"
+  | "telemetry_otlp_partial_success"
+  | "telemetry_otlp_send_failed"
   | "telemetry_posthog_import_failed"
   | "telemetry_posthog_init_failed"
-  | "telemetry_shutdown_failed";
+  | "telemetry_shutdown_failed"
+  | "telemetry_spool_purge_refused"
+  | "telemetry_spool_sweep_failed"
+  | "telemetry_spool_write_failed";
 
 export type TelemetryDiagnosticErrorKind = "error" | "non_error";
 
