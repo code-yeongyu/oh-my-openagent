@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:953bafa7698d615ecec8d73b67d3e5835a0b1c48c7d8e496986f9cfd7c6b577f:d298e5d3a827d1258c20a225d079c7c0a84d750db2a299cd0ca50a1da02b4609
+// omo-codex-install:527a916b095e7882678cd45fa8dba16f9922aed3ca4a3ca54d64f6c544280ff8:1bbd909cb8d3d589608ddc1d0dee3256187ab544648655c199eef73d4119e6e0
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10015,6 +10015,12 @@ var init_events = __esm(() => {
 // packages/telemetry-core/src/record-daily-active.ts
 var init_record_daily_active = () => {};
 
+// packages/telemetry-core/src/turn-trace-bridge.ts
+var REGISTRY;
+var init_turn_trace_bridge = __esm(() => {
+  REGISTRY = Symbol.for("omo.telemetry.turn-traceparent.v1");
+});
+
 // packages/telemetry-core/src/index.ts
 var init_src = __esm(() => {
   init_activity_state();
@@ -10026,6 +10032,7 @@ var init_src = __esm(() => {
   init_machine_id();
   init_posthog_client();
   init_record_daily_active();
+  init_turn_trace_bridge();
 });
 
 // packages/omo-codex/package.json

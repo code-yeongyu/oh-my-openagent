@@ -68,6 +68,9 @@ export type ManagedStartSpec = {
   readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
+  // The delegating turn's W3C traceparent, for a process child's own turn spans. Launch-time only:
+  // never persisted on the spawn spec, so a respawned or resumed child starts its own trace.
+  readonly traceparent?: string
 }
 
 export type ManagedRunner = {
@@ -299,6 +302,9 @@ export type TaskManagerOptions = {
   // capability check). Absent -> `auto` reads as in-process, which is what a wiring without a
   // daemon (tests, a pinned engine without the host surface) must do.
   readonly executionModeGate?: ExecutionModeGate
+  // The parent session's current turn traceparent (raw session id in), read once per launch. Absent or
+  // undefined -> the child carries no inherited trace context.
+  readonly traceparentFor?: (parentSessionId: string) => string | undefined
 }
 
 export type TaskManager = {

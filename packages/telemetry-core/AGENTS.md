@@ -19,7 +19,8 @@ Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed machine id, 
 | `diagnostics.ts` | `writeTelemetryDiagnostic`, `cleanupTelemetryDiagnostics` |
 | `consent-gated-fetch.ts` | `createConsentGatedFetch` — the PostHog `fetch` option gated on consent at send time; every SDK flush (interval, batch size, shutdown) goes through it, and a dropped batch answers 200 so it leaves the queue unsent |
 | `constants.ts` | `DEFAULT_POSTHOG_HOST`, `DEFAULT_POSTHOG_API_KEY` |
-| `types.ts` | `TelemetryProductConfig`, `TelemetryClient`, `TelemetryTransport(Factory)`, `TelemetryOsProvider`, … |
+| `types.ts` | `TelemetryProductConfig`, `TelemetryClient`, `TelemetryTransport(Factory)` (optional `traces: TurnTracing` on a transport with a span sink), `TelemetryOsProvider`, … |
+| `turn-trace-bridge.ts` | `publishTurnTraceparent` / `readTurnTraceparent` / `clearTurnTraceparent` / `isTraceparent`: a process-wide (`globalThis` symbol) map raw session id -> current turn traceparent, so the task engine bundle can hand the delegating turn's context to a process child. Dependency-free. |
 
 ## OPENTELEMETRY HOST (`@oh-my-opencode/telemetry-core/otlp` subpath, NOT in the main barrel)
 
@@ -29,6 +30,9 @@ The collector transport (telemetry-collector plan, todo 21). Kept off the main b
 |--------|------|
 | `otel-minimal-logs.ts` / `otel-minimal-trace.ts` / `otel-time.ts` | Minimal in-house `LoggerProvider`/`TracerProvider` behind `@opentelemetry/api` + `api-logs` (spike 13 (g) fallback: the stock SDK missed the startup budget). `telemetry.sdk.name = omo-otel-minimal`. AlwaysOn sampling (never ParentBased); span events, links, exception text and status messages are never recorded. Reads no `OTEL_*` variable. |
 | `otel-providers.ts` | `createTelemetryProviders()`: one WAL processor per signal; registers only the AsyncLocalStorage context manager and the W3C propagator globally, never a provider. `getActiveTraceContext()`. |
+| `otel-turn-span.ts` | `createTurnTracing()` -> `transport.traces.startTurn()`: one `omo.turn` span (INTERNAL, AlwaysOn) per assistant turn; `run(fn)` makes it active so every event emitted inside carries its trace/span ids; `end("ok"|"error")`. Parent = a valid inherited `traceparent` (task bridge) else the active context; an unsampled `-00` parent still records. Undefined while consent is off or after shutdown, so no span exists when telemetry is disabled; the PostHog transport has no `traces`. |
+| `otel-traceparent-fetch.ts` | `createTraceparentFetch(fetch, hosts)`: injects the active span's `traceparent` only for exact hosts in the allowlist (`OMO_TRACE_HOSTS` = `t.omo.dev`, `api.omo.dev`, plus the transport's own endpoint host); model-provider hosts never receive it. The OTLP sender sends through it. |
+| `otlp-inspect.ts` | `inspectOtlpRequest(signal, body)`: decodes one OTLP protobuf request into plain records with hex ids (QA sinks, tests). |
 | `otel-resource.ts` | `createTelemetryResource()`: the D-P Resource (`service.*`, `os.type` win32->windows, `host.arch` x64->amd64, `omo.*`). |
 | `otlp-wal.ts` | `SpoolWriter` + `WalLogRecordProcessor`/`WalSpanProcessor`: each record is appended synchronously (no fsync) as a length-prefixed OTLP frame to `active-<signal>-<pid>-<boot_id>.otlp` BEFORE anything is queued. File and dir are created on the first consented append only. |
 | `otlp-spool-file.ts` | Spool format: header frame `[format=1][signal]` + ResourceLogs/ResourceSpans (Resource + Scope); `readSpoolRequest()` builds the one Export*ServiceRequest per file from the FILE's header. Torn tail frames are ignored. |

@@ -477,6 +477,7 @@ class TaskManagerImpl implements TaskManager {
         plan: effectivePlan,
         cwd: isolation === undefined ? this.#options.cwd : isolation.handle.mergedDir,
         stateDir: this.#options.store.stateDir,
+        traceparent: this.#options.traceparentFor?.(spec.parent_session_id),
       })
       // Persist the mode-neutral rebuild spec for BOTH execution modes: v1 carries only safe
       // launch facts (effective prompt, instructions, tool names, cwd) - never executable tools,

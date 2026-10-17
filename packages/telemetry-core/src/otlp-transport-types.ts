@@ -3,7 +3,7 @@ import type { InstrumentationScope, OtelClock } from "./otel-time"
 import type { OtlpWireProjection } from "./otlp-config"
 import type { ResourceAttributes } from "./otlp-encode"
 import type { OtlpFetch } from "./otlp-http"
-import type { TelemetryDiagnosticInput, TelemetryEnv, TelemetryTransport } from "./types"
+import type { TelemetryDiagnosticInput, TelemetryEnv, TelemetryTransport, TurnTracing } from "./types"
 
 export type CreateOtlpTelemetryTransportInput = {
   readonly productEnvPrefix: string
@@ -43,6 +43,7 @@ export type CreateOtlpTelemetryTransportInput = {
 export type OtlpTelemetryTransport = TelemetryTransport & {
   readonly sampling: { readonly rawTurnRate: 1 }
   readonly providers: TelemetryProviders
+  readonly traces: TurnTracing
   readonly endpoint: string
   readonly ready: Promise<void>
   readonly flush: () => Promise<void>

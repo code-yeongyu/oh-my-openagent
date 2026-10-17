@@ -9,6 +9,9 @@ export {
   type TelemetryProviders,
 } from "./otel-providers"
 export { createTelemetryResource, otelHostArch, otelOsType, type TelemetryResourceAttribution } from "./otel-resource"
+export { createTraceparentFetch, OMO_TRACE_HOSTS } from "./otel-traceparent-fetch"
+export { createTurnTracing, TURN_SPAN_NAME } from "./otel-turn-span"
+export { inspectOtlpRequest, type InspectedAttributes, type InspectedLogRecord, type InspectedSpan } from "./otlp-inspect"
 export { OTEL_SDK_LANGUAGE, OTEL_SDK_NAME, OTEL_SDK_VERSION, type InstrumentationScope } from "./otel-time"
 export {
   DEFAULT_OTLP_ENDPOINT,

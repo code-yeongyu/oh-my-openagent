@@ -48,6 +48,12 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     call: "state.capture(name)", reason: FAN_IN,
   },
   {
+    file: "omo-native-component.ts", fn: "createOmoNativeTelemetryComponent>register>captureEvent>run(=>)",
+    guard: "",
+    route: VIA_FAN_IN,
+    call: "client.captureEvent(name)", reason: THROUGH_FAN_IN,
+  },
+  {
     file: "omo-native-component.ts", fn: "installCaptureFacade",
     guard: "",
     call: "createEventTelemetryClient({ diagnostics: options.diagnostics, distinctId: template.dis)", reason: FAN_IN,

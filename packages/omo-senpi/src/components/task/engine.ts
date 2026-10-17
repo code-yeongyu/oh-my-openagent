@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import { readTurnTraceparent } from "@oh-my-opencode/telemetry-core"
 import { log } from "@oh-my-opencode/utils"
 import {
   createCompletionNotifier,
@@ -249,6 +250,8 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     resolveInheritedExtensions,
     rpcRespawnRunner: buildRespawnRunner(runnerContext),
     executionModeGate: host.executionModeGate,
+    // A process child continues the trace of the parent turn that delegated it (telemetry todo 41).
+    traceparentFor: readTurnTraceparent,
     cwd: deps.cwd,
     destruction: {
       destroyResidentTask: (taskId, cause) =>

@@ -206,6 +206,7 @@ export {
   readSessionAncestry,
   readSessionContext,
   readSessionRole,
+  readSessionTraceparent,
   HOST_WARMUP_CONTEXT,
   HOST_WARMUP_TASK_ID,
   isHostWarmupSession,
