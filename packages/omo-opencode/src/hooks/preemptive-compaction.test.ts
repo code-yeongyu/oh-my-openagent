@@ -249,6 +249,54 @@ describe("preemptive-compaction", () => {
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
 
+  // #given a session already warned about an unknown context limit
+  // #when session.deleted fires and the same sessionID is reused afterward
+  // #then the warned-session dedup state is reset, so a fresh toast is shown again
+  it("should reset the context-limit-warned dedup state on session.deleted", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_reused_after_delete"
+
+    const emitUnknownLimitUsage = async () => {
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              role: "assistant",
+              sessionID,
+              providerID: "some-unregistered-provider",
+              modelID: "some-unregistered-model",
+              finish: true,
+              tokens: { input: 500000, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            },
+          },
+        },
+      })
+
+      const output = { title: "", output: "test", metadata: null }
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_1" },
+        output
+      )
+    }
+
+    await emitUnknownLimitUsage()
+    await emitUnknownLimitUsage()
+
+    expect(ctx.client.tui.showToast).toHaveBeenCalledTimes(1)
+
+    await hook.event({
+      event: {
+        type: "session.deleted",
+        properties: { info: { id: sessionID } },
+      },
+    })
+
+    await emitUnknownLimitUsage()
+
+    expect(ctx.client.tui.showToast).toHaveBeenCalledTimes(2)
+  })
+
   it("should log summarize errors instead of swallowing them", async () => {
     //#given
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
