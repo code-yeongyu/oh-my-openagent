@@ -1,0 +1,48 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/shared/session-prompt-params-helpers.test.ts:
+73 |     // when
+74 |     applySessionPromptParams(sessionID, model)
+75 | 
+76 |     // then - the session records that the requested level rides the variant channel,
+77 |     // leaving no reasoningEffort option for a stale provider default to hide behind
+78 |     expect(getSessionPromptParams(sessionID)).toEqual({
+                                                   ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "reasoningViaVariant": true,
+- }
++ {}
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6614/packages/omo-opencode/src/shared/session-prompt-params-helpers.test.ts:78:47)
+(fail) applySessionPromptParams > marks variant-routed reasoning so stale provider efforts cannot override it (#6614) [0.88ms]
+
+packages/omo-opencode/src/plugin/chat-params.test.ts:
+153 |     //#when
+154 |     await handler(input, output)
+155 | 
+156 |     //#then - the requested xhigh variant reaches the provider without the lingering
+157 |     // medium effort clobbering it
+158 |     expect(output.options).toEqual({})
+                                 ^
+error: expect(received).toEqual(expected)
+
+- {}
++ {
++   "reasoningEffort": "medium",
++ }
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6614/packages/omo-opencode/src/plugin/chat-params.test.ts:158:28)
+(fail) createChatParamsHandler > clears stale provider reasoningEffort when session reasoning rides the variant channel (#6614) [1.59ms]
+
+ 8 pass
+ 2 fail
+ 12 expect() calls
+Ran 10 tests across 2 files. [606.00ms]
