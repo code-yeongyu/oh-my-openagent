@@ -5,6 +5,8 @@ import { dirname, join, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { fileURLToPath } from "node:url"
 
+import { withTelemetryOptOut } from "../../../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
+
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..")
 const plugin = join(repo, "packages/omo-senpi/plugin")
 const provider = join(dirname(fileURLToPath(import.meta.url)), "provider.ts")
@@ -40,7 +42,7 @@ export function sandboxEnvironment(source: NodeJS.ProcessEnv, home: string, agen
   const clean = Object.fromEntries(
     Object.entries(source).filter(([key]) => !/^(OMO|SENPI|PI)_/.test(key)),
   )
-  return {
+  return withTelemetryOptOut({
     ...clean,
     HOME: home,
     USERPROFILE: home,
@@ -52,7 +54,7 @@ export function sandboxEnvironment(source: NodeJS.ProcessEnv, home: string, agen
     PI_CODING_AGENT_DIR: agentDir,
     PI_OFFLINE: "1",
     OMO_SENPI_QA: "1",
-  }
+  })
 }
 
 export function createSandbox(computer: Json, enginePath?: string): Sandbox {
