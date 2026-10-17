@@ -88,6 +88,10 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       requestedAgain.add(taskId)
       return existing
     }
+    // Nothing persisted to deliver: register no drain. A drain over an empty queue would still read as
+    // "draining" for a few ticks, and a send to the live child in that window queued behind nothing
+    // instead of steering (#10399). A message enqueued later starts its own drain from enqueuePending.
+    if (!hasDeliverableEntries(tryLoad(taskId))) return Promise.resolve()
     const work = Promise.resolve().then(async () => {
       // Re-read after each delivered batch: sends accepted during delivery retain their order.
       for (let pass = 0; pass < MAX_DRAIN_PASSES; pass += 1) {
@@ -102,6 +106,10 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
     })
     draining.set(taskId, work)
     return work
+  }
+
+  function hasDeliverableEntries(record: TaskRecord | undefined): boolean {
+    return record?.pending_steering?.some(entry => entry.workpool === undefined) === true
   }
 
   async function drainPending(taskId: string): Promise<boolean> {
