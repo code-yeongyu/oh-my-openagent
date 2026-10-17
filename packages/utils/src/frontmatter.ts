@@ -32,11 +32,12 @@ export function parseFrontmatter<T = Record<string, unknown>>(
 ): FrontmatterResult<T> {
   if (options.mode === "rule") return parseRuleFrontmatter<T>(content)
 
+  const normalized = stripBom(content)
   const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n?---\r?\n([\s\S]*)$/
-  const match = content.match(frontmatterRegex)
+  const match = normalized.match(frontmatterRegex)
 
   if (!match) {
-    return { data: {} as T, body: content, hadFrontmatter: false, parseError: false }
+    return { data: {} as T, body: normalized, hadFrontmatter: false, parseError: false }
   }
 
   const yamlContent = match[1]

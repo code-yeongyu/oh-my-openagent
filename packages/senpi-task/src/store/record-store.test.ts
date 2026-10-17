@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as fs from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,6 +11,7 @@ import { resolveStateDir } from "./state-dir"
 const cleanupRoots: string[] = []
 
 afterEach(() => {
+  mock.restore()
   for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
@@ -204,6 +206,56 @@ describe("createTaskRecordStore event append", () => {
     const raw = readFileSync(join(stateDir, "tasks", "st_00000006.json"), "utf8")
     expect(raw).not.toContain("\n  ")
     expect(JSON.parse(raw).task_id).toBe("st_00000006")
+  })
+})
+
+describe("createTaskRecordStore rename contention", () => {
+  function renameRefusal(code: string): () => never {
+    return () => {
+      throw Object.assign(new Error(`${code}: operation not permitted, rename`), { code, syscall: "rename" })
+    }
+  }
+
+  function tempFiles(project: string): string[] {
+    const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
+    return readdirSync(tasksDir).filter((entry) => entry.endsWith(".tmp"))
+  }
+
+  test("#given a win32 store replacing a record #when renameSync is refused with EPERM twice #then the terminal status persists and no temp file remains", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project }, { platform: "win32" })
+    const record = baseRecord("st_00000011")
+    store.save(record)
+    const rename = spyOn(fs, "renameSync")
+      .mockImplementationOnce(renameRefusal("EPERM"))
+      .mockImplementationOnce(renameRefusal("EPERM"))
+
+    // when
+    store.replace({ ...record, status: "completed" })
+
+    // then
+    expect(rename).toHaveBeenCalledTimes(3)
+    expect(createTaskRecordStore({ project_dir: project }).load(record.task_id)?.status).toBe("completed")
+    expect(tempFiles(project)).toEqual([])
+  })
+
+  test("#given a POSIX store replacing a record #when renameSync is refused with EPERM once #then the error rethrows unchanged after one attempt and no temp file remains", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project }, { platform: "darwin" })
+    const record = baseRecord("st_00000012")
+    store.save(record)
+    const rename = spyOn(fs, "renameSync").mockImplementationOnce(renameRefusal("EPERM"))
+
+    // when
+    const replace = () => store.replace({ ...record, status: "completed" })
+
+    // then
+    expect(replace).toThrow("EPERM: operation not permitted, rename")
+    expect(rename).toHaveBeenCalledTimes(1)
+    expect(store.load(record.task_id)?.status).toBe("pending")
+    expect(tempFiles(project)).toEqual([])
   })
 })
 

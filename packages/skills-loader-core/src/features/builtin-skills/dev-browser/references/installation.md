@@ -136,10 +136,11 @@ netstat -ano | findstr :3000
 
 ### Playwright Installation Issues
 
-If Chromium fails to install:
-```bash
-npx playwright install chromium
-```
+Use installed Chrome rather than downloading a managed browser. From js eval,
+write and run a `playwright-core` script with
+`chromium.launch({ channel: "chrome" })`. For authenticated sessions, clone the
+profile first and use `launchPersistentContext` on the clone, never the live profile.
+If Chrome is absent, report that prerequisite instead of installing a browser.
 
 ### Windows-Specific Issues
 

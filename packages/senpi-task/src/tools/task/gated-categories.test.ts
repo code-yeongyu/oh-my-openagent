@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
+import { categoryGateModels } from "../../category/builtins"
 import { listTaskCategories } from "./categories"
+
+function requiredAnnotation(name: string): string {
+  const gateModels = categoryGateModels(name)
+  if (gateModels === undefined) throw new Error(`builtin category ${name} is not model-gated`)
+  return `(requires ${gateModels.join(" or ")})`
+}
 
 function entryFor(name: string, config: Parameters<typeof listTaskCategories>[0]) {
   return listTaskCategories(config).find((entry) => entry.name === name)
@@ -13,7 +20,7 @@ describe("gated category listing", () => {
       const entry = entryFor("architect", {})
 
       // then
-      expect(entry?.description).toContain("(requires claude-fable-5)")
+      expect(entry?.description).toContain("(requires claude-fable-5-1)")
     })
 
     test("#when the categories are listed #then ultrabrain carries its required model annotation", () => {
@@ -21,15 +28,20 @@ describe("gated category listing", () => {
       const entry = entryFor("ultrabrain", {})
 
       // then
-      expect(entry?.description).toContain("(requires gpt-5.6-sol)")
+      expect(entry?.description).toContain(requiredAnnotation("ultrabrain"))
     })
 
-    test("#when the categories are listed #then deep carries its required model annotation", () => {
+    test("#when the categories are listed #then each deep lane carries its own required model annotation", () => {
       // given / when
-      const entry = entryFor("deep", {})
+      const low = entryFor("deep-low", {})
+      const high = entryFor("deep-high", {})
 
       // then
-      expect(entry?.description).toContain("(requires gpt-5.6-sol)")
+      expect(low?.description).toContain("(requires gpt-6.1-sol or gpt-6.1-sol-fast or gpt-5.6-sol-fast or gpt-5.6-sol)")
+      expect(low?.description).toContain(requiredAnnotation("deep-low"))
+      expect(low?.description).not.toContain("gpt-6-sol")
+      expect(high?.description).toContain("(requires gpt-6-astra)")
+      expect(high?.description).toContain(requiredAnnotation("deep-high"))
     })
   })
 

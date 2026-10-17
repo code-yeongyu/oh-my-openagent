@@ -1,0 +1,301 @@
+{
+  "version": 1,
+  "carriers": [
+    "fast",
+    "reasoning"
+  ],
+  "cap_usd": 6.0,
+  "queries": [
+    {
+      "id": "q01",
+      "split": "calibration",
+      "query": "삼성전자 실적 외인 수급",
+      "since_days_ago": 7,
+      "reference_urls": [
+        "https://x.com/grok/status/2095333026204971141"
+      ],
+      "web_terms": [
+        "삼성전자",
+        "실적",
+        "외인",
+        "수급"
+      ]
+    },
+    {
+      "id": "q02",
+      "split": "calibration",
+      "query": "코스피 외국인 순매수",
+      "since_days_ago": 5,
+      "reference_urls": [],
+      "web_terms": [
+        "코스피",
+        "외국인",
+        "순매수"
+      ]
+    },
+    {
+      "id": "q03",
+      "split": "calibration",
+      "query": "SK하이닉스 HBM 반응",
+      "since_days_ago": 10,
+      "reference_urls": [],
+      "web_terms": [
+        "SK하이닉스",
+        "HBM",
+        "반응"
+      ]
+    },
+    {
+      "id": "q04",
+      "split": "calibration",
+      "query": "삼성전자 주가 전망 외국인 기관",
+      "since_days_ago": 14,
+      "reference_urls": [],
+      "web_terms": [
+        "삼성전자",
+        "주가",
+        "외국인",
+        "기관"
+      ]
+    },
+    {
+      "id": "q05",
+      "split": "calibration",
+      "query": "코스피 반도체 외인 매수",
+      "since_days_ago": 3,
+      "reference_urls": [],
+      "web_terms": [
+        "코스피",
+        "반도체",
+        "외인",
+        "매수"
+      ]
+    },
+    {
+      "id": "q06",
+      "split": "calibration",
+      "query": "현대차 실적 주가 시장 반응",
+      "since_days_ago": 9,
+      "reference_urls": [],
+      "web_terms": [
+        "현대차",
+        "실적",
+        "주가",
+        "시장",
+        "반응"
+      ]
+    },
+    {
+      "id": "q07",
+      "split": "calibration",
+      "query": "KOSPI foreign investor flows",
+      "since_days_ago": 12,
+      "reference_urls": [],
+      "web_terms": [
+        "KOSPI",
+        "foreign",
+        "investor",
+        "flows"
+      ]
+    },
+    {
+      "id": "q08",
+      "split": "calibration",
+      "query": "네이버 실적 외국인 수급",
+      "since_days_ago": 6,
+      "reference_urls": [],
+      "web_terms": [
+        "네이버",
+        "실적",
+        "외국인",
+        "수급"
+      ]
+    },
+    {
+      "id": "q09",
+      "split": "calibration",
+      "query": "xAI Grok CLI",
+      "since_days_ago": 4,
+      "reference_urls": [],
+      "web_terms": [
+        "xAI",
+        "Grok",
+        "CLI"
+      ]
+    },
+    {
+      "id": "q10",
+      "split": "calibration",
+      "query": "Bun 1.4 javascript",
+      "since_days_ago": 8,
+      "reference_urls": [],
+      "web_terms": [
+        "Bun",
+        "1.4",
+        "javascript"
+      ]
+    },
+    {
+      "id": "q11",
+      "split": "calibration",
+      "query": "Cloudflare Workers outage",
+      "since_days_ago": 2,
+      "reference_urls": [],
+      "web_terms": [
+        "Cloudflare",
+        "Workers",
+        "outage"
+      ]
+    },
+    {
+      "id": "q12",
+      "split": "calibration",
+      "query": "OpenAI agents API update",
+      "since_days_ago": 11,
+      "reference_urls": [],
+      "web_terms": [
+        "OpenAI",
+        "agents",
+        "API",
+        "update"
+      ]
+    },
+    {
+      "id": "q13",
+      "split": "calibration",
+      "query": "Grok latest release",
+      "since_days_ago": 15,
+      "x_search": {
+        "allowed_x_handles": [
+          "grok"
+        ]
+      },
+      "reference_urls": [],
+      "web_terms": [
+        "Grok",
+        "latest",
+        "release"
+      ]
+    },
+    {
+      "id": "q14",
+      "split": "calibration",
+      "query": "Elon Musk xAI announcement",
+      "since_days_ago": 13,
+      "x_search": {
+        "allowed_x_handles": [
+          "elonmusk"
+        ]
+      },
+      "reference_urls": [],
+      "web_terms": [
+        "Elon",
+        "Musk",
+        "xAI",
+        "announcement"
+      ]
+    },
+    {
+      "id": "q15",
+      "split": "holdout",
+      "query": "Bun JavaScript runtime news",
+      "since_days_ago": 16,
+      "x_search": {
+        "allowed_x_handles": [
+          "bunjavascript"
+        ]
+      },
+      "reference_urls": [],
+      "web_terms": [
+        "Bun",
+        "JavaScript",
+        "runtime",
+        "news"
+      ]
+    },
+    {
+      "id": "q16",
+      "split": "holdout",
+      "query": "LG에너지솔루션 실적 외인 반응",
+      "since_days_ago": 18,
+      "x_search": {
+        "until_days_ago": 4
+      },
+      "until_days_ago": 4,
+      "reference_urls": [],
+      "web_terms": [
+        "LG에너지솔루션",
+        "실적",
+        "외인",
+        "반응"
+      ]
+    },
+    {
+      "id": "q17",
+      "split": "holdout",
+      "query": "삼성전자 HBM 시장 반응",
+      "since_days_ago": 20,
+      "x_search": {
+        "until_days_ago": 7
+      },
+      "until_days_ago": 7,
+      "reference_urls": [],
+      "web_terms": [
+        "삼성전자",
+        "HBM",
+        "시장",
+        "반응"
+      ]
+    },
+    {
+      "id": "q18",
+      "split": "holdout",
+      "query": "xAI Grok API changes",
+      "since_days_ago": 21,
+      "x_search": {
+        "until_days_ago": 3
+      },
+      "until_days_ago": 3,
+      "reference_urls": [],
+      "web_terms": [
+        "xAI",
+        "Grok",
+        "API",
+        "changes"
+      ]
+    },
+    {
+      "id": "q19",
+      "split": "holdout",
+      "query": "Bun runtime performance",
+      "since_days_ago": 24,
+      "x_search": {
+        "until_days_ago": 10
+      },
+      "until_days_ago": 10,
+      "reference_urls": [],
+      "web_terms": [
+        "Bun",
+        "runtime",
+        "performance"
+      ]
+    },
+    {
+      "id": "q20",
+      "split": "holdout",
+      "query": "Cloudflare Workers incident report",
+      "since_days_ago": 30,
+      "x_search": {
+        "until_days_ago": 14
+      },
+      "until_days_ago": 14,
+      "reference_urls": [],
+      "web_terms": [
+        "Cloudflare",
+        "Workers",
+        "incident",
+        "report"
+      ]
+    }
+  ]
+}

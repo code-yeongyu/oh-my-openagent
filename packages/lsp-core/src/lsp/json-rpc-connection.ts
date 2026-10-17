@@ -73,6 +73,7 @@ export class JsonRpcConnection {
 		let settled = false;
 		const writeCancel = (): Promise<void> => this.writeMessage({ jsonrpc: "2.0", method: "$/cancelRequest", params: { id } });
 
+		let rejectAfterCancelWrite: (() => Promise<void>) | undefined;
 		const responsePromise = new Promise<T>((resolve, reject) => {
 			const cleanup = (): void => {
 				options.signal?.removeEventListener("abort", onAbort);
@@ -83,15 +84,19 @@ export class JsonRpcConnection {
 				this.pendingRequests.delete(key);
 				cleanup();
 				const rejectCancelled = (): void => reject(abortError(options.signal));
+				rejectAfterCancelWrite = async (): Promise<void> => {
+					try {
+						await writeCancel();
+					} catch (error) {
+						this.emitError(toError(error));
+					}
+					rejectCancelled();
+				};
 				if (!requestWritten) {
 					cancelAfterWrite = true;
-					rejectCancelled();
 					return;
 				}
-				void writeCancel().then(rejectCancelled, (error) => {
-					this.emitError(toError(error));
-					rejectCancelled();
-				});
+				void rejectAfterCancelWrite();
 			};
 			const onAbort = (): void => settleCancel();
 			this.pendingRequests.set(key, {
@@ -118,7 +123,7 @@ export class JsonRpcConnection {
 		try {
 			await this.writeMessage(message);
 			requestWritten = true;
-			if (cancelAfterWrite) await writeCancel();
+			if (cancelAfterWrite) await rejectAfterCancelWrite?.();
 		} catch (error) {
 			if (settled) return responsePromise;
 			const pending = this.pendingRequests.get(key);

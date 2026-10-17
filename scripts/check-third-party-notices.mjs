@@ -9,30 +9,10 @@ import { CODEX_COMPONENT_NOTICE_REQUIREMENTS } from "./third-party-notice-requir
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"])
 
-const CODEGRAPH_COMPONENTS = [
-  "@colbymchenry/codegraph",
-  "@colbymchenry/codegraph-darwin-arm64",
-  "@colbymchenry/codegraph-darwin-x64",
-  "@colbymchenry/codegraph-linux-arm64",
-  "@colbymchenry/codegraph-linux-x64",
-  "@colbymchenry/codegraph-win32-arm64",
-  "@colbymchenry/codegraph-win32-x64",
-  "CodeGraph bundled Node.js runtime",
-  "tree-sitter-wasms",
-  "web-tree-sitter",
-  "@clack/core",
-  "fast-string-truncated-width",
-  "fast-string-width",
-  "fast-wrap-ansi",
-  "ignore",
-  "sisteransi",
-]
-
 const ROOT_BUNDLED_COMPONENTS = [
   "pi-lsp-client",
   "pi-rules",
   "pi-comment-checker",
-  ...CODEGRAPH_COMPONENTS,
 ]
 
 const CODEX_AGGREGATE_COMPONENTS = [

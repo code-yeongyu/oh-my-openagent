@@ -1,4 +1,4 @@
-import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+import { transformModelForProvider, type DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoCategoryConfig } from "@oh-my-opencode/omo-config-core"
 
 import { ANTHROPIC_CATEGORIES } from "./anthropic-categories"
@@ -34,52 +34,65 @@ export const CATEGORY_PROMPT_APPENDS: Readonly<Record<string, string>> = Object.
 
 function hasRequiresModel(
   definition: BuiltinCategoryDefinition,
-): definition is BuiltinCategoryDefinition & { readonly requiresModel: string } {
+): definition is BuiltinCategoryDefinition & { readonly requiresModel: string | readonly string[] } {
   return definition.requiresModel !== undefined
 }
 
-export const BUILTIN_CATEGORY_REQUIRES_MODEL: Readonly<Record<string, string>> = Object.fromEntries(
-  BUILTIN_CATEGORY_DEFAULTS.filter(hasRequiresModel).map((definition) => [definition.name, definition.requiresModel]),
+// A gate lists every model id that opens the category; one present id is enough. ultrabrain gates on
+// gpt-6-astra OR gpt-5.6-sol so a registry carrying either GPT flagship keeps it, deep-low on either
+// GPT-6 Sol tier and deep-high on gpt-6-astra alone, and a registry with none of a lane's ids never
+// falls through to a cross-family model.
+export const BUILTIN_CATEGORY_REQUIRES_MODEL: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+  BUILTIN_CATEGORY_DEFAULTS.filter(hasRequiresModel).map((definition) => [
+    definition.name,
+    typeof definition.requiresModel === "string" ? [definition.requiresModel] : definition.requiresModel,
+  ]),
 )
 
-export function categoryGateModel(categoryName: string): string | undefined {
+export function categoryGateModels(categoryName: string): readonly string[] | undefined {
   return Object.hasOwn(BUILTIN_CATEGORY_REQUIRES_MODEL, categoryName)
     ? BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName]
     : undefined
 }
 
+function categoryChainProviders(categoryName: string): readonly string[] {
+  const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, categoryName)
+    ? CATEGORY_FALLBACK_CHAINS[categoryName]
+    : []
+  return chain.flatMap((rung) => rung.providers)
+}
+
+// `provider` serves `model` when the registry lists it under that provider, spelled as omo's routing
+// tables spell it (claude-fable-5-1) or through the provider-specific id transform delegate-core
+// applies at resolution time (github-copilot: claude-fable-5.1, kimi-coding: k3). The provider is
+// part of the check: a gateway re-publishing the model (openrouter/anthropic/claude-opus-5.5) serves
+// no builtin rung, because a builtin chain resolves only on the providers it lists (#9146).
+function providerServesModel(provider: string, model: string, availableModels: ReadonlySet<string>): boolean {
+  return availableModels.has(`${provider}/${model}`)
+    || availableModels.has(`${provider}/${transformModelForProvider(provider, model)}`)
+}
+
+// `availableModels` holds live registry models as `provider/id`. A gate opens only when a provider
+// this category's chain lists serves a gate model; family and version comparison stays exact.
 export function isCategoryGateSatisfied(
   categoryName: string,
   hasExplicitUserConfig: boolean,
-  availableModelIds: ReadonlySet<string>,
+  availableModels: ReadonlySet<string>,
 ): boolean {
-  const gateModel = categoryGateModel(categoryName)
-  if (gateModel === undefined || hasExplicitUserConfig) return true
-  return availableModelIds.has(gateModel)
+  const gateModels = categoryGateModels(categoryName)
+  if (gateModels === undefined || hasExplicitUserConfig) return true
+  const chainProviders = categoryChainProviders(categoryName)
+  return gateModels.some((gateModel) =>
+    chainProviders.some((provider) => providerServesModel(provider, gateModel, availableModels))
+  )
 }
 
-// Mirrors the kimi transform from model-core provider-model-id-transform.ts (kimi-k3 -> k3); the
-// other chain providers resolve by their bare model id. senpi-task cannot import model-core here
-// without adding a package dependency outside this task's scope (see fallback-chains.ts).
-function transformChainModelId(provider: string, model: string): string {
-  if (provider === "kimi-coding" || provider === "kimi-for-coding") {
-    if (model === "kimi-k3") return "k3"
-    if (model === "kimi-k3-256k") return "k3-256k"
-  }
-  return model
-}
-
-// A chain rung resolves when the live registry exposes its model id: either directly (the
-// gateway-prefix unwrap in resolver.modelIdsOf surfaces vercel/openai/gpt-5.6-sol as gpt-5.6-sol)
-// or through the provider-specific id transform (kimi-coding/k3 satisfies a kimi-k3 rung).
+// A chain rung resolves when one of its own providers serves its model in the live registry.
 export function isCategoryChainRungResolvable(
   entry: DelegateFallbackEntry,
-  availableModelIds: ReadonlySet<string>,
+  availableModels: ReadonlySet<string>,
 ): boolean {
-  if (availableModelIds.has(entry.model)) return true
-  return entry.providers.some((provider) =>
-    availableModelIds.has(transformChainModelId(provider, entry.model))
-  )
+  return entry.providers.some((provider) => providerServesModel(provider, entry.model, availableModels))
 }
 
 // Dead-chain availability: a builtin-only category is usable only when at least one of its
@@ -88,14 +101,14 @@ export function isCategoryChainRungResolvable(
 export function isCategoryChainViable(
   categoryName: string,
   hasExplicitUserConfig: boolean,
-  availableModelIds: ReadonlySet<string>,
+  availableModels: ReadonlySet<string>,
 ): boolean {
   if (hasExplicitUserConfig) return true
   const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, categoryName)
     ? CATEGORY_FALLBACK_CHAINS[categoryName]
     : undefined
   if (chain === undefined || chain.length === 0) return true
-  return chain.some((rung) => isCategoryChainRungResolvable(rung, availableModelIds))
+  return chain.some((rung) => isCategoryChainRungResolvable(rung, availableModels))
 }
 
 export const CATEGORY_PROMPT_APPEND_RESOLVERS: Readonly<Record<string, (model: string | undefined) => string>> =

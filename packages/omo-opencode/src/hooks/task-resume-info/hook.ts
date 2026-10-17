@@ -18,7 +18,7 @@ export function createTaskResumeInfoHook() {
 
     output.output =
       outputText.trimEnd() +
-      `\n\nto continue: task(task_id="${taskId}", load_skills=[], run_in_background=false, prompt="...")`
+      `\n\nto continue: task(task_id="${taskId}", load_skills=[], run_in_background=true, prompt="...")`
   }
 
   return {

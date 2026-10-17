@@ -20,6 +20,7 @@ export function buildTaskRecord(input: LaunchInput, id: string, queuedAt: Date):
     sessionPermission: input.sessionPermission,
     category: input.category,
     isUnstableAgent: input.isUnstableAgent,
+    cwd: input.cwd,
     onSessionCreated: input.onSessionCreated,
   }
 }

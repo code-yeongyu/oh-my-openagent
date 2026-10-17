@@ -111,6 +111,38 @@ export class FactsQueue {
     return this.locked(() => this.listPendingUnlocked())
   }
 
+  async claim(entries: readonly FactsQueueEntry[], claimId: string): Promise<FactsQueueEntry[]> {
+    if (entries.length === 0) return []
+    return this.locked(async () => {
+      const pending = await this.listPendingUnlocked()
+      const claims = await this.readClaimsUnlocked()
+      const requested = new Set(entries.map((entry) => this.entryKey(entry)))
+      const reclaimBefore = this.now().getTime() - 15 * 60_000
+      const claimed = pending.filter((entry) => {
+        const claim = claims[this.entryKey(entry)]
+        return requested.has(this.entryKey(entry)) && (claim === undefined || Date.parse(claim.claimedAt) < reclaimBefore)
+      })
+      for (const entry of claimed) delete claims[this.entryKey(entry)]
+      const next = { ...claims }
+      for (const entry of claimed) next[this.entryKey(entry)] = { claimId, claimedAt: this.now().toISOString() }
+      await this.writeClaims(next)
+      return claimed
+    })
+  }
+
+  async releaseClaim(entries: readonly FactsQueueEntry[], claimId: string): Promise<void> {
+    if (entries.length === 0) return
+    await this.locked(async () => {
+      const claims = await this.readClaimsUnlocked()
+      const next = { ...claims }
+      for (const entry of entries) {
+        const key = this.entryKey(entry)
+        if (next[key]?.claimId === claimId) delete next[key]
+      }
+      await this.writeClaims(next)
+    })
+  }
+
   /**
    * Terminal SUCCESS only: deletes the batch's files and advances the consumed
    * watermark. The enqueue watermark is NEVER touched here, so an older batch
@@ -127,6 +159,10 @@ export class FactsQueue {
         const key = `${candidate.conversationId}\u0000${candidate.range.end_message_id}`
         if (consumedKeys.has(key)) await rm(candidate.filePath, { force: true })
       }
+      const claims = await this.readClaimsUnlocked()
+      const nextClaims = { ...claims }
+      for (const entry of entries) delete nextClaims[this.entryKey(entry)]
+      await this.writeClaims(nextClaims)
       await this.advanceConsumed(entries)
     })
   }
@@ -186,7 +222,7 @@ export class FactsQueue {
     }
     const entries: (FactsQueueEntry & { readonly filePath: string })[] = []
     for (const name of names.sort()) {
-      if (!name.endsWith(".json") || name === "consumed.json" || name === "failures.json") continue
+      if (!name.endsWith(".json") || name === "consumed.json" || name === "failures.json" || name === "claims.json") continue
       const filePath = join(this.layout.queueDir, name)
       const raw = await readFile(filePath, "utf8").catch(() => undefined)
       if (raw === undefined) continue
@@ -200,6 +236,35 @@ export class FactsQueue {
   private async readCursorUnlocked(conversationId: string): Promise<FactsCursor> {
     const raw = await readFile(this.layout.cursorPath(conversationId), "utf8").catch(() => undefined)
     return raw === undefined ? initialCursor() : parseCursor(raw)
+  }
+
+  private async readClaimsUnlocked(): Promise<Record<string, { claimId: string; claimedAt: string }>> {
+    const raw = await readFile(join(this.layout.queueDir, "claims.json"), "utf8").catch(() => undefined)
+    if (raw === undefined) return {}
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {}
+      const claims: Record<string, { claimId: string; claimedAt: string }> = {}
+      for (const [key, value] of Object.entries(parsed)) {
+        if (value === null || typeof value !== "object" || Array.isArray(value)) continue
+        const claimId = Reflect.get(value, "claimId")
+        const claimedAt = Reflect.get(value, "claimedAt")
+        if (typeof claimId !== "string" || claimId.length === 0 || typeof claimedAt !== "string" || Number.isNaN(Date.parse(claimedAt))) continue
+        claims[key] = { claimId, claimedAt }
+      }
+      return claims
+    } catch { return {} }
+  }
+
+  private async writeClaims(claims: Record<string, { claimId: string; claimedAt: string }>): Promise<void> {
+    const target = join(this.layout.queueDir, "claims.json")
+    const temporary = `${target}.tmp`
+    await writeFile(temporary, `${JSON.stringify(claims, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
+    await rename(temporary, target)
+  }
+
+  private entryKey(entry: FactsQueueEntry): string {
+    return `${entry.conversationId}\u0000${entry.range.end_message_id}`
   }
 
   private async readConsumedUnlocked(): Promise<FactsConsumedWatermark> {

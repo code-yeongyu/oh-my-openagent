@@ -60,7 +60,7 @@ export type ChatMessageHooks = {
   stopContinuationGuard?: StopContinuationGuard | null
   backgroundNotificationHook?: ChatMessageHook | null
   runtimeFallback?: ChatMessageHook | null
-  keywordDetector?: ChatMessageHook | null
+  keywordDetector?: (ChatMessageHook & { clearSession?: (sessionID: string) => void }) | null
   thinkMode?: ChatMessageHook | null
   claudeCodeHooks?: ChatMessageHook | null
   autoSlashCommand?: ChatMessageHook | null

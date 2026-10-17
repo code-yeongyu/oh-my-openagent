@@ -4,13 +4,12 @@
 
 ## OVERVIEW
 
-Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed by both adapters (`packages/omo-opencode`, `packages/omo-codex`) and the other Core packages. Barrel-exports 36 modules across runtime shims, config tooling, file utilities, prompt gating, git parsing, migration maps, and codegraph primitives.
+Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed by both adapters (`packages/omo-opencode`, `packages/omo-codex`) and the other Core packages. Barrel-exports runtime shims, config tooling, file utilities, prompt gating, git parsing, and migration maps.
 
 ## CATEGORY MAP
 
 | Group | Key Files | Role |
 |-------|-----------|------|
-| **Config** | `omo-config.ts` | Legacy codegraph config validator: `validateOmoConfig()` plus the `CodegraphConfig` / harness-block types re-exported from `@oh-my-opencode/omo-config-core`. The unified `omo.jsonc` loader and migration engine live in `@oh-my-opencode/omo-config-core`, not here |
 | **Deep Merge** | `deep-merge.ts` | `deepMerge()` — recursive, prototype-pollution safe (`__proto__`/`constructor`/`prototype` filtered), max depth 50 |
 | **Frontmatter** | `frontmatter.ts` | `parseFrontmatter()` — default YAML (`js-yaml` JSON_SCHEMA) + rule-mode parser with multiline glob arrays |
 | **File Utils** | `file-utils.ts`, `atomic-write.ts`, `xdg-data-dir.ts` | Symlink resolution, atomic writes with tolerant fsync, XDG data dir with tmp fallback |
@@ -19,9 +18,8 @@ Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed
 | **Git Worktree** | `git-worktree/*.ts` | Porcelain status parser, diff stat collection, `formatFileChanges()` |
 | **Migration** | `migration.ts`, `migration/*.ts` | Agent-name, hook-name, model-version, agent-category migration maps; `migrateConfigFile()` |
 | **Command Exec** | `command-executor/execute-command.ts`, `execute-hook-command.ts` | `executeCommand()` via `node:child_process` `exec`; stderr inlined in return string |
-| **Codegraph** | `codegraph/*.ts` | Workspace manifest, env detection, Node runtime policy (min major 20, major 25 blocked, `CODEGRAPH_NODE_BIN` override), provision helpers |
 | **Ast-grep** | `ast-grep/*.ts` | sg binary provisioning: pinned manifest, resolver/cache, install script; `provisionSgBinary()` |
-| **Process Sweep** | `process-sweep/*.ts` | Family-based orphan cleanup: codegraph zombie sweep, LSP daemon proxy/version sweeps, ownership attestation |
+| **Process Sweep** | `process-sweep/*.ts` | Family-based orphan cleanup: LSP daemon proxy/version sweeps, ownership attestation |
 | **Process Tree** | `process-tree.ts`, `process-tree-termination.ts`, `process-stream-reader.ts` | Process tree enumeration/termination, stream reading |
 | **Logging** | `logging/*.ts` | Buffered logger (flush/rotation) + product identity |
 | **Zip Listing** | `zip-entry-listing/*.ts` | tar / zipinfo / Python / PowerShell adapters + symlink target reading |

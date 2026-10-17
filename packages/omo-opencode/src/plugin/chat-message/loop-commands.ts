@@ -2,6 +2,7 @@ import type { OhMyOpenCodeConfig } from "../../config"
 
 import { AUTO_SLASH_COMMAND_TAG_OPEN } from "../../hooks/auto-slash-command/constants"
 import { parseGoalCommand } from "../../hooks/goal/command-arguments"
+import { MAX_OBJECTIVE_LENGTH } from "../../hooks/goal/validation"
 import { log } from "../../shared"
 import { extractPromptText } from "./prompt-text"
 import type { ChatMessageHooks, ChatMessageHandlerOutput, ChatMessageInput } from "./types"
@@ -13,17 +14,33 @@ export function handleGoalMessage(args: {
   readonly isFirstMessage: boolean
   readonly pluginConfig: OhMyOpenCodeConfig
   readonly nativeGoalCommand: boolean
+  readonly originalPromptText?: string
 }): void {
   const { hooks, input, output, isFirstMessage, pluginConfig, nativeGoalCommand } = args
   if (!hooks.goal || nativeGoalCommand) {
     return
   }
 
-  const promptText = extractPromptText(output.parts)
+  const promptText = args.originalPromptText ?? extractPromptText(output.parts)
   if (promptText.includes(AUTO_SLASH_COMMAND_TAG_OPEN)) {
     return
   }
-  const parsed = parseGoalCommand(promptText)
+  // The parser accepts bare arguments for native commands, not ordinary chat.
+  const goalCommand = promptText.trim().match(/^\/goal(?:\s+([\s\S]*))?$/i)
+  if (!goalCommand) {
+    const objective = promptText.trim()
+    if (
+      isFirstMessage
+      && pluginConfig.default_mode?.goal
+      && objective.length > 0
+      && objective.length <= MAX_OBJECTIVE_LENGTH
+    ) {
+      hooks.goal.setGoal(input.sessionID, objective)
+      log("[chat-message] Default goal auto-started", { sessionID: input.sessionID, objective })
+    }
+    return
+  }
+  const parsed = parseGoalCommand(goalCommand[1] ?? "")
 
   switch (parsed.kind) {
     case "setObjective":
@@ -48,17 +65,5 @@ export function handleGoalMessage(args: {
       break
     default:
       break
-  }
-
-  if (
-    parsed.kind === "show"
-    && isFirstMessage
-    && pluginConfig.default_mode?.goal
-  ) {
-    const objective = promptText.trim()
-    if (objective.length > 0) {
-      hooks.goal.setGoal(input.sessionID, objective)
-      log("[chat-message] Default goal auto-started", { sessionID: input.sessionID, objective })
-    }
   }
 }

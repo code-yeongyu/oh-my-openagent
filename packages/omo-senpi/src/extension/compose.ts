@@ -1,13 +1,18 @@
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
+import { isOmoSenpiDisabledByEnv } from "./disable-env"
+import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
-import { createToolkitPathProvisioning } from "./toolkit-path-provisioning"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
 
 export interface ComposeOmoSenpiExtensionOptions {
   logger?: ComponentLogger
+  /** Test seam for the startup deferral; production uses its next-tick scheduler. */
+  scheduleStartupWork?: StartupWorkScheduler
+  env?: NodeJS.ProcessEnv
 }
 
 const REQUIRED_CAPABILITIES = [
@@ -22,15 +27,28 @@ const REQUIRED_CAPABILITIES = [
 
 type RequiredCapability = (typeof REQUIRED_CAPABILITIES)[number]
 
+// Batch window for the shared idle-injection flush: everything that becomes ready inside it collapses
+// into ONE steer injection.
+const IDLE_FLUSH_BATCH_WINDOW_MS = 200
+
+// Forward `details` only when present: `console.info(message, undefined)` renders a trailing "undefined".
+function consoleArgs(message: string, details: unknown): [string] | [string, unknown] {
+  return details === undefined ? [message] : [message, details]
+}
+
+// warn/error always write to stderr. info is silent unless OMO_DEBUG is set (then also stderr).
+// A child's stdout is its deliverable - the reflection worker's report is read back from it -
+// so an info line on stdout became the "report" (#8564).
 const defaultLogger: ComponentLogger = {
   info(message, details) {
-    console.info(message, details)
+    if (!process.env.OMO_DEBUG) return
+    console.error(...consoleArgs(message, details))
   },
   warn(message, details) {
-    console.warn(message, details)
+    console.warn(...consoleArgs(message, details))
   },
   error(message, details) {
-    console.error(message, details)
+    console.error(...consoleArgs(message, details))
   },
 }
 
@@ -51,15 +69,18 @@ export function composeOmoSenpiExtension(
   options: ComposeOmoSenpiExtensionOptions = {},
 ): (pi: unknown) => Promise<void> {
   const logger = options.logger ?? defaultLogger
-  const provisionToolkitPath = createToolkitPathProvisioning({ logger })
   const provisionDagSdkRoot = createDagSdkRootProvisioning({ logger })
+  const provisionAgentToolkitSdkRoot = createSdkRootProvisioning({
+    envKey: AGENT_TOOLKIT_SDK_ROOT_ENV,
+    packagedRelativeDir: "../runtime/agent-toolkit-sdk",
+    sourceTreeRelativeDir: "../../plugin/runtime/agent-toolkit-sdk",
+    logger,
+  })
 
   return async (pi: unknown): Promise<void> => {
-    // Provision the in-session toolkit PATH/env at activation, before any component registers,
-    // so component spawns resolve omo-agent-toolkit without global bins. Never throws.
-    provisionToolkitPath()
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
+    provisionAgentToolkitSdkRoot()
 
     const missing = getMissingCapabilities(pi)
     if (missing.length > 0 || !isSenpiExtensionAPI(pi)) {
@@ -84,7 +105,7 @@ export function composeOmoSenpiExtension(
       })
     }
 
-    if (pi.getFlag("omo-senpi-disabled") === true) {
+    if (pi.getFlag("omo-senpi-disabled") === true || isOmoSenpiDisabledByEnv(options.env ?? process.env)) {
       logger.info("omo-senpi disabled by flag")
       return
     }
@@ -94,12 +115,42 @@ export function composeOmoSenpiExtension(
     const captureRegistry = installToolCaptureRegistry(pi)
     // The 200ms batch window: every delivered notification (completions, team messages, the ulw
     // continuation) defers its flush through this timer, so everything that becomes ready within the
-    // window collapses into ONE steer injection instead of N separate ones.
+    // window collapses into ONE steer injection instead of N separate ones. The timer is unref'd and
+    // cancellable like every sibling scheduler in this codebase (lead-poller-lifecycle's interval,
+    // senpi-task's completion retry): retirement cancels the armed handle instead of leaving a live
+    // 200ms timer behind after a `quit` shutdown.
     const idleCoordinator = new IdleInjectionCoordinator(
       (message, options) =>
         pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
-      { scheduleFlush: (flush) => void setTimeout(flush, 200) },
+      {
+        scheduleFlush: (flush) => {
+          const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)
+          timer.unref?.()
+          return () => clearTimeout(timer)
+        },
+      },
     )
+    // senpi emits session_shutdown on the old runner before it invalidates that generation; retire the
+    // shared queue there so a 200ms flush armed before a reload cannot call pi.sendMessage on a stale
+    // API and throw out of the timer queue (uncaughtException -> exit 1). Retirement hands every
+    // still-queued injection back to its producer as a delivery failure, so a completion caught inside
+    // the batch window is recorded as undelivered and redelivered after the reload.
+    // See: https://github.com/code-yeongyu/oh-my-openagent/issues/7932
+    pi.on("session_shutdown", () => idleCoordinator.retire())
+
+    // Startup work that is not needed before the first user turn (telemetry capture, the init-deep
+    // advisor's git/fs preflight, the LSP project-config notice) is queued here instead of running
+    // on the session_start dispatch path the engine bills under `interactiveMode.init`. The gate
+    // opens on the first post-paint host edge or its backstop timer, never on a bare next tick:
+    // session_start is dispatched from inside that init phase, so a zero-delay macrotask fires
+    // before it returns and the work stays on the critical path. Retired on the same shutdown edge
+    // as the idle coordinator: a session that ends before the gate opens must not start a
+    // half-session's worth of work on a dead API.
+    const startupDeferral = createStartupDeferral({
+      schedule: options.scheduleStartupWork ?? createFirstPaintScheduler({ on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions) }),
+      onError: (label, error) => logger.warn("omo-senpi deferred startup work failed", { label, error }),
+    })
+    pi.on("session_shutdown", () => startupDeferral.retire())
 
     // Warm the pi-tui lazy boundary once for the whole extension, before any component registers.
     // Renderers across several components (fallback-architect notices, memory worker entries, task
@@ -119,6 +170,7 @@ export function composeOmoSenpiExtension(
       },
       getCapturedTools: () => captureRegistry.getCapturedTools(),
       idleCoordinator,
+      deferStartupWork: (label, work) => startupDeferral.defer(label, work),
     }
 
     for (const component of components) {
@@ -133,6 +185,10 @@ export function composeOmoSenpiExtension(
         logger.error("omo-senpi component registration failed", { component: component.name, error })
       }
     }
+    // The wrapper exists only to collect omo component tools. Senpi loads builtin factories after
+    // path extensions, so leaving it installed would capture raw builtin definitions (including
+    // freeform eval) and inject them as parent custom tools into every in-process child.
+    captureRegistry.stopCapture()
   }
 }
 

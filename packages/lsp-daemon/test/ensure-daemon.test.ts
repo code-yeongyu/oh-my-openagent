@@ -1,15 +1,24 @@
-import { spawnSync } from "node:child_process";
-import { describe, expect, it } from "vitest";
+import { type ChildProcess, type SpawnOptions, spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
 	DaemonUnreachableError,
 	type EnsureDaemonDeps,
 	ensureDaemonRunning,
 	resolveDaemonNodeExecutable,
+	spawnDaemonProcess,
 } from "../src/ensure-daemon.js";
 import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 const PATHS = daemonTestPaths("/tmp/ensure-test", "9.9.9");
+const tempDirectories: string[] = [];
+
+afterEach(() => {
+	for (const dir of tempDirectories.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 interface Harness {
 	deps: EnsureDaemonDeps;
@@ -37,7 +46,74 @@ function makeHarness(config: { probeQueue: boolean[]; onSpawnPush?: boolean[] })
 	return { deps, counts };
 }
 
+describe("spawnDaemonProcess", () => {
+	it("#given the packaged omo binary #when spawning the daemon #then the env forces Bun runtime mode", () => {
+		const dir = mkdtempSync(join(tmpdir(), "lsp-daemon-spawn-env-"));
+		tempDirectories.push(dir);
+		const paths = daemonTestPaths(dir, "9.9.9");
+		const observed: Array<{ executable: string; args: string[]; options: SpawnOptions }> = [];
+		const stubChild: ChildProcess = {
+			once(event: string, listener: () => void) {
+				if (event === "spawn") listener();
+				return stubChild;
+			},
+			unref() {
+				return undefined;
+			},
+		} as unknown as ChildProcess;
+
+		spawnDaemonProcess(paths, {
+			spawn: (executable, args, options) => {
+				observed.push({ executable, args: [...args], options });
+				return stubChild;
+			},
+			// Compiled-binary style path: under the packaged runtime execPath IS the
+			// omo binary, not a node interpreter, so without BUN_BE_BUN the CLI argv
+			// boots a billable agent session instead of the daemon.
+			resolveExecutable: () => "/opt/omo/payload/omo",
+		});
+
+		expect(observed).toHaveLength(1);
+		expect(observed[0]?.executable).toBe("/opt/omo/payload/omo");
+		expect(observed[0]?.args).toEqual([paths.cliPath, "daemon"]);
+		expect(observed[0]?.options.env).toEqual({ ...process.env, BUN_BE_BUN: "1" });
+	});
+});
+
 describe("ensureDaemonRunning", () => {
+	it("probes without respawning for five seconds after failed readiness, then allows recovery", async () => {
+		const paths = daemonTestPaths(join(tmpdir(), "lsp-cooldown-expiry"));
+		const { deps, counts } = makeHarness({ probeQueue: [] });
+		const options = { readyTimeoutMs: 300, pollIntervalMs: 100 };
+		await expect(ensureDaemonRunning(paths, deps, options)).rejects.toBeInstanceOf(DaemonUnreachableError);
+		await expect(ensureDaemonRunning({ ...paths }, { ...deps }, options)).rejects.toBeInstanceOf(
+			DaemonUnreachableError,
+		);
+		expect(counts.spawn).toBe(1);
+		expect(deps.now()).toBe(300);
+
+		await deps.sleep(4_999);
+		await expect(ensureDaemonRunning(paths, deps, options)).rejects.toBeInstanceOf(DaemonUnreachableError);
+		expect(counts.spawn).toBe(1);
+		await deps.sleep(1);
+		await expect(ensureDaemonRunning(paths, deps, options)).rejects.toBeInstanceOf(DaemonUnreachableError);
+		expect(counts.spawn).toBe(2);
+	});
+
+	it("does not suppress another endpoint or a reachable daemon during cooldown", async () => {
+		const paths = daemonTestPaths(join(tmpdir(), "lsp-cooldown-isolation"));
+		const { deps, counts } = makeHarness({ probeQueue: [] });
+		await expect(ensureDaemonRunning(paths, deps, { readyTimeoutMs: 0 })).rejects.toBeInstanceOf(
+			DaemonUnreachableError,
+		);
+		const other = daemonTestPaths(join(tmpdir(), "lsp-cooldown-other"));
+		await ensureDaemonRunning(other, { ...deps, probe: async () => counts.spawn > 1 });
+		expect(counts.spawn).toBe(2);
+		await ensureDaemonRunning(paths, { ...deps, probe: async () => true });
+		await ensureDaemonRunning(paths, { ...deps, probe: async () => counts.spawn > 2 });
+		expect(counts.spawn).toBe(3);
+	});
+
 	it("#given the cached Node executable was removed #when resolving the daemon launcher #then uses argv0", () => {
 		const executable = resolveDaemonNodeExecutable(
 			"/opt/homebrew/Cellar/node/26.5.0/bin/node",

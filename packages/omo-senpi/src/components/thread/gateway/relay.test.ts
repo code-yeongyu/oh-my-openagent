@@ -1,0 +1,567 @@
+import { afterEach, describe, expect, test } from "bun:test"
+
+import { parseThreadParams, threadToolParamSchemas } from "../contracts"
+import type { AnswerFields } from "./answer-shape"
+import { type BindInput, RELAY_TEXT_MAX_BYTES } from "./bindings"
+import { createCompletionTracker } from "./completion"
+import { createInboxDrain } from "./drain"
+import { createGatewayRelay, type GatewayRelay } from "./relay"
+import type { GatewayStore } from "./store"
+import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+
+/** The arm a completion report made: its sequence number is the watermark the tracker's settle passes. */
+function armSeqOf(reported: { readonly arm_seq: number | null }): number {
+  if (reported.arm_seq === null) throw new Error("the report armed no completion")
+  return reported.arm_seq
+}
+
+let harness: GatewayHarness | undefined
+
+function within<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${label}`)), ms) })]).finally(() => clearTimeout(timer))
+}
+
+afterEach(async () => {
+  await harness?.dispose()
+  harness = undefined
+})
+
+type UiResponse = { readonly session: string; readonly ui_request_id: string; readonly fields: AnswerFields }
+
+function relayOn(h: GatewayHarness, store: GatewayStore = h.store()) {
+  const responses: UiResponse[] = []
+  const relay = createGatewayRelay({
+    store,
+    engine: h.engineFor(store),
+    endpoints: {
+      wake: async () => ({ admitted: [] }),
+      respondUi: async (endpoint, answer) => {
+        responses.push({ session: endpoint.socket.slice("fake:".length), ...answer })
+        return { delivered: true }
+      },
+    },
+    locate: async (durableId) => {
+      const online = h.entries().find((entry) => entry.thread_id === durableId && entry.liveness === "routable")
+      return online?.endpoint ?? null
+    },
+    now: () => h.clock.now,
+  })
+  return { relay, store, responses }
+}
+
+function binding(session: string, extra: Partial<BindInput> = {}): BindInput {
+  return { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session_durable_id: session, ...extra }
+}
+
+function ok<T extends { kind: string }>(result: T): Extract<T, { kind: "ok" }> {
+  if (result.kind !== "ok") throw new Error(`expected ok, got ${JSON.stringify(result)}`)
+  return result as Extract<T, { kind: "ok" }>
+}
+
+function code(result: { kind: string; error?: { code: string } }): string {
+  return result.kind === "ok" ? "ok" : (result.error?.code ?? "?")
+}
+
+async function bindAs(relay: GatewayRelay, input: BindInput): Promise<string> {
+  return ok(await relay.bind({ principal: "session:A", binding: input })).binding.binding_id
+}
+
+describe("relay_text_byte_cap", () => {
+  test("#given relay text measured in UTF-8 bytes #when multibyte text sits at and just past the cap #then the cap passes, one more character is message_too_large (never invalid_arguments), and the tool schema carries no character cap", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const atCap = "한".repeat(Math.floor(RELAY_TEXT_MAX_BYTES / 3)) + "ab"
+    expect(Buffer.byteLength(atCap)).toBe(RELAY_TEXT_MAX_BYTES)
+    expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "report", text: atCap }))).toBe("ok")
+    const over = `${atCap}한`
+    expect({ chars: over.length < RELAY_TEXT_MAX_BYTES, bytes: Buffer.byteLength(over) > RELAY_TEXT_MAX_BYTES }).toEqual({ chars: true, bytes: true })
+    expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "report", text: over }))).toBe("message_too_large")
+    expect(code(await relay.answer({ binding_id: x, reply_token: "rt1.x.y", answer: over }))).toBe("message_too_large")
+    const longAscii = "a".repeat(RELAY_TEXT_MAX_BYTES + 1)
+    expect(parseThreadParams(threadToolParamSchemas.thread_report, { kind: "report", text: longAscii }).kind).toBe("ok")
+  })
+})
+
+describe("relay_direction_question_authority_and_completion", () => {
+  test("#given a connector message #when the same inbound event id arrives twice #then it is admitted once, and the target sees an external provenance header naming the binding", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const first = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "hello from outside" })
+    const second = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "hello from outside" })
+    await h.quiesce()
+    const deliveryId = ok(first).delivery_id
+    expect({ first: ok(first).delivery.kind, replayId: ok(second).delivery_id, deduplicated: ok(second).deduplicated }).toEqual({ first: "started", replayId: deliveryId, deduplicated: true })
+    expect({ enqueued: b.runtime.enqueueCount(deliveryId), entries: b.runtime.transcriptEntries(deliveryId), rows: (await b.store.list({ target_durable_id: "B" })).length }).toEqual({ enqueued: 1, entries: 1, rows: 1 })
+    const header = (b.runtime.textOf(deliveryId) ?? "").split("\n")[0]
+    expect(header).toContain("source=external")
+    expect(header).toContain(`binding=${x}@1`)
+    expect(header).toContain("actor=qa")
+  })
+
+  test("#given a session bound to two chat threads #when it reports without naming a binding #then only the originating binding's outbox gets the row, and a binding outside its direction or events refuses", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    h.session("D")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const y = await bindAs(relay, binding("B", { chat_id: "c2" }))
+    const inboundOnly = await bindAs(relay, binding("B", { chat_id: "c3", direction: { inbound: true, outbound: false } }))
+    const reportsOnly = await bindAs(relay, binding("B", { chat_id: "c4", outbound_events: ["report"] }))
+    expect(code(await relay.report({ principal: "session:D", session_durable_id: "D", event: "milestone", text: "nothing came in" }))).toBe("invalid_arguments")
+    const started = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "start the job" }))
+    await h.quiesce()
+    expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", event: "milestone", text: "whose run?" }))).toBe("invalid_arguments")
+    const reported = ok(await relay.report({ principal: "session:B", session_durable_id: "B", origin_delivery_ids: [started.delivery_id], event: "milestone", text: "step 1" }))
+    expect({ binding: reported.binding_id, revision: reported.revision }).toEqual({ binding: x, revision: 1 })
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["step 1"])
+    expect(ok(await relay.outbox({ binding_id: y })).rows).toEqual([])
+    expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: inboundOnly, event: "report", text: "r" }))).toBe("unsupported")
+    expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: reportsOnly, event: "milestone", text: "m" }))).toBe("unsupported")
+    expect(code(await relay.report({ principal: "session:D", session_durable_id: "D", binding_id: x, event: "report", text: "not my binding" }))).toBe("scope_denied")
+  })
+
+  test("#given more outbox rows than one page #when the connector pages with a limit #then each page holds at most that many rows in cursor order and next_cursor continues exactly after it", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    for (const text of ["one", "two", "three"]) ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "report", text }))
+    const first = ok(await relay.outbox({ binding_id: x, limit: 2 }))
+    expect(first.rows.map((row) => row.text)).toEqual(["one", "two"])
+    expect(first.next_cursor).toBe(first.rows[1]?.cursor)
+    const second = ok(await relay.outbox({ binding_id: x, after_cursor: first.next_cursor, limit: 2 }))
+    expect({ texts: second.rows.map((row) => row.text), next: second.next_cursor }).toEqual({ texts: ["three"], next: second.rows[0]?.cursor })
+  })
+
+  test("#given milestones on a binding #when the connector acks the first with its posted message id #then later milestones carry that id to edit and the binding records it", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const one = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "milestone", text: "25%" }))
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.edit_message_id)).toEqual([null])
+    ok(await relay.ack({ binding_id: x, cursor: one.cursor as number, provider_message_id: "pm-1" }))
+    ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "milestone", text: "50%" }))
+    const rows = ok(await relay.outbox({ binding_id: x })).rows
+    expect(rows.map((row) => [row.text, row.edit_message_id])).toEqual([["50%", "pm-1"]])
+    expect(ok(await relay.bindings({ filter: { chat_id: "c1" } })).bindings[0]?.progress_message_id).toBe("pm-1")
+  })
+
+  test("#given a question relayed through binding X #when the answer arrives through binding Y #then it is binding_mismatch and the question stays pending; through X it resolves the session's UI request once and a replay is already_answered", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay, responses } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const y = await bindAs(relay, binding("B", { chat_id: "c2" }))
+    const asked = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "deploy now?", request_id: "ui-7" }))
+    const token = asked.reply_token as string
+    expect(code(await relay.answer({ binding_id: y, reply_token: token, answer: "yes" }))).toBe("binding_mismatch")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
+    expect(responses).toEqual([])
+    expect(ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toMatchObject({ binding_id: x, session_durable_id: "B", cursor: asked.cursor })
+    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-7", fields: { value: "yes", answers: {}, comment: "yes", confirmed: true } }])
+    expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toBe("already_answered")
+    expect(code(await relay.answer({ binding_id: x, reply_token: `${token.slice(0, -2)}xx`, answer: "forged" }))).toBe("invalid_arguments")
+    expect(responses).toHaveLength(1)
+  })
+
+  test("#given pending questions #when the binding is rebound, the session restarts, or the session is unreachable #then the answer is stale_token, stale_token, and host_unavailable with the question kept pending", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    h.session("C")
+    const { relay, store, responses } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const y = await bindAs(relay, binding("B", { chat_id: "c2" }))
+    const beforeRebind = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "q1", request_id: "ui-1" })).reply_token as string
+    ok(await relay.rebind({ principal: "session:A", binding_id: x, expected_revision: 1, session_durable_id: "C" }))
+    expect(code(await relay.answer({ binding_id: x, reply_token: beforeRebind, answer: "a" }))).toBe("stale_token")
+    const beforeRestart = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: y, event: "question", text: "q2", request_id: "ui-2" })).reply_token as string
+    await store.registerIncarnation({ durable_id: "B", incarnation: "runtime-after-restart" })
+    expect(code(await relay.answer({ binding_id: y, reply_token: beforeRestart, answer: "a" }))).toBe("stale_token")
+    const offline = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: y, event: "question", text: "q3", request_id: "ui-3" })).reply_token as string
+    b.online = false
+    expect(code(await relay.answer({ binding_id: y, reply_token: offline, answer: "later" }))).toBe("host_unavailable")
+    expect(ok(await relay.outbox({ binding_id: y })).rows.find((row) => row.reply_token === offline)?.question_state).toBe("pending")
+    b.online = true
+    ok(await relay.answer({ binding_id: y, reply_token: offline, answer: "later" }))
+    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-3", fields: { value: "later", answers: {}, comment: "later" } }])
+  })
+
+  test("#given a completion armed through a binding #when agent_end fires, a retry ends again, and the session settles #then no row appears at any agent_end and exactly one appears at the settle, with the final run's real outcome", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const tracker = createCompletionTracker((durableId, outcome) => relay.settle({ session_durable_id: durableId, outcome }), { retryAfterMs: () => 50 })
+    const armed = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "job finished" }))
+    expect({ armed: armed.armed, cursor: armed.cursor }).toEqual({ armed: true, cursor: null })
+    tracker.arm("B", armSeqOf(armed))
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "error" }] })
+    expect(ok(await relay.outbox({ binding_id: x })).rows).toEqual([])
+    tracker.agentEnd("B", { aborted: true, messages: [] })
+    expect(ok(await relay.outbox({ binding_id: x })).rows).toEqual([])
+    expect(await tracker.settled("B")).toHaveLength(1)
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => [row.event, row.outcome, row.text])).toEqual([["completion", "cancelled", "job finished"]])
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "stop" }] })
+    expect(await tracker.settled("B")).toEqual([])
+    expect(ok(await relay.outbox({ binding_id: x, after_cursor: 0 })).rows).toHaveLength(1)
+  })
+
+  test("#given a run's completion write still in flight #when the next run arms another binding and settles cancelled #then each binding's completion carries its own run's outcome", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay, store } = relayOn(h)
+    const x = await bindAs(relay, binding("B", { chat_id: "chat-x" }))
+    const y = await bindAs(relay, binding("B", { chat_id: "chat-y" }))
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let writes = 0
+    const tracker = createCompletionTracker(async (durableId, outcome, throughArmSeq) => {
+      // The first write is held before it reaches the store, as a store busy with another process holds it.
+      if (++writes === 1) await gate
+      return await relay.settle({ session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq })
+    }, { retryAfterMs: () => 50 })
+    const emitted: number[] = []
+    let bothWritten: () => void = () => undefined
+    const written = new Promise<void>((resolve) => { bothWritten = resolve })
+    store.onEvent((event) => {
+      if (event.kind !== "completions_emitted") return
+      emitted.push(event.cursors.length)
+      if (emitted.length === 2) bothWritten()
+    })
+
+    // run 1 arms x and settles completed; its write is held
+    const firstArm = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "first job" }))
+    tracker.arm("B", armSeqOf(firstArm))
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "stop" }] })
+    const first = tracker.settled("B")
+    // run 2 arms y and settles cancelled while run 1's write is outstanding
+    h.clock.now += 1_000
+    const secondArm = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: y, event: "completion", text: "second job" }))
+    tracker.arm("B", armSeqOf(secondArm))
+    tracker.agentEnd("B", { aborted: true, messages: [] })
+    await tracker.settled("B")
+    release()
+    await first
+    await within(written, "the second run's completion write")
+
+    const rows = async (bindingId: string) => ok(await relay.outbox({ binding_id: bindingId })).rows.map((row) => [row.event, row.outcome, row.text])
+    expect({ x: await rows(x), y: await rows(y) }).toEqual({ x: [["completion", "completed", "first job"]], y: [["completion", "cancelled", "second job"]] })
+  })
+
+  test("#given a run's completion write still in flight #when the next run arms the SAME binding again and settles cancelled #then the binding gets both completions, in run order, each with its own text and outcome", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay, store } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let writes = 0
+    const tracker = createCompletionTracker(async (durableId, outcome, throughArmSeq) => {
+      // The first write is held before it reaches the store, as a store busy with another process holds it.
+      if (++writes === 1) await gate
+      return await relay.settle({ session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq })
+    }, { retryAfterMs: () => 50 })
+    let bothWritten: () => void = () => undefined
+    const written = new Promise<void>((resolve) => { bothWritten = resolve })
+    let emissions = 0
+    store.onEvent((event) => {
+      if (event.kind === "completions_emitted" && ++emissions === 2) bothWritten()
+    })
+
+    // run 1 arms x and settles completed; its write is held
+    const firstArm = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "first job" }))
+    tracker.arm("B", armSeqOf(firstArm))
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "stop" }] })
+    const first = tracker.settled("B")
+    // run 2 arms the same binding and settles cancelled while run 1's write is outstanding
+    h.clock.now += 1_000
+    const secondArm = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "second job" }))
+    tracker.arm("B", armSeqOf(secondArm))
+    tracker.agentEnd("B", { aborted: true, messages: [] })
+    await tracker.settled("B")
+    release()
+    await first
+    await within(written, "the second run's completion write")
+
+    const rows = ok(await relay.outbox({ binding_id: x })).rows.map((row) => [row.event, row.outcome, row.text])
+    expect(rows).toEqual([["completion", "completed", "first job"], ["completion", "cancelled", "second job"]])
+  })
+
+  test.each([["the same binding", true], ["another binding", false]] as const)("#given a run's completion write still in flight and a clock that does not advance #when the next run arms %s and settles cancelled #then every run's completion is written, in run order, with its own text and outcome", async (_name, sameBinding) => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay, store } = relayOn(h)
+    const x = await bindAs(relay, binding("B", { chat_id: "chat-x" }))
+    const y = sameBinding ? x : await bindAs(relay, binding("B", { chat_id: "chat-y" }))
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let writes = 0
+    const tracker = createCompletionTracker(async (durableId, outcome, throughArmSeq) => {
+      // The first write is held before it reaches the store, as a store busy with another process holds it.
+      if (++writes === 1) await gate
+      return await relay.settle({ session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq })
+    }, { retryAfterMs: () => 50 })
+    let bothWritten: () => void = () => undefined
+    const written = new Promise<void>((resolve) => { bothWritten = resolve })
+    let emissions = 0
+    store.onEvent((event) => {
+      if (event.kind === "completions_emitted" && ++emissions === 2) bothWritten()
+    })
+
+    // Both runs arm and settle at the same clock reading.
+    const firstArm = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "first job" }))
+    tracker.arm("B", armSeqOf(firstArm))
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "stop" }] })
+    const first = tracker.settled("B")
+    const secondArm = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: y, event: "completion", text: "second job" }))
+    tracker.arm("B", armSeqOf(secondArm))
+    tracker.agentEnd("B", { aborted: true, messages: [] })
+    await tracker.settled("B")
+    release()
+    await first
+    await within(written, "the second run's completion write")
+
+    const rows = async (bindingId: string) => ok(await relay.outbox({ binding_id: bindingId, after_cursor: 0 })).rows.map((row) => [row.cursor, row.event, row.outcome, row.text] as const)
+    const all = sameBinding ? await rows(x) : [...(await rows(x)), ...(await rows(y))].toSorted((left, right) => Number(left[0]) - Number(right[0]))
+    expect(all.map(([, ...rest]) => rest)).toEqual([["completion", "completed", "first job"], ["completion", "cancelled", "second job"]])
+  })
+
+  test("#given one run that arms the same binding twice #when the run settles #then the binding gets one completion carrying the newest arm's text", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const tracker = createCompletionTracker((durableId, outcome, throughArmSeq) => relay.settle({ session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq }), { retryAfterMs: () => 50 })
+    for (const text of ["draft summary", "final summary"]) {
+      const reported = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text }))
+      tracker.arm("B", armSeqOf(reported))
+      h.clock.now += 10
+    }
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "stop" }] })
+    expect(await tracker.settled("B")).toHaveLength(1)
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => [row.outcome, row.text])).toEqual([["completed", "final summary"]])
+  })
+
+  test("#given the user is composing in the bound session #when a connector message waits behind the draft and inbox wakes repeat #then the session shows one queued notice naming the actor and delivery, and the message lands after submit", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B", { online: false })
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const notices: string[] = []
+    const drain = createInboxDrain({ store: b.store, runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now, notify: (text) => notices.push(text) })
+    b.runtime.typeDraft()
+    const deliveryId = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "while you type" })).delivery_id
+    await drain.drain({ reason: "inbox" })
+    await drain.drain({ reason: "inbox" })
+    expect({ notices, enqueued: b.runtime.enqueueCalls.length }).toEqual({ notices: [`remote message from qa queued (${deliveryId})`], enqueued: 0 })
+    b.runtime.submitDraft()
+    await drain.drain({ reason: "submission" })
+    expect({ notices: notices.length, lanes: b.runtime.enqueueCalls.map((call) => call.lane) }).toEqual({ notices: 1, lanes: ["followUp"] })
+  })
+
+  test("#given three outbox rows #when the connector acks and re-reads #then a read after the ack returns nothing new, an older ack is a no-op, and an older cursor re-reads from there", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const cursors: number[] = []
+    for (const text of ["r1", "r2", "r3"]) cursors.push(ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "report", text })).cursor as number)
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["r1", "r2", "r3"])
+    expect(ok(await relay.ack({ binding_id: x, cursor: cursors[1] }))).toMatchObject({ changed: true, acked_cursor: cursors[1] })
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["r3"])
+    expect(ok(await relay.ack({ binding_id: x, cursor: cursors[0] }))).toMatchObject({ changed: false, acked_cursor: cursors[1] })
+    expect(ok(await relay.outbox({ binding_id: x, after_cursor: cursors[0] })).rows.map((row) => [row.text, row.state])).toEqual([["r2", "acked"], ["r3", "pending"]])
+    expect(code(await relay.ack({ binding_id: x, cursor: cursors[2] + 10 }))).toBe("cursor_invalid")
+    ok(await relay.ack({ binding_id: x, cursor: cursors[2] }))
+    expect(ok(await relay.outbox({ binding_id: x })).rows).toEqual([])
+  })
+
+  test("#given two bindings whose outbox rows interleave #when the connector acks one binding with a cursor the other owns #then it is cursor_invalid and neither binding loses a pending row; its own cursor still acks", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B", { chat_id: "chat-x" }))
+    const y = await bindAs(relay, binding("B", { chat_id: "chat-y" }))
+    const report = async (bindingId: string, text: string) => ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: bindingId, event: "report", text })).cursor as number
+    const x1 = await report(x, "x1")
+    const y1 = await report(y, "y1")
+    await report(x, "x2")
+
+    expect(code(await relay.ack({ binding_id: x, cursor: y1 }))).toBe("cursor_invalid")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["x1", "x2"])
+    expect(ok(await relay.outbox({ binding_id: y })).rows.map((row) => row.text)).toEqual(["y1"])
+
+    expect(ok(await relay.ack({ binding_id: x, cursor: x1 }))).toMatchObject({ changed: true, acked_cursor: x1 })
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["x2"])
+  })
+})
+
+describe("inbound_lost_ack_replay_across_a_rebind", () => {
+  const JANE = { platform_user_id: "U123", display: "Jane" }
+
+  test("#given an event delivered to B #when the binding is rebound to C and the connector retries the identical event after a lost-ACK #then the original delivery replays, B holds it once and C receives nothing", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const c = h.session("C")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const first = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE }))
+    await h.quiesce()
+    ok(await relay.rebind({ principal: "session:A", binding_id: x, expected_revision: 1, session_durable_id: "C" }))
+
+    const retried = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE })
+    await h.quiesce()
+
+    expect(retried).toEqual({ ...first, deduplicated: true })
+    expect({ enqueued: b.runtime.enqueueCount(first.delivery_id), entries: b.runtime.transcriptEntries(first.delivery_id), toC: (await c.store.list({ target_durable_id: "C" })).length }).toEqual({ enqueued: 1, entries: 1, toC: 0 })
+  })
+
+  test.each([
+    ["its text", { text: "ship it now" }],
+    ["its mode", { mode: "follow_up" }],
+    ["its author", { author: { platform_user_id: "U456", display: "Kim" } }],
+  ] as const)("#given an event delivered to B before the binding was rebound to C #when the key is reused with %s changed #then it is idempotency_conflict and nothing is delivered again", async (_name, change) => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const c = h.session("C")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const first = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE }))
+    await h.quiesce()
+    ok(await relay.rebind({ principal: "session:A", binding_id: x, expected_revision: 1, session_durable_id: "C" }))
+
+    const changed = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE, ...change })
+    await h.quiesce()
+
+    expect(code(changed)).toBe("idempotency_conflict")
+    expect({ enqueued: b.runtime.enqueueCount(first.delivery_id), toC: (await c.store.list({ target_durable_id: "C" })).length }).toEqual({ enqueued: 1, toC: 0 })
+  })
+
+  test("#given an event delivered to B #when the binding is rebound to C, then unbound, and the connector retries the identical event after a lost-ACK #then the original delivery replays instead of binding_inactive", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const c = h.session("C")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const first = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it" }))
+    await h.quiesce()
+    ok(await relay.rebind({ principal: "session:A", binding_id: x, expected_revision: 1, session_durable_id: "C" }))
+    ok(await relay.unbind({ principal: "session:A", binding_id: x, expected_revision: 2 }))
+
+    const retried = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it" })
+
+    expect(retried).toEqual({ ...first, deduplicated: true })
+    expect(code(await relay.inbound({ binding_id: x, event_id: "evt-2", text: "new" }))).toBe("binding_inactive")
+    expect({ enqueued: b.runtime.enqueueCount(first.delivery_id), toC: (await c.store.list({ target_durable_id: "C" })).length }).toEqual({ enqueued: 1, toC: 0 })
+  })
+})
+
+describe("answer_when_the_session_cannot_be_located", () => {
+  test("#given a pending question whose host is gone #when thread_answer cannot locate the session #then it is host_unavailable with the question pending and no frame sent, and once the host is back a retry delivers exactly once", async () => {
+    // given
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const store = h.store()
+    const delivered: AnswerFields[] = []
+    let hostGone = true
+    const relay = createGatewayRelay({
+      store,
+      engine: h.engineFor(store),
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: async (_endpoint, answer) => {
+          delivered.push(answer.fields)
+          return { delivered: true }
+        },
+      },
+      locate: async () => {
+        if (hostGone) throw new Error("host_unavailable:/gone/rpc.sock")
+        return { kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }
+      },
+      now: () => h.clock.now,
+    })
+    const x = await bindAs(relay, binding("B"))
+    const token = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "deploy?", request_id: "ui-9" })).reply_token as string
+
+    // when
+    const whileGone = await relay.answer({ binding_id: x, reply_token: token, answer: "yes" })
+
+    // then
+    expect(code(whileGone)).toBe("host_unavailable")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
+    expect(delivered).toEqual([])
+
+    // when
+    hostGone = false
+    const retried = await relay.answer({ binding_id: x, reply_token: token, answer: "yes" })
+    const replay = await relay.answer({ binding_id: x, reply_token: token, answer: "yes" })
+
+    // then
+    expect(retried).toMatchObject({ kind: "ok", binding_id: x, session_durable_id: "B" })
+    expect(code(replay)).toBe("already_answered")
+    expect(delivered).toEqual([{ value: "yes", answers: {}, comment: "yes", confirmed: true }])
+  })
+
+  test("#given a pending question #when the answer text is empty or whitespace #then it is invalid_arguments, nothing is claimed and nothing is sent", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay, responses } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const token = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "deploy?", request_id: "ui-10" })).reply_token as string
+    expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "" }))).toBe("invalid_arguments")
+    expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: " \n\t " }))).toBe("invalid_arguments")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
+    expect(responses).toEqual([])
+  })
+})
+
+describe("answer_release_retry_past_the_lock_wait_bound", () => {
+  test("#given an answer whose hand-off failed #when releasing the question gives up at the store's lock-wait bound #then the release is retried in the background, the question returns to pending, and a later answer resolves it", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const real = h.store({ _test: { busyTimeoutMs: 50 } })
+    let releases = 0
+    let released!: () => void
+    const retried = new Promise<void>((resolve) => { released = resolve })
+    const store: GatewayStore = {
+      ...real,
+      releaseAnswer: async (request) => {
+        releases++
+        if (releases === 1) throw Object.assign(new Error("gateway store lock wait exceeded: release_answer waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+        const done = await real.releaseAnswer(request)
+        released()
+        return done
+      },
+    }
+    const responses: AnswerFields[] = []
+    let failHandOff = true
+    const relay = createGatewayRelay({
+      store,
+      engine: h.engineFor(store),
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: async (_endpoint, answer) => {
+          if (failHandOff) throw new Error("the session hung up")
+          responses.push(answer.fields)
+          return { delivered: true }
+        },
+      },
+      locate: async () => ({ kind: "tui", socket: "fake:B", routing_id: null }),
+      now: () => h.clock.now,
+    })
+    const x = await bindAs(relay, binding("B"))
+    const token = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "deploy?", request_id: "ui-1" })).reply_token as string
+    expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toBe("host_unavailable")
+    await within(retried, "the background release retry")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
+    failHandOff = false
+    ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))
+    expect({ responses, releases }).toEqual({ responses: [{ value: "yes", answers: {}, comment: "yes", confirmed: true }], releases: 2 })
+  })
+})

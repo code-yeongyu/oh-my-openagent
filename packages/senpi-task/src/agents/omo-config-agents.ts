@@ -11,10 +11,14 @@ import type { AgentDefinition } from "./types"
  * (`execution_mode`, `max_depth`, `allowed_subagents`), and expresses tools as a `{ name: boolean }`
  * record; `AgentDefinition` carries an explicit `name`, camelCase keys, and last-match-wins tool rules.
  * This maps each field across, reusing the tool-rule normalizer, and omits any field the source omits.
+ *
+ * Record keys and `allowed_subagents` entries are taken verbatim: an agent name means exactly what
+ * the user wrote, and `manager/depth-policy.ts` compares against that same id.
  */
 export function mapOmoConfigAgents(config: OmoConfig): Readonly<Record<string, AgentDefinition>> {
+  const source = config.agents ?? {}
   const agents: Record<string, AgentDefinition> = {}
-  for (const [name, def] of Object.entries(config.agents ?? {})) {
+  for (const [name, def] of Object.entries(source)) {
     agents[name] = toAgentDefinition(name, def)
   }
   return agents

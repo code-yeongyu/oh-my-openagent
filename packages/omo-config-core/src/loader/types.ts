@@ -1,7 +1,17 @@
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
-import type { OmoConfig, OmoHarnessId } from "../schema"
+import type { OmoConfig, OmoHarnessId, OmoLegacyHarnessId } from "../schema"
 
-export type OmoConfigDiagnosticKind = "parse" | "profile" | "read" | "validation"
+export type OmoConfigDiagnosticKind =
+  | "deprecated-keys"
+  | "invalid-value"
+  | "parse"
+  | "profile"
+  | "read"
+  | "unknown-keys"
+  | "validation"
+
+/** The `path` of a diagnostic about the merged config rather than one file. */
+export const MERGED_OMO_CONFIG_PATH = "(merged omo config)"
 
 export type OmoConfigDiagnostic = {
   readonly kind: OmoConfigDiagnosticKind
@@ -41,7 +51,7 @@ export type LoadOmoConfigOptions = {
   readonly cwd?: string
   readonly env?: OmoConfigEnv
   readonly fileSystem?: OmoConfigReadFileSystem
-  readonly harness?: OmoHarnessId
+  readonly harness?: OmoHarnessId | OmoLegacyHarnessId
   readonly platform?: NodeJS.Platform
   readonly profile?: string
 }

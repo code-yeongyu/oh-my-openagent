@@ -90,11 +90,11 @@ describe("TaskManager.continueTask", () => {
 })
 
 describe("TaskManager.sendToTask one-shot refusal", () => {
-  test("#given a momus child started through manager.start #when sent #then the outcome is one_shot_agent (guards the subagent_type -> agent_type rename)", async () => {
+  test("#given a plan-reviewer child started through manager.start #when sent #then the outcome is one_shot_agent (guards the subagent_type -> agent_type rename)", async () => {
     // given
     const inProcess = new FakeRunner()
     const { manager } = makeManager({ inProcess })
-    const started = await manager.start(baseSpec({ subagent_type: "momus" }))
+    const started = await manager.start(baseSpec({ subagent_type: "plan-reviewer" }))
     if (started.kind !== "started") throw new Error("expected started")
 
     // when
@@ -103,8 +103,8 @@ describe("TaskManager.sendToTask one-shot refusal", () => {
     // then
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
     expect(outcome.task_id).toBe(started.task_id)
-    expect(outcome.agent).toBe("momus")
-    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(outcome.agent).toBe("plan-reviewer")
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
     expect(inProcess.handles.get(started.task_id)?.steerCalls).toEqual([])
   })

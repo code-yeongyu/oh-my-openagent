@@ -64,6 +64,52 @@ describe("pollSyncSession", () => {
       expect(result).toBe("Forbidden: Selected provider is forbidden")
     })
 
+    test("surfaces terminal errors even when status remains busy", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      const controller = new AbortController()
+      let statusCallCount = 0
+      let messageCallCount = 0
+      const terminalError = "Provider quota exceeded"
+      const mockClient = {
+        session: {
+          messages: async () => {
+            messageCallCount++
+            return {
+              data: [
+                { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                {
+                  info: {
+                    id: "msg_002",
+                    role: "assistant",
+                    time: { created: 2000 },
+                    error: { data: { message: terminalError } },
+                  },
+                  parts: [],
+                },
+              ],
+            }
+          },
+          status: async () => {
+            statusCallCount++
+            if (statusCallCount >= 3) controller.abort()
+            return { data: { ses_busy_error: { type: "busy" } } }
+          },
+          abort: async () => ({}),
+        },
+      }
+
+      const result = await pollSyncSession({ ...createMockCtx(), abort: controller.signal }, mockClient, {
+        sessionID: "ses_busy_error",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      }, 50)
+
+      expect(result).toBe(terminalError)
+      expect(messageCallCount).toBe(1)
+      expect(statusCallCount).toBe(1)
+    })
+
     test("ignores stale prior-turn assistant errors after a new user turn starts", async () => {
       // given: prior error exists but user sent new message
       const { pollSyncSession } = require("./sync-session-poller")
@@ -496,24 +542,29 @@ describe("pollSyncSession", () => {
   })
 
   describe("non-idle session status", () => {
-    test("skips message check when session is not idle", async () => {
+    test("inspects messages while active but only completes once the session is idle", async () => {
       // given: session is running (not idle)
       const { pollSyncSession } = require("./sync-session-poller")
 
       let statusCallCount = 0
       let messageCallCount = 0
+      let messageCallsWhileActive = 0
        const mockClient = {
          session: {
            messages: async () => {
              messageCallCount++
+             if (statusCallCount <= 2) messageCallsWhileActive++
              return {
-               data: [
-                 { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
-                 {
-                   info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
-                   parts: [{ type: "text", text: "Done" }],
-                 },
-               ],
+               data:
+                 statusCallCount >= 3
+                   ? [
+                       { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                       {
+                         info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+                         parts: [{ type: "text", text: "Done" }],
+                       },
+                     ]
+                   : [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }],
              }
            },
            status: async () => {
@@ -534,9 +585,12 @@ describe("pollSyncSession", () => {
         taskId: undefined,
       })
 
-      // then: waits for idle before checking messages
+      // then: messages were inspected while the status was still active (terminal errors
+      // must surface there), and completion was only declared once the session went idle
       expect(result).toBeNull()
       expect(statusCallCount).toBeGreaterThanOrEqual(3)
+      expect(messageCallsWhileActive).toBeGreaterThanOrEqual(1)
+      expect(messageCallCount).toBeGreaterThanOrEqual(2)
     })
   })
 

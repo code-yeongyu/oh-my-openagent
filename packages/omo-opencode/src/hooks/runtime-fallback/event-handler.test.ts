@@ -66,6 +66,55 @@ afterEach(() => {
 })
 
 describe("createEventHandler", () => {
+  for (const limit of ["attempt limit", "chain exhaustion"] as const) {
+    it(`stops content-filter fallback at ${limit} without retrying the current model`, async () => {
+      const sessionID = `session-content-filter-${limit}`
+      const deps = createDeps()
+      deps.config.max_fallback_attempts = limit === "attempt limit" ? 2 : 3
+      deps.pluginConfig = {
+        categories: {
+          test: {
+            fallback_models: [
+              "openai/primary",
+              "openai/alternate-one",
+              "openai/alternate-two",
+              ...(limit === "attempt limit" ? ["openai/alternate-three"] : []),
+            ],
+          },
+        },
+      }
+      SessionCategoryRegistry.register(sessionID, "test")
+      const dispatched: string[] = []
+      const helpers = createHelpers(deps, [], [])
+      helpers.autoRetryWithFallback = async (_sessionID, model) => {
+        dispatched.push(model)
+        deps.sessionAwaitingFallbackResult.add(sessionID)
+        return { accepted: true, status: "dispatched" }
+      }
+      const handler = createEventHandler(deps, helpers)
+
+      for (let failure = 0; failure < 4; failure++) {
+        await handler({
+          event: {
+            type: "session.error",
+            properties: {
+              sessionID,
+              model: deps.sessionStates.get(sessionID)?.currentModel ?? "openai/primary",
+              error: {
+                name: "ContentFilterError",
+                message: "The response was blocked by the provider's content filter",
+              },
+            },
+          },
+        })
+      }
+
+      expect(dispatched).toEqual(["openai/alternate-one", "openai/alternate-two"])
+      expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
+      expect(deps.sessionStates.get(sessionID)?.currentModel).toBe("openai/alternate-two")
+    })
+  }
+
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {
     // given
     const sessionID = "session-stop"

@@ -217,6 +217,28 @@ documentation text, or component implementations are vendored. beui.dev names re
 property of their owner, and the guide instructs reading component source for mechanism
 extraction only, not vendoring it into references or projects.
 
+`frontend/references/design/ambience-skill.md` is a project-original, curl-only operating
+guide for consulting the react-bits (reactbits.dev) animated-component registry during hero
+atmosphere, background, typographic-motion, and card-surface work, written from live endpoint
+verification; no react-bits source code, documentation text, or component implementations are
+vendored. react-bits is distributed under MIT plus the Commons Clause, which permits use inside
+applications but forbids redistributing or porting the components themselves; the guide
+therefore instructs reading component source for mechanism extraction only and never vendoring
+it into references, design documents, or this repository. React Bits names remain the property
+of their owner.
+
+`frontend/references/design/component-catalogs.md` is a project-original, curl-only operating
+guide that routes by tone and situation to public component catalogs (smoothui, cult-ui,
+kokonutui, magicui, bklit, vengenceui, neobrutalism, daisyUI, shadcn/ui, animate-ui, Aceternity
+UI, unlumen UI) and to the MUI X Charts styling docs, written from live endpoint, licence,
+terms-of-service, and robots.txt verification on 2026-10-06; no catalog source code,
+documentation text, or component implementations are vendored. It records each catalog's
+licence class: animate-ui is MIT plus the Commons Clause, and Aceternity UI and unlumen UI
+permit use in applications but forbid redistributing the components themselves, so the guide
+instructs reading source for mechanism extraction only. It excludes styles.refero.design (its
+robots.txt disallows AI agents), skiper-ui.com (its terms forbid copying site material), and
+originkit.dev (partnership licence). All catalog names remain the property of their owners.
+
 `frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
 workflow guide. Its browser + `getComputedStyle` clone approach follows the same
 MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that `aside.md`

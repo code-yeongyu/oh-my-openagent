@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { OMO_SENPI_TASK_RPC_CHILD, buildRpcSpawn } from "./spawn"
+import { OMO_SENPI_TASK_DEPTH, OMO_SENPI_TASK_ROOT_SESSION_ID, OMO_SENPI_TASK_RPC_CHILD, buildRpcSpawn } from "./spawn"
 
 const baseSpec = {
   task_id: "st_1a2b3c4d",
@@ -44,5 +44,24 @@ describe("RPC child marker", () => {
     )
 
     expect(descriptor.env[OMO_SENPI_TASK_RPC_CHILD]).toBe("1")
+  })
+
+  test("#given a parent that is itself a depth-1 child #when it launches its own child #then the child env carries the child's depth, never the parent's", () => {
+    const runtime = {
+      isBunBinary: false,
+      execPath: "/usr/bin/node",
+      platform: "linux" as const,
+      parentEnv: { [OMO_SENPI_TASK_DEPTH]: "1", [OMO_SENPI_TASK_ROOT_SESSION_ID]: "root" },
+      resolveRpcEntry: () => "/rpc-entry.js",
+      ...noExecutable,
+    }
+
+    const withDepth = buildRpcSpawn({ ...baseSpec, depth: 2, root_session_id: "root" }, runtime)
+    const withoutDepth = buildRpcSpawn(baseSpec, runtime)
+
+    expect(withDepth.env[OMO_SENPI_TASK_DEPTH]).toBe("2")
+    expect(withDepth.env[OMO_SENPI_TASK_ROOT_SESSION_ID]).toBe("root")
+    expect(withoutDepth.env[OMO_SENPI_TASK_DEPTH]).toBeUndefined()
+    expect(withoutDepth.env[OMO_SENPI_TASK_ROOT_SESSION_ID]).toBeUndefined()
   })
 })

@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from "bun:test"
 
-import { isFableFiveModel, isMessageEndEvent, isModelSelectEvent, isRefusalLikeMessage } from "./detection"
+import {
+  EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC,
+  isFableFiveSelector,
+  isMessageEndEvent,
+  isModelSelectEvent,
+  isRefusalLikeMessage,
+} from "./detection"
 
 function assistant(message: Record<string, unknown>): Record<string, unknown> {
   return { role: "assistant", ...message }
@@ -45,6 +51,32 @@ describe("fallback-architect detection", () => {
     })
   })
 
+  describe("#given the host demoted an empty tool-use turn to stop", () => {
+    const demotion = { type: EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC, timestamp: 0, details: {} }
+
+    describe("#when the demoted turn kept its refusal details", () => {
+      it("#then the diagnostic admits it as refusal-like", () => {
+        const message = assistant({ stopReason: "stop", content: [], diagnostics: [demotion], stopDetails: { type: "refusal" } })
+        expect(isRefusalLikeMessage(message)).toBe(true)
+      })
+    })
+
+    describe("#when the demoted turn carries no refusal signal", () => {
+      it("#then it stays a continuable stop", () => {
+        expect(isRefusalLikeMessage(assistant({ stopReason: "stop", content: [], diagnostics: [demotion] }))).toBe(false)
+      })
+    })
+
+    describe("#when a plain stop carries refusal details without the demotion diagnostic", () => {
+      it("#then the stop reason still wins", () => {
+        expect(isRefusalLikeMessage(assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [] }))).toBe(false)
+        expect(
+          isRefusalLikeMessage(assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [{ type: "other" }] })),
+        ).toBe(false)
+      })
+    })
+  })
+
   describe("#given messages that are not refusals", () => {
     describe("#when the stop is an ordinary transient failure", () => {
       it("#then reports the message as not refusal-like", () => {
@@ -80,19 +112,20 @@ describe("fallback-architect detection", () => {
     })
   })
 
-  describe("#given a model descriptor", () => {
-    describe("#when the id is claude-fable-5", () => {
-      it("#then matches regardless of provider", () => {
-        expect(isFableFiveModel({ provider: "anthropic", id: "claude-fable-5" })).toBe(true)
-        expect(isFableFiveModel({ provider: "anthropic-api", id: "claude-fable-5" })).toBe(true)
+  describe("#given a formatted model selector", () => {
+    describe("#when the id is any fable 5 release", () => {
+      it("#then matches regardless of provider or dotted release", () => {
+        expect(isFableFiveSelector("anthropic/claude-fable-5")).toBe(true)
+        expect(isFableFiveSelector("anthropic-api/claude-fable-5-1")).toBe(true)
+        expect(isFableFiveSelector("claude-fable-5-1")).toBe(true)
       })
     })
 
     describe("#when the id is another model", () => {
       it("#then does not match", () => {
-        expect(isFableFiveModel({ provider: "anthropic", id: "claude-opus-5" })).toBe(false)
-        expect(isFableFiveModel(undefined)).toBe(false)
-        expect(isFableFiveModel({ provider: "anthropic" })).toBe(false)
+        expect(isFableFiveSelector("anthropic/claude-opus-5-5")).toBe(false)
+        expect(isFableFiveSelector("kimi-coding/kimi-k3-unlocked")).toBe(false)
+        expect(isFableFiveSelector("")).toBe(false)
       })
     })
   })
@@ -102,7 +135,7 @@ describe("fallback-architect detection", () => {
       it("#then the guard accepts it", () => {
         const payload = {
           type: "model_select",
-          model: { provider: "anthropic", id: "claude-opus-5" },
+          model: { provider: "anthropic", id: "claude-opus-5-5" },
           previousModel: { provider: "anthropic", id: "claude-fable-5" },
           source: "fallback",
         }

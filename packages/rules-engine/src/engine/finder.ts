@@ -55,6 +55,7 @@ const HEPHAESTUS_BUNDLED_RULE_PREFIX = "bundled-rules/hephaestus/";
 const HEPHAESTUS_DEFAULT_VARIANT_FILE = "gpt-5.5.md";
 const HEPHAESTUS_MODEL_VARIANT_FILES: ReadonlyArray<readonly [family: string, file: string]> = [
 	["gpt-5.6", "gpt-5.6.md"],
+	["gpt-6", "gpt-6.md"],
 ];
 
 export function findRuleCandidates(options: FinderOptions): RuleCandidate[] {

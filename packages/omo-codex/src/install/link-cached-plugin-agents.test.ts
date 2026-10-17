@@ -267,7 +267,7 @@ describe("linkCachedPluginAgents", () => {
     // then
     expect(linked).toHaveLength(3)
     const entries = (await readdir(join(codexHome, "agents"))).sort()
-    expect(entries).toEqual(["explorer.toml", "librarian.toml", "planner.toml"])
+    expect(entries).toEqual([".lazycodex-agent-models.json", "explorer.toml", "librarian.toml", "planner.toml"])
   })
 
   test("discovers TOMLs across multiple component agent directories", async () => {

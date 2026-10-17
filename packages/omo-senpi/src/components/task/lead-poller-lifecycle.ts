@@ -12,7 +12,7 @@ import {
   type TeamCoreConfig,
 } from "@oh-my-opencode/senpi-task"
 
-import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
+import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskRuntimeContext } from "./runtime-context"
 
@@ -42,6 +42,7 @@ export type LeadPollerLifecycle = {
     | { readonly ok: false; readonly reason: string }
   >
   resolveDefaultTeamRunId(): Promise<DefaultTeamRunIdResolution>
+  kick(): void
   shutdown(): void
 }
 
@@ -60,6 +61,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   let stopped = false
   let syncInFlight: Promise<readonly ActiveTeamSummary[]> | undefined
   let tickInFlight: Promise<void> | undefined
+  let runtimeUnavailable = false
 
   const synchronize = (): Promise<readonly ActiveTeamSummary[]> => {
     if (syncInFlight !== undefined) return syncInFlight
@@ -110,7 +112,32 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     if (deps.runtime.sessionFile() === undefined) return Promise.resolve()
     if (tickInFlight !== undefined) return tickInFlight
     const pending = (async () => {
-      const owned = await synchronize()
+      let owned: readonly ActiveTeamSummary[]
+      try {
+        owned = await synchronize()
+      } catch (error) {
+        if (!isRuntimeAccessError(error)) throw error
+        if (!runtimeUnavailable) {
+          runtimeUnavailable = true
+          deps.logger.warn("omo-senpi lead poller runtime unavailable", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+        return
+      }
+      // Only this session's own tool calls can create an owned team, so with none the 1 Hz
+      // poll stands down (zero registry reads while idle) until kick() re-arms it.
+      if (owned.length === 0) {
+        standby = true
+        disarmInterval()
+      } else {
+        standby = false
+        armInterval()
+      }
+      if (runtimeUnavailable) {
+        runtimeUnavailable = false
+        deps.logger.info("omo-senpi lead poller runtime recovered")
+      }
       if (deps.runtime.sessionFile() === undefined) return
       if (isTransition(deps.runtime.parentState())) return
       for (const team of owned) {
@@ -155,23 +182,44 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     return { kind: "ambiguous", reason: multipleOwnedReason(owned) }
   }
 
-  const disposeInterval = (deps.scheduleInterval ?? scheduleInterval)(() => {
+  let intervalDisposer: (() => void) | undefined
+  let standby = false
+  const armInterval = (): void => {
+    if (stopped || intervalDisposer !== undefined) return
+    intervalDisposer = (deps.scheduleInterval ?? scheduleInterval)(() => {
+      void tick().catch((error: unknown) => {
+        deps.logger.warn("omo-senpi lead poller tick failed", {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }, POLL_INTERVAL_MS)
+  }
+  const disarmInterval = (): void => {
+    intervalDisposer?.()
+    intervalDisposer = undefined
+  }
+  const kick = (): void => {
+    if (stopped || !standby) return
+    standby = false
+    armInterval()
     void tick().catch((error: unknown) => {
-      deps.logger.warn("omo-senpi lead poller tick failed", {
+      deps.logger.warn("omo-senpi lead poller kick failed", {
         error: error instanceof Error ? error.message : String(error),
       })
     })
-  }, POLL_INTERVAL_MS)
+  }
+  armInterval()
 
   return {
     tick,
     resolveLeadPoller,
     resolveTeamRunId,
     resolveDefaultTeamRunId,
+    kick,
     shutdown() {
       if (stopped) return
       stopped = true
-      disposeInterval()
+      disarmInterval()
       for (const entry of pollers.values()) entry.poller.shutdown()
       pollers.clear()
     },
@@ -192,11 +240,15 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
           injection.onFlushed?.()
           return
         }
-        input.coordinator.enqueue({
+        // Refused (coordinator retired with the session): throw so the lead poller releases its
+        // durable delivery reservation and redelivers the message after the reload, instead of
+        // leaving it reserved-but-never-flushed.
+        const accepted = input.coordinator.enqueue({
           ...injection,
           customType: "senpi-task:team-message",
           display: false,
         })
+        if (accepted === false) throw new IdleInjectionRetiredError()
         const parentState = input.runtime.parentState()
         switch (parentState.kind) {
           case "streaming":
@@ -240,6 +292,12 @@ function scheduleInterval(tick: () => void, intervalMs: number): () => void {
   const timer = setInterval(tick, intervalMs)
   timer.unref?.()
   return () => clearInterval(timer)
+}
+
+function isRuntimeAccessError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error
+    && "code" in error
+    && (error.code === "EACCES" || error.code === "EPERM")
 }
 
 function assertNever(value: never): never {

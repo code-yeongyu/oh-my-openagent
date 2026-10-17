@@ -1,0 +1,19 @@
+[package]
+name = "senpi-qa-fake-eis"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Standalone server around the wayland backend's recording fake EIS, for script/qa/desktop/linux.ts"
+
+# Not a member of the repository workspace: a QA helper that only
+# `script/qa/desktop/linux.ts` uses, pinned to the workspace's versions.
+[workspace]
+
+[[bin]]
+name = "senpi-qa-fake-eis"
+path = "src/main.rs"
+
+[dependencies]
+reis = { version = "=0.5.0", features = ["tokio"] }
+tempfile = "=3.27.0"
+tokio = { version = "=1.53.1", features = ["net", "rt"] }
