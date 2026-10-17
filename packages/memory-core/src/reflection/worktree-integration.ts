@@ -2,6 +2,7 @@ import { existsSync } from "../fs/resilient"
 import { rm } from "../fs/resilient"
 import { resolve } from "node:path"
 import type { GitExec, GitExecResult } from "../git"
+import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -108,7 +109,7 @@ export async function integrateValidatedReflection(
     }
 
     const merge = await run(worktree.exec, worktree.parent.dir, [
-      "merge", "--no-ff", input.validated.tipSha,
+      ...NO_AUTO_MAINTENANCE, "merge", "--no-ff", input.validated.tipSha,
       "-m", `merge(reflection): ${input.summary}`,
       "-m", `Omo-Run: ${input.runId}`,
     ])

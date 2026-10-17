@@ -1,0 +1,126 @@
+{
+  "comment": "releasable = batches at or below covers_seq plus the current snapshot; keyring rows are never releasable; charge = max(0, requested - releasable)",
+  "account": "encoding-account",
+  "objects": [
+    {
+      "id": "batch-a-epoch1",
+      "kind": "batch",
+      "seq": 101,
+      "bytes": 595
+    },
+    {
+      "id": "batch-b-epoch1",
+      "kind": "batch",
+      "seq": 102,
+      "bytes": 452
+    },
+    {
+      "id": "batch-big-epoch1",
+      "kind": "batch",
+      "seq": 103,
+      "bytes": 150465
+    },
+    {
+      "id": "batch-big2-epoch1",
+      "kind": "batch",
+      "seq": 104,
+      "bytes": 150470
+    },
+    {
+      "id": "batch-c-epoch3",
+      "kind": "batch",
+      "seq": 105,
+      "bytes": 437
+    },
+    {
+      "id": "batch-d-epoch3-recovered",
+      "kind": "batch",
+      "bytes": 457
+    },
+    {
+      "id": "genesis",
+      "kind": "keyring",
+      "seq": 1,
+      "bytes": 1413,
+      "releasable": false
+    },
+    {
+      "id": "recovery_key",
+      "kind": "keyring",
+      "seq": 2,
+      "bytes": 1060,
+      "releasable": false
+    },
+    {
+      "id": "recovery_key_removed",
+      "kind": "keyring",
+      "seq": 3,
+      "bytes": 659,
+      "releasable": false
+    },
+    {
+      "id": "approval",
+      "kind": "keyring",
+      "seq": 4,
+      "bytes": 1015,
+      "releasable": false
+    },
+    {
+      "id": "recovery_join",
+      "kind": "keyring",
+      "seq": 5,
+      "bytes": 786,
+      "releasable": false
+    },
+    {
+      "id": "post_join_rotation",
+      "kind": "keyring",
+      "seq": 6,
+      "bytes": 884,
+      "releasable": false
+    },
+    {
+      "id": "recovery_join_vetoed",
+      "kind": "keyring",
+      "seq": 7,
+      "bytes": 678,
+      "releasable": false
+    },
+    {
+      "id": "veto_rotation",
+      "kind": "keyring",
+      "seq": 8,
+      "bytes": 1066,
+      "releasable": false
+    }
+  ],
+  "snapshot": {
+    "chunks": ["snapshot-c0.omob", "snapshot-c1.omob"],
+    "bytes": [478, 478],
+    "covers_seq": 105
+  },
+  "scenarios": [
+    {
+      "name": "full compaction at the head",
+      "covers_seq": 105,
+      "requested_bytes": 956,
+      "releasable": [
+        "batch-a-epoch1",
+        "batch-b-epoch1",
+        "batch-big-epoch1",
+        "batch-big2-epoch1",
+        "batch-c-epoch3"
+      ],
+      "charge": 0,
+      "admitted_over_quota": true
+    },
+    {
+      "name": "partial compaction over the first two batches",
+      "covers_seq": 102,
+      "requested_bytes": 478,
+      "releasable": ["batch-a-epoch1", "batch-b-epoch1"],
+      "charge": 0,
+      "admitted_over_quota": true
+    }
+  ]
+}
