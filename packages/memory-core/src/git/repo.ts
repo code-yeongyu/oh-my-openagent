@@ -154,7 +154,7 @@ export class GitMemoryRepo {
   async status(paths: readonly string[] = []): Promise<string> {
     const normalized = normalizePathspecs(paths)
     const suffix = normalized.length > 0 ? ["--", ...normalized] : []
-    return (await this.git(["-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
+    return (await this.git(["--literal-pathspecs", "-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
   }
 
   head(): Promise<string | null> { return this.reads.head() }
@@ -168,7 +168,7 @@ export class GitMemoryRepo {
   log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> { return this.reads.log(options) }
 
   /**
-   * Roll index and worktree back to HEAD for the given pathspecs after a refused
+   * Roll index and worktree back to HEAD for the given paths after a refused
    * staging: paths tracked at HEAD are restored on both sides (`git restore
    * --source=HEAD --staged --worktree`), and paths new at HEAD are unstaged and
    * removed, so a refused tool call leaves no trace behind.
@@ -180,10 +180,10 @@ export class GitMemoryRepo {
     const tracked = normalized.filter((path) => atHead.has(path))
     const untracked = normalized.filter((path) => !atHead.has(path))
     if (tracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...tracked]))
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "restore", "--source=HEAD", "--staged", "--worktree", "--", ...tracked]))
     }
     for (const path of untracked) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["rm", "-q", "--cached", "--ignore-unmatch", "--", path]))
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "rm", "-q", "--cached", "--ignore-unmatch", "--", path]))
       await rm(join(this.dir, path), { force: true })
     }
   }
@@ -191,10 +191,10 @@ export class GitMemoryRepo {
   /** Undo staged entries only; the working tree is left exactly as it is. */
   async unstage(tracked: readonly string[], untracked: readonly string[]): Promise<void> {
     if (tracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["restore", "--source=HEAD", "--staged", "--", ...tracked]))
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "restore", "--source=HEAD", "--staged", "--", ...tracked]))
     }
     if (untracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["rm", "-q", "--cached", "-f", "--ignore-unmatch", "--", ...untracked]))
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "rm", "-q", "--cached", "-f", "--ignore-unmatch", "--", ...untracked]))
     }
   }
 
@@ -246,7 +246,7 @@ export class GitMemoryRepo {
   }
 
   private async stage(paths: readonly string[]): Promise<void> {
-    await withStrandedGitLockRecovery(this.dir, () => this.git(["add", "-A", "--", ...paths]))
+    await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "add", "-A", "--", ...paths]))
   }
 
   private async hasPathChanges(paths: readonly string[]): Promise<boolean> {
