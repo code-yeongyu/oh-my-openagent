@@ -1,0 +1,10 @@
+sandbox root: /tmp/opencode/issue-6751/xdg-sandbox-lmfI6a
+PASS S1 forward-only sequence :: dispatched=["go/fallback-a","zen/fallback-b"]
+PASS S1 no backward hop to primary :: primary revisited after hop1=false
+PASS S1 no multi-minute stall :: gap between hop1 and hop2=2ms
+PASS S2 fresh cycle after genuine stop :: dispatched=["go/fallback-a","go/fallback-a"]
+PASS S3 manual change resets then chain restarts from its head :: after manual switch + failure dispatched=["go/fallback-a","go/fallback-a","zen/fallback-b","zai/primary"] (must not continue old position zen/fallback-b)
+PASS S3 no stale-position continuation :: second dispatch=go/fallback-a must not be old-chain tail
+PASS S4 exhausted chain stays quiet :: prompts before=2 after=2 models=["go/fallback-a","zen/fallback-b"]
+PASS S4 primary never revisited :: primary occurrences=0
+QA RESULT: ALL SCENARIOS PASS
