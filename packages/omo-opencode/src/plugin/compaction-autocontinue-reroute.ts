@@ -3,6 +3,7 @@ import {
   type SDKMessage,
 } from "../features/hook-message-injector/sdk-message-lookup"
 import { log } from "../shared/logger"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 export const COMPACTION_CONTINUE_TEXT =
   "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
@@ -179,22 +180,39 @@ export async function reissueCompactionContinue(args: {
 }): Promise<boolean> {
   const { client, directory, sessionID, agent, workingModel } = args
   try {
-    await client.session.promptAsync({
-      path: { id: sessionID },
-      ...(directory ? { query: { directory } } : {}),
-      body: {
-        ...(agent ? { agent } : {}),
-        model: { providerID: workingModel.providerID, modelID: workingModel.modelID },
-        parts: [
-          {
-            type: "text",
-            text: COMPACTION_CONTINUE_TEXT,
-            metadata: { compaction_continue: true },
-          },
-        ],
+    // The continue goes through the shared prompt gate: only the gate may call the raw OpenCode
+    // prompt APIs, and the gate's reservation/queue state must see this dispatch. An accepted
+    // dispatch (sent or queued) means the continue is on its way; anything else is logged and
+    // reported as not reissued.
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID,
+      source: "compaction-autocontinue-reroute",
+      settleMs: 0,
+      queueBehavior: "enqueue",
+      input: {
+        path: { id: sessionID },
+        ...(directory ? { query: { directory } } : {}),
+        body: {
+          ...(agent ? { agent } : {}),
+          model: { providerID: workingModel.providerID, modelID: workingModel.modelID },
+          parts: [
+            {
+              type: "text",
+              text: COMPACTION_CONTINUE_TEXT,
+              metadata: { compaction_continue: true },
+            },
+          ],
+        },
       },
     })
-    return true
+    if (isInternalPromptDispatchAccepted(result)) return true
+    log("[session-compacting] compaction continue reroute was not accepted", {
+      sessionID,
+      status: result.status,
+    })
+    return false
   } catch (error) {
     log("[session-compacting] failed to reissue compaction continue", {
       sessionID,
