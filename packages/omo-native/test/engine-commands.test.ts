@@ -68,7 +68,7 @@ describe("every one-shot engine command reaches the engine with the command firs
 })
 
 describe("the compiled entry hands engine commands over unchanged (#9572)", () => {
-  for (const args of [["models", "discover", "custom"], ["schedule", "list"], ["uninstall", "source"]]) {
+  for (const args of [["models", "discover", "custom"], ["schedule", "list"], ["uninstall", "source"], ["--help"], ["-h"]]) {
     test(`#given ${args.join(" ")} #when the compiled binary builds the engine argv #then it is unchanged and prints no banner`, () => {
       expect(buildSenpiArgs([...args], "/provisioned")).toEqual(args)
       expect(shouldPrintCompiledBanner([...args], true)).toBe(false)
@@ -111,7 +111,7 @@ function launcherWithFakeEngine() {
 }
 
 describe("the npm launcher hands engine commands over unchanged (#9572)", () => {
-  for (const args of [["models", "discover", "custom"], ["schedule", "list"], ["uninstall", "source"]]) {
+  for (const args of [["models", "discover", "custom"], ["schedule", "list"], ["uninstall", "source"], ["--help"], ["-h"]]) {
     test(`#given omo ${args.join(" ")} #when launched #then the engine receives exactly those arguments`, () => {
       // given
       const fixture = launcherWithFakeEngine()
