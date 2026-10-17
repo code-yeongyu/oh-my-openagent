@@ -68,6 +68,16 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // Persistent PR-watch QA drives real tools through the existing fake-model protocol.
+  const watchScenario = [...inputStr.matchAll(/PR_WATCH_QA_(REGISTER|LIST|UNWATCH)(?::([A-Za-z0-9_.\/#-]+))?/g)].at(-1)
+  if (watchScenario && !inputStr.slice(watchScenario.index).includes("function_call_output")) {
+    const [, action, argument] = watchScenario
+    const name = action === "REGISTER" ? "watch_pull_request" : action === "UNWATCH" ? "unwatch_pull_request" : "list_pull_request_watches"
+    const args = action === "REGISTER" ? { reference: argument } : action === "UNWATCH" ? { watch_id: argument } : {}
+    sendSse(res, toolCallEvents(callCount, name, `call_pr_watch_${callCount}`, args))
+    return
+  }
+
   if (branch === "parent-tool-call") {
     latches.parentToolCallIssued = true
     sendSse(res, toolCallEvents(callCount, "task", `call_agent_${callCount}`, {
