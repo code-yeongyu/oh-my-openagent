@@ -1,0 +1,84 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/chat-message/main-session-fallback.test.ts:
+40 |         pluginConfig,
+41 |         availableModels,
+42 |       })
+43 | 
+44 |       // then
+45 |       expect(promoted).toEqual({
+                            ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "modelID": "claude-sonnet-5",
+-   "providerID": "github-copilot",
+-   "variant": "max",
+- }
++ undefined
+
+- Expected  - 5
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7226/packages/omo-opencode/src/plugin/chat-message/main-session-fallback.test.ts:45:24)
+(fail) main-session fallback_models > #given a main session whose agent configures fallback_models > #when the primary model is unavailable #then the first reachable fallback entry is promoted (issue #7226) [6.98ms]
+167 |         pluginConfig,
+168 |         availableModels,
+169 |       })
+170 | 
+171 |       // then
+172 |       expect(promoted).toEqual({ providerID: "opencode", modelID: "kimi-k2.5" })
+                             ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "modelID": "kimi-k2.5",
+-   "providerID": "opencode",
+- }
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7226/packages/omo-opencode/src/plugin/chat-message/main-session-fallback.test.ts:172:24)
+(fail) main-session fallback_models > #given a main session whose agent configures fallback_models > #when the agent inherits its category fallback_models #then the category chain is honored [0.53ms]
+228 |           Promise.resolve(new Set(["github-copilot/claude-sonnet-5"])),
+229 |         notify: (title, message) => notifications.push(`${title}: ${message}`),
+230 |       })
+231 | 
+232 |       // then
+233 |       expect(output.message.model).toEqual({
+                                         ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "modelID": "claude-sonnet-5",
+-   "providerID": "github-copilot",
++   "modelID": "claude-opus-4-8",
++   "providerID": "opencode",
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7226/packages/omo-opencode/src/plugin/chat-message/main-session-fallback.test.ts:233:36)
+(fail) main-session fallback_models > #given applyMainSessionFallbackOverride wiring > #when the primary is unreachable #then output.message carries the promoted model and input stays untouched [1.38ms]
+270 |       // when
+271 |       await applyMainSessionFallbackOverride({ ...args, output: makeOutput() })
+272 |       await applyMainSessionFallbackOverride({ ...args, output: makeOutput() })
+273 | 
+274 |       // then
+275 |       expect(notifications).toHaveLength(1)
+                                  ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7226/packages/omo-opencode/src/plugin/chat-message/main-session-fallback.test.ts:275:29)
+(fail) main-session fallback_models > #given applyMainSessionFallbackOverride wiring > #when the same fallback was already promoted for the session #then no duplicate notification fires [0.72ms]
+
+ 6 pass
+ 4 fail
+ 11 expect() calls
+Ran 10 tests across 1 file. [458.00ms]
