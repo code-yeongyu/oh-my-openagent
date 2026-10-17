@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { log } from "../../shared/logger"
-import { buildSystemContent } from "./prompt-builder"
+import { buildSystemContent, resolveProviderBaseURL } from "./prompt-builder"
 import {
   resolveSkillContent,
   resolveParentContext,
@@ -132,8 +132,10 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       }
 
       let systemDefaultModel: string | undefined
+      let openCodeConfigData: unknown
       try {
         const openCodeConfig = await options.client.config.get()
+        openCodeConfigData = openCodeConfig
         systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
       } catch (error) {
         if (!(error instanceof Error)) throw error
@@ -157,6 +159,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       let isUnstableAgent = false
       let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
       let maxPromptTokens: number | undefined
+      let providerBaseURL: string | undefined
 
       if (delegateTaskArgs.category) {
         const resolution = await resolveCategoryExecution(delegateTaskArgs, modelOptions, inheritedModel, systemDefaultModel)
@@ -171,6 +174,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         isUnstableAgent = resolution.isUnstableAgent
         fallbackChain = resolution.fallbackChain
         maxPromptTokens = resolution.maxPromptTokens
+        providerBaseURL = resolveProviderBaseURL(openCodeConfigData, categoryModel?.providerID, categoryModel?.modelID)
 
         const isRunInBackgroundExplicitlyFalse = isExplicitSyncRun(delegateTaskArgs.run_in_background)
 
@@ -192,6 +196,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
             agentName: agentToUse,
             maxPromptTokens,
             model: categoryModel,
+            providerBaseURL,
             availableCategories,
             availableSkills,
             nativeSkillInfos,
@@ -206,6 +211,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
         fallbackChain = resolution.fallbackChain
+        providerBaseURL = resolveProviderBaseURL(openCodeConfigData, categoryModel?.providerID, categoryModel?.modelID)
       }
 
       const systemContent = buildSystemContent({
@@ -215,6 +221,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         agentName: agentToUse,
         maxPromptTokens,
         model: categoryModel,
+        providerBaseURL,
         availableCategories,
         availableSkills,
         nativeSkillInfos,
