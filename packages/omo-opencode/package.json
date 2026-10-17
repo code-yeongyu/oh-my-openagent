@@ -12,6 +12,10 @@
     "./binary-downloader": {
       "types": "./src/shared/binary-downloader.ts",
       "import": "./src/shared/binary-downloader.ts"
+    },
+    "./v2": {
+      "types": "./src/v2/index.ts",
+      "import": "./src/v2/index.ts"
     }
   },
   "scripts": {
@@ -45,5 +49,16 @@
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "2.0.20"
+  },
+  "peerDependencies": {
+    "@opencode/plugin": "2.0.20"
+  },
+  "peerDependenciesMeta": {
+    "@opencode/plugin": {
+      "optional": true
+    }
   }
 }
