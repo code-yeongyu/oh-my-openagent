@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A curated agent configured with the documented `"provider/model:level"` string form now runs instead of always reporting no available model.** In `agents.<name>.models`, a string entry such as `"myprovider/fast-model:low"` kept `:low` inside the model id, so the lookup never found the model and agents like `explore` and `librarian` failed with `model_unavailable`, while the object form `{ "model": ..., "reasoning": ... }` worked. Both forms now resolve the same way, a level written on an object entry still wins, a colon that is not a reasoning level stays part of the id, and the error names the first configured model rather than the last one tried. Thanks to @BoheSama1999 for the report and diagnosis. ([#10380](https://github.com/code-yeongyu/oh-my-openagent/issues/10380), [#10383](https://github.com/code-yeongyu/oh-my-openagent/pull/10383))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))

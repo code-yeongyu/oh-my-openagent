@@ -1,3 +1,5 @@
+import { splitReasoningSuffix } from "@oh-my-opencode/omo-config-core"
+
 export type AgentModelCandidate = {
   readonly model: string
   readonly variant?: string
@@ -19,13 +21,23 @@ export function agentModelCandidates(
   entries: readonly AgentModelEntry[] | undefined,
   defaults: AgentTuningDefaults,
 ): readonly AgentModelCandidate[] {
-  const primaryCandidate = primary === undefined ? [] : [withDefaults({ model: primary }, defaults)]
+  const primaryCandidate = primary === undefined ? [] : [withDefaults(withModelSuffix({ model: primary }), defaults)]
   const chain = (entries ?? []).map((entry) => withDefaults(normalizeEntry(entry), defaults))
   return [...primaryCandidate, ...chain]
 }
 
 function normalizeEntry(entry: AgentModelEntry): AgentModelCandidate {
-  return typeof entry === "string" ? { model: entry } : entry
+  return withModelSuffix(typeof entry === "string" ? { model: entry } : entry)
+}
+
+// "provider/model:level" is the documented string spelling of { model, reasoning } (#10380), and the
+// config schema keeps the suffix on the model string, so it is split here before any registry lookup.
+// A level written on the entry itself still wins over the suffix.
+function withModelSuffix(candidate: AgentModelCandidate): AgentModelCandidate {
+  const { base, level } = splitReasoningSuffix(candidate.model)
+  if (level === undefined) return candidate
+  const explicit = candidate.reasoning ?? candidate.reasoningEffort
+  return { ...candidate, model: base, ...(explicit === undefined ? { reasoning: level } : {}) }
 }
 
 function withDefaults(candidate: AgentModelCandidate, defaults: AgentTuningDefaults): AgentModelCandidate {

@@ -117,7 +117,8 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   }
   const directModels = agentModelCandidates(definition.model, definition.models, configuredTuning)
   for (const candidate of directModels) {
-    attemptedModel = candidate.model
+    // Name the first configured model in a refusal, not whichever rung the loop saw last (#10380).
+    attemptedModel ??= candidate.model
     const found = findExactAgentModel(candidate.model, registry)
     if (found === undefined) continue
     if (availableModels !== undefined && !availableModels.includes(`${found.provider}/${found.modelId}`)) continue
