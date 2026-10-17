@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/shared/system-directive.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'containsSystemDirective' not found in module '/home/viprix/projects/oom-wt-3435/packages/omo-opencode/src/shared/system-directive.ts'.
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [10.42s]
+prefix carries trigger literal: true "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
+outbound payload carries trigger: TODO CONTINUATION -> [SYSTEM DIRECTIVE: OH-MY-OPENCODE - TODO CONTINUATION]
+outbound payload carries trigger: BOULDER CONTINUATION -> [SYSTEM DIRECTIVE: OH-MY-OPENCODE - BOULDER CONTINUATION]
+outbound payload carries trigger: DELEGATION REQUIRED -> [SYSTEM DIRECTIVE: OH-MY-OPENCODE - DELEGATION REQUIRED]
+outbound payload carries trigger: SINGLE TASK ONLY -> [SYSTEM DIRECTIVE: OH-MY-OPENCODE - SINGLE TASK ONLY]
+outbound payload carries trigger: COMPACTION CONTEXT -> [SYSTEM DIRECTIVE: OH-MY-OPENCODE - COMPACTION CONTEXT]
+outbound payload carries trigger: CONTEXT WINDOW MONITOR -> [SYSTEM DIRECTIVE: OH-MY-OPENCODE - CONTEXT WINDOW MONITOR]
+outbound payload carries trigger: PROMETHEUS READ-ONLY -> [SYSTEM DIRECTIVE: OH-MY-OPENCODE - PROMETHEUS READ-ONLY]
