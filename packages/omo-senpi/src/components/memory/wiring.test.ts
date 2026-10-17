@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
-import { rmEfaultTolerant } from "./teardown.test-support"
+import { removeWhenReleased } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
@@ -29,30 +29,6 @@ import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 const roots: string[] = []
-
-// afterBind starts background git pipelines it never exposes a drain handle for
-// (fire-and-forget refreshInitialStatus and the footer recompute parked in
-// MemoryFooterLive.pending). Both spawn `git status` with cwd inside the temp root and can
-// still be running when the awaited reservation resolves. POSIX unlinks a live cwd; Windows
-// returns EBUSY for that child's whole lifetime, which on a loaded runner exceeds the 2s that
-// maxRetries:10/retryDelay:200 buys. Wait for the handles to drain instead of guessing a
-// bigger fixed budget.
-const TEMP_ROOT_RELEASE_TIMEOUT_MS = 30_000
-const TEMP_ROOT_RELEASE_POLL_MS = 50
-
-async function removeWhenReleased(root: string): Promise<void> {
-  const deadline = Date.now() + TEMP_ROOT_RELEASE_TIMEOUT_MS
-  for (;;) {
-    try {
-      await rmEfaultTolerant(root, { recursive: true, force: true })
-      return
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code
-      if ((code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") || Date.now() >= deadline) throw error
-      await new Promise((resolve) => setTimeout(resolve, TEMP_ROOT_RELEASE_POLL_MS))
-    }
-  }
-}
 
 afterEach(async () => {
   for (const root of roots.splice(0)) await removeWhenReleased(root)

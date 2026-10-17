@@ -29,6 +29,10 @@ export type RmEfaultTolerantDeps = {
   efaultDelayMs?: number
 }
 
+type RemoveWhenReleasedDeps = RmEfaultTolerantDeps & {
+  now?: () => number
+}
+
 const DEFAULT_OPTIONS: TeardownRmOptions = {
   recursive: true,
   force: true,
@@ -38,6 +42,8 @@ const DEFAULT_OPTIONS: TeardownRmOptions = {
 
 const DEFAULT_EFAULT_ATTEMPTS = 3
 const DEFAULT_EFAULT_DELAY_MS = 50
+const TEMP_ROOT_RELEASE_TIMEOUT_MS = 30_000
+const TEMP_ROOT_RELEASE_POLL_MS = 50
 
 function defaultSleepSync(ms: number): void {
   Bun.sleepSync(ms)
@@ -58,7 +64,9 @@ function errorCode(error: unknown): string | undefined {
 const RETRYABLE_CODES = new Set(["EFAULT", "EBUSY", "EPERM", "ENOTEMPTY"])
 
 function teardownFailure(path: string, attempts: number, cause: unknown): Error {
-  const error = new Error(`${TEARDOWN_FAILURE_PREFIX} EFAULT persisted after ${attempts} attempts removing ${path}`)
+  const code = errorCode(cause)
+  const error: NodeJS.ErrnoException = new Error(`${TEARDOWN_FAILURE_PREFIX} ${code ?? "unknown error"} persisted after ${attempts} attempts removing ${path}`)
+  error.code = code
   error.cause = cause
   return error
 }
@@ -107,4 +115,22 @@ export async function rmEfaultTolerant(
     }
   }
   throw teardownFailure(path, attempts, lastError)
+}
+
+// afterBind leaves background git children with cwd inside the temp root. Windows
+// keeps that root busy until the children release their handles.
+export async function removeWhenReleased(root: string, deps: RemoveWhenReleasedDeps = {}): Promise<void> {
+  const now = deps.now ?? Date.now
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+  const deadline = now() + TEMP_ROOT_RELEASE_TIMEOUT_MS
+  for (;;) {
+    try {
+      await rmEfaultTolerant(root, { recursive: true, force: true }, deps)
+      return
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if ((code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") || now() >= deadline) throw error
+      await sleep(TEMP_ROOT_RELEASE_POLL_MS)
+    }
+  }
 }
