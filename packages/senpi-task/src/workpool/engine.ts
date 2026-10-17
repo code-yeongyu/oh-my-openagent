@@ -27,7 +27,8 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
   const awaitingAck = new Set<string>()
   const emit = (event: WorkpoolEvent): void => {
     for (const listener of listeners) listener(event)
-    if (event.kind === "item_result" || event.kind === "worker_idle" || event.kind === "cancelled") flushAggregate(event.pool_id)
+    if (event.kind === "item_result" || event.kind === "worker_idle" || event.kind === "cancelled" ||
+      (event.kind === "admission_failed" && event.item_id !== undefined)) flushAggregate(event.pool_id)
   }
   function persistAggregate(poolId: PoolId, generation: number, state: { readonly delivered: boolean; readonly accepted: boolean }): void {
     store.mutate(poolId, pool => pool.generation !== generation ? pool : {
@@ -38,6 +39,8 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
   }
   function flushAggregate(poolId: PoolId): void {
     const pool = store.load(poolId)
+    if (pool.items.some(item => item.error?.code === "delivery_uncertain" && item.binding !== undefined &&
+      dispatcher.isObserving(item.binding.task_id, item.binding.run_epoch))) return
     // Close-completion: the last worker of a closed pool is gone and no item is outstanding.
     if (poolWorkIsFinished(pool)) releaseKernelTools(pool.pool_id)
     const key = `${pool.pool_id}:${pool.generation}`

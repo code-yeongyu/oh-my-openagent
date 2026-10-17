@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+import { rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { createTaskManager } from "../manager/manager"
 import { TaskConcurrency } from "../manager/concurrency"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
@@ -8,6 +10,9 @@ import { createTaskRecordStore } from "../store"
 import { bounded, fixture, fixtureHandle, poolInput } from "./__fixtures__/admission"
 import type { WorkpoolAggregateMessage, WorkpoolAggregatePort } from "./aggregate"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { deliveryFixture } from "./__fixtures__/delivery"
+import { createWorkpoolStore } from "./store"
+import { createWorkpoolYieldCapability } from "./worker-capability"
 
 function acking(messages: WorkpoolAggregateMessage[]): WorkpoolAggregatePort {
   return { enqueue: (message, receipts) => { messages.push(message); receipts.ack() } }
@@ -26,6 +31,21 @@ function reopen(root: string) {
     planner: spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }), destruction: lifecycle, admit: async () => ({ kind: "admitted" }) })
   return { manager, lifecycle }
 }
+
+for (const failure of ["missing", "corrupt"] as const) test(`#given a ${failure} pool record #when its scheduled pump fails #then admission reports the load error without a second exception`, async () => {
+  // given
+  const f = fixture()
+  const pool = f.manager.workpools.create(f.caller, poolInput)
+  const failed = f.manager.workpools.waitForEvent(pool.pool_id, "admission_failed", AbortSignal.timeout(5000))
+  const path = join(f.store.stateDir, "workpools", `${pool.pool_id}.json`)
+  // when
+  if (failure === "missing") rmSync(path)
+  else writeFileSync(path, "{")
+  const event = await bounded(failed)
+  // then
+  expect(event).toMatchObject({ pool_id: pool.pool_id, error: { code: failure === "missing" ? "pool_not_found" : "store_corrupt" } })
+  expect(event.item_id).toBeUndefined()
+})
 
 test("#given omitted mode #when creating a pool #then the approved keep_alive default is installed", () => {
   const f = fixture()
@@ -76,6 +96,65 @@ test("#given notifier throw #when close is empty #then aggregate stays pending, 
   const messages: WorkpoolAggregateMessage[] = []
   f.manager.workpools.bindAggregate(acking(messages))
   expect(messages).toEqual([{ pool_id: pool.pool_id, generation: 1, results: [] }])
+})
+
+test("#given a closing pool whose last binding is refused #when admission fails #then its aggregate is delivered once", async () => {
+  // given
+  const f = deliveryFixture()
+  const messages: WorkpoolAggregateMessage[] = []
+  f.manager.workpools.bindAggregate(acking(messages))
+  const worker = await f.start()
+  f.yieldResults(worker.taskId, worker.epoch, [{ key: "first", data: 1 }])
+  f.push("recovered")
+  f.store.mutate(worker.taskId, record => ({ ...record, burnt_epoch: worker.epoch + 1 }))
+  createWorkpoolStore(f.store.stateDir).mutate(f.pool.pool_id, pool => ({ ...pool, items: pool.items.map(item => item.key === "recovered"
+    ? { ...item, status: "assigned", binding: { task_id: worker.taskId, generation: pool.generation, run_epoch: worker.epoch + 1 }, delivery: { phase: "queued" } } : item) }))
+  f.manager.workpools.close(f.caller, f.pool.pool_id)
+  const failed = f.event("admission_failed")
+  // when
+  f.children.get(worker.taskId)?.settle({ status: "completed", finalResponse: "turn finished" })
+  await failed
+  // then
+  expect(messages).toMatchObject([{ pool_id: f.pool.pool_id, results: [{ key: "first", data: 1 }, { key: "recovered", error: { code: "worker_not_continuable" } }] }])
+  expect(f.inspect().aggregate).toEqual({ generation: f.pool.generation, delivered: true })
+  f.manager.workpools.close(f.caller, f.pool.pool_id)
+  expect(messages).toHaveLength(1)
+})
+
+for (const closeBeforeFailure of [true, false]) for (const durableYield of [true, false]) test(`#given uncertain admission and close ${closeBeforeFailure ? "before" : "after"} failure #when the worker completes ${durableYield ? "with" : "without"} a durable yield #then only the final aggregate is delivered`, async () => {
+  // given
+  const f = deliveryFixture()
+  const messages: WorkpoolAggregateMessage[] = []
+  f.manager.workpools.bindAggregate(acking(messages))
+  const worker = await f.start()
+  f.yieldResults(worker.taskId, worker.epoch, [{ key: "first", data: 1 }])
+  await f.settle(worker.taskId)
+  await f.park(worker.taskId)
+  f.followUp(async () => { throw new Error("fixture lost acknowledgment") })
+  const failed = f.event("admission_failed")
+  f.push("late-yield")
+  if (closeBeforeFailure) f.manager.workpools.close(f.caller, f.pool.pool_id)
+  await failed
+  if (!closeBeforeFailure) f.manager.workpools.close(f.caller, f.pool.pool_id)
+  expect(f.inspect().items[1]?.error?.code).toBe("delivery_uncertain")
+  expect(messages).toHaveLength(0)
+  expect(f.inspect().aggregate?.delivered).not.toBe(true)
+  if (durableYield) {
+    const pools = createWorkpoolStore(f.store.stateDir)
+    const crash = createWorkpoolYieldCapability({ ...pools, mutate: (id, update) => {
+      update(pools.load(id))
+      throw new Error("fixture crash before pool result replace")
+    } }, f.store)
+    expect(() => crash(worker.taskId, worker.epoch + 1, { op: "yield", results: [{ key: "late-yield", data: 42 }] })).toThrow()
+  }
+  // when
+  await f.settle(worker.taskId)
+  // then
+  if (durableYield) expect(messages).toEqual([{ pool_id: f.pool.pool_id, generation: f.pool.generation, results: [{ key: "first", data: 1 }, { key: "late-yield", data: 42 }] }])
+  else expect(messages).toMatchObject([{ pool_id: f.pool.pool_id, generation: f.pool.generation, results: [{ key: "first", data: 1 }, { key: "late-yield", error: { code: "delivery_uncertain" } }] }])
+  expect(f.inspect().aggregate).toEqual({ generation: f.pool.generation, delivered: true })
+  f.manager.workpools.attach(f.caller)
+  expect(messages).toHaveLength(1)
 })
 
 test("#given cancel of unstarted items #when a lane is held #then waiters are removed and no spawn happens", async () => {

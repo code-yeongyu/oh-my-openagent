@@ -1,7 +1,10 @@
 import type { WorkpoolAdmission } from "./ports"
+import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
+import { messageability } from "../state"
+import { oneShotPolicyDenial } from "../steering/engine-policy"
 import { reconcileWorkerTurn, reconcileWorkpool, uncertainItem } from "./reconcile"
 import type { WorkpoolStore } from "./store"
-import { WorkpoolError, type PoolId, type WorkpoolEvent, type WorkpoolRecord, type WorkpoolWorker } from "./types"
+import { WorkpoolError, type PoolId, type WorkpoolEvent, type WorkpoolItem, type WorkpoolRecord, type WorkpoolWorker } from "./types"
 
 export function orderIdleWorkers(workers: readonly WorkpoolWorker[]): readonly WorkpoolWorker[] {
   return workers.filter(worker => worker.status === "idle").toSorted((a, b) =>
@@ -87,11 +90,39 @@ export function createWorkpoolDispatcher(ports: {
         event: event => {
           if (event.kind === "admission_failed") {
             pending.delete(item.item_id)
-            store.mutate(poolId, latest => latest.generation !== pool.generation ? latest : { ...latest, items: latest.items.map(candidate => {
-              const affected = candidate.item_id === item.item_id || (boundTask !== undefined && candidate.binding?.task_id === boundTask && candidate.binding.run_epoch === event.run_epoch)
-              if (!affected || (candidate.status !== "queued" && candidate.status !== "assigned")) return candidate
-              return event.error?.code === "delivery_uncertain" ? uncertainItem(candidate, latest, event.task_id === undefined ? null : admission.tasks.load(event.task_id)) : { ...candidate, status: "error", error: event.error }
-            }), workers: latest.workers.filter(worker => worker.task_id !== event.task_id || admission.get(worker.task_id)?.status === "running") })
+            // Another engine owner may begin this item's turn after the failing admission last looked at it: a delivery
+            // already past queued under a different task or run epoch is that owner's live turn, so this failure leaves its item and
+            // the pool worker running it alone.
+            const othersTurn = (candidate: WorkpoolItem): boolean => candidate.status === "assigned" && candidate.delivery !== undefined &&
+              candidate.delivery.phase !== "queued" && (candidate.binding?.task_id !== event.task_id || candidate.binding?.run_epoch !== event.run_epoch)
+            store.mutate(poolId, latest => {
+              if (latest.generation !== pool.generation) return latest
+              const refused: WorkpoolItem[] = []
+              const items = latest.items.map(candidate => {
+                const affected = candidate.item_id === item.item_id || (boundTask !== undefined && candidate.binding?.task_id === boundTask && candidate.binding.run_epoch === event.run_epoch)
+                if (!affected || (candidate.status !== "queued" && candidate.status !== "assigned") || othersTurn(candidate)) return candidate
+                refused.push(candidate)
+                return event.error?.code === "delivery_uncertain" ? uncertainItem(candidate, latest, event.task_id === undefined ? null : admission.tasks.load(event.task_id)) : { ...candidate, status: "error" as const, error: event.error }
+              })
+              for (const candidate of refused) {
+                const binding = candidate.binding
+                if (binding === undefined || candidate.delivery?.phase !== "queued" || event.error?.code === "delivery_uncertain") continue
+                admission.tasks.mutate(binding.task_id, task => {
+                  const pending = (task.pending_steering ?? []).filter(entry => entry.id !== candidate.item_id ||
+                    entry.workpool?.pool_id !== poolId || entry.workpool.generation !== binding.generation ||
+                    entry.workpool.item_id !== candidate.item_id || entry.workpool.run_epoch !== binding.run_epoch)
+                  return pending.length === (task.pending_steering?.length ?? 0) ? task : { ...task, pending_steering: pending }
+                })
+              }
+              return { ...latest, items, workers: latest.workers.filter(worker => {
+                if (worker.task_id !== event.task_id) return true
+                const task = admission.get(worker.task_id)
+                return task?.status === "running" || (worker.status === "idle" && task !== undefined && task.parent_session_id === latest.parent_session_id &&
+                  oneShotPolicyDenial(task) === undefined && (isColdRevivalCandidate(task) ||
+                    messageability(task.status, task.residency_state, task.execution_mode, task.killed) === "revive")) ||
+                  latest.items.some(candidate => othersTurn(candidate) && candidate.binding?.task_id === worker.task_id && candidate.binding.run_epoch === worker.run_epoch)
+              }) }
+            })
             if (event.error?.code === "delivery_uncertain" && event.task_id !== undefined && event.run_epoch !== undefined) observeCompletion(pool, event.task_id, event.run_epoch)
             schedule(poolId)
           }
@@ -155,5 +186,7 @@ export function createWorkpoolDispatcher(ports: {
     for (const controller of completions.values()) controller.abort()
     completions.clear()
   }
-  return { schedule, attach, cancel, stopScheduling }
+  return { schedule, attach, cancel, stopScheduling,
+    isObserving: (taskId: string, epoch: number) => completions.has(`${taskId}:${epoch}`),
+  }
 }
