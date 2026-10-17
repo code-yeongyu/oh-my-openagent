@@ -126,6 +126,62 @@ describe("runComputerCode", HANG_GUARD, () => {
 		]);
 	});
 
+	it("matches window by exact id or throws assertion error on unknown filter key (#10409)", async () => {
+		// Given
+		const { service } = await openDesktop();
+
+		// When: window lookup uses an object filter with id
+		const byId = await run(
+			service,
+			`
+			const win = await desktop.window({ id: "101" });
+			return win.id;
+		`,
+		);
+		expect(byId.returnValue).toBe("101");
+
+		// When: window lookup uses both id and app
+		const byIdAndApp = await run(
+			service,
+			`
+			const win = await desktop.window({ id: "101", app: "code" });
+			return win.id;
+		`,
+		);
+		expect(byIdAndApp.returnValue).toBe("101");
+
+		// When: windows() filter uses id
+		const windowsById = await run(
+			service,
+			`
+			const list = await desktop.windows({ id: "101" });
+			return list.map(w => w.id);
+		`,
+		);
+		expect(windowsById.returnValue).toEqual(["101"]);
+
+		// Then: unknown filter key in window() throws assertion error
+		const badKey = await rejectionOf(run(service, `await desktop.window({ unknownId: "101" });`));
+		expect(badKey).toMatchObject({
+			reason: "assertion",
+			message: expect.stringContaining("unknown filter key 'unknownId'"),
+		});
+
+		// Then: unknown filter key in windows() throws assertion error
+		const badKeyList = await rejectionOf(run(service, `await desktop.windows({ unknownId: "101" });`));
+		expect(badKeyList).toMatchObject({
+			reason: "assertion",
+			message: expect.stringContaining("unknown filter key 'unknownId'"),
+		});
+
+		// Then: non-matching id throws window error
+		const notFound = await rejectionOf(run(service, `await desktop.window({ id: "non-existent" });`));
+		expect(notFound).toMatchObject({
+			reason: "window",
+			message: expect.stringContaining('no window matches {"id":"non-existent"}'),
+		});
+	});
+
 	it("rejects with the error of code that throws before its first await, leaving nothing unhandled", async () => {
 		// Given: the vm rejects its evaluation promise while its own microtasks drain, before the host has
 		// attached a handler; that used to surface as an unhandled rejection in the host (Vitest fails the
