@@ -98,4 +98,11 @@ export interface HookDeps {
    */
   internallyAbortedSessions: Set<string>
   fallbackExhaustionToastStates?: Map<string, FallbackState>
+  /**
+   * session.error events skipped because a retry dispatch was in flight when they arrived, keyed by session.
+   * Their recovery claims stay open until that dispatch settles (see hook.ts).
+   */
+  deferredSessionErrors?: Map<string, object[]>
+  /** Called by the retry dispatcher once a dispatch it started has finished, accepted or not. */
+  onRetryDispatchSettled?: (sessionID: string, accepted: boolean) => void
 }
