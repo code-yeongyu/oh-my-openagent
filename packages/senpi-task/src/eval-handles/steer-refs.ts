@@ -50,6 +50,10 @@ export async function sendRef(deps: SteerDeps, ref: HandleRef, message: string, 
   const outcome = await deps.tasks.sendToTask({ idOrName: ref.id, message, callerSessionId: ctx.ownerSessionId, expectedRunEpoch: ref.run_epoch })
   const runAt = prior.reread(deps.tasks, "not_found")
   switch (outcome.kind) {
+    case "uncertain":
+      return runAt(ref.run_epoch).uncertain(ref, `${outcome.reason} Effect id: ${outcome.effect_id}`)
+    case "failed":
+      throw new EvalHandleHostError("eval_handle_send_refused", `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`)
     case "revived":
       return runAt(outcome.run_epoch).delivered(ref, `revived as epoch ${outcome.run_epoch}`)
     case "steered":

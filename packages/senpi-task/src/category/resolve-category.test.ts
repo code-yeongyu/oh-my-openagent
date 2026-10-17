@@ -472,7 +472,7 @@ describe("builtin category defaults", () => {
 
     // then: declared order plus each category's primary provider, model, and variant
     expect(defaults.map(({ config, name }) => [name, config.model, config.variant])).toEqual([
-      ["visual-engineering", "anthropic/claude-fable-5-1", "max"],
+      ["visual-engineering", "google/gemini-4-argon", "low"],
       ["artistry", "anthropic/claude-fable-5-1", "max"],
       ["ultrabrain", "chatgpt-subscription/gpt-6-astra", "max"],
       ["deep-low", "chatgpt-subscription/gpt-6.1-sol", "medium"],
@@ -481,7 +481,7 @@ describe("builtin category defaults", () => {
       ["unspecified-low", "anthropic/claude-sonnet-5-5", "medium"],
       ["unspecified-high", "anthropic/claude-opus-5-5", "medium"],
       ["architect", "anthropic/claude-fable-5-1", "max"],
-      ["writing", "anthropic/claude-opus-5-5", "low"],
+      ["writing", "google/gemini-4-argon", "low"],
     ])
 
     // then: availability gating applies only to the model-gated builtins; any listed id opens the gate
