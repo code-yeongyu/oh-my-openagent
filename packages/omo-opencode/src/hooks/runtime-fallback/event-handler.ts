@@ -18,6 +18,7 @@ import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { isCompactionInFlight } from "../../shared/compaction-in-flight"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -76,6 +77,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     sessionAwaitingFallbackResult.delete(sessionID)
     deps.internallyAbortedSessions.delete(sessionID)
     sessionStatusRetryKeys.delete(sessionID)
+    deps.fallbackExhaustionToastStates?.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
   }
 
@@ -130,6 +132,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       deps.internallyAbortedSessions.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
+      deps.fallbackExhaustionToastStates?.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
   }
@@ -153,6 +156,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const sessionID = resolveMessageEventSessionID(props)
     const role = info?.role as string | undefined
     if (!sessionID || role !== "user") return
+
+    // Capped-state reset lives in chat.message because message.updated payloads carry no parts.
 
     cancelledSessions.delete(sessionID)
   }
@@ -188,13 +193,20 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
   }
 
-  const handleSessionError = async (props: Record<string, unknown> | undefined) => {
+  const handleSessionError = async (props: Record<string, unknown> | undefined, event: object) => {
     const sessionID = resolveSessionEventID(props)
     const error = props?.error
     const agent = props?.agent as string | undefined
 
     if (!sessionID) {
       log(`[${HOOK_NAME}] session.error without sessionID, skipping`)
+      return
+    }
+
+    // A retry dispatch in flight owns this error's outcome even during a compaction: it falls through to the
+    // deferral below, so a refused dispatch still declines the claim instead of leaving the task waiting.
+    if (!isAbortError(error) && isCompactionInFlight(sessionID) && !sessionRetryInFlight.has(sessionID)) {
+      log(`[${HOOK_NAME}] session.error belongs to compaction lane; preserving fallback state`, { sessionID })
       return
     }
 
@@ -216,9 +228,14 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     if (sessionRetryInFlight.has(sessionID)) {
+      // The dispatch in flight decides what happens to this error once it settles (hook.ts), so it is never dropped.
+      const deferred = deps.deferredSessionErrors?.get(sessionID) ?? []
+      deferred.push(event)
+      deps.deferredSessionErrors?.set(sessionID, deferred)
       log(`[${HOOK_NAME}] session.error skipped - retry in flight`, {
         sessionID,
         retryInFlight: true,
+        deferred: true,
       })
       return
     }
@@ -226,7 +243,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (sessionAwaitingFallbackResult.has(sessionID)) {
       const pendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
       const eventModel = resolveEventModel(props)
-      if (!pendingFallbackModel || eventModel !== pendingFallbackModel) {
+      // Real session.error events have no model. Once dispatch has finished,
+      // treat those as the retry's failure; only an explicitly older model is stale.
+      if (pendingFallbackModel && eventModel && eventModel !== pendingFallbackModel) {
         log(`[${HOOK_NAME}] session.error skipped - awaiting fallback result`, {
           sessionID,
           pendingFallbackModel,
@@ -307,6 +326,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (event.type === "message.updated") { handleMessageUpdated(props); return }
     if (event.type === "session.idle") { handleSessionIdle(props); return }
     if (event.type === "session.status") { await sessionStatusHandler(props); return }
-    if (event.type === "session.error") { await handleSessionError(props); return }
+    if (event.type === "session.error") { await handleSessionError(props, event); return }
   }
 }
