@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, setSystemTime, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, setSystemTime, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -11,6 +11,13 @@ import { resolveConfigValue } from "../../../node_modules/@code-yeongyu/senpi/di
 import { readAuthStore, writeAuthStore } from "../bin/lib/auth-store.js"
 import { planOpencodeProviders } from "../bin/lib/setup-opencode-providers.js"
 import { teardownRoots } from "./teardown.test-support"
+
+// Set the per-file budget HERE, never via a preload: a preload setDefaultTimeout only
+// sticks for the first test file of a run, and every later file silently reverts to the
+// built-in budget. Every test here spawns the setup launcher as a real child process;
+// under `bun test --parallel` on a contended windows runner the catalog-cache import
+// test (#10158) exceeded the built-in budget and timed out.
+setDefaultTimeout(process.platform === "win32" ? 60_000 : 30_000)
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
