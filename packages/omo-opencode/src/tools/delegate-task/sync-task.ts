@@ -57,12 +57,10 @@ export async function executeSyncTask(
     })
 
     if (!createSessionResult.ok) {
-      spawnReservation?.rollback()
       return createSessionResult.error
     }
 
     const sessionID = createSessionResult.sessionID
-    spawnReservation?.commit()
     syncSessionID = sessionID
 
     const registerSyncSession = async (newSessionID: string): Promise<void> => {
@@ -154,7 +152,6 @@ export async function executeSyncTask(
       }
     }
   } catch (error) {
-    spawnReservation?.rollback()
     const errorToFormat = error instanceof Error ? error : String(error)
     return formatDetailedError(errorToFormat, {
       operation: "Execute task",
@@ -164,6 +161,8 @@ export async function executeSyncTask(
       category: args.category,
     })
   } finally {
+    // Sync children are never handed to a tracked task, so the slot is released here instead of committed.
+    spawnReservation?.rollback()
     if (syncSessionID) {
       cleanupSyncSessionSideEffects(syncSessionID, executorCtx)
       handedBackSyncSessions.add(syncSessionID)

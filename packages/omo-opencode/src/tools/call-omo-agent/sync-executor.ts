@@ -98,10 +98,6 @@ export async function executeSync(
     syncSubagentSessions.add(sessionID)
     handedBackSyncSessions.delete(sessionID)
 
-    if (session.isNew) {
-      spawnReservation?.commit()
-    }
-
     if (fallbackChain && fallbackChain.length > 0) {
       deps.setSessionFallbackChain(sessionID, fallbackChain)
       appliedFallbackChain = true
@@ -183,10 +179,9 @@ export async function executeSync(
     const responseText = await deps.processMessages(sessionID, ctx)
 
     return responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
-  } catch (error) {
-    spawnReservation?.rollback()
-    throw error
   } finally {
+    // Sync children are never handed to a tracked task, so the slot is released here instead of committed.
+    spawnReservation?.rollback()
     if (sessionID && appliedFallbackChain) {
       deps.clearSessionFallbackChain(sessionID)
     }

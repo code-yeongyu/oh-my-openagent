@@ -601,12 +601,52 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#then - should complete and cleanup resources
     expect(result).toContain("Task completed")
     expect(mockExecutorCtx.manager.reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
-    expect(commit).toHaveBeenCalledTimes(1)
-    expect(rollback).toHaveBeenCalledTimes(0)
+    expect(commit).toHaveBeenCalledTimes(0)
+    expect(rollback).toHaveBeenCalledTimes(1)
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("sync_ses_test")
     expect(deleteCalls.length).toBe(1)
     expect(deleteCalls[0]).toBe("ses_test_12345678")
+  })
+
+  test("#given a root capped at one live descendant #when two blocking tasks run back to back #then the second one is admitted", async () => {
+    //#given - the real BackgroundManager limits the root session to one live descendant
+    const { BackgroundManager } = require("../../features/background-agent/manager")
+    const { executeSyncTask } = require("./sync-task")
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp" } }),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: { client, directory: "/tmp" },
+      config: { maxLiveDescendantsPerRoot: 1 },
+    })
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+    const runBlockingTask = () => executeSyncTask(
+      { prompt: "test prompt", description: "test task", category: "test", load_skills: [], run_in_background: false, command: null },
+      { sessionID: "parent-session", callID: "call-123", metadata: () => {} },
+      { manager, client, directory: "/tmp", onSyncSessionCreated: null },
+      { sessionID: "parent-session" },
+      "test-agent", undefined, undefined, undefined, undefined, deps,
+    )
+
+    try {
+      //#when - two blocking tasks run one after the other under the same root
+      const first = await runBlockingTask()
+      const second = await runBlockingTask()
+
+      //#then - the finished child no longer counts, so the second spawn is not blocked
+      expect(first).toContain("Task completed")
+      expect(second).toContain("Task completed")
+    } finally {
+      manager.shutdown()
+    }
   })
 
   test("retries sync session on retryable runtime session error using next fallback model", async () => {

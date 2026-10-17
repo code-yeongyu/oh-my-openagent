@@ -578,7 +578,7 @@ describe("executeSync", () => {
     expect(deps.processMessages).toHaveBeenCalledTimes(1)
   })
 
-  test("commits reserved descendant quota after creating a new sync session", async () => {
+  test("releases the reserved descendant quota once a new sync session finishes", async () => {
     //#given
     const { executeSync } = require("./sync-executor")
 
@@ -622,8 +622,8 @@ describe("executeSync", () => {
     await executeSync(args, toolContext, unsafeTestValue(ctx), deps, undefined, spawnReservation)
 
     //#then
-    expect(spawnReservation.commit).toHaveBeenCalledTimes(1)
-    expect(spawnReservation.rollback).toHaveBeenCalledTimes(0)
+    expect(spawnReservation.commit).toHaveBeenCalledTimes(0)
+    expect(spawnReservation.rollback).toHaveBeenCalledTimes(1)
   })
 
   test("strips legacy ZWSP-prefixed agent names from persisted sync prompt body (GH-3259)", async () => {
