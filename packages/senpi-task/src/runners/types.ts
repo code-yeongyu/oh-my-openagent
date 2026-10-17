@@ -2,6 +2,8 @@ import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
 import type { RunnerOutcome } from "./in-process/child-handle"
 import type { ChildExtensionListener } from "./child-extension-events"
 import type { EffectiveModel } from "./pinned-model-equivalence"
+import type { TaskRecord } from "../state"
+import type { HostTurnReconciliation } from "./rpc-host/reconcile-turn"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -104,6 +106,7 @@ export type RpcTerminalAssistantMessage = {
 }
 
 export type RpcChildHandle = ChildHandle & {
+  reconcileTurn?(record: Pick<TaskRecord, "host_session" | "final_response">): Promise<HostTurnReconciliation>
   readonly spawnSpec?: RpcSpawnSpec
   terminalAssistantMessage?(): RpcTerminalAssistantMessage | undefined
   wasAbortedByUser?(): boolean

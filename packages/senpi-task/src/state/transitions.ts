@@ -94,10 +94,16 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "lose":
       return { ...record, error_message: transition.error_message }
     case "cancel":
+      return {
+        ...record,
+        ...(transition.error_message === undefined ? {} : { error_message: transition.error_message }),
+        ...runStatsField(transition.run_stats),
+      }
     case "interrupt":
       return {
         ...record,
         ...(transition.error_message === undefined ? {} : { error_message: transition.error_message }),
+        ...(transition.final_response === undefined ? {} : { final_response: transition.final_response }),
         ...runStatsField(transition.run_stats),
       }
     case "persist_only": {

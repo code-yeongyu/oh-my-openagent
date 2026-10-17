@@ -7,6 +7,7 @@ import type { IsolationRuntime, IsolationStartedDetails } from "../isolation"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { KernelToolGrant } from "../kernel-tools/resolve"
 import type {
+  EffectiveModelRecord,
   ResolvedModelRecord,
   TaskRecord,
   TaskRunStats,
@@ -154,7 +155,7 @@ export type StartResult =
       readonly resolved_model?: ResolvedModelRecord
       // The model the child ACTUALLY started on, read from the child itself (never the plan) -
       // absent for a queued start that has not launched yet (#9722).
-      readonly effective_model?: ResolvedModelRecord
+      readonly effective_model?: EffectiveModelRecord
       readonly queue_position?: number
       // The task host has not admitted the child yet; its start outcome arrives on the record (#10042).
       // run_epoch and resolved_model are then the plan's: a start-time fallback may still move both.

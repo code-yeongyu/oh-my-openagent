@@ -22,7 +22,7 @@ export type HostSessionCommand =
   | { readonly type: "abort" }
 
 /** Why a child parked itself instead of reattaching. */
-export type HostParkReason = "host_incompatible" | "own_host_unreachable" | "store_index_unavailable"
+export type HostParkReason = "host_incompatible" | "own_host_unreachable" | "store_index_unavailable" | "daemon_unavailable"
 
 /**
  * Why the HOST parked a session it holds: its idle sweep (`idle_evicted`) or a generation handoff that

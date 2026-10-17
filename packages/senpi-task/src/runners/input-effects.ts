@@ -98,7 +98,7 @@ export function createInputEffects(input: {
       store?.mutate(taskId, record => {
         const seq = Math.max(record.effect_seq ?? 0, record.host_session?.effect_seq ?? 0) + 1
         id = `${taskId}:${record.notification.run_epoch}:${seq}`
-        return { ...record, effect_seq: seq,
+        return { ...record, effect_seq: seq, last_effect_id: id,
           ...(record.host_session === undefined ? {} : { host_session: { ...record.host_session, effect_seq: seq } }) }
       })
       const identified = { ...command, clientMessageId: id }
@@ -124,7 +124,9 @@ export function createInputEffects(input: {
       const record = store?.load(taskId)
       const commands = record?.uncertain_inputs ?? [...pending.values()]
       const currentEpoch = record?.notification.run_epoch
-      const stale = currentEpoch === undefined ? [] : commands.filter(command => epochOf(command) !== currentEpoch)
+      // An id whose retry is already in flight is settled by that retry, so the log never records it both ways.
+      const stale = currentEpoch === undefined ? [] : commands.filter(command =>
+        epochOf(command) !== currentEpoch && !retries.has(command.clientMessageId))
       for (const command of stale) {
         forget(command)
         event("effect_failed", command, {

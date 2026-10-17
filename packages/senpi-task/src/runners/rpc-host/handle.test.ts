@@ -131,11 +131,12 @@ describe("createHostSessionHandle over a daemon session", () => {
     const handle = await openHostSessionHandle({ client, sessionPath: "/tmp/sessions/b.jsonl" })
     const parked: HostSessionParked[] = []
     handle.onParked((park) => parked.push(park))
+    const released = host.waitForConnections(0)
 
     // when
     host.evict("/tmp/sessions/b.jsonl")
-    // A reply on the SAME connection cannot overtake the park record that preceded it.
-    await client.getState()
+    // The park releases this session's client (#10062): its connection closing proves the park was handled.
+    await released
 
     // then
     expect(parked).toEqual([{ sessionId: "routing-1", sessionPath: "/tmp/sessions/b.jsonl", reason: "idle_evicted" }])
@@ -151,13 +152,13 @@ describe("createHostSessionHandle over a daemon session", () => {
     const handle = await openHostSessionHandle({ client, sessionPath: "/tmp/sessions/c.jsonl" })
     const parked: HostSessionParked[] = []
     handle.onParked((park) => parked.push(park))
+    const released = host.waitForConnections(0)
     host.evict("/tmp/sessions/c.jsonl")
-    await client.getState()
+    await released
     expect(parked).toHaveLength(1)
 
-    // when
+    // when: the park already released the client, so the crash reaches no connection of this handle
     host.crash()
-    await client.transportGone
 
     // then
     expect(handle.exitOutcome()).toBeUndefined()
@@ -264,8 +265,9 @@ describe("createHostSessionHandle over a daemon session", () => {
     const host = await fakeHost()
     const client = hostClient(host)
     const handle = await openHostSessionHandle({ client, sessionPath: "/tmp/sessions/j.jsonl", closeGraceMs: 50 })
+    const released = host.waitForConnections(0)
     host.evict("/tmp/sessions/j.jsonl")
-    await client.getState()
+    await released
     expect(handle.exitOutcome()).toBeUndefined()
 
     // when

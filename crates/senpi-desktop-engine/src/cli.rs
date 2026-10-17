@@ -12,8 +12,10 @@ use crate::daemon;
     version,
     about = "Senpi desktop engine (JSON-RPC 2.0 over NDJSON)"
 )]
-#[command(group(ArgGroup::new("mode").args(["stdio", "serve", "oneshot", "mcp", "resume", "selftest", "schema"])))]
+#[command(group(ArgGroup::new("mode").args(["stdio", "serve", "oneshot", "mcp", "resume", "selftest", "schema", "xpc_agent"])))]
 pub struct Cli {
+    #[arg(long, hide = true, value_name = "MACH_SERVICE")]
+    xpc_agent: Option<String>,
     /// Serve on stdin/stdout (the default).
     #[arg(long)]
     stdio: bool,
@@ -114,6 +116,7 @@ impl DaemonArgs {
 }
 
 pub enum Mode {
+    XpcAgent { name: String },
     Stdio,
     /// `--serve`, `--oneshot` or `--mcp` without `--enable-daemon`.
     DaemonDisabled {
@@ -142,6 +145,9 @@ pub enum Mode {
 
 impl Cli {
     pub fn mode(self) -> Mode {
+        if let Some(name) = self.xpc_agent {
+            return Mode::XpcAgent { name };
+        }
         if !self.enable_daemon {
             let disabled = [
                 (self.serve.is_some(), "--serve"),

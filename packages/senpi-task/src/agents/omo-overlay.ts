@@ -2,6 +2,7 @@ import { join } from "node:path"
 
 import {
   loadOmoConfig,
+  type OmoConfig,
   resolveModelReferences,
   type OmoConfigDiagnostic,
   type OmoModelReferenceDiagnostic,
@@ -12,6 +13,7 @@ import type { AgentDefinition, AgentLoaderDiagnostic, LoadAgentsOptions } from "
 
 type OmoAgentOverlayResult = {
   readonly agents: readonly AgentDefinition[]
+  readonly config: OmoConfig
   readonly diagnostics: readonly AgentLoaderDiagnostic[]
 }
 
@@ -29,7 +31,7 @@ export function loadOmoAgentOverlays(options: Required<LoadAgentsOptions>): OmoA
   const loaded = loadOmoConfig({ cwd: options.projectDir, env, harness: "senpi" })
   const resolvedModels = resolveModelReferences(loaded.config)
   const diagnostics = [...loaded.diagnostics, ...resolvedModels.diagnostics].map(toAgentLoaderDiagnostic)
-  return { agents: Object.values(mapOmoConfigAgents(resolvedModels.view)), diagnostics }
+  return { agents: Object.values(mapOmoConfigAgents(resolvedModels.view)), config: resolvedModels.view, diagnostics }
 }
 
 function toAgentLoaderDiagnostic(diagnostic: ConfigDiagnostic): AgentLoaderDiagnostic {

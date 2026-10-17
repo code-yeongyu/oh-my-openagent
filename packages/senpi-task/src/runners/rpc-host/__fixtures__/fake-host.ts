@@ -208,7 +208,10 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       else failed.set(type, error)
     },
     requestUi: (routingId, request) => sendTo(routingId, { type: "extension_ui_request", ...request }),
-    emitRecord: (routingId, payload) => sendTo(routingId, payload),
+    emitRecord: (routingId, payload) => {
+      if (payload["type"] === "agent_start" && (payload["sessionId"] === undefined || payload["sessionId"] === routingId)) table.setStreaming(routingId, true)
+      sendTo(routingId, payload)
+    },
     stall: (driftMs) => {
       for (const socket of [...sockets]) writeFrame(socket, { type: "host_stalled", driftMs })
     },
