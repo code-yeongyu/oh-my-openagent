@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 import { once } from "node:events"
 import { fileURLToPath } from "node:url"
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 
 import { spawnFakeChild } from "./__fixtures__/spawn-fake"
 import { terminateRpcChild } from "./terminate"
@@ -104,6 +104,48 @@ describe("terminateRpcChild", () => {
       }
     }
   })
+
+  // kill(-pgid) fails with EPERM only when no member of the group can be signalled (#9596 saw it on macOS), so
+  // a refusal hands escalation to the owned child, whether the group refuses the first SIGTERM or only the
+  // SIGKILL that follows a delivered SIGTERM.
+  const groupSignalRefusals: Array<[string, (signal?: number | NodeJS.Signals) => boolean, NodeJS.Signals[]]> = [
+    ["every process-group signal", () => true, ["SIGTERM"]],
+    ["only the process-group SIGKILL", (signal) => signal === "SIGKILL", ["SIGTERM", "SIGKILL"]],
+  ]
+  for (const [refusal, refuses, attemptedGroupSignals] of groupSignalRefusals) {
+    test.skipIf(isWin32)(
+      `#given the OS denies ${refusal} #when terminating #then it escalates on the owned child instead of throwing`,
+      async () => {
+        // given
+        const child = spawnFakeChild({ ...process.env, FAKE_IGNORE_TERM: "1" })
+        await once(child.stdout!, "data")
+        const exited = onExit(child)
+        const realKill = process.kill.bind(process)
+        const groupSignals: Array<number | NodeJS.Signals | undefined> = []
+        const killSpy = spyOn(process, "kill").mockImplementation(((pid: number, signal?: number | NodeJS.Signals) => {
+          if (pid < 0 && signal !== 0) {
+            groupSignals.push(signal)
+            if (refuses(signal)) {
+              throw Object.assign(new Error("operation not permitted"), { code: "EPERM" })
+            }
+          }
+          return realKill(pid, signal as NodeJS.Signals)
+        }) as typeof process.kill)
+
+        try {
+          // when
+          await terminateRpcChild(child, { sigkillDelayMs: 150 })
+
+          // then
+          const { signal } = await exited
+          expect(signal).toBe("SIGKILL")
+          expect(groupSignals).toEqual(attemptedGroupSignals)
+        } finally {
+          killSpy.mockRestore()
+        }
+      },
+    )
+  }
 })
 
 async function waitUntilStopped(pid: number): Promise<void> {

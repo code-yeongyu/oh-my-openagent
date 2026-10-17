@@ -32,6 +32,7 @@ function fixture(): Fixture {
   mkdirSync(join(root, "tmp"), { recursive: true })
   cpSync(join(SOURCE_ROOT, "bin"), join(app, "bin"), { recursive: true })
   write(join(app, "package.json"), JSON.stringify({ name: "omo-ai", version: "test", type: "module" }))
+  symlinkSync(resolve(SOURCE_ROOT, "../../node_modules"), join(app, "node_modules"), process.platform === "win32" ? "junction" : "dir")
   return {
     home: join(root, "home"),
     agentDir: join(root, "senpi-agent"),
@@ -47,11 +48,9 @@ function opencode(item: Fixture, config: unknown, auth?: unknown): void {
   if (auth !== undefined) write(join(item.dataHome, "opencode", "auth.json"), JSON.stringify(auth))
 }
 
-// The launcher runs from a copied app with no node_modules, so Bun auto-installs the engine's dependencies
-// on first import and extracts them under the temp dir. On Windows those extraction directories outlive the
-// child (#9766 guard: `.typebox`, `.openai`, `.client-bedrock-runtime`), so the child gets its own temp dir
-// inside the fixture root, which teardown removes. The Bun install cache stays the host's: it is a cache, not a temp
-// leak, and a fresh per-file cache would make the first engine-importing case install cold (#10210's timeout).
+// The copied launcher resolves the installed pinned engine through the fixture's node_modules link.
+// Its child temp files stay inside the fixture root for teardown (#9766); the host's Bun install cache
+// remains a cache rather than a temporary extraction directory (#10210).
 function childEnv(item: Fixture): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -396,6 +395,10 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
         expect(models.map((model: any) => [model.id, model.api, model.baseUrl, model.contextWindow, model.maxTokens, model.reasoning])).toEqual([
           ["kimi-k2.5", "openai-completions", "https://api.neuralwatt.com/v1", 262144, 32768, true],
         ])
+        expect(readJson(join(item.agentDir, "settings.json"))).toMatchObject({
+          defaultProvider: "neuralwatt",
+          defaultModel: "kimi-k2.5",
+        })
         expect(readAuthStore(join(item.agentDir, "auth.json")).entries.neuralwatt).toMatchObject({ type: "api_key" })
         expect(result.stdout).toContain("providers-imported: neuralwatt")
         expect(result.stdout).not.toContain("providers omo does not serve (neuralwatt)")
@@ -523,4 +526,3 @@ describe("omo setup e2e temp isolation (#9766)", () => {
     expect([env.BUN_INSTALL, env.BUN_INSTALL_CACHE_DIR]).toEqual([process.env.BUN_INSTALL, process.env.BUN_INSTALL_CACHE_DIR])
   })
 })
-
