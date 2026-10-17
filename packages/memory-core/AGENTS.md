@@ -11,7 +11,7 @@ The public API is the barrel at `src/index.ts`.
 
 | Directory | Responsibility |
 |-----------|----------------|
-| `src/git/` | Git command boundary, clean-tree checks, commits, merges, remotes, and typed git errors. |
+| `src/git/` | Git command boundary, clean-tree checks, commits, merges, remotes, and typed git errors. A stranded git lock is reclaimed only with proven-dead ownership (`repo-lock-sweep.ts`); a kept one surfaces `StrandedGitLockError` with the way out, `inspectStrandedGitLock` / `unlockStrandedGitLock` (`repo-lock-unlock.ts`: refuse on any visible live holder, remove one confirmed lock after a fresh re-check). |
 | `src/identity/` | Memory identity resolution and the `OMO_MEMORY_HOME` directory layout. |
 | `src/locks/` | Cross-process locks for memory writes, reflection scheduling, and transcript state, plus the machine-wide `recall-wake` counting lease (`recall-wake.slot-<n>.lock` per slot, FIFO `recall-wake.tickets/`, default 2 slots, proof-based stale recovery for slots and tickets alike, bounded wait ending in `RecallWakeBusyError`). |
 | `src/memfs/` | Memory-path validation, markdown frontmatter parsing, and hook-script installation. |
