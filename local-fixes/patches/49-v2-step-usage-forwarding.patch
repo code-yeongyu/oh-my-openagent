@@ -1,0 +1,347 @@
+From 8c1b527dd072b6259922ef144fd8704d19b807df Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Sun, 18 Oct 2026 01:41:32 +0300
+Subject: [PATCH] fix(v2): forward providerID and token usage from step events
+ to V1 message.updated
+
+The v2 bridge turned session.step.started/ended into message.updated with only
+{id, sessionID, role, finish}. V1 consumers read providerID/modelID/tokens from
+that event, so the preemptive-compaction token cache never filled on v2: the
+hook was structurally inert since the v2 migration (0 [preemptive-compaction]
+lines in %TEMP%/oh-my-opencode.log; 15 real fires on Oct 6-9 on v1, none after).
+
+session.step.ended carries the step's tokens (input/output/reasoning/cache) and
+session.step.started carries the model ref ({id, providerID, variant}) and the
+agent. A stateful shaper (createV1EventShaper) now remembers the model per
+assistant message between the two events and joins both into the message.updated
+info; the stateless toV1Event still forwards the tokens the ended event itself
+carries. Both subscription sites (hook-bridge, cli/run v2-client) use one shaper
+per stream.
+
+Tests: event-shape unit tests for started/ended/join; preemptive-compaction
+integration test drives raw v2 step events through the shaper and asserts the
+summarize fires (RED on the pre-fix bridge: the token cache never fills).
+---
+ .../omo-opencode/src/cli/run/v2-client.ts     |  5 +-
+ .../src/hooks/preemptive-compaction.test.ts   | 42 +++++++++
+ .../omo-opencode/src/v2/event-shape.test.ts   | 94 ++++++++++++++++++-
+ packages/omo-opencode/src/v2/event-shape.ts   | 80 +++++++++++++---
+ packages/omo-opencode/src/v2/hook-bridge.ts   |  7 +-
+ 5 files changed, 210 insertions(+), 18 deletions(-)
+
+diff --git a/packages/omo-opencode/src/cli/run/v2-client.ts b/packages/omo-opencode/src/cli/run/v2-client.ts
+index 86ee7a958..5061731bb 100644
+--- a/packages/omo-opencode/src/cli/run/v2-client.ts
++++ b/packages/omo-opencode/src/cli/run/v2-client.ts
+@@ -1,6 +1,6 @@
+ import { readFileSync, existsSync } from "node:fs"
+ 
+-import { toV1Event } from "../../v2/event-shape"
++import { createV1EventShaper } from "../../v2/event-shape"
+ import { filesFromPrompt, type PromptFile } from "../../v2/session-actions"
+ 
+ export type V2RunTransport = {
+@@ -121,7 +121,8 @@ export function createV2RunClient(input: {
+         const source = input.transport.events()
+         return {
+           stream: (async function* events() {
+-            for await (const event of source) yield toV1Event(event)
++            const shape = createV1EventShaper()
++            for await (const event of source) yield shape(event)
+           })(),
+         }
+       },
+diff --git a/packages/omo-opencode/src/hooks/preemptive-compaction.test.ts b/packages/omo-opencode/src/hooks/preemptive-compaction.test.ts
+index 409a866df..5577a8a77 100644
+--- a/packages/omo-opencode/src/hooks/preemptive-compaction.test.ts
++++ b/packages/omo-opencode/src/hooks/preemptive-compaction.test.ts
+@@ -1,6 +1,7 @@
+ /// <reference types="bun-types" />
+ 
+ import { afterAll, describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
++import { createV1EventShaper } from "../v2/event-shape"
+ 
+ const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
+ const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
+@@ -1114,4 +1115,45 @@ describe("preemptive-compaction", () => {
+       restoreTimeouts()
+     }
+   })
++
++  // #given raw V2 step events (started carries the model, ended carries usage)
++  // #when they are shaped like V1 message.updated events and a tool finishes
++  // #then the token cache fills and the preemptive compaction fires
++  it("caches V2 step usage through the event shaper and triggers compaction", async () => {
++    const shape = createV1EventShaper()
++    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
++    const sessionID = "ses_v2_step"
++    const assistantMessageID = "msg_v2_step"
++
++    await hook.event({
++      event: shape({
++        type: "session.step.started",
++        data: {
++          sessionID,
++          assistantMessageID,
++          agent: "sisyphus",
++          model: { id: "claude-sonnet-4-6", providerID: "anthropic" },
++          started: 1,
++        },
++      }),
++    })
++    await hook.event({
++      event: shape({
++        type: "session.step.ended",
++        data: {
++          sessionID,
++          assistantMessageID,
++          finish: "stop",
++          tokens: { input: 800000, output: 1000, reasoning: 0, cache: { read: 10000, write: 0 } },
++        },
++      }),
++    })
++
++    await hook["tool.execute.after"](
++      { tool: "bash", sessionID, callID: "call_v2_step" },
++      { title: "", output: "test", metadata: null },
++    )
++
++    expect(ctx.client.session.summarize).toHaveBeenCalled()
++  })
+ })
+diff --git a/packages/omo-opencode/src/v2/event-shape.test.ts b/packages/omo-opencode/src/v2/event-shape.test.ts
+index c905f2aeb..3ca7968b4 100644
+--- a/packages/omo-opencode/src/v2/event-shape.test.ts
++++ b/packages/omo-opencode/src/v2/event-shape.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, expect, test } from "bun:test"
+ 
+-import { toV1Event } from "./event-shape"
++import { createV1EventShaper, toV1Event } from "./event-shape"
+ 
+ describe("OpenCode V2 event shape", () => {
+   test("maps session.retry.scheduled into the V1 retry-status shape", () => {
+@@ -32,4 +32,96 @@ describe("OpenCode V2 event shape", () => {
+       properties: { sessionID: "ses_compact", error: { message: "provider failed" } },
+     })
+   })
++
++  test("maps session.step.started into an assistant message.updated carrying the step model", () => {
++    expect(toV1Event({
++      type: "session.step.started",
++      data: {
++        sessionID: "ses_step",
++        assistantMessageID: "msg_step",
++        agent: "sisyphus",
++        model: { id: "deepseek-v4.1-flash", providerID: "opencode-go" },
++        started: 123,
++      },
++    })).toEqual({
++      type: "message.updated",
++      properties: {
++        sessionID: "ses_step",
++        info: {
++          id: "msg_step",
++          sessionID: "ses_step",
++          role: "assistant",
++          finish: undefined,
++          providerID: "opencode-go",
++          modelID: "deepseek-v4.1-flash",
++          agent: "sisyphus",
++        },
++      },
++    })
++  })
++
++  test("joins the started model with the ended usage so providerID and tokens land together", () => {
++    const shape = createV1EventShaper()
++    shape({
++      type: "session.step.started",
++      data: {
++        sessionID: "ses_join",
++        assistantMessageID: "msg_join",
++        agent: "sisyphus",
++        model: { id: "claude-sonnet-4-6", providerID: "anthropic" },
++        started: 1,
++      },
++    })
++    expect(shape({
++      type: "session.step.ended",
++      data: {
++        sessionID: "ses_join",
++        assistantMessageID: "msg_join",
++        finish: "stop",
++        cost: 0.42,
++        tokens: { input: 810000, output: 120, reasoning: 0, cache: { read: 10000, write: 0 } },
++      },
++    })).toEqual({
++      type: "message.updated",
++      properties: {
++        sessionID: "ses_join",
++        info: {
++          id: "msg_join",
++          sessionID: "ses_join",
++          role: "assistant",
++          finish: "stop",
++          providerID: "anthropic",
++          modelID: "claude-sonnet-4-6",
++          agent: "sisyphus",
++          tokens: { input: 810000, output: 120, reasoning: 0, cache: { read: 10000, write: 0 } },
++        },
++      },
++    })
++  })
++
++  test("forwards step.ended tokens even without a remembered step.started", () => {
++    const event = toV1Event({
++      type: "session.step.ended",
++      data: {
++        sessionID: "ses_solo",
++        assistantMessageID: "msg_solo",
++        finish: "tool-calls",
++        tokens: { input: 5, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
++      },
++    })
++    expect(event).toEqual({
++      type: "message.updated",
++      properties: {
++        sessionID: "ses_solo",
++        info: {
++          id: "msg_solo",
++          sessionID: "ses_solo",
++          role: "assistant",
++          finish: "tool-calls",
++          tokens: { input: 5, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
++        },
++      },
++    })
++    expect("providerID" in (event.properties.info as Record<string, unknown>)).toBe(false)
++  })
+ })
+diff --git a/packages/omo-opencode/src/v2/event-shape.ts b/packages/omo-opencode/src/v2/event-shape.ts
+index d73d5e951..cfa481cd8 100644
+--- a/packages/omo-opencode/src/v2/event-shape.ts
++++ b/packages/omo-opencode/src/v2/event-shape.ts
+@@ -7,7 +7,66 @@ export type V1Event = {
+   properties: Record<string, unknown>
+ }
+ 
+-export function toV1Event(event: unknown): V1Event {
++// A step's model arrives on `session.step.started` and its usage on
++// `session.step.ended`. V1 consumers (the preemptive-compaction token cache,
++// the context-limit recovery) read both from one `message.updated`, so a
++// stateful shaper remembers each assistant message's model between the two
++// events. A stateless call still forwards everything the event itself carries.
++export type StepModel = {
++  providerID?: string
++  modelID?: string
++  agent?: string
++}
++
++function stepModelFrom(data: Record<string, unknown>): StepModel {
++  const model = isRecord(data.model) ? data.model : {}
++  return {
++    providerID: typeof model.providerID === "string" ? model.providerID : undefined,
++    modelID: typeof model.id === "string" ? model.id : undefined,
++    agent: typeof data.agent === "string" ? data.agent : undefined,
++  }
++}
++
++function stepMessageUpdated(
++  type: string,
++  data: Record<string, unknown>,
++  sessionID: string | undefined,
++  stepModels: Map<string, StepModel> | undefined,
++): V1Event {
++  const messageID = typeof data.assistantMessageID === "string" ? data.assistantMessageID : undefined
++  let model: StepModel | undefined
++  if (type === "session.step.started") {
++    model = stepModelFrom(data)
++    if (stepModels && messageID) stepModels.set(messageID, model)
++  } else if (stepModels && messageID) {
++    model = stepModels.get(messageID)
++    stepModels.delete(messageID)
++  }
++  const tokens = isRecord(data.tokens) ? data.tokens : undefined
++  return {
++    type: "message.updated",
++    properties: {
++      sessionID,
++      info: {
++        id: data.assistantMessageID,
++        sessionID,
++        role: "assistant",
++        finish: data.finish,
++        ...(model?.providerID ? { providerID: model.providerID } : {}),
++        ...(model?.modelID ? { modelID: model.modelID } : {}),
++        ...(model?.agent ? { agent: model.agent } : {}),
++        ...(tokens ? { tokens } : {}),
++      },
++    },
++  }
++}
++
++export function createV1EventShaper(): (event: unknown) => V1Event {
++  const stepModels = new Map<string, StepModel>()
++  return (event) => toV1Event(event, stepModels)
++}
++
++export function toV1Event(event: unknown, stepModels?: Map<string, StepModel>): V1Event {
+   const record = isRecord(event) ? event : {}
+   const type = typeof record.type === "string" ? record.type : "unknown"
+   const data = isRecord(record.data) ? record.data : isRecord(record.properties) ? record.properties : {}
+@@ -52,18 +111,13 @@ export function toV1Event(event: unknown): V1Event {
+   }
+ 
+   if (type === "session.step.started" || type === "session.step.ended") {
+-    return {
+-      type: "message.updated",
+-      properties: {
+-        sessionID,
+-        info: {
+-          id: data.assistantMessageID,
+-          sessionID,
+-          role: "assistant",
+-          finish: data.finish,
+-        },
+-      },
+-    }
++    return stepMessageUpdated(type, data, sessionID, stepModels)
++  }
++
++  if (type === "session.step.failed") {
++    const messageID = typeof data.assistantMessageID === "string" ? data.assistantMessageID : undefined
++    if (stepModels && messageID) stepModels.delete(messageID)
++    return { type, properties: { ...data } }
+   }
+ 
+   if (type === "session.text.delta" || type === "session.reasoning.delta") {
+diff --git a/packages/omo-opencode/src/v2/hook-bridge.ts b/packages/omo-opencode/src/v2/hook-bridge.ts
+index ae88e3d71..85794e596 100644
+--- a/packages/omo-opencode/src/v2/hook-bridge.ts
++++ b/packages/omo-opencode/src/v2/hook-bridge.ts
+@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode/plugin"
+ 
+ import { log } from "../shared/logger"
+ import type { AdapterState } from "./adapter-state"
+-import { toV1Event } from "./event-shape"
++import { createV1EventShaper, toV1Event } from "./event-shape"
+ import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
+ import { createOmoDelegationRouting } from "./delegation-routing"
+ 
+@@ -305,8 +305,11 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?:
+   if (eventHandler || autocontinue) {
+     void (async () => {
+       try {
++        // fix 49 (opencode-v2): one shaper per subscription joins each step's
++        // started model with its ended usage before the V1 handlers see it.
++        const shape = createV1EventShaper()
+         for await (const raw of ctx.event.subscribe({ signal: controller.signal })) {
+-          const event = toV1Event(raw)
++          const event = shape(raw)
+           noteRuntimeEvent(state, event)
+           const retryKey = retryEventKey(event)
+           const sessionID = typeof event.properties.sessionID === "string" ? event.properties.sessionID : undefined
+-- 
+2.55.0.windows.5
+

@@ -712,6 +712,22 @@
       "overlapsWith": [],
       "orderNote": "Independent of 01-47; touches features/tui-sidebar/{constants,mirror-path,mirror-io,mirror-manager}.ts and tui.ts plus mirror-manager.test.ts and mirror-io.test.ts. RED: the new tests fail on pre-fix source; GREEN: tui-sidebar 65 pass. Behaviour change: with no TUI attached the mirror is refreshed only by events (it was refreshed every 2 s); a TUI that attaches later shows the sidebar within one heartbeat (<= 2 s) of its first read. Markers are server-bundle symbols (dist/index.js); the TUI side (touchReaderLease in tui.ts) ships in dist/tui.js, which only a full `bun run build` / `bun run fixes:apply` regenerates.",
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10457"
+    },
+    {
+      "id": "49-v2-step-usage-forwarding",
+      "title": "Forward providerID and token usage from V2 step events to V1 message.updated",
+      "commit": "8c1b527dd072b6259922ef144fd8704d19b807df",
+      "patch": "patches/49-v2-step-usage-forwarding.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/4",
+      "why": "The v2 bridge turned session.step.started/ended into message.updated with only {id, sessionID, role, finish}, so the preemptive-compaction token cache never filled on v2 and runPreemptiveCompactionIfNeeded returned at `if (!cached) return` on every step: 0 [preemptive-compaction] lines in %TEMP%/oh-my-opencode.log (70,471 lines since Oct 16 22:55Z) vs 15 real fires Oct 6-9 on v1. session.step.ended carries tokens {input,output,reasoning,cache{read,write}} + finish; session.step.started carries model {id,providerID,variant} + agent. A stateful createV1EventShaper() (one per subscription) remembers the model per assistant message and joins model + usage into the message.updated info; stateless toV1Event still forwards the tokens the ended event carries. Both subscription sites (v2/hook-bridge.ts, cli/run/v2-client.ts) use one shaper per stream.",
+      "markers": [
+        "createV1EventShaper",
+        "stepModelFrom",
+        "stepMessageUpdated"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-48; touches v2/event-shape.ts, v2/hook-bridge.ts, cli/run/v2-client.ts plus tests. Tests: v2/event-shape.test.ts (started mapping, join, stateless tokens) + preemptive-compaction.test.ts integration (raw step events -> shaper -> hook -> session.summarize; RED against the pre-fix bridge shape: 'Received number of calls: 0'; GREEN 21 pass across the two files, plus 38 pass across v2-client/host/hook-bridge/loop-regression/limit-status). LSP clean; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS. Upstream: issue #10465 + stacked PR SwarmStorm/oh-my-openagent#4 (base = #9016's branch, the only carrier of the v2 bridge). Post-restart acceptance: %TEMP%/oh-my-opencode.log shows [preemptive-compaction] lines again (summarize model resolved; fires above 78% usage), and v2 sessions compact preemptively.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10465"
     }
   ],
   "externalFixes": [
