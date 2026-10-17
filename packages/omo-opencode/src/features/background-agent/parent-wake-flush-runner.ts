@@ -50,10 +50,26 @@ export class ParentWakeFlushRunner {
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
     if (sessionActive && !forceDispatchAfterActiveDefer) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      log("[background-agent] Deferred parent wake because parent session is active:", {
+      // Issue #4169: a pure deferral made completion notifications wait until the
+      // parent turn ended, so a live turn never saw finished subagent output.
+      // Admit the notification into the active parent's history as noReply so the
+      // running turn consumes it on its next step; reply obligations stay queued
+      // and are settled by the existing admitted-wake drop/dedupe paths.
+      if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+        return
+      }
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry: false,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+        retainPendingWake: latestWake.shouldReply,
+      })
+      log("[background-agent] Admitted parent wake into active parent turn:", {
         sessionID,
       })
+      if (latestWake.shouldReply) {
+        this.schedulePendingParentWakeFlush(sessionID)
+      }
       return
     }
 
