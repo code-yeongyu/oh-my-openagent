@@ -57,6 +57,64 @@ function sessionError(sessionID: string, model?: string): SessionErrorEvent {
   }
 }
 
+type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (error: Error) => void }
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+// The first promptAsync() call, which the retry dispatcher makes after marking the session's retry in flight,
+// blocks until the test releases or refuses it. `started` resolves when that call is made.
+function createGatedPluginInput(promptCalls: unknown[]) {
+  const started = createDeferred<void>()
+  const gate = createDeferred<void>()
+  const base = createPluginInput(promptCalls)
+  let gated = false
+  const input = unsafeTestValue<RuntimeFallbackPluginInput>({
+    ...base,
+    client: {
+      ...base.client,
+      session: {
+        ...base.client.session,
+        promptAsync: async (args: unknown) => {
+          if (!gated) {
+            gated = true
+            started.resolve()
+            await gate.promise
+          }
+          promptCalls.push(args)
+          return {}
+        },
+      },
+    },
+  })
+  return { input, started: started.promise, release: () => gate.resolve(), refuse: (error: Error) => gate.reject(error) }
+}
+
+function sessionStatusRetry(sessionID: string): SessionErrorEvent {
+  return {
+    type: "session.status",
+    properties: {
+      sessionID,
+      status: { type: "retry", attempt: 1, message: "Rate limit exceeded [retrying in 5s attempt #1]" },
+    },
+  }
+}
+
+const PENDING = "pending" as const
+
+// Resolves to the decision if the claim is already settled, otherwise to PENDING. A settled claim resolves its
+// waiter synchronously, so the decision promise is already resolved and listed first.
+function decisionSoFar(decision: Promise<unknown> | undefined) {
+  return Promise.race([decision, Promise.resolve(PENDING)])
+}
+
 describe("runtime-fallback recovery claim", () => {
   beforeEach(() => {
     _resetRuntimeFallbackRecoveryForTesting()
@@ -190,4 +248,68 @@ describe("runtime-fallback recovery claim", () => {
     // then
     expect(awaitRuntimeFallbackRecoveryDecision(event)).toBeUndefined()
   })
+
+  describe("when a session.status dispatch is in flight as the error arrives", () => {
+    async function errorDuringStatusDispatch(sessionID: string) {
+      const promptCalls: unknown[] = []
+      const gated = createGatedPluginInput(promptCalls)
+      const hook = createRuntimeFallbackHook(gated.input, {
+        config: createConfig({ timeout_seconds: 0 }),
+        pluginConfig: createPluginConfig(["openai/gpt-5.4", "anthropic/claude-opus-4-8"]),
+      })
+      await startSession(hook, sessionID, "google/gemini-2.5-pro")
+      const statusHandled = hook.event({ event: sessionStatusRetry(sessionID) })
+      await gated.started
+      const event = sessionError(sessionID)
+      openRuntimeFallbackRecoveryClaim(event, sessionID)
+      // Not awaited: the decision may legitimately stay open until the dispatch settles.
+      const decision = awaitRuntimeFallbackRecoveryDecision(event)
+      await hook.event({ event })
+      return { hook, gated, promptCalls, statusHandled, decision }
+    }
+
+    test("keeps the error's claim open until that dispatch settles", async () => {
+      // given
+      const { hook, gated, statusHandled, decision } = await errorDuringStatusDispatch("ses_claim_inflight_open")
+
+      // when
+      const beforeSettle = await decisionSoFar(decision)
+      gated.release()
+      await statusHandled
+
+      // then
+      expect(beforeSettle).toBe(PENDING)
+      expect(await decision).toBe("retry-owned")
+      hook.dispose?.()
+    })
+
+    test("declines the error when that dispatch is refused, so it is not dropped", async () => {
+      // given
+      const { hook, gated, promptCalls, statusHandled, decision } = await errorDuringStatusDispatch("ses_claim_inflight_refused")
+
+      // when
+      gated.refuse(new Error("upstream unavailable"))
+      await statusHandled
+
+      // then
+      expect(promptCalls).toHaveLength(0)
+      expect(await decision).toBe("declined")
+      hook.dispose?.()
+    })
+
+    test("declines the error when the hook is disposed while that dispatch is in flight", async () => {
+      // given
+      const { hook, gated, statusHandled, decision } = await errorDuringStatusDispatch("ses_claim_inflight_disposed")
+
+      // when
+      hook.dispose?.()
+      const afterDispose = await decisionSoFar(decision)
+      gated.refuse(new Error("disposed"))
+      await statusHandled
+
+      // then
+      expect(afterDispose).toBe("declined")
+    })
+  })
+
 })
