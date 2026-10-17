@@ -65,6 +65,20 @@ export function writeNatural(fork: LoroDoc, key: string, value: FieldValue): voi
   }
 }
 
+/**
+ * Insert-only adoption (sync-design §3): one more register entry that supersedes nothing, so the
+ * value shows beside every active one. A value ANY entry ever held, active or superseded, adds
+ * nothing: this is the WRITE rule, shared with registerValuesWritten (adopt-values.ts). The deletion
+ * gate's READ rule is active entries only (space/read-back.ts); the two differ on purpose.
+ */
+export function addRegisterValue(fork: LoroDoc, key: string, value: string, slot = 0): void {
+  // Any entry that ever held this value, active or superseded, means it was written already. A
+  // superseded one was replaced by a writer who saw it, so re-adding it (a replay, a stale copy)
+  // would let an older write come back above a newer one (review r9 LOW 1).
+  if (readKeyState(fork, key).reg.some((entry) => entry.value === value)) return
+  fork.getMap(fmName(key, "reg")).set(newTag(fork, value, slot), { v: value, s: [] })
+}
+
 export function clearKey(fork: LoroDoc, key: string, unseen: ReadonlySet<string>): void {
   const state = readKeyState(fork, key)
   deleteSeenElements(fork, key, state, unseen)

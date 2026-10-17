@@ -10,7 +10,21 @@ export interface GitExecOptions {
   stdin?: string | Buffer
   /** Stops the git process (SIGTERM, so git removes its own lock and temp files) and rejects. */
   signal?: AbortSignal
+  /** After a timeout's SIGTERM, how long git gets to exit before SIGKILL (default GIT_KILL_GRACE_MS). */
+  killGraceMs?: number
+  /** After git exits normally, how long to wait for its pipes to close (default GIT_EXIT_DRAIN_MS). */
+  exitDrainMs?: number
 }
+
+// A timed-out git first gets SIGTERM, on which it removes its own lock and temp files; SIGKILL
+// follows only if it is still running after this grace. Killing outright stranded a HEAD.lock
+// when a slow `git commit` was killed right after updating HEAD (omo #10199 field incident).
+export const GIT_KILL_GRACE_MS = 10_000
+
+// A hook's background child can inherit git's stdout/stderr and hold them open long after git has
+// exited, so `close` may never come while it lives. Git's own output is written before it exits;
+// this bounded drain only catches the last buffered chunks (omo #10199 review LOW 1).
+export const GIT_EXIT_DRAIN_MS = 2_000
 
 export interface GitExecResult {
   code: number
@@ -95,10 +109,13 @@ function runGitCommand(
     const stderr: Buffer[] = []
     let settled = false
     let timedOut = false
+    let exitDrain: ReturnType<typeof setTimeout> | undefined
 
+    let killTimer: ReturnType<typeof setTimeout> | undefined
     const timer = setTimeout(() => {
       timedOut = true
-      child.kill("SIGKILL")
+      child.kill("SIGTERM")
+      killTimer = setTimeout(() => child.kill("SIGKILL"), options.killGraceMs ?? GIT_KILL_GRACE_MS)
     }, options.timeoutMs)
     let aborted = false
     const onAbort = () => {
@@ -115,6 +132,8 @@ function runGitCommand(
       if (settled) return
       settled = true
       clearTimeout(timer)
+      clearTimeout(killTimer)
+      clearTimeout(exitDrain)
       options.signal?.removeEventListener("abort", onAbort)
       if (error.code === "ENOENT") {
         // spawn reports ENOENT for a missing cwd as much as for a missing git binary. A fresh
@@ -133,10 +152,12 @@ function runGitCommand(
         reject(new GitNotFoundError({ cause: error }))
       } else reject(error)
     })
-    child.on("close", (code) => {
+    const settleWithResult = (code: number | null) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      clearTimeout(killTimer)
+      clearTimeout(exitDrain)
       options.signal?.removeEventListener("abort", onAbort)
       if (aborted) {
         reject(new GitAbortedError(argv))
@@ -153,7 +174,29 @@ function runGitCommand(
         stderr: Buffer.concat(stderr).toString("utf8"),
         stdoutBytes,
       })
+    }
+    // Git has exited even while a hook it started still holds its stdout/stderr open, so `close`
+    // may never come. A stopped git (timeout or abort) settles at once; a git that finished
+    // normally settles on `close`, or with what it wrote once the bounded drain runs out.
+    child.on("exit", (code) => {
+      if (settled) return
+      if (timedOut || aborted) {
+        settled = true
+        clearTimeout(timer)
+        clearTimeout(killTimer)
+        options.signal?.removeEventListener("abort", onAbort)
+        reject(aborted ? new GitAbortedError(argv) : new GitTimeoutError(argv, options.timeoutMs))
+        return
+      }
+      clearTimeout(timer)
+      exitDrain = setTimeout(() => {
+        // Still open past the drain: a hook child holds them. Destroy them so it cannot keep us.
+        child.stdout!.destroy()
+        child.stderr!.destroy()
+        settleWithResult(code)
+      }, options.exitDrainMs ?? GIT_EXIT_DRAIN_MS)
     })
+    child.on("close", (code) => settleWithResult(code))
   })
 }
 

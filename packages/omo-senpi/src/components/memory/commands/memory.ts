@@ -7,6 +7,8 @@
 import { parseMemoryFile, type GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../../extension/types"
+import { parseCommandArgs } from "./args"
+import { runMemoryUnlock } from "./memory-unlock"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
 
@@ -47,11 +49,19 @@ function renderNameSection(title: string, paths: readonly string[]): string[] {
 
 export function registerMemoryCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
   pi.registerCommand("memory", {
-    description: "View committed memory: HEAD, system bodies, external names, and uncommitted changes.",
-    argumentHint: "",
-    handler: async (_args: string, ctx: MemoryCommandContext): Promise<string> => {
+    description: "View committed memory: HEAD, system bodies, external names, and uncommitted changes; unlock re-checks and removes a stranded git lock.",
+    argumentHint: "[unlock <lock path> [--force]]",
+    handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
+
+      const parsed = parseCommandArgs(args, { booleans: ["force"] })
+      if (parsed.positionals[0] === "unlock") {
+        return runMemoryUnlock(ctx, identity, parsed.positionals.slice(1).join(" "), parsed.flags.get("force") === true)
+      }
+      if (parsed.positionals.length > 0) {
+        return respond(ctx, `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory or /memory unlock <lock path>`, "error")
+      }
 
       if (!hasGitRepo(identity)) {
         return respond(
