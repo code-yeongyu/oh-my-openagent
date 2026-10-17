@@ -7,6 +7,7 @@ import { createFallbackState, isModelInCooldown, stringifyRuntimeModelWithVarian
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { isRuntimeFallbackRetryTextParts } from "../../shared"
 
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
@@ -70,22 +71,41 @@ export function createChatMessageHandler(deps: HookDeps) {
 
     const { sessionID } = input
     let state = sessionStates.get(sessionID)
-
-    if (!state) return
-
-    sessionLastAccess.set(sessionID, Date.now())
-
     const requestedModel = stringifyRuntimeModelWithVariant(
       input.model,
       output.message.variant ?? input.variant,
     )
 
-    if (requestedModel && state.pendingFallbackModel === requestedModel) {
+    if (!state) {
+      if (!requestedModel) return
+      state = createFallbackState(requestedModel)
+      sessionStates.set(sessionID, state)
+    }
+
+    sessionLastAccess.set(sessionID, Date.now())
+
+    if (
+      requestedModel
+      && state.pendingFallbackModel === requestedModel
+      && isRuntimeFallbackRetryTextParts(output.parts)
+    ) {
       state.pendingFallbackModel = undefined
       state.pendingFallbackPromptMayHaveBeenAccepted = false
       clearModelLessRetryKeys(sessionID)
       return
     }
+
+    clearFallbackWatchdog(sessionID)
+    sessionRetryInFlight.delete(sessionID)
+    sessionStatusRetryKeys.delete(sessionID)
+    state.pendingFallbackModel = undefined
+    state.pendingFallbackPromptMayHaveBeenAccepted = false
+
+    state = {
+      ...state,
+      failedModels: new Map(state.failedModels),
+    }
+    sessionStates.set(sessionID, state)
 
     if (requestedModel && requestedModel !== state.currentModel) {
       log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
