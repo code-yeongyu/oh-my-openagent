@@ -62,6 +62,8 @@ function fixtureEnv(fixture: Fixture, env: Record<string, string> = {}): NodeJS.
   delete inherited.OMO_CODING_AGENT_DIR
   delete inherited.SENPI_CODING_AGENT_DIR
   delete inherited.PI_CODING_AGENT_DIR
+  delete inherited.NODE
+  delete inherited.npm_node_execpath
   return { ...inherited, ...env }
 }
 
@@ -344,6 +346,36 @@ describe("bun launcher bin shim", () => {
       // then
       expect(result.action).toBe("skipped-no-bun")
       expect(fs.written).toHaveLength(0)
+    })
+
+    test("#then fixtureEnv strips inherited NODE and npm_node_execpath (#10419)", () => {
+      // given
+      const fakeFixture: Fixture = {
+        root: "/tmp/fake",
+        bunInstall: "/tmp/fake/bun",
+        packageRoot: "/tmp/fake/pkg",
+        launcher: "/tmp/fake/pkg/bin/omo.js",
+        binPath: "/tmp/fake/bin/omo",
+        bunBinary: "/tmp/fake/bin/bun",
+        captureFile: "/tmp/fake/cap.json",
+        markerFile: "/tmp/fake/marker",
+      }
+      const originalNode = process.env.NODE
+      const originalNpmNode = process.env.npm_node_execpath
+      try {
+        process.env.NODE = "/stray/node"
+        process.env.npm_node_execpath = "/stray/node"
+        // when
+        const env = fixtureEnv(fakeFixture)
+        // then
+        expect(env.NODE).toBeUndefined()
+        expect(env.npm_node_execpath).toBeUndefined()
+      } finally {
+        if (originalNode !== undefined) process.env.NODE = originalNode
+        else delete process.env.NODE
+        if (originalNpmNode !== undefined) process.env.npm_node_execpath = originalNpmNode
+        else delete process.env.npm_node_execpath
+      }
     })
   })
 
