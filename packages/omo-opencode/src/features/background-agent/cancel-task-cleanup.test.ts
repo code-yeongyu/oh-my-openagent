@@ -135,6 +135,7 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     // then
     expect(cancelled).toBe(false)
     expect(task.status).toBe("running")
+    expect(task.cancellationRequested).toBeUndefined()
     expect(getTaskMap(manager).get(task.id)).toBe(task)
     expect(getPendingByParent(manager).get(task.parentSessionId)).toEqual(new Set([task.id]))
   })
@@ -219,5 +220,213 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     expect(cancelled).toBe(true)
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(1)
     expect(manager.getTask(pendingTask.id)?.status).toBe("running")
+  })
+
+  test("#given cancellation is waiting for session abort #when session.idle arrives #then idle does not complete or re-abort the task", async () => {
+    let resolveAbort: (() => void) | undefined
+    let abortStarted: (() => void) | undefined
+    const abortPending = new Promise<void>((resolve) => { resolveAbort = resolve })
+    const abortStartedPromise = new Promise<void>((resolve) => { abortStarted = resolve })
+    let abortCalls = 0
+    const manager = createBackgroundManager(undefined, async () => {
+      abortCalls += 1
+      abortStarted?.()
+      await abortPending
+      return { data: true }
+    })
+    const task = createMockTask({
+      id: "task-cancel-idle-race",
+      parentSessionId: "parent-session-cancel-idle-race",
+      sessionId: "session-cancel-idle-race",
+    })
+
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+    Reflect.set(manager, "validateSessionHasOutput", async () => true)
+    Reflect.set(manager, "checkSessionTodos", async () => false)
+    let fallbackCalls = 0
+    Reflect.set(manager, "tryFallbackRetry", async () => {
+      fallbackCalls += 1
+      return true
+    })
+
+    const cancellation = manager.cancelTask(task.id, {
+      skipNotification: true,
+      source: "test",
+    })
+    await abortStartedPromise
+    manager.handleEvent({
+      type: "session.idle",
+      properties: { sessionID: task.sessionId },
+    })
+    manager.handleEvent({
+      type: "message.updated",
+      properties: {
+        info: {
+          sessionID: task.sessionId,
+          role: "assistant",
+          error: { name: "MessageAbortedError", message: "Aborted" },
+        },
+      },
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(task.status).toBe("running")
+    expect(task.cancellationRequested).toBe(true)
+    expect(abortCalls).toBe(1)
+    expect(fallbackCalls).toBe(0)
+
+    resolveAbort?.()
+    expect(await cancellation).toBe(true)
+    expect(task.status).toBe("cancelled")
+    expect(abortCalls).toBe(1)
+  })
+
+  test("#given cancellation is already in flight #when cancelTask is called again #then only the first request aborts and finalizes", async () => {
+    let resolveAbort: (() => void) | undefined
+    let abortStarted: (() => void) | undefined
+    const abortPending = new Promise<void>((resolve) => { resolveAbort = resolve })
+    const abortStartedPromise = new Promise<void>((resolve) => { abortStarted = resolve })
+    let abortCalls = 0
+    const manager = createBackgroundManager(undefined, async () => {
+      abortCalls += 1
+      abortStarted?.()
+      await abortPending
+      return { data: true }
+    })
+    const task = createMockTask({
+      id: "task-concurrent-cancel",
+      parentSessionId: "parent-session-concurrent-cancel",
+      sessionId: "session-concurrent-cancel",
+    })
+
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    const firstCancellation = manager.cancelTask(task.id, { skipNotification: true, source: "first" })
+    await abortStartedPromise
+    const secondCancellation = manager.cancelTask(task.id, { skipNotification: true, source: "second" })
+
+    expect(await secondCancellation).toBe(false)
+    expect(abortCalls).toBe(1)
+
+    resolveAbort?.()
+    expect(await firstCancellation).toBe(true)
+    expect(task.status).toBe("cancelled")
+  })
+
+  test("#given cancellation abort fails while idle is suppressed #when abort failure completes #then the idle event is replayed", async () => {
+    let rejectAbort: (() => void) | undefined
+    let abortStarted: (() => void) | undefined
+    const abortPending = new Promise<void>((_, reject) => { rejectAbort = () => reject(new Error("abort failed")) })
+    const abortStartedPromise = new Promise<void>((resolve) => { abortStarted = resolve })
+    let abortCalls = 0
+    const manager = createBackgroundManager(undefined, async () => {
+      abortCalls += 1
+      if (abortCalls === 1) {
+        abortStarted?.()
+        await abortPending
+      }
+      return { data: true }
+    })
+    const task = createMockTask({
+      id: "task-replay-idle-after-abort-failure",
+      parentSessionId: "parent-session-replay-idle",
+      sessionId: "session-replay-idle",
+      startedAt: new Date(Date.now() - 10_000),
+    })
+
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+    Reflect.set(manager, "validateSessionHasOutput", async () => true)
+    Reflect.set(manager, "checkSessionTodos", async () => false)
+
+    const cancellation = manager.cancelTask(task.id, { skipNotification: true, source: "test" })
+    await abortStartedPromise
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: task.sessionId } })
+    rejectAbort?.()
+
+    expect(await cancellation).toBe(false)
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(task.status).toBe("completed")
+    expect(abortCalls).toBe(2)
+  })
+
+  test("#given cancellation abort fails while assistant error is suppressed #when abort failure completes #then the assistant error is replayed", async () => {
+    let rejectAbort: (() => void) | undefined
+    let abortStarted: (() => void) | undefined
+    const abortPending = new Promise<void>((_, reject) => { rejectAbort = () => reject(new Error("abort failed")) })
+    const abortStartedPromise = new Promise<void>((resolve) => { abortStarted = resolve })
+    let fallbackCalls = 0
+    const manager = createBackgroundManager(undefined, async () => {
+      abortStarted?.()
+      await abortPending
+      return { data: true }
+    })
+    const task = createMockTask({
+      id: "task-replay-assistant-error-after-abort-failure",
+      parentSessionId: "parent-session-replay-assistant-error",
+      sessionId: "session-replay-assistant-error",
+    })
+
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+    Reflect.set(manager, "tryFallbackRetry", async () => {
+      fallbackCalls += 1
+      return true
+    })
+
+    const cancellation = manager.cancelTask(task.id, { skipNotification: true, source: "test" })
+    await abortStartedPromise
+    manager.handleEvent({
+      type: "message.updated",
+      properties: {
+        info: { sessionID: task.sessionId, role: "assistant", error: { name: "Retryable", message: "temporary" } },
+      },
+    })
+    rejectAbort?.()
+
+    expect(await cancellation).toBe(false)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(fallbackCalls).toBe(1)
+  })
+
+  test("#given cancellation abort fails while session error is suppressed #when abort failure completes #then the session error is replayed", async () => {
+    let rejectAbort: (() => void) | undefined
+    let abortStarted: (() => void) | undefined
+    const abortPending = new Promise<void>((_, reject) => { rejectAbort = () => reject(new Error("abort failed")) })
+    const abortStartedPromise = new Promise<void>((resolve) => { abortStarted = resolve })
+    const manager = createBackgroundManager(undefined, async () => {
+      abortStarted?.()
+      await abortPending
+      return { data: true }
+    })
+    const task = createMockTask({
+      id: "task-replay-session-error-after-abort-failure",
+      parentSessionId: "parent-session-replay-session-error",
+      sessionId: "session-replay-session-error",
+    })
+
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+    Reflect.set(manager, "verifySessionExists", async () => false)
+
+    const cancellation = manager.cancelTask(task.id, { skipNotification: true, source: "test" })
+    await abortStartedPromise
+    manager.handleEvent({
+      type: "session.error",
+      properties: { sessionID: task.sessionId, error: { name: "MessageAbortedError", message: "Aborted" } },
+    })
+    rejectAbort?.()
+
+    expect(await cancellation).toBe(false)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(task.status).toBe("error")
+    expect(task.error).toBe("Aborted")
   })
 })
