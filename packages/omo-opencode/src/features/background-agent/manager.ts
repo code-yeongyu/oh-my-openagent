@@ -44,6 +44,7 @@ import {
   getCurrentAttempt,
   startAttempt,
 } from "./attempt-lifecycle"
+import { formatBackgroundNotificationError } from "./background-notification-error"
 import {
   type BackgroundTaskNotificationTask,
   buildBackgroundTaskNotificationText,
@@ -887,7 +888,7 @@ export class BackgroundManager {
         : ""
       const failedError = previousAttempt?.error ?? task.retryNotification.failedError
       const failedErrorLine = failedError
-        ? `\n- Error: ${failedError}`
+        ? `\n- Error: ${formatBackgroundNotificationError(failedError)}`
         : ""
       const retryModel = formatAttemptModelSummary(boundAttempt) ?? task.retryNotification.nextModel
       const parentPromptContext = await this.resolveParentWakePromptContext(task)
@@ -2286,7 +2287,9 @@ The fallback retry session is now created and can be inspected directly.
         const failedSessionLine = previousAttempt?.sessionId ? `\n- Failed session: \`${previousAttempt.sessionId}\`` : ""
         const failedModel = formatAttemptModelSummary(previousAttempt)
         const failedModelLine = failedModel ? `\n- Failed model: \`${failedModel}\`` : ""
-        const failedErrorLine = previousAttempt?.error ? `\n- Error: ${previousAttempt.error}` : ""
+        const failedErrorLine = previousAttempt?.error
+          ? `\n- Error: ${formatBackgroundNotificationError(previousAttempt.error)}`
+          : ""
         const nextModel = formatAttemptModelSummary(currentAttempt)
         retryingNotification = `<system-reminder>
 [BACKGROUND TASK RETRYING]

@@ -31,6 +31,26 @@ afterEach(() => {
 })
 
 const TASK_TTL_MS = 30 * 60 * 1000
+const MAX_EMBEDDED_ERROR_LENGTH = 2_000
+const LARGE_PROVIDER_ERROR_LENGTH = 513_039
+const LARGE_PROVIDER_ERROR_TAIL = "[UNIQUE_PROVIDER_ERROR_TAIL]"
+const LARGE_PROVIDER_ERROR_MARKER = `[truncated from ${LARGE_PROVIDER_ERROR_LENGTH} characters]`
+
+function createLargeProviderError(): string {
+  const prefix = "Forbidden: Selected provider is forbidden. "
+  const paddingLength = LARGE_PROVIDER_ERROR_LENGTH - prefix.length - LARGE_PROVIDER_ERROR_TAIL.length
+  return `${prefix}${"x".repeat(paddingLength)}${LARGE_PROVIDER_ERROR_TAIL}`
+}
+
+function extractNotificationLineValue(notification: string, prefix: string): string {
+  const line = notification.split("\n").find((candidate) => candidate.startsWith(prefix))
+  if (!line) {
+    throw new Error(`Expected notification line starting with ${prefix}`)
+  }
+
+  return line.slice(prefix.length)
+}
+
 type PendingParentWakeForTest = {
   promptContext: Record<string, unknown>
   notifications: string[]
@@ -849,8 +869,9 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
 })
 
 describe("BackgroundManager retry observability", () => {
-  test("queues a parent-visible retry notification when fallback retry is scheduled", async () => {
+  test("queues a parent-visible retry notification with a bounded failed error when fallback retry is scheduled", async () => {
     //#given
+    const failedError = createLargeProviderError()
     const client = {
       session: {
         messages: async () => [
@@ -905,7 +926,7 @@ describe("BackgroundManager retry observability", () => {
       tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
     }>(manager)).tryFallbackRetry(task, {
       name: "APIError",
-      message: "Forbidden: Selected provider is forbidden",
+      message: failedError,
     }, "promptAsync.launch")
 
     //#then
@@ -929,6 +950,11 @@ describe("BackgroundManager retry observability", () => {
     expect(notification).toContain("ses_retry_visibility")
     expect(notification).toContain("genai-proxy-openai/gpt-5.6-luna-fast")
     expect(notification).toContain("anthropic/claude-haiku-4-5")
+    const renderedError = extractNotificationLineValue(notification, "- Error: ")
+    expect(renderedError.length).toBeLessThanOrEqual(MAX_EMBEDDED_ERROR_LENGTH)
+    expect(renderedError).toContain(LARGE_PROVIDER_ERROR_MARKER)
+    expect(renderedError).not.toContain(LARGE_PROVIDER_ERROR_TAIL)
+    expect(task.attempts?.[0]?.error).toBe(failedError)
   })
 
   test("falls back to task parent agent when retrying wake cannot load parent messages", async () => {
@@ -1048,8 +1074,9 @@ describe("BackgroundManager retry observability", () => {
     expect(retryingCall?.[2]).toEqual({})
   })
 
-  test("queues a second parent-visible notification once the retry session ID is created", async () => {
+  test("queues a second parent-visible notification with a bounded failed error once the retry session ID is created", async () => {
     //#given
+    const failedError = createLargeProviderError()
     const queuePendingParentWake = mock(() => {})
     const client = {
       session: {
@@ -1101,7 +1128,7 @@ describe("BackgroundManager retry observability", () => {
           providerId: "genai-proxy-openai",
           modelId: "gpt-5.6-luna-fast",
           status: "error",
-          error: "Forbidden: Selected provider is forbidden",
+          error: failedError,
         },
         {
           attemptId: "att_retry_ready",
@@ -1158,7 +1185,11 @@ describe("BackgroundManager retry observability", () => {
     expect(retryReadyNotification).toContain(expectedRetryLink)
     expect(retryReadyNotification).toContain("ses_retry_visibility")
     expect(retryReadyNotification).toContain("genai-proxy-openai/gpt-5.6-luna-fast")
-    expect(retryReadyNotification).toContain("Forbidden: Selected provider is forbidden")
+    const renderedError = extractNotificationLineValue(retryReadyNotification ?? "", "- Error: ")
+    expect(renderedError.length).toBeLessThanOrEqual(MAX_EMBEDDED_ERROR_LENGTH)
+    expect(renderedError).toContain(LARGE_PROVIDER_ERROR_MARKER)
+    expect(renderedError).not.toContain(LARGE_PROVIDER_ERROR_TAIL)
+    expect(task.attempts?.[0]?.error).toBe(failedError)
   })
 
   test("builds retry-ready links from the parent session directory when it differs from the manager directory", async () => {
