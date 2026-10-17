@@ -2,9 +2,11 @@ import { readFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import { StrandedGitLockError } from "../git/repo-lock-sweep"
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import type { LockDomain } from "../locks"
 import type { MemoryToolProvenance } from "./memory"
+import { undoBehindKeptLock } from "./rollback-behind-lock"
 import { MemoryToolError } from "./tool-errors"
 
 export interface CommitMemoryWriteOptions {
@@ -46,6 +48,7 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
         await repo.restorePaths(paths)
         throw new MemoryToolError(error.message, { cause: error })
       }
+      if (error instanceof StrandedGitLockError) return undoBehindKeptLock(repo, paths, error)
       throw error
     }
     const shortSha = result.sha.slice(0, 7)

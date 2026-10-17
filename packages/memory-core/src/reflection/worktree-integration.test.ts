@@ -4,6 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec } from "../git"
+import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import { validateCompletion } from "./completion-validation"
 import {
   cleanupReflectionWorktree,
@@ -46,6 +47,37 @@ afterEach(async () => {
 })
 
 describe("reflection worktree integration", () => {
+  it("#given a validated tip #when auto integration merges #then the merge runs with auto-maintenance disabled", async () => {
+    // omo #10199 review MEDIUM 3: the integration merge must carry the same NO_AUTO_MAINTENANCE
+    // flags as the repo's commit path; the injected exec captures the exact argv boundary call.
+    const { worktree } = await fixture()
+    await commit(worktree, "learned.md", "learned\n")
+    const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+    expect(validation.status).toBe("valid")
+    if (validation.status !== "valid") throw new Error("expected valid reflection")
+    const seen: string[][] = []
+    const capture = {
+      run: async (argv: readonly string[], options: Parameters<typeof exec.run>[1]) => {
+        seen.push([...argv])
+        return exec.run(argv, options)
+      },
+    }
+
+    const result = await integrateValidatedReflection(
+      { ...worktree, exec: capture },
+      { mode: "auto", runId: "run-123", summary: "learned facts", validated: validation, withWriterLock: unlocked },
+    )
+
+    expect(result.outcome).toBe("merged")
+    const merges = seen.filter((argv) => argv.includes("merge"))
+    expect(merges).not.toHaveLength(0)
+    for (const argv of merges) {
+      for (let flag = 0; flag < NO_AUTO_MAINTENANCE.length; flag += 1) {
+        expect(argv[flag]).toBe(NO_AUTO_MAINTENANCE[flag])
+      }
+    }
+  })
+
   it("#given a validated tip #when auto integration lands #then it creates a no-ff receipt without cleaning resources", async () => {
     const { parentDir, worktree } = await fixture()
     await commit(worktree, "learned.md", "learned\n")

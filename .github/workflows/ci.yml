@@ -225,10 +225,39 @@ jobs:
       # `bun test --parallel` is not used on POSIX: --isolate re-runs the heavy
       # preload per file and OOM-kills the 7 GB runners, and --no-isolate leaks
       # module state between files. Job-level sharding is the parallelism.
+      # Linux: memory-core's stranded-git-lock tests read the host process table. On hosted runners
+      # same-uid processes of other sessions cannot be inspected, so on Linux memory-core runs in an
+      # unprivileged PID namespace, and the step fails loudly when no namespace can be made instead
+      # of falling back to the host table (omo #10199). Even inside it, the user's own LIVE git
+      # processes return EACCES on /proc/<pid>/fd (this runner's azure 7.0 kernel, and Boat alike),
+      # so the 7 rows that need the scan to answer are skipped here via
+      # OMO_CI_SAME_UID_GIT_UNINSPECTABLE. Behavior stays fail-closed (an unanswerable scan keeps
+      # the lock). Coverage for those rows is macOS CI (and macOS hosts) until kernel-lock liveness
+      # lands; running them on Linux CI is #10322's acceptance criterion:
+      # https://github.com/code-yeongyu/oh-my-openagent/issues/10322
       - name: Run tests
         id: root-tests-posix-1
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: bun test --timeout 20000 packages/omo-opencode packages/memory-core
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" != "Linux" ]; then
+            bun test --timeout 20000 packages/omo-opencode packages/memory-core
+            exit 0
+          fi
+          bun test --timeout 20000 packages/omo-opencode
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if ! procs="$(unshare -Upf --mount-proc --map-current-user -- sh -c 'ls /proc | grep -c "^[0-9]"')"; then
+            echo "::error::cannot create an unprivileged PID namespace; memory-core's lock tests must not fall back to the host process table (omo #10199)"
+            exit 1
+          fi
+          if [ "$procs" -gt 8 ]; then
+            echo "::error::the PID namespace sees $procs processes, so it is not isolated from the host (omo #10199)"
+            exit 1
+          fi
+          echo "PID namespace ready ($procs processes visible)"
+          unshare -Upf --mount-proc --map-current-user -- env CI=1 OMO_CI_SAME_UID_GIT_UNINSPECTABLE=1 bun test --timeout 20000 packages/memory-core
 
       - name: Run tests with Windows telemetry
         id: root-tests-windows-1

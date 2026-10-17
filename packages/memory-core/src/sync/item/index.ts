@@ -1,3 +1,5 @@
+export { activeRegisters } from "./adopt-values"
+export type { RegisterValue } from "./adopt-values"
 export { CaptureBaselineError } from "./capture"
 export { caseFold } from "./casefold"
 export { createDeviceItemDoc, openItemDevice } from "./device"

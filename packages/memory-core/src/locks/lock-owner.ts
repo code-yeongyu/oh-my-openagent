@@ -3,6 +3,7 @@ import path from "node:path"
 
 import type { LockRecord } from "./lock-record"
 import { parseLockRecord } from "./lock-record"
+import { forgetProvenDeadTakeover } from "./proven-dead-takeovers"
 
 export type OwnerSnapshot = {
   readonly raw: string
@@ -41,6 +42,7 @@ export function isSameOwner(left: OwnerSnapshot, right: OwnerSnapshot): boolean 
 }
 
 export async function releaseLock(lockPath: string, record: Pick<LockRecord, "nonce">): Promise<boolean> {
+  forgetProvenDeadTakeover(lockPath, record.nonce)
   const owner = await readOwner(lockPath)
   if (owner === null || owner.record?.nonce !== record.nonce) return false
   try {
