@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**`desktop.window` and `desktop.windows` support filtering by window id and reject unknown filter keys.** `WindowFilter` accepts `id?: string` to match windows by their exact window id. Filter objects that specify keys other than `id`, `title` or `owner` now fail with an assertion error instead of matching all windows. ([#10418](https://github.com/code-yeongyu/oh-my-openagent/pull/10418), [#10409](https://github.com/code-yeongyu/oh-my-openagent/issues/10409))
+
 **The engine publishes its OpenTelemetry schema artifact.** `telemetry-schema.json` describes exactly what an OTel client of the engine may send, generated from the event schemas and kept byte-exact by a drift gate, so the telemetry collector can pin and enforce it. It is separate from the anonymous PostHog events, which are unchanged ([#10980](https://github.com/code-yeongyu/oh-my-openagent/pull/10980)).
 
 **Reading the end of a long session takes 42 ms and 68 MB instead of 40 s and 1.8 GB.** `session_read`, `session_search` and `session_info` page through OpenCode's message API instead of loading the whole session: on a 23,000-message session, `session_read` with `limit: 2, from_end: true` dropped from 39.6 s and 1,848 MB peak memory to 42 ms and 68 MB, and a search that runs out its 60-second timeout now stops reading when it returns, where it used to read another 228 MB in the background ([#10738](https://github.com/code-yeongyu/oh-my-openagent/issues/10738), [#10741](https://github.com/code-yeongyu/oh-my-openagent/pull/10741)).
