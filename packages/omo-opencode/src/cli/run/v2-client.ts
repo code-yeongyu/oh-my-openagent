@@ -1,12 +1,13 @@
 import { readFileSync, existsSync } from "node:fs"
 
 import { toV1Event } from "../../v2/event-shape"
+import { filesFromPrompt, type PromptFile } from "../../v2/session-actions"
 
 export type V2RunTransport = {
   switchAgent: (input: { sessionID: string; agent: string }) => Promise<void>
   switchModel: (input: { sessionID: string; model: { id: string; providerID: string; variant?: string } }) => Promise<void>
   synthetic: (input: { sessionID: string; text: string }) => Promise<void>
-  prompt: (input: { sessionID: string; text: string; delivery?: "steer" | "queue" }) => Promise<unknown>
+  prompt: (input: { sessionID: string; text: string; delivery?: "steer" | "queue"; files?: PromptFile[] }) => Promise<unknown>
   listSessions: () => Promise<Array<Record<string, unknown>>>
   active: () => Promise<Record<string, { type: string }>>
   events: () => AsyncIterable<unknown>
@@ -70,7 +71,8 @@ async function send(transport: V2RunTransport, input: unknown): Promise<{ data: 
   }
   if (typeof body.system === "string" && body.system.length > 0) await transport.synthetic({ sessionID, text: body.system })
   const delivery = body.delivery === "steer" || body.delivery === "queue" ? body.delivery : undefined
-  return { data: await transport.prompt({ sessionID, text: textFrom(body), ...(delivery ? { delivery } : {}) }) }
+  const files = filesFromPrompt(body)
+  return { data: await transport.prompt({ sessionID, text: textFrom(body), ...(delivery ? { delivery } : {}), ...(files.length > 0 ? { files } : {}) }) }
 }
 
 export function createV2RunClient(input: {
@@ -191,7 +193,11 @@ export function httpTransport(baseUrl: string, fetchImpl: typeof fetch = fetch):
     switchAgent: (value) => call(`/api/session/${value.sessionID}/agent`, "POST", { agent: value.agent }).then(() => undefined),
     switchModel: (value) => call(`/api/session/${value.sessionID}/model`, "POST", { model: value.model }).then(() => undefined),
     synthetic: (value) => call(`/api/session/${value.sessionID}/synthetic`, "POST", { text: value.text }).then(() => undefined),
-    prompt: (value) => call(`/api/session/${value.sessionID}/prompt`, "POST", { text: value.text, ...(value.delivery ? { delivery: value.delivery } : {}) }),
+    prompt: (value) => call(`/api/session/${value.sessionID}/prompt`, "POST", {
+      text: value.text,
+      ...(value.delivery ? { delivery: value.delivery } : {}),
+      ...(value.files && value.files.length > 0 ? { files: value.files } : {}),
+    }),
     async listSessions() {
       const body = await call("/api/session", "GET")
       return isRecord(body) && Array.isArray(body.data) ? body.data.filter(isRecord) : []

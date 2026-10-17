@@ -4,6 +4,7 @@ import { storedMessagesToV1 } from "./message-shape"
 import type { AdapterState } from "./adapter-state"
 import { SessionHttpError } from "./serve-http"
 import { AGENT_RECOVERY_PROMPT } from "../hooks/compaction-context-injector/constants"
+import { log } from "../shared/logger"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -29,6 +30,33 @@ function textFromPrompt(input: unknown): string {
     .map((part) => (isRecord(part) && part.type === "text" && typeof part.text === "string" ? part.text : ""))
     .filter((text) => text.length > 0)
     .join("\n")
+}
+
+export type PromptFile = { uri: string; name?: string; description?: string }
+
+// V1 callers (look_at, delegate-task) attach images and documents as `{ type: "file", url, filename }` parts.
+// V2 takes them as `files: [{ uri, name }]` and materializes `file:` and `data:` URIs at prompt admission.
+export function filesFromPrompt(input: unknown): PromptFile[] {
+  const body = bodyOf(input)
+  const files: PromptFile[] = []
+  const add = (uri: unknown, name: unknown, description?: unknown) => {
+    if (typeof uri !== "string" || uri.length === 0) return
+    files.push({
+      uri,
+      ...(typeof name === "string" && name.length > 0 ? { name } : {}),
+      ...(typeof description === "string" && description.length > 0 ? { description } : {}),
+    })
+  }
+  if (Array.isArray(body.files)) {
+    for (const file of body.files) if (isRecord(file)) add(file.uri, file.name, file.description)
+  }
+  if (Array.isArray(body.parts)) {
+    for (const part of body.parts) {
+      if (!isRecord(part) || part.type !== "file") continue
+      add(typeof part.url === "string" ? part.url : part.uri, typeof part.filename === "string" ? part.filename : part.name)
+    }
+  }
+  return files
 }
 
 function promptDelivery(input: unknown): "steer" | "queue" | undefined {
@@ -65,7 +93,7 @@ function toolDenies(value: unknown): Array<{ action: string; resource: string; e
 type SessionApi = {
   get: (input: { sessionID: string }) => Promise<Record<string, unknown>>
   context: (input: { sessionID: string }) => Promise<unknown>
-  prompt: (input: { sessionID: string; text: string; delivery?: "steer" | "queue" }) => Promise<unknown>
+  prompt: (input: { sessionID: string; text: string; delivery?: "steer" | "queue"; files?: PromptFile[] }) => Promise<unknown>
   create: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
   interrupt: (input: { sessionID: string }) => Promise<unknown>
   switchAgent: (input: { sessionID: string; agent: string }) => Promise<unknown>
@@ -153,16 +181,19 @@ export async function sendPrompt(api: SessionApi, input: unknown): Promise<unkno
   const denies = toolDenies(body.tools)
   if (denies.length > 0) await api.update({ sessionID, permissions: denies })
   const text = textFromPrompt(input)
+  const files = filesFromPrompt(input)
   if (body.noReply === true) {
     // V2 configuration is persistent control-plane state. The v1 recovery
     // sentinel is not a user request or context for the model/tool bridge.
     if (text.startsWith(AGENT_RECOVERY_PROMPT) && text.includes("<!-- OMO_INTERNAL_NOREPLY -->")) {
       return api.get({ sessionID })
     }
+    // Synthetic context has no attachment field; say so instead of losing the files silently.
+    if (files.length > 0) log("[oh-my-openagent] v2 noReply prompt cannot carry attachments; files not delivered", { sessionID, files: files.map((file) => file.name ?? file.uri.slice(0, 64)) })
     return api.synthetic({ sessionID, text, resume: false })
   }
   const delivery = promptDelivery(input)
-  return api.prompt({ sessionID, text, ...(delivery ? { delivery } : {}) })
+  return api.prompt({ sessionID, text, ...(delivery ? { delivery } : {}), ...(files.length > 0 ? { files } : {}) })
 }
 
 export async function readMessages(api: SessionApi, input: unknown): Promise<ReturnType<typeof storedMessagesToV1>> {
