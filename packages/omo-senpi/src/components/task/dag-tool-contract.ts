@@ -51,12 +51,13 @@ export type DagToolError = {
 }
 
 /** How the engine delivered a send: steered into a live turn, revived a resident child, or queued. */
-export type DagToolSendDelivery = "steer" | "revive" | "queued"
+export type DagToolSendDelivery = "steer" | "revive" | "queued" | "uncertain"
 
 export type DagToolSendOutcome = {
   readonly nodeId: string
   readonly taskId: string
   readonly delivery: DagToolSendDelivery
+  readonly effectId?: string
   readonly queuePosition?: number
 }
 
@@ -85,6 +86,7 @@ export type DagToolDetails =
       readonly node_id: string
       readonly task_id: string
       readonly delivery: DagToolSendDelivery
+      readonly effect_id?: string
       readonly queue_position?: number
     }
   | { readonly kind: "amended"; readonly run_id: string; readonly snapshot: DagRunSnapshot }

@@ -12,6 +12,7 @@ mod holds;
 mod keys;
 mod menu_key;
 mod post;
+mod release;
 
 #[cfg(test)]
 mod tests;
@@ -237,31 +238,6 @@ impl MacInput {
         }
     }
 
-    /// Posts the release of every key and button still held, through the route
-    /// it was pressed on, and reports the first failure without stopping.
-    pub(crate) fn release_all(&mut self) -> CoreResult<()> {
-        let mut first_error = None;
-        for key in self.held.take_keys() {
-            let release = keys::post_key(
-                &self.source,
-                &mut self.held,
-                key.code,
-                key.text.as_deref(),
-                false,
-                core_graphics::event::CGEventFlags::CGEventFlagNull,
-                key.route,
-            );
-            if let Err(error) = release {
-                first_error.get_or_insert(error);
-            }
-        }
-        for button in self.held.take_buttons() {
-            if let Err(error) = global::release_button(&self.source, &button) {
-                first_error.get_or_insert(error);
-            }
-        }
-        first_error.map_or(Ok(()), Err)
-    }
 }
 
 fn resolve_window(capture: &MacCapture, id: &str) -> CoreResult<DesktopWindow> {

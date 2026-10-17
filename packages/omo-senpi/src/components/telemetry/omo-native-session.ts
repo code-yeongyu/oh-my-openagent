@@ -2,7 +2,6 @@ import {
   createEventTelemetryClient,
   getDailyActiveCaptureState,
   getDefaultTelemetryOsProvider,
-  getTelemetryDistinctId,
   isTelemetryClientEnabled,
   type EventTelemetryClient,
   type EventTelemetrySetTimeout,
@@ -24,9 +23,9 @@ import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
+  getOmoNativeAttribution,
   getOmoNativeStateDir,
   hashSessionId,
-  withOmoNativeAttribution,
 } from "./product-identity"
 import { readOmoNativeInventory, type OmoNativeInventoryDiagnostic } from "./session-inventory"
 import { resolveSessionModelRegistry } from "./session-model-registry"
@@ -65,15 +64,16 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
         if (sessionClosed) return
         const env = options.env ?? process.env
         const product = createOmoNativeProductConfig()
-        if (!isTelemetryClientEnabled({ env, product }) || !configEnabled(options, eventCtx, env)) return
+        if (!isOmoNativeTelemetryEnabled(options, eventCtx, env)) return
 
         const osProvider = options.osProvider ?? getDefaultTelemetryOsProvider()
         const sessionId = extractSessionId(eventCtx) ?? "unknown"
+        const attribution = getOmoNativeAttribution({ env, now: options.now, osProvider })
         client = createEventTelemetryClient({
           diagnostics: options.diagnostics,
-          distinctId: getTelemetryDistinctId(product.machineIdPrefix, osProvider),
+          distinctId: attribution.install_hash,
           env,
-          product: withOmoNativeAttribution(product, { env }),
+          product: { ...product, additionalProperties: { ...product.additionalProperties, ...attribution } },
           propertyAllowlist: OMO_NATIVE_PROPERTY_ALLOWLISTS,
           schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
           setTimeoutFn: options.setTimeoutFn,
@@ -208,7 +208,20 @@ function readTimeZone(provider: (() => string) | undefined): string | undefined 
   }
 }
 
-function configEnabled(options: OmoNativeSessionOptions, eventCtx: unknown, env: TelemetryEnv): boolean {
+/** The one enablement decision: the env opt-out matrix plus the omo config gate for the event's cwd. */
+export function isOmoNativeTelemetryEnabled(
+  options: Pick<OmoNativeSessionOptions, "diagnostics" | "isConfigEnabled">,
+  eventCtx: unknown,
+  env: TelemetryEnv,
+): boolean {
+  return isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() }) && configEnabled(options, eventCtx, env)
+}
+
+function configEnabled(
+  options: Pick<OmoNativeSessionOptions, "diagnostics" | "isConfigEnabled">,
+  eventCtx: unknown,
+  env: TelemetryEnv,
+): boolean {
   const cwd = extractString(eventCtx, "cwd")
   if (options.isConfigEnabled !== undefined) return options.isConfigEnabled(cwd, env)
   try {

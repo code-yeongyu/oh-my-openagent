@@ -1,5 +1,3 @@
-import { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
-
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
 function shellQuoteForNestedCommand(value: string): string {
@@ -17,9 +15,28 @@ export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, dir
   return `${TMUX_COMMAND_SHELL} -c "opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
 }
 
+const PLACEHOLDER_DESCRIPTION_LIMIT = 2_000
+const PANE_TITLE_DESCRIPTION_LIMIT = 20
+
+function withoutNul(value: string): string {
+  return value.replaceAll("\0", "")
+}
+
+export function escapeTmuxFormat(value: string): string {
+  return value.replaceAll("#", "##")
+}
+
+export function buildSubagentPaneTitle(description: string): string {
+  const shown = withoutNul(description).slice(0, PANE_TITLE_DESCRIPTION_LIMIT)
+  return `omo-subagent-${escapeTmuxFormat(shown)}`
+}
+
 export function buildTmuxPlaceholderCommand(description: string): string {
-  const escapedDescription = shellEscapeForDoubleQuotedCommand(description)
-  return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' \\"OMO subagent pane ready: ${escapedDescription}\\" \\"Focus this pane to attach.\\"; while :; do sleep 86400; done"`
+  const clean = withoutNul(description)
+  const shown = clean.length > PLACEHOLDER_DESCRIPTION_LIMIT ? `${clean.slice(0, PLACEHOLDER_DESCRIPTION_LIMIT)}…` : clean
+  const banner = shellQuoteForNestedCommand(`OMO subagent pane ready: ${shown}`)
+  const hint = shellQuoteForNestedCommand("Focus this pane to attach.")
+  return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' ${banner} ${hint}; while :; do sleep 86400; done"`
 }
 
 export function buildPaneAuthEnvironmentArgs(): string[] {

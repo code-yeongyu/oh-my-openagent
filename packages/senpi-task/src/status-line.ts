@@ -1,5 +1,5 @@
 import { excerptRendererText, optionalRendererText } from "./renderer-text"
-import type { ResolvedModelRecord, TaskRunStats } from "./state"
+import type { EffectiveModelRecord, ResolvedModelRecord, TaskRunStats } from "./state"
 
 // One status row must survive next to a spinner, elapsed clock and the terminal edge, so the human
 // label is bounded here rather than at each call site.
@@ -16,6 +16,9 @@ export type StatusTargetInput = {
   readonly category?: string
   readonly agentType?: string
   readonly resolvedModel?: ResolvedModelRecord
+  // The live route from the child's model events (F12): wins over resolvedModel/model and adds
+  // the operator mark when someone other than omo switched it.
+  readonly effectiveModel?: EffectiveModelRecord
   // Raw model string used when no resolved model metadata exists (live/legacy tasks).
   readonly model?: string
   readonly fallbackCount?: number
@@ -64,10 +67,14 @@ export function formatTargetIdentity(input: Pick<StatusTargetInput, "category" |
 // is the only useful signal left.
 export function formatTargetWithModel(input: StatusTargetInput): string | undefined {
   const identity = formatTargetIdentity(input)
-  const model = formatStatusModel(input.resolvedModel) ?? optionalRendererText(input.model)
-  if (identity !== undefined) return model === undefined ? identity : `${identity}(${model})`
-  if (model !== undefined) return `model:${model}`
-  return undefined
+  const model = formatStatusModel(input.effectiveModel)
+    ?? formatStatusModel(input.resolvedModel)
+    ?? optionalRendererText(input.model)
+  const target = identity !== undefined
+    ? (model === undefined ? identity : `${identity}(${model})`)
+    : (model !== undefined ? `model:${model}` : undefined)
+  if (target === undefined) return undefined
+  return input.effectiveModel?.switched_by_operator === true ? `${target} (switched by operator)` : target
 }
 
 // WHERE it runs: the routing target plus the model actually resolved for it.
@@ -155,7 +162,9 @@ export function toolCountSuffix(toolCalls: number): string {
   return ` (${toolCalls} ${toolCalls === 1 ? "tool" : "tools"})`
 }
 
-function formatStatusModel(resolved: ResolvedModelRecord | undefined): string | undefined {
+function formatStatusModel(
+  resolved: Pick<ResolvedModelRecord, "provider" | "model_id" | "variant" | "reasoning_effort" | "reasoning"> | undefined,
+): string | undefined {
   if (resolved === undefined) return undefined
   const provider = optionalRendererText(resolved.provider)
   const modelId = optionalRendererText(resolved.model_id)

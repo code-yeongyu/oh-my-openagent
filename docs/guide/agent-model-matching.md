@@ -102,7 +102,7 @@ Delegation goes through the `task` tool. Four curated read-only agents have thei
 | `explore` | Fast codebase grep and pattern discovery | `kimi-for-coding-highspeed` (off) | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` -> `chatgpt-subscription\|openai/gpt-6-luna-fast (low)` -> `anthropic-subscription\|anthropic\|github-copilot/claude-haiku-5-5 (medium)` -> `deepseek/deepseek-flash (max)` -> `opencode-go\|bailian-coding-plan/qwen3.7-plus` -> `opencode-go/minimax-m2.7` |
 | `librarian` | Documentation and OSS code search | `kimi-for-coding-highspeed` (off) | Same chain as `explore`. |
 | `plan-consultant` | Pre-planning gap analysis for `/ulw-plan` | `claude-fable-5-1` (max) | `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` -> `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)` |
-| `plan-reviewer` | One-shot plan review against clarity, verification, and context criteria | `gpt-6-astra` (xhigh) | `chatgpt-subscription\|openai/gpt-6-astra (xhigh)` -> `github-copilot/gpt-6-astra (high)` -> `chatgpt-subscription\|openai\|opencode/gpt-6-astra (high)` -> `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> one lower rung listed in the source file -> `opencode-go/glm-5.2` |
+| `plan-reviewer` | One-shot plan review against clarity, verification, and context criteria | `gpt-6-astra` (xhigh) | `chatgpt-subscription\|openai/gpt-6-astra (xhigh)` -> `github-copilot/gpt-6-astra (high)` -> `chatgpt-subscription\|openai\|opencode/gpt-6-astra (high)` -> `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> two lower rungs listed in the source file -> `opencode-go/glm-5.2` |
 
 The utility rungs elided above are cheap fast models; read the source file for the exact list. They exist so the system degrades gracefully when you don't hold every subscription. If you have a paid tier connected, it's always preferred.
 
@@ -124,7 +124,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect`, `visual-engineering` and `artistry` categories, and of Daily · Heavy. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
+Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect` and `artistry` categories, the second rung of `visual-engineering` (behind Argon at low), and of Daily · Heavy. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
 
 ```jsonc
 {
@@ -147,7 +147,7 @@ When the main agent delegates implementation work, it doesn't pick a model name.
 | Category | Used for | Default | Chain |
 | --- | --- | --- | --- |
 | `architect` | Big-picture system design; proposes, doesn't implement (the architect consult lane) | `anthropic/claude-fable-5-1 (max)` | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` |
-| `visual-engineering` | Frontend, UI/UX, CSS, animation, design systems | `anthropic/claude-fable-5-1 (max)` | `claude-fable-5-1 (max)` -> `claude-opus-5-5 (max)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
+| `visual-engineering` | Frontend, UI/UX, CSS, animation, design systems | `google/gemini-4-argon (low)` | `google\|google-vertex\|opencode/gemini-4-argon (low)` -> `claude-fable-5-1 (max)` -> `claude-opus-5-5 (max)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)`; the Argon rung resolves once the engine catalog carries the model |
 | `ultrabrain` | Genuinely hard, logic-heavy tasks; goals only, no step-by-step | `chatgpt-subscription/gpt-6-astra (max)` | `gpt-6-astra (max)` across `chatgpt-subscription`, `openai`, `github-copilot`, `opencode` -> `gpt-5.6-sol (max)` across the same providers |
 | `deep-low` | Default deep lane: 3D graphics, computer use, browser use, backend, algorithms, multimodal work; decisions settled from evidence | `chatgpt-subscription/gpt-6.1-sol (medium)` | `chatgpt-subscription\|openai/gpt-6.1-sol (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol-fast (medium)` -> `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-5.6-sol (medium)` -> `chatgpt-subscription\|openai/gpt-5.6-sol-fast (medium)` |
 | `deep-high` | Escalation deep lane: a central decision evidence cannot settle | `chatgpt-subscription/gpt-6-astra (high)` | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (high)`, no fallback |
@@ -155,7 +155,7 @@ When the main agent delegates implementation work, it doesn't pick a model name.
 | `quick` | Trivial tasks: single-file changes, typos | `chatgpt-subscription/gpt-6-luna-fast (low)` | `chatgpt-subscription\|openai/gpt-6-luna-fast (low)` -> `claude-haiku-5-5 (medium)` -> `deepseek/deepseek-flash (off)` -> `qwen3.6-flash (low)` -> cheaper utility rungs -> `xai/grok-4.20-0309-non-reasoning` -> `zai\|zai-coding-cn/glm-5.3-flash (low)` -> `xiaomi/mimo-v2.6-flash (low)` |
 | `unspecified-low` | Doesn't fit elsewhere, low effort | `anthropic/claude-sonnet-5-5 (medium)` | `claude-sonnet-5-5 (medium)` -> `xiaomi\|opencode-go/mimo-v2.6-pro (max)` -> `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` -> `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` -> `gpt-5.6-sol (medium)` -> `claude-sonnet-5 (low)` -> `qwen3.8-max-preview (max)` -> `deepseek\|opencode-go/deepseek-v4-pro (max)` -> `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | `unspecified-high` | Doesn't fit elsewhere, high effort | `anthropic/claude-opus-5-5 (medium)` | `claude-opus-5-5 (medium)` -> `zai-coding-plan\|opencode-go/glm-5.3 (max)` -> `kimi-k3 (max)` |
-| `writing` | Documentation, prose, technical writing | `anthropic/claude-opus-5-5 (low)` | `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)`; unavailable when none of these is connected, with no fallback to another family |
+| `writing` | Documentation, prose, technical writing | `google/gemini-4-argon (low)` | `google\|google-vertex\|opencode/gemini-4-argon (low)` -> `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)`; unavailable when none of these is connected, with no fallback to another family |
 
 Every Claude rung is headed by `anthropic-subscription` and every GPT rung by `chatgpt-subscription`, so a subscription login always outranks an API key for the same model.
 
@@ -238,8 +238,8 @@ Because this is your own configuration, `deep-low` stays on the list even on a m
 - Main agent: Daily · Normal or Daily · Heavy for the generalist lanes; Geeky · Normal or Geeky · Heavy for the GPT lanes.
 - `plan-consultant`: any Claude-family model, Kimi K3, GLM 5.2 / 5.3.
 - `plan-reviewer`: GPT-6 Astra at xhigh or high; Claude Opus 5.5 at max as a communicative fallback.
-- `visual-engineering`, `artistry`: swap among Claude Fable 5.1, Claude Opus 5.5, and Kimi K3.
-- `writing`: Claude Opus 5.5 or Claude Opus 4.6.
+- `visual-engineering`: Argon at low, then Claude Fable 5.1, Claude Opus 5.5, and Kimi K3; `artistry`: swap among Claude Fable 5.1, Claude Opus 5.5, and Kimi K3.
+- `writing`: Argon at low, then Claude Opus 5.5 or Claude Opus 4.6.
 
 **Lower-confidence**, works but thinly validated:
 
