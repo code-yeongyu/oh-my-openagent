@@ -8,7 +8,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
 import { terminateRpcChild } from "../runners/rpc/terminate"
 import { createRpcManagedRunner } from "./runner"
-import { FakeRunner, cleanupProjects, launchSettled, makeManager } from "./__fixtures__/manager-fakes"
+import { FakeRunner, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
 
 // The same shape start-failure-security.test.ts uses: a cause carrying a credential, so any test that
 // persists free text fails loudly instead of leaking quietly.
@@ -99,7 +99,14 @@ describe("TaskManager start failure diagnostics", () => {
         return child
       },
     })
-    const { manager, store } = makeManager({ process: createRpcManagedRunner(rpcRunner) })
+    // The launch's own cleanup (a real taskkill on Windows) can outlast the default report window on a
+    // busy machine, which would report the task as still starting instead of the launch's outcome
+    // (#10344). Give the manager a window the launch can't miss so the test always takes the
+    // start_failed path.
+    const { manager, store } = makeManager({
+      process: createRpcManagedRunner(rpcRunner),
+      startReportWindowMs: 4_000,
+    })
 
     // when
     const result = await manager.start({
@@ -111,12 +118,7 @@ describe("TaskManager start failure diagnostics", () => {
     })
 
     // then
-    if (result.kind === "started") {
-      expect(result.starting).toBe(true)
-      await launchSettled(manager, result.task_id)
-    } else {
-      expect(result.kind).toBe("start_failed")
-    }
+    expect(result.kind).toBe("start_failed")
     const eventLog = readOnlyEventLog(store.stateDir)
     const event = JSON.parse(eventLog.trim().split("\n").at(-1) ?? "{}") as {
       type?: string
