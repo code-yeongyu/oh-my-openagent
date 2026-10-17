@@ -1,0 +1,113 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/agents/types.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'resolveClaudeThinkingBudget' not found in module '/home/viprix/projects/oom-wt-6387/packages/omo-opencode/src/agents/types.ts'.
+-------------------------------
+
+
+packages/omo-opencode/src/agents/sisyphus-junior/index.test.ts:
+237 |       // when
+238 |       const lowResult = createSisyphusJuniorAgentWithOverrides(lowOverride)
+239 |       const maxResult = createSisyphusJuniorAgentWithOverrides(maxOverride)
+240 | 
+241 |       // then
+242 |       expect(lowResult.thinking).toEqual({ type: "enabled", budgetTokens: 8192 })
+                                       ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  {
+-   "budgetTokens": 8192,
++   "budgetTokens": 32000,
+    "type": "enabled",
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6387/packages/omo-opencode/src/agents/sisyphus-junior/index.test.ts:242:34)
+(fail) createSisyphusJuniorAgentWithOverrides > reasoning configuration > #given Claude model with variant override #when agent is created #then scales thinking budget by variant [0.45ms]
+253 | 
+254 |       // when
+255 |       const result = createSisyphusJuniorAgentWithOverrides(override)
+256 | 
+257 |       // then
+258 |       expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 12345 })
+                                    ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  {
+-   "budgetTokens": 12345,
++   "budgetTokens": 32000,
+    "type": "enabled",
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6387/packages/omo-opencode/src/agents/sisyphus-junior/index.test.ts:258:31)
+(fail) createSisyphusJuniorAgentWithOverrides > reasoning configuration > #given Claude model with explicit thinking override #when agent is created #then keeps user budgetTokens [0.26ms]
+
+packages/omo-opencode/src/agents/builtin-agents/agent-overrides.test.ts:
+202 | 
+203 |       // when
+204 |       const result = applyOverrides(base, undefined, {})
+205 | 
+206 |       // then
+207 |       expect(readThinking(result)).toEqual({ type: "enabled", budgetTokens: 60000 })
+                                         ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  {
+-   "budgetTokens": 60000,
++   "budgetTokens": 32000,
+    "type": "enabled",
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6387/packages/omo-opencode/src/agents/builtin-agents/agent-overrides.test.ts:207:36)
+(fail) applyOverrides > #given a manual-path Claude thinking config > re-derives budgetTokens from the resolved variant [0.36ms]
+215 |       // when
+216 |       const lowResult = applyOverrides(lowBase, undefined, {})
+217 |       const maxResult = applyOverrides(maxBase, undefined, {})
+218 | 
+219 |       // then
+220 |       expect(readThinking(lowResult).budgetTokens).toBe(8192)
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: 8192
+Received: 32000
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6387/packages/omo-opencode/src/agents/builtin-agents/agent-overrides.test.ts:220:52)
+(fail) applyOverrides > #given a manual-path Claude thinking config > different variants produce different budgets [0.18ms]
+278 |       // when
+279 |       const result = applyOverrides(base, override, categories)
+280 | 
+281 |       // then
+282 |       expect(result.variant).toBe("medium")
+283 |       expect(readThinking(result)).toEqual({ type: "enabled", budgetTokens: 16000 })
+                                         ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  {
+-   "budgetTokens": 16000,
++   "budgetTokens": 32000,
+    "type": "enabled",
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6387/packages/omo-opencode/src/agents/builtin-agents/agent-overrides.test.ts:283:36)
+(fail) applyOverrides > #given a manual-path Claude thinking config > derives from the final variant when both category and direct reasoning are set [0.16ms]
+
+ 64 pass
+ 6 fail
+ 1 error
+ 99 expect() calls
+Ran 70 tests across 3 files. [1.97s]
