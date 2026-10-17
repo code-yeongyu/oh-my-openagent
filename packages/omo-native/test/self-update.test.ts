@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { channelPackageSpec, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
 
 // updateTarget reads the version of the install it is pointed at and falls back to this package's own
@@ -60,6 +62,7 @@ describe("updateTarget", () => {
         argv: ["npm", "i", "-g", SPEC],
       })
     })
+
   })
 })
 
@@ -154,11 +157,12 @@ describe("omo self-update", () => {
           log: () => {},
         })
         expect(code).toBe(0)
-        expect(spawned).toEqual([{
-          command: "npm",
-          args: ["i", "-g", SPEC],
-          env: { PATH: "/usr/bin" },
-        }])
+        expect(spawned).toHaveLength(1)
+        expect(spawned[0].command).toBe("npm")
+        expect(spawned[0].args).toEqual(["i", "-g", SPEC])
+        const { npm_config_logs_dir: logsDir, ...env } = spawned[0].env
+        expect(env).toEqual({ PATH: "/usr/bin" })
+        expect(logsDir?.startsWith(join(tmpdir(), "omo-npm-logs-"))).toBe(true)
       })
     })
 
