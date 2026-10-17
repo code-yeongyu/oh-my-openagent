@@ -76,7 +76,8 @@ export interface SenpiExtensionAPI {
   /** Feature-detected: senpi runtimes before 2026.10.7 have no eval-handle capability slot. */
   provideEvalHandleHost?(host: EvalHandleHost): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
-  appendEntry?(customType: string, data?: unknown): void
+  /** `options.startupBookkeeping` (senpi#3329): older hosts ignore the third argument. */
+  appendEntry?(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
   /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
   exec?(

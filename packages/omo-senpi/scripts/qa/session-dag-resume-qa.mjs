@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url"
 import { createInterface } from "node:readline"
 import { createSandbox, seedSandbox, credentialDigest } from "./drive.mjs"
 import { sandboxStateDir } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = resolve(here, "../../../..")
@@ -106,13 +107,13 @@ try {
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
   writeFileSync(join(sandbox.cwd, ".omo/omo.json"), JSON.stringify({ memory: { enabled: false }, task: { resume_children: true }, agents: { "qa-worker": { model: "omo-mock/mock-1" } } }))
   writeFileSync(join(sandbox.cwd, "witness.txt"), "QA durable child transcript witness\n")
-  const env = {
+  const env = withTelemetryOptOut({
     PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, LANG: "en_US.UTF-8",
     HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir, OMO_CODING_AGENT_DIR: sandbox.agentDir, PI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome, XDG_DATA_HOME: sandbox.xdgDataHome, XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "xdg-state"),
-    OMO_DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1", PI_OFFLINE: "1", SENPI_RPC_CLIENT_CAPABILITIES: "extension_events",
-  }
+    PI_OFFLINE: "1", SENPI_RPC_CLIENT_CAPABILITIES: "extension_events",
+  })
   const senpiCli = process.env.SENPI_QA_CLI ?? join(repo, "node_modules/@code-yeongyu/senpi/dist/cli.js")
   if (ptyMode) {
     const { runSelectorPty } = await import("./session-dag-selector-pty.mjs")

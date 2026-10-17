@@ -7,6 +7,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpa
 import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
+import { withTelemetryOptOut } from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { binaryOnlyFailures, compareRuns, normalizeText, PARITY_STEPS } from "./omo-native-parity-compare.mjs"
 import { parityProviderSource } from "./omo-native-parity-provider.mjs"
 
@@ -38,7 +39,7 @@ function scrubbedEnv(overrides) {
     if (/TOKEN|SECRET|PASSWORD|COOKIE|CREDENTIAL|API_KEY/i.test(key)) continue
     env[key] = value
   }
-  return { ...env, PI_OFFLINE: "1", PI_TELEMETRY: "0", OMO_SEND_ANONYMOUS_TELEMETRY: "0", ...overrides }
+  return withTelemetryOptOut({ ...env, PI_OFFLINE: "1", PI_TELEMETRY: "0", OMO_SEND_ANONYMOUS_TELEMETRY: "0", ...overrides })
 }
 
 function sandbox(root, label) {
