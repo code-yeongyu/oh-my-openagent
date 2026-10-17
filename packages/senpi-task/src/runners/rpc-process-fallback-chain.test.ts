@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { spawnFakeChild } from "./rpc/__fixtures__/spawn-fake"
-import { terminateRpcChild } from "./rpc/terminate"
+import { releaseSpawnedChild } from "./rpc/__fixtures__/release-child"
 import { RpcProcessRunner } from "./rpc-process"
 import type { RpcRunnerSpec } from "./types"
 
@@ -13,7 +13,7 @@ const children: ChildProcess[] = []
 const tmpDirs: string[] = []
 
 afterEach(async () => {
-  for (const child of children.splice(0)) await terminateRpcChild(child, { sigkillDelayMs: 200 })
+  for (const child of children.splice(0)) await releaseSpawnedChild(child)
   for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 

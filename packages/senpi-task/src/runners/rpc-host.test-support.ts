@@ -166,6 +166,8 @@ export function fakeFallbackRunner(): FakeFallbackRunner {
 
 export interface StubChannel extends HostSessionChannel {
   readonly calls: readonly string[]
+  /** Settles when the session is detached: a refused start's teardown finishes after start() rejects (#10402). */
+  readonly detached: Promise<void>
 }
 
 /**
@@ -176,6 +178,10 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
   const calls: string[] = []
   // Like the real host, get_state reports the model the session was opened with.
   let openedModel: { readonly provider: string; readonly id: string } | undefined
+  let markDetached: () => void = () => undefined
+  const detached = new Promise<void>((resolve) => {
+    markDetached = resolve
+  })
   const record = <T>(name: string, value: T): T => {
     calls.push(name)
     return value
@@ -186,6 +192,7 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
     get calls() {
       return calls
     },
+    detached,
     open: (request) => {
       if (request.provider !== undefined && request.modelId !== undefined) openedModel = { provider: request.provider, id: request.modelId }
       return record(
@@ -207,6 +214,9 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
     onParked: () => () => undefined,
     onClosed: () => () => undefined,
     close: () => record("close", Promise.resolve()),
-    detach: () => record("detach", Promise.resolve()),
+    detach: () => {
+      markDetached()
+      return record("detach", Promise.resolve())
+    },
   }
 }

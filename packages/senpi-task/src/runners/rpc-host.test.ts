@@ -14,6 +14,7 @@ import {
   hostRunnerHarness,
   stubChannel,
 } from "./rpc-host.test-support"
+import { bounded } from "./rpc-host/__fixtures__/cancel-lane"
 import type { FakeHostCommand } from "./rpc-host/__fixtures__/fake-host"
 import type { RpcRunnerSpec } from "./types"
 
@@ -230,6 +231,8 @@ describe("RpcHostRunner start failures", () => {
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("child-prompt-failed")
     expect(RunnerError.is(failure) ? failure.failure.rejected_while : undefined).toBe("alive")
     expect(RunnerError.is(failure) ? failure.failure.message : "").toContain("prompt rejected by the host")
+    // and: the teardown runs to completion after start() has already rejected (#10402)
+    await bounded(channel.detached, "the refused session's detach")
     expect(channel.calls).toEqual(["open", "prompt", "abort", "close", "detach"])
   })
 

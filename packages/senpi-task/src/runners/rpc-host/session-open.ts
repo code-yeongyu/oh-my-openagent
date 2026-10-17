@@ -71,11 +71,9 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
     } catch (error) {
       if (error instanceof InputUncertainError) error = error.cause
       const exitOutcome = handle.exitOutcome()
-      try {
-        await discardUnstartedRpcHandle(handle)
-      } catch (cleanupError) {
+      void discardUnstartedRpcHandle(handle, (cleanupError) => {
         log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
-      }
+      })
       throw new RunnerError({
         kind: "child-prompt-failed",
         message: error instanceof Error ? error.message : String(error),
