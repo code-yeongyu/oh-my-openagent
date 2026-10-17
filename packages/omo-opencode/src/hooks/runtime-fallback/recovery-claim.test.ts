@@ -8,6 +8,7 @@ import {
   openRuntimeFallbackRecoveryClaim,
 } from "../../shared/runtime-fallback-recovery"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { clearAllCompactions, recordCompactionStart } from "../../shared/compaction-in-flight"
 import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import { createRuntimeFallbackHook } from "./hook"
 import type { RuntimeFallbackPluginInput } from "./types"
@@ -124,6 +125,7 @@ describe("runtime-fallback recovery claim", () => {
   })
 
   afterEach(() => {
+    clearAllCompactions()
     _resetRuntimeFallbackRecoveryForTesting()
     SessionCategoryRegistry.clear()
     resetClaudeCodeSessionState()
@@ -312,4 +314,55 @@ describe("runtime-fallback recovery claim", () => {
     })
   })
 
+
+  describe("when a compaction is running", () => {
+    test("#given a status dispatch in flight #when an error arrives and that dispatch is refused #then the error's claim is declined, never left waiting", async () => {
+      // given
+      const sessionID = "ses_claim_compaction_inflight"
+      const promptCalls: unknown[] = []
+      const gated = createGatedPluginInput(promptCalls)
+      const hook = createRuntimeFallbackHook(gated.input, {
+        config: createConfig({ timeout_seconds: 0 }),
+        pluginConfig: createPluginConfig(["openai/gpt-5.4", "anthropic/claude-opus-4-8"]),
+      })
+      await startSession(hook, sessionID, "google/gemini-2.5-pro")
+      const statusHandled = hook.event({ event: sessionStatusRetry(sessionID) })
+      await gated.started
+      recordCompactionStart(sessionID)
+      const event = sessionError(sessionID)
+      openRuntimeFallbackRecoveryClaim(event, sessionID)
+      const decision = awaitRuntimeFallbackRecoveryDecision(event)
+      await hook.event({ event })
+
+      // when
+      const beforeSettle = await decisionSoFar(decision)
+      gated.refuse(new Error("upstream unavailable"))
+      await statusHandled
+
+      // then
+      expect(beforeSettle).toBe(PENDING)
+      expect(await decision).toBe("declined")
+      hook.dispose?.()
+    })
+
+    test("#given no retry in flight #when a session.error arrives #then no fallback starts and the claim is still decided", async () => {
+      // given
+      const sessionID = "ses_claim_compaction_error"
+      const promptCalls: unknown[] = []
+      const hook = createRuntimeFallbackHook(createPluginInput(promptCalls), {
+        config: createConfig({ timeout_seconds: 0 }),
+        pluginConfig: createPluginConfig(["openai/gpt-5.4"]),
+      })
+      await startSession(hook, sessionID, "google/gemini-2.5-pro")
+      recordCompactionStart(sessionID)
+
+      // when
+      const decision = await deliver(hook, sessionError(sessionID, "google/gemini-2.5-pro"))
+
+      // then
+      expect(promptCalls).toHaveLength(0)
+      expect(decision).toBe("declined")
+      hook.dispose?.()
+    })
+  })
 })
