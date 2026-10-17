@@ -1,11 +1,11 @@
 import { log } from "../../../shared/logger"
-import { compareVersions } from "../../../shared/opencode-version"
 import type { UpdateCheckResult } from "../types"
 import { extractChannel } from "../version-channel"
 import { isLocalDevMode } from "./local-dev-path"
 import { findPluginEntry } from "./plugin-entry"
 import { getCachedVersion } from "./cached-version"
 import { getLatestVersion } from "./latest-version"
+import { isStrictlyNewerVersion } from "./semver-compare"
 
 export async function checkForUpdate(directory: string): Promise<UpdateCheckResult> {
   if (isLocalDevMode(directory)) {
@@ -56,7 +56,11 @@ export async function checkForUpdate(directory: string): Promise<UpdateCheckResu
     }
   }
 
-  const needsUpdate = compareVersions(currentVersion, latestVersion) !== 0
+  // Only a strictly newer registry version counts as an update. "Different"
+  // is not enough: a local build ahead of the channel tag must never be
+  // offered a downgrade, and prerelease increments (beta.85 -> beta.89) must
+  // still register.
+  const needsUpdate = isStrictlyNewerVersion(currentVersion, latestVersion)
   log(
     `[auto-update-checker] Current: ${currentVersion}, Latest (${channel}): ${latestVersion}, NeedsUpdate: ${needsUpdate}`
   )

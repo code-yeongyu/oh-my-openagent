@@ -10,6 +10,8 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createInterface } from "node:readline"
 import { createSandbox, seedSandbox, credentialDigest } from "./drive.mjs"
+import { sandboxStateDir } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = resolve(here, "../../../..")
@@ -64,7 +66,7 @@ async function switchSession(sessionPath) {
 const workflow = (data) => request("extension_request", { name: "qa.workflow", data })
 const nodeEvent = (node, to) => eventWhere((event) => event.type === "extension_event" && event.name === "omo.dag.event" && event.data?.nodeId === node && event.data?.to === to, `${node}:${to}`)
 const taskRecords = () => {
-  const path = join(sandbox.cwd, ".omo/senpi-task/tasks")
+  const path = join(sandboxStateDir(sandbox), "tasks")
   return existsSync(path) ? readdirSync(path).filter((name) => name.endsWith(".json")).map((name) => JSON.parse(readFileSync(join(path, name), "utf8"))) : []
 }
 function reply(response, step) {
@@ -105,13 +107,13 @@ try {
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
   writeFileSync(join(sandbox.cwd, ".omo/omo.json"), JSON.stringify({ memory: { enabled: false }, task: { resume_children: true }, agents: { "qa-worker": { model: "omo-mock/mock-1" } } }))
   writeFileSync(join(sandbox.cwd, "witness.txt"), "QA durable child transcript witness\n")
-  const env = {
+  const env = withTelemetryOptOut({
     PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, LANG: "en_US.UTF-8",
     HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir, OMO_CODING_AGENT_DIR: sandbox.agentDir, PI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome, XDG_DATA_HOME: sandbox.xdgDataHome, XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "xdg-state"),
-    OMO_DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1", PI_OFFLINE: "1", SENPI_RPC_CLIENT_CAPABILITIES: "extension_events",
-  }
+    PI_OFFLINE: "1", SENPI_RPC_CLIENT_CAPABILITIES: "extension_events",
+  })
   const senpiCli = process.env.SENPI_QA_CLI ?? join(repo, "node_modules/@code-yeongyu/senpi/dist/cli.js")
   if (ptyMode) {
     const { runSelectorPty } = await import("./session-dag-selector-pty.mjs")
@@ -162,7 +164,7 @@ try {
   const liveBefore = tasksBefore.find((task) => task.owner?.nodeId === "live")
   assert.equal(liveBefore.status, "running")
   await switchSession(pathB)
-  const runPath = join(sandbox.cwd, ".omo/senpi-task/dag/runs", `${runId}.json`)
+  const runPath = join(sandboxStateDir(sandbox), "dag", "runs", `${runId}.json`)
   const paused = JSON.parse(readFileSync(runPath, "utf8"))
   assert.equal(paused.status, "paused")
   assert.equal(paused.leaseHolderPid, undefined)
@@ -192,7 +194,7 @@ try {
   const done = tasksAfter.find((task) => task.owner?.nodeId === "done")
   assert.equal(done.final_response, "QA_RESULT_DONE")
   assert.equal(liveAfter.final_response, "QA_RESULT_LIVE")
-  const history = readFileSync(join(sandbox.cwd, ".omo/senpi-task/dag/events", `${runId}.jsonl`), "utf8").trim().split("\n").map(JSON.parse)
+  const history = readFileSync(join(sandboxStateDir(sandbox), "dag", "events", `${runId}.jsonl`), "utf8").trim().split("\n").map(JSON.parse)
   assert.equal(history.filter((event) => event.type === "dag.run.cancelled").length, 0)
   assert.equal(history.filter((event) => event.type === "dag.node.task-attached" && event.nodeId === "next").length, 1)
   report.checks.samePidResume = true

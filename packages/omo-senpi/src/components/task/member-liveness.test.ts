@@ -113,6 +113,7 @@ describe("team member liveness notifier", () => {
   test("#given a failed direct injection #when the delivery promise rejects #then local dedupe clears and a bounded retry sends again", async () => {
     const attempts: string[] = []
     const retries: Array<() => void> = []
+    const retryQueued = Promise.withResolvers<void>()
     const notifier = createTeamMemberLivenessNotifier({
       pi: {
         sendMessage: () => {
@@ -121,23 +122,23 @@ describe("team member liveness notifier", () => {
         },
       },
       isStreaming: () => false,
-      scheduleRetry: (retry) => retries.push(retry),
+      scheduleRetry: (retry) => { retries.push(retry); retryQueued.resolve() },
       maxDeliveryRetries: 1,
     })
 
     notifier.notifyTerminal(memberRecord())
-    await flushMicrotasks()
+    await withTimeout(retryQueued.promise, 1000)
     expect(attempts).toEqual(["send"])
     expect(retries).toHaveLength(1)
 
     retries.shift()?.()
-    await flushMicrotasks()
     expect(attempts).toEqual(["send", "send"])
   })
 
   test("#given a failed coordinator delivery #when its promise rejects #then the liveness injection is requeued and delivered on retry", async () => {
     const deliveries: string[] = []
     const retries: Array<() => void> = []
+    const retryQueued = Promise.withResolvers<void>()
     const coordinator = new IdleInjectionCoordinator((message) => {
       deliveries.push(message.content)
       return deliveries.length === 1 ? Promise.reject(new Error("admission failed")) : Promise.resolve()
@@ -146,18 +147,17 @@ describe("team member liveness notifier", () => {
       pi: new FakeExtensionAPI(),
       coordinator,
       isStreaming: () => false,
-      scheduleRetry: (retry) => retries.push(retry),
+      scheduleRetry: (retry) => { retries.push(retry); retryQueued.resolve() },
       maxDeliveryRetries: 1,
     })
 
     notifier.notifyTerminal(memberRecord())
     coordinator.flushOnIdle()
-    await flushMicrotasks()
+    await withTimeout(retryQueued.promise, 1000)
     expect(retries).toHaveLength(1)
 
     retries.shift()?.()
     coordinator.flushOnIdle()
-    await flushMicrotasks()
     expect(deliveries).toHaveLength(2)
   })
 
@@ -195,6 +195,15 @@ describe("team member liveness notifier", () => {
     notifier.notifyTerminal(memberRecord())
 
     expect(pi.messages).toEqual([])
+  })
+
+  test("#given a parked process member #when revived and later killed #then parking does not consume the death notification", () => {
+    const pi = new FakeExtensionAPI()
+    const notifier = createTeamMemberLivenessNotifier({ pi, isStreaming: () => false })
+    notifier.notifyTerminal(memberRecord({ residency_state: "rpc_detached", killed: undefined }))
+    expect(pi.messages).toEqual([])
+    notifier.notifyTerminal(memberRecord({ residency_state: "disposed" }))
+    expect(pi.messages).toHaveLength(1)
   })
 
   test("#given a normal member completion #when observed #then no liveness event is injected", () => {
@@ -258,10 +267,4 @@ async function withTimeout<T>(signal: Promise<T>, timeoutMs: number): Promise<T>
   } finally {
     if (timer !== undefined) clearTimeout(timer)
   }
-}
-
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
-  await Promise.resolve()
 }

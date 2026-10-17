@@ -18,7 +18,7 @@ describe("manager wiring seams (W1-V F3/F7)", () => {
     expect(manager.getResidentHandle(started.task_id)).not.toBeUndefined()
 
     // when
-    manager.forget(started.task_id)
+    manager.forget(started.task_id, { path: "end" })
 
     // then
     expect(manager.residentTaskIds()).not.toContain(started.task_id)
@@ -71,7 +71,6 @@ describe("manager wiring seams (W1-V F3/F7)", () => {
 
   test("#given an admit gate that evicts #when starting #then start proceeds", async () => {
     // given
-    const evicted: string[] = []
     const admit = (): Promise<SpawnAdmission> => Promise.resolve({ kind: "evicted", evicted_task_id: "st_old" })
     const { manager, inProcess } = makeManager({ admit })
 
@@ -81,6 +80,5 @@ describe("manager wiring seams (W1-V F3/F7)", () => {
     // then
     expect(started.kind).toBe("started")
     expect(inProcess.startedSpecs).toHaveLength(1)
-    expect(evicted).toEqual([])
   })
 })

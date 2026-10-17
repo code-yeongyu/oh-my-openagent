@@ -332,15 +332,14 @@ describe("team e2e process cleanup", () => {
     expect(posixCalls).toEqual([])
   })
 
-  it("#given a live Windows QA root pid #when its process tree is terminated #then taskkill targets only that pid tree and returns structured evidence", async () => {
+  it("#given taskkill reports success before pid visibility settles #when its process tree is terminated #then command completion is authoritative", async () => {
     // given
     const calls: Array<{ command: string; args: readonly string[] }> = []
-    const aliveReads = [true, false]
 
     // when
     const result = await runtime.terminateProcessTree(4242, {
       platform: "win32",
-      isProcessAlive: () => aliveReads.shift() ?? false,
+      isProcessAlive: () => true,
       spawnSync: (command: string, args: readonly string[]) => {
         calls.push({ command, args })
         return { status: 0, stdout: "SUCCESS", stderr: "" }

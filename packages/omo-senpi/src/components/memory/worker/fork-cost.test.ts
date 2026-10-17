@@ -75,7 +75,7 @@ describe("chooseMemoryLaunchRoute", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "anthropic/claude-opus-5", cost: OPUS },
+        session: { model: "anthropic/claude-opus-5-5", cost: OPUS },
         parentContextTokens: PARENT_P50,
         turns: 1,
         cacheHit: true,

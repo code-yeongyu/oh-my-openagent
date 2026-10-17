@@ -82,9 +82,11 @@ describe("omo config schema", () => {
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
     expect(result.data.git_master?.include_co_authored_by).toBe(false)
-    expect(result.data.task?.default_execution_mode).toBe("in-process")
+    expect(result.data.task?.default_execution_mode).toBe("auto")
+    expect(result.data.task?.process_runner).toBe("host")
+    expect(result.data.task?.host_engine_policy).toBe("upgrade")
     expect(result.data.task?.default_concurrency).toBe(5)
-    expect(result.data.task?.residency_max_children).toBe(8)
+    expect(result.data.task?.residency_max_children).toBe("unlimited")
     expect(result.data.categories?.deep?.max_tokens).toBe(12000)
     expect(result.data.categories?.deep?.reasoning).toBe("high")
     expect(result.data.categories?.deep?.provider_options).toEqual({
@@ -103,7 +105,7 @@ describe("omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.git_master).toEqual({ commit_footer: true, include_co_authored_by: true })
+    expect(result.data.git_master).toEqual({ commit_footer: false, include_co_authored_by: false })
   })
 
   test("#given an unknown root key #when parsed #then the schema rejects the config", () => {
@@ -135,7 +137,12 @@ describe("omo config schema", () => {
     // given
     const block = {
       model_profiles: {
-        capable: { display_name: "Capable", models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }] },
+        capable: {
+          display_name: "Capable",
+          family: "daily",
+          tier: "normal",
+          models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],
+        },
       },
       model_profile: "capable",
     }
@@ -157,10 +164,12 @@ describe("omo config schema", () => {
     ])
     if (!results.config.success) throw new Error(results.config.error.message)
     expect(results.config.data.model_profile).toBe("capable")
-    expect(results.config.data.model_profiles?.capable?.models).toEqual([
-      "anthropic/claude-fable-5-1",
-      { model: "openai/gpt-6-astra", reasoning: "high" },
-    ])
+    expect(results.config.data.model_profiles?.capable).toEqual({
+      display_name: "Capable",
+      family: "daily",
+      tier: "normal",
+      models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],
+    })
   })
 
   test("#given a non-string model_profile #when parsed #then the issue path identifies the bad field", () => {
@@ -198,12 +207,12 @@ describe("omo config schema", () => {
     }
   })
 
-  test("#given model_profile inside a [senpi] block #when the senpi view loads #then the harness block selects the profile", () => {
+  test("#given model_profile inside a [native] block #when the senpi view loads #then the harness block selects the profile", () => {
     // given
     const fixture = makeConfigFixture()
     writeFileSync(
       join(fixture.homeDir, ".omo", "omo.json"),
-      `{"model_profile":"simple-work","[senpi]":{"model_profile":"deep-work","model_profiles":{"deep-work":{"models":["openai/gpt-6-astra"]}}}}`,
+      `{"model_profile":"simple-work","[native]":{"model_profile":"deep-work","model_profiles":{"deep-work":{"models":["openai/gpt-6-astra"]}}}}`,
     )
 
     try {

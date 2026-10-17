@@ -39,7 +39,7 @@ export type ThreadCandidate = {
   readonly name: string
   readonly cwd: string
   readonly preview: string
-  readonly updatedAt: string
+  readonly updatedAt: string | null
   readonly state: ThreadStatus
 }
 
@@ -146,7 +146,7 @@ function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
 function toCandidates(matches: readonly ThreadAddressEntry[]): readonly ThreadCandidate[] {
   return [...matches]
     .sort((a, b) =>
-      a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at < b.updated_at ? 1 : -1,
+      a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at === null ? 1 : b.updated_at === null ? -1 : a.updated_at < b.updated_at ? 1 : -1,
     )
     .slice(0, AMBIGUOUS_CANDIDATE_LIMIT)
     .map(toCandidate)
@@ -166,6 +166,9 @@ function gitWorktreeRoot(dir: string): string | null {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 5000,
+      // git.exe is console-subsystem: without this each root lookup flashes a console window that
+      // Windows foregrounds, stealing the user's focus (#8501).
+      windowsHide: true,
     })
     const trimmed = output.trim()
     return trimmed.length === 0 ? null : trimmed
@@ -193,6 +196,19 @@ function sameWorkspace(entryCwd: string, callerRoot: string, rootOf: (dir: strin
     return canonicalPath(entryRoot) === canonicalPath(callerRootTop)
   }
   return canonicalPath(entryCwd) === canonicalPath(callerRoot)
+}
+
+/**
+ * Every path the caller's workspace can be spelled as: the root, its git top level (a session in any
+ * directory under it shares the workspace), and the realpath of each. A session directory named
+ * after one of them may hold a thread `resolveTarget` would judge in scope.
+ */
+export function workspaceDirectories(callerWorkspaceRoot: string): string[] {
+  const root = callerWorkspaceRoot.trim()
+  if (root.length === 0) return []
+  const top = gitWorktreeRoot(root)
+  const spelled = top === null ? [root] : [root, top]
+  return [...new Set(spelled.flatMap((path) => [path, canonicalPath(path)]))]
 }
 
 /**

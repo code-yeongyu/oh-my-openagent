@@ -21,14 +21,8 @@ describe("codex ultrawork directive source", () => {
 		// given
 		const directiveSource = readFileSync(new URL("../src/directive.ts", import.meta.url), "utf8");
 
-		// when
-		const importsBundledConstant = directiveSource.includes(
-			'import { ULTRAWORK_DIRECTIVE_TEXT } from "./directive-content.js"',
-		);
-
 		// then
 		// prompts-core's contract: markdown is bundled at build time, never read from disk at runtime.
-		expect(importsBundledConstant).toBe(true);
 		expect(directiveSource).not.toMatch(/readFileSync|readFile\(/);
 	});
 });

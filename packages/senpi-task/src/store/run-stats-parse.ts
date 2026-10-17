@@ -14,6 +14,7 @@ import { isRecord, readNumber, readOptionalNumber, readOptionalString } from "./
 // the record, so a corrupted stat can never masquerade as a measurement).
 export function parseRunStats(value: unknown): TaskRunStats {
   if (!isRecord(value)) throw new Error("run_stats is not an object")
+  const failedTurns = readOptionalNumber(value, "failed_turns")
   const outputTokens = readOptionalNumber(value, "output_tokens")
   const inputTokens = readOptionalNumber(value, "input_tokens")
   const cacheReadTokens = readOptionalNumber(value, "cache_read_tokens")
@@ -32,6 +33,7 @@ export function parseRunStats(value: unknown): TaskRunStats {
   return {
     runtime_ms: readNumber(value, "runtime_ms"),
     turns: readNumber(value, "turns"),
+    ...(failedTurns === undefined ? {} : { failed_turns: failedTurns }),
     tool_calls: readNumber(value, "tool_calls"),
     ...(outputTokens === undefined ? {} : { output_tokens: outputTokens }),
     ...(inputTokens === undefined ? {} : { input_tokens: inputTokens }),

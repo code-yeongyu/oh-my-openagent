@@ -32,6 +32,7 @@ describe("facts launch ownership", () => {
         return {
           task_id: spec.taskId,
           sessionId: `session-${spec.taskId}`,
+          effectiveModel: () => undefined,
           steer: async () => undefined,
           followUp: async () => undefined,
           abort: async () => undefined,
@@ -130,16 +131,13 @@ describe("quick-pinned facts launch", () => {
     // when
     const result = await runner.launchPending()
 
-    // then: identical skip semantics to the `category_unavailable` path - one warning, no child,
-    // no run dir, queue intact, and the preflight-scoped failure/backoff record still lands.
+    // A missing user selection is not a failed extraction and must not park the queue.
     expect(result.status).toBe("skipped")
     expect(warnings).toHaveLength(1)
     expect(await queue.listPending()).toHaveLength(1)
     expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
     const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
-    expect(state.entries).toHaveLength(1)
-    expect(state.entries[0]).toMatchObject({ streak: 1, lastReason: "quick_category_unavailable" })
-    expect(state.entries[0]?.lastFailureId).toMatch(/^preflight-[0-9a-f-]{36}$/)
+    expect(state.entries).toHaveLength(0)
   }, 30_000)
 
   test("#given two pending queue entries #when one launch runs #then the supervised child consumes all entries in one trailer-bearing commit", async () => {

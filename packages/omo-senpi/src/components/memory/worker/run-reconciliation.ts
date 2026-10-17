@@ -1,11 +1,9 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
-import { readdir, rm } from "@oh-my-opencode/memory-core/fs"
+import { readdir } from "@oh-my-opencode/memory-core/fs"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
 import {
-  discardReflectionWorktree,
-  GitMemoryRepo,
   LockContentionError,
   type MemoryIdentity,
   type ProcessLiveness,
@@ -14,7 +12,6 @@ import {
 
 import {
   readRunJson,
-  parseRunPrelaunchArtifact,
   runOutcomeMatchesLedger,
   type RunOutcome,
 } from "./run-artifacts"
@@ -25,9 +22,13 @@ import {
   type ReservationRunResult,
   type ReservationStatePort,
 } from "./run-finalization"
-import { classifyGhostActive } from "./run-ghost-active"
-import { classifyRunProcess, isLauncherDead, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
+import { backfillRunReceipt } from "./run-receipt-backfill"
+import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
+import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
+import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
+import type { MemoryReceiptsPort, ReceiptWarn } from "../receipts-port"
+import { sweepReflectionRunOrphans, type ReflectionSweepLogger } from "./run-reconciliation-sweep"
 import { waitForRunSentinel, type SentinelWaitResult } from "./run-sentinel"
 import { sweepStrandedRunTemporaries } from "./run-temporaries"
 
@@ -45,11 +46,14 @@ export interface ReflectionRunReconciliationOptions {
   readonly waitUntil?: (deadlineAt: number) => Promise<void>
   readonly signalProcessGroup?: (pid: number, signal: NodeJS.Signals) => void
   readonly withWriterLock?: <T>(operation: () => Promise<T>) => Promise<T>
+  readonly logger?: ReflectionSweepLogger
   /** Bind-time maintenance defers when another session is scheduling this identity. */
   readonly deferOnSchedulerContention?: boolean
+  readonly receipts?: MemoryReceiptsPort
+  readonly warn?: ReceiptWarn
 }
 
-type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">>
+export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">>
   & ReflectionRunReconciliationOptions
 
 export async function reconcileReflectionRuns(
@@ -74,12 +78,17 @@ export async function reconcileReflectionRuns(
       if (name === prelaunch.retiredRunId) continue
       const runDir = join(runsDir, name)
       await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
-      if (existsSync(join(runDir, "final.json")) || existsSync(join(runDir, "abandoned.json"))) continue
+      if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
+        await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
+        continue
+      }
       if (!existsSync(join(runDir, "ledger.json"))) continue
-      const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
-      const result = await reconcileRun(context, runDir, ledger)
+      const ledger = await readLedgerOrUndefined(runDir)
+      if (ledger === undefined) continue
+      const result = await reconcileRunOrQuarantine(context, runDir, ledger)
       if (result !== undefined) results.push({ runId: result.runId, outcome: result.outcome })
     }
+    await sweepReflectionRunOrphans(context)
     return results
   } catch (error) {
     if (context.deferOnSchedulerContention && error instanceof LockContentionError) return []
@@ -87,87 +96,28 @@ export async function reconcileReflectionRuns(
   }
 }
 
-interface PrelaunchReconcile {
-  readonly result?: ReflectionRunReconcileResult
-  readonly retiredRunId?: string
-}
-
-async function reconcilePrelaunch(context: ReconcileContext): Promise<PrelaunchReconcile> {
-  const active = (await context.reservation.readState(
-    context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
-  )).active
-  if (active === undefined) return {}
-  const ghost = await classifyGhostActive({ identity: context.identity, active })
-  if (ghost.ghost && ghost.reason === "missing-identity") {
-    if (active.launcherPid !== undefined && active.launcherHostname !== undefined) {
-      if (active.launcherHostname !== context.hostname()) return {}
-      if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
-    }
-    return { result: await completeReservationAsFailed(context, active.runId), retiredRunId: active.runId }
-  }
-  if (active.reservedAt === undefined || active.launcherPid === undefined || active.launcherHostname === undefined) return {}
-  const runDir = join(context.identity.paths.reflection, "runs", active.runId)
-  let retiredGeneration = false
-  if (existsSync(join(runDir, "ledger.json"))) {
-    const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
-    const hasFinal = existsSync(join(runDir, "final.json"))
-    const terminalPath = join(runDir, hasFinal ? "final.json" : "abandoned.json")
-    if (!existsSync(terminalPath)) {
-      if (!ghost.ghost) return {}
-      retiredGeneration = true
-    } else {
-      const terminal = await readRunJson<{ finishedAt?: unknown; abandonedAt?: unknown } | null>(terminalPath)
-      const timestamp = hasFinal ? terminal?.finishedAt : terminal?.abandonedAt
-      const terminalAt = typeof timestamp === "string" ? Date.parse(timestamp) : NaN
-      const reservedAt = Date.parse(active.reservedAt)
-      const startedAt = Date.parse(ledger.startedAt)
-      const finalizedAt = ledger.finalizedAt === undefined ? undefined : Date.parse(ledger.finalizedAt)
-      // Corrupt or missing timestamps cannot prove generation ownership. Report them without
-      // mutating state, rather than silently treating NaN comparisons as a current generation.
-      if (![terminalAt, reservedAt, startedAt].every(Number.isFinite)
-        || (finalizedAt !== undefined && !Number.isFinite(finalizedAt))) {
-        throw new TypeError(`Invalid reflection generation timestamps for ${active.runId}`)
-      }
-      retiredGeneration = startedAt < reservedAt && terminalAt < reservedAt
-        && (finalizedAt === undefined || finalizedAt < reservedAt)
-      if (!retiredGeneration) return {}
-    }
-  }
-  const prelaunchPath = join(runDir, "prelaunch.json")
-  if (!retiredGeneration && existsSync(runDir) && !existsSync(prelaunchPath)) return {}
-  if (context.now() - Date.parse(active.reservedAt) <= 60_000 || active.launcherHostname !== context.hostname()) {
-    return retiredGeneration ? { retiredRunId: active.runId } : {}
-  }
-  if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) {
-    return retiredGeneration ? { retiredRunId: active.runId } : {}
-  }
-  // Retired artifacts are historical evidence, not resources owned by this reservation.
-  if (!retiredGeneration && existsSync(prelaunchPath)) {
-    const prelaunch = parseRunPrelaunchArtifact(await readRunJson<unknown>(prelaunchPath))
-    if (prelaunch.runId !== active.runId) throw new Error("Reflection prelaunch run id does not match reservation")
-    const repo = new GitMemoryRepo({ dir: context.identity.paths.repo, agentId: context.identity.id })
-    const cleanup = await discardReflectionWorktree(
-      repo,
-      prelaunch.worktreeDir,
-      prelaunch.worktreeBranch,
-    )
-    if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) return {}
-    await rm(runDir, { recursive: true, force: true })
-  }
-  return {
-    result: await completeReservationAsFailed(context, active.runId),
-    ...(retiredGeneration ? { retiredRunId: active.runId } : {}),
+async function reconcileRunOrQuarantine(
+  context: ReconcileContext,
+  runDir: string,
+  ledger: ReservationRunLedger,
+): Promise<ReflectionRunReconcileResult | undefined> {
+  try {
+    return await reconcileRun(context, runDir, ledger)
+  } catch (error) {
+    if (!(error instanceof RunTerminalClaimUnrecoverableError)) throw error
+    const active = (await context.reservation.readState(
+      context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
+    )).active
+    return quarantineRun(context, runDir, ledger.runId, "terminal_claim_unrecoverable", ledger, active?.runId === ledger.runId ? active : undefined)
   }
 }
 
-async function completeReservationAsFailed(context: ReconcileContext, runId: string): Promise<ReflectionRunReconcileResult> {
-  const transition = await context.reservation.complete(
-    runId,
-    "failed",
-    context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
-  )
-  if (transition.launch !== undefined) context.launch?.(transition.launch)
-  return { runId, outcome: "failed" }
+async function readLedgerOrUndefined(runDir: string): Promise<ReservationRunLedger | undefined> {
+  try {
+    return parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
+  } catch {
+    return undefined
+  }
 }
 
 async function reconcileRun(
@@ -177,7 +127,7 @@ async function reconcileRun(
 ): Promise<ReflectionRunReconcileResult | undefined> {
   const outcomePath = join(runDir, "outcome.json")
   if (await hasMatchingOutcome(outcomePath, ledger)) {
-    return await finalizeRecordedOutcome(context, runDir, ledger)
+    return await finalizeRecordedOutcome(context, runDir, ledger, { recovered: true })
   }
   if (ledger.launching === true && context.now() <= ledger.hardDeadlineAt) return undefined
   const supervisor = await classifyRunProcess(ledger.pid, ledger.processStart, context)
@@ -186,7 +136,7 @@ async function reconcileRun(
     await wait(outcomePath, ledger.deadlineAt)
     const refreshed = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
     if (await hasMatchingOutcome(outcomePath, refreshed)) {
-      return await finalizeRecordedOutcome(context, runDir, refreshed)
+      return await finalizeRecordedOutcome(context, runDir, refreshed, { recovered: true })
     }
     if (refreshed.launching === true && context.now() <= refreshed.hardDeadlineAt) return undefined
     const freshSupervisor = await classifyRunProcess(refreshed.pid, refreshed.processStart, context)
@@ -207,6 +157,11 @@ async function hasMatchingOutcome(
   return runOutcomeMatchesLedger(ledger, outcome)
 }
 
+// The child exited on its own after the supervisor died, so a tip it committed may be complete.
+const RECOVER_TIP = { recoverWorktreeTip: true } as const
+const SUPERVISOR_DIED_DETAIL = "reflection supervisor died before publishing an outcome"
+const CHILD_KILLED_AFTER_DEADLINE_DETAIL = "reflection child outlived its deadline after the supervisor died and was killed"
+
 async function reconcileDeadSupervisor(
   context: ReconcileContext,
   runDir: string,
@@ -214,11 +169,13 @@ async function reconcileDeadSupervisor(
 ): Promise<ReflectionRunReconcileResult | undefined> {
   let child = await classifyRunProcess(ledger.childPid, ledger.childProcessStart, context)
   if (child === "unknown") return await abandonReservationRun(context, runDir, ledger)
-  if (child === "dead" || child === "absent") return await failReservationRun(context, runDir, ledger, "failed")
+  if (child === "dead" || child === "absent") {
+    return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child), RECOVER_TIP)
+  }
   const wait = context.waitUntil ?? ((deadlineAt) => waitForTime(deadlineAt, context.now))
   await wait(ledger.hardDeadlineAt)
   child = await classifyRunProcess(ledger.childPid, ledger.childProcessStart, context)
-  if (child === "dead") return await failReservationRun(context, runDir, ledger, "failed")
+  if (child === "dead") return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child), RECOVER_TIP)
   if (child === "unknown") return await abandonReservationRun(context, runDir, ledger)
   const signal = context.signalProcessGroup ?? signalRecordedProcessGroup
   if (ledger.childPid !== undefined) signal(ledger.childPid, "SIGTERM")
@@ -229,7 +186,18 @@ async function reconcileDeadSupervisor(
     signal(ledger.childPid, "SIGKILL")
     child = await classifyRunProcess(ledger.childPid, ledger.childProcessStart, context)
   }
-  return child === "dead" ? await failReservationRun(context, runDir, ledger, "timed_out") : undefined
+  return child === "dead"
+    ? await failReservationRun(context, runDir, ledger, "timed_out", `${CHILD_KILLED_AFTER_DEADLINE_DETAIL}\n${deadProcesses(ledger)}`)
+    : undefined
+}
+
+function deadRunDetail(ledger: ReservationRunLedger, child: "dead" | "absent"): string {
+  const childState = child === "absent" ? "no child was recorded" : "the child is dead too"
+  return `${SUPERVISOR_DIED_DETAIL}; ${childState}\n${deadProcesses(ledger)}`
+}
+
+function deadProcesses(ledger: ReservationRunLedger): string {
+  return `supervisor pid ${ledger.pid ?? "unknown"}, child pid ${ledger.childPid ?? "unknown"}`
 }
 
 async function directoryNames(path: string): Promise<readonly string[]> {

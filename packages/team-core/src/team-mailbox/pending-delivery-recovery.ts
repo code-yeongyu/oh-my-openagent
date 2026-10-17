@@ -1,5 +1,5 @@
 import type { TeamModeConfig } from "../config"
-import { isRecord } from "@oh-my-opencode/utils"
+import { isRecord } from "@oh-my-opencode/utils/record-type-guard"
 import { log } from "../logger"
 import { releaseDeliveryReservation, reserveMessageForDelivery } from "./reservation"
 

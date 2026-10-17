@@ -2,7 +2,7 @@
 
 import type { JSX, ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
-import { Bot, Download, Star } from "lucide-react"
+import { Download, Star } from "lucide-react"
 
 import { useLiveStats } from "@/components/landing/live-stats"
 import { cn } from "@/lib/utils"
@@ -22,9 +22,7 @@ export interface ProofStripProps {
     readonly githubStars: string
     readonly totalDownloads: string
     readonly monthlyDownloads: string
-    readonly agents: string
   }
-  readonly agentCount: string
   readonly className?: string
 }
 
@@ -61,44 +59,42 @@ function useEntered(): { ref: (node: HTMLElement | null) => void; entered: boole
  * once, keeping the suffix. Reduced motion or an unparsable value renders the target.
  */
 function useCountUp(target: string, start: boolean): string {
-  const [display, setDisplay] = useState(target)
+  // In-flight frame for one target; anything else (idle, finished, another target) shows the target.
+  const [frame, setFrame] = useState<{ readonly target: string; readonly value: string } | null>(
+    null,
+  )
   const finished = useRef(false)
 
   useEffect(() => {
-    if (finished.current) {
-      setDisplay(target)
-      return
-    }
-    if (!start) return
+    if (finished.current || !start) return
     const match = /^(\d+(?:\.(\d+))?)(.*)$/.exec(target)
     const numeric = match?.[1]
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
     if (!numeric || reduced) {
       finished.current = true
-      setDisplay(target)
       return
     }
     const end = Number.parseFloat(numeric)
     const decimals = match[2]?.length ?? 0
     const suffix = match[3] ?? ""
-    let frame = 0
+    let handle = 0
     const startedAt = performance.now()
     const step = (now: number): void => {
       const progress = Math.min(1, (now - startedAt) / COUNT_MS)
       const eased = 1 - (1 - progress) ** 4
-      setDisplay(`${(end * eased).toFixed(decimals)}${suffix}`)
       if (progress < 1) {
-        frame = requestAnimationFrame(step)
+        setFrame({ target, value: `${(end * eased).toFixed(decimals)}${suffix}` })
+        handle = requestAnimationFrame(step)
       } else {
         finished.current = true
-        setDisplay(target)
+        setFrame(null)
       }
     }
-    frame = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(frame)
+    handle = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(handle)
   }, [target, start])
 
-  return display
+  return frame?.target === target ? frame.value : target
 }
 
 interface ProofCellProps {
@@ -124,15 +120,10 @@ function ProofCell({ value, label, icon, start }: ProofCellProps): JSX.Element {
 }
 
 /**
- * DESIGN.md §5 ProofStrip: 4 cells (2 × 2 below lg) ruled by `--line`; Numeral + Eyebrow +
+ * DESIGN.md §5 ProofStrip: 3 cells (stacked below sm, 3 across from sm) ruled by `--line`; Numeral + Eyebrow +
  * 14px icon per cell. Values are live from `/api/stats` and count up once on enter.
  */
-export function ProofStrip({
-  initialStats,
-  labels,
-  agentCount,
-  className,
-}: ProofStripProps): JSX.Element {
+export function ProofStrip({ initialStats, labels, className }: ProofStripProps): JSX.Element {
   const stats = useLiveStats(initialStats)
   const { ref, entered } = useEntered()
 
@@ -140,7 +131,7 @@ export function ProofStrip({
     <ul
       ref={ref}
       data-testid="proof-strip"
-      className={cn("bg-line border-line grid grid-cols-2 gap-px border lg:grid-cols-4", className)}
+      className={cn("bg-line border-line grid grid-cols-1 gap-px border sm:grid-cols-3", className)}
     >
       <ProofCell value={stats.stars} label={labels.githubStars} icon={<Star />} start={entered} />
       <ProofCell
@@ -155,7 +146,6 @@ export function ProofStrip({
         icon={<Download />}
         start={entered}
       />
-      <ProofCell value={agentCount} label={labels.agents} icon={<Bot />} start={entered} />
     </ul>
   )
 }

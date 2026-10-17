@@ -9,8 +9,12 @@ export type RunStatsTracker = {
 // Accumulates run facts from the managed child event stream. A generation window opens at the last
 // boundary (spawn, assistant message_start, tool_execution_end, previous message_end) and closes on
 // an assistant message_end, so tokens_per_second measures streaming speed and excludes tool time.
+// An assistant message_end whose stopReason is "error" or "aborted" is a FAILED turn: it contributes
+// no tokens, cost, usage coverage or generation time - only the failed_turns count - but it still
+// re-anchors the window, so a failure's wall time never inflates a later window.
 export function createRunStatsTracker(startedAt: number, now: () => number = Date.now): RunStatsTracker {
   let turns = 0
+  let failedTurns = 0
   let toolCalls = 0
   let outputTokens = 0
   let totalTokens = 0
@@ -76,6 +80,11 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
       // Windows are measured on the arrival clock: AssistantMessage.timestamp marks message
       // creation (stream start), not completion, so it cannot close a generation window.
       const timestamp = now()
+      if (isFailedAssistantTurn(event.message)) {
+        failedTurns += 1
+        windowStart = timestamp
+        return true
+      }
       turns += 1
       const window = Math.max(0, timestamp - windowStart)
       generationMs += window
@@ -122,6 +131,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
       return {
         runtime_ms: runtimeMs,
         turns,
+        ...(failedTurns > 0 ? { failed_turns: failedTurns } : {}),
         tool_calls: toolCalls,
         // The tracker measures this run from its own injected clock, so the duration is active
         // execution time. Reconstructed durations (reconciled records) are the consumer's job.
@@ -179,6 +189,13 @@ function boundedCacheHitRate(cacheReadTokens: number, cacheableTokens: number): 
 
 function isAssistantMessage(message: unknown): message is Record<string, unknown> {
   return isRecord(message) && message.role === "assistant"
+}
+
+// Mirrors the engine's failed-turn predicate (transcript logging and the runner outcome mapping
+// treat stopReason "error" and "aborted" as failures): an errored or aborted turn produced no
+// usable output, so it is a failure datum, never a turn.
+function isFailedAssistantTurn(message: Record<string, unknown>): boolean {
+  return message.stopReason === "error" || message.stopReason === "aborted"
 }
 
 type UsageFacts = {

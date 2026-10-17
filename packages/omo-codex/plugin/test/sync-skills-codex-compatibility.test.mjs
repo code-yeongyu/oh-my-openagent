@@ -166,3 +166,14 @@ test("#given the flattened plugin cache the Codex installer produces #when sync-
 		await rm(codexHome, { recursive: true, force: true });
 	}
 });
+
+test("#given the shared ulw-research skill #when the Codex overlay runs #then the overlay applies", async () => {
+	// given
+	const shared = await readFile(join(sharedSkillsRoot, "ulw-research", "SKILL.md"), "utf8");
+
+	// when
+	const actual = applyCodexSkillOverlays("ulw-research", shared);
+
+	// then
+	assert.notEqual(actual, shared, "the ulw-research overlay anchor no longer matches the shared SKILL.md");
+});

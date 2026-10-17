@@ -105,7 +105,7 @@ function isKnownNonGitBashLauncher(path: string): boolean {
 
 function whereCommand(command: "bash"): readonly string[] {
   try {
-    return execFileSync("where", [command], { encoding: "utf8" })
+    return execFileSync("where", [command], { encoding: "utf8", windowsHide: true })
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0)
