@@ -6,7 +6,7 @@ import { join } from "node:path"
 import type { SenpiHostProtocolInfo } from "../../../lazy/senpi-barrel"
 import { FakeSessionTable, type FakeDrainedSession, type FakeHostSession } from "./fake-host-sessions"
 import { fakeProtocolInfo, probeFakeHost, type FakeHostIdentityOptions } from "./fake-host-probe"
-import { fakeHostTransport, type FakeHostTransport } from "./fake-host-transport"
+import { fakeHostTransport } from "./fake-host-transport"
 import { handleWireLine, writeFrame, type FakeHostCommand, type FakeHostOpenFailure, type FakeHostWarmAnswer } from "./fake-host-wire"
 import { FakeInputAdmissions } from "./fake-input-admissions"
 
@@ -92,13 +92,13 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   // On win32 the pipe instance can outlive `server.close()` while a client handle lingers, so one
   // fixed derivation makes restart race itself with EADDRINUSE. Re-deriving also rotates
   // `<path>.secret`, which is how the real host behaves and how clients already resolve the address.
-  let transport: FakeHostTransport
   const drainRetryAfterMs = options.drainRetryAfterMs ?? 2_000
   const table = new FakeSessionTable({ transcripts: options.transcripts === true, sessionProcesses: options.sessionProcesses === true })
   const admissions = new FakeInputAdmissions()
   const commands: FakeHostCommand[] = []
   const waiters: Array<{ readonly type: string; readonly resolve: (command: FakeHostCommand) => void }> = []
   const sockets = new Set<Socket>()
+  const acceptedSockets = new Set<Socket>()
   const connectionWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
   const withheld = new Set<string>()
   const failed = new Map<string, string>()
@@ -106,6 +106,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   let generation = typeof identity.generation === "number" ? identity.generation : 1
   let openFailure = options.openFailure
   let server: Server
+  let stopAccepting: () => void
 
   const record = (command: FakeHostCommand): void => {
     commands.push(command)
@@ -129,29 +130,44 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   }
 
   const listen = async (): Promise<void> => {
-    transport = fakeHostTransport(socketPath)
-    server = createServer((socket) => transport.authenticate(socket, () => {
-      sockets.add(socket)
-      settleConnectionWaiters()
-      let buffer = ""
-      socket.setEncoding("utf8")
-      socket.on("data", (chunk: string) => {
-        buffer += chunk
-        for (;;) {
-          const newline = buffer.indexOf("\n")
-          if (newline === -1) break
-          const line = buffer.slice(0, newline).trim()
-          buffer = buffer.slice(newline + 1)
-          if (line) handleWireLine(ports, socket, line)
-        }
-      })
+    const transport = fakeHostTransport(socketPath)
+    let closing = false
+    stopAccepting = () => { closing = true }
+    server = createServer((socket) => {
+      // A Windows connection belongs to this listener before its handshake completes (#9955).
+      acceptedSockets.add(socket)
       socket.on("error", () => undefined)
       socket.on("close", () => {
+        acceptedSockets.delete(socket)
         sockets.delete(socket)
         table.detach(socket)
         settleConnectionWaiters()
       })
-    }))
+      if (closing) {
+        socket.destroy()
+        return
+      }
+      transport.authenticate(socket, () => {
+        if (closing || socket.destroyed) {
+          socket.destroy()
+          return
+        }
+        sockets.add(socket)
+        settleConnectionWaiters()
+        let buffer = ""
+        socket.setEncoding("utf8")
+        socket.on("data", (chunk: string) => {
+          buffer += chunk
+          for (;;) {
+            const newline = buffer.indexOf("\n")
+            if (newline === -1) break
+            const line = buffer.slice(0, newline).trim()
+            buffer = buffer.slice(newline + 1)
+            if (line) handleWireLine(ports, socket, line)
+          }
+        })
+      })
+    })
     await new Promise<void>((resolve) => server.listen(transport.listenAddress, resolve))
   }
   await listen()
@@ -168,7 +184,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   }
 
   const dropConnections = (): void => {
-    for (const socket of [...sockets]) socket.destroy()
+    for (const socket of [...acceptedSockets]) socket.destroy()
   }
 
   /** A drain closes its connections gracefully, so the records it just wrote still arrive. */
@@ -178,7 +194,9 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
 
   const closeServer = (): Promise<void> =>
     new Promise<void>((resolve) => {
+      stopAccepting()
       server.close(() => resolve())
+      dropConnections()
     })
 
   return {
@@ -259,12 +277,10 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     cutConnections: () => dropConnections(),
     crash: () => {
       table.clear()
-      dropConnections()
-      server.close()
+      void closeServer()
     },
     restart: async () => {
       table.clear()
-      dropConnections()
       await closeServer()
       await listen()
     },
@@ -280,7 +296,6 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
           }),
     stop: async () => {
       table.clear()
-      dropConnections()
       await closeServer()
       rmSync(dir, { recursive: true, force: true })
     },
