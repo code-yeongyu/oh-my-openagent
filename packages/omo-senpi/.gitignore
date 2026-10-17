@@ -8,11 +8,13 @@
 !/plugin/extensions/memory-run-supervisor.mjs
 !/plugin/extensions/omo-memory-doctor.js
 !/plugin/extensions/omo-memory-memfs.js
+!/plugin/extensions/omo-memory-palace.js
 !/plugin/extensions/omo-computer-use.js
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js
 !/plugin/extensions/omo-side-panel.js
 !/plugin/extensions/omo-task.js
+!/plugin/extensions/omo-thread-client.js
 !/plugin/extensions/omo.js
 !/plugin/extensions/reflection-persona.md
 /plugin/skills/

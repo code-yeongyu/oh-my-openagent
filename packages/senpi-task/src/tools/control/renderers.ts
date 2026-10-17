@@ -144,6 +144,10 @@ function optionalToken(label: string, value: string | undefined): string | undef
 
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
+    case "uncertain":
+      return { color: "warning", text: `task_send ${details.reason} Effect id: ${details.effect_id}` }
+    case "failed":
+      return { color: "error", text: `task_send ${details.reason}: ${details.detail}. Action: ${details.action}.` }
     case "admission_refused":
     case "cwd_unavailable":
     case "config_generation_mismatch":

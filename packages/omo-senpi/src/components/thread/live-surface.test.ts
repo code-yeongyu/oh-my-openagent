@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { once } from "node:events"
+import { EventEmitter, once } from "node:events"
 import { mkdtempSync, rmSync } from "node:fs"
 import { createServer, type Socket } from "node:net"
 import { join, resolve } from "node:path"
@@ -146,6 +146,30 @@ describe("live thread session-control RPCs", () => {
       expect(typeof surface.setThinkingLevel).toBe("function")
       await expect(surface.setThinkingLevel("route-peer", "low")).rejects.toThrow(/^thread RPC request failed:/)
     })
+  })
+})
+
+describe("live thread frame decoding", () => {
+  test("#given a reply whose non-ASCII text arrives one byte per read #when it is decoded #then the text is identical to what the engine sent", async () => {
+    // given
+    const name = "한국어 모델 🙂 ｍｏｄｅｌ"
+    const socket = new EventEmitter() as EventEmitter & { write: (data: string | Uint8Array) => boolean; destroy: () => void }
+    socket.destroy = () => {}
+    socket.write = (data) => {
+      const text = typeof data === "string" ? data : ""
+      if (!text.endsWith("\n")) return true
+      const frame = JSON.parse(text) as { id: string }
+      const reply = Buffer.from(`${JSON.stringify({ id: frame.id, type: "response", success: true, data: { models: [{ provider: "p", id: "m", name }] } })}\n`)
+      queueMicrotask(() => { for (const byte of reply) socket.emit("data", Buffer.from([byte])) })
+      return true
+    }
+    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/tmp/byte-split.sock" }, exists: () => true, statusAll: NO_ENUMERATION, registry: NO_REGISTRY, connect: () => { queueMicrotask(() => socket.emit("connect")); return socket as never } })
+
+    // when
+    const models = await surface.getAvailableModels?.("route-peer")
+
+    // then
+    expect(models).toEqual([{ provider: "p", id: "m", name }])
   })
 })
 

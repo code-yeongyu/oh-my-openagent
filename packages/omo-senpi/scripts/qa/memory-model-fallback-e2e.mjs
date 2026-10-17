@@ -13,6 +13,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
@@ -86,7 +87,6 @@ function writeCompletionHold(completions) {
   const path = join(sandbox.root, "completion-hold.js")
   writeFileSync(path, `
 import { mkdirSync, readdirSync, watch } from "node:fs"
-import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 export default function holdUntilReflectionCompletes(pi) {
   pi.on("agent_settled", () => {

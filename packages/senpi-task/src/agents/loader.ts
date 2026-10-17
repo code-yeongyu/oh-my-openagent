@@ -1,5 +1,8 @@
 import { resolve } from "node:path"
 
+import { MERGED_OMO_CONFIG_PATH } from "@oh-my-opencode/omo-config-core"
+
+import { categoryShadowedAgentNames, categoryShadowMessage } from "./category-shadow"
 import { loadMarkdownAgent } from "./markdown"
 import { loadOmoAgentOverlays } from "./omo-overlay"
 import { listMarkdownAgentFiles, resolveAgentDefinitionLocations } from "./paths"
@@ -42,6 +45,15 @@ export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
   diagnostics.push(...omoOverlay.diagnostics)
   for (const definition of omoOverlay.agents) {
     overlayAgent(agents, definition)
+  }
+
+  for (const name of categoryShadowedAgentNames(omoOverlay.config, agents.keys())) {
+    diagnostics.push({
+      kind: "category_shadows_agent",
+      path: MERGED_OMO_CONFIG_PATH,
+      message: categoryShadowMessage(omoOverlay.config, name),
+      issuePaths: [`categories.${name}`],
+    })
   }
 
   return { agents: Object.fromEntries(agents), diagnostics }
