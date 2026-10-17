@@ -15,7 +15,7 @@ import type {
 import { CONSENT_CACHE_MS, createOmoNativeTelemetryComponent } from "./omo-native-component"
 import * as parallelSummaryModule from "./omo-native-parallel-summary"
 import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, OMO_NATIVE_SCHEMA_VERSION } from "./product-identity"
-import { rollupDir } from "./session-summary-store"
+import { OWNER_STALE_MS, summaryDir } from "./session-summary-storage"
 import {
   FIXED_NOW,
   createEnabledEnv,
@@ -87,13 +87,15 @@ function toolResult(): Record<string, unknown> {
 const DEAD_PID = 0x7fff_fff0
 
 function rollupFiles(stateDir: string): string[] {
-  return existsSync(rollupDir(stateDir)) ? readdirSync(rollupDir(stateDir)).filter((name) => name.endsWith(".json")) : []
+  return existsSync(summaryDir(stateDir)) ? readdirSync(summaryDir(stateDir)).filter((name) => name.endsWith(".json")) : []
 }
 
+// A killed owner: its pid is gone and its heartbeat went stale (but not expired), so recovery may claim it.
 function killWithoutShutdown(stateDir: string): void {
   for (const name of rollupFiles(stateDir)) {
-    const path = join(rollupDir(stateDir), name)
-    writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, "utf8")), pid: DEAD_PID }))
+    const path = join(summaryDir(stateDir), name)
+    const record: Record<string, unknown> = JSON.parse(readFileSync(path, "utf8"))
+    writeFileSync(path, JSON.stringify({ ...record, owner: { pid: DEAD_PID, bootId: "killed" }, heartbeatAt: Date.now() - OWNER_STALE_MS - 60_000 }))
   }
 }
 
@@ -564,7 +566,8 @@ describe("OmO Native telemetry component integration", () => {
 
         // then: only the enabled session reached the wire
         expect(nativeMessages(recorder.messages).filter(({ properties }) => properties?.$session_id === "hashed:opted-out")).toEqual([])
-        expect(rollupFiles(stateDir)).toEqual([])
+        // The opted-in session keeps its own closed window (it carries the sequence); nothing of the opted-out one is on disk.
+        expect(rollupFiles(stateDir)).toEqual(["hashed_opted-in.json"])
       })
     })
   }
@@ -830,7 +833,12 @@ describe("OmO Native telemetry component integration", () => {
 
         // then
         expect(recorder.messages.filter(({ event, properties }) => event === "session_summary" && properties?.$session_id === "hashed:killed")).toEqual([])
-        expect(rollupFiles(stateDir)).toEqual([])
+        // The killed session's window is gone; a clean quit leaves only the next session's window-less seq
+        // placeholder (so a resumed session continues its numbering), which holds nothing to send.
+        expect(rollupFiles(stateDir).filter((name) => name.includes("killed"))).toEqual([])
+        for (const name of rollupFiles(stateDir)) {
+          expect(JSON.parse(readFileSync(join(summaryDir(stateDir), name), "utf8"))).toMatchObject({ window: null })
+        }
       })
     })
   }
@@ -871,6 +879,8 @@ describe("OmO Native telemetry component integration", () => {
       const b = register("/project-b")
       await b.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("b", "/project-b"))
       await b.dispatch("turn_end", turnEnd(), inProject("b", "/project-b"))
+      // The sweep loads its sidecar asynchronously; shutdown awaits that in-flight sweep before it returns.
+      await b.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("b", "/project-b"))
 
       // then
       expect(recorder.messages.filter(({ event, properties }) => event === "session_summary" && properties?.$session_id === "hashed:a")).toEqual([])

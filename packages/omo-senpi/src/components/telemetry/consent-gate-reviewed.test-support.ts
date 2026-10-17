@@ -13,14 +13,18 @@ const SESSION_START_PATH = "called only from the session_started path, after the
 const FAN_IN = "capture fan-in: reaches a transport only through the session client the gate created; opted-out hashes are dropped"
 const THROUGH_FAN_IN = "hands the event to the component fan-in, which forwards only through the gated session client"
 const NOTICE_MARKER = "claimNotice runs only after isOmoNativeTelemetryEnabled returned true"
-const CONSENTED_RECORDER = "the session-summary recorder sends only when isConsented holds"
 const GATE: GateRoute = { kind: "gate" }
 const VIA_FAN_IN: GateRoute = { kind: "fan-in" }
 const VIA_SESSION_CLIENT: GateRoute = { kind: "session-client" }
 const GATE_OWNER = "the gate's owner: every writer runs after the isOmoNativeTelemetryEnabled early return"
 const CRASH_CLAIMS = "crash claims run from the gated session_started path"
 const IDENTITY_FILES = "salt and install id are created only by a gated hash or attribution call"
-const SUMMARY_STORE = "written only by the consent-checked session-summary recorder"
+const SUMMARY_STORE = "window, pending and owner files are written only by the session-summary recorder, which exists only when consent held at registration and re-reads it before every write"
+const SUMMARY_REMOVAL = "deletes or rename-claims a summary file inside the state dir; it adds no data, and the opted-out purge relies on it"
+const SUMMARY_RECOVERY = "recovery re-creates a window only for a record whose consent mark is on and whose scope still consents (isRecordSendable)"
+const OWNER_LIVENESS = "owner liveness: links back an owner entry it moved aside only when that entry changed meanwhile; it re-creates existing data, never new data"
+const PROCESS_START = "reads a process start time to judge owner liveness; it sends nothing and writes nothing"
+const SUMMARY_SEND = "sends a pending session_summary only while the component's consent gate holds, the same per-event read the fan-in makes"
 
 export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   {
@@ -54,7 +58,7 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   },
   {
     file: "omo-native-component.ts", fn: "forwardValidatedCapture",
-    guard: "",
+    guard: "unless(message.event === \"session_summary\" && message.uuid !== undefined && transport.captureImmediate !== undefined)",
     route: VIA_SESSION_CLIENT,
     call: "transport.capture(message)", reason: FAN_IN,
   },
@@ -121,12 +125,6 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     guard: "unless(prompt === undefined || completed.has(inputId))",
     route: VIA_FAN_IN,
     call: "options.client.captureEvent(\"prompt_submitted\")", reason: THROUGH_FAN_IN,
-  },
-  {
-    file: "omo-native-session-summary.ts", fn: "createSessionSummaryRecorder>emit",
-    guard: "",
-    route: VIA_FAN_IN,
-    call: "options.captureEvent(\"session_summary\")", reason: CONSENTED_RECORDER,
   },
   {
     file: "omo-native-session.ts", fn: "createOmoNativeSessionComponent>register>captureSessionStart",
@@ -226,43 +224,64 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     call: "writeFileSync(path)", reason: IDENTITY_FILES,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>write",
-    guard: "",
-    call: "mkdirSync(dir)", reason: SUMMARY_STORE,
+    file: "session-summary-delivery.ts", fn: "publishThroughState",
+    guard: "unless(capture === undefined || state.isConsented?.() !== true)",
+    route: GATE,
+    call: "capture(\"session_summary\")", reason: SUMMARY_SEND,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>write",
+    file: "session-summary-files.ts", fn: "writeJsonAtomic",
+    guard: "",
+    call: "mkdirSync(dirname(path))", reason: SUMMARY_STORE,
+  },
+  {
+    file: "session-summary-files.ts", fn: "writeJsonAtomic",
     guard: "",
     call: "writeFileSync(temp)", reason: SUMMARY_STORE,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>write",
+    file: "session-summary-files.ts", fn: "writeJsonAtomic",
     guard: "",
     call: "renameSync(temp)", reason: SUMMARY_STORE,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>remove",
+    file: "session-summary-files.ts", fn: "removeFile",
     guard: "",
-    call: "rmSync(pathOf(sessionHash))", reason: SUMMARY_STORE,
+    call: "rmSync(path)", reason: SUMMARY_REMOVAL,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
-    guard: "if(leftover !== null) if(owner !== pid && !isAlive(owner))",
-    call: "rmSync(path)", reason: SUMMARY_STORE,
-  },
-  {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
-    guard: "if(rollup !== undefined && now() - rollup.updatedAt > ROLLUP_TTL_MS)",
-    call: "rmSync(path)", reason: SUMMARY_STORE,
-  },
-  {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
+    file: "session-summary-files.ts", fn: "renameIfPresent",
     guard: "",
-    call: "renameSync(path)", reason: SUMMARY_STORE,
+    call: "renameSync(from)", reason: SUMMARY_REMOVAL,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
+    file: "session-summary-liveness.ts", fn: "removeIfUnchanged",
+    guard: "unless(!renameIfPresent(path, aside)) if(readText(aside) !== judged)",
+    call: "linkSync(aside)", reason: OWNER_LIVENESS,
+  },
+  {
+    file: "session-summary-process-start.ts", fn: "psStartTime",
     guard: "",
-    call: "rmSync(claimPath)", reason: SUMMARY_STORE,
+    call: "execFileSync(\"ps\")", reason: PROCESS_START,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "mkdirSync(dir)", reason: SUMMARY_RECOVERY,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "writeFileSync(temp)", reason: SUMMARY_RECOVERY,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "linkSync(temp)", reason: SUMMARY_RECOVERY,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "unlinkSync(temp)", reason: SUMMARY_REMOVAL,
   },
 ]

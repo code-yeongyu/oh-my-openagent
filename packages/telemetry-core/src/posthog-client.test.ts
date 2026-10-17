@@ -8,6 +8,7 @@ import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
   UNCONFIGURED_POSTHOG_API_KEY,
+  createDefaultPostHogTransport,
   createTelemetryClient,
   getTelemetryActivityStateFilePath,
   getTelemetryDistinctId,
@@ -277,6 +278,45 @@ describe("posthog telemetry client", () => {
       expect(existsSync(stateFilePath)).toBe(false)
     } finally {
       rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
+
+  // Acknowledgment contract: an ack-gated event (session_summary) may be retired only once it is on the
+  // wire. posthog-node's capture() enqueues after an async prepare step that flush() does not wait for, so
+  // the transport exposes captureImmediate, whose promise resolves after the HTTP request was answered.
+  test("#given the real PostHog transport #when an event is captured immediately #then the request carrying its uuid and time was sent before the promise resolved", async () => {
+    // given
+    const bodies: string[] = []
+    const options = {
+      host: "https://posthog.test",
+      disableGeoip: true,
+      enableExceptionAutocapture: false,
+      enableLocalEvaluation: false,
+      strictLocalEvaluation: true,
+      disableRemoteConfig: true,
+      disableCompression: true,
+      flushAt: 20,
+      flushInterval: 10_000,
+      fetch: async (_url: string, init: { readonly body?: unknown }) => {
+        bodies.push(String(init.body))
+        return new Response("{}", { status: 200 })
+      },
+    }
+    const transport = createDefaultPostHogTransport("test-key", options)
+    const uuid = "0b6c5d3e-2f1a-4c8b-9d7e-6a5b4c3d2e1f"
+    const createdAt = new Date("2026-05-25T01:02:03.000Z")
+
+    try {
+      // when
+      expect(transport.captureImmediate).toBeFunction()
+      await transport.captureImmediate?.({ distinctId: "machine-hash", event: "session_summary", properties: { turns: 1 }, uuid, timestamp: createdAt })
+
+      // then
+      const wire = bodies.join("\n")
+      expect(wire).toContain(uuid)
+      expect(wire).toContain(createdAt.toISOString())
+    } finally {
+      await transport.shutdown()
     }
   })
 })

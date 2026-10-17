@@ -14,6 +14,7 @@
 !/plugin/extensions/omo-member.js
 !/plugin/extensions/omo-side-panel.js
 !/plugin/extensions/omo-task.js
+!/plugin/extensions/omo-telemetry-recovery.js
 !/plugin/extensions/omo-thread-client.js
 !/plugin/extensions/omo.js
 !/plugin/extensions/reflection-persona.md

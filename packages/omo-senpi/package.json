@@ -10,6 +10,7 @@
     "#omo-memory-doctor-runtime": "./src/components/memory/commands/doctor-runtime.ts",
     "#omo-thread-client-runtime": "./src/components/thread/live-surface.ts",
     "#omo-memory-memfs-runtime": "./src/components/memory/commands/memfs-runtime.ts",
+    "#omo-telemetry-recovery-runtime": "./src/components/telemetry/session-summary-recovery.ts",
     "#omo-memory-palace-runtime": "./src/components/memory/palace/runtime.ts",
     "#omo-agent-toolkit-sdk": "./src/extension/agent-toolkit-sdk.ts"
   },

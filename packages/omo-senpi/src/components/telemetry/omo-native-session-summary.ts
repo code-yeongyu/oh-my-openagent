@@ -1,40 +1,35 @@
-import { createHash } from "node:crypto"
+import { randomUUID } from "node:crypto"
+import type { TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
 
-import type { EventTelemetryProperties, TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
-
-import type { OmoNativeEventName } from "./product-identity"
-import type { ConsentScope, StoredRollup, SummaryStore } from "./session-summary-store"
-import {
-  addTurn,
-  openWindow,
-  summaryProperties,
-  type EndedBy,
-  type SummaryTurn,
-  type SummaryWindow,
-} from "./session-summary-window"
+import type { TelemetrySessionRole } from "./session-role"
+import { CORRUPT } from "./session-summary-files"
+import type { SummaryPublish } from "./session-summary-delivery"
+import { createSummaryPublisher } from "./session-summary-publisher"
+import { createLazySummaryRecovery, memoizeLoad, type LoadSummaryRecovery } from "./session-summary-lazy-recovery"
+import { isSessionSampled } from "./session-summary-sampling"
+import { isRecordSendable, type ConsentScope, type SummaryStorage, type WindowRecord } from "./session-summary-storage"
+import { addTurn, newSummaryEpoch, openWindow, type EndedBy, type SummaryTurn, type SummaryWindow } from "./session-summary-window"
 
 export type { SummaryTurn } from "./session-summary-window"
+export type { SummaryPublication } from "./session-summary-publisher"
+export { RAW_TURN_SAMPLE_RATE, isSessionSampled } from "./session-summary-sampling"
 
-// Share of sessions whose raw turn_completed rows go to PostHog. Turns are sampled here only because
-// PostHog is today's only sink; the first-party collector receives every turn through its own path.
-export const RAW_TURN_SAMPLE_RATE = 0.05
 export const CHECKPOINT_MAX_TURNS = 50
 export const CHECKPOINT_MAX_WINDOW_MS = 30 * 60_000
+export const HEARTBEAT_INTERVAL_MS = 60_000
+
+export type ScheduleHeartbeat = (tick: () => void, intervalMs: number) => () => void
 
 export type SessionSummaryOptions = {
-  readonly captureEvent: (name: OmoNativeEventName, properties: EventTelemetryProperties) => void
-  readonly store: SummaryStore
-  readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
-  readonly sessionRole?: string
   /**
-   * Asked before every write, because consent can change mid-session. Without it nothing is recorded,
-   * and the session's own rollup file is deleted so no later process can send it.
+   * Asked before every write, because consent can change mid-session. Without it nothing is recorded, and
+   * the session's own window file is deleted so no later process can send it. Defaults to consented.
    */
-  readonly isConsented?: (options?: { readonly fresh?: boolean }) => boolean
-  /** The scope `isConsented` reads right now; stamped into every persisted window. */
+  readonly isConsented?: (check?: { readonly fresh?: boolean }) => boolean
+  /** The scope `isConsented` reads right now; stamped into every persisted record. */
   readonly consentScope?: () => ConsentScope
   /**
-   * Consent for the scope a persisted window came from, read when it is about to be sent or resumed:
+   * Consent for the scope a persisted record came from, read when it is about to be sent or resumed:
    * consent at send time wins over the mark written while the session was still opted in.
    */
   readonly isScopeConsented?: (scope: ConsentScope) => boolean
@@ -43,202 +38,302 @@ export type SessionSummaryOptions = {
    * further turn or shutdown arrives (a kill right after opting out). Returns the disarm function.
    */
   readonly scheduleConsentCheck?: (check: () => void) => () => void
+  readonly storage: SummaryStorage
+  /** The capture state publishes through the sidecar, so the entry bundle carries no publish code. */
+  readonly publish: SummaryPublish
+  readonly sessionRole: TelemetrySessionRole
+  /** Read when a window opens; the component resolves config, env and sink lazily behind it. */
+  readonly sampleRate: () => number
   readonly now?: () => number
-  readonly sampleRate?: number
+  readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
+  readonly scheduleHeartbeat?: ScheduleHeartbeat
+  /** Events the transport knows it dropped since the last call (todo 21 wires the OTLP sender's counter). */
+  readonly droppedEvents?: () => number
+  /** Loads the recovery sweep and the send step; defaults to the `#omo-telemetry-recovery-runtime` sidecar. */
+  readonly loadRecovery?: LoadSummaryRecovery
 }
 
 export type SessionSummaryRecorder = {
-  readonly isRawTurnSampled: (sessionHash: string) => boolean
   readonly sampleRate: number
-  readonly recordTurn: (sessionHash: string, turn: SummaryTurn) => void
-  /** `reload` keeps the session's sequence and file so the next registration continues it. */
-  readonly finish: (sessionHash: string, reason: string | undefined) => void
+  readonly isRawTurnSampled: (sessionHash: string) => boolean
+  /** Re-sends unacknowledged events (this process's and dead ones') and recovers abandoned windows. */
+  readonly recover: () => Promise<void>
+  /** Resolves when every publication this call started has been acknowledged or given up. */
+  readonly recordTurn: (sessionHash: string, turn: SummaryTurn) => Promise<void>
+  /** `reload` keeps the session's sequence so the next registration continues it. */
+  readonly finish: (sessionHash: string, reason: string | undefined) => Promise<void>
   /** Re-reads consent and, when it is off, deletes every window this process left on disk. */
   readonly purgeIfOptedOut: () => void
   /** Stops the periodic consent check; the session is going away. */
   readonly dispose: () => void
 }
 
-type Live = { nextSeq: number; window: SummaryWindow | null }
-
-export function isSessionSampled(sessionHash: string, sampleRate: number): boolean {
-  if (sampleRate >= 1) return true
-  if (sampleRate <= 0) return false
-  const bucket = createHash("sha256").update(`turn-sample:${sessionHash}`).digest().readUInt32BE(0)
-  return bucket / 0x1_0000_0000 < sampleRate
+export type LiveWindow = {
+  key: string
+  epoch: string
+  seq: number
+  sampleRate: number
+  windowId: string | null
+  window: SummaryWindow | null
 }
 
 export function createSessionSummaryRecorder(options: SessionSummaryOptions): SessionSummaryRecorder {
-  const now = options.now ?? Date.now
-  const sampleRate = options.sampleRate ?? RAW_TURN_SAMPLE_RATE
-  const sessionRole = options.sessionRole ?? "main"
+  const { storage } = options
+  const now = options.now ?? storage.now
   const isConsented = options.isConsented ?? (() => true)
   const consentScope = options.consentScope ?? (() => ({}))
   const isScopeConsented = options.isScopeConsented ?? (() => true)
-  const live = new Map<string, Live>()
-  // Seqs a session already used before it opted out, so opting back in never reuses a sent seq.
-  const retiredSeq = new Map<string, number>()
-  // Sessions with a file this process wrote; the periodic consent check runs only while one exists.
-  const onDisk = new Set<string>()
-  let disarm: (() => void) | undefined
-  let recovered = false
+  // A normal turn loads nothing: the sidecar is loaded when a window closes, a sweep has work, or a session
+  // continues a window another process wrote (only the sidecar can tell whether that owner is alive).
+  const loadSidecar = memoizeLoad(options.loadRecovery ?? (() => import("#omo-telemetry-recovery-runtime")))
+  const publisher = createSummaryPublisher({
+    storage,
+    publish: options.publish,
+    loadDelivery: loadSidecar,
+    isScopeConsented,
+    ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+    ...(options.droppedEvents === undefined ? {} : { transportDropped: options.droppedEvents }),
+  })
+  const live = new Map<string, LiveWindow>()
+  // Window files this process wrote, by session; the periodic consent check runs only while one exists.
+  const onDisk = new Map<string, string>()
+  const recovery = createLazySummaryRecovery({
+    storage,
+    publisher,
+    isScopeConsented,
+    ownWindowKeys: () => onDisk.values(),
+    load: loadSidecar,
+    ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+  })
+  let disarmConsentCheck: (() => void) | undefined
+  let swept = false
+  let stopHeartbeat: (() => void) | undefined
 
-  const track = (sessionHash: string, present: boolean): void => {
-    if (present) onDisk.add(sessionHash)
-    else onDisk.delete(sessionHash)
-    if (onDisk.size > 0 && disarm === undefined && options.scheduleConsentCheck !== undefined) {
-      disarm = options.scheduleConsentCheck(() => purgeIfOptedOut())
-    } else if (onDisk.size === 0 && disarm !== undefined) {
-      disarm()
-      disarm = undefined
+  const track = (sessionHash: string, key: string | undefined): void => {
+    if (key === undefined) onDisk.delete(sessionHash)
+    else onDisk.set(sessionHash, key)
+    if (onDisk.size > 0 && disarmConsentCheck === undefined && options.scheduleConsentCheck !== undefined) {
+      disarmConsentCheck = options.scheduleConsentCheck(() => purgeIfOptedOut())
+    } else if (onDisk.size === 0 && disarmConsentCheck !== undefined) {
+      disarmConsentCheck()
+      disarmConsentCheck = undefined
     }
   }
 
-  // Only a window marked opted in, whose originating scope is still opted in now, may be sent or resumed.
-  // A scope that cannot be read back (an older file, a damaged field) fails closed.
-  const stillConsented = (rollup: StoredRollup): ConsentScope | undefined => {
-    if (rollup.consent !== "enabled") return undefined
-    const scope = readScope(rollup.scope)
-    return scope !== undefined && isScopeConsented(scope) ? scope : undefined
+  const removeWindow = (sessionHash: string, key: string): void => {
+    storage.removeWindow(key)
+    if (onDisk.get(sessionHash) === key) track(sessionHash, undefined)
   }
 
-  const emit = (sessionHash: string, window: SummaryWindow, seq: number, endedBy: EndedBy, role: string): void => {
-    options.captureEvent("session_summary", summaryProperties(sessionHash, window, {
-      endedBy,
-      seq,
-      sampleRate,
-      sampled: isSessionSampled(sessionHash, sampleRate),
-      sessionRole: role,
-    }))
-  }
+  const report = (error: unknown): void => publisher.report("telemetry_activity_state_write_failed", error)
 
-  // Rollups a crashed or killed process left behind are sent once, from the first live event, so the
-  // capture path is already installed and only one of several racing processes claims each file. The
-  // claimer leaves a window-less placeholder carrying the next seq (and the orphan's age, so it expires),
-  // because the user may resume that session in any other process. An orphan without the opted-in mark
-  // (an opted-out session, or a file older than the mark) was claimed, which deleted it, and is not sent.
-  const recoverOrphans = (): void => {
-    if (recovered) return
-    recovered = true
-    for (const orphan of options.store.claimOrphans()) {
-      const scope = stillConsented(orphan)
-      if (scope === undefined) continue
-      const nextSeq = orphan.window === null ? orphan.nextSeq : orphan.nextSeq + 1
-      if (nextSeq > 0) {
-        writeSafely({ sessionHash: orphan.sessionHash, sessionRole: orphan.sessionRole, nextSeq, window: null, updatedAt: orphan.updatedAt, consent: "enabled", scope })
-      }
-      if (orphan.window !== null) emit(orphan.sessionHash, orphan.window, orphan.nextSeq, "recovered", orphan.sessionRole)
+  const recordOf = (sessionHash: string, entry: LiveWindow): WindowRecord => ({
+    consent: "enabled",
+    scope: consentScope(),
+    sessionHash,
+    sessionRole: options.sessionRole,
+    owner: storage.owner,
+    heartbeatAt: now(),
+    epoch: entry.epoch,
+    seq: entry.seq,
+    sampleRate: entry.sampleRate,
+    windowId: entry.windowId,
+    window: entry.window,
+  })
+
+  const persist = (sessionHash: string, entry: LiveWindow): void => {
+    try {
+      storage.writeWindow(entry.key, recordOf(sessionHash, entry))
+      track(sessionHash, entry.key)
+    } catch (error) {
+      report(error)
     }
   }
 
-  const liveFor = (sessionHash: string): Live => {
-    const cached = live.get(sessionHash)
-    if (cached !== undefined) return cached
-    const stored = options.store.read(sessionHash)
-    const resumable = stored !== undefined && stillConsented(stored) !== undefined
-    const entry: Live = resumable ? { nextSeq: stored.nextSeq, window: stored.window } : { nextSeq: 0, window: null }
-    entry.nextSeq = Math.max(entry.nextSeq, retiredSeq.get(sessionHash) ?? 0)
-    live.set(sessionHash, entry)
-    return entry
-  }
-
-  const persist = (sessionHash: string, entry: Live): void => {
-    writeSafely({ sessionHash, sessionRole, nextSeq: entry.nextSeq, window: entry.window, consent: "enabled", scope: consentScope() })
-  }
-
-  const remove = (sessionHash: string): void => {
-    options.store.remove(sessionHash)
-    track(sessionHash, false)
-  }
-
+  // Opting out drops the session with nothing left on disk: its live state and its window file. Opting back
+  // in starts a new epoch, so no (epoch, seq) pair it already sent can repeat.
   const discard = (sessionHash: string): void => {
-    const used = live.get(sessionHash)?.nextSeq ?? options.store.read(sessionHash)?.nextSeq ?? 0
-    if (used > 0) retiredSeq.set(sessionHash, Math.max(used, retiredSeq.get(sessionHash) ?? 0))
+    const key = live.get(sessionHash)?.key ?? onDisk.get(sessionHash)
     live.delete(sessionHash)
+    if (key === undefined) return
     try {
-      remove(sessionHash)
+      removeWindow(sessionHash, key)
     } catch (error) {
-      options.diagnostics?.({
-        event: "telemetry_activity_state_write_failed",
-        source: "omo-native-session-summary",
-        error: error instanceof Error ? error : new Error(String(error)),
-        errorKind: "error",
-      })
+      report(error)
     }
-  }
-
-  function writeSafely(rollup: Parameters<SummaryStore["write"]>[0]): void {
-    try {
-      options.store.write(rollup)
-      track(rollup.sessionHash, true)
-    } catch (error) {
-      options.diagnostics?.({
-        event: "telemetry_activity_state_write_failed",
-        source: "omo-native-session-summary",
-        error: error instanceof Error ? error : new Error(String(error)),
-        errorKind: "error",
-      })
-    }
-  }
-
-  // The closed window leaves disk BEFORE it is sent: a crash in between loses one window instead of
-  // sending it twice, so summed totals can only undercount, never double count.
-  const flush = (sessionHash: string, entry: Live, endedBy: EndedBy): void => {
-    const window = entry.window ?? openWindow(now(), 0)
-    const seq = entry.nextSeq
-    entry.nextSeq += 1
-    entry.window = null
-    if (endedBy === "shutdown") remove(sessionHash)
-    else persist(sessionHash, entry)
-    emit(sessionHash, window, seq, endedBy, sessionRole)
-  }
-
-  return {
-    sampleRate,
-    isRawTurnSampled: (sessionHash) => isSessionSampled(sessionHash, sampleRate),
-    recordTurn(sessionHash, turn) {
-      if (!isConsented()) return discard(sessionHash)
-      recoverOrphans()
-      const entry = liveFor(sessionHash)
-      const at = now()
-      entry.window ??= openWindow(at, turn.turnIndex)
-      addTurn(entry.window, turn, at)
-      if (entry.window.totals.length >= CHECKPOINT_MAX_TURNS || at - entry.window.startedAt >= CHECKPOINT_MAX_WINDOW_MS) {
-        flush(sessionHash, entry, "checkpoint")
-      } else {
-        persist(sessionHash, entry)
-      }
-    },
-    finish(sessionHash, reason) {
-      if (!isConsented()) return discard(sessionHash)
-      recoverOrphans()
-      const entry = liveFor(sessionHash)
-      live.delete(sessionHash)
-      if (reason === "reload") {
-        if (entry.window !== null) flush(sessionHash, entry, "reload")
-        else if (entry.nextSeq > 0) persist(sessionHash, entry)
-        return
-      }
-      if (entry.window !== null || entry.nextSeq > 0) flush(sessionHash, entry, "shutdown")
-      else remove(sessionHash)
-    },
-    purgeIfOptedOut,
-    dispose() {
-      disarm?.()
-      disarm = undefined
-    },
   }
 
   function purgeIfOptedOut(): void {
     if (onDisk.size === 0 && live.size === 0) return
     if (isConsented({ fresh: true })) return
-    for (const sessionHash of new Set([...onDisk, ...live.keys()])) discard(sessionHash)
+    for (const sessionHash of new Set([...onDisk.keys(), ...live.keys()])) discard(sessionHash)
+  }
+
+  const heartbeat = (): void => {
+    purgeIfOptedOut()
+    if (!isConsented()) return
+    // An idle session writes no window, so the tick itself keeps this owner's entry (boot id, start time) on disk.
+    try {
+      storage.register()
+    } catch (error) {
+      report(error)
+    }
+    for (const [sessionHash, entry] of live) if (entry.window !== null) persist(sessionHash, entry)
+    void runSweep()
+  }
+
+  // A sweep still loading its module is awaited by the next turn, which the synchronous sweep always preceded.
+  let sweepInFlight: Promise<void> | undefined
+  const runSweep = (): Promise<void> | undefined => {
+    try {
+      const loading = recovery.sweep()?.catch(report)
+      if (loading === undefined) return undefined
+      const settled = loading.finally(() => {
+        if (sweepInFlight === settled) sweepInFlight = undefined
+      })
+      sweepInFlight = settled
+      return settled
+    } catch (error) {
+      report(error)
+      return undefined
+    }
+  }
+
+  const sweepOnce = (): Promise<void> | undefined => {
+    if (swept) return sweepInFlight
+    swept = true
+    return runSweep()
+  }
+
+  const isOwn = (owner: WindowRecord["owner"]) => owner.pid === storage.owner.pid && owner.bootId === storage.owner.bootId
+
+  // Before a session adopts a window another process wrote, the sidecar (owner liveness, claims) must be loaded.
+  const loadLivenessFor = (sessionHash: string): Promise<unknown> | undefined => {
+    if (live.has(sessionHash) || recovery.runtime() !== undefined) return undefined
+    const stored = storage.readWindow(storage.windowKey(sessionHash))
+    return typeof stored === "object" && !isOwn(stored.owner) ? recovery.load().catch(report) : undefined
+  }
+
+  // What a turn or shutdown waits for first: the first sweep, then the liveness check it may need.
+  const ready = (sessionHash: string): Promise<unknown> | undefined => {
+    const sweeping = sweepOnce()
+    return sweeping === undefined ? loadLivenessFor(sessionHash) : sweeping.then(() => loadLivenessFor(sessionHash))
+  }
+
+  const ensureHeartbeat = (): void => {
+    if (stopHeartbeat !== undefined) return
+    stopHeartbeat = (options.scheduleHeartbeat ?? scheduleUnrefInterval)(heartbeat, HEARTBEAT_INTERVAL_MS)
+  }
+
+  const liveFor = (sessionHash: string): LiveWindow => {
+    const cached = live.get(sessionHash)
+    if (cached !== undefined) return cached
+    const entry = adopt(sessionHash)
+    live.set(sessionHash, entry)
+    return entry
+  }
+
+  // A session's file is continued by whoever records its next turn: this process's own file, or the file
+  // of a dead owner (claimed first, so two resuming processes never both continue it). Continuing a file keeps
+  // its epoch and seq; anything else (no usable file, a LIVE process's file, a lost claim) starts a new epoch at
+  // seq 0, so an own copy beside another process's window can never publish that window's (epoch, seq).
+  const adopt = (sessionHash: string): LiveWindow => {
+    const key = storage.windowKey(sessionHash)
+    const fresh = (entryKey = key, epoch = newSummaryEpoch(), seq = 0): LiveWindow => ({
+      key: entryKey, epoch, seq, sampleRate: options.sampleRate(), windowId: null, window: null,
+    })
+    const ownCopy = storage.windowKey(sessionHash, true)
+    const stored = storage.readWindow(key)
+    if (stored === undefined || stored === CORRUPT) return fresh()
+    // Only a window marked opted in, whose originating scope is still opted in now, may be continued.
+    if (!isRecordSendable(stored, isScopeConsented)) {
+      storage.removeWindow(key)
+      return fresh()
+    }
+    if (isOwn(stored.owner)) {
+      return { key, epoch: stored.epoch ?? newSummaryEpoch(), seq: stored.seq, sampleRate: stored.sampleRate, windowId: stored.windowId, window: stored.window }
+    }
+    // Without the sidecar (its load failed, already reported) the owner counts as alive: nothing is claimed.
+    return recovery.runtime()?.adopt({ key, ownCopy, stored, isScopeConsented, fresh, persist: (entry) => persist(sessionHash, entry) }) ?? fresh(ownCopy)
+  }
+
+  const close = (sessionHash: string, entry: LiveWindow, endedBy: EndedBy, keepFile: boolean): void => {
+    const window = entry.window ?? openWindow(now(), 0)
+    const windowId = entry.windowId ?? randomUUID()
+    const seq = entry.seq
+    void publisher.publishWindow({
+      consent: "enabled", scope: consentScope(), sessionHash, sessionRole: options.sessionRole, sampleRate: entry.sampleRate, epoch: entry.epoch, seq, windowId, window, endedBy,
+    }, () => {
+      entry.seq = seq + 1
+      entry.window = null
+      entry.windowId = null
+      if (keepFile) persist(sessionHash, entry)
+      else removeWindow(sessionHash, entry.key)
+    })
+  }
+
+  return {
+    get sampleRate() {
+      return options.sampleRate()
+    },
+    isRawTurnSampled: (sessionHash) => isSessionSampled(sessionHash, options.sampleRate()),
+    async recover() {
+      if (!isConsented()) return
+      swept = true
+      await runSweep()
+      await publisher.settled()
+    },
+    async recordTurn(sessionHash, turn) {
+      if (!isConsented()) return discard(sessionHash)
+      const waiting = ready(sessionHash)
+      if (waiting !== undefined) await waiting
+      ensureHeartbeat()
+      const entry = liveFor(sessionHash)
+      const at = now()
+      if (entry.window === null) {
+        entry.windowId = randomUUID()
+        entry.window = openWindow(at, turn.turnIndex)
+        entry.sampleRate = options.sampleRate()
+      }
+      addTurn(entry.window, turn, at)
+      if (entry.window.totals.length >= CHECKPOINT_MAX_TURNS || at - entry.window.startedAt >= CHECKPOINT_MAX_WINDOW_MS) {
+        close(sessionHash, entry, "checkpoint", true)
+      } else {
+        persist(sessionHash, entry)
+      }
+      await publisher.settled()
+    },
+    async finish(sessionHash, reason) {
+      if (!isConsented()) return discard(sessionHash)
+      const waiting = ready(sessionHash)
+      if (waiting !== undefined) await waiting
+      const entry = liveFor(sessionHash)
+      live.delete(sessionHash)
+      if (live.size === 0) {
+        stopHeartbeat?.()
+        stopHeartbeat = undefined
+      }
+      const ownCopy = entry.key !== storage.windowKey(sessionHash)
+      if (reason === "reload") {
+        if (entry.window !== null) close(sessionHash, entry, "reload", !ownCopy)
+        else if (entry.seq > 0 && !ownCopy) persist(sessionHash, entry)
+      } else if (entry.window !== null || entry.seq > 0) {
+        close(sessionHash, entry, "shutdown", !ownCopy)
+      } else {
+        removeWindow(sessionHash, entry.key)
+      }
+      await publisher.settled()
+    },
+    purgeIfOptedOut,
+    dispose() {
+      disarmConsentCheck?.()
+      disarmConsentCheck = undefined
+    },
   }
 }
 
-function readScope(value: unknown): ConsentScope | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
-  const cwd: unknown = Reflect.get(value, "cwd")
-  if (cwd === undefined) return {}
-  return typeof cwd === "string" ? { cwd } : undefined
+function scheduleUnrefInterval(tick: () => void, intervalMs: number): () => void {
+  const timer = setInterval(tick, intervalMs)
+  timer.unref?.()
+  return () => clearInterval(timer)
 }

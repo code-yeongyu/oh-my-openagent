@@ -15,6 +15,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo-memory-memfs.js"),
   join("extensions", "omo-memory-palace.js"),
   join("extensions", "omo-thread-client.js"),
+  join("extensions", "omo-telemetry-recovery.js"),
   join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
   join("extensions", "memory-run-supervisor.mjs"),

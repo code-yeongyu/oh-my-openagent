@@ -11,7 +11,7 @@ Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed machine id, 
 | Module | Key exports |
 |--------|-------------|
 | `record-daily-active.ts` | `recordDailyActive(input)` — orchestrator: enabled? → client → dedup → `trackActive` → flush → shutdown |
-| `posthog-client.ts` | `createTelemetryClient`, `isTelemetryClientEnabled`, `createDefaultPostHogTransport` |
+| `posthog-client.ts` | `createTelemetryClient`, `isTelemetryClientEnabled`, `createDefaultPostHogTransport`, `TelemetryDeliveryError` (`telemetry-delivery-error.ts`; `permanent` marks 400/413). The transport's `captureImmediate` resolves only on a 2xx answer and rejects with it otherwise; its sender (`posthog-immediate-send.ts`, given the PostHog class by the caller) is loaded on the first immediate send through the package import `#telemetry-immediate-send`, which bundlers inline and the senpi plugin maps to its telemetry sidecar; a failed load is retried by the next send. The package subpath `@oh-my-opencode/telemetry-core/immediate-send` exposes the same module (the sender plus `TelemetryDeliveryError`), so the sidecar takes it without the barrel and without posthog-node's top-level code |
 | `activity-state.ts` | `getDailyActiveCaptureState`, `resolveTelemetryStateDir`, `getTelemetryActivityStateFilePath` |
 | `env.ts` | `shouldDisableTelemetry`, `getTelemetryApiKey/Host`, `hasTelemetryApiKey` |
 | `machine-id.ts` | `getTelemetryDistinctId`, `getDefaultTelemetryOsProvider` |

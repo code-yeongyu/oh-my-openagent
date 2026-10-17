@@ -234,6 +234,29 @@ describe("event telemetry client", () => {
     expect(diagnostics.map((input) => input.event)).toEqual(["telemetry_event_property_dropped"])
   })
 
+  // Protocol contract: a caller-supplied uuid reaches the wire so a re-sent event (session_summary's ack-gated
+  // pending file) deduplicates in PostHog; a malformed uuid is rejected with a diagnostic and replaced by a
+  // freshly minted id, as is a missing one, and the id on the wire is always the event's event_id.
+  test("#given an event uuid #when captured #then a valid uuid reaches the transport and a malformed one is replaced", () => {
+    const recorder = createRecorder()
+    const diagnostics: TelemetryDiagnosticInput[] = []
+    const client = createClient(recorder, diagnostics)
+    const uuid = "0b6c5d3e-2f1a-4c8b-9d7e-6a5b4c3d2e1f"
+
+    const createdAt = new Date(1_700_000_000_000)
+    client.captureEvent("session_started", { reason: "a" }, { uuid, timestamp: createdAt })
+    client.captureEvent("session_started", { reason: "b" }, { uuid: "not-a-uuid" })
+    client.captureEvent("session_started", { reason: "c" })
+
+    const sent = recorder.messages.map((message) => message.uuid)
+    expect(sent[0]).toBe(uuid)
+    expect(sent.slice(1).every((id) => typeof id === "string" && id !== uuid && id !== "not-a-uuid")).toBe(true)
+    expect(recorder.messages.map((message) => message.properties?.event_id)).toEqual(sent)
+    // A re-sent event keeps its original time: PostHog's dedup key is the uuid within the event's day.
+    expect(recorder.messages.map((message) => message.timestamp?.getTime())).toEqual([createdAt.getTime(), undefined, undefined])
+    expect(diagnostics.map((input) => input.event)).toEqual(["telemetry_event_property_rejected"])
+  })
+
   test("#given a product with additionalProperties #when any event is captured #then they ride on the shared block without overriding fixed keys", () => {
     // given
     const recorder = createRecorder()

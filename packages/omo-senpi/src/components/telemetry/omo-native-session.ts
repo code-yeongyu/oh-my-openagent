@@ -29,6 +29,7 @@ import {
 } from "./product-identity"
 import { readOmoNativeInventory, type OmoNativeInventoryDiagnostic } from "./session-inventory"
 import { resolveSessionModelRegistry } from "./session-model-registry"
+import { resolveTelemetrySessionRole } from "./session-role-resolver"
 
 export type { OmoNativeInventoryDiagnostic }
 
@@ -110,6 +111,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           model_count: inventory.modelCount,
           providers: inventory.providers,
           reason,
+          session_role: resolveTelemetrySessionRole(pi, env),
           ...(timezone === undefined ? {} : { timezone }),
           ...(inventory.defaultProvider === undefined ? {} : { default_provider: inventory.defaultProvider }),
           ...(inventory.defaultModel === undefined ? {} : { default_model: inventory.defaultModel }),

@@ -142,6 +142,8 @@ Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_
 
 The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to OmO Native.
 
+`telemetry.rawTurnSampleRate` is a number from `0` to `1`: the share of sessions that also send one `turn_completed` event per assistant turn. Every session always sends its exact totals in `session_summary`. When unset it is `0.05`; the `OMO_TELEMETRY_RAW_TURN_SAMPLE_RATE` environment variable overrides it, and a value outside `0..1` is ignored. Turns a session does not send are never recoverable, so lower it only on purpose.
+
 ```jsonc
 {
   "[native]": {
