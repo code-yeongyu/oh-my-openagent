@@ -18,7 +18,10 @@ export {
   buildFrontendGuidanceSection,
   buildNonClaudePlannerSection,
   buildParallelDelegationSection,
+  PLAN_CONSULT_TRIGGERS,
 } from "./dynamic-agent-core-sections"
+
+export type { PlanConsultTrigger } from "./dynamic-agent-core-sections"
 
 export { buildCategorySkillsDelegationGuide } from "./dynamic-agent-category-skills-guide"
 
