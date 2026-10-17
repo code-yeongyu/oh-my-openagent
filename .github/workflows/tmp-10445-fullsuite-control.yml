@@ -1,0 +1,68 @@
+name: tmp-10445-fullsuite-control
+on:
+  push:
+    branches: [memsync/tmp-10445-fullsuite-control]
+jobs:
+  control:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Prepare both commits (before / after #10199), as the senpi-compatibility job does
+        shell: pwsh
+        run: |
+          foreach ($c in @("96b208343e28d5eaba15e220fedd682cfac33e14","90eaba6e93a4fbfdb342bd001e6b512e852bdc04")) {
+            $d = Join-Path (Resolve-Path "..") ("wt-" + $c.Substring(0,10))
+            git worktree add -q --detach $d $c
+            Push-Location $d
+            git submodule update --init --recursive -q
+            bun install --frozen-lockfile --ignore-scripts
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            bun run script/remove-stale-self-package-tests.ts
+            bun run build:senpi-plugin
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Output "READY $c $(git rev-parse HEAD)"
+            Pop-Location
+          }
+      - name: Interleaved full omo-senpi suite x4 each (#10445 control)
+        shell: pwsh
+        env:
+          CI: "1"
+          WINDOWS_TEST_SHARD: senpi-compatibility
+        run: |
+          $tally = @{ "96b208343e" = 0; "90eaba6e93" = 0 }
+          $rowTally = @{ "96b208343e" = 0; "90eaba6e93" = 0 }
+          for ($i = 1; $i -le 4; $i++) {
+            foreach ($c in @("96b208343e","90eaba6e93")) {
+              $d = Join-Path (Resolve-Path "..") ("wt-" + $c)
+              Push-Location $d
+              $art = Join-Path $env:RUNNER_TEMP ("tel-" + $c + "-" + $i)
+              $log = Join-Path $env:RUNNER_TEMP ("suite-" + $c + "-" + $i + ".log")
+              & pwsh -NoProfile -Command "& .github/scripts/windows-ci-telemetry.ps1 -ArtifactDirectory '$art' -Invocation senpi-compatibility -TestArguments @('test','packages/omo-senpi')" *> $log
+              $code = $LASTEXITCODE
+              Pop-Location
+              $fails = @(Select-String -Path $log -Pattern '^\(fail\)' | ForEach-Object { $_.Line })
+              $row = @($fails | Where-Object { $_ -like '*memory pressure dream wiring*' }).Count
+              if ($code -ne 0) { $tally[$c]++ }
+              if ($row -gt 0) { $rowTally[$c]++ }
+              Write-Output "RUN $i $c exit=$code fails=$($fails.Count) dreamRow=$row"
+              $fails | Select-Object -First 6 | ForEach-Object { Write-Output "  $_" }
+              if ($row -gt 0) {
+                Write-Output "  PREDECESSORS:"
+                $lines = Get-Content $log
+                $idx = ($lines | Select-String -Pattern 'memory pressure dream wiring' | Select-Object -First 1).LineNumber
+                $lines[[Math]::Max(0,$idx-80)..($idx-1)] | Select-String -Pattern '^[a-zA-Z0-9_./\\-]+\.test\.(ts|mjs|js):$' | ForEach-Object { Write-Output "    $($_.Line)" }
+              }
+            }
+          }
+          Write-Output "LOOP_DONE before_10199(96b208343e) failedRuns=$($tally['96b208343e'])/4 dreamRow=$($rowTally['96b208343e'])/4 | after_10199(90eaba6e93) failedRuns=$($tally['90eaba6e93'])/4 dreamRow=$($rowTally['90eaba6e93'])/4"
+          "### #10445 full-suite control: before #10199 dreamRow=$($rowTally['96b208343e'])/4 (failed runs $($tally['96b208343e'])/4); after #10199 dreamRow=$($rowTally['90eaba6e93'])/4 (failed runs $($tally['90eaba6e93'])/4)" | Out-File -Append $env:GITHUB_STEP_SUMMARY
