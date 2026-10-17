@@ -1,5 +1,6 @@
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { OhMyOpenCodeConfig } from "./config"
+import { isRecord } from "@oh-my-opencode/utils"
 
 import { applyAgentVariant } from "./shared/agent-variant"
 import { createChatParamsHandler } from "./plugin/chat-params"
@@ -39,7 +40,7 @@ export function createPluginInterface(args: {
     "chat.params": async (input: unknown, output: unknown) => {
       const chatParamsInput = input as {
         agent?: string | { name?: string }
-        model?: { providerID?: unknown; modelID?: unknown; id?: unknown }
+        model?: { providerID?: unknown; modelID?: unknown; id?: unknown; capabilities?: unknown }
         message?: { variant?: string }
       }
       const agentName =
@@ -50,7 +51,11 @@ export function createPluginInterface(args: {
       const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
       const modelID = typeof rawModelID === "string" ? rawModelID : undefined
       if (chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
-        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, {
+          providerID,
+          modelID,
+          runtimeModel: isRecord(chatParamsInput.model?.capabilities) ? chatParamsInput.model : undefined,
+        })
       }
       const handler = createChatParamsHandler({
         client: ctx.client,

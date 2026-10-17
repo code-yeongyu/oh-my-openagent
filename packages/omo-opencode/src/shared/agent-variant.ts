@@ -130,7 +130,7 @@ export function applyAgentVariant(
   config: OhMyOpenCodeConfig,
   agentName: string | undefined,
   message: { variant?: string },
-  currentModel: { providerID: string; modelID: string },
+  currentModel: GetModelCapabilitiesInput,
 ): void {
   const variant = resolveAgentVariant(config, agentName)
   if (variant === undefined || message.variant !== undefined) return
