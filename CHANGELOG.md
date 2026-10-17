@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Preemptive compaction no longer re-fires from a pre-compaction measurement, and an empty summary is not recorded as a success.** When a summarize outlives its budget and the prompt is replaced, the cached pre-compaction measurement is dropped, so a tool call landing before a fresh measurement can no longer justify a second compaction from a prompt that no longer exists. A summary with no text and zero output tokens is logged, warned about and left unlatched so a retry stays possible, and the summarize budget is raised from 60s to 120s, matching the degradation monitor. ([#8473](https://github.com/code-yeongyu/oh-my-openagent/pull/8473))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
