@@ -9,6 +9,8 @@ export const JSON_ERROR_TOOL_EXCLUDE_LIST = [
   "look_at",
   "grep_app_searchgithub",
   "websearch_web_search_exa",
+  "websearch_web_search",
+  "websearch_web_fetch",
   "todowrite",
   "todoread",
   "task",
