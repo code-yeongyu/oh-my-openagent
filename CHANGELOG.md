@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Cancelling a background task no longer races idle, assistant-error and session-error handling.** Cancellation intent is recorded before the session abort is awaited, concurrent duplicate cancellations are rejected, and deferred lifecycle events are replayed when an abort fails, discarded when it succeeds and cleared during shutdown. The runtime-fallback first-prompt watchdog is extended from 90 seconds to 3 minutes. ([#8167](https://github.com/code-yeongyu/oh-my-openagent/pull/8167))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
