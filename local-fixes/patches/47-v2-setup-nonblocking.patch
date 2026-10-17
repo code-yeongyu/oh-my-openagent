@@ -1,0 +1,814 @@
+From 2ffdf8fa63fb82affae889a0bf535e6dcacf3a74 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Sat, 17 Oct 2026 20:51:40 +0300
+Subject: [PATCH] fix(v2): keep per-folder plugin setup off the shared event
+ loop
+
+Every new OpenChamber chat folder runs the full plugin setup on the backend's one
+event loop. A CPU profile of that setup (isolated sandbox, the owner's real config:
+25 agents, 54 commands, 187 skill files) showed the synchronous work that stalls
+every other session while a folder activates:
+
+- detectWorktreePath (three copies: skills loader, command discovery, compat
+  command loader) ran `git rev-parse --show-toplevel` with execFileSync for each
+  new folder, even when no ancestor has a .git marker (chat folders never do), so
+  git can only fail; timeout 5 s each. Skip the spawn when there is no marker and
+  no GIT_DIR.
+- resolveSkillPathReferences used a lookbehind regex that JSC evaluates at every
+  offset: about 45 ms per pass over the 2.4 MB of skill text, once per folder.
+  Scan for "@" and check the preceding character by hand: identical output
+  (verified on all 187 files), about 0.4 ms.
+- team-mode dependency probes (tmux, git) spawned two processes per folder; probe
+  once per process with the default spawner.
+- built-in MCP runtime lookups ran a synchronous PATH search per folder; remember
+  default lookups per PATH value.
+- yield to the event loop between setup phases so one folder never holds it for
+  the whole setup.
+
+Isolated setup per new folder (steady state, 6 runs): 600-670 ms -> about 220 ms;
+time the loop is blocked 190-250 ms -> about 55 ms; longest synchronous slice
+about 200 ms -> about 55 ms (the remaining slice is fix 28's source fingerprint
+walk). No git process is spawned for a chat folder any more.
+
+(cherry picked from commit b2dc5e08b79c7553a4eb883767ffe804f1fbaea3)
+
+Review R5: the team-mode probes are shared per process but bounded. Every probe
+has a 3 s deadline and is killed on timeout, so callers always settle; concurrent
+callers share one in-flight probe; "available" is remembered per PATH value; a
+definite "unavailable" is remembered for 5 minutes and then retried; a timeout
+is never remembered. Injected spawners bypass the shared cache but keep the
+deadline.
+---
+ ...roject-discovery-dirs.no-git-spawn.test.ts |  46 +++++++
+ .../src/shared/project-discovery-dirs.ts      |   7 ++
+ .../team-mode/deps.once-per-process.test.ts   | 116 ++++++++++++++++++
+ .../src/features/team-mode/deps.ts            |  92 ++++++++++++--
+ .../runtime-executable.cached-lookup.test.ts  |  56 +++++++++
+ .../src/mcp/runtime-executable.ts             |  14 ++-
+ .../src/shared/project-discovery-dirs.test.ts |  25 ++++
+ .../src/shared/project-discovery-dirs.ts      |   7 ++
+ .../src/testing/create-plugin-module.ts       |   8 ++
+ packages/omo-opencode/src/v2/host.ts          |   8 ++
+ ...roject-discovery-dirs.no-git-spawn.test.ts |  58 +++++++++
+ .../src/shared/project-discovery-dirs.ts      |  24 ++++
+ ...kill-path-resolver.lookbehind-free.test.ts |  56 +++++++++
+ packages/utils/src/skill-path-resolver.ts     |  12 +-
+ 14 files changed, 519 insertions(+), 10 deletions(-)
+ create mode 100644 packages/claude-code-compat-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts
+ create mode 100644 packages/omo-opencode/src/features/team-mode/deps.once-per-process.test.ts
+ create mode 100644 packages/omo-opencode/src/mcp/runtime-executable.cached-lookup.test.ts
+ create mode 100644 packages/skills-loader-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts
+ create mode 100644 packages/skills-loader-core/src/shared/skill-path-resolver.lookbehind-free.test.ts
+
+diff --git a/packages/claude-code-compat-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts b/packages/claude-code-compat-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts
+new file mode 100644
+index 000000000..063f434d7
+--- /dev/null
++++ b/packages/claude-code-compat-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts
+@@ -0,0 +1,46 @@
++/// <reference types="bun-types" />
++
++import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
++import { mkdirSync, rmSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++
++const TEST_DIR = join(tmpdir(), `compat-discovery-no-git-${Date.now()}`)
++let gitSpawns = 0
++const savedGitDir = process.env.GIT_DIR
++
++describe("findProjectOpencodeCommandDirs without a .git marker (local fix 47)", () => {
++  beforeEach(() => {
++    mkdirSync(join(TEST_DIR, "chat", "session-1"), { recursive: true })
++    gitSpawns = 0
++    mock.module("node:child_process", () => ({
++      execFileSync: () => {
++        gitSpawns += 1
++        return TEST_DIR
++      },
++    }))
++  })
++
++  afterEach(() => {
++    mock.restore()
++    if (savedGitDir === undefined) delete process.env.GIT_DIR
++    else process.env.GIT_DIR = savedGitDir
++    rmSync(TEST_DIR, { recursive: true, force: true })
++  })
++
++  it("#given a chat folder outside any repository #when finding command dirs #then never spawns git", async () => {
++    delete process.env.GIT_DIR
++    const { findProjectOpencodeCommandDirs } = await import("./project-discovery-dirs")
++
++    expect(findProjectOpencodeCommandDirs(join(TEST_DIR, "chat", "session-1"))).toEqual([])
++    expect(gitSpawns).toBe(0)
++  })
++
++  it("#given GIT_DIR is set #when finding command dirs for a new folder #then still asks git", async () => {
++    process.env.GIT_DIR = join(TEST_DIR, "elsewhere.git")
++    const { findProjectOpencodeCommandDirs } = await import("./project-discovery-dirs")
++
++    findProjectOpencodeCommandDirs(join(TEST_DIR, "chat", "session-2-git-dir"))
++    expect(gitSpawns).toBe(1)
++  })
++})
+diff --git a/packages/claude-code-compat-core/src/shared/project-discovery-dirs.ts b/packages/claude-code-compat-core/src/shared/project-discovery-dirs.ts
+index 64607ae66..5a30d066a 100644
+--- a/packages/claude-code-compat-core/src/shared/project-discovery-dirs.ts
++++ b/packages/claude-code-compat-core/src/shared/project-discovery-dirs.ts
+@@ -45,6 +45,13 @@ function detectWorktreePath(directory: string): string | undefined {
+     return gitMarkerAncestor
+   }
+ 
++  // Local fix 47: with no .git marker in any ancestor (and no GIT_DIR) `git rev-parse` can only fail, but
++  // the synchronous spawn runs on the setup path of every new chat folder (seconds on a loaded machine).
++  if (!process.env.GIT_DIR) {
++    worktreePathCache.set(cacheKey, undefined)
++    return undefined
++  }
++
+   try {
+     const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+       cwd: resolvedDirectory,
+diff --git a/packages/omo-opencode/src/features/team-mode/deps.once-per-process.test.ts b/packages/omo-opencode/src/features/team-mode/deps.once-per-process.test.ts
+new file mode 100644
+index 000000000..a405792d2
+--- /dev/null
++++ b/packages/omo-opencode/src/features/team-mode/deps.once-per-process.test.ts
+@@ -0,0 +1,116 @@
++/// <reference types="bun-types" />
++
++import { afterEach, beforeEach, expect, mock, test } from "bun:test"
++
++import { TeamModeConfigSchema } from "../../config/schema/team-mode"
++
++const savedPath = process.env.PATH
++type FakeProc = { exited: Promise<number>; kill?: () => void }
++let behaviour: (cmd: string) => FakeProc = () => ({ exited: Promise.resolve(0) })
++const spawned: string[] = []
++
++beforeEach(async () => {
++  spawned.length = 0
++  behaviour = () => ({ exited: Promise.resolve(0) })
++  mock.module("../../shared/bun-spawn-shim", () => ({
++    spawn: (options: { cmd: string[] }) => {
++      spawned.push(options.cmd.join(" "))
++      return behaviour(options.cmd[0] ?? "")
++    },
++  }))
++  const { resetTeamModeProbeCache } = await import("./deps")
++  resetTeamModeProbeCache()
++  process.env.PATH = "/fix47/path-a"
++})
++
++afterEach(() => {
++  mock.restore()
++  process.env.PATH = savedPath
++})
++
++const config = () => TeamModeConfigSchema.parse({})
++
++test("default-spawner probes run once per process and PATH (local fix 47)", async () => {
++  const { checkTeamModeDependencies } = await import("./deps")
++
++  const first = await checkTeamModeDependencies(config(), { tmuxEnv: "" })
++  const second = await checkTeamModeDependencies(config(), { tmuxEnv: "" })
++
++  expect(first).toEqual({ tmuxAvailable: true, gitAvailable: true })
++  expect(second).toEqual(first)
++  expect(spawned).toEqual(["tmux -V", "git --version"])
++})
++
++test("concurrent callers share one in-flight probe", async () => {
++  const { checkTeamModeDependencies } = await import("./deps")
++  let release: (code: number) => void = () => {}
++  const gate = new Promise<number>((resolve) => { release = resolve })
++  behaviour = () => ({ exited: gate })
++
++  const a = checkTeamModeDependencies(config(), { tmuxEnv: "set" })
++  const b = checkTeamModeDependencies(config(), { tmuxEnv: "set" })
++  release(0)
++
++  expect(await a).toEqual({ tmuxAvailable: true, gitAvailable: true })
++  expect(await b).toEqual({ tmuxAvailable: true, gitAvailable: true })
++  expect(spawned).toEqual(["git --version"])
++})
++
++test("a probe that never exits is killed at its deadline, settles unavailable and is not remembered", async () => {
++  const { checkTeamModeDependencies } = await import("./deps")
++  let killed = 0
++  behaviour = () => ({ exited: new Promise<number>(() => {}), kill: () => { killed += 1 } })
++
++  const started = Date.now()
++  const report = await checkTeamModeDependencies(config(), { tmuxEnv: "set", probeTimeoutMs: 50 })
++
++  expect(report).toEqual({ tmuxAvailable: true, gitAvailable: false })
++  expect(Date.now() - started).toBeLessThan(2_000)
++  expect(killed).toBe(1)
++
++  behaviour = () => ({ exited: Promise.resolve(0) })
++  const retried = await checkTeamModeDependencies(config(), { tmuxEnv: "set", probeTimeoutMs: 50 })
++  expect(retried.gitAvailable).toBe(true)
++  expect(spawned).toEqual(["git --version", "git --version"])
++})
++
++test("a spawn failure is remembered only for the negative TTL, then the probe recovers", async () => {
++  const { checkTeamModeDependencies } = await import("./deps")
++  let clock = 1_000
++  const now = () => clock
++  behaviour = () => { throw new Error("ENOENT") }
++
++  expect((await checkTeamModeDependencies(config(), { tmuxEnv: "set", now })).gitAvailable).toBe(false)
++  behaviour = () => ({ exited: Promise.resolve(0) })
++  expect((await checkTeamModeDependencies(config(), { tmuxEnv: "set", now })).gitAvailable).toBe(false)
++  expect(spawned).toEqual(["git --version"])
++
++  clock += 5 * 60_000 + 1
++  expect((await checkTeamModeDependencies(config(), { tmuxEnv: "set", now })).gitAvailable).toBe(true)
++  expect(spawned).toEqual(["git --version", "git --version"])
++})
++
++test("a PATH change probes again", async () => {
++  const { checkTeamModeDependencies } = await import("./deps")
++
++  await checkTeamModeDependencies(config(), { tmuxEnv: "set" })
++  process.env.PATH = "/fix47/path-b"
++  await checkTeamModeDependencies(config(), { tmuxEnv: "set" })
++
++  expect(spawned).toEqual(["git --version", "git --version"])
++})
++
++test("an injected spawner is never cached and is bounded by the same deadline", async () => {
++  const { checkTeamModeDependencies } = await import("./deps")
++  let calls = 0
++  const spawn = (() => {
++    calls += 1
++    return { exited: new Promise<number>(() => {}), kill: () => {} }
++  }) as never
++
++  const report = await checkTeamModeDependencies(config(), { spawn, tmuxEnv: "", probeTimeoutMs: 30 })
++  await checkTeamModeDependencies(config(), { spawn, tmuxEnv: "", probeTimeoutMs: 30 })
++
++  expect(report).toEqual({ tmuxAvailable: false, gitAvailable: false })
++  expect(calls).toBe(4)
++})
+diff --git a/packages/omo-opencode/src/features/team-mode/deps.ts b/packages/omo-opencode/src/features/team-mode/deps.ts
+index 889ff3e70..e58e1ee45 100644
+--- a/packages/omo-opencode/src/features/team-mode/deps.ts
++++ b/packages/omo-opencode/src/features/team-mode/deps.ts
+@@ -11,6 +11,8 @@ type Spawn = typeof spawn
+ type TeamModeDependencyDeps = {
+   readonly spawn?: Spawn
+   readonly tmuxEnv?: string
++  readonly probeTimeoutMs?: number
++  readonly now?: () => number
+ }
+ 
+ export async function checkTeamModeDependencies(
+@@ -18,9 +20,15 @@ export async function checkTeamModeDependencies(
+   deps: TeamModeDependencyDeps = {},
+ ): Promise<TeamModeDependencyReport> {
+   const spawnImpl = deps.spawn ?? spawn
++  const timeoutMs = deps.probeTimeoutMs ?? PROBE_TIMEOUT_MS
++  const now = deps.now ?? Date.now
++  const probe = (cmd: string, args: string[]): Promise<boolean> =>
++    deps.spawn === undefined
++      ? probeBinaryShared(cmd, args, spawnImpl, timeoutMs, now)
++      : probeBinary(cmd, args, spawnImpl, timeoutMs).then((outcome) => outcome === "available")
+   const tmuxEnv = deps.tmuxEnv ?? process.env["TMUX"]
+-  const tmuxAvailable = Boolean(tmuxEnv) || (await probeBinary("tmux", ["-V"], spawnImpl))
+-  const gitAvailable = await probeBinary("git", ["--version"], spawnImpl)
++  const tmuxAvailable = Boolean(tmuxEnv) || (await probe("tmux", ["-V"]))
++  const gitAvailable = await probe("git", ["--version"])
+   if (config.tmux_visualization && !tmuxAvailable) {
+     console.warn(
+       "[team-mode] tmux_visualization=true but tmux not available; layout will be skipped at runtime",
+@@ -29,13 +37,83 @@ export async function checkTeamModeDependencies(
+   return { tmuxAvailable, gitAvailable }
+ }
+ 
+-async function probeBinary(cmd: string, args: string[], spawnImpl: Spawn): Promise<boolean> {
++// Local fix 47: binary availability rarely changes between chat folders, but each probe is a child-process
++// spawn on the setup path of every new folder. Default-spawner probes are shared per process, keyed by the
++// executable search path, with an explicit policy:
++//   - every probe has a deadline; a probe that does not exit in time is killed and reported unavailable,
++//     so callers always settle and a wedged executable cannot hold later folder setups;
++//   - concurrent callers share one in-flight probe;
++//   - "available" is remembered for the process (per PATH);
++//   - a definite "unavailable" (non-zero exit, spawn failure) is remembered for NEGATIVE_TTL_MS, then retried;
++//   - a timeout is never remembered: the next caller probes again.
++const PROBE_TIMEOUT_MS = 3_000
++const NEGATIVE_TTL_MS = 5 * 60_000
++
++type ProbeOutcome = "available" | "unavailable" | "timeout"
++type SharedProbe = { readonly pending?: Promise<boolean>; readonly available?: boolean; readonly until?: number }
++
++const sharedProbes = new Map<string, SharedProbe>()
++
++function probeKey(cmd: string, args: string[]): string {
++  return `${process.env.PATH ?? process.env.Path ?? ""}\0${[cmd, ...args].join(" ")}`
++}
++
++function probeBinaryShared(
++  cmd: string,
++  args: string[],
++  spawnImpl: Spawn,
++  timeoutMs: number,
++  now: () => number,
++): Promise<boolean> {
++  const key = probeKey(cmd, args)
++  const entry = sharedProbes.get(key)
++  if (entry?.pending !== undefined) return entry.pending
++  if (entry?.available === true) return Promise.resolve(true)
++  if (entry?.available === false && entry.until !== undefined && now() < entry.until) return Promise.resolve(false)
++  const pending = probeBinary(cmd, args, spawnImpl, timeoutMs).then((outcome) => {
++    if (outcome === "available") sharedProbes.set(key, { available: true })
++    else if (outcome === "unavailable") sharedProbes.set(key, { available: false, until: now() + NEGATIVE_TTL_MS })
++    else sharedProbes.delete(key)
++    return outcome === "available"
++  })
++  sharedProbes.set(key, { pending })
++  return pending
++}
++
++/** Test hook: forget every shared probe result. */
++export function resetTeamModeProbeCache(): void {
++  sharedProbes.clear()
++}
++
++async function probeBinary(cmd: string, args: string[], spawnImpl: Spawn, timeoutMs: number): Promise<ProbeOutcome> {
++  let proc: ReturnType<Spawn>
++  try {
++    proc = spawnImpl({ cmd: [cmd, ...args], stdout: "pipe", stderr: "pipe" })
++  } catch (error) {
++    error instanceof Error
++    return "unavailable"
++  }
++  let timer: ReturnType<typeof setTimeout> | undefined
++  const deadline = new Promise<"timeout">((resolve) => {
++    timer = setTimeout(() => resolve("timeout"), timeoutMs)
++  })
+   try {
+-    const proc = spawnImpl({ cmd: [cmd, ...args], stdout: "pipe", stderr: "pipe" })
+-    const code = await proc.exited
+-    return code === 0
++    const result = await Promise.race([
++      proc.exited.then((code): ProbeOutcome => (code === 0 ? "available" : "unavailable")),
++      deadline,
++    ])
++    if (result === "timeout") {
++      try {
++        proc.kill?.()
++      } catch (error) {
++        error instanceof Error
++      }
++    }
++    return result
+   } catch (error) {
+     error instanceof Error
+-    return false
++    return "unavailable"
++  } finally {
++    if (timer !== undefined) clearTimeout(timer)
+   }
+ }
+diff --git a/packages/omo-opencode/src/mcp/runtime-executable.cached-lookup.test.ts b/packages/omo-opencode/src/mcp/runtime-executable.cached-lookup.test.ts
+new file mode 100644
+index 000000000..c64bdffd4
+--- /dev/null
++++ b/packages/omo-opencode/src/mcp/runtime-executable.cached-lookup.test.ts
+@@ -0,0 +1,56 @@
++/// <reference types="bun-types" />
++
++import { afterEach, expect, mock, test } from "bun:test"
++
++const savedPath = process.env.PATH
++
++afterEach(() => {
++  mock.restore()
++  process.env.PATH = savedPath
++})
++
++test("resolveRuntimeExecutable remembers default PATH lookups per PATH value (local fix 47)", async () => {
++  // given
++  const lookups: string[] = []
++  mock.module("../shared/bun-which-shim", () => ({
++    bunWhich: (name: string) => {
++      lookups.push(name)
++      return name === "fix47-present" ? `/bin/${name}` : null
++    },
++  }))
++  const { resolveRuntimeExecutable } = await import("./runtime-executable")
++  process.env.PATH = "/fix47/a"
++
++  // when
++  const first = resolveRuntimeExecutable("fix47-present")
++  const again = resolveRuntimeExecutable("fix47-present")
++  const missing = resolveRuntimeExecutable("fix47-missing")
++  const missingAgain = resolveRuntimeExecutable("fix47-missing")
++  process.env.PATH = "/fix47/b"
++  const afterPathChange = resolveRuntimeExecutable("fix47-present")
++
++  // then
++  expect(first).toEqual({ command: "/bin/fix47-present", available: true })
++  expect(again).toEqual(first)
++  expect(missing).toEqual({ command: "fix47-missing", available: false })
++  expect(missingAgain).toEqual(missing)
++  expect(afterPathChange).toEqual(first)
++  expect(lookups).toEqual(["fix47-present", "fix47-missing", "fix47-present"])
++})
++
++test("resolveRuntimeExecutable never caches an injected lookup", async () => {
++  // given
++  const { resolveRuntimeExecutable } = await import("./runtime-executable")
++  let calls = 0
++  const which = () => {
++    calls += 1
++    return "/x/tool"
++  }
++
++  // when
++  resolveRuntimeExecutable("tool", { which })
++  resolveRuntimeExecutable("tool", { which })
++
++  // then
++  expect(calls).toBe(2)
++})
+diff --git a/packages/omo-opencode/src/mcp/runtime-executable.ts b/packages/omo-opencode/src/mcp/runtime-executable.ts
+index 117438c9a..064be9d96 100644
+--- a/packages/omo-opencode/src/mcp/runtime-executable.ts
++++ b/packages/omo-opencode/src/mcp/runtime-executable.ts
+@@ -15,6 +15,18 @@ type RuntimeExecutableOptions = {
+ 
+ const NODE_EXECUTABLE_NAMES = new Set(["node", "node.exe"])
+ 
++// Local fix 47: the built-in MCP configs resolve the same executables for every new chat folder; a PATH
++// search is synchronous file-system work on the shared event loop. Remember default lookups per PATH value.
++const defaultLookups = new Map<string, string | null>()
++
++function cachedBunWhich(commandName: string): string | null {
++  const key = `${process.env.PATH ?? process.env.Path ?? ""}\0${commandName}`
++  if (defaultLookups.has(key)) return defaultLookups.get(key) ?? null
++  const resolved = bunWhich(commandName)
++  defaultLookups.set(key, resolved)
++  return resolved
++}
++
+ function isUnsafeCommandName(commandName: string): boolean {
+   if (commandName.length === 0) return true
+   if (commandName.includes("/") || commandName.includes("\\")) return true
+@@ -39,7 +51,7 @@ export function resolveRuntimeExecutable(commandName: string, options: RuntimeEx
+     return { command: execPath, available: true }
+   }
+ 
+-  const resolved = (options.which ?? bunWhich)(commandName)
++  const resolved = (options.which ?? cachedBunWhich)(commandName)
+   if (resolved) {
+     return { command: resolved, available: true }
+   }
+diff --git a/packages/omo-opencode/src/shared/project-discovery-dirs.test.ts b/packages/omo-opencode/src/shared/project-discovery-dirs.test.ts
+index 54159ac41..364fe8c52 100644
+--- a/packages/omo-opencode/src/shared/project-discovery-dirs.test.ts
++++ b/packages/omo-opencode/src/shared/project-discovery-dirs.test.ts
+@@ -24,6 +24,9 @@ describe("project-discovery-dirs", () => {
+ 
+   it("#given repeated worktree detection #when detecting twice #then reuses the cached result", async () => {
+     worktreeSpawnCount = 0
++    // Local fix 47: without a .git marker git is only asked when GIT_DIR points elsewhere.
++    const savedGitDir = process.env.GIT_DIR
++    process.env.GIT_DIR = join(TEST_DIR, "elsewhere.git")
+     mock.module("node:child_process", () => ({
+       execFileSync: () => {
+         worktreeSpawnCount += 1
+@@ -36,6 +39,28 @@ describe("project-discovery-dirs", () => {
+     expect(detectWorktreePath("/some/dir")).toBe(canonicalPath(TEST_DIR))
+     expect(detectWorktreePath("/some/dir")).toBe(canonicalPath(TEST_DIR))
+     expect(worktreeSpawnCount).toBe(1)
++    if (savedGitDir === undefined) delete process.env.GIT_DIR
++    else process.env.GIT_DIR = savedGitDir
++  })
++
++  it("#given a folder with no .git marker and no GIT_DIR #when detecting #then never spawns git (local fix 47)", async () => {
++    worktreeSpawnCount = 0
++    const savedGitDir = process.env.GIT_DIR
++    delete process.env.GIT_DIR
++    mock.module("node:child_process", () => ({
++      execFileSync: () => {
++        worktreeSpawnCount += 1
++        return TEST_DIR
++      },
++    }))
++    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
++    clearWorktreeCache()
++    const chat = join(TEST_DIR, "chats", "session-1")
++    mkdirSync(chat, { recursive: true })
++
++    expect(detectWorktreePath(chat)).toBeUndefined()
++    expect(worktreeSpawnCount).toBe(0)
++    if (savedGitDir !== undefined) process.env.GIT_DIR = savedGitDir
+   })
+ 
+   it("#given nested opencode skill directories #when finding them #then aliases resolve nearest-first", async () => {
+diff --git a/packages/omo-opencode/src/shared/project-discovery-dirs.ts b/packages/omo-opencode/src/shared/project-discovery-dirs.ts
+index 5f9bd00be..0ece9afbe 100644
+--- a/packages/omo-opencode/src/shared/project-discovery-dirs.ts
++++ b/packages/omo-opencode/src/shared/project-discovery-dirs.ts
+@@ -107,6 +107,13 @@ export function detectWorktreePath(directory: string): string | undefined {
+     return gitMetadataRoot
+   }
+ 
++  // Local fix 47: with no .git marker in any ancestor (and no GIT_DIR) `git rev-parse` can only fail, but
++  // the synchronous spawn runs on the setup path of every new chat folder (seconds on a loaded machine).
++  if (!process.env.GIT_DIR) {
++    worktreePathCache.set(cacheKey, undefined)
++    return undefined
++  }
++
+   try {
+     const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+       cwd: resolvedDirectory,
+diff --git a/packages/omo-opencode/src/testing/create-plugin-module.ts b/packages/omo-opencode/src/testing/create-plugin-module.ts
+index 82c9d2b06..b04d0a52f 100644
+--- a/packages/omo-opencode/src/testing/create-plugin-module.ts
++++ b/packages/omo-opencode/src/testing/create-plugin-module.ts
+@@ -177,6 +177,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+       setupTimings[name] = now - setupPhaseStartedAt;
+       setupPhaseStartedAt = now;
+     };
++    // Local fix 47: every plugin setup shares the backend's one event loop with all open sessions; yield
++    // between phases so no new chat folder holds it for the whole setup in one stretch.
++    const yieldSetupSlice = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+     deps.logLegacyPluginStartupWarning()
+     deps.migrateLegacyWorkspaceDirectory(input.directory)
+     startupMigration ??= deps.runOpenCodeStartupMigration({ cwd: input.directory })
+@@ -200,6 +203,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+       targetBackupPaths: startupMigration.targetBackupPaths,
+     })
+     markSetupPhase("startupMigrationAndValidation");
++    await yieldSetupSlice();
+     if (toast !== undefined) showStartupToast(input.client, toast, deps.log)
+ 
+     // Unconditional omo process hygiene (T16): fire-and-forget family sweep,
+@@ -302,6 +306,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+     const modelCacheState = deps.createModelCacheState()
+ 
+     markSetupPhase("pluginInit");
++    await yieldSetupSlice();
+     const managers = deps.createManagers({
+       ctx: input,
+       pluginConfig,
+@@ -312,6 +317,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+     })
+ 
+     markSetupPhase("managers");
++    await yieldSetupSlice();
+     const toolsResult = await deps.createTools({
+       ctx: input,
+       pluginConfig,
+@@ -319,6 +325,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+     })
+ 
+     markSetupPhase("tools");
++    await yieldSetupSlice();
+     const hooks = deps.createHooks({
+       ctx: input,
+       pluginConfig,
+@@ -333,6 +340,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+     })
+ 
+     markSetupPhase("hooks");
++    await yieldSetupSlice();
+     const pluginInterface = deps.createPluginInterface({
+       ctx: input,
+       pluginConfig,
+diff --git a/packages/omo-opencode/src/v2/host.ts b/packages/omo-opencode/src/v2/host.ts
+index 23f67b04e..5cb59d6f9 100644
+--- a/packages/omo-opencode/src/v2/host.ts
++++ b/packages/omo-opencode/src/v2/host.ts
+@@ -9,6 +9,11 @@ import { projectV1Surface } from "./project-config"
+ 
+ type V1Server = (input: never, options: unknown) => Promise<V1HookMap>
+ 
++// Local fix 47: hand the shared backend event loop back between setup stages of a new folder.
++function yieldToEventLoop(): Promise<void> {
++  return new Promise((resolve) => setImmediate(resolve))
++}
++
+ function isRecord(value: unknown): value is Record<string, unknown> {
+   return typeof value === "object" && value !== null
+ }
+@@ -38,7 +43,9 @@ export async function setupOpenCodeV2(
+     return
+   }
+ 
++  await yieldToEventLoop()
+   const stopEvents = await registerV1Hooks(ctx, hooks, state)
++  await yieldToEventLoop()
+   const scratch: Record<string, unknown> = {}
+   if (typeof hooks.config === "function") {
+     try {
+@@ -50,6 +57,7 @@ export async function setupOpenCodeV2(
+     }
+   }
+ 
++  await yieldToEventLoop()
+   try {
+     await projectV1Surface({
+       ctx,
+diff --git a/packages/skills-loader-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts b/packages/skills-loader-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts
+new file mode 100644
+index 000000000..50be2554e
+--- /dev/null
++++ b/packages/skills-loader-core/src/shared/project-discovery-dirs.no-git-spawn.test.ts
+@@ -0,0 +1,58 @@
++/// <reference types="bun-types" />
++
++import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
++import { mkdirSync, rmSync } from "node:fs"
++import { tmpdir } from "node:os"
++import { join } from "node:path"
++
++const TEST_DIR = join(tmpdir(), `skills-discovery-no-git-${Date.now()}`)
++let gitSpawns = 0
++const savedGitDir = process.env.GIT_DIR
++
++describe("detectWorktreePath without a .git marker (local fix 47)", () => {
++  beforeEach(() => {
++    mkdirSync(join(TEST_DIR, "chat", "session-1"), { recursive: true })
++    gitSpawns = 0
++    mock.module("node:child_process", () => ({
++      execFileSync: () => {
++        gitSpawns += 1
++        return TEST_DIR
++      },
++    }))
++  })
++
++  afterEach(() => {
++    mock.restore()
++    if (savedGitDir === undefined) delete process.env.GIT_DIR
++    else process.env.GIT_DIR = savedGitDir
++    rmSync(TEST_DIR, { recursive: true, force: true })
++  })
++
++  it("#given a folder with no .git in any ancestor #when detecting #then returns undefined without spawning git", async () => {
++    delete process.env.GIT_DIR
++    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
++    clearWorktreeCache()
++
++    expect(detectWorktreePath(join(TEST_DIR, "chat", "session-1"))).toBeUndefined()
++    expect(gitSpawns).toBe(0)
++  })
++
++  it("#given a .git marker in an ancestor #when detecting #then still asks git", async () => {
++    delete process.env.GIT_DIR
++    mkdirSync(join(TEST_DIR, ".git"), { recursive: true })
++    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
++    clearWorktreeCache()
++
++    detectWorktreePath(join(TEST_DIR, "chat", "session-1"))
++    expect(gitSpawns).toBe(1)
++  })
++
++  it("#given GIT_DIR is set #when detecting a folder without a marker #then still asks git", async () => {
++    process.env.GIT_DIR = join(TEST_DIR, "elsewhere.git")
++    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
++    clearWorktreeCache()
++
++    detectWorktreePath(join(TEST_DIR, "chat", "session-1"))
++    expect(gitSpawns).toBe(1)
++  })
++})
+diff --git a/packages/skills-loader-core/src/shared/project-discovery-dirs.ts b/packages/skills-loader-core/src/shared/project-discovery-dirs.ts
+index 9a26f6b91..3d9651ea4 100644
+--- a/packages/skills-loader-core/src/shared/project-discovery-dirs.ts
++++ b/packages/skills-loader-core/src/shared/project-discovery-dirs.ts
+@@ -76,6 +76,23 @@ function findAncestorDirectories(
+   }
+ }
+ 
++function hasGitMarkerAncestor(startDirectory: string): boolean {
++  let currentDirectory = normalizePath(startDirectory)
++
++  while (true) {
++    if (existsSync(join(currentDirectory, ".git"))) {
++      return true
++    }
++
++    const parentDirectory = dirname(currentDirectory)
++    if (parentDirectory === currentDirectory) {
++      return false
++    }
++
++    currentDirectory = normalizePath(parentDirectory)
++  }
++}
++
+ export function clearWorktreeCache(): void {
+   worktreePathCache.clear()
+ }
+@@ -87,6 +104,13 @@ export function detectWorktreePath(directory: string): string | undefined {
+     return worktreePathCache.get(cacheKey)
+   }
+ 
++  // Local fix 47: with no .git marker in any ancestor (and no GIT_DIR) `git rev-parse` can only fail, but
++  // the synchronous spawn runs on the setup path of every new chat folder (seconds on a loaded machine).
++  if (!hasGitMarkerAncestor(resolvedDirectory) && !process.env.GIT_DIR) {
++    worktreePathCache.set(cacheKey, undefined)
++    return undefined
++  }
++
+   try {
+     const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+       cwd: resolvedDirectory,
+diff --git a/packages/skills-loader-core/src/shared/skill-path-resolver.lookbehind-free.test.ts b/packages/skills-loader-core/src/shared/skill-path-resolver.lookbehind-free.test.ts
+new file mode 100644
+index 000000000..fc6d00a87
+--- /dev/null
++++ b/packages/skills-loader-core/src/shared/skill-path-resolver.lookbehind-free.test.ts
+@@ -0,0 +1,56 @@
++import { describe, it, expect } from "bun:test"
++import { resolveSkillPathReferences } from "./skill-path-resolver"
++
++// The lookbehind form this resolver used before local fix 47; kept here only as the reference result.
++function referenceMatches(content: string): string {
++	const marker: string[] = []
++	content.replace(/(?<![a-zA-Z0-9="\(])@([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.\-\/]*)/g, (match: string, path: string, offset: number) => {
++		marker.push(`${offset}:${path}`)
++		return match
++	})
++	return marker.join("|")
++}
++
++describe("resolveSkillPathReferences without lookbehind (local fix 47)", () => {
++	const basePath = "/skills/frontend"
++
++	it("#given a reference preceded by a word, quote, equals or paren #when resolving #then leaves it unchanged", () => {
++		for (const prefix of ["x", "Z", "7", "=", "\"", "("]) {
++			const content = `see ${prefix}@scripts/run.py now`
++			expect(resolveSkillPathReferences(content, basePath)).toBe(content)
++		}
++	})
++
++	it("#given a reference at the start, after a space, backtick or newline #when resolving #then resolves it", () => {
++		expect(resolveSkillPathReferences("@scripts/run.py", basePath)).toBe("/skills/frontend/scripts/run.py")
++		expect(resolveSkillPathReferences("run `@scripts/run.py`", basePath)).toBe("run `/skills/frontend/scripts/run.py`")
++		expect(resolveSkillPathReferences("a\n@data/x.csv", basePath)).toBe("a\n/skills/frontend/data/x.csv")
++	})
++
++	it("#given content without @ #when resolving #then returns the same string", () => {
++		const content = "plain skill body with no references"
++		expect(resolveSkillPathReferences(content, basePath)).toBe(content)
++	})
++
++	it("#given a blocked reference followed by a valid one #when resolving #then only the valid one resolves", () => {
++		expect(resolveSkillPathReferences("user@host/a.md and @docs/b.md", basePath)).toBe("user@host/a.md and /skills/frontend/docs/b.md")
++	})
++
++	it("#given mixed samples #when comparing with the lookbehind form #then the same references are rewritten", () => {
++		const samples = [
++			"email me@example.com/x.md or @scripts/a.py",
++			"(@a/b.md) [@c/d.md] =@e/f.md \"@g/h.md\" '@i/j.md'",
++			"@@x/y.md and @@@z/w.md",
++			"npm i @scope/pkg and see @refs/guide.md",
++		]
++		for (const sample of samples) {
++			const expected = referenceMatches(sample)
++			const ours: string[] = []
++			sample.replace(/@([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.\-\/]*)/g, (match: string, path: string, offset: number) => {
++				if (!(offset > 0 && /[a-zA-Z0-9="(]/.test(sample.charAt(offset - 1)))) ours.push(`${offset}:${path}`)
++				return match
++			})
++			expect(ours.join("|")).toBe(expected)
++		}
++	})
++})
+diff --git a/packages/utils/src/skill-path-resolver.ts b/packages/utils/src/skill-path-resolver.ts
+index 25640c74c..808b6d3f0 100644
+--- a/packages/utils/src/skill-path-resolver.ts
++++ b/packages/utils/src/skill-path-resolver.ts
+@@ -18,11 +18,19 @@ function looksLikeFilePath(path: string): boolean {
+ 	return /\.[a-zA-Z0-9]+$/.test(lastSegment)
+ }
+ 
++// Local fix 47: no lookbehind. JSC tried `(?<!...)@` at every offset of every skill body (about 45 ms per
++// 2.4 MB pass, repeated for each new chat folder, all synchronous). Scanning for "@" and checking the
++// preceding character by hand produces identical output in well under a millisecond.
++const SKILL_PATH_REFERENCE = /@([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.\-\/]*)/g
++const REFERENCE_BLOCKING_PREFIX = /[a-zA-Z0-9="(]/
++
+ export function resolveSkillPathReferences(content: string, basePath: string): string {
+ 	const normalizedBase = basePath.replace(/[\\/]$/, "")
++	if (!content.includes("@")) return content
+ 	return content.replace(
+-		/(?<![a-zA-Z0-9="\(])@([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.\-\/]*)/g,
+-		(match, relativePath: string) => {
++		SKILL_PATH_REFERENCE,
++		(match, relativePath: string, offset: number) => {
++			if (offset > 0 && REFERENCE_BLOCKING_PREFIX.test(content.charAt(offset - 1))) return match
+ 			if (!looksLikeFilePath(relativePath)) return match
+ 			if (isWindowsAbsolutePath(normalizedBase)) {
+ 				const resolvedPath = win32.resolve(normalizedBase, relativePath)
+-- 
+2.55.0.windows.5
+

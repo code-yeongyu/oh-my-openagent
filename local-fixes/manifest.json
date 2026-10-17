@@ -631,6 +631,21 @@
       "orderNote": "Depends on native pre-plugin config ordering (core plugin/internal.ts + supervisor.ts). New regressions RED 0/5 then GREEN; expanded adapter suite 29 passes/104 assertions. Stage in final owner batch with fix41/fix42, F21, context-mode hooks and #55756 amendment. No upstream post/PR without owner go. Rename-back is post-restart final batch step, gated by live precedence + visibility verification and exactly-one original-name gateway-route proof."
     },
     {
+      "id": "44-v2-scoped-delegation-routing",
+      "title": "OMO agents use task-only delegation guidance; native agents retain subagent",
+      "commit": "8e6cc4f87e27de52c742fe76d118900ddec30075",
+      "patch": "patches/44-v2-scoped-delegation-routing.patch",
+      "pr": null,
+      "why": "V2 exposes native subagent directly and OMO task through Code Mode. Restrict task-only guidance to exact OMO identities/aliases, never generated-file ownership or every config agent. Register after legacy transforms even with no legacy hooks, remove stale guidance on native/custom switches, and retain native general/build/plan. Optional per-context hiding is opt-in only; production leaves it off and relies on the separately proven agent-local native permissions. No global registry removal.",
+      "markers": [
+        "OMO delegation routing: delegate ONLY through tools.task in the current Code Mode catalog."
+      ],
+      "overlapsWith": [
+        "41-v2-tool-host-namespaces"
+      ],
+      "orderNote": "Apply after fix41 (same bridge/test). Owner-approved Hephaestus pilot then17-ID config rollout and fresh OMO/native proof passed; native parent notifications preserved. Candidate RED8 failures then GREEN18, native-protection RED1 then GREEN19; review-gap coverage final20 passes. Full typecheck and isolated real OpenCode2.0.29/local-provider request proof PASS; live DB count unchanged. Full project attempt observed9 unrelated browser/sidecar failures then60s timeout; v2 discovery attempts timed out. Staged only in task-owned isolation; do not overwrite the existing shared stage, activate, restart, or post upstream without owner go. Localized OMO display overrides need explicit ownership injection; current active IDs have no such overrides. See corpus X-158 and task evidence report."
+    },
+    {
       "id": "45-claude-quota-retry-status",
       "title": "Accept Claude subscription quota wording in native retry statuses",
       "commit": "389e2a21736be3bad0f4f013d1dac766900d6ac9",
@@ -640,6 +655,37 @@
       "markers": ["quota retry status accepted for fallback"],
       "overlapsWith": [],
       "orderNote": "44 remains reserved for the isolated scoped-delegation-routing candidate, which is NOT included here. Five regressions exercise V2 translation and mocked dispatch; live quota fallback end-to-end QA remains post-activation. Stage only under owner-approved existing teardown/timeout caveat."
+    },
+    {
+      "id": "46-v2-prompt-file-attachments",
+      "title": "Forward V1 prompt file parts to the V2 session as files",
+      "commit": "c0221c728c947c5b87385741553f9e7b8a7ac2fe",
+      "patch": "patches/46-v2-prompt-file-attachments.patch",
+      "pr": null,
+      "why": "The V2 host adapter (sendPrompt/textFromPrompt and the CLI run client) kept only text parts, so every look_at image/PDF attachment ({type:'file', url:file:///... or data:...;base64, filename}) was dropped before OpenCode V2. All 5 multimodal-looker children on 2026-10-17 02:10Z stored text-only user messages and answered 'No attachment is visible'; normal app sessions store files fine, so V2 core needed no change. Map file parts (and V2-shaped body.files) to files:[{uri,name}] on the V2 prompt and HTTP transport; text-only prompts send no files key; noReply (synthetic) prompts cannot carry attachments and now log that instead of dropping them silently.",
+      "markers": [
+        "filesFromPrompt",
+        "v2 noReply prompt cannot carry attachments; files not delivered"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Id 45 intentionally left free for the in-flight claude quota-retry fix (fix/claude-quota-retry-status-20261017); only the manifest merge is needed if 45 lands later. Independent of 01-44; touches src/v2/session-actions.ts and src/cli/run/v2-client.ts plus tests. Tests: src/v2/session-actions.files.test.ts, src/cli/run/v2-client.test.ts (RED 6 fail on pre-fix source, GREEN with host.test.ts + session-actions.recovery.test.ts 29 pass). Full typecheck PASS. Live smoke after owner-approved restart only: look_at on a known PNG -> child user session_message has files[0], assistant describes the image. Staged in task-owned isolation; do not overwrite the shared stage, activate, restart, or post upstream without owner go."
+    },
+    {
+      "id": "47-v2-setup-nonblocking",
+      "title": "Keep per-folder plugin setup off the shared event loop",
+      "commit": "2ffdf8fa63fb82affae889a0bf535e6dcacf3a74",
+      "patch": "patches/47-v2-setup-nonblocking.patch",
+      "pr": null,
+      "why": "Every new OpenChamber chat folder runs the whole plugin setup on the backend's single event loop; synchronous work there stalls every other session (owner symptom: a new chat freezes the app; Stage-2 plan P1). CPU profile of the setup in an isolated sandbox with the owner's real config: three detectWorktreePath copies ran execFileSync('git rev-parse') per folder even with no .git marker in any ancestor (chat folders never have one; timeout 5 s each), resolveSkillPathReferences' lookbehind regex cost ~45 ms per 2.4 MB pass per folder, team-mode probes spawned tmux+git per folder (now shared per process and PATH with a 3 s kill deadline, 5 min negative TTL, timeouts never remembered: review R5), MCP runtime PATH lookups were repeated per folder, and setup phases ran back to back without yielding. Fix: skip the git spawn without a marker (unless GIT_DIR), lookbehind-free scan with identical output (verified on 187 skill files), probe binaries and PATH lookups once per process, yield between setup phases. Isolated steady state: setup ~620 ms -> ~220 ms, loop blocked ~200 ms -> ~55 ms, longest slice ~200 ms -> ~55 ms, zero git spawns per chat folder.",
+      "markers": [
+        "probeBinaryShared",
+        "REFERENCE_BLOCKING_PREFIX",
+        "yieldSetupSlice",
+        "cachedBunWhich"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-46; touches packages/utils/src/skill-path-resolver.ts, the three project-discovery-dirs.ts copies (skills-loader-core, omo-opencode, claude-code-compat-core), features/team-mode/deps.ts, mcp/runtime-executable.ts, testing/create-plugin-module.ts, v2/host.ts plus tests. Tests: 5 new files + project-discovery-dirs.test.ts adjusted (its marker-less git fallback now needs GIT_DIR); RED 5 fail on pre-fix source, GREEN 343 pass across 43 files; full typecheck PASS; LSP clean. Acceptance after owner-approved restart only: backend 'runtime readiness phase completed phase=plugin.setup pluginID=oh-my-openagent' for a fresh chat folder, and %TEMP%/oh-my-opencode.log '[oh-my-openagent] setup phase timing' tools/total, against the 2026-10-17 baseline (tools p50 1500 ms, total p50 2298 ms). Residual: fix 28's source fingerprint walk (~55 ms synchronous per folder). Staged in task-owned isolation; do not overwrite the shared stage, activate, restart, or post upstream without owner go.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10436"
     }
   ],
   "externalFixes": [

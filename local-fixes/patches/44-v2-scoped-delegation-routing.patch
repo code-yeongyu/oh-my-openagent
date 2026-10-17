@@ -1,0 +1,244 @@
+From 8e6cc4f87e27de52c742fe76d118900ddec30075 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Fri, 16 Oct 2026 22:44:40 +0300
+Subject: [PATCH] fix(v2): scope task-only delegation guidance to OMO agents
+
+(cherry picked from commit 32a56323339ad0894fbfb03ff6657515d1b49c83)
+---
+ .../src/v2/delegation-routing.test.ts         | 51 ++++++++++++++
+ .../omo-opencode/src/v2/delegation-routing.ts | 39 +++++++++++
+ .../src/v2/hook-bridge-tool-routing.test.ts   | 69 +++++++++++++++++--
+ packages/omo-opencode/src/v2/hook-bridge.ts   |  8 +++
+ 4 files changed, 162 insertions(+), 5 deletions(-)
+ create mode 100644 packages/omo-opencode/src/v2/delegation-routing.test.ts
+ create mode 100644 packages/omo-opencode/src/v2/delegation-routing.ts
+
+diff --git a/packages/omo-opencode/src/v2/delegation-routing.test.ts b/packages/omo-opencode/src/v2/delegation-routing.test.ts
+new file mode 100644
+index 000000000..92bafa5f8
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/delegation-routing.test.ts
+@@ -0,0 +1,51 @@
++/// <reference types="bun-types" />
++import { expect, test } from "bun:test"
++import { createOmoDelegationRouting, OMO_DELEGATION_RULE, type OmoRoutingEvent } from "./delegation-routing"
++
++const route = createOmoDelegationRouting(["Localized OMO Display Name"])
++
++for (const agent of ["oracle", "oh-my-openagent/oracle", "Sisyphus - ultraworker", "Sisyphus-Junior", "Localized OMO Display Name"]) {
++  test(`filters only native subagent for owned OMO identity ${agent}`, () => {
++    const event: OmoRoutingEvent = { agent, system: [], tools: { subagent: {}, execute: {}, task: {}, other: {} } }
++    route(event, { hideNativeTool: true })
++    expect(Object.hasOwn(event.tools!, "subagent")).toBe(false)
++    expect(Object.keys(event.tools!).sort()).toEqual(["execute", "other", "task"])
++    expect(event.system).toEqual([{ type: "text", text: OMO_DELEGATION_RULE }])
++    route(event, { hideNativeTool: true })
++    expect(event.system).toHaveLength(1)
++  })
++}
++
++for (const agent of ["general", "build", "plan", "custom", "oh-my-openagent/custom", "oracle-custom", "compaction", "ocBuilder", undefined]) {
++  test(`leaves non-OMO identity ${agent} untouched`, () => {
++    const event: OmoRoutingEvent = { agent, system: [{ type: "text", text: "original" }], tools: { subagent: {}, execute: {} } }
++    const before = structuredClone(event)
++    route(event, { hideNativeTool: true })
++    expect(event).toEqual(before)
++  })
++}
++
++test("prompt-only mode retains native tool; filter is explicitly opted in", () => {
++  const event: OmoRoutingEvent = { agent: "oracle", system: [], tools: { subagent: {} } }
++  route(event)
++  expect(Object.hasOwn(event.tools!, "subagent")).toBe(true)
++  expect(event.system).toEqual([{ type: "text", text: OMO_DELEGATION_RULE }])
++})
++
++test("agent switch removes only our stale prompt from native context", () => {
++  const original = { type: "text" as const, text: "original" }
++  const event: OmoRoutingEvent = { agent: "general", system: [original, { type: "text", text: OMO_DELEGATION_RULE }], tools: { subagent: {} } }
++  route(event, { hideNativeTool: true })
++  expect(event.system).toEqual([original])
++  expect(Object.hasOwn(event.tools!, "subagent")).toBe(true)
++})
++
++test("native primary identities cannot be claimed through additional OMO aliases", () => {
++  const attempt = createOmoDelegationRouting(["general", "build", "plan"])
++  for (const agent of ["general", "build", "plan"]) {
++    const event: OmoRoutingEvent = { agent, system: [], tools: { subagent: {} } }
++    attempt(event, { hideNativeTool: true })
++    expect(event.system).toEqual([])
++    expect(Object.hasOwn(event.tools!, "subagent")).toBe(true)
++  }
++})
+diff --git a/packages/omo-opencode/src/v2/delegation-routing.ts b/packages/omo-opencode/src/v2/delegation-routing.ts
+new file mode 100644
+index 000000000..140126dc7
+--- /dev/null
++++ b/packages/omo-opencode/src/v2/delegation-routing.ts
+@@ -0,0 +1,39 @@
++import { AGENT_DISPLAY_NAMES, getAgentConfigKey } from "../shared/agent-display-names"
++
++export const OMO_DELEGATION_RULE = [
++  "OMO delegation routing: delegate ONLY through tools.task in the current Code Mode catalog.",
++  "Discover tools.task with search before calling it; use its actual category and load_skills schema.",
++  "Do not use native subagent or another delegation entry point for OMO agents.",
++  "If tools.task is unavailable, stop and report the missing route; never silently fall back.",
++  "This rule applies only to OMO agents. Native general, build, plan, and custom agents retain native subagent behavior.",
++].join("\n")
++
++export type OmoRoutingEvent = {
++  agent?: string
++  system: Array<{ type: "text"; text: string }>
++  tools?: Record<string, unknown>
++}
++
++export function createOmoDelegationRouting(additionalOwnedIDs: readonly string[] = []) {
++  // Only explicit OMO definitions establish ownership. Generated Markdown and
++  // config.agent also contain native/custom agents, so neither is a scope test.
++  const additional = new Set(additionalOwnedIDs.map((id) => id.toLowerCase()))
++  return (event: OmoRoutingEvent, options: { hideNativeTool?: boolean } = {}): void => {
++    for (let index = event.system.length - 1; index >= 0; index--) {
++      if (event.system[index].type === "text" && event.system[index].text === OMO_DELEGATION_RULE) {
++        event.system.splice(index, 1)
++      }
++    }
++    if (typeof event.agent !== "string") return
++    const id = event.agent.startsWith("oh-my-openagent/")
++      ? event.agent.slice("oh-my-openagent/".length)
++      : event.agent
++    if (["general", "build", "plan"].includes(id.toLowerCase())) return
++    if (!Object.hasOwn(AGENT_DISPLAY_NAMES, getAgentConfigKey(id)) && !additional.has(id.toLowerCase())) return
++    event.system.push({ type: "text", text: OMO_DELEGATION_RULE })
++    // Opt-in only: callers must prove event.tools is fresh per inference.
++    // Never remove from the global registry. Native permissions enforce the
++    // configured deny even when this optional presentation filter is disabled.
++    if (options.hideNativeTool === true && event.tools) delete event.tools.subagent
++  }
++}
+diff --git a/packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts b/packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts
+index 320cebd41..0f3383d3f 100644
+--- a/packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts
++++ b/packages/omo-opencode/src/v2/hook-bridge-tool-routing.test.ts
+@@ -1,13 +1,15 @@
++/// <reference types="bun-types" />
+ import { expect, test } from "bun:test"
+ import type { Plugin } from "@opencode/plugin"
+ import { registerV1Hooks } from "./hook-bridge"
++import { OMO_DELEGATION_RULE } from "./delegation-routing"
+ 
+ test("v2 context gives catalog precedence over imported legacy tool instructions", async () => {
+-  let onContext: (event: any) => Promise<void> = async () => {}
++  const onContext: Array<(event: any) => Promise<void> | void> = []
+   const ctx = {
+     session: {
+-      hook: async (name: string, handler: typeof onContext) => {
+-        if (name === "context") onContext = handler
++      hook: async (name: string, handler: (event: any) => Promise<void> | void) => {
++        if (name === "context") onContext.push(handler)
+       },
+     },
+   } as unknown as Plugin.Context
+@@ -18,15 +20,72 @@ test("v2 context gives catalog precedence over imported legacy tool instructions
+   })
+   try {
+     const event = { sessionID: "child", model: { id: "claude", providerID: "anthropic" }, system: [] as { type: string; text: string }[] }
+-    await onContext(event)
++    for (const handler of onContext) await handler(event)
+     const guidance = event.system.at(-1)!.text
+     expect(guidance).toContain("Code Mode")
+     expect(guidance).toContain("search")
+     expect(guidance).toContain("execute")
+     expect(guidance).toContain("do not create callable tools")
+-    await onContext(event)
++    for (const handler of onContext) await handler(event)
+     expect(event.system.filter((part) => part.text === guidance)).toHaveLength(1)
+   } finally {
+     dispose()
+   }
+ })
++
++test("OMO routing hook runs without legacy transforms and leaves native agents unchanged", async () => {
++  const onContext: Array<(event: any) => Promise<void> | void> = []
++  const ctx = {
++    session: {
++      hook: async (name: string, handler: (event: any) => Promise<void> | void) => {
++        if (name === "context") onContext.push(handler)
++      },
++    },
++  } as unknown as Plugin.Context
++  const dispose = await registerV1Hooks(ctx, {})
++  try {
++    const event = { agent: "Hephaestus - Deep Agent", system: [] as { type: "text"; text: string }[], tools: { subagent: {} } }
++    for (const handler of onContext) await handler(event)
++    expect(event.system.at(-1)?.text).toBe(OMO_DELEGATION_RULE)
++    expect(OMO_DELEGATION_RULE).toContain("tools.task")
++    expect(Object.hasOwn(event.tools, "subagent")).toBe(true)
++    event.agent = "general"
++    for (const handler of onContext) await handler(event)
++    expect(event.system).toEqual([])
++    expect(Object.hasOwn(event.tools, "subagent")).toBe(true)
++  } finally {
++    dispose()
++  }
++})
++
++test("OMO rule follows legacy transforms, deduplicates, and clears on a custom-agent switch", async () => {
++  const onContext: Array<(event: any) => Promise<void> | void> = []
++  const ctx = {
++    session: {
++      hook: async (name: string, handler: (event: any) => Promise<void> | void) => {
++        if (name === "context") onContext.push(handler)
++      },
++    },
++  } as unknown as Plugin.Context
++  const dispose = await registerV1Hooks(ctx, {
++    "experimental.chat.system.transform": (_input: unknown, output: { system: string[] }) => {
++      output.system.push("legacy-transformed-system")
++    },
++  })
++  try {
++    const event = { sessionID: "proof", agent: "oracle", model: { id: "proof", providerID: "local" }, system: [] as { type: "text"; text: string }[], tools: { subagent: {} } }
++    for (let pass = 0; pass < 2; pass++) {
++      for (const handler of onContext) await handler(event)
++      expect(event.system.at(-1)?.text).toBe(OMO_DELEGATION_RULE)
++      expect(event.system.filter((part) => part.text === OMO_DELEGATION_RULE)).toHaveLength(1)
++      expect(event.system.some((part) => part.text === "legacy-transformed-system")).toBe(true)
++    }
++    event.agent = "custom-reviewer"
++    for (const handler of onContext) await handler(event)
++    expect(event.system.some((part) => part.text === OMO_DELEGATION_RULE)).toBe(false)
++    expect(event.system.some((part) => part.text === "legacy-transformed-system")).toBe(true)
++    expect(Object.hasOwn(event.tools, "subagent")).toBe(true)
++  } finally {
++    dispose()
++  }
++})
+diff --git a/packages/omo-opencode/src/v2/hook-bridge.ts b/packages/omo-opencode/src/v2/hook-bridge.ts
+index a7a28738d..ae88e3d71 100644
+--- a/packages/omo-opencode/src/v2/hook-bridge.ts
++++ b/packages/omo-opencode/src/v2/hook-bridge.ts
+@@ -4,6 +4,7 @@ import { log } from "../shared/logger"
+ import type { AdapterState } from "./adapter-state"
+ import { toV1Event } from "./event-shape"
+ import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
++import { createOmoDelegationRouting } from "./delegation-routing"
+ 
+ type V2Context = Plugin.Context
+ 
+@@ -193,6 +194,13 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?:
+     })
+   }
+ 
++  // Independent of legacy transforms: OMO routing remains present when none
++  // were registered, and runs after them. Native/custom agents are unchanged.
++  const routeDelegation = createOmoDelegationRouting()
++  await ctx.session.hook("context", (event) => {
++    routeDelegation(event)
++  })
++
+   if (chatHeaders) {
+     await ctx.session.hook("model.request", (event) => {
+       return safeCall("chat.headers", async () => {
+-- 
+2.55.0.windows.5
+
