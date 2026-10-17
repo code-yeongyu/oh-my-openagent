@@ -177,6 +177,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       setupTimings[name] = now - setupPhaseStartedAt;
       setupPhaseStartedAt = now;
     };
+    // Local fix 47: every plugin setup shares the backend's one event loop with all open sessions; yield
+    // between phases so no new chat folder holds it for the whole setup in one stretch.
+    const yieldSetupSlice = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
     deps.logLegacyPluginStartupWarning()
     deps.migrateLegacyWorkspaceDirectory(input.directory)
     startupMigration ??= deps.runOpenCodeStartupMigration({ cwd: input.directory })
@@ -200,6 +203,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       targetBackupPaths: startupMigration.targetBackupPaths,
     })
     markSetupPhase("startupMigrationAndValidation");
+    await yieldSetupSlice();
     if (toast !== undefined) showStartupToast(input.client, toast, deps.log)
 
     // Unconditional omo process hygiene (T16): fire-and-forget family sweep,
@@ -302,6 +306,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     const modelCacheState = deps.createModelCacheState()
 
     markSetupPhase("pluginInit");
+    await yieldSetupSlice();
     const managers = deps.createManagers({
       ctx: input,
       pluginConfig,
@@ -312,6 +317,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     })
 
     markSetupPhase("managers");
+    await yieldSetupSlice();
     const toolsResult = await deps.createTools({
       ctx: input,
       pluginConfig,
@@ -319,6 +325,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     })
 
     markSetupPhase("tools");
+    await yieldSetupSlice();
     const hooks = deps.createHooks({
       ctx: input,
       pluginConfig,
@@ -333,6 +340,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     })
 
     markSetupPhase("hooks");
+    await yieldSetupSlice();
     const pluginInterface = deps.createPluginInterface({
       ctx: input,
       pluginConfig,

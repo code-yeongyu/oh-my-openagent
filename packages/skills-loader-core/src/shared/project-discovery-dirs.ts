@@ -76,6 +76,23 @@ function findAncestorDirectories(
   }
 }
 
+function hasGitMarkerAncestor(startDirectory: string): boolean {
+  let currentDirectory = normalizePath(startDirectory)
+
+  while (true) {
+    if (existsSync(join(currentDirectory, ".git"))) {
+      return true
+    }
+
+    const parentDirectory = dirname(currentDirectory)
+    if (parentDirectory === currentDirectory) {
+      return false
+    }
+
+    currentDirectory = normalizePath(parentDirectory)
+  }
+}
+
 export function clearWorktreeCache(): void {
   worktreePathCache.clear()
 }
@@ -85,6 +102,13 @@ export function detectWorktreePath(directory: string): string | undefined {
   const cacheKey = pathKey(normalizePath(resolvedDirectory))
   if (worktreePathCache.has(cacheKey)) {
     return worktreePathCache.get(cacheKey)
+  }
+
+  // Local fix 47: with no .git marker in any ancestor (and no GIT_DIR) `git rev-parse` can only fail, but
+  // the synchronous spawn runs on the setup path of every new chat folder (seconds on a loaded machine).
+  if (!hasGitMarkerAncestor(resolvedDirectory) && !process.env.GIT_DIR) {
+    worktreePathCache.set(cacheKey, undefined)
+    return undefined
   }
 
   try {

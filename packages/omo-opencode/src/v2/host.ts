@@ -9,6 +9,11 @@ import { projectV1Surface } from "./project-config"
 
 type V1Server = (input: never, options: unknown) => Promise<V1HookMap>
 
+// Local fix 47: hand the shared backend event loop back between setup stages of a new folder.
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve))
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -38,7 +43,9 @@ export async function setupOpenCodeV2(
     return
   }
 
+  await yieldToEventLoop()
   const stopEvents = await registerV1Hooks(ctx, hooks, state)
+  await yieldToEventLoop()
   const scratch: Record<string, unknown> = {}
   if (typeof hooks.config === "function") {
     try {
@@ -50,6 +57,7 @@ export async function setupOpenCodeV2(
     }
   }
 
+  await yieldToEventLoop()
   try {
     await projectV1Surface({
       ctx,

@@ -24,6 +24,9 @@ describe("project-discovery-dirs", () => {
 
   it("#given repeated worktree detection #when detecting twice #then reuses the cached result", async () => {
     worktreeSpawnCount = 0
+    // Local fix 47: without a .git marker git is only asked when GIT_DIR points elsewhere.
+    const savedGitDir = process.env.GIT_DIR
+    process.env.GIT_DIR = join(TEST_DIR, "elsewhere.git")
     mock.module("node:child_process", () => ({
       execFileSync: () => {
         worktreeSpawnCount += 1
@@ -36,6 +39,28 @@ describe("project-discovery-dirs", () => {
     expect(detectWorktreePath("/some/dir")).toBe(canonicalPath(TEST_DIR))
     expect(detectWorktreePath("/some/dir")).toBe(canonicalPath(TEST_DIR))
     expect(worktreeSpawnCount).toBe(1)
+    if (savedGitDir === undefined) delete process.env.GIT_DIR
+    else process.env.GIT_DIR = savedGitDir
+  })
+
+  it("#given a folder with no .git marker and no GIT_DIR #when detecting #then never spawns git (local fix 47)", async () => {
+    worktreeSpawnCount = 0
+    const savedGitDir = process.env.GIT_DIR
+    delete process.env.GIT_DIR
+    mock.module("node:child_process", () => ({
+      execFileSync: () => {
+        worktreeSpawnCount += 1
+        return TEST_DIR
+      },
+    }))
+    const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
+    clearWorktreeCache()
+    const chat = join(TEST_DIR, "chats", "session-1")
+    mkdirSync(chat, { recursive: true })
+
+    expect(detectWorktreePath(chat)).toBeUndefined()
+    expect(worktreeSpawnCount).toBe(0)
+    if (savedGitDir !== undefined) process.env.GIT_DIR = savedGitDir
   })
 
   it("#given nested opencode skill directories #when finding them #then aliases resolve nearest-first", async () => {

@@ -45,6 +45,13 @@ function detectWorktreePath(directory: string): string | undefined {
     return gitMarkerAncestor
   }
 
+  // Local fix 47: with no .git marker in any ancestor (and no GIT_DIR) `git rev-parse` can only fail, but
+  // the synchronous spawn runs on the setup path of every new chat folder (seconds on a loaded machine).
+  if (!process.env.GIT_DIR) {
+    worktreePathCache.set(cacheKey, undefined)
+    return undefined
+  }
+
   try {
     const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       cwd: resolvedDirectory,
