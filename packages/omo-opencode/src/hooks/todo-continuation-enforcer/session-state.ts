@@ -233,6 +233,12 @@ export function createSessionStateStore(): SessionStateStore {
       state.countdownInterval = undefined
     }
 
+    if (state.gateRetryTimer) {
+      clearTimeout(state.gateRetryTimer)
+      state.gateRetryTimer = undefined
+    }
+    state.gateRetryCount = 0
+
     state.inFlight = false
     state.countdownStartedAt = undefined
   }
