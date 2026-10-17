@@ -9,6 +9,9 @@
 //   is never applied twice, and no register value is ever merged as text.
 // - A receipt is written before the update is returned and is trusted only when the doc holds
 //   its ops (capture-receipts.ts), so a crash before import leaves the baseline diff in force.
+// - Adoption (sync-design §3) passes the extra register values it plans: they are added (entries
+//   superseding nothing) in the SAME update and receipt as the capture, so a replay from the same
+//   baseline finds the landed receipt and applies neither half twice.
 // recordMaterialized is the engine's half: it receipts the text it writes to disk before the
 // write, so a crash between writing the file and saving the baseline cannot re-apply synced text.
 // Captures of one item run one at a time in this process; the engine must not run two
@@ -18,6 +21,8 @@ import { randomBytes } from "node:crypto"
 
 import type { LoroDoc } from "../../crdt/loro-runtime"
 
+import type { RegisterValue } from "./adopt-values"
+import { registerValuesWritten, withRegisterValues } from "./adopt-values"
 import { captureItem } from "./capture"
 import type { CaptureReceipt, OpSpan } from "./capture-receipts"
 import { captureMessage, readReceipts, receiptLanded, sameFrontier, stampsOf, writeReceipts } from "./capture-receipts"
@@ -36,23 +41,27 @@ export async function captureOnDevice(
   baseText: string,
   baseFrontier: ItemFrontier,
   workingText: string,
+  registerValues: readonly RegisterValue[] = [],
 ): Promise<Uint8Array | null> {
   assertDeviceDoc(device, doc)
   return serialized(`${device.stateDir}\0${itemKey}`, async () => {
     const receipts = await readReceipts(device.stateDir, itemKey)
-    if (isLive(doc) && workingText === renderDocContent(doc)) {
+    const unchanged = isLive(doc) && workingText === renderDocContent(doc)
+    if (unchanged && registerValuesWritten(doc, registerValues)) {
       await receipt(device, itemKey, receipts, { base: baseFrontier, text: workingText, landed: doc, seen: mapTags(doc), span: null })
       return null
     }
     const prior = receipts.find((r) => sameFrontier(r.base, baseFrontier) && receiptLanded(doc, r))
     const captureId = randomBytes(12).toString("hex")
     const message = captureMessage(captureId)
-    const update =
-      prior === undefined
+    const captured = unchanged
+      ? null
+      : prior === undefined
         ? captureItem(doc, baseText, baseFrontier, workingText, message)
         : await captureDrift(doc, prior, workingText, message)
+    const update = withRegisterValues(doc, captured, registerValues, message)
     if (update === null) return null
-    const seenBefore = prior === undefined ? viewTags(doc, baseFrontier) : new Set(prior.seen)
+    const seenBefore = unchanged ? mapTags(doc) : prior === undefined ? viewTags(doc, baseFrontier) : new Set(prior.seen)
     const before = mapTags(doc)
     const start = doc.oplogVersion().get(doc.peerIdStr) ?? 0
     const after = doc.fork()
