@@ -724,4 +724,82 @@ describe("resolveCategoryExecution", () => {
 		// THIS TEST MUST FAIL (RED) - proves bug #5182 that applyCategoryParams drops config.tools
 		expect((result as unknown as { tools?: Record<string, boolean> }).tools).toEqual({ grep: false, read: true })
 	})
+
+	test("applyCategoryParams reads the documented max_tokens key", () => {
+		//#given a category configured with the key CategoryConfigSchema documents
+		const base: DelegatedModelConfig = {
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+		}
+		const config: CategoryConfig = {
+			temperature: 0.2,
+			top_p: 0.9,
+			max_tokens: 4321,
+		}
+
+		//#when applyCategoryParams maps the category onto the delegated model
+		const result = applyCategoryParams(base, config)
+
+		//#then the documented key reaches the model as maxTokens
+		// THIS TEST MUST FAIL (RED) - applyCategoryParams read only the deprecated maxTokens alias
+		expect(result).toEqual({
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+			temperature: 0.2,
+			top_p: 0.9,
+			maxTokens: 4321,
+		})
+	})
+
+	test("applyCategoryParams still honours the deprecated maxTokens key", () => {
+		//#given a category written before the snake_case rename
+		const base: DelegatedModelConfig = {
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+		}
+		const config: CategoryConfig = {
+			maxTokens: 1234,
+		}
+
+		//#when
+		const result = applyCategoryParams(base, config)
+
+		//#then the alias keeps working
+		expect(result.maxTokens).toBe(1234)
+	})
+
+	test("applyCategoryParams prefers max_tokens over the deprecated maxTokens key", () => {
+		//#given both spellings at once
+		const base: DelegatedModelConfig = {
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+		}
+		const config: CategoryConfig = {
+			maxTokens: 1234,
+			max_tokens: 4321,
+		}
+
+		//#when
+		const result = applyCategoryParams(base, config)
+
+		//#then the documented key wins, like reasoning over reasoningEffort
+		expect(result.maxTokens).toBe(4321)
+	})
+
+	test("applyCategoryParams leaves max output unset when the category names neither key", () => {
+		//#given a category with no output limit
+		const base: DelegatedModelConfig = {
+			providerID: "anthropic",
+			modelID: "claude-sonnet-4-6",
+		}
+		const config: CategoryConfig = {
+			temperature: 0.5,
+		}
+
+		//#when
+		const result = applyCategoryParams(base, config)
+
+		//#then the field stays absent rather than becoming undefined-valued
+		expect("maxTokens" in result).toBe(false)
+	})
 })
