@@ -1,0 +1,341 @@
+From fda8ca8522eb8a548b3fd253ec50d3778708dc58 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Sat, 17 Oct 2026 23:28:46 +0300
+Subject: [PATCH] fix(tui-sidebar): refresh the mirror on the heartbeat only
+ while a TUI reads it
+
+Every loaded folder rebuilt its TUI sidebar snapshot and rewrote the mirror file
+every 2 s, even when no TUI was attached (an app-managed backend never has one).
+With 22 idle folders that cost about 12 % of a core and up to 0.4 s event-loop
+stalls. The TUI now touches a reader lease next to the mirror when it reads; the
+heartbeat refreshes only while the lease is fresh. Event-driven flushes are
+unchanged, and a TUI that attaches later sees a fresh mirror within one heartbeat.
+---
+ .../src/features/tui-sidebar/constants.ts     |  4 ++
+ .../features/tui-sidebar/mirror-io.test.ts    | 45 +++++++++++++-
+ .../src/features/tui-sidebar/mirror-io.ts     | 40 +++++++++++-
+ .../tui-sidebar/mirror-manager.test.ts        | 62 ++++++++++++++++++-
+ .../features/tui-sidebar/mirror-manager.ts    | 16 ++++-
+ .../src/features/tui-sidebar/mirror-path.ts   |  4 ++
+ packages/omo-opencode/src/tui.ts              |  3 +-
+ 7 files changed, 164 insertions(+), 10 deletions(-)
+
+diff --git a/packages/omo-opencode/src/features/tui-sidebar/constants.ts b/packages/omo-opencode/src/features/tui-sidebar/constants.ts
+index c625a2a49..c7ddb9c1d 100644
+--- a/packages/omo-opencode/src/features/tui-sidebar/constants.ts
++++ b/packages/omo-opencode/src/features/tui-sidebar/constants.ts
+@@ -4,6 +4,10 @@ export const STALE_MS = 6_000
+ export const LOOP_FRESH_MS = 120_000
+ export const POLL_INTERVAL_MS = 1_000
+ export const HEARTBEAT_MS = 2_000
++// A TUI that reads the mirror touches a lease next to it; the server's heartbeat refreshes the mirror only
++// while that lease is fresh. Folders without a TUI (an app-managed backend) then cost one stat per heartbeat.
++export const READER_LEASE_MS = 10_000
++export const READER_LEASE_TOUCH_MS = 2_000
+ export const WRITE_DEBOUNCE_MS = 250
+ export const MAX_AGENTS = 12
+ export const MAX_JOBS = 12
+diff --git a/packages/omo-opencode/src/features/tui-sidebar/mirror-io.test.ts b/packages/omo-opencode/src/features/tui-sidebar/mirror-io.test.ts
+index 8eee8b58d..abc64abec 100644
+--- a/packages/omo-opencode/src/features/tui-sidebar/mirror-io.test.ts
++++ b/packages/omo-opencode/src/features/tui-sidebar/mirror-io.test.ts
+@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, sym
+ import { tmpdir } from "node:os"
+ import { dirname, join, resolve } from "node:path"
+ 
+-import { MIRROR_DIR_NAME, MIRROR_SCHEMA_VERSION, STALE_MS } from "./constants"
+-import { readMirror, writeMirror } from "./mirror-io"
+-import { mirrorFilePath, mirrorStorageDir } from "./mirror-path"
++import { MIRROR_DIR_NAME, MIRROR_SCHEMA_VERSION, READER_LEASE_MS, READER_LEASE_TOUCH_MS, STALE_MS } from "./constants"
++import { readMirror, readerLeaseFresh, resetReaderLeaseThrottle, touchReaderLease, writeMirror } from "./mirror-io"
++import { mirrorFilePath, mirrorReaderLeasePath, mirrorStorageDir } from "./mirror-path"
+ import type { TuiRuntimeSnapshot } from "./snapshot-schema"
+ 
+ const originalXdgDataHome = process.env.XDG_DATA_HOME
+@@ -230,3 +230,42 @@ describe("tui-sidebar mirror IPC", () => {
+     expect(() => writeMirror(projectDir, snapshot)).toThrow()
+   })
+ })
++
++describe("tui-sidebar reader lease (local fix 48)", () => {
++  const original = process.env.XDG_DATA_HOME
++  let root = ""
++  beforeEach(() => {
++    root = mkdtempSync(join(tmpdir(), "omo-tui-lease-"))
++    process.env.XDG_DATA_HOME = root
++    resetReaderLeaseThrottle()
++  })
++  afterEach(() => {
++    if (original === undefined) delete process.env.XDG_DATA_HOME
++    else process.env.XDG_DATA_HOME = original
++    rmSync(root, { recursive: true, force: true })
++  })
++
++  it("#given no lease #when checking #then no reader is active", () => {
++    expect(readerLeaseFresh(join(root, "project"))).toBe(false)
++  })
++
++  it("#given a touched lease #when checking within the lease window #then a reader is active, and stale after it", () => {
++    const project = join(root, "project")
++    const now = Date.now()
++    touchReaderLease(project, now)
++    expect(existsSync(mirrorReaderLeasePath(project))).toBe(true)
++    expect(readerLeaseFresh(project, now + 1_000)).toBe(true)
++    expect(readerLeaseFresh(project, now + READER_LEASE_MS + 5_000)).toBe(false)
++  })
++
++  it("#given repeated touches #when within the touch interval #then the lease file is written once", () => {
++    const project = join(root, "project")
++    const now = Date.now()
++    touchReaderLease(project, now)
++    rmSync(mirrorReaderLeasePath(project))
++    touchReaderLease(project, now + READER_LEASE_TOUCH_MS - 1)
++    expect(existsSync(mirrorReaderLeasePath(project))).toBe(false)
++    touchReaderLease(project, now + READER_LEASE_TOUCH_MS)
++    expect(existsSync(mirrorReaderLeasePath(project))).toBe(true)
++  })
++})
+diff --git a/packages/omo-opencode/src/features/tui-sidebar/mirror-io.ts b/packages/omo-opencode/src/features/tui-sidebar/mirror-io.ts
+index 0ae4b0ec3..3fb77d3be 100644
+--- a/packages/omo-opencode/src/features/tui-sidebar/mirror-io.ts
++++ b/packages/omo-opencode/src/features/tui-sidebar/mirror-io.ts
+@@ -1,9 +1,9 @@
+-import { mkdirSync, readFileSync } from "node:fs"
++import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
+ import { dirname } from "node:path"
+ 
+ import { writeFileAtomically } from "../../shared/write-file-atomically"
+-import { STALE_MS } from "./constants"
+-import { canonicalProjectDir, mirrorFilePath } from "./mirror-path"
++import { READER_LEASE_MS, READER_LEASE_TOUCH_MS, STALE_MS } from "./constants"
++import { canonicalProjectDir, mirrorFilePath, mirrorReaderLeasePath } from "./mirror-path"
+ import { parseSnapshot } from "./snapshot-schema"
+ import type { TuiRuntimeSnapshot } from "./snapshot-schema"
+ 
+@@ -38,3 +38,37 @@ export function readMirror(projectDir: string): TuiRuntimeSnapshot | null {
+   }
+   return snapshot
+ }
++
++const leaseTouchedAt = new Map<string, number>()
++
++/** Called by the TUI before it reads the mirror: marks that someone is reading this project's mirror. */
++export function touchReaderLease(projectDir: string, now: number = Date.now()): void {
++  const filePath = mirrorReaderLeasePath(projectDir)
++  if (now - (leaseTouchedAt.get(filePath) ?? Number.NEGATIVE_INFINITY) < READER_LEASE_TOUCH_MS) return
++  leaseTouchedAt.set(filePath, now)
++  try {
++    mkdirSync(dirname(filePath), { recursive: true })
++    writeFileSync(filePath, String(now), { mode: 0o600 })
++  } catch (error) {
++    if (!(error instanceof Error)) throw error
++  }
++}
++
++/** True while a TUI has read this project's mirror recently (lease mtime within READER_LEASE_MS). */
++export function readerLeaseFresh(projectDir: string, now: number = Date.now()): boolean {
++  return readerLeaseFreshAt(mirrorReaderLeasePath(projectDir), now)
++}
++
++/** Same check on a lease path resolved once (resolving it costs a realpath and a hash per call). */
++export function readerLeaseFreshAt(leasePath: string, now: number = Date.now()): boolean {
++  try {
++    return now - statSync(leasePath).mtimeMs <= READER_LEASE_MS
++  } catch (error) {
++    if (error instanceof Error) return false
++    throw error
++  }
++}
++
++export function resetReaderLeaseThrottle(): void {
++  leaseTouchedAt.clear()
++}
+diff --git a/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.test.ts b/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.test.ts
+index e0306aa1e..ff43ad7fe 100644
+--- a/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.test.ts
++++ b/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.test.ts
+@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
+ import { join } from "node:path"
+ 
+ import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
+-import { readMirror } from "./mirror-io"
++import { readMirror, resetReaderLeaseThrottle, touchReaderLease } from "./mirror-io"
+ import { TuiStateMirror } from "./mirror-manager"
+ import type { SessionAgentResolver } from "./snapshot-builder"
+ import type { BackgroundTaskSnapshot } from "../background-agent/types"
+@@ -61,6 +61,7 @@ function createMirror(input?: {
+   readonly backgroundManager?: FakeBackgroundManager
+   readonly sessionAgentResolver?: SessionAgentResolver
+   readonly reportFlushError?: (error: Error) => void
++  readonly isReaderActive?: () => boolean
+ }): TuiStateMirror {
+   const projectDir = input?.projectDir ?? makeTempDir("project")
+   return new TuiStateMirror({
+@@ -69,6 +70,7 @@ function createMirror(input?: {
+     backgroundManager: input?.backgroundManager ?? createBackgroundManager([]),
+     sessionAgentResolver: input?.sessionAgentResolver ?? resolveTestSessionAgent,
+     reportFlushError: input?.reportFlushError,
++    isReaderActive: input?.isReaderActive,
+   })
+ }
+ 
+@@ -118,6 +120,7 @@ describe("TuiStateMirror", () => {
+     const mirror = createMirror({
+       projectDir,
+       client: createClient({ "ses-main": { type: "busy" } }),
++      isReaderActive: () => true,
+     })
+     mirror.start()
+ 
+@@ -132,6 +135,63 @@ describe("TuiStateMirror", () => {
+     mirror.stop()
+   })
+ 
++  it("#given no TUI reader #when the heartbeat fires #then it neither builds nor writes the mirror (local fix 48)", async () => {
++    jest.useFakeTimers()
++    // given
++    const projectDir = makeTempDir("idle-project")
++    let builds = 0
++    const client = createClient({ "ses-main": { type: "busy" } })
++    const counting: FakeClient = { session: { ...client.session, status: async () => { builds++; return client.session.status() } } }
++    const mirror = createMirror({ projectDir, client: counting, isReaderActive: () => false })
++    mirror.start()
++
++    // when
++    for (let i = 0; i < 5; i++) jest.advanceTimersByTime(HEARTBEAT_MS + WRITE_DEBOUNCE_MS)
++    jest.useRealTimers()
++    await new Promise((resolve) => setTimeout(resolve, 10))
++
++    // then
++    expect(builds).toBe(0)
++    expect(readMirror(projectDir)).toBeNull()
++    mirror.stop()
++  })
++
++  it("#given no TUI reader #when an event arrives #then the mirror is still flushed (local fix 48)", async () => {
++    jest.useFakeTimers()
++    // given
++    const projectDir = makeTempDir("event-project")
++    const mirror = createMirror({ projectDir, client: createClient({ "ses-main": { type: "running" } }), isReaderActive: () => false })
++    mirror.start()
++
++    // when
++    mirror.onEvent({ type: "session.status" })
++    const write = mirror.flush()
++    jest.advanceTimersByTime(WRITE_DEBOUNCE_MS)
++    await write
++
++    // then
++    expect(readMirror(projectDir)?.activeAgents).toEqual([{ name: "sisyphus", status: "running" }])
++    mirror.stop()
++  })
++
++  it("#given the default reader check #when a TUI touches the lease #then the heartbeat writes again (local fix 48)", async () => {
++    // given (real timers: the default check stats the lease file next to the mirror)
++    const projectDir = makeTempDir("lease-project")
++    const mirror = createMirror({ projectDir, client: createClient({ "ses-main": { type: "busy" } }) })
++    mirror.start()
++    await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_MS + WRITE_DEBOUNCE_MS + 400))
++    expect(readMirror(projectDir)).toBeNull()
++
++    // when
++    resetReaderLeaseThrottle()
++    touchReaderLease(projectDir)
++    await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_MS + WRITE_DEBOUNCE_MS + 400))
++
++    // then
++    expect(readMirror(projectDir)?.activeAgents).toEqual([{ name: "sisyphus", status: "busy" }])
++    mirror.stop()
++  }, 15_000)
++
+   it("#given a started mirror #when started #then heartbeat handle is unref'd", () => {
+     jest.useFakeTimers()
+     const mirror = createMirror()
+diff --git a/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.ts b/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.ts
+index 8e5ab5ce4..65e5ceb9b 100644
+--- a/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.ts
++++ b/packages/omo-opencode/src/features/tui-sidebar/mirror-manager.ts
+@@ -1,6 +1,7 @@
+ import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
+ import { log } from "../../shared/logger"
+-import { writeMirror } from "./mirror-io"
++import { readerLeaseFreshAt, writeMirror } from "./mirror-io"
++import { mirrorReaderLeasePath } from "./mirror-path"
+ import { buildTuiRuntimeSnapshot } from "./snapshot-builder"
+ import type {
+   BuildTuiRuntimeSnapshotInput,
+@@ -18,11 +19,14 @@ export type TuiStateMirrorInput = {
+   readonly getStatuses?: () => Promise<SessionStatusMap>
+   readonly sessionAgentResolver?: SessionAgentResolver
+   readonly reportFlushError?: (error: Error) => void
++  /** Whether a TUI is reading this mirror; defaults to the reader lease next to the mirror file. */
++  readonly isReaderActive?: () => boolean
+ }
+ 
+ export class TuiStateMirror {
+   private readonly snapshotInput: BuildTuiRuntimeSnapshotInput
+   private readonly reportFlushError: (error: Error) => void
++  private readonly isReaderActive: () => boolean
+   private heartbeatID: ReturnType<typeof setInterval> | null = null
+   private debounceID: ReturnType<typeof setTimeout> | null = null
+   private pendingFlush: Promise<void> | null = null
+@@ -33,6 +37,12 @@ export class TuiStateMirror {
+   constructor(input: TuiStateMirrorInput) {
+     this.snapshotInput = input
+     this.reportFlushError = input.reportFlushError ?? ((error) => log("[tui-sidebar] mirror flush failed", { error }))
++    if (input.isReaderActive) {
++      this.isReaderActive = input.isReaderActive
++    } else {
++      let leasePath: string | undefined
++      this.isReaderActive = () => readerLeaseFreshAt((leasePath ??= mirrorReaderLeasePath(input.projectDir)))
++    }
+   }
+ 
+   buildSnapshot(): Promise<TuiRuntimeSnapshot> {
+@@ -78,8 +88,10 @@ export class TuiStateMirror {
+     if (this.heartbeatID !== null) {
+       return
+     }
++    // The heartbeat only keeps the mirror fresh for a reader (STALE_MS); events still flush unconditionally.
++    // Without a TUI reader it costs one stat instead of a snapshot build and an atomic file write per folder.
+     this.heartbeatID = setInterval(() => {
+-      void this.flush()
++      if (this.isReaderActive()) void this.flush()
+     }, HEARTBEAT_MS)
+     this.heartbeatID.unref?.()
+   }
+diff --git a/packages/omo-opencode/src/features/tui-sidebar/mirror-path.ts b/packages/omo-opencode/src/features/tui-sidebar/mirror-path.ts
+index 8fe080b76..85932be01 100644
+--- a/packages/omo-opencode/src/features/tui-sidebar/mirror-path.ts
++++ b/packages/omo-opencode/src/features/tui-sidebar/mirror-path.ts
+@@ -30,3 +30,7 @@ export function mirrorFilePath(projectDir: string): string {
+   const projectHash = createHash("sha1").update(canonicalProjectDir(projectDir)).digest("hex").slice(0, 16)
+   return join(mirrorStorageDir(), `${projectHash}.json`)
+ }
++
++export function mirrorReaderLeasePath(projectDir: string): string {
++  return mirrorFilePath(projectDir).replace(/\.json$/, ".reader")
++}
+diff --git a/packages/omo-opencode/src/tui.ts b/packages/omo-opencode/src/tui.ts
+index 68541eadc..107005606 100644
+--- a/packages/omo-opencode/src/tui.ts
++++ b/packages/omo-opencode/src/tui.ts
+@@ -7,7 +7,7 @@ import { computeView, viewKey } from "./features/tui-sidebar/compute-view"
+ import { POLL_INTERVAL_MS } from "./features/tui-sidebar/constants"
+ import { deriveAgents, deriveConfig, deriveJobBoard, deriveLoop, deriveRoster } from "./features/tui-sidebar/derivers"
+ import type { ViewNode } from "./features/tui-sidebar/element-helpers"
+-import { readMirror } from "./features/tui-sidebar/mirror-io"
++import { readMirror, touchReaderLease } from "./features/tui-sidebar/mirror-io"
+ import { buildViewNodes } from "./features/tui-sidebar/render-view"
+ import type { RosterRow } from "./features/tui-sidebar/state-types"
+ import type { SidebarView } from "./features/tui-sidebar/state-types"
+@@ -96,6 +96,7 @@ async function loadRosterRows(directory: string): Promise<readonly RosterRow[]>
+ 
+ async function readView(directory: string): Promise<SidebarView> {
+   const validation = await loadPluginValidation(directory)
++  touchReaderLease(directory)
+   const mirror = readMirror(directory)
+   const roster = await loadRosterRows(directory)
+   return computeView({
+-- 
+2.55.0.windows.5

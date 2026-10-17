@@ -31,7 +31,7 @@
       "commit": "7cb33a77c",
       "patch": "patches/02-hijack-working-model.patch",
       "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/8397",
-      "why": "The first fix resolved 'working model' from the newest message carrying agent+model fields, which matched compaction summaries and the internal compaction_continue prompts themselves \u2014 a self-sustaining loop that silently switched live sessions to the summarizer model.",
+      "why": "The first fix resolved 'working model' from the newest message carrying agent+model fields, which matched compaction summaries and the internal compaction_continue prompts themselves — a self-sustaining loop that silently switched live sessions to the summarizer model.",
       "markers": [
         "isInternalContinuationMessage",
         "pickActiveSessionMessage"
@@ -62,7 +62,7 @@
       "commit": "06aef99f5",
       "patch": "patches/04-compaction-pin-resolution.patch",
       "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/8511",
-      "why": "agents.<key>.compaction.model silently fell back to the session model on every failure path with no logging, and the failure log printed the SESSION model \u2014 a dead pin looked exactly like a working one. Four production compactions ran on the session model while the config pinned GLM.",
+      "why": "agents.<key>.compaction.model silently fell back to the session model on every failure path with no logging, and the failure log printed the SESSION model — a dead pin looked exactly like a working one. Four production compactions ran on the session model while the config pinned GLM.",
       "markers": [
         "summarize model resolved",
         "releasing a stalled summarize guard",
@@ -71,7 +71,7 @@
       "overlapsWith": [
         "03-empty-summary-guard"
       ],
-      "orderNote": "This is the local-lineage form, which builds on 03's empty-summary module. PR #8511 ships an equivalent port written against dev (commit eb15543ea) that does not depend on 03 \u2014 if 03 ever merges upstream, prefer that one instead. Keep after 03.",
+      "orderNote": "This is the local-lineage form, which builds on 03's empty-summary module. PR #8511 ships an equivalent port written against dev (commit eb15543ea) that does not depend on 03 — if 03 ever merges upstream, prefer that one instead. Keep after 03.",
       "portCommit": "eb15543ea"
     },
     {
@@ -80,7 +80,7 @@
       "commit": "af6461926",
       "patch": "patches/05-background-agent-liveness.patch",
       "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/8512",
-      "why": "session-activity.ts detached an SDK method (const sessionGet = client.session.get), so this._client was undefined and every read degraded to unavailable \u2014 which suppresses stale interruption \u2014 with no completion watchdog. Two review tasks stranded for six hours.",
+      "why": "session-activity.ts detached an SDK method (const sessionGet = client.session.get), so this._client was undefined and every read degraded to unavailable — which suppresses stale interruption — with no completion watchdog. Two review tasks stranded for six hours.",
       "markers": [
         "Task exceeded the hard deadline"
       ],
@@ -604,7 +604,9 @@
         "hook_host: \"opencode\"",
         "Imported instructions naming bare tools, mcp__server__tool aliases, or legacy get_tool_schema/invoke_tool endpoints do not create callable tools."
       ],
-      "overlapsWith": ["40-v2-hook-writeback-identity"],
+      "overlapsWith": [
+        "40-v2-hook-writeback-identity"
+      ],
       "orderNote": "Apply after the v2 bridge and Claude-hook loader fixes. Paired context-mode hooks must honor hook_host: opencode (context-mode fix/opencode-hook-host-20261015). Scoped suite 36 pass; actual dispatcher-to-hook child probe PASS; fresh Claude child calls verified with prompt-delivered staged guidance. Live post-activation verification still required."
     },
     {
@@ -615,7 +617,9 @@
       "pr": null,
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10237",
       "why": "V1 grep_app_*:false became shared V2 registry deletion, defeating librarian allows and colliding with user server names. Preserve all namespaced shared tools based on native options.namespace metadata, not a spelling exception. MCP execution still uses the host permission engine. Unnamespaced plugin/native disable behavior is unchanged. This does not fix MCP server override precedence or project V1 global deny defaults as host permission rules.",
-      "markers": ["preserving shared namespaced MCP tool registration"],
+      "markers": [
+        "preserving shared namespaced MCP tool registration"
+      ],
       "overlapsWith": [],
       "orderNote": "Owner superseded separate-restart plan: batch with fix41 + fix43, F21, paired context-mode hooks and OpenCode #55756 amendment, one combined offline script and one restart. Keep the original fix41 stage intact until final batch assembly. Regression RED 2 failures then GREEN 2 passes/10 assertions. Rename-back only after fix42+fix43 are active and live-verified with gateway route proof."
     },
@@ -626,8 +630,12 @@
       "patch": "patches/43-v2-host-mcp-precedence.patch",
       "pr": null,
       "why": "The empty V2 scratch config hid user entries from V1 merge precedence, and unconditional editor.set overwrote gateway routes. Native ConfigMcpPlugin runs before package plugins; inspect editor.get on every replay and leave existing entries intact, including disabled states, credentials and timeouts. Suppress the grep_app fallback when host grep-app migration alias exists, avoiding its duplicate direct connection. Do not normalize unrelated names or delete user entries; native execution permissions unchanged.",
-      "markers": ["host MCP configuration wins; OMO fills gaps only"],
-      "overlapsWith": ["42-v2-shared-mcp-registry"],
+      "markers": [
+        "host MCP configuration wins; OMO fills gaps only"
+      ],
+      "overlapsWith": [
+        "42-v2-shared-mcp-registry"
+      ],
       "orderNote": "Depends on native pre-plugin config ordering (core plugin/internal.ts + supervisor.ts). New regressions RED 0/5 then GREEN; expanded adapter suite 29 passes/104 assertions. Stage in final owner batch with fix41/fix42, F21, context-mode hooks and #55756 amendment. No upstream post/PR without owner go. Rename-back is post-restart final batch step, gated by live precedence + visibility verification and exactly-one original-name gateway-route proof."
     },
     {
@@ -652,7 +660,9 @@
       "patch": "patches/45-claude-quota-retry-status.patch",
       "pr": null,
       "why": "Native session.retry.scheduled reached runtime-fallback but session/weekly limit wording was rejected before fallback-chain resolution. Reuse the existing quota classifier without broadening terminal/context error policy.",
-      "markers": ["quota retry status accepted for fallback"],
+      "markers": [
+        "quota retry status accepted for fallback"
+      ],
       "overlapsWith": [],
       "orderNote": "44 remains reserved for the isolated scoped-delegation-routing candidate, which is NOT included here. Five regressions exercise V2 translation and mocked dispatch; live quota fallback end-to-end QA remains post-activation. Stage only under owner-approved existing teardown/timeout caveat."
     },
@@ -686,6 +696,22 @@
       "overlapsWith": [],
       "orderNote": "Independent of 01-46; touches packages/utils/src/skill-path-resolver.ts, the three project-discovery-dirs.ts copies (skills-loader-core, omo-opencode, claude-code-compat-core), features/team-mode/deps.ts, mcp/runtime-executable.ts, testing/create-plugin-module.ts, v2/host.ts plus tests. Tests: 5 new files + project-discovery-dirs.test.ts adjusted (its marker-less git fallback now needs GIT_DIR); RED 5 fail on pre-fix source, GREEN 343 pass across 43 files; full typecheck PASS; LSP clean. Acceptance after owner-approved restart only: backend 'runtime readiness phase completed phase=plugin.setup pluginID=oh-my-openagent' for a fresh chat folder, and %TEMP%/oh-my-opencode.log '[oh-my-openagent] setup phase timing' tools/total, against the 2026-10-17 baseline (tools p50 1500 ms, total p50 2298 ms). Residual: fix 28's source fingerprint walk (~55 ms synchronous per folder). Staged in task-owned isolation; do not overwrite the shared stage, activate, restart, or post upstream without owner go.",
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10436"
+    },
+    {
+      "id": "48-tui-mirror-reader-lease",
+      "title": "Refresh the TUI sidebar mirror on the heartbeat only while a TUI reads it",
+      "commit": "fda8ca8522eb8a548b3fd253ec50d3778708dc58",
+      "patch": "patches/48-tui-mirror-reader-lease.patch",
+      "pr": null,
+      "why": "features/tui-sidebar/mirror-manager.ts started a 2 s heartbeat per loaded folder that built a full snapshot (client session status, background tasks, agent resolution) and wrote the mirror atomically, whether or not any TUI was reading it. Measured on a real OpenCode 2.0.29 backend with 22 idle chat folders and no traffic: 11.9-12.3% of a core and 29-36 s of event-loop delay per 180 s, versus 2.7% / 3.4 s with OMO absent; timer attribution put 4.8 s per idle minute in this heartbeat (single callbacks up to 81 ms). The TUI (tui.ts readView) now touches a reader lease next to the mirror (throttled to one write per 2 s); the heartbeat stats the lease (path resolved once) and rebuilds/writes only while it is fresh (10 s). Event-driven flushes are unchanged.",
+      "markers": [
+        "readerLeaseFreshAt",
+        "READER_LEASE_MS",
+        "mirrorReaderLeasePath"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-47; touches features/tui-sidebar/{constants,mirror-path,mirror-io,mirror-manager}.ts and tui.ts plus mirror-manager.test.ts and mirror-io.test.ts. RED: the new tests fail on pre-fix source; GREEN: tui-sidebar 65 pass. Behaviour change: with no TUI attached the mirror is refreshed only by events (it was refreshed every 2 s); a TUI that attaches later shows the sidebar within one heartbeat (<= 2 s) of its first read. Markers are server-bundle symbols (dist/index.js); the TUI side (touchReaderLease in tui.ts) ships in dist/tui.js, which only a full `bun run build` / `bun run fixes:apply` regenerates.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10457"
     }
   ],
   "externalFixes": [
