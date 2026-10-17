@@ -143,10 +143,20 @@ describe("Gatekeeper check after notarization", () => {
   posixBashTest("fails when the ticket never arrives within the window", () => {
     const { root, env, binary } = notarySandbox(["Accepted"], [NOT_YET])
     try {
-      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "1", GATEKEEPER_POLL_SECONDS: "0.2" }, binary)
+      const dateCommand = join(root, "bin", "date")
+      // Advance the integer clock after the second assessment to remove the wall-clock phase race.
+      writeFileSync(dateCommand, `#!/bin/bash
+if [ -f "${root}/spctl-calls" ] && [ "$(wc -l < "${root}/spctl-calls")" -ge 2 ]; then
+  echo 1001
+else
+  echo 1000
+fi
+`)
+      chmodSync(dateCommand, 0o755)
+      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "1", GATEKEEPER_POLL_SECONDS: "0" }, binary)
       expect(result.status).toBe(1)
       expect(result.stderr).toContain("Gatekeeper does not accept")
-      expect(spctlCalls(root)).toBeGreaterThan(1)
+      expect(spctlCalls(root)).toBe(2)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

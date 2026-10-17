@@ -399,6 +399,15 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 
 **MAINTENANCE - KEEP THIS IN SYNC.** `script/agent/setup.sh`, `script/agent/cleanup.sh`, and harness launchers such as `script/agent/cleanup-hook.sh` are the contract. Whenever a setup dependency or configuration is added, breaks, or changes (a new build step, a pinned tool version in the Dockerfile, a new env var or credential, a new harness wiring file), you MUST, in the SAME change, update: this section; the matching "Development Environment" / "Credentials & Isolation" sections in [`CONTRIBUTING.md`](CONTRIBUTING.md); [`.devcontainer/README.md`](.devcontainer/README.md) if container config injection changed; and the matching skill (`opencode-qa` for the OpenCode side, `codex-qa` for the Codex side) whose isolation conventions `qa-sandbox.sh` mirrors. Keep `script/agent-env.test.ts`, `script/agent-harness-wiring.test.ts`, and `script/agents-md-dev-env.test.ts` green. `CLAUDE.md` is a symlink to this file, so the Claude side stays in sync automatically. The scripts, the docs, and the skills must never drift out of sync.
 
+**Optional LSP runtime budget.** Set `OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS`
+before starting the harness or shared daemon when a slow language server needs
+more time to publish current diagnostics. It accepts positive integer
+milliseconds up to 2,147,483,647; unset or invalid values retain 3,000 ms.
+Restart an existing daemon after changing it. This is not a credential or a
+replacement for HOME/XDG/`CODEX_HOME`/agent-dir isolation: set it in the actual
+isolated target process and verify child forwarding instead of assuming a host
+export reaches it. See the [LSP runtime guidance](packages/lsp-tools-mcp/README.md).
+
 ## CI/CD
 
 Adding `ci:full-matrix` launches `ci-full-matrix-label.yml`, which calls `ci.yml` with the caller's pull-request payload. Its `full-matrix / <ci job>` checks are optional and do not gate merge. To run the full matrix in the required checks, keep the label and push a commit or reopen the PR. Normal CI ignores label events. The label job has separate concurrency behind its exact label gate, so bot labels cannot cancel either the active full-matrix job or required CI, or replace a required failure with skipped checks.

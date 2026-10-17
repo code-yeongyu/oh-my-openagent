@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 
 import { afterEach, describe, expect, it } from "bun:test";
 
+import type { LspClientOptions } from "./client.js";
 import { ControlledClock } from "./controlled-clock-test-support.js";
 
 import {
@@ -13,6 +14,24 @@ import {
 } from "./workspace-apply-edit-test-support.js";
 
 const harness = createWorkspaceEditTestHarness();
+const DIAGNOSTICS_TIMEOUT_ENV = "OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS";
+
+function makeConfiguredClient(
+	scenario: Record<string, unknown>,
+	options: Partial<LspClientOptions>,
+	envTimeout: string | undefined,
+) {
+	const original = process.env[DIAGNOSTICS_TIMEOUT_ENV];
+	try {
+		if (envTimeout === undefined) delete process.env[DIAGNOSTICS_TIMEOUT_ENV];
+		else process.env[DIAGNOSTICS_TIMEOUT_ENV] = envTimeout;
+		// The harness constructs the client before its first await.
+		return harness.makeClient(scenario, options);
+	} finally {
+		if (original === undefined) delete process.env[DIAGNOSTICS_TIMEOUT_ENV];
+		else process.env[DIAGNOSTICS_TIMEOUT_ENV] = original;
+	}
+}
 
 afterEach(async () => {
 	await harness.cleanup();
@@ -40,6 +59,41 @@ async function resolveThroughFreshnessWindow<T>(clock: ControlledClock, start: (
 const FRESHNESS_WINDOW_MS = 500;
 
 describe("LspClient diagnostics freshness", () => {
+	it.each([
+		{ envTimeout: undefined, explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "6000", explicitTimeout: undefined, expectedBudget: 6_000 },
+		{ envTimeout: "2147483647", explicitTimeout: undefined, expectedBudget: 2_147_483_647 },
+		{ envTimeout: "", explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "invalid", explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "0", explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "-1", explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "1.5", explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "Infinity", explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "2147483648", explicitTimeout: undefined, expectedBudget: 3_000 },
+		{ envTimeout: "6000", explicitTimeout: 40, expectedBudget: 40 },
+	])("#given freshness configuration %j #when a pull hangs #then its budget and timeout follow configuration precedence", async ({ envTimeout, explicitTimeout, expectedBudget }) => {
+		const clock = new ControlledClock();
+		const context = await makeConfiguredClient(
+			{
+				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+				diagnosticResponses: [{ action: "hang" }],
+			},
+			{ timerProvider: clock, ...(explicitTimeout === undefined ? {} : { diagnosticsFreshnessTimeoutMs: explicitTimeout }) },
+			envTimeout,
+		);
+		const scheduledBefore = clock.scheduledDelays.length;
+		const scheduled = clock.waitForScheduled(scheduledBefore + 1);
+		const pending = context.client.diagnostics(context.source);
+		await scheduled;
+		const grantedBudget = clock.scheduledDelays.at(-1);
+		clock.advanceBy(Math.max(...clock.scheduledDelays));
+		const result = await pending;
+
+		expect(grantedBudget).toBe(expectedBudget);
+		expect(result.items).toEqual([]);
+		expect(result.transientError?.kind).toBe("freshness_timeout");
+	});
+
 	it("#given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload", async () => {
 		const clock = new ControlledClock();
 		const context = await harness.makeClient(
@@ -179,11 +233,14 @@ describe("LspClient diagnostics freshness", () => {
 		expect(futureResult.transientError?.kind).toBe("freshness_timeout");
 	});
 
-	it("#given a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart within the same request and resolve from the current version", async () => {
+	it.each([
+		{ envTimeout: undefined, explicitTimeout: 800, advanceMs: 0 },
+		{ envTimeout: "6000", explicitTimeout: undefined, advanceMs: 3_500 },
+	])("#given a freshness window %j and a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart and resolve from the current version", async ({ envTimeout, explicitTimeout, advanceMs }) => {
 		// Both pull reports answer this request, so no freshness deadline may fire: a controlled clock
 		// removes the 800ms wall-clock race that a starved shard otherwise wins (#8323).
 		const clock = new ControlledClock();
-		const context = await harness.makeClient(
+		const context = await makeConfiguredClient(
 			{
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
 				diagnosticResponses: [
@@ -196,16 +253,19 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 800, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+			{ versionlessPublishQuiescenceMs: 5, timerProvider: clock, ...(explicitTimeout === undefined ? {} : { diagnosticsFreshnessTimeoutMs: explicitTimeout }) },
+			envTimeout,
 		);
 		await context.client.openFile(context.source);
 
-		const pending = context.client.diagnostics(context.source);
-		await waitForEventCountBySubscription(
+		const firstPull = waitForEventCountBySubscription(
 			context.events,
 			(event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic",
 			1,
 		);
+		const pending = context.client.diagnostics(context.source);
+		expect(await firstPull).toHaveLength(1);
+		clock.advanceBy(advanceMs);
 		writeFileSync(context.source, "const pull_fresh = 1;\n", "utf-8");
 		await context.client.openFile(context.source);
 

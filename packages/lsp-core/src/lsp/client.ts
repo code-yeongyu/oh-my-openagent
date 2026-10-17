@@ -48,8 +48,16 @@ export class LspClient extends LspClientConnection {
 
 	constructor(root: string, server: ResolvedServer, options: LspClientOptions = {}) {
 		super(root, server, options);
+		const environmentFreshnessTimeoutMs = Number(
+			process.env["OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS"],
+		);
 		this.diagnosticsFreshnessTimeoutMs =
-			options.diagnosticsFreshnessTimeoutMs ?? DIAGNOSTICS_FRESHNESS_TIMEOUT_MS;
+			options.diagnosticsFreshnessTimeoutMs ??
+			(Number.isInteger(environmentFreshnessTimeoutMs) &&
+			environmentFreshnessTimeoutMs > 0 &&
+			environmentFreshnessTimeoutMs <= 2_147_483_647
+				? environmentFreshnessTimeoutMs
+				: DIAGNOSTICS_FRESHNESS_TIMEOUT_MS);
 		this.documents = new WorkspaceDocumentState(
 			(method, params) => this.sendNotification(method, params),
 			(uri) => this.diagnosticsStore.delete(uri),

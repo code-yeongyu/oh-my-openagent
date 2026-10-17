@@ -49,6 +49,18 @@ Windows.
 sandbox, free port, server start/stop, and an EXIT-trap cleanup). It requires
 `opencode`, `sqlite3`, `curl`, `jq`, and `tmux` on PATH.
 
+### Optional LSP freshness budget
+
+For diagnostics QA, compare an unset
+`OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS` (3,000 ms) with a configured value
+such as `6000`. Valid values are positive integer milliseconds up to
+2,147,483,647; invalid values retain the default. Set it in the actual isolated
+OpenCode/MCP process before launch and restart only the QA-owned daemon.
+Do not assume a host export enters the Docker container or an existing daemon.
+Record the effective child value and observed diagnostic result while keeping
+the same XDG sandbox and protected-session-count checks. See the repository's
+`packages/lsp-tools-mcp/README.md`; the separate total request limit still applies.
+
 ## Router: pick your case
 
 | You want to... | Case | Script | Reference |
