@@ -23,10 +23,13 @@ const RECOMMENDATION_FILES = [
   "packages/web/messages/zh.json",
 ] as const
 
-const LEGACY_OPUS_RECOMMENDATION = /\b(?:claude[- ]?)?opus[ _-]?4[._-]?(?:6|8)\b/i
+// `claude-opus-4-6` is deliberately excluded: `MODEL_VERSION_MAP` keeps it in
+// `CURRENT_USER_SELECTABLE_MODELS`, and the `writing` chain ships it as its third rung, so it is a
+// current recommendation rather than a leftover from the Opus 5 migration (#8525).
+const LEGACY_OPUS_RECOMMENDATION = /\b(?:claude[- ]?)?opus[ _-]?4[._-]?8\b/i
 
 describe("Opus 5 model recommendation migration", () => {
-  test("does not publish legacy Opus 4.6 or 4.8 recommendations", async () => {
+  test("does not publish legacy Opus 4.8 recommendations", async () => {
     const staleReferences = (
       await Promise.all(
         RECOMMENDATION_FILES.map(async (file) => {

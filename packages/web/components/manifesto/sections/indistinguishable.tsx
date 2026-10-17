@@ -11,7 +11,7 @@ import {
 } from "@/components/manifesto/manifesto-section"
 
 export async function IndistinguishableSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
   const indistinguishableKeys = [
     "patterns",
     "errorHandling",

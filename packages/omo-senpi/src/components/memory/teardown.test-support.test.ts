@@ -92,6 +92,21 @@ describe("rmEfaultTolerant", () => {
     expect(calls).toBe(2)
   })
 
+  test("#given Windows keeps a runner directory busy once #when teardown runs #then EBUSY is retried and the path is removed", async () => {
+    let calls = 0
+    const rm: RmAsyncFn = async () => {
+      calls += 1
+      if (calls === 1) throw errno("EBUSY", "resource busy or locked")
+    }
+
+    await rmEfaultTolerant("/tmp/omo-teardown-ebusy-once-async", { recursive: true, force: true }, {
+      rm,
+      sleep: async () => {},
+    })
+
+    expect(calls).toBe(2)
+  })
+
   test("#given rm always throws ENOENT #when teardown runs #then the original error is rethrown immediately", async () => {
     const error = errno("ENOENT", "no such file or directory")
     let calls = 0

@@ -3,6 +3,7 @@ import type { JSX, ReactNode } from "react"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import Script from "next/script"
+import { installDetectScript } from "@/lib/install-targets"
 import { getStats, FALLBACK_DESCRIPTION } from "@/lib/stats"
 import "./globals.css"
 
@@ -21,8 +22,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(primarySiteUrl),
     title: {
-      default: "Oh My OpenAgent — The Best Agent Harness",
-      template: "%s | Oh My OpenAgent",
+      default: "OmO — Your tool for real work. But it's an agent.",
+      template: "%s | OmO",
     },
     description,
     keywords: [
@@ -59,14 +60,14 @@ export async function generateMetadata(): Promise<Metadata> {
       locale: "en_US",
       alternateLocale: ["ko_KR", "ja_JP", "zh_CN"],
       url: primarySiteUrl,
-      siteName: "Oh My OpenAgent",
-      title: "Oh My OpenAgent — The Best Agent Harness",
+      siteName: "OmO",
+      title: "OmO — Your tool for real work. But it's an agent.",
       description,
       // Next.js supplies the dynamic image from app/opengraph-image.tsx.
     },
     twitter: {
       card: "summary_large_image",
-      title: "Oh My OpenAgent — The Best Agent Harness",
+      title: "OmO — Your tool for real work. But it's an agent.",
       description,
       // app/twitter-image.tsx shares the Open Graph image generator.
     },
@@ -86,7 +87,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Oh My OpenAgent",
+  name: "OmO",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS, Linux, Windows",
   url: primarySiteUrl,
@@ -114,7 +115,30 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
       className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: installDetectScript }} />
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="flex min-h-screen flex-col bg-[#0a0a0a] text-[#ededed] antialiased">
+        {process.env.NODE_ENV === "development" && (
+          <>
+            <Script
+              src="//unpkg.com/react-grab/dist/index.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+            <Script
+              src="//unpkg.com/react-scan/dist/auto.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+          </>
+        )}
         <Script id="google-analytics-loader" strategy="lazyOnload">
           {`if (typeof window !== 'undefined' && window.location.hostname === '${gaTrackedDomain}') {
   var s = document.createElement('script');

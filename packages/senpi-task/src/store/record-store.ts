@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -11,7 +12,8 @@ import { join } from "node:path"
 
 import { parseTaskId, transitionTaskRecord } from "../state"
 import type { TaskId, TaskRecord } from "../state"
-import { appendTaskEvent, closeAppendFd, type AppendFdCache } from "./event-log"
+import { appendTaskEvent, closeAppendFd, taskEventLogPath, type AppendFdCache } from "./event-log"
+import { holdsTombstone, removeExpungeOwner, readExpungeOwnerFile, restoreTombstone, takeOverTombstone, writeExpungeOwner } from "./expunge-owner"
 import { withTaskRecordLock } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
 import { writeRecord } from "./record-write"
@@ -107,7 +109,7 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
       const path = taskPath(stateDir, parsedTaskId)
       withTaskRecordLock(path, () => removeRecord(stateDir, parsedTaskId, cache, appendFds))
     },
-    tombstoneIfExpired(taskId, shouldRetain) {
+    tombstoneIfExpired(taskId, shouldRetain, owner) {
       const parsedTaskId = parseTaskId(taskId)
       const path = taskPath(stateDir, parsedTaskId)
       // The lock file lives beside the record, so the tasks dir must exist even when the record
@@ -119,22 +121,41 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
         const current = readRecord(path)
         if (current === null) return { kind: "missing" } as const
         if (shouldRetain(current)) return { kind: "retained" } as const
+        if (owner !== undefined) writeExpungeOwner(tombstonePath(stateDir, parsedTaskId), owner)
         renameSync(path, tombstonePath(stateDir, parsedTaskId))
         cache.delete(path)
         return { kind: "tombstoned", record: current } as const
       })
     },
-    completeExpunge(taskId) {
+    completeExpunge(taskId, owner) {
       const parsedTaskId = parseTaskId(taskId)
-      // Phase 2 (and crash recovery): the record is already tombstoned - committed to deletion,
-      // invisible to load/list, never resurrected - so this is idempotent and needs no lock.
+      const tombstone = tombstonePath(stateDir, parsedTaskId)
+      // Phase 2 (and crash recovery): the tombstone is committed to deletion and invisible to load/list.
+      // An owned attempt first confirms, under the record lock, that the tombstone is still its own.
+      if (owner !== undefined && !holdsTombstone(taskPath(stateDir, parsedTaskId), tombstone, owner)) return false
       removeRecord(stateDir, parsedTaskId, cache, appendFds)
-      rmSync(tombstonePath(stateDir, parsedTaskId), { force: true })
+      rmSync(tombstone, { force: true })
+      removeExpungeOwner(tombstone)
+      return true
+    },
+    loadExpunging(taskId) {
+      return readRecord(tombstonePath(stateDir, parseTaskId(taskId)))
+    },
+    restoreExpunging(taskId, owner) {
+      const parsedTaskId = parseTaskId(taskId)
+      const path = taskPath(stateDir, parsedTaskId)
+      if (restoreTombstone(path, tombstonePath(stateDir, parsedTaskId), owner)) cache.delete(path)
+    },
+    readExpungeOwner(taskId) {
+      return readExpungeOwnerFile(tombstonePath(stateDir, parseTaskId(taskId)))
+    },
+    takeOverExpunging(taskId, from, to) {
+      const parsedTaskId = parseTaskId(taskId)
+      return takeOverTombstone(taskPath(stateDir, parsedTaskId), tombstonePath(stateDir, parsedTaskId), from, to)
     },
     listExpunging() {
       const tasksDir = join(stateDir, "tasks")
-      mkdirSync(tasksDir, { recursive: true })
-      return readdirSync(tasksDir)
+      return readDirectoryNames(tasksDir)
         .filter((entry) => entry.endsWith(TOMBSTONE_SUFFIX))
         .map((entry) => entry.slice(0, entry.length - TOMBSTONE_SUFFIX.length))
         .filter(isParseableTaskId)
@@ -155,7 +176,7 @@ function removeRecord(
   // (2) completion spill file
   rmSync(join(stateDir, "completion-results", `${taskId}.txt`), { force: true })
   // (3) task event log
-  const logPath = join(stateDir, "logs", `${taskId}.jsonl`)
+  const logPath = taskEventLogPath(stateDir, String(taskId))
   rmSync(logPath, { force: true })
   closeAppendFd(logPath, appendFds)
   // (4) record LAST
@@ -166,12 +187,11 @@ function removeRecord(
 
 function listRecords(stateDir: string, cache: Map<string, CacheEntry>): ListTaskRecordsResult {
   const tasksDir = join(stateDir, "tasks")
-  mkdirSync(tasksDir, { recursive: true })
   const records: TaskRecord[] = []
   const diagnostics: TaskRecordDiagnostic[] = []
   const seen = new Set<string>()
 
-  for (const file of readdirSync(tasksDir).filter((entry) => entry.endsWith(".json")).toSorted()) {
+  for (const file of readDirectoryNames(tasksDir).filter((entry) => entry.endsWith(".json")).toSorted()) {
     const path = join(tasksDir, file)
     seen.add(path)
     try {
@@ -197,6 +217,15 @@ function listRecords(stateDir: string, cache: Map<string, CacheEntry>): ListTask
   }
 
   return { records, diagnostics }
+}
+
+function readDirectoryNames(directory: string): string[] {
+  try {
+    return readdirSync(directory)
+  } catch (error) {
+    if (isEnoent(error)) return []
+    throw error
+  }
 }
 
 function readCached(path: string, cache: Map<string, CacheEntry>): TaskRecord | null {

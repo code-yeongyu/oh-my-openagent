@@ -307,19 +307,7 @@ fn init_tracing() {
     fmt().with_env_filter(filter).with_target(false).json().init();
 }
 
-async fn shutdown_signal() {
-    let ctrl_c = async { tokio::signal::ctrl_c().await.expect("ctrl_c handler"); };
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("signal handler").recv().await;
-    };
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! { _ = ctrl_c => {}, _ = terminate => {} }
-    tracing::info!("shutting down");
-}
+// shutdown_signal(): the Ctrl-C / SIGTERM future from async-tokio.md#graceful-shutdown
 ```
 
 ## Middleware: bearer auth example

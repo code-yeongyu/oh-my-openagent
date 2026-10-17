@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { DEFAULT_POSTHOG_API_KEY } from "@oh-my-opencode/telemetry-core"
 import packageJson from "../../../../package.json" with { type: "json" }
 import { PLUGIN_NAME } from "./plugin-identity"
 import { createOpencodeTelemetryProductConfig } from "./telemetry-product-identity"
@@ -14,6 +15,7 @@ describe("createOpencodeTelemetryProductConfig", () => {
     // then
     expect(product).toMatchObject({
       cacheDirName: "oh-my-opencode",
+      defaultApiKey: DEFAULT_POSTHOG_API_KEY,
       eventName: "omo_daily_active",
       machineIdPrefix: "oh-my-openagent:",
       packageName: "oh-my-openagent",

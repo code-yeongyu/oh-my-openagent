@@ -80,6 +80,98 @@ function ownerPid(): number {
 	return record.pid;
 }
 
+function manualClock() {
+	let now = Date.now();
+	const tasks = new Set<{ at: number; fn: () => void }>();
+	return {
+		now: () => now,
+		schedule(fn: () => void, ms: number) {
+			const task = { at: now + ms, fn };
+			tasks.add(task);
+			return { unref() {}, cancel: () => tasks.delete(task) };
+		},
+		advance(ms: number) {
+			const end = now + ms;
+			for (;;) {
+				const next = [...tasks].filter((task) => task.at <= end).sort((a, b) => a.at - b.at)[0];
+				if (next === undefined) break;
+				now = next.at;
+				tasks.delete(next);
+				next.fn();
+			}
+			now = end;
+		},
+	};
+}
+
+describe("#given lease-based ownership", () => {
+	it("#when (1) a live owner's lease expired #then an async waiter reclaims it", async () => {
+		const clock = manualClock();
+		mkdirSync(join(workDir, ".omo", "ulw-loop", "s1"), { recursive: true });
+		await writeFile(
+			lockPath,
+			JSON.stringify({
+				pid: process.pid,
+				token: "expired",
+				createdAt: new Date().toISOString(),
+				leaseUntil: clock.now() - 1,
+			}),
+		);
+		await expect(withStateLock(lockPath, async () => "acquired", { clock, leaseMs: 90, timeoutMs: 0 })).resolves.toBe(
+			"acquired",
+		);
+	});
+
+	it("#when (2) reclaimed while owner alive #then its heartbeat never overwrites or recreates the successor path", async () => {
+		const clock = manualClock();
+		await withStateLock(
+			lockPath,
+			async () => {
+				const initial = JSON.parse(readFileSync(lockPath, "utf8"));
+				expect(initial.leaseUntil).toBe(clock.now() + 90);
+				await withStateLock(
+					lockPath,
+					async () => {
+						const successor = readFileSync(lockPath, "utf8");
+						clock.advance(30);
+						expect(readFileSync(lockPath, "utf8")).toBe(successor);
+					},
+					{ leaseMs: 900, heartbeatMs: 0, timeoutMs: 0, clock: { ...clock, now: () => clock.now() + 91 } },
+				);
+				clock.advance(30);
+				expect(existsSync(lockPath)).toBe(false);
+			},
+			{ clock, leaseMs: 90 },
+		);
+	});
+
+	it("#when (3) the clock passes the original lease #then a refreshing holder cannot be reclaimed", async () => {
+		const clock = manualClock();
+		await withStateLock(
+			lockPath,
+			async () => {
+				clock.advance(120);
+				await expect(withStateLock(lockPath, async () => "stolen", { clock, timeoutMs: 0 })).rejects.toMatchObject({
+					code: ULW_LOOP_LOCK_TIMEOUT_CODE,
+				});
+			},
+			{ clock, leaseMs: 90 },
+		);
+	});
+
+	it("#when acquisition hands off to its body #then ownership uses the acquired token rather than rereading a successor", async () => {
+		await withStateLock(lockPath, async (token: string) => {
+			expect(token).toBe(JSON.parse(readFileSync(lockPath, "utf8")).token);
+		});
+	});
+
+	it("#when (4) a synchronous holder runs #then it writes a lease-less record", () => {
+		withStateLockSync(lockPath, () => {
+			expect(JSON.parse(readFileSync(lockPath, "utf8"))).not.toHaveProperty("leaseUntil");
+		});
+	});
+});
+
 describe("withStateLock", () => {
 	describe("#given a lock held by another live process", () => {
 		it("#when acquiring #then it waits for that process to release before running the body", async () => {

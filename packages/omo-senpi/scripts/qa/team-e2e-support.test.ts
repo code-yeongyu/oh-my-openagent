@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { analyzeMain } from "./team-e2e-analysis.mjs"
-import { sessionEnvelopeCount } from "./team-e2e-support.mjs"
+import { memberSessionDir, runtimeDir, sessionEnvelopeCount, taskStateDir } from "./team-e2e-support.mjs"
 
 const roots: string[] = []
 
@@ -21,7 +21,7 @@ describe("team e2e injection evidence", () => {
     // when
     const checks = analyzeMain(
       { events: fixture.events, status: 0 },
-      { cwd: fixture.project },
+      fixture.sandbox,
       fixture.obsDir,
     )
 
@@ -42,7 +42,7 @@ describe("team e2e injection evidence", () => {
     // when
     analyzeMain(
       { events: fixture.events, status: 0 },
-      { cwd: fixture.project },
+      fixture.sandbox,
       fixture.obsDir,
     )
 
@@ -65,10 +65,23 @@ describe("team e2e injection evidence", () => {
     })
 
     // when
-    const count = sessionEnvelopeCount(fixture.project, fixture.taskId, fixture.leadMessageId)
+    const count = sessionEnvelopeCount(fixture.sandbox, fixture.taskId, fixture.leadMessageId)
 
     // then
     expect(count).toBe(1)
+  })
+
+  it("#given a sandbox without a legacy project state dir #when team paths resolve #then they live in the agent dir, not the project", () => {
+    // given
+    const fixture = createFixture()
+
+    // when
+    const stateDir = taskStateDir(fixture.sandbox)
+
+    // then
+    expect(stateDir.startsWith(join(fixture.sandbox.agentDir, "projects"))).toBe(true)
+    expect(stateDir.startsWith(fixture.project)).toBe(false)
+    expect(runtimeDir(fixture.sandbox, fixture.runId)).toBe(join(stateDir, "teams", "runtime", fixture.runId))
   })
 })
 
@@ -86,6 +99,7 @@ function createFixture() {
   mkdirSync(obsDir, { recursive: true })
   return {
     project,
+    sandbox: { cwd: project, agentDir: join(root, "agent") },
     obsDir,
     runId,
     taskId,
@@ -101,9 +115,9 @@ function createFixture() {
 }
 
 function seedInjectionEvidence(fixture: Fixture): void {
-  const runtime = join(fixture.project, ".omo", "senpi-task", "teams", "runtime", fixture.runId)
+  const runtime = runtimeDir(fixture.sandbox, fixture.runId)
   const processed = join(runtime, "inboxes", "lead", "processed")
-  const sessions = join(fixture.project, ".omo", "senpi-task", "children", fixture.taskId, "sessions", fixture.taskId)
+  const sessions = memberSessionDir(fixture.sandbox, fixture.taskId)
   mkdirSync(processed, { recursive: true })
   mkdirSync(sessions, { recursive: true })
   writeFileSync(join(runtime, "senpi-task-members.json"), `${JSON.stringify({ quick: fixture.taskId })}\n`)
@@ -119,15 +133,7 @@ function seedInjectionEvidence(fixture: Fixture): void {
 }
 
 function writeSessionLine(fixture: Fixture, event: object): void {
-  const sessions = join(
-    fixture.project,
-    ".omo",
-    "senpi-task",
-    "children",
-    fixture.taskId,
-    "sessions",
-    fixture.taskId,
-  )
+  const sessions = memberSessionDir(fixture.sandbox, fixture.taskId)
   mkdirSync(sessions, { recursive: true })
   writeFileSync(join(sessions, "session.jsonl"), `${JSON.stringify(event)}\n`)
 }

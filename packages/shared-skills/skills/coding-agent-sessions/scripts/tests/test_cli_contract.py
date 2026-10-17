@@ -14,6 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent_sessions.jsonio import as_map, parse_json_text
@@ -112,6 +114,70 @@ def test_platform_filter_narrows_find_results(tmp_path: Path) -> None:
     results = _rows(payload, "results")
     assert len(results) == 1
     assert results[0]["platform"] == "codex"
+
+
+def test_find_matches_a_user_event_between_the_first_and_last_prompts(tmp_path: Path) -> None:
+    # given: a transcript whose query text appears only in a middle user event
+    root = _fixture_root(tmp_path)
+    _write_jsonl(
+        root / "transcripts" / "claude-gamma.jsonl",
+        [
+            {"sessionId": "claude-gamma", "type": "user", "timestamp": "2026-06-11T00:00:00Z", "cwd": "/tmp/work", "content": "alpha-edge"},
+            {"sessionId": "claude-gamma", "type": "user", "timestamp": "2026-06-11T00:00:01Z", "cwd": "/tmp/work", "content": "needle-middle-only"},
+            {"sessionId": "claude-gamma", "type": "user", "timestamp": "2026-06-11T00:00:02Z", "cwd": "/tmp/work", "content": "omega-edge"},
+        ],
+    )
+
+    # when
+    payload = _run(root, "find", "needle-middle-only", "--platform", "claude")
+
+    # then
+    results = _rows(payload, "results")
+    assert [item["id"] for item in results] == ["claude-gamma"]
+    reasons = _rows(results[0], "match_reasons")
+    assert reasons[0]["field"] == "user_message"
+    assert reasons[0]["snippet"] == "needle-middle-only"
+
+
+EDGE_AND_MIDDLE_PROMPTS = ("alpha-edge", "needle-middle-only", "omega-edge")
+OWN_FORMAT_TRANSCRIPTS: dict[str, tuple[str, list[JsonMap]]] = {
+    "droid": ("sessions/proj/droid-1.jsonl", [{"type": "message", "message": {"role": "user", "content": prompt}} for prompt in EDGE_AND_MIDDLE_PROMPTS]),
+    "kimi": ("sessions/proj/kimi-1/wire.jsonl", [{"type": "TurnBegin", "payload": {"user_input": prompt}} for prompt in EDGE_AND_MIDDLE_PROMPTS]),
+    "aside": ("sessions/x_aside-1/messages.jsonl", [{"role": "user", "content": [{"type": "text", "text": prompt}]} for prompt in EDGE_AND_MIDDLE_PROMPTS]),
+}
+
+
+@pytest.mark.parametrize("platform", sorted(OWN_FORMAT_TRANSCRIPTS))
+def test_find_matches_a_middle_prompt_in_platform_specific_transcripts(tmp_path: Path, platform: str) -> None:
+    # given: a transcript in the platform's own format whose query text appears only in a middle prompt
+    relative, rows = OWN_FORMAT_TRANSCRIPTS[platform]
+    _write_jsonl(tmp_path / relative, rows)
+
+    # when
+    payload = _run(tmp_path, "find", "needle-middle-only", "--platform", platform)
+
+    # then
+    results = _rows(payload, "results")
+    assert [item["id"] for item in results] == [f"{platform}-1"]
+    assert _rows(results[0], "match_reasons")[0]["field"] == "user_message"
+
+
+def test_entrypoint_rejects_python_older_than_3_11(tmp_path: Path) -> None:
+    # given: an interpreter that reports Python 3.9
+    script = SKILL_ROOT / "scripts" / "find-agent-sessions.py"
+    launcher = (
+        "import runpy, sys\n"
+        + "sys.version_info = (3, 9, 6, 'final', 0)\n"
+        + f"runpy.run_path({str(script)!r}, run_name='__main__')\n"
+    )
+
+    # when
+    proc = subprocess.run([sys.executable, "-c", launcher, "list"], cwd=tmp_path, capture_output=True, text=True, check=False)
+
+    # then
+    assert proc.returncode == 2
+    assert "3.11" in proc.stderr
+    assert proc.stdout == ""
 
 
 def test_read_summarizes_first_and_last_user_prompts(tmp_path: Path) -> None:

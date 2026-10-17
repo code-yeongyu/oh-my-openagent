@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("category routing policy", () => {
-  test("visual-engineering prioritizes Fable 5.1 max, Opus max, then Kimi K3 max", () => {
+  test("visual-engineering prioritizes Argon low, Fable 5.1 max, Opus max, then Kimi K3 max", () => {
     // given
     const visual = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -13,13 +13,18 @@ describe("category routing policy", () => {
     // then
     expect(leadingChain).toEqual([
       {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
+      },
+      {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
         variant: "max",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
+        model: "claude-opus-5-5",
         variant: "max",
       },
       {
@@ -30,29 +35,32 @@ describe("category routing policy", () => {
     ])
   })
 
-  test("deep is limited to a single sol-family medium rung", () => {
+  test("deep-high is a single Astra rung and deep-low a Sol ladder, so the lanes never substitute each other", () => {
     // given
-    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
-
-    // when
-    const chain = deep.fallbackChain
+    const low = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
+    const high = CATEGORY_MODEL_REQUIREMENTS["deep-high"]
 
     // then
-    expect(chain).toEqual([
+    expect(high.fallbackChain).toEqual([
       {
-        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-6-astra",
         variant: "high",
       },
+    ])
+    expect(low.fallbackChain).toEqual([
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
       {
-        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
         variant: "medium",
-      }
+      },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" }
     ])
   })
 
-  test("quick prioritizes Kimi high-speed, Luna low, DeepSeek off, then the speed tier", () => {
+  test("quick prioritizes Luna low, Haiku 5.5 medium, DeepSeek off, then the speed tier", () => {
     // given
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -62,17 +70,18 @@ describe("category routing policy", () => {
     // then
     expect(leadingChain).toEqual([
       {
-        providers: ["kimi-for-coding"],
-        model: "kimi-for-coding-highspeed",
-      },
-      {
-        providers: ["openai-codex"],
-        model: "gpt-5.6-luna-fast",
+        providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6-luna-fast",
         variant: "low",
       },
       {
+        providers: ["anthropic", "anthropic-api", "github-copilot"],
+        model: "claude-haiku-5-5",
+        variant: "medium",
+      },
+      {
         providers: ["deepseek"],
-        model: "deepseek-v4-flash",
+        model: "deepseek-flash",
         variant: "off",
       },
       {
@@ -94,15 +103,12 @@ describe("category routing policy", () => {
         providers: ["xai"],
         model: "grok-4.20-0309-non-reasoning",
       },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot"],
-        model: "claude-haiku-4-5",
-        variant: "off",
-      }
+      { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
+      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
     ])
   })
 
-  test("unspecified-low follows the approved 6-rung chain headed by grok-4.6 xhigh", () => {
+  test("unspecified-low follows the approved 8-rung chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -113,14 +119,29 @@ describe("category routing policy", () => {
     expect(chain.map((entry) => entry.model)).not.toContain("gpt-5.6-luna")
     expect(chain).toEqual([
       {
-        providers: ["xai", "github-copilot", "opencode"],
-        model: "grok-4.6",
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-sonnet-5-5",
+        variant: "medium",
+      },
+      {
+        providers: ["xiaomi", "opencode-go"],
+        model: "mimo-v2.6-pro",
+        variant: "max",
+      },
+      {
+        providers: ["xai", "github-copilot", "opencode-go"],
+        model: "grok-4.7",
         variant: "xhigh",
       },
       {
-        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
-        model: "gpt-5.6-terra",
-        variant: "high",
+        providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.1-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -159,14 +180,9 @@ describe("category routing policy", () => {
     // then
     expect(highChain).toEqual([
       {
-        providers: ["openai", "openai-codex", "github-copilot", "opencode"],
-        model: "gpt-6-astra",
-        variant: "high",
-      },
-      {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "xhigh",
+        model: "claude-opus-5-5",
+        variant: "medium",
       },
       {
         providers: ["zai-coding-plan", "opencode-go"],
@@ -186,25 +202,30 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
-        model: "kimi-k3",
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5-5",
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "xhigh",
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "max",
       }
     ])
     expect(writingChain).toEqual([
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-1",
-        variant: "medium",
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
-        model: "kimi-k3",
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5-5",
+        variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-4-6",
         variant: "max",
       }
     ])

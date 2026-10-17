@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -29,11 +29,6 @@ import { createShutdownDrain, type ShutdownDrainSteps } from "./shutdown-drain"
 export const CONVERSATION = "conversation-a"
 export const NOW_MS = Date.parse("2026-08-10T12:00:00.000Z")
 export const IDLE_MS = 30 * 60_000
-
-const roots: string[] = []
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
-})
 
 export function triggerSettings(overrides: Partial<DreamTriggerSettings> = {}): DreamTriggerSettings {
   return { ...DEFAULT_DREAM_TRIGGER_SETTINGS, ...overrides }
@@ -90,7 +85,7 @@ export async function fixture(options: {
   readonly now?: () => number
 } = {}): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), "omo-dream-trigger-"))
-  roots.push(root)
+  onTestFinished(() => rm(root, { recursive: true, force: true }))
   const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
   const text = options.conversationText === undefined ? "x".repeat(DREAM_VOLUME_GATE_BYTES + 1) : options.conversationText
   if (text !== null) await writeConversation(identity.paths.transcripts, CONVERSATION, text)

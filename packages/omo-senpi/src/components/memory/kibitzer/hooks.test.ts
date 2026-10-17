@@ -28,7 +28,7 @@ function context(sessionId: string): { readonly ctx: Record<string, unknown>; di
 
 interface Recorder {
   readonly sink: KibitzerHookSink
-  readonly delivery: Pick<KibitzerDelivery, "onToolResult" | "markRunning" | "markSettled">
+  readonly delivery: KibitzerHooksOptions["delivery"]
   readonly log: string[]
 }
 
@@ -51,6 +51,9 @@ function recorder(overrides: { readonly sink?: Partial<KibitzerHookSink>; readon
       onToolResult: async (sessionId, _context, eventCtx) => { log.push(`delivery:tool_result:${alive(eventCtx)}:${sessionId}`) },
       markRunning: (sessionId) => { log.push(`delivery:running:${sessionId}`) },
       markSettled: (sessionId) => { log.push(`delivery:settled:${sessionId}`) },
+      markToolStarted: (sessionId, toolCallId) => { log.push(`delivery:tool_started:${sessionId}:${toolCallId}`) },
+      markToolFinished: (sessionId, toolCallId) => { log.push(`delivery:tool_finished:${sessionId}:${toolCallId}`) },
+      markTurnEnded: (sessionId) => { log.push(`delivery:turn_ended:${sessionId}`) },
       ...overrides.delivery,
     },
   }
@@ -71,7 +74,7 @@ function options(r: Recorder, overrides: Partial<KibitzerHooksOptions> = {}): Ki
 }
 
 describe("registerKibitzerHooks", () => {
-  test("#given the four Kibitzer hooks #when a turn's events dispatch #then every capture runs synchronously on the live ctx, before delivery and before the host disposes it", async () => {
+  test("#given the Kibitzer hooks #when a turn's events dispatch #then every capture runs synchronously on the live ctx, before delivery and before the host disposes it", async () => {
     const pi = new FakeExtensionAPI()
     const r = recorder()
     registerKibitzerHooks(pi, options(r))
@@ -79,21 +82,47 @@ describe("registerKibitzerHooks", () => {
 
     const results: unknown[][] = []
     results.push(await pi.dispatch("before_agent_start", beforeAgentStart("recall this"), host.ctx))
-    results.push(await pi.dispatch("tool_call", { toolName: "read", input: { path: "README.md" } }, host.ctx))
-    results.push(await pi.dispatch("tool_result", { toolName: "read", content: [{ type: "text", text: "# readme" }] }, host.ctx))
+    results.push(await pi.dispatch("tool_call", { toolName: "read", toolCallId: "call-1", input: { path: "README.md" } }, host.ctx))
+    results.push(await pi.dispatch("tool_result", { toolName: "read", toolCallId: "call-1", content: [{ type: "text", text: "# readme" }] }, host.ctx))
+    results.push(await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, host.ctx))
     results.push(await pi.dispatch("agent_settled", {}, host.ctx))
     host.dispose()
 
-    expect(results).toEqual([[undefined], [undefined], [undefined], [undefined]])
+    expect(results).toEqual([[undefined], [undefined], [undefined], [undefined], [undefined]])
     expect(r.log).toEqual([
       "delivery:running:session-1",
       "sink:prompt:live:recall this",
       "sink:tool_call:live:read",
+      "delivery:tool_started:session-1:call-1",
       "sink:tool_result:live:read",
+      "delivery:tool_finished:session-1:call-1",
       "delivery:tool_result:live:session-1",
+      "delivery:turn_ended:session-1",
       "delivery:settled:session-1",
       "sink:settled:live",
     ])
+  })
+
+  test("#given a preview followed by a real prompt #when before_agent_start dispatches #then preview marks nothing and the real prompt still reaches delivery and the sidecar", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const r = recorder()
+    registerKibitzerHooks(pi, options(r))
+    const host = context("session-1")
+
+    // when
+    const preview = await pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "recall this", preview: true }, host.ctx)
+    expect(preview).toEqual([undefined])
+    expect(r.log).toEqual([])
+    const real = await pi.dispatch("before_agent_start", beforeAgentStart("recall this"), host.ctx)
+
+    // then
+    expect(pi.handlers.find((registration) => registration.event === "before_agent_start")?.options).toEqual({ previewSafe: true })
+    expect(r.log).toEqual([
+      "delivery:running:session-1",
+      "sink:prompt:live:recall this",
+    ])
+    expect(real).toEqual([undefined])
   })
 
   test("#given a before_agent_start payload that is not a prompt #when dispatched #then nothing is captured or marked", async () => {

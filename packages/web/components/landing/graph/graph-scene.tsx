@@ -29,7 +29,7 @@ function Scene({ mobile, active, rotation, focusRequest, onReady }: GraphScenePr
   const lastInput = useRef(0)
   const interacting = useRef(false)
   const ready = useRef(false)
-  const texture = useMemo(makeHalo, [])
+  const texture = useMemo(() => makeHalo(), [])
   const nodes = useMemo(
     () => graphNodes.filter((node) => !mobile || mobileNodeIds.some((id) => id === node.id)),
     [mobile],

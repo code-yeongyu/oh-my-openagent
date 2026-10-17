@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs"
 import type { CreateAgentSessionOptions, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { ResolvedModelRecord } from "../state"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
+import type { KernelToolGrant } from "../kernel-tools/resolve"
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
+import { isWorkpoolYieldTool } from "../workpool/worker-tool-identity"
 import {
   createChildHandle,
   createRestoredChildHandle,
@@ -13,6 +16,7 @@ import {
   type ChildSession,
 } from "./in-process/child-handle"
 import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
+import { assertPinnedModelHonoured } from "./in-process/pin-check"
 import { RunnerError } from "./in-process/runner-error"
 import type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -23,11 +27,13 @@ export type {
   ChildSession,
   ChildSessionEvent,
   ChildSessionListener,
+  QueuedInputDisposition,
   RunnerFailure,
   RunnerOutcome,
 } from "./in-process/child-handle"
 export type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 export {
+  childVisibleToolNames,
   filterSharedParentTools,
   isTaskOrTeamFamilyTool,
   mergeChildCustomTools,
@@ -52,6 +58,9 @@ export type ChildSpec = {
   // typed session-create-failed, never a silent inMemory/default-dir fallback.
   readonly sessionDir: string
   readonly agentDir?: string
+  // The parent session's project-trust decision. The child's settings include the project layer
+  // only when the parent trusted it; unknown means untrusted.
+  readonly projectTrusted?: boolean
   readonly authStorage?: CreateAgentSessionOptions["authStorage"]
   readonly modelRegistry?: CreateAgentSessionOptions["modelRegistry"]
   readonly modelRuntime?: CreateAgentSessionOptions["modelRuntime"]
@@ -71,12 +80,21 @@ export type ChildSpec = {
   // Denylist mapped onto senpi's real deny field `excludeTools` (`tools:` is the allowlist and does
   // NOT deny). Sourced from record.tool_deny (the agent definition's disallowedTools).
   readonly toolDenylist?: readonly string[]
+  // Ordinary task children match process mode's nested task/workpool surface. DAG/workpool/member
+  // children leave this false and retain the stricter orchestration exclusion.
+  readonly includeTaskTools?: boolean
   // Names of the member-scoped tools, carried for persistence so a later resume can re-resolve
   // them against the live shared parent tools (todo 10). Start uses `memberScopedTools` directly.
   readonly memberScopedToolNames?: readonly string[]
   // executable ToolDefinitions merged AFTER the shared-tool family filter - the ONLY sanctioned
   // bypass of the task/team-family exclusion (team layer injects the pre-scoped member tool here).
   readonly memberScopedTools?: readonly ToolDefinition[]
+  /**
+   * TRANSIENT parent kernel-tool grant for THIS process only: live capability plus the fenced
+   * descriptors resolved at spawn. It is never persisted - SpawnSpecV1, the JSONL session_init and
+   * the task record carry no closure, descriptor or requested name (see buildSpawnSpecV1).
+   */
+  readonly kernelTools?: KernelToolGrant
   readonly depth: number
   readonly parentSessionId: string
   readonly rootSessionId: string
@@ -111,22 +129,37 @@ export type InProcessRunnerOptions = {
   readonly uiOnlyToolNames?: Iterable<string>
   readonly depthPolicy?: DepthPolicy
   readonly createSession?: CreateChildSession
+  /**
+   * The parent engine's runtime kernel-tool map. The runner binds a granted child here at spawn so
+   * a SAME-host revive can reach the same live parent closures; a new host process has no map entry
+   * and the revived child fails closed instead.
+   */
+  readonly kernelToolBindings?: KernelToolBindingRegistry
 }
 
-const defaultCreateChildSession: CreateChildSession = async (options) =>
-  (await (await loadSenpiBarrel()).createAgentSession(options)).session
+const defaultCreateChildSession: CreateChildSession = async (options) => {
+  // SDK callers that supply a ResourceLoader own its reload and extension binding. Load the
+  // builtin-only child surface, then run session_start so model-aware builtins (apply_patch, web
+  // search, terminal) select the same variants and active names as a process child.
+  await options.resourceLoader?.reload()
+  const session = (await (await loadSenpiBarrel()).createAgentSession(options)).session
+  await session.bindExtensions({ mode: "print" })
+  return session
+}
 
 export class InProcessRunner {
   readonly #sharedParentTools: readonly ToolDefinition[]
   readonly #uiOnlyToolNames: readonly string[]
   readonly #depthPolicy: DepthPolicy
   readonly #createSession: CreateChildSession
+  readonly #kernelToolBindings: KernelToolBindingRegistry | undefined
 
   constructor(options: InProcessRunnerOptions = {}) {
     this.#sharedParentTools = options.sharedParentTools ?? []
     this.#uiOnlyToolNames = [...(options.uiOnlyToolNames ?? [])]
     this.#depthPolicy = options.depthPolicy ?? { maxDepth: DEFAULT_MAX_CHILD_DEPTH }
     this.#createSession = options.createSession ?? defaultCreateChildSession
+    this.#kernelToolBindings = options.kernelToolBindings
   }
 
   async start(spec: ChildSpec): Promise<ChildHandle> {
@@ -138,6 +171,7 @@ export class InProcessRunner {
     }
 
     let session: ChildSession
+    let createdSession: ChildSession | undefined
     try {
       // SessionManager and the child option helpers below read barrel values synchronously, so the
       // barrel is loaded here (memoized: a cache hit in any process that already runs the engine).
@@ -147,9 +181,30 @@ export class InProcessRunner {
         sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec)),
         sharedParentTools: this.#sharedParentTools,
         uiOnlyToolNames: this.#uiOnlyToolNames,
+        ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
       session = await this.#createSession(options)
+      createdSession = session
+      assertPinnedModelHonoured(spec, session)
     } catch (error) {
+      // A start that never produced a session must leave NO binding behind: the runner floor refuses
+      // curated/policy-narrowed/colliding grants by throwing from here, and a stale entry would keep
+      // a strong reference to the parent kernel until TTL expunge.
+      this.#kernelToolBindings?.release(spec.taskId)
+      // A session that WAS created but failed the pin check is disposed here (session_shutdown +
+      // dispose): no handle exists yet, so nobody else owns that teardown (#9722 M1). A teardown
+      // that itself fails still escapes as a typed RunnerError - never an untyped AggregateError.
+      if (createdSession !== undefined) {
+        try {
+          await discardUnstartedChildSession(createdSession)
+        } catch (shutdownError) {
+          throw new RunnerError({
+            kind: "model_unavailable",
+            message: "the pin check failed, and shutting down its session failed",
+            cause: new AggregateError([error, shutdownError]),
+          })
+        }
+      }
       if (RunnerError.is(error)) throw error
       throw new RunnerError({ kind: "session-create-failed", message: sessionCreateMessage(error), cause: error })
     }
@@ -169,17 +224,26 @@ export class InProcessRunner {
         ...(spec.instructions !== undefined && { instructions: spec.instructions }),
       })
 
+    let handle: ChildHandle
     try {
-      return createChildHandle({
+      handle = createChildHandle({
         taskId: spec.taskId,
         session,
         promptText,
         ...(spec.completion === undefined ? {} : { completion: spec.completion }),
       })
     } catch (error) {
-      discardUnstartedChildSession(session)
+      this.#kernelToolBindings?.release(spec.taskId)
+      await discardUnstartedChildSession(session).catch((shutdownError: unknown) => {
+        throw new AggregateError([error, shutdownError], "child handle construction failed, and shutting down its session failed")
+      })
       throw error
     }
+    // Runtime-only, and only once the child actually exists: the grant is bound under this child's
+    // id for same-host revival. Nothing about it reaches the record, the v1 spawn_spec or the
+    // child's JSONL transcript.
+    if (spec.kernelTools !== undefined) this.#kernelToolBindings?.bind(spec.taskId, spec.kernelTools)
+    return handle
   }
 
   // Rebuild a persisted child from its session transcript WITHOUT replaying its prompt. The tool
@@ -190,17 +254,26 @@ export class InProcessRunner {
   // never comes back with a WIDER tool surface than it had. The restored handle is IDLE; any
   // continuation nudge is manager-owned (todo 12), never sent here.
   async resume(spec: ChildSpec, sessionPath: string): Promise<ChildHandle> {
-    const memberScopedTools = resolveMemberScopedToolNames(spec.memberScopedToolNames ?? [], this.#sharedParentTools)
+    const yields = (spec.memberScopedTools ?? []).filter(isWorkpoolYieldTool)
+    const memberScopedTools = resolveMemberScopedToolNames(spec.memberScopedToolNames ?? [], [
+      ...this.#sharedParentTools.filter(tool => tool.name !== "workpool"), ...yields,
+    ])
     assertUsableSessionFile(sessionPath)
 
     let session: ChildSession
     try {
       const { SessionManager } = await loadSenpiBarrel()
+      // Parent kernel tools are NOT rebuilt from the spec: only a runtime binding that survived
+      // same-host parking can restore a callable tool, and a missing binding restores typed error
+      // stubs from this child's own recorded transcript names.
+      const { kernelTools: _discardedGrant, ...plain } = spec
       const options = buildChildSessionOptions({
-        spec: { ...spec, memberScopedTools },
+        spec: { ...plain, memberScopedTools },
         sessionManager: SessionManager.open(sessionPath, requireChildSessionDir(spec), spec.cwd),
         sharedParentTools: this.#sharedParentTools,
         uiOnlyToolNames: this.#uiOnlyToolNames,
+        revivedSessionPath: sessionPath,
+        ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
       session = await this.#createSession(options)
     } catch (error) {

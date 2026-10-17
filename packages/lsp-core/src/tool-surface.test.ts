@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
+import { handleLspMcpRequest } from "./mcp.js";
 import { createStandaloneMcpRequestContext, runWithRequestContext } from "./request-context.js";
-import { coerceToolArguments, executeLspTool, LSP_MCP_TOOLS } from "./tools.js";
+import { coerceToolArguments, executeLspTool } from "./tools.js";
 
 const expectedToolSurface = [
 	{
@@ -140,17 +141,15 @@ const expectedToolSurface = [
 ];
 
 describe("LSP core tool surface", () => {
-	test("#given tool descriptors #when listed #then the public nine-tool schemas are pinned", () => {
-		// given / when
-		const surface = LSP_MCP_TOOLS.map((tool) => ({
-			name: tool.name,
-			title: tool.title,
-			description: tool.description,
-			inputSchema: tool.inputSchema,
-		}));
+	test("#given a JSON-RPC tools/list request #when descriptors are returned #then the public nine-tool schemas are pinned", async () => {
+		// given
+		const request = { jsonrpc: "2.0", id: 21, method: "tools/list" };
+
+		// when
+		const response = await handleLspMcpRequest(request);
 
 		// then
-		expect(surface).toEqual(expectedToolSurface);
+		expect(response?.result?.tools).toEqual(expectedToolSurface);
 	});
 
 	test("#given legacy tool aliases #when executed #then aliases are callable but not listed", async () => {
@@ -161,7 +160,8 @@ describe("LSP core tool surface", () => {
 
 		// then
 		expect(result.content[0]?.text).toContain("No LSP server configured for extension: .wat");
-		expect(LSP_MCP_TOOLS.map((tool) => tool.name)).not.toContain("lsp_diagnostics");
+		const listResponse = await handleLspMcpRequest({ jsonrpc: "2.0", id: 23, method: "tools/list" });
+		expect(listResponse?.result?.tools?.map((tool: { name: string }) => tool.name)).not.toContain("lsp_diagnostics");
 	});
 
 	test("#given non-object tool arguments #when coerced #then they produce an empty argument record", () => {

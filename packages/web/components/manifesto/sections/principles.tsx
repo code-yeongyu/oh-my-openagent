@@ -10,7 +10,7 @@ const PRINCIPLES = [
 ] as const
 
 export async function PrinciplesSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
 
   return (
     <ManifestoSection data-section="manifesto-principles">

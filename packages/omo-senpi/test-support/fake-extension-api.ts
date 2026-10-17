@@ -36,6 +36,12 @@ export interface FakeRpcEvent {
   data: unknown
 }
 
+export interface FakeHandlerRegistration {
+  event: string
+  handler: FakeEventHandler
+  options?: { previewSafe?: boolean }
+}
+
 type FakeExtensionEventHandler = (payload: unknown) => void
 const extensionEventHandlers = new WeakMap<FakeExtensionAPI, Map<string, Set<FakeExtensionEventHandler>>>()
 
@@ -78,8 +84,9 @@ export async function dispatchRunEnd(pi: FakeExtensionAPI, payload: unknown, ctx
 export class FakeExtensionAPI implements SenpiExtensionAPI {
   // Mirrors the host's per-session cwd; left undefined to emulate hosts that predate it.
   cwd?: string
-  readonly handlers: Array<{ event: string; handler: FakeEventHandler }> = []
+  readonly handlers: FakeHandlerRegistration[] = []
   readonly tools: Record<string, unknown>[] = []
+  readonly removedToolHints = new Map<string, string>()
   readonly commands: FakeCommandRegistration[] = []
   readonly flags: FakeFlagRegistration[] = []
   readonly messages: FakeSendMessageCall[] = []
@@ -104,12 +111,16 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 
-  on(event: string, handler: FakeEventHandler): void {
-    this.handlers.push({ event, handler })
+  on(event: string, handler: FakeEventHandler, options?: { previewSafe?: boolean }): void {
+    this.handlers.push({ event, handler, ...(options === undefined ? {} : { options }) })
   }
 
   registerTool(tool: Record<string, unknown>): void {
     this.tools.push(tool)
+  }
+
+  registerRemovedToolHint(name: string, hint: string): void {
+    this.removedToolHints.set(name, hint)
   }
 
   registerMessageRenderer(customType: string, renderer: unknown): void {

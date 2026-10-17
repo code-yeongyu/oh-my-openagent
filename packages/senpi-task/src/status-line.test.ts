@@ -57,14 +57,14 @@ describe("formatStatusTarget", () => {
       formatStatusTarget({
         category: "quick",
         resolvedModel: {
-          provider: "openai-codex",
+          provider: "chatgpt-subscription",
           model_id: "gpt-5.6-luna-fast",
           display: "gpt-5.6-luna-fast",
           reasoning_effort: "high",
           source: "category",
         },
       }),
-    ).toBe("category:quick(openai-codex/gpt-5.6-luna-fast:high)")
+    ).toBe("category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high)")
   })
 
   test("#given only an agent type #when formatted #then the agent target shares the category grammar", () => {
@@ -92,6 +92,33 @@ describe("formatStatusTarget", () => {
     // given / when / then
     expect(formatStatusTarget({ agentType: "explore", model: "anthropic/claude-sonnet-4-6" })).toBe(
       "agent:explore(anthropic/claude-sonnet-4-6)",
+    )
+  })
+
+  // A record carrying BOTH identities is a task whose caller wrote a subagent_type that a category
+  // ended up resolving (#8348). The category must never silently erase the name the caller wrote:
+  // the model and the target that selected it have to travel together in the same view.
+  test("#given a record carrying both the asked-for agent and the resolving category #when formatted #then both targets ride the model", () => {
+    // given / when / then
+    expect(
+      formatStatusTarget({
+        category: "architect",
+        agentType: "architect",
+        resolvedModel: {
+          provider: "anthropic",
+          model_id: "claude-fable-5-1",
+          display: "claude-fable-5-1",
+          reasoning: "xhigh",
+          source: "category",
+        },
+      }),
+    ).toBe("agent:architect\u2192category:architect(anthropic/claude-fable-5-1:xhigh)")
+  })
+
+  test("#given a record whose asked-for agent differs from the resolving category #when formatted #then the asked-for name is kept", () => {
+    // given / when / then
+    expect(formatStatusTarget({ category: "visual-engineering", agentType: "frontend-worker" })).toBe(
+      "agent:frontend-worker\u2192category:visual-engineering",
     )
   })
 
@@ -248,5 +275,63 @@ describe("composeStatusLine", () => {
   test("#given no stats #when composed #then only known tokens are emitted", () => {
     // given / when / then
     expect(composeStatusLine({ identity: "t", verb: "waiting (running)" })).toBe("t · waiting (running)")
+  })
+})
+
+describe("composeStatusLine not-yet-started grammar", () => {
+  test("#given zero stats #when composed #then the row reads starting with no turn or cost token", () => {
+    // given / when
+    const line = composeStatusLine({
+      identity: "Audit renderers",
+      target: "category:deep-low(provider/model:medium)",
+      stats: { runtime_ms: 41_000, turns: 0, tool_calls: 0, failed_turns: 0 },
+      verb: "starting",
+    })
+
+    // then — a run that has not landed a turn claims neither motion nor spend
+    expect(line).toBe("Audit renderers · category:deep-low(provider/model:medium) · starting")
+  })
+
+  test("#given failed attempts without a successful turn #when composed #then the failed counter replaces the turn and cost tokens", () => {
+    // given / when
+    const line = composeStatusLine({
+      identity: "Audit renderers",
+      target: "category:deep-low(provider/model:medium)",
+      stats: { runtime_ms: 41_000, turns: 0, tool_calls: 0, failed_turns: 2 },
+      verb: "retrying",
+    })
+
+    // then
+    expect(line).toBe("Audit renderers · category:deep-low(provider/model:medium) · failed 2 · retrying")
+  })
+
+  test("#given a normal run #when composed #then the turn, tool, cost and tps tokens render exactly as today", () => {
+    // given / when
+    const line = composeStatusLine({
+      identity: "Audit renderers",
+      stats: { runtime_ms: 65_000, turns: 3, tool_calls: 5, cost_usd: 0.12, tokens_per_second: 42 },
+      verb: "running",
+    })
+
+    // then
+    expect(line).toBe("Audit renderers · turn 3 (5 tools) · running · $0.1200 · 42 tok/s")
+  })
+
+  test("#given a successful turn with a genuine zero cost #when composed #then the cost token still reports the zero", () => {
+    // given / when / then
+    expect(
+      composeStatusLine({ identity: "t", stats: { runtime_ms: 0, turns: 1, tool_calls: 0, cost_usd: 0 }, verb: "running" }),
+    ).toBe("t · turn 1 · running · $0.0000")
+  })
+
+  test("#given a mix of successful and failed turns #when composed #then both counters ride the row", () => {
+    // given / when / then
+    expect(
+      composeStatusLine({
+        identity: "t",
+        stats: { runtime_ms: 0, turns: 2, tool_calls: 4, failed_turns: 1, cost_usd: 0.12 },
+        verb: "running",
+      }),
+    ).toBe("t · turn 2 (4 tools) · failed 1 · running · $0.1200")
   })
 })

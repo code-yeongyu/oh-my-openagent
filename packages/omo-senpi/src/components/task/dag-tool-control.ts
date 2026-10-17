@@ -65,12 +65,16 @@ export async function sendAction(deps: DagToolDeps, params: DagToolInput, runId:
     return failure("node_not_continuable", `Dag run ${runId} has no send surface wired in this session.`)
   }
   const sent = await deps.send(runId as DagRunId, nodeId.trim(), message)
-  return toolResult(`Delivered the message to dag node ${sent.nodeId} (${sent.delivery}).`, {
+  const text = sent.delivery === "uncertain"
+    ? `uncertain: the host did not acknowledge the message to dag node ${sent.nodeId}; it may still be delivered. omo will confirm by itself; do not resend the same text. Effect id: ${sent.effectId}`
+    : `Delivered the message to dag node ${sent.nodeId} (${sent.delivery}).`
+  return toolResult(text, {
     kind: "sent",
     run_id: runId,
     node_id: sent.nodeId,
     task_id: sent.taskId,
     delivery: sent.delivery,
+    ...(sent.effectId === undefined ? {} : { effect_id: sent.effectId }),
     ...(sent.queuePosition === undefined ? {} : { queue_position: sent.queuePosition }),
   })
 }

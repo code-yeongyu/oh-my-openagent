@@ -37,7 +37,7 @@ test("#given spawn parameter mutations and role-like prose #when parsed #then on
 	const content = [
 		'multi_agent_v1.spawn_agent({"message":"model and reasoning_effort are prose","agent_type":"explorer","fork_context":false})',
 		'multi_agent_v1.spawn_agent(agent_type="explorer", message="invalid keyword role", fork_context=false)',
-		'spawn_agent({"message":"invalid flat role","agent_type":"explorer","fork_turns":"none"})',
+		'spawn_agent({"message":"valid flat role","agent_type":"explorer","fork_turns":"none"})',
 		'spawn_agent(agent_type="explorer", message="invalid direct role", fork_turns="none")',
 		'spawn_agent({"message":"model and agent_type are prose","metadata":{"model":"nested","agent_type":"nested"},"fork_turns":"none"})',
 		'spawn_agent({"message":"placeholder prose","agent_type":...,"fork_turns":"none"})',
@@ -47,7 +47,7 @@ test("#given spawn parameter mutations and role-like prose #when parsed #then on
 
 	assert.deepEqual(
 		findSpawnAgentCallsWithUnsupportedParameters(content).map(({ parameters }) => parameters),
-		[["agent_type"], ["agent_type"], ["agent_type"], ["model"], ["reasoning_effort"]],
+		[["agent_type"], ["agent_type"], ["model"], ["reasoning_effort"]],
 	);
 });
 

@@ -9,6 +9,8 @@ export type ModelProfileSummary = {
   readonly id: string
   readonly displayName: string
   readonly source: ModelProfileSource
+  readonly family?: "daily" | "geeky"
+  readonly tier?: "normal" | "heavy"
 }
 
 /** One rung of a profile chain, after builtin entries and user config entries are unified. */
@@ -92,13 +94,29 @@ export function mergeModelProfiles(
   const merged = new Map<string, ModelProfileDefinition>()
   for (const [id, builtin] of Object.entries(BUILTIN_MODEL_PROFILES)) {
     merged.set(id, {
-      profile: { id, displayName: builtin.displayName, source: "builtin" },
+      profile: {
+        id,
+        displayName: builtin.displayName,
+        source: "builtin",
+        ...(builtin.family !== undefined ? { family: builtin.family } : {}),
+        ...(builtin.tier !== undefined ? { tier: builtin.tier } : {}),
+      },
       models: builtin.models.map(builtinRung),
     })
   }
   for (const [id, entry] of Object.entries(profiles ?? {})) {
+    const replaced = merged.get(id)?.profile
+    const family = entry.family ?? replaced?.family
+    const tier = entry.tier ?? replaced?.tier
     merged.set(id, {
-      profile: { id, displayName: entry.display_name ?? id, source: "user" },
+      profile: {
+        id,
+        // A customized builtin lane keeps its lane name unless the entry renames it.
+        displayName: entry.display_name ?? replaced?.displayName ?? id,
+        source: "user",
+        ...(family !== undefined ? { family } : {}),
+        ...(tier !== undefined ? { tier } : {}),
+      },
       models: (entry.models ?? []).map(userRung),
     })
   }
@@ -119,11 +137,14 @@ function unknownProfileMessage(name: string, known: readonly string[]): string {
 // (`packages/delegate-core/src/model-selection.ts`, via `senpi-task/src/category/resolver.ts`), one
 // rung at a time, so a profile and a category can never disagree on provider spelling or on which
 // registry id counts as "that model". The deps pin it to the availability branch: an empty registry
-// is answered here, above, instead of letting the cold-cache branch guess a provider.
+// is answered here, above, instead of letting the cold-cache branch guess a provider. A rung that
+// lists providers is served only by them, so a builtin lane never lands the session on a gateway's
+// copy of its model (#9146); only a user's bare model id, which names no provider, matches anywhere.
 function matchRung(rung: ModelProfileRung, availableModels: ReadonlySet<string>): RungMatch | undefined {
   const selection = resolveModelForDelegateTask(
     {
       fallbackChain: [{ providers: [...rung.providers], model: rung.model }],
+      allowUnlistedProviders: rung.providers.length === 0,
       availableModels,
     },
     { connectedProviders: null, hasProviderModelsCache: true, hasConnectedProvidersCache: true },
@@ -137,6 +158,29 @@ function matchRung(rung: ModelProfileRung, availableModels: ReadonlySet<string>)
     modelId: selection.model.slice(separatorIndex + 1),
     ...(rung.reasoning !== undefined ? { reasoning: rung.reasoning } : {}),
   }
+}
+
+function matchScopedUserRung(rung: ModelProfileRung, availableModels: ReadonlySet<string>): RungMatch | undefined {
+  for (const provider of rung.providers) {
+    if (!availableModels.has(`${provider}/${rung.model}`)) continue
+    return {
+      provider,
+      modelId: rung.model,
+      ...(rung.reasoning !== undefined ? { reasoning: rung.reasoning } : {}),
+    }
+  }
+  return undefined
+}
+
+function matchProfileRung(
+  rung: ModelProfileRung,
+  availableModels: ReadonlySet<string>,
+  definition: ModelProfileDefinition,
+): RungMatch | undefined {
+  if (definition.profile.source === "user" && rung.providers.length > 0) {
+    return matchScopedUserRung(rung, availableModels)
+  }
+  return matchRung(rung, availableModels)
 }
 
 /**
@@ -173,7 +217,7 @@ export function resolveModelProfile(input: ResolveModelProfileInput): ModelProfi
   const skipped: string[] = []
   if (availableModels.size > 0) {
     for (const rung of definition.models) {
-      const match = matchRung(rung, availableModels)
+      const match = matchProfileRung(rung, availableModels, definition)
       if (match !== undefined) {
         return { kind: "resolved", profile: definition.profile, ...match, skipped }
       }

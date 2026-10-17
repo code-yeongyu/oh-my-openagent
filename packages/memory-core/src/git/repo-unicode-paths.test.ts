@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "./index"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const KOREAN_CARD = "people/김철수/card.md"
 const AUTHOR = { agentId: "agent-one", authorName: "홍길동", authorEmail: "hong@example.com" }
@@ -21,7 +22,7 @@ async function repoWithKoreanCard() {
 
 afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
+    await removeTree(dir, { maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
   }
 })
 

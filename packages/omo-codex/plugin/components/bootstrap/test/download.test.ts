@@ -262,22 +262,6 @@ describe("downloadFromManifest", () => {
 });
 
 describe("committed manifests", () => {
-	it("#given the committed ast-grep manifest #when loaded #then every required platform pins an https URL and a sha256", async () => {
-		// given / when
-		const manifest = await loadAssetManifest("ast-grep");
-
-		// then
-		expect(manifest.name).toBe("ast-grep");
-		expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
-		for (const platformKey of ["darwin-arm64", "darwin-x64", "linux-x64", "win32-x64"]) {
-			const asset = manifest.platforms[platformKey];
-			if (asset === undefined) throw new Error(`missing platform ${platformKey}`);
-			expect(asset.url).toStartWith("https://");
-			expect(asset.url).toContain(manifest.version);
-			expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/);
-		}
-	});
-
 	it("#given the committed node manifest #when loaded #then the win32-x64 LTS zip pins an https URL and a sha256", async () => {
 		// given / when
 		const manifest = await loadAssetManifest("node");

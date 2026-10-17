@@ -1,2 +1,0 @@
-legacy_exists=yes
-journal_exists=yes

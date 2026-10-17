@@ -4,7 +4,7 @@ import { Eyebrow } from "@/components/ledger/eyebrow"
 import { LEAD_CLASS, PROSE_LIMIT } from "@/components/manifesto/manifesto-section"
 
 export async function HeroSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
 
   return (
     <section

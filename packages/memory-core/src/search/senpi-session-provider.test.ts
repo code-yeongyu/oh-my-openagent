@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { SenpiSessionProvider, searchTranscripts } from "./index"
+import { removeTreeSync } from "../../../../test-support/remove-tree"
 
 // Fixtures mirror the on-disk senpi format verified against
 // senpi packages/coding-agent/src/core/session-manager.ts (SessionHeader / SessionEntryBase /
@@ -11,7 +12,7 @@ import { SenpiSessionProvider, searchTranscripts } from "./index"
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) removeTreeSync(root, { maxRetries: 10, retryDelay: 200 })
 })
 
 function sessionsRoot(): string {

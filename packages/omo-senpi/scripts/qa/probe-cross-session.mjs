@@ -6,12 +6,14 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
-import { toSpawnTarget } from "../../src/components/ulw-loop/omo-command.ts"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
+
 
 const scriptPath = fileURLToPath(import.meta.url)
 const repoRoot = join(dirname(scriptPath), "../../../..")
-const toolkitExecutable = process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit"
-const toolkitBin = join(repoRoot, "packages/omo-senpi/plugin/runtime/agent-toolkit", toolkitExecutable)
+// Native no longer stages a toolkit CLI. This probe drives the component's CLI from source with the
+// runtime already executing this script, so it needs no build step and no staged payload.
+const toolkitBin = join(repoRoot, "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts")
 // Senpi never puts a session id on the extension host's process.env, so the host-with-no-session-identity
 // scenario is the one that actually models production. It must never continue an unscoped run.
 const NO_SESSION = "--no-session"
@@ -153,9 +155,7 @@ async function runExtensionChild(sessionId) {
     ),
   ])
   const pi = new FakeExtensionAPI()
-  await createUlwLoopComponent({
-    resolveOmoBin: () => toolkitBin,
-  }).register(pi, {
+  await createUlwLoopComponent().register(pi, {
     logger: {
       info() {},
       warn() {},
@@ -194,8 +194,7 @@ function runChild(cwd, sessionId) {
 }
 
 function runToolkit(args, cwd, sessionId, expectedStatus) {
-  const target = toSpawnTarget(toolkitBin, args)
-  const child = spawnSync(target.command, [...target.args], {
+  const child = spawnSync(process.execPath, [toolkitBin, ...args], {
     cwd,
     env: sessionEnv(sessionId),
     encoding: "utf8",
@@ -215,7 +214,7 @@ function sessionEnv(sessionId) {
   delete env.CODEX_THREAD_ID
   delete env.PI_SESSION_ID
   if (sessionId !== null) env.PI_SESSION_ID = sessionId
-  return env
+  return withTelemetryOptOut(env)
 }
 
 function assert(condition, message) {

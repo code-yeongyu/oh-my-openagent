@@ -1,12 +1,22 @@
 import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
-import type * as z from "zod"
 
-import { OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
-import { isUnsafeObjectKey, mergeOmoConfigRecords } from "./merge"
+import {
+  canonicalizeLegacyCategoryNames,
+  canonicalizeLegacyHarnessBlocks,
+  OmoConfigSchema,
+  resolveOmoTaskSettings,
+  type LegacyCategoryRename,
+  type LegacyHarnessRename,
+  type OmoConfig,
+} from "../schema"
+import { invalidValueDiagnostics, validateConfigLayer, validationDiagnostic } from "./layer-validation"
+import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
+import { pruneInvalidConfigPaths } from "./prune-invalid-leaves"
 import { resolveOmoConfigView, resolveOmoProfileName } from "./resolution"
 import {
   DEFAULT_READ_FILE_SYSTEM,
+  MERGED_OMO_CONFIG_PATH,
   type LoadOmoConfigOptions,
   type LoadOmoConfigResult,
   type OmoConfigDiagnostic,
@@ -46,6 +56,7 @@ const DEFAULT_RAW_CONFIG: Record<string, unknown> = {
 function stripResolutionControlKeys(config: OmoConfig): OmoConfig {
   const {
     "[codex]": _codex,
+    "[native]": _native,
     "[opencode]": _opencode,
     "[senpi]": _senpi,
     profiles: _profiles,
@@ -54,102 +65,17 @@ function stripResolutionControlKeys(config: OmoConfig): OmoConfig {
   return resolved
 }
 
-function validationDiagnostic(path: string, issues: readonly { readonly path: readonly PropertyKey[] }[]): OmoConfigDiagnostic {
-  const issuePaths = issues.map((issue) => issue.path.map((segment) => String(segment)).join("."))
-  return {
-    kind: "validation",
-    message: `Invalid omo config at ${path}: ${issuePaths.join(", ")}`,
-    path,
-    issuePaths,
-  }
-}
-
-type UnrecognizedKeyIssue = {
-  readonly keys: readonly string[]
-  readonly path: readonly string[]
-}
-
-function unrecognizedKeyIssues(issues: readonly z.core.$ZodIssue[]): readonly UnrecognizedKeyIssue[] {
-  return issues.flatMap((issue) =>
-    issue.code === "unrecognized_keys"
-      ? [{ keys: issue.keys, path: issue.path.map((segment) => String(segment)) }]
-      : [],
-  )
-}
-
-/**
- * A layer carrying `__proto__`, `prototype`, or `constructor` is hostile input, not a stale key, so it
- * stays fail-closed (whole layer rejected) instead of being stripped and partially loaded.
- *
- * `prototype` and `constructor` arrive as own properties and surface here as unrecognized keys. A
- * JSON `"__proto__"` member does not: it is written THROUGH the prototype, so the schema sees only the
- * injected payload's inner keys, or nothing at all when a sub-schema rebuilds the object first. That
- * case is caught by `hasTamperedPrototype`, which runs on every layer before validation.
- */
-function hasUnsafeUnrecognizedKey(issues: readonly UnrecognizedKeyIssue[]): boolean {
-  return issues.some((issue) => issue.keys.some((key) => isUnsafeObjectKey(key)))
-}
-
-function hasTamperedPrototype(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some((entry) => hasTamperedPrototype(entry))
-  if (!isRecord(value)) return false
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null) return true
-  return Object.values(value).some((entry) => hasTamperedPrototype(entry))
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function containerAt(record: Record<string, unknown>, path: readonly string[]): Record<string, unknown> | null {
-  let container: Record<string, unknown> = record
-  for (const segment of path) {
-    const next = container[segment]
-    if (!isRecord(next)) return null
-    container = next
-  }
-  return container
-}
-
-/** Delete every unrecognized key reported by zod, returning the pruned clone plus the dotted path of each removal. */
-function stripUnrecognizedKeys(
-  record: Record<string, unknown>,
-  issues: readonly UnrecognizedKeyIssue[],
-): { readonly issuePaths: readonly string[]; readonly stripped: Record<string, unknown> } {
-  const stripped = structuredClone(record)
-  const issuePaths: string[] = []
-  for (const issue of issues) {
-    const container = containerAt(stripped, issue.path)
-    if (container === null) continue
-    for (const key of issue.keys) {
-      delete container[key]
-      issuePaths.push([...issue.path, key].join("."))
-    }
-  }
-  return { issuePaths, stripped }
-}
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return null
-  const record: Record<string, unknown> = {}
-  for (const [key, entry] of Object.entries(value)) {
-    record[key] = entry
-  }
-  return record
-}
-
 function readConfigSource(
   path: string,
   scope: "project" | "user",
   fileSystem: OmoConfigReadFileSystem,
 ): {
-  readonly diagnostic?: OmoConfigDiagnostic
+  readonly diagnostics: readonly OmoConfigDiagnostic[]
   readonly source: OmoConfigSource
   readonly value?: Record<string, unknown>
 } {
   if (!fileSystem.existsSync(path)) {
-    return { source: { exists: false, loaded: false, path, scope } }
+    return { diagnostics: [], source: { exists: false, loaded: false, path, scope } }
   }
 
   let content: string
@@ -158,7 +84,7 @@ function readConfigSource(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return {
-      diagnostic: { kind: "read", message: `Failed to read ${path}: ${message}`, path },
+      diagnostics: [{ kind: "read", message: `Failed to read ${path}: ${message}`, path }],
       source: { exists: true, loaded: false, path, scope },
     }
   }
@@ -166,66 +92,46 @@ function readConfigSource(
   const parsed = parseJsoncSafe<unknown>(content)
   if (parsed.errors.length > 0) {
     return {
-      diagnostic: {
+      diagnostics: [{
         kind: "parse",
         message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
         path,
-      },
+      }],
       source: { exists: true, loaded: false, path, scope },
     }
   }
 
-  // The guard runs before validation and reads `parsed.data` directly: `toRecord` rebuilds only the
-  // root from its own enumerable properties, nested objects keep their prototype, and a valid layer
-  // (nothing for zod to report) would otherwise hand a tampered sub-object to every consumer of it.
-  if (hasTamperedPrototype(parsed.data)) {
-    return {
-      diagnostic: { kind: "validation", message: `Invalid omo config at ${path}: "__proto__" member is not allowed`, path },
-      source: { exists: true, loaded: false, path, scope },
-    }
-  }
+  const layer = validateConfigLayer(path, parsed.data)
+  return layer.loaded
+    ? { diagnostics: layer.diagnostics, source: { exists: true, loaded: true, path, scope }, value: layer.value }
+    : { diagnostics: layer.diagnostics, source: { exists: true, loaded: false, path, scope } }
+}
 
-  const parsedRecord = toRecord(parsed.data)
-  const validation = OmoConfigLayerSchema.safeParse(parsed.data)
-  if (!validation.success) {
-    const unrecognized = unrecognizedKeyIssues(validation.error.issues)
-    if (hasUnsafeUnrecognizedKey(unrecognized)) {
-      return {
-        diagnostic: validationDiagnostic(path, validation.error.issues),
-        source: { exists: true, loaded: false, path, scope },
-      }
-    }
-    const rejected = {
-      diagnostic: validationDiagnostic(path, validation.error.issues),
-      source: { exists: true, loaded: false, path, scope },
-    } as const
-    const unknownIssues = unrecognizedKeyIssues(validation.error.issues)
-    if (parsedRecord === null || unknownIssues.length === 0) return rejected
-
-    const { issuePaths, stripped } = stripUnrecognizedKeys(parsedRecord, unknownIssues)
-    if (!OmoConfigLayerSchema.safeParse(stripped).success) return rejected
-
-    return {
-      diagnostic: {
-        kind: "unknown-keys",
-        message: `Ignored unknown keys in ${path}: ${issuePaths.join(", ")}`,
-        path,
-        issuePaths,
-      },
-      source: { exists: true, loaded: true, path, scope },
-      value: stripped,
-    }
-  }
-  if (parsedRecord === null) {
-    return {
-      diagnostic: { kind: "validation", message: `Invalid omo config at ${path}: root must be an object`, path },
-      source: { exists: true, loaded: false, path, scope },
-    }
-  }
-
+function legacyCategoryDiagnostic(path: string, renames: readonly LegacyCategoryRename[]): OmoConfigDiagnostic {
+  const detail = renames
+    .map((rename) => rename.dropped
+      ? `${rename.path} ignored because ${rename.canonical} is also configured`
+      : `${rename.path} renamed to ${rename.canonical}`)
+    .join(", ")
   return {
-    source: { exists: true, loaded: true, path, scope },
-    value: parsedRecord,
+    kind: "deprecated-keys",
+    message: `Deprecated category name in ${path}: ${detail}. Rename it; the alias is removed in a future release.`,
+    path,
+    issuePaths: renames.map((rename) => rename.path),
+  }
+}
+
+function legacyHarnessDiagnostic(path: string, renames: readonly LegacyHarnessRename[]): OmoConfigDiagnostic {
+  const detail = renames
+    .map((rename) => rename.dropped
+      ? `${rename.path} ignored because ${rename.canonical} is also configured`
+      : `${rename.path} renamed to ${rename.canonical}`)
+    .join(", ")
+  return {
+    kind: "deprecated-keys",
+    message: `Deprecated harness block in ${path}: ${detail}. Rename it; the alias is removed in a future release.`,
+    path,
+    issuePaths: renames.map((rename) => rename.path),
   }
 }
 
@@ -245,10 +151,21 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
   })) {
     const loaded = readConfigSource(candidate.path, candidate.scope, fileSystem)
     sources.push(loaded.source)
-    if (loaded.diagnostic !== undefined) diagnostics.push(loaded.diagnostic)
+    diagnostics.push(...loaded.diagnostics)
     if (loaded.value !== undefined) {
-      layers.push({ config: loaded.value, source: loaded.source })
-      merged = mergeOmoConfigRecords(merged, loaded.value)
+      // A retired category key or harness block still resolves, so a config the startup migration
+      // could not rewrite (locked run, read-only project file) keeps applying its override instead
+      // of being ignored.
+      const canonicalized = canonicalizeLegacyCategoryNames(loaded.value)
+      if (canonicalized.renames.length > 0) {
+        diagnostics.push(legacyCategoryDiagnostic(candidate.path, canonicalized.renames))
+      }
+      const harnessCanonicalized = canonicalizeLegacyHarnessBlocks(canonicalized.document)
+      if (harnessCanonicalized.renames.length > 0) {
+        diagnostics.push(legacyHarnessDiagnostic(candidate.path, harnessCanonicalized.renames))
+      }
+      layers.push({ config: harnessCanonicalized.document, source: loaded.source })
+      merged = mergeOmoConfigRecords(merged, harnessCanonicalized.document)
     }
   }
 
@@ -261,7 +178,8 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     ...(options.harness === undefined ? {} : { harness: options.harness }),
     ...(requestedProfile === undefined ? {} : { profile: requestedProfile }),
   })
-  const finalConfig = OmoConfigSchema.safeParse(mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, resolved.config))
+  const finalInput = mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, resolved.config)
+  const finalConfig = OmoConfigSchema.safeParse(finalInput)
   if (finalConfig.success) {
     return {
       config: stripResolutionControlKeys(finalConfig.data),
@@ -272,9 +190,25 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     }
   }
 
+  // Every layer already validated on its own; a merged value that still fails the full schema (a
+  // partial team spec, say) is dropped like any other invalid value instead of resetting the config.
+  const pruned = pruneInvalidConfigPaths(finalInput, finalConfig.error.issues, (record) => {
+    const parsed = OmoConfigSchema.safeParse(record)
+    return parsed.success ? { success: true } : { success: false, issues: parsed.error.issues }
+  })
+  if (pruned.ok) {
+    return {
+      config: stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config)),
+      diagnostics: [...diagnostics, ...resolved.diagnostics, ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped)],
+      layers,
+      ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
+      sources,
+    }
+  }
+
   return {
     config: stripResolutionControlKeys(OmoConfigSchema.parse(DEFAULT_RAW_CONFIG)) satisfies OmoConfig,
-    diagnostics: [...diagnostics, ...resolved.diagnostics, validationDiagnostic("(merged omo config)", finalConfig.error.issues)],
+    diagnostics: [...diagnostics, ...resolved.diagnostics, validationDiagnostic(MERGED_OMO_CONFIG_PATH, finalConfig.error.issues)],
     layers,
     ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
     sources,

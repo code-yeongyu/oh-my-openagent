@@ -46,7 +46,9 @@ function fixture(): {
   return {
     manager,
     store,
-    runFileCount: () => fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length,
+    runFileCount: () => fs.existsSync(store.paths.runs)
+      ? fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length
+      : 0,
   }
 }
 
@@ -494,10 +496,10 @@ describe("dag tool start warnings", () => {
     expect(result.details.warnings).toEqual([])
   })
 
-  test("#given a node targeting the legacy momus id #when start runs #then the route is canonical and the start result carries the deprecation warning", async () => {
+  test("#given a node targeting the retired momus id #when start runs #then the route keeps the submitted id and no deprecation warning is emitted", async () => {
     // given
     const { manager } = fixture()
-    const legacy = definition({
+    const retired = definition({
       nodes: [
         {
           id: "review",
@@ -509,15 +511,13 @@ describe("dag tool start warnings", () => {
     })
 
     // when
-    const result = await runDagTool(deps(manager), { action: "start", definition: legacy })
+    const result = await runDagTool(deps(manager), { action: "start", definition: retired })
 
     // then
     expect(result.details.kind).toBe("started")
-    if (result.details.kind !== "started") throw new Error("Expected the legacy id to start through the alias")
-    expect(result.details.snapshot.nodes[0]?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "anthropic/claude-opus-4" })
-    expect(result.details.warnings).toEqual([
-      'node "review": subagent_type "momus" is deprecated; use "plan-reviewer". The alias is removed in the next release.',
-    ])
+    if (result.details.kind !== "started") throw new Error("Expected the retired id to start as an ordinary agent name")
+    expect(result.details.snapshot.nodes[0]?.route).toEqual({ kind: "agent", agent: "momus", model: "anthropic/claude-opus-4" })
+    expect(result.details.warnings).toEqual([])
   })
 })
 

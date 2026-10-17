@@ -3,10 +3,19 @@ import { homedir as osHomedir } from "node:os"
 import { join } from "node:path"
 import { bunRoot, findBunBinary, isUnderBunGlobalTree } from "./bun-runtime.js"
 
-// Bumping this rewrites every generated shim on its next node boot; the value is embedded so a
-// stale shim is recognizable by content comparison alone.
+// Bumping this rewrites every generated shim on its next launch; the value is embedded so a stale
+// shim is recognizable by content comparison alone.
 const SHIM_VERSION = 1
 const SHIM_MARKER = "omo-ai bun launcher shim"
+
+// The two bins a POSIX bun-global install exposes for the same launcher. `bun add -g` links the
+// package bin into BOTH, and a bun layout that puts the global node_modules/.bin on PATH first
+// makes the second one the entry a typed `omo` actually reaches - so repairing only the first
+// leaves those machines paying for a node boot on every launch. Each entry is judged on its own.
+const BIN_ENTRIES = [
+  { label: "bin", segments: ["bin", "omo"] },
+  { label: "node-modules-bin", segments: ["install", "global", "node_modules", ".bin", "omo"] },
+]
 
 function quoteForShell(value) {
   return `'${value.replaceAll("'", "'\\''")}'`
@@ -17,8 +26,8 @@ function quoteForShell(value) {
  * entrypoint so the launch never pays for a node boot. Both fallbacks land on the entrypoint's
  * own `#!/usr/bin/env node` shebang, which is byte-identical to what the stock symlink did:
  *   - OMO_RUNTIME=node asks for node end to end, so bun is skipped on purpose;
- *   - a bun that moved or vanished falls back to the node path, and the next node boot rewrites
- *     the shim with the freshly discovered bun path.
+ *   - a bun that moved or vanished falls back to the node path, and the next launch rewrites the
+ *     shim with the freshly discovered bun path.
  */
 export function bunBinShimScript(entryPath, bunPath) {
   return [
@@ -32,63 +41,89 @@ export function bunBinShimScript(entryPath, bunPath) {
 }
 
 /**
- * Keeps the user-facing bin of a POSIX bun-global install pointed at bun without a node boot.
- * Called on every launcher start; it must stay cheap on the happy path (one lstat plus, when the
- * bin is already a regular file, reading a few hundred bytes) and must never break a launch:
- * every failure path - foreign file, missing bin, unwritable bin dir - returns quietly, and only
- * OMO_DEBUG narrates. Repairs run under node only, because a bun process either arrived through
- * this shim already or has no node boot to save.
+ * Brings ONE bin entry to the shim, or explains why it was left as it was. Only bun's own link to
+ * THIS install, or a file already carrying the marker, is ever replaced; anything else - a link
+ * into another install, a hand-written file, a directory, a socket - is not ours to touch.
+ * Returns the labelled action; the caller owns the try/catch, so a broken entry cannot take the
+ * other one down with it.
+ */
+function applyShim(binPath, script, io) {
+  let stats
+  try {
+    stats = io.lstat(binPath)
+  } catch {
+    return "absent-bin"
+  }
+  if (stats.isSymbolicLink()) {
+    if (io.realpath(binPath) !== io.scriptPath) return "foreign-link"
+  } else if (stats.isFile()) {
+    const current = io.readFile(binPath, "utf8")
+    if (current === script) return "current"
+    if (!current.includes(SHIM_MARKER)) return "foreign-file"
+  } else {
+    return "foreign-entry"
+  }
+
+  const temporary = `${binPath}.${io.pid}.tmp`
+  io.write(temporary, script, { mode: 0o755 })
+  // writeFileSync applies umask, and a 077 umask would ship a non-executable shim; chmod is exact.
+  io.chmod(temporary, 0o755)
+  io.rename(temporary, binPath)
+  return "repaired"
+}
+
+function repairBinEntry(entry, root, script, io) {
+  const path = join(root, ...entry.segments)
+  try {
+    return { label: entry.label, path, action: applyShim(path, script, io), error: undefined }
+  } catch (error) {
+    if (io.env.OMO_DEBUG) io.warn(`omo: bun launcher shim left untouched at ${path}: ${error.message}`)
+    return { label: entry.label, path, action: "failed", error: error.message }
+  }
+}
+
+/**
+ * Keeps the user-facing bins of a POSIX bun-global install pointed at bun without a node boot.
+ * Called on every launcher start; it must stay cheap on the happy path (one lstat per entry plus,
+ * when an entry is already a regular file, reading a few hundred bytes) and must never break a
+ * launch: every failure path - foreign file, missing bin, unwritable bin dir - returns quietly,
+ * one entry's failure never stops the other from being repaired, and only OMO_DEBUG narrates.
+ * It runs under bun as well as node: `bun add -g` links the bin back to the node-shebang entrypoint
+ * and then runs omo-ai's postinstall (`bin/senpi-patch.mjs`) under bun whenever node is not on
+ * PATH, and that postinstall is the only code that runs before the next `omo`. A node-only repair
+ * left a bun-only machine (a launchd job, cron, node only through nvm) with an `omo` that cannot
+ * start until something boots it under node (#9293).
+ *
+ * The answer is per entry (`entries`), with the primary `<bunRoot>/bin/omo` entry's action and
+ * error mirrored at the top level for callers that only ever cared about that one.
  */
 export function ensureBunBinShim(input) {
   const env = input.env ?? process.env
   const homedir = input.homedir ?? osHomedir
   const platform = input.platform ?? process.platform
-  const versions = input.versions ?? process.versions
-  const lstat = input.lstat ?? lstatSync
-  const realpath = input.realpath ?? realpathSync
-  const readFile = input.readFile ?? readFileSync
-  const write = input.write ?? writeFileSync
-  const rename = input.rename ?? renameSync
-  const chmod = input.chmod ?? chmodSync
-  const pid = input.pid ?? process.pid
-  const warn = input.warn ?? ((message) => console.error(message))
-
-  if (platform !== "darwin" && platform !== "linux") return { action: "skipped-platform" }
-  if (versions.bun) return { action: "skipped-runtime" }
-  if (!isUnderBunGlobalTree(input.scriptPath, { env, homedir, platform, realpath })) {
-    return { action: "skipped-install" }
+  const io = {
+    env,
+    scriptPath: input.scriptPath,
+    lstat: input.lstat ?? lstatSync,
+    realpath: input.realpath ?? realpathSync,
+    readFile: input.readFile ?? readFileSync,
+    write: input.write ?? writeFileSync,
+    rename: input.rename ?? renameSync,
+    chmod: input.chmod ?? chmodSync,
+    pid: input.pid ?? process.pid,
+    warn: input.warn ?? ((message) => console.error(message)),
   }
-  const bunPath = findBunBinary({ env, homedir, platform, exists: input.exists, realpath })
-  if (!bunPath) return { action: "skipped-no-bun" }
 
-  const binPath = join(bunRoot(env, homedir, platform), "bin", "omo")
+  if (platform !== "darwin" && platform !== "linux") return { action: "skipped-platform", error: undefined, entries: [] }
+  if (!isUnderBunGlobalTree(input.scriptPath, { env, homedir, platform, realpath: io.realpath })) {
+    return { action: "skipped-install", error: undefined, entries: [] }
+  }
+  const bunPath = findBunBinary({ env, homedir, platform, exists: input.exists, realpath: io.realpath })
+  if (!bunPath) return { action: "skipped-no-bun", error: undefined, entries: [] }
+
+  const root = bunRoot(env, homedir, platform)
   const script = bunBinShimScript(input.scriptPath, bunPath)
-  try {
-    let stats
-    try {
-      stats = lstat(binPath)
-    } catch {
-      return { action: "absent-bin" }
-    }
-    if (stats.isSymbolicLink()) {
-      // Only bun's own link to THIS install is replaced; anything else is not ours to touch.
-      if (realpath(binPath) !== input.scriptPath) return { action: "foreign-link" }
-    } else if (stats.isFile()) {
-      const current = readFile(binPath, "utf8")
-      if (current === script) return { action: "current" }
-      if (!current.includes(SHIM_MARKER)) return { action: "foreign-file" }
-    } else {
-      return { action: "foreign-entry" }
-    }
-
-    const temporary = `${binPath}.${pid}.tmp`
-    write(temporary, script, { mode: 0o755 })
-    // writeFileSync applies umask, and a 077 umask would ship a non-executable shim; chmod is exact.
-    chmod(temporary, 0o755)
-    rename(temporary, binPath)
-    return { action: "repaired" }
-  } catch (error) {
-    if (env.OMO_DEBUG) warn(`omo: bun launcher shim left untouched at ${binPath}: ${error.message}`)
-    return { action: "failed", error: error.message }
-  }
+  const entries = BIN_ENTRIES.map((entry) => repairBinEntry(entry, root, script, io))
+  const primary = entries[0]
+  return { action: primary.action, error: primary.error, entries }
 }
