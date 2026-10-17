@@ -5,6 +5,8 @@ export const AUTO_SLASH_COMMAND_TAG_CLOSE = "</auto-slash-command>"
 
 export const SLASH_COMMAND_PATTERN = /^\/([a-zA-Z@][\w.:@/-]*)\s*(.*)/
 
+export const SLASH_COMMAND_PATTERN_ANYWHERE = /(^|\s)\/([a-zA-Z@][\w.:@/-]*)\s*(.*)/
+
 export const EXCLUDED_COMMANDS = new Set([
   "ralph-loop",
   "cancel-ralph",

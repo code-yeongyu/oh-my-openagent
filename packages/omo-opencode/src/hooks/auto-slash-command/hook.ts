@@ -3,7 +3,9 @@ import {
   detectSlashCommand,
   extractPromptText,
   findSlashCommandPartIndex,
+  parseSlashCommand,
 } from "./detector"
+import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import { executeSlashCommand, type ExecutorOptions } from "./executor"
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
@@ -11,6 +13,7 @@ import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
 } from "./constants"
+import { replaceSlashCommandSpan } from "./replace-command-span"
 import { createProcessedCommandStore } from "./processed-command-store"
 import type {
   AutoSlashCommandHookInput,
@@ -151,7 +154,9 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       }
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
-      output.parts[idx].text = taggedContent
+      if (!replaceSlashCommandSpan(output.parts[idx], taggedContent)) {
+        output.parts[idx].text = taggedContent
+      }
 
       log(`[auto-slash-command] Replaced message with command template`, {
         sessionID: input.sessionID,
@@ -213,7 +218,21 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       const idx = findSlashCommandPartIndex(output.parts)
       if (idx >= 0) {
-        output.parts[idx].text = taggedContent
+        const partParsed = parseSlashCommand(output.parts[idx].text ?? "")
+        if (partParsed && partParsed.command.toLowerCase() === input.command.toLowerCase()) {
+          if (!replaceSlashCommandSpan(output.parts[idx], taggedContent)) {
+            output.parts[idx].text = taggedContent
+          }
+        } else {
+          const startIdx = output.parts.findIndex(
+            (part) => isRealUserTextPart(part) && (part.text ?? "").trim().startsWith("/")
+          )
+          if (startIdx >= 0) {
+            output.parts[startIdx].text = taggedContent
+          } else {
+            output.parts.unshift({ type: "text", text: taggedContent })
+          }
+        }
       } else {
         output.parts.unshift({ type: "text", text: taggedContent })
       }

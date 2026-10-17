@@ -14,6 +14,8 @@ export interface ParsedSlashCommand {
   command: string
   args: string
   raw: string
+  start?: number
+  end?: number
 }
 
 export interface AutoSlashCommandResult {
