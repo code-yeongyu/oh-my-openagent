@@ -28,7 +28,8 @@ async function listTmuxSessionsViaTmux(tmux: string): Promise<string[]> {
 	const result = await runTmuxCommand(tmux, ["list-sessions", "-F", "#{session_name}"])
 
 	if (result.exitCode !== 0) {
-		return []
+		const detail = result.stderr || result.stdout || "no diagnostic output"
+		throw new Error(`tmux list-sessions failed with exit code ${result.exitCode}: ${detail}`)
 	}
 
 	return result.output
@@ -53,6 +54,7 @@ export type SweepDeps = SweepTmuxSessionsDeps & {
 export type SweepTmuxSessionsOptions = {
 	prefix?: string
 	predicate?: (sessionName: string) => boolean
+	throwOnListError?: boolean
 }
 
 function matchesSweepOptions(sessionName: string, options: SweepTmuxSessionsOptions): boolean {
@@ -100,6 +102,9 @@ export async function sweepTmuxSessionsWith(
 		deps.log("[sweepTmuxSessionsWith] failed to list candidate sessions", {
 			error: getErrorMessage(error),
 		})
+		if (options.throwOnListError) {
+			throw error
+		}
 		return []
 	}
 
@@ -128,6 +133,7 @@ export async function sweepTmuxSessionsWith(
 
 export async function sweepStaleOmoAgentSessionsWith(deps: SweepDeps): Promise<number> {
 	const killedSessionNames = await sweepTmuxSessionsWith(deps, {
+		throwOnListError: true,
 		predicate: (sessionName) => {
 			const pidMatch = sessionName.match(STALE_SESSION_PATTERN)
 			if (!pidMatch) {

@@ -21,7 +21,8 @@ async function listCandidateSessions(tmux: string): Promise<string[]> {
   const result = await runTmuxCommand(tmux, ["list-sessions", "-F", "#{session_name}"])
 
   if (result.exitCode !== 0) {
-    return []
+    const detail = result.stderr || result.stdout || "no diagnostic output"
+    throw new Error(`tmux list-sessions failed with exit code ${result.exitCode}: ${detail}`)
   }
 
   return result.output
