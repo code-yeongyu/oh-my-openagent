@@ -1,0 +1,6 @@
+real_db_path=/home/cye/.local/share/opencode/opencode.db
+real_db_sessions_before=585
+real_db_sessions_after=585
+sandbox_db_path=/tmp/oqa-bash-guard-U92MfE/data/opencode/opencode.db
+sandbox_db_sessions=2
+isolation_verified=true
