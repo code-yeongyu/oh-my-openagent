@@ -17,6 +17,7 @@ interface Step {
   if?: string
   env?: Record<string, unknown>
   run?: string
+  "continue-on-error"?: boolean
   "working-directory"?: string
 }
 
@@ -53,10 +54,14 @@ function mapOmoAiVersion(rootVersion: string): string {
 }
 
 describe("omo-ai publish workflow shape", () => {
-  test("requires tarball readiness before live install", () => {
-    const readinessRun = namedStep("post-publish-verify", "Wait for omo-ai registry readiness").run ?? ""
-    expect(readinessRun).toContain('npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball')
-    expect(readinessRun).toContain('curl --fail --silent --location --connect-timeout 10 --max-time 15 --head --output /dev/null "$TARBALL_URL"')
+  test("#given post-publish verification #when a readiness probe fails #then live install remains gated behind it", () => {
+    // The real-shell owner tests prove tarball readiness; this guards Actions step ordering/failure semantics.
+    const verificationSteps = steps("post-publish-verify")
+    const readinessIndex = verificationSteps.findIndex((step) => step.name?.endsWith("registry readiness"))
+    const installIndex = verificationSteps.indexOf(namedStep("post-publish-verify", "Verify omo-ai live install"))
+    expect(readinessIndex).toBeGreaterThanOrEqual(0)
+    expect(installIndex).toBeGreaterThan(readinessIndex)
+    expect(verificationSteps[readinessIndex]["continue-on-error"]).not.toBe(true)
   })
 
   test("preserves an explicit prerelease version and derives its beta dist tag", () => {
