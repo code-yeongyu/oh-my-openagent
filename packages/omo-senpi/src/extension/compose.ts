@@ -7,6 +7,7 @@ import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
+import { releaseHerdrAgentHint } from "./herdr-agent-hint"
 
 export interface ComposeOmoSenpiExtensionOptions {
   logger?: ComponentLogger
@@ -78,6 +79,7 @@ export function composeOmoSenpiExtension(
   })
 
   return async (pi: unknown): Promise<void> => {
+    releaseHerdrAgentHint()
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
     provisionAgentToolkitSdkRoot()
