@@ -153,6 +153,8 @@ bunx oh-my-openagent install
 
 The TUI walks you through it. **Do NOT use `npm install -g`, `bun add -g`, or `bun install -g`** — global installation is not officially supported. oh-my-openagent is a plugin that must resolve from where OpenCode/Codex loads plugins, and the `prepare` script requires Bun. Always invoke via `bunx`.
 
+`oh-my-opencode` and `oh-my-openagent` ship the same command names, so npm cannot install both into the same prefix: switching names without removing the other package fails with `EEXIST` (for example, on `bin/lazycodex`). If you previously installed the legacy package globally, remove it with `npm uninstall -g oh-my-opencode`, then use the supported `bunx oh-my-openagent install` above. If the old installation used `--prefix`, use that same prefix when uninstalling. The same rule applies in reverse: uninstall `oh-my-openagent` before installing `oh-my-opencode` into its prefix. Do not use `--force` to overwrite the shared commands.
+
 If you already used Bun global install or update and Bun reports blocked lifecycle scripts, inspect them before trusting anything:
 
 ```bash
@@ -1054,4 +1056,4 @@ If a workspace still has old project-local Codex state, run `npx lazycodex-ai un
 - Claude Code compatibility is supported (hooks, commands, skills, MCPs, plugins).
 - Claude Code plugin discovery load timeout is 10 seconds.
 - Runtime logger: `oh-my-opencode.log` in the OS temp dir (`/tmp` on Linux, `/var/folders/.../T/` on macOS, `%TEMP%` on Windows), 50 MB cap with `.1`/`.2` backup segments.
-- Dual-publish during the rename transition: `oh-my-opencode` and `oh-my-openagent` are both published. Inside `opencode.json`, the compatibility layer prefers the entry `"oh-my-openagent"`, while legacy `"oh-my-opencode"` entries still load with a warning. Plugin configuration lives in the unified `omo.jsonc`; legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files are imported once by the migration engine and no longer read at runtime. If `doctor` warns about the legacy package name, update your `opencode.json` plugin entry.
+- Dual-publish during the rename transition: `oh-my-opencode` and `oh-my-openagent` are both published. Use only one package name per npm prefix; they share command names, so uninstall the other package from that prefix before switching to avoid `EEXIST`. Inside `opencode.json`, the compatibility layer prefers the entry `"oh-my-openagent"`, while legacy `"oh-my-opencode"` entries still load with a warning. Plugin configuration lives in the unified `omo.jsonc`; legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files are imported once by the migration engine and no longer read at runtime. If `doctor` warns about the legacy package name, update your `opencode.json` plugin entry.
