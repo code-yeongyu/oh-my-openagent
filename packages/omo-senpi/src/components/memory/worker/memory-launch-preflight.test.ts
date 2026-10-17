@@ -98,7 +98,7 @@ describe("resolveAndPreflightMemoryLaunch", () => {
 
       // when
       await resolveAndPreflightMemoryLaunch({
-        candidates: [{ model: "openai-codex/gpt-5.6-luna-fast" }] as unknown as MemoryModelChain,
+        candidates: [{ model: "chatgpt-subscription/gpt-5.6-luna-fast" }] as unknown as MemoryModelChain,
         senpiCommand: item.command,
         senpiPrefixArgs: item.prefixArgs,
         env: { PATH: process.env.PATH },
@@ -112,7 +112,7 @@ describe("resolveAndPreflightMemoryLaunch", () => {
       })
 
       // then
-      expect(launched).toEqual(["openai-codex/gpt-5.6-luna-fast"])
+      expect(launched).toEqual(["chatgpt-subscription/gpt-5.6-luna-fast"])
     })
   })
 

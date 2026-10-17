@@ -11,6 +11,11 @@ interface TimerWaiter {
 	readonly resolve: () => void;
 }
 
+interface ScheduleWaiter {
+	readonly count: number;
+	readonly resolve: () => void;
+}
+
 /**
  * Deterministic TimerProvider for tests: timers fire only through advanceBy(),
  * and waitForTimer(delayMs) resolves once a timer with exactly that delay is
@@ -20,6 +25,7 @@ export class ControlledClock implements TimerProvider {
 	private readonly timers: ControlledTimer[] = [];
 	private currentTime = 0;
 	private readonly timerWaiters = new Set<TimerWaiter>();
+	private readonly scheduleWaiters = new Set<ScheduleWaiter>();
 	readonly scheduledDelays: number[] = [];
 
 	readonly now = (): number => this.currentTime;
@@ -30,6 +36,12 @@ export class ControlledClock implements TimerProvider {
 		for (const waiter of this.timerWaiters) {
 			if (waiter.delayMs === undefined || waiter.delayMs === delayMs) {
 				this.timerWaiters.delete(waiter);
+				waiter.resolve();
+			}
+		}
+		for (const waiter of this.scheduleWaiters) {
+			if (this.scheduledDelays.length >= waiter.count) {
+				this.scheduleWaiters.delete(waiter);
 				waiter.resolve();
 			}
 		}
@@ -46,6 +58,23 @@ export class ControlledClock implements TimerProvider {
 		if (hasTimer) return Promise.resolve();
 		return new Promise((resolve) => {
 			this.timerWaiters.add({ delayMs, resolve });
+		});
+	}
+
+	/**
+	 * Resolves once this clock has been asked to schedule `count` timers in total.
+	 *
+	 * Timer DELAYS are ambiguous whenever the code under test derives several budgets from the same
+	 * remaining window (an LSP request timeout and the push-fallback wait are both "whatever is left
+	 * of the freshness window"). The schedule ORDER is not ambiguous: a step that only runs after an
+	 * earlier request settled can only arm its timer once that request's own timer was cleared. So a
+	 * test that must fire the LATER timer waits for the later schedule instead of a delay value, and
+	 * never races the earlier one.
+	 */
+	waitForScheduled(count: number): Promise<void> {
+		if (this.scheduledDelays.length >= count) return Promise.resolve();
+		return new Promise((resolve) => {
+			this.scheduleWaiters.add({ count, resolve });
 		});
 	}
 

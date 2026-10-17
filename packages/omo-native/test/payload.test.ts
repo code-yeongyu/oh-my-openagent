@@ -87,12 +87,10 @@ describe("build:omo-native staged payload", () => {
             join("extensions", "facts-persona.md"),
             join("extensions", "kibitzer-persona.md"),
             join("runtime", "ast-grep-mcp", "cli.js"),
-            join("runtime", "agent-toolkit", "cli.js"),
-            join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
-            join("runtime", "agent-toolkit", "omo-agent-toolkit"),
-            join("runtime", "agent-toolkit", "omo-agent-toolkit.cmd"),
-            join("runtime", "agent-toolkit", "directive.md"),
             join("runtime", "lsp-daemon", "dist", "cli.js"),
+            join("runtime", "category-coverage", "index.js"),
+            join("runtime", "category-coverage", "assets.generated.json"),
+            join("runtime", "task-config", "index.js"),
             join("scripts", "install.mjs"),
             "package.json",
           ]
@@ -100,21 +98,19 @@ describe("build:omo-native staged payload", () => {
             expect(existsSync(join(outputDir, artifact))).toBe(true)
           }
 
+          // The doctor runtime and the computer-use extension read the same prelude assets (#9193).
+          expect(readFileSync(join(outputDir, "runtime", "category-coverage", "assets.generated.json"), "utf8")).toBe(
+            readFileSync(join(outputDir, "extensions", "assets.generated.json"), "utf8"),
+          )
+
           const manifest = JSON.parse(readFileSync(join(outputDir, "package.json"), "utf8")) as {
             name?: string
           }
           expect(manifest.name).toBe("@code-yeongyu/omo-senpi")
 
-          const posixShim = join(outputDir, "runtime", "agent-toolkit", "omo-agent-toolkit")
-          const windowsShim = join(outputDir, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd")
-          if (process.platform === "win32") {
-            expect(existsSync(windowsShim)).toBe(true)
-            expect(statSync(windowsShim).mode & 0o400).toBe(0o400)
-            expect(isWindowsAgentToolkitLauncher(readFileSync(windowsShim, "utf8"))).toBe(true)
-          } else {
-            const shimMode = statSync(posixShim).mode & 0o777
-            expect(isLaunchablePosixShim(shimMode)).toBe(true)
-          }
+          // The toolkit CLI is deliberately absent from the Native payload: the loop runs in-process
+          // behind the eval SDK (OMO_AGENT_TOOLKIT_SDK_ROOT), and Codex keeps its own staged copy.
+          expect(existsSync(join(outputDir, "runtime", "agent-toolkit"))).toBe(false)
 
           const skillCount = readdirSync(join(outputDir, "skills"), {
             withFileTypes: true,

@@ -5,7 +5,9 @@ import type { RunnerOutcome } from "@oh-my-opencode/senpi-task"
 import { OmoMemoryRecallSchema } from "@oh-my-opencode/omo-config-core"
 
 import { resolveKibitzerSidecarSettings } from "./settings"
+import { KibitzerSidecarStartError } from "./sidecar-model"
 import { KIBITZER_RESEED_FRACTION, KIBITZER_SIDECAR_MAX_TOKENS, KIBITZER_WAKE_DEADLINE_MS, KIBITZER_WAKE_TOOL_BUDGET } from "./sidecar"
+import { KIBITZER_WAKE_MAX_TOTAL_MS } from "./sidecar-contract"
 import { candidate, fakeChild, fakeWakeSlot, sidecarHarness, withinMs, type FakeChild, type SidecarHarness } from "./sidecar.test-support"
 
 const K8S = "reference/kubernetes-rollouts.md"
@@ -429,6 +431,47 @@ describe("KibitzerSidecar lifecycle", () => {
     expect(candidatePathsOf(retry.input.prompt)).toEqual([K8S])
     expect(harness.sidecar.events.size()).toBe(0)
   })
+
+  test("#given the pinned recall category's chain has no connected provider #when the wake is offered #then the refusal is a non-diagnostic configuration state, and a provider connecting mid-session self-heals", async () => {
+    const started: FakeChild[] = []
+    let connected = false
+    const harness = sidecarHarness({
+      startChild: async (input) => {
+        if (!connected) {
+          throw new KibitzerSidecarStartError("category_unavailable", "Kibitzer sidecar model unavailable: quick (category_unavailable)", {
+            category: "quick",
+            missingProviders: ["chatgpt-subscription", "openai"],
+          })
+        }
+        const child = fakeChild(input)
+        started.push(child)
+        return child.handle
+      },
+    })
+    harness.prompt(1, "how do we handle kubernetes rollouts")
+
+    const result = await harness.offer([candidate(K8S)])
+
+    // A permanent configuration state is not a streak failure: nothing here feeds the gate notice,
+    // and the wake record names the dead category and its unconnected providers.
+    expect(result).toEqual({ action: "buffered", reason: "backoff" })
+    expect(harness.outcomes).toHaveLength(1)
+    expect(harness.outcomes[0]).toMatchObject({
+      status: "failed",
+      cause: "start_failed",
+      diagnostic: false,
+      configuration: { category: "quick", cause: "category_unavailable", missingProviders: ["chatgpt-subscription", "openai"] },
+    })
+    expect(harness.children).toHaveLength(0)
+    expect(harness.slot.held()).toBe(0)
+
+    // The refusal is re-resolved against the live registry on the next wake, so a provider connecting
+    // mid-session (or a stale early snapshot catching up) recovers without a restart.
+    connected = true
+    harness.timers.fire()
+    expect(await harness.offer([candidate(K8S)])).toEqual({ action: "seeded", wake: 2 })
+    expect(started).toHaveLength(1)
+  })
 })
 
 describe("KibitzerSidecar wake governance", () => {
@@ -505,6 +548,93 @@ describe("KibitzerSidecar wake governance", () => {
     expect(harness.sidecar.events.size()).toBe(1)
   })
 
+  test("#given a child start that never resolves #when the wake deadline fires #then the wake ends as deadline, the lease is handed back, and the late handle is aborted and disposed without a turn", async () => {
+    const gate = Promise.withResolvers<void>()
+    const entered = Promise.withResolvers<void>()
+    const started: FakeChild[] = []
+    const harness = sidecarHarness({
+      startChild: async (input) => {
+        const child = fakeChild(input)
+        started.push(child)
+        entered.resolve()
+        await gate.promise
+        return child.handle
+      },
+    })
+    harness.prompt(1, "how do we handle kubernetes rollouts")
+
+    const seeding = harness.offer([candidate(K8S)])
+    await withinMs(entered.promise, "startChild to be entered")
+
+    // The deadline covers the child start: it is armed from admission, before the child exists.
+    expect(harness.timers.pending().map((timer) => timer.ms)).toEqual([KIBITZER_WAKE_DEADLINE_MS])
+    expect(harness.slot.held()).toBe(1)
+
+    harness.clock.now += KIBITZER_WAKE_DEADLINE_MS
+    harness.timers.fire()
+    const outcome = await harness.nextWake()
+
+    expect(outcome).toMatchObject({ wake: 1, generation: 1, status: "deadline", diagnostic: false, toolCalls: 0, nudges: [], durationMs: KIBITZER_WAKE_DEADLINE_MS })
+    // The machine-wide slot goes back while the start is still pending: no other session waits on it.
+    expect(harness.slot.held()).toBe(0)
+    expect(harness.sidecar.state()).toBe("idle")
+    expect(harness.timers.pending()).toEqual([])
+
+    // The child that finally arrives is aborted and disposed; no turn begins behind the deadline.
+    gate.resolve()
+    expect(await withinMs(seeding, "the abandoned seed")).toEqual({ action: "buffered", reason: "backoff" })
+    const abandoned = started[0]
+    if (abandoned === undefined) throw new Error("the seed did not start a child")
+    expect(abandoned.aborts).toBe(1)
+    expect(abandoned.disposed).toBe(true)
+    expect(harness.outcomes.map((entry) => entry.status)).toEqual(["deadline"])
+    expect(harness.sidecar.state()).toBe("backoff")
+    expect(harness.timers.pending().map((timer) => timer.ms)).toEqual([1_000])
+
+    // Nothing the abandoned wake carried is lost: the retry seed replays its events and candidate.
+    harness.timers.fire()
+    expect(await harness.offer([candidate(K8S)])).toEqual({ action: "seeded", wake: 2 })
+    const retry = started[1]
+    if (retry === undefined) throw new Error("the retry did not start a child")
+    expect(cursorsOf(retry.input.prompt)).toEqual([1])
+    expect(candidatePathsOf(retry.input.prompt)).toEqual([K8S])
+  })
+
+  test("#given a steer storm inside the quiet period #when the wake reaches the total cap #then the re-armed deadline is clamped and the wake is aborted at the cap", async () => {
+    const harness = sidecarHarness()
+    const startedAt = harness.clock.now
+    const child = await seeded(harness)
+    expect(KIBITZER_WAKE_MAX_TOTAL_MS).toBe(300_000)
+    expect(harness.timers.pending().map((timer) => timer.ms)).toEqual([KIBITZER_WAKE_DEADLINE_MS])
+
+    // A steer every minute keeps re-arming the 90s quiet period: the turn survives well past it.
+    for (const minute of [1, 2, 3]) {
+      harness.clock.now = startedAt + minute * 60_000
+      harness.toolCall(minute + 1)
+      expect(await harness.offer([candidate(`reference/topic-${minute}.md`)])).toEqual({ action: "steered", wake: 1 })
+      child.consume(child.steers.at(-1) ?? "")
+      expect(harness.timers.pending().map((timer) => timer.ms)).toEqual([KIBITZER_WAKE_DEADLINE_MS])
+    }
+    expect(harness.sidecar.state()).toBe("turn_running")
+
+    // The fourth steer lands 240s in: 90s more would outlive the cap, so the deadline is clamped to it.
+    harness.clock.now = startedAt + 240_000
+    harness.toolCall(5)
+    expect(await harness.offer([candidate("reference/topic-4.md")])).toEqual({ action: "steered", wake: 1 })
+    child.consume(child.steers.at(-1) ?? "")
+    expect(harness.timers.pending().map((timer) => timer.ms)).toEqual([KIBITZER_WAKE_MAX_TOTAL_MS - 240_000])
+
+    harness.clock.now = startedAt + KIBITZER_WAKE_MAX_TOTAL_MS
+    harness.timers.fire()
+    const outcome = await harness.nextWake()
+
+    expect(outcome).toMatchObject({ wake: 1, status: "deadline", steered: 4, durationMs: KIBITZER_WAKE_MAX_TOTAL_MS })
+    expect(child.aborts).toBe(1)
+    expect(harness.sidecar.state()).toBe("idle")
+    expect(harness.slot.held()).toBe(0)
+    expect(harness.timers.pending()).toEqual([])
+  })
+
   test("#given the configured recall settings #when the sidecar is built from them #then tool_budget, event_caps and sidecar_max_tokens govern the wake instead of the defaults", async () => {
     const settings = resolveKibitzerSidecarSettings(OmoMemoryRecallSchema.parse({
       category: "deep",
@@ -519,6 +649,7 @@ describe("KibitzerSidecar wake governance", () => {
       sidecarMaxTokens: 500,
       maxConcurrentWakes: 1,
       eventCaps: { toolArgs: 400, resultHead: 600, assistant: 1500, prompt: 12 },
+      queryExpansion: false,
     })
     const harness = sidecarHarness({ toolBudget: settings.toolBudget, sidecarMaxTokens: settings.sidecarMaxTokens, eventCaps: settings.eventCaps })
     harness.prompt(1, "how do we handle kubernetes rollouts")

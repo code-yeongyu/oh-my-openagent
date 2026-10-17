@@ -7,7 +7,7 @@ export function componentHookContractCases(tempRoot) {
 	writeFileSync(join(tempRoot, ".omo", "evidence", "receipt.txt"), "command output PASS\n".repeat(10));
 	const spawnPayload = {
 		cwd: tempRoot, hook_event_name: "PreToolUse", model: "gpt-6-astra",
-		permission_mode: "default", session_id: "s-spawn-admission", tool_input: { message: "scan" },
+		permission_mode: "default", session_id: "s-spawn-admission", tool_input: { message: "scan", agent_type: "explorer", fork_context: false },
 		tool_name: "spawn_agent", tool_use_id: "spawn-1", transcript_path: null, turn_id: "t-spawn",
 	};
 	const marker = join(tempRoot, "plugin-data", "spawn-breaker", "s-spawn-admission.json");
@@ -45,6 +45,18 @@ export function componentHookContractCases(tempRoot) {
 			payload: { ...spawnPayload, session_id: "s-spawn-clean" },
 			assertOutput(stdout) { assert.equal(stdout, ""); },
 		},
+		...[
+			{ message: "scan", fork_context: false },
+			{ message: "scan", agent_type: "worker", fork_context: false },
+			{ message: "scan", fork_turns: "all", task_name: "scan" },
+		].map((tool_input, index) => ({
+			name: `ulw-loop rejects generic or unnamed role ${index}`,
+			component: "ulw-loop", event: "pre-tool-use-spawn",
+			payload: { ...spawnPayload, session_id: "s-spawn-clean", tool_input },
+			assertOutput(stdout) {
+				assert.equal(JSON.parse(stdout).hookSpecificOutput.permissionDecision, "deny");
+			},
+		})),
 		{
 			name: "rules session-start",
 			component: "rules",

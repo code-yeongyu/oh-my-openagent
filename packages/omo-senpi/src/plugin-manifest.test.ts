@@ -40,7 +40,7 @@ function adapterVersionIfPresent(): string | undefined {
 }
 
 describe("OMO Senpi plugin manifest", () => {
-  it("#given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory", () => {
+  it("#given a Pi package manifest #when loaded #then it points at exactly one bundled extension and no manifest skills", () => {
     const manifest = readJsonObject(pluginManifestPath)
     const pi = manifest.pi
 
@@ -50,10 +50,25 @@ describe("OMO Senpi plugin manifest", () => {
     }
 
     expect(Reflect.get(pi, "extensions")).toEqual(["./extensions/omo.js"])
-    // skills-conditional ships in `files` but must NOT join pi.skills: the conditional x-search
-    // skill is contributed at runtime only when an xAI credential exists.
-    expect(Reflect.get(pi, "skills")).toEqual(["./skills"])
+    // Bundled skills are contributed at runtime through resources_discover (bundled-skills
+    // component) so `disabled_skills` can hide them; a manifest entry would load every skill
+    // unfiltered on the launcher's --extension path. skills-conditional stays runtime-only too.
+    expect(Reflect.has(pi, "skills")).toBe(false)
     expect(Reflect.has(pi, "hooks")).toBe(false)
+  })
+
+  it("#given the plugin is the harness itself #when the engine resolves it from the command line #then the manifest declares a system package", () => {
+    const manifest = readJsonObject(pluginManifestPath)
+    const pi = manifest.pi
+
+    if (typeof pi !== "object" || pi === null || Array.isArray(pi)) {
+      throw new Error("plugin package.json pi manifest is not an object")
+    }
+
+    // senpi honors a boolean `system` flag only for command-line packages (the launcher passes
+    // `--extension <plugin>`), which files the plugin's extension and bundled skills under the
+    // `system` scope and keeps them out of the compact startup banner.
+    expect(Reflect.get(pi, "system")).toBe(true)
   })
 
   it("#given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent", () => {
@@ -89,6 +104,7 @@ describe("OMO Senpi plugin manifest", () => {
       "README.md",
       "NOTICE",
       "LICENSE",
+      "daemon-launch-spec.json",
     ])
   })
 

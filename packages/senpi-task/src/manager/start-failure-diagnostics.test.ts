@@ -65,7 +65,7 @@ describe("TaskManager start failure diagnostics", () => {
     }
     expect(event.type).toBe("task_start_failed")
     expect(event.payload).toEqual({
-      error_message: PUBLIC_START_FAILURE,
+      error_message: "Child prompt failed to start: the child process exited before accepting it (crashed, code 1).",
       failure_kind: "child-prompt-failed",
       rejected_while: "exited",
       exit_kind: "crashed",

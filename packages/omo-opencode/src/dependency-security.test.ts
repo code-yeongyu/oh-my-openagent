@@ -18,6 +18,7 @@ type BunLock = {
   workspaces?: {
     ""?: {
       dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
     }
   }
   packages?: Record<string, [string, ...unknown[]]>
@@ -94,12 +95,12 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
 }
 
 describe("dependency security", () => {
-  it("#given picomatch is a runtime dependency #when dependencies are locked #then it uses the patched ReDoS-safe release", () => {
+  it("#given picomatch is bundled into the published dist #when dependencies are locked #then it uses the patched ReDoS-safe release", () => {
     const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf-8")) as {
-      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
     }
     const bunLock = parse(readFileSync(join(REPO_ROOT, "bun.lock"), "utf-8")) as BunLock
-    const dependencyRange = packageJson.dependencies?.picomatch
+    const dependencyRange = packageJson.devDependencies?.picomatch
     const lockedReference = bunLock.packages?.picomatch?.[0]
 
     expect(dependencyRange).toBe(`^${MINIMUM_SAFE_PICOMATCH_VERSION}`)
@@ -107,7 +108,7 @@ describe("dependency security", () => {
 
     const lockedVersion = extractLockedVersion(lockedReference ?? "")
     expect(compareVersions(lockedVersion, MINIMUM_SAFE_PICOMATCH_VERSION)).toBeGreaterThanOrEqual(0)
-    expect(bunLock.workspaces?.[""]?.dependencies?.picomatch).toBe(`^${MINIMUM_SAFE_PICOMATCH_VERSION}`)
+    expect(bunLock.workspaces?.[""]?.devDependencies?.picomatch).toBe(`^${MINIMUM_SAFE_PICOMATCH_VERSION}`)
   })
 
   it("#given effect is only needed by OpenCode internals #when root dependencies are locked #then the root package does not depend on effect directly", () => {

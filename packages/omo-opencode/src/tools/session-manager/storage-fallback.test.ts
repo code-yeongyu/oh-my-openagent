@@ -118,6 +118,95 @@ describe("session-manager storage fallback", () => {
     if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
+  test("#given a legacy file-storage session the SQLite server answers NotFoundError for #when its messages are read #then the file copy is returned (#5854)", async () => {
+    //#given
+    createSessionMessage("ses_legacy", "msg_legacy", 1_000)
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "NotFoundError", data: { message: "Session not found: ses_legacy" } } }),
+    )
+
+    //#when
+    const messages = await storage.readSessionMessages("ses_legacy")
+
+    //#then
+    expect(messages.map((message) => message.id)).toEqual(["msg_legacy"])
+  })
+
+  test("#given a legacy file-storage session the SQLite server answers NotFoundError for #when its info is read #then the file info is returned instead of an error (#5854)", async () => {
+    //#given
+    createSessionMessage("ses_legacy", "msg_legacy", 1_000)
+    const notFound = { error: { name: "NotFoundError", data: { message: "Session not found: ses_legacy" } } }
+    mockClient.session.messages.mockImplementation(() => Promise.resolve(notFound))
+    mockClient.session.todo.mockImplementation(() => Promise.resolve(notFound))
+
+    //#when
+    const info = await storage.getSessionInfo("ses_legacy")
+
+    //#then
+    expect(info?.id).toBe("ses_legacy")
+    expect(info?.message_count).toBe(1)
+  })
+
+  test("#given a session neither the SQLite server nor file storage has #when its existence is checked #then it is reported missing, not thrown (#5854)", async () => {
+    //#given
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "NotFoundError", data: { message: "Session not found: ses_nowhere" } } }),
+    )
+
+    //#when
+    const exists = await storage.sessionExists("ses_nowhere")
+
+    //#then
+    expect(exists).toBe(false)
+  })
+
+  test("#given the SQLite server answers a session read with a non-NotFound error body #when its messages are read #then it still rejects with that error's text", async () => {
+    //#given
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "UnknownError", data: { message: "database disk image is malformed" } } }),
+    )
+
+    //#when
+    const failure = await storage.readSessionMessages("ses_bad").then(() => undefined, (error: unknown) => error)
+
+    //#then
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toBe("UnknownError: database disk image is malformed")
+  })
+
+  test("#given one session whose SDK read fails with a non-NotFound error #when sessions are listed #then the others are listed and the failing one is named", async () => {
+    //#given
+    createSessionMessage("ses_ok", "msg_ok", 1_000)
+    mockClient.session.messages.mockImplementation((input: unknown) => {
+      const id = (input as { path: { id: string } }).path.id
+      return Promise.resolve(id === "ses_bad" ? { error: { name: "UnknownError", data: { message: "database disk image is malformed" } } } : { data: [] })
+    })
+    mockClient.session.todo.mockImplementation(() => Promise.resolve({ data: [] }))
+    const { formatSessionList } = await import("./session-formatter")
+
+    //#when
+    const output = await formatSessionList(["ses_ok", "ses_bad"])
+
+    //#then
+    expect(output).toContain("ses_ok")
+    expect(output).toContain("Skipped 1 session that could not be read: ses_bad (UnknownError: database disk image is malformed)")
+    expect(output).not.toContain("[object Object]")
+  })
+
+  test("#given an SDK error body whose message says the server is unreachable #when a session is read #then it falls back to file storage like a thrown network error", async () => {
+    //#given
+    createSessionMessage("ses_file", "msg_file", 1_000)
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.resolve({ error: { name: "UnknownError", data: { message: "fetch failed" } } }),
+    )
+
+    //#when
+    const messages = await storage.readSessionMessages("ses_file")
+
+    //#then
+    expect(messages.map((message) => message.id)).toEqual(["msg_file"])
+  })
+
   test("#given unreachable SDK list response #when getMainSessions runs #then falls back to file sessions", async () => {
     createSessionMetadata("proj_test", "ses_file", "/workspace/project", 2_000)
     mockClient.session.list.mockImplementation(() => Promise.resolve({ error: createSdkUnavailableError("fetch failed ECONNREFUSED") }))
@@ -168,7 +257,7 @@ describe("session-manager storage fallback", () => {
     expect(sessionIds).toEqual(["ses_file"])
   })
 
-  test("#given SDK and file session ids overlap #when getAllSessions runs #then returns deduped union", async () => {
+  test("#given unavailable global SDK route and overlapping scoped/file sessions #when getAllSessions runs #then returns the scoped deduped union", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
     createSessionMessage("ses_sdk", "msg_002", 2_000)
     mockClient.session.list.mockImplementation(() => Promise.resolve({
@@ -176,10 +265,77 @@ describe("session-manager storage fallback", () => {
         { id: "ses_sdk" },
       ],
     }))
+    const globalList = mock(() => Promise.resolve({ error: { name: "NotFoundError" } }))
+    storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
 
     const sessionIds = await storage.getAllSessions()
 
     expect(sessionIds).toEqual(["ses_sdk", "ses_file"])
+    expect(globalList).toHaveBeenCalledWith({ limit: 100 })
+  })
+
+  test("#given 1000 global sessions #when bounded search and directory list run #then they stop paging after enough rows", async () => {
+    const globalSessions = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `ses_global_${index}`, projectID: "other", directory: "/workspace/other",
+      time: { created: 10_000 - index, updated: 10_000 - index },
+    }))
+    const globalList = mock((input?: { roots?: boolean; cursor?: number; limit?: number }): Promise<unknown> => {
+      if (input?.roots) {
+        const targetPage = input.cursor === 100
+          ? ["ses_target_new", "ses_target_old"].map((id, index) => ({ id, projectID: "target", directory: "/workspace/target", time: { created: 1_000 - index, updated: 1_000 - index } }))
+          : Array.from({ length: 100 }, (_, index) => ({ id: `ses_other_${index}`, projectID: "other", directory: "/workspace/other", time: { created: 5_000 - index, updated: 5_000 - index } }))
+        return Promise.resolve({
+          data: targetPage,
+          response: new Response(null, { headers: input.cursor === 100 ? new Headers() : new Headers([["x-next-cursor", "100"]]) }),
+        })
+      }
+
+      const start = input?.cursor ?? 0
+      const page = globalSessions.slice(start, start + (input?.limit ?? 100))
+      const nextCursor = start + page.length
+      return Promise.resolve({
+        data: page,
+        response: new Response(null, { headers: nextCursor < globalSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers() }),
+      })
+    })
+    storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
+
+    const mainSessions = await storage.getMainSessions({ directory: "/workspace/target", limit: 2 })
+    const allSessionIDs = await storage.getAllSessions(50)
+
+    expect(globalList).toHaveBeenCalledTimes(3)
+    expect(mainSessions.map((session) => session.id)).toEqual(["ses_target_new", "ses_target_old"])
+    expect(allSessionIDs).toEqual(globalSessions.slice(0, 50).map((session) => session.id))
+    expect(globalList).toHaveBeenNthCalledWith(1, { roots: true, limit: 100 })
+    expect(globalList).toHaveBeenNthCalledWith(2, { roots: true, cursor: 100, limit: 100 })
+    expect(globalList).toHaveBeenNthCalledWith(3, { limit: 50 })
+  })
+
+  test("#given a project whose root sessions sit behind 600 newer ones #when getMainSessions filters by directory #then it pages until the cursor is exhausted", async () => {
+    const rootSessions = [
+      ...Array.from({ length: 600 }, (_, index) => ({
+        id: `ses_other_${index}`, projectID: "other", directory: "/workspace/other",
+        time: { created: 10_000 - index, updated: 10_000 - index },
+      })),
+      ...["ses_target_new", "ses_target_old"].map((id, index) => ({
+        id, projectID: "target", directory: "/workspace/target",
+        time: { created: 1_000 - index, updated: 1_000 - index },
+      })),
+    ]
+    const globalList = mock((input?: { roots?: boolean; cursor?: number; limit?: number }): Promise<unknown> => {
+      const start = input?.cursor ?? 0
+      const page = rootSessions.slice(start, start + (input?.limit ?? 100))
+      const nextCursor = start + page.length
+      return Promise.resolve({
+        data: page,
+        response: new Response(null, { headers: nextCursor < rootSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers() }),
+      })
+    })
+    storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
+
+    const sessions = await storage.getMainSessions({ directory: "/workspace/target" })
+
+    expect(sessions.map((session) => session.id)).toEqual(["ses_target_new", "ses_target_old"])
   })
 
   test("#given unreachable SDK messages error #when readSessionMessages runs #then falls back to file messages", async () => {

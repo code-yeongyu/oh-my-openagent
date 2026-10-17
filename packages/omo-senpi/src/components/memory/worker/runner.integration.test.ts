@@ -105,7 +105,7 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(item.spawnCalls[0]?.hardDeadlineAt).toBe(runStartedAt + 60_000)
   }, 60_000)
 
-  test("#given a stub child that commits in its reflection worktree #when launched #then it merges records notifies and advances the cursor", async () => {
+  test("#given a stub child that commits in its reflection worktree #when launched #then it merges records and advances the cursor without a toast", async () => {
     // given
     const item = await harness({ childMode: "commit" })
     const parent = new GitMemoryRepo({ dir: item.identity.paths.repo, agentId: item.identity.id })
@@ -135,12 +135,8 @@ describe("SenpiSubprocessRunner integration", () => {
         backlogSteps: 1,
       }),
     })
-    expect(item.api.renderers.map((entry) => entry.customType)).toEqual([
-      "senpi-memory.reflection-completion",
-      "senpi-memory.reflection-launched",
-      "senpi-memory.reflection-summary",
-    ])
-    expect(item.notifications).toHaveLength(1)
+    expect(item.api.renderers.map((entry) => entry.customType)).toEqual(["senpi-memory.reflection-completion"])
+    expect(item.notifications).toEqual([])
     expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
     expect(item.spawnCalls).toHaveLength(1)
     const spawn = item.spawnCalls[0]
@@ -278,7 +274,10 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(fresh.outcome).toBe("merged")
     expect(cached.outcome).toBe("merged")
     expect(item.spawnCalls).toHaveLength(2)
-    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
+    // Reactive attempts run in the most permissive child, so a miss there is conclusive (#9175).
+    expect(item.spawnCalls.map((spawn) => spawn.args.includes("--no-extensions"))).toEqual([false, false])
+    // One discovery-disabled and one extension-loading catalog, each probed once and then cached.
+    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\nprobe\n")
   }, 60_000)
 
   test("#given every child-visible candidate misses its model or auth #when the chain is exhausted #then the failed outcome fingerprints every attempted cause", async () => {

@@ -24,9 +24,10 @@ function createFakeSession(sessionId = "child-session-1"): FakeSessionControls {
         settle = resolve
       })
     },
-    async steer() {},
+    async steer() { return "handled" },
     async followUp(text: string) {
       followUpCalls.push(text)
+      return "handled"
     },
     async abort() {},
     subscribe(_listener: ChildSessionListener) {

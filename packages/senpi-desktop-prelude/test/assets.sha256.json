@@ -1,0 +1,8 @@
+{
+	"_comment": "sha256 of each published prelude asset on dev (bc64056efc's unchanged asset sources). Any change to the published bytes must consciously update this fixture (#9113 prelude contingency). COMPUTER_DOCUMENTATION was updated for the experimental facade label (#9124). Updated for the menu.items/menu.select facade (#9651 B2a). Updated for the #9651 B5b control facade (computer.control.acquire/release/state), then for the acquire run-budget note and the raise wording. Then for the menu.select delivery option (#9888) and #9887 cursor capabilities and controls. Then for computer.display() and the active-display default (#9651 B6). Then for native-detail region zoom with unchanged full-frame input coordinates (#9651 B7). Then for atomic window observe (#9651 B8). Then for bounded key/mouse holds (#9651 B10) and the ScreenCaptureKit capture worker (#9651 B9).",
+	"COMPUTER_PRELUDE_JAVASCRIPT": "76396fea98c9d5061e76beb69ca7a0c0cc5e7855ea87150ff28fcc29b116b7fa",
+	"COMPUTER_PRELUDE_PYTHON": "3c58fd16cbbf370cd7f4dbf84fbe83e54382c4f624e2b2227cca4ab7f4fc5af5",
+	"COMPUTER_DECLARATIONS": "52eb002106a2e60e6e225fa14bfd52252ae0d76ddb9f3c9364d234d2bf8c690e",
+	"COMPUTER_DOCUMENTATION": "b0b3ca3d69ba1848145f9fa281960b96d75773eb607c6b9b4ca07cfdba305715",
+	"COMPUTER_SAFETY": "0c9f2d6223d92fdff268f1ee1eebc6f33870f5737bc09ab0dadafb96a4f36124"
+}

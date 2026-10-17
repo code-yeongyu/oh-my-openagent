@@ -41,7 +41,6 @@ export function normalizeLegacyModelFields(entry: Readonly<Record<string, unknow
   delete normalized["reasoningEffort"]
   delete normalized["thinking"]
   delete normalized["textVerbosity"]
-  delete normalized["maxTokens"]
   delete normalized["providerOptions"]
 
   if (typeof entry["model"] === "string") normalized["model"] = canonicalModelString(entry["model"])
@@ -65,8 +64,15 @@ export function normalizeLegacyModelFields(entry: Readonly<Record<string, unknow
   if (entry["textVerbosity"] !== undefined) providerOptions["textVerbosity"] = entry["textVerbosity"]
   if (Object.keys(providerOptions).length > 0) normalized["provider_options"] = providerOptions
 
-  if (entry["max_tokens"] !== undefined) normalized["max_tokens"] = entry["max_tokens"]
-  else if (entry["maxTokens"] !== undefined) normalized["max_tokens"] = entry["maxTokens"]
+  if (entry["max_tokens"] !== undefined) {
+    normalized["max_tokens"] = entry["max_tokens"]
+    if (entry["maxTokens"] === undefined || typeof entry["maxTokens"] === "number") {
+      delete normalized["maxTokens"]
+    }
+  } else if (typeof entry["maxTokens"] === "number") {
+    normalized["max_tokens"] = entry["maxTokens"]
+    delete normalized["maxTokens"]
+  }
 
   return normalized
 }

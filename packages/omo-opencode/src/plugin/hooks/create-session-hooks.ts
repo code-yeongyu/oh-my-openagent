@@ -27,6 +27,7 @@ import {
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
+  createNativeEditionNudgeHook,
 } from "../../hooks"
 import { createGoalHook } from "../../hooks/goal"
 import {
@@ -63,6 +64,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
+  nativeEditionNudge: ReturnType<typeof createNativeEditionNudgeHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -229,6 +231,10 @@ export function createSessionHooks(args: {
     ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
     : null
 
+  const nativeEditionNudge = isHookEnabled("native-edition-nudge")
+    ? safeHook("native-edition-nudge", () => createNativeEditionNudgeHook(ctx))
+    : null
+
   return {
     preemptiveCompaction,
     sessionNotification,
@@ -253,5 +259,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     runtimeFallback,
     legacyPluginToast,
+    nativeEditionNudge,
   }
 }

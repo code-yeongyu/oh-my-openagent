@@ -62,14 +62,36 @@ function createManager(sessionMessages: readonly SessionMessageForTest[] = []): 
   readonly manager: BackgroundManager
   readonly internals: BackgroundManagerInternals
   readonly promptCalls: PromptCall[]
+  readonly nthPromptCall: (count: number, timeoutMs: number) => Promise<void>
 } {
   const promptCalls: PromptCall[] = []
+  const promptCallWaiters: { readonly count: number; readonly resolve: () => void }[] = []
+  const nthPromptCall = (count: number, timeoutMs: number): Promise<void> => {
+    if (promptCalls.length >= count) return Promise.resolve()
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`waited ${timeoutMs}ms for prompt call #${count}, saw ${promptCalls.length}`)),
+        timeoutMs,
+      )
+      promptCallWaiters.push({
+        count,
+        resolve: () => {
+          clearTimeout(timer)
+          resolve()
+        },
+      })
+    })
+  }
   const client = unsafeTestValue<PluginInput["client"]>({
     session: {
       status: async () => ({ data: { "parent-session-empty-wake": { type: "idle" } } }),
       messages: async () => ({ data: sessionMessages }),
       promptAsync: async (args: PromptCall) => {
         promptCalls.push(args)
+        for (const waiter of promptCallWaiters.filter((entry) => entry.count <= promptCalls.length)) {
+          promptCallWaiters.splice(promptCallWaiters.indexOf(waiter), 1)
+          waiter.resolve()
+        }
         return {}
       },
       abort: async () => ({}),
@@ -84,22 +106,14 @@ function createManager(sessionMessages: readonly SessionMessageForTest[] = []): 
     manager,
     internals: unsafeTestValue<BackgroundManagerInternals>(manager),
     promptCalls,
+    nthPromptCall,
   }
 }
 
-async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    if (predicate()) {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
-  expect(predicate()).toBe(true)
-}
-
-function waitForPendingWake(internals: BackgroundManagerInternals, sessionID: string): Promise<void> {
-  return waitUntil(() => internals.parentWakeNotifier.getPendingParentWakes().has(sessionID), 600)
+// handleEvent requeues an empty-turn wake synchronously, so the pending entry is
+// observable the moment the event returns.
+function expectPendingWake(internals: BackgroundManagerInternals, sessionID: string): void {
+  expect(internals.parentWakeNotifier.getPendingParentWakes().has(sessionID)).toBe(true)
 }
 
 describe("isEmptyNoProgressAssistantTurnInfo", () => {
@@ -188,7 +202,7 @@ describe("BackgroundManager parent wake empty-turn recovery", () => {
         info: EMPTY_UNKNOWN_ASSISTANT_INFO,
       },
     })
-    await waitForPendingWake(internals, sessionID)
+    expectPendingWake(internals, sessionID)
 
     // then
     expect(internals.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
@@ -221,7 +235,7 @@ describe("BackgroundManager parent wake empty-turn recovery", () => {
         info: EMPTY_UNKNOWN_ASSISTANT_INFO,
       },
     })
-    await waitForPendingWake(internals, sessionID)
+    expectPendingWake(internals, sessionID)
 
     // then
     expect(internals.parentWakeNotifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([
@@ -248,7 +262,7 @@ describe("BackgroundManager parent wake empty-turn recovery", () => {
         parts: [{ type: "step-finish", reason: "unknown", tokens: EMPTY_UNKNOWN_ASSISTANT_INFO.tokens }],
       },
     ]
-    const { manager, internals, promptCalls } = createManager(sessionMessages)
+    const { manager, internals, promptCalls, nthPromptCall } = createManager(sessionMessages)
     managerUnderTest = manager
     internals.queuePendingParentWake(sessionID, notification, { agent: "sisyphus" }, true, 0)
     await internals.flushPendingParentWake(sessionID)
@@ -262,12 +276,13 @@ describe("BackgroundManager parent wake empty-turn recovery", () => {
         info: EMPTY_UNKNOWN_ASSISTANT_INFO,
       },
     })
-    await waitForPendingWake(internals, sessionID)
+    expectPendingWake(internals, sessionID)
 
     // when
+    const retryDelivered = nthPromptCall(2, 4_000)
     manager.handleEvent({ type: "session.idle", properties: { sessionID } })
     await internals.flushPendingParentWake(sessionID)
-    await waitUntil(() => promptCalls.length === 2, 4_000)
+    await retryDelivered
 
     // then
     expect(promptCalls).toHaveLength(2)

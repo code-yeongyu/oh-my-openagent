@@ -83,6 +83,7 @@ export function resolveLatestVersion(env) {
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "ignore"],
 		timeout,
+		windowsHide: true,
 	});
 	if (result.status !== 0) return undefined;
 	const version = result.stdout.trim();
@@ -96,6 +97,7 @@ export function defaultRunCommandForManualUpdate(command, args, options) {
 			cwd: options.cwd,
 			env: options.env,
 			stdio: "inherit",
+			windowsHide: true,
 		});
 		child.once("error", reject);
 		child.once("close", (code) => {

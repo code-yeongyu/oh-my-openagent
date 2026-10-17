@@ -1,7 +1,7 @@
 import { readFile } from "../fs/resilient"
 import { join } from "node:path"
 
-import { NoEffectiveChangesError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import { NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import type { LockDomain } from "../locks"
 import type { MemoryToolProvenance } from "./memory"
@@ -41,6 +41,10 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
     } catch (error) {
       if (error instanceof NoEffectiveChangesError) {
         throw new MemoryToolError(noChangesMessage ?? "made no effective changes", { cause: error })
+      }
+      if (error instanceof MemorySecretError) {
+        await repo.restorePaths(paths)
+        throw new MemoryToolError(error.message, { cause: error })
       }
       throw error
     }

@@ -50,10 +50,12 @@ export interface BackgroundTask {
   teamRunId?: string
   description: string
   prompt: string
+  originalPrompt?: string
   agent: string
   spawnDepth?: number
   status: BackgroundTaskStatus
   queuedAt?: Date
+  pendingResume?: object
   startedAt?: Date
   completedAt?: Date
   result?: string
@@ -101,6 +103,8 @@ export interface BackgroundTask {
   stablePolls?: number
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
+  /** Number of consecutive idle polls where the session still ended on an errored assistant turn */
+  consecutiveErroredIdlePolls?: number
 }
 
 export interface BackgroundTaskSnapshot {

@@ -3,12 +3,17 @@
 // senpi process that task(subagent_type: "plan-reviewer"|"plan-consultant") is denied without an
 // explicit USER ulw-plan request plus a .omo/plans artifact (a SKILL.md read alone stays denied),
 // opens once the user prompt requests ulw-plan and a plan file is written, and closes again after a
-// ulw-execute SKILL.md read. The rename scenarios cover the one-release legacy aliases (`momus` ->
-// plan-reviewer, `metis` -> plan-consultant) at every input boundary: task tool, team_create, dag
-// start, omo.json agents key, plus the task tool description wording.
+// ulw-execute SKILL.md read. The retired-name scenarios prove the removed read alias at every input
+// boundary: the retired ids (`momus`, `metis`) are ordinary names at the task tool, team_create, dag
+// start and the omo.json agents key - never routed onto plan-reviewer/plan-consultant and never
+// carrying a deprecation notice - plus the task tool description wording.
 //   node plan-gated-agents-e2e.mjs --bundle <pluginDir> --scenario <name> --expect <gated|ungated>
-//   scenarios: denial | read-unlock | sequence | legacy-alias | description | team-legacy |
-//              dag-legacy | legacy-config   (the rename scenarios only take --expect gated)
+//   --expect gated is the contract for every bundle built since the gate landed (520edada8), including
+//   the committed plugin bundle. --expect ungated is only the differential baseline for a bundle built
+//   WITHOUT the gate, so it FAILs by design against a current bundle (#8781): e.g. sequence closes the
+//   gate after the ulw-execute read and denies the second spawn.
+//   scenarios: denial | read-unlock | sequence | retired-id | description | team-retired |
+//              dag-retired | retired-config   (the retired-name scenarios only take --expect gated)
 // Exit code: 0 on PASS, 1 on FAIL (the JSON verdict is printed either way).
 // Isolation: SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME point at a throwaway sandbox; the real
 // ~/.senpi/agent is digest-compared before/after and MUST stay identical. When launched from inside
@@ -22,6 +27,7 @@ import { fileURLToPath } from "node:url"
 import { createHash } from "node:crypto"
 
 import { createSandbox, digestDirectory } from "./drive.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 // Isolation gate: auth/models/trust byte-identical plus settings.json compared with the live
 // host session's own bookkeeping keys stripped (workflow-skills/tipsHistory/skills - proven to
@@ -64,9 +70,9 @@ const OMO_CONFIG = {
   },
 }
 
-// Retired agents key: the alias in senpi-task's mapOmoConfigAgents must land the model on
-// plan-reviewer and omo-senpi's config-startup must emit the omo-config:agent-alias-deprecated notice.
-const LEGACY_OMO_CONFIG = {
+// Retired agents key: mapOmoConfigAgents must keep it under its own name as a plain custom agent,
+// and config-startup must emit no notice about it at all.
+const RETIRED_OMO_CONFIG = {
   agents: {
     momus: { model: MOCK_MODEL },
   },
@@ -74,9 +80,9 @@ const LEGACY_OMO_CONFIG = {
 
 const TOOLS_DUMP_FILE = "task-tool-dump.jsonl"
 const PLAN_WRITE_STEP = { type: "tool_call", name: "write", arguments: { path: ".omo/plans/qa-plan.md", content: "# QA Plan\n\n- review me\n" } }
-const DEPRECATED_REVIEWER_NOTICE = 'is deprecated; use "plan-reviewer"'
-const DEPRECATED_CONSULTANT_NOTICE = 'is deprecated; use "plan-consultant"'
-const LEGACY_CONFIG_NOTICE = "omo.json agents.momus is deprecated; rename the key to agents.plan-reviewer"
+// The exact strings the removed alias used to emit; every retired-name scenario asserts their ABSENCE.
+const RETIRED_DEPRECATION_MARKER = "is deprecated"
+const RETIRED_CONFIG_NOTICE = "omo.json agents.momus is deprecated"
 
 function parseArgs(argv) {
   const args = { bundle: defaultPluginRoot, scenario: "denial", expect: "gated" }
@@ -134,17 +140,16 @@ function sequenceScript(skillsDir) {
   }
 }
 
-// Legacy alias at the task tool: `momus` spawns plan-reviewer after a plan touch and the start
-// result (a background spawn returns it; a foreground spawn returns the child's output instead)
-// carries the one-line deprecation notice.
-function legacyAliasScript() {
+// Retired id at the task tool: `momus` is not a defined agent in this sandbox, so the spawn fails
+// as an unknown agent instead of silently landing on plan-reviewer, and no deprecation line appears.
+function retiredIdScript() {
   return {
     parentSteps: [
       PLAN_WRITE_STEP,
       { type: "tool_call", name: "task", arguments: { subagent_type: "momus", prompt: "review the plan", run_in_background: true } },
-      { type: "text", text: "legacy-alias scenario complete" },
+      { type: "text", text: "retired-id scenario complete" },
     ],
-    childSteps: [{ type: "text", text: "plan-reviewer review complete" }],
+    childSteps: [{ type: "text", text: "unused child" }],
   }
 }
 
@@ -157,7 +162,7 @@ function descriptionScript() {
   }
 }
 
-function teamLegacyScript() {
+function teamRetiredScript() {
   return {
     parentSteps: [
       {
@@ -165,7 +170,7 @@ function teamLegacyScript() {
         name: "team_create",
         arguments: { inline_spec: { name: "qa-team", members: [{ name: "reviewer", subagent_type: "momus" }] } },
       },
-      { type: "text", text: "team-legacy scenario complete" },
+      { type: "text", text: "team-retired scenario complete" },
     ],
     childSteps: [{ type: "text", text: "unused child" }],
   }
@@ -174,13 +179,13 @@ function teamLegacyScript() {
 // The dag engine is exposed to the model as the `workflow` tool (dag-tool.ts WORKFLOW_TOOL_NAME),
 // and senpi withholds it from the direct tool list whenever `eval` is registered (codemode), so the
 // start goes through an eval cell exactly the way the model would call it.
-const DAG_LEGACY_DEFINITION = {
-  key: "qa-dag-legacy",
-  name: "legacy alias dag",
+const DAG_RETIRED_DEFINITION = {
+  key: "qa-dag-retired",
+  name: "retired id dag",
   nodes: [{ id: "consult", subagent_type: "metis", prompt: "TASK: gap analysis of .omo/plans/qa-plan.md. STOP WHEN the gaps are listed." }],
 }
 
-function dagLegacyScript() {
+function dagRetiredScript() {
   return {
     parentSteps: [
       PLAN_WRITE_STEP,
@@ -189,24 +194,25 @@ function dagLegacyScript() {
         name: "eval",
         arguments: {
           language: "js",
-          summary: "start the legacy-alias dag through the workflow tool",
-          code: `const started = await tool.workflow(${JSON.stringify({ action: "start", definition: DAG_LEGACY_DEFINITION })});\nconsole.log(JSON.stringify(started));`,
+          summary: "start the retired-id dag through the workflow tool",
+          code: `const started = await tool.workflow(${JSON.stringify({ action: "start", definition: DAG_RETIRED_DEFINITION })});\nconsole.log(JSON.stringify(started));`,
         },
       },
-      { type: "text", text: "dag-legacy scenario complete" },
+      { type: "text", text: "dag-retired scenario complete" },
     ],
-    childSteps: [{ type: "text", text: "plan-consultant consult complete" }],
+    childSteps: [{ type: "text", text: "unused child" }],
   }
 }
 
-function legacyConfigScript() {
+// The retired omo.json key defines an ordinary custom agent named momus: it is NOT plan-gated, it
+// carries the key's model, and starting a session against that config emits no notice about it.
+function retiredConfigScript() {
   return {
     parentSteps: [
-      PLAN_WRITE_STEP,
-      { type: "tool_call", name: "task", arguments: { subagent_type: "plan-reviewer", prompt: "review the plan", run_in_background: false } },
-      { type: "text", text: "legacy-config scenario complete" },
+      { type: "tool_call", name: "task", arguments: { subagent_type: "momus", prompt: "review the plan", run_in_background: false } },
+      { type: "text", text: "retired-config scenario complete" },
     ],
-    childSteps: [{ type: "text", text: "plan-reviewer review complete" }],
+    childSteps: [{ type: "text", text: "custom momus agent complete" }],
   }
 }
 
@@ -218,11 +224,11 @@ const SCENARIOS = {
   denial: { script: () => denialScript(), prompt: PLAIN_PROMPT, config: OMO_CONFIG },
   "read-unlock": { script: (skillsDir) => readUnlockScript(skillsDir), prompt: PLAIN_PROMPT, config: OMO_CONFIG },
   sequence: { script: (skillsDir) => sequenceScript(skillsDir), prompt: UNLOCK_PROMPT, config: OMO_CONFIG },
-  "legacy-alias": { script: () => legacyAliasScript(), prompt: UNLOCK_PROMPT, config: OMO_CONFIG },
+  "retired-id": { script: () => retiredIdScript(), prompt: UNLOCK_PROMPT, config: OMO_CONFIG },
   description: { script: () => descriptionScript(), prompt: PLAIN_PROMPT, config: OMO_CONFIG },
-  "team-legacy": { script: () => teamLegacyScript(), prompt: PLAIN_PROMPT, config: OMO_CONFIG },
-  "dag-legacy": { script: () => dagLegacyScript(), prompt: UNLOCK_PROMPT, config: OMO_CONFIG },
-  "legacy-config": { script: () => legacyConfigScript(), prompt: UNLOCK_PROMPT, config: LEGACY_OMO_CONFIG },
+  "team-retired": { script: () => teamRetiredScript(), prompt: PLAIN_PROMPT, config: OMO_CONFIG },
+  "dag-retired": { script: () => dagRetiredScript(), prompt: UNLOCK_PROMPT, config: OMO_CONFIG },
+  "retired-config": { script: () => retiredConfigScript(), prompt: UNLOCK_PROMPT, config: RETIRED_OMO_CONFIG },
 }
 
 function seedScenario(pluginRoot, script, omoConfig) {
@@ -241,7 +247,7 @@ function seedScenario(pluginRoot, script, omoConfig) {
   mkdirSync(omoDir, { recursive: true })
   writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(omoConfig, null, 2)}\n`)
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify(script, null, 2)}\n`)
-  return { sandbox, sessionDir, stateDir: join(sandbox.cwd, ".omo", "senpi-task") }
+  return { sandbox, sessionDir, stateDir: sandboxStateDir(sandbox) }
 }
 
 function collectText(root) {
@@ -309,10 +315,10 @@ const SENPI_TIMEOUT_MS = 120_000
 
 // HOME is redirected too: the omo config loader reads the user scope (~/.omo/omo.jsonc), and a
 // developer's real file with its own agents keys would leak into every scenario's roster and the
-// legacy-config notice (drive.mjs convention).
+// retired-config scenario (drive.mjs convention).
 function senpiEnv(sandbox, sessionDir) {
   return {
-    ...process.env,
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     HOME: sandbox.homeDir,
     USERPROFILE: sandbox.homeDir,
@@ -431,32 +437,35 @@ async function main() {
     } else if (args.scenario === "sequence" && args.expect === "ungated") {
       checks.no_gate_text = !anyDenial
       checks.both_spawned = records.length === 2
-    } else if (args.scenario === "legacy-alias") {
+    } else if (args.scenario === "retired-id") {
       const spawns = taskSpawnDetails(stdout)
-      checks.legacy_spawn_allowed = spawns.length === 1 && spawns[0].status === "running" && !anyDenial
-      checks.deprecation_notice_in_start_result = mentions(transcript, DEPRECATED_REVIEWER_NOTICE)
-      checks.details_name_canonical_and_legacy = spawns[0]?.subagent_type === "plan-reviewer" && spawns[0]?.legacy_subagent_type === "momus"
-      checks.record_stored_under_canonical_id = records.length === 1 && reviewerRecords.length === 1
-      checks.no_legacy_id_in_store = !collectText(stateDir).includes('"momus"')
+      checks.retired_id_not_routed_to_canonical = spawns.every((details) => details.subagent_type !== "plan-reviewer")
+      checks.no_reviewer_child_started = reviewerRecords.length === 0
+      checks.spawn_reported_unresolved = spawns.length === 1 && spawns[0].status !== "running"
+      checks.no_deprecation_notice = !mentions(transcript, RETIRED_DEPRECATION_MARKER)
+      checks.no_legacy_alias_field = spawns.every((details) => details.legacy_subagent_type === undefined)
     } else if (args.scenario === "description") {
       checks.description_captured = description.length > 0
       checks.plan_gated_roster_named = /Plan-gated agents[^\n]*plan-consultant, plan-reviewer/.test(description)
       checks.no_retired_persona = !/Sisyphus|Momus|Metis/i.test(description)
-    } else if (args.scenario === "team-legacy") {
-      checks.team_create_rejected_naming_canonical = mentions(transcript, '"plan-reviewer" (requested as "momus")')
+    } else if (args.scenario === "team-retired") {
+      checks.team_create_rejected_naming_retired_id = mentions(transcript, "unknown subagent_type 'momus'")
+      checks.rejection_never_names_canonical = !mentions(transcript, '(requested as "momus")')
       checks.no_member_spawned = records.length === 0
-    } else if (args.scenario === "dag-legacy") {
-      checks.dag_start_warned_deprecation = mentions(transcript, DEPRECATED_CONSULTANT_NOTICE)
+    } else if (args.scenario === "dag-retired") {
       checks.dag_run_started = /Started dag run/.test(transcript)
-    } else if (args.scenario === "legacy-config") {
-      const spawns = taskSpawnDetails(stdout).filter((details) => details.subagent_type === "plan-reviewer")
-      checks.legacy_key_model_applied_to_plan_reviewer =
+      checks.no_deprecation_warning = !mentions(transcript, RETIRED_DEPRECATION_MARKER)
+      checks.route_keeps_retired_id = mentions(transcript, '"agent":"metis"')
+    } else if (args.scenario === "retired-config") {
+      const spawns = taskSpawnDetails(stdout).filter((details) => details.subagent_type === "momus")
+      checks.retired_key_defines_custom_agent =
         spawns.length === 1 && spawns[0].resolved_model?.display === MOCK_MODEL && spawns[0].resolved_model?.source === "agent"
-      checks.legacy_spawn_completed = childCompleted
-      const probe = await probeStartupNotice(senpiBin, sandbox, sessionDir, LEGACY_CONFIG_NOTICE)
+      checks.custom_agent_spawn_completed = transcript.includes("custom momus agent complete")
+      checks.plan_reviewer_untouched = !records.some((record) => record.agent_type === "plan-reviewer")
+      const probe = await probeStartupNotice(senpiBin, sandbox, sessionDir, RETIRED_CONFIG_NOTICE)
       if (typeof probe.pid === "number") pids.push(probe.pid)
       startupNotices = probe.notices
-      checks.startup_alias_notice = probe.found && probe.notices.some((notice) => notice.message.includes(LEGACY_CONFIG_NOTICE) && notice.notifyType === "warning")
+      checks.no_startup_alias_notice = !probe.found && !probe.notices.some((notice) => notice.message.includes(RETIRED_DEPRECATION_MARKER))
     } else {
       throw new Error(`scenario ${args.scenario} does not take --expect ${args.expect}`)
     }

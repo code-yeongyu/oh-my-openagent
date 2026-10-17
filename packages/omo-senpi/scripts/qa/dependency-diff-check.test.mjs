@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { execFileSync, spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { devNull, tmpdir } from "node:os"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -9,14 +9,19 @@ import { EXIT_ADDED, EXIT_CLEAN, EXIT_USAGE, compareRange, listManifests, resolv
 import { entriesOf, stripJsonc } from "./dependency-diff-parsers.mjs"
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "dependency-diff-check.mjs")
+// os.devNull is `//./nul` on Windows which git cannot open as GIT_CONFIG_GLOBAL;
+// use an empty temp file instead so the test ignores user/system git config on all platforms.
+const EMPTY_GIT_CONFIG = join(mkdtempSync(join(tmpdir(), "dep-diff-git-")), ".gitconfig")
+writeFileSync(EMPTY_GIT_CONFIG, "")
+
 const GIT_ENV = {
   ...process.env,
   GIT_AUTHOR_NAME: "qa",
   GIT_AUTHOR_EMAIL: "qa@example.invalid",
   GIT_COMMITTER_NAME: "qa",
   GIT_COMMITTER_EMAIL: "qa@example.invalid",
-  GIT_CONFIG_GLOBAL: devNull,
-  GIT_CONFIG_SYSTEM: devNull,
+  GIT_CONFIG_GLOBAL: EMPTY_GIT_CONFIG,
+  GIT_CONFIG_SYSTEM: EMPTY_GIT_CONFIG,
 }
 
 function git(repo, args) {

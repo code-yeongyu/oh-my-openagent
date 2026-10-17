@@ -8,8 +8,9 @@ import { runSetup } from "./lib/setup-import.js"
 try {
   // A machine that has bun runs omo on bun, whichever package manager installed it. A `bun add -g`
   // install is reached through a symlink in ~/.bun/bin, and node resolves the main module to its
-  // real path, so this URL already points inside the bun global tree and that bun is trusted as-is;
-  // every other install probes the bun it found and hands over when it meets the engine's floor.
+  // real path, so this URL already points inside the bun global tree. Every bun is held to the
+  // engine's floor (BUN_MIN_VERSION): a bun the user chose (that tree, or OMO_RUNTIME=bun) that is
+  // too old stops with an upgrade message, any other old bun leaves the launch on node (#9563).
   // Only an explicit OMO_RUNTIME=node, or a machine without a usable bun, stays on node.
   const scriptPath = fileURLToPath(import.meta.url)
   // That same symlink makes node boot before every re-exec, so POSIX bun-global installs pay for
@@ -19,7 +20,10 @@ try {
   ensureBunBinShim({ scriptPath })
   const reexeced = await maybeReexecUnderBun({ scriptPath })
   if (!reexeced) {
-    if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
+    if (["login", "logout", "whoami"].includes(process.argv[2])) {
+      const { runServiceAuthCommand } = await import("./lib/service-auth.generated.js")
+      await runServiceAuthCommand(process.argv.slice(2))
+    } else if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
     else await runLauncher()
   }
 } catch (error) {

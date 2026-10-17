@@ -1,10 +1,9 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
 
-const tempDirs: string[] = []
 interface CompiledBlockStructure {
   readonly sections: readonly string[]
   readonly projectionPaths: readonly string[]
@@ -62,7 +61,7 @@ function requiredMatch(input: string, pattern: RegExp): string {
 
 export async function repoWith(files: Array<{ relativePath: string; content: string }>) {
   const dir = await mkdtemp(join(tmpdir(), "memory-compile-"))
-  tempDirs.push(dir)
+  onTestFinished(() => rm(dir, { recursive: true, force: true }))
   const repo = new GitMemoryRepo({ dir, agentId: "fixture-agent" })
   await repo.init({ seedFiles: files })
   return { dir, repo }
@@ -71,7 +70,3 @@ export async function repoWith(files: Array<{ relativePath: string; content: str
 export function memory(description: string, body: string): string {
   return `---\ndescription: ${description}\n---\n${body}`
 }
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
-})

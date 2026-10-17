@@ -1,4 +1,4 @@
-import { canonicalAgentName } from "../../agents/legacy-agent-names"
+import { canonicalCategoryName } from "@oh-my-opencode/omo-config-core"
 
 import type { ResolvedSpawnItem } from "./types"
 
@@ -11,10 +11,13 @@ export type TaskTargetError = {
 
 export type TaskTargetSelection =
   | { readonly kind: "category"; readonly category: string }
-  | { readonly kind: "subagent_type"; readonly subagentType: string; readonly legacySubagentType?: string }
+  | { readonly kind: "subagent_type"; readonly subagentType: string }
   | { readonly kind: "error"; readonly error: TaskTargetError }
 
 type TargetInput = {
+  readonly isolated?: boolean
+  readonly apply?: boolean
+  readonly merge?: "patch" | "branch"
   readonly prompt?: string
   readonly category?: string
   readonly subagent_type?: string
@@ -105,17 +108,12 @@ export function validateTaskTarget(params: TargetInput): TaskTargetSelection {
     return { kind: "error", error: { code: "category_with_model", message: CATEGORY_WITH_MODEL_MESSAGE } }
   }
   if (present(params.category)) {
-    return { kind: "category", category: params.category.trim() }
+    // Canonicalized at the spawn boundary so the task record, telemetry, and renderers all carry the
+    // name that actually ran. A user category keeping a retired name was already renamed at config load.
+    return { kind: "category", category: canonicalCategoryName(params.category.trim()) }
   }
   if (present(params.subagent_type)) {
-    // Legacy curated ids canonicalize here; the legacy id rides along in-memory only
-    // so the caller can surface the deprecation notice without changing any persisted shape.
-    const canonical = canonicalAgentName(params.subagent_type)
-    return {
-      kind: "subagent_type",
-      subagentType: canonical.name,
-      ...(canonical.legacy === undefined ? {} : { legacySubagentType: canonical.legacy }),
-    }
+    return { kind: "subagent_type", subagentType: params.subagent_type.trim() }
   }
   return { kind: "error", error: { code: "no_target", message: NO_TARGET_MESSAGE } }
 }
@@ -199,8 +197,14 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
     }
 
     const model = effectiveModel
+    const isolated = input.isolated ?? params.isolated
+    const apply = input.apply ?? params.apply
+    const merge = input.merge ?? params.merge
     const common = {
       prompt: input.prompt,
+      ...(isolated === undefined ? {} : { isolated }),
+      ...(apply === undefined ? {} : { apply }),
+      ...(merge === undefined ? {} : { merge }),
       load_skills: input.load_skills ?? params.load_skills ?? [],
       ...(input.task_summary === undefined ? {} : { task_summary: input.task_summary }),
       ...(input.description === undefined ? {} : { description: input.description }),
@@ -210,14 +214,7 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
     if (target.kind === "category") {
       items.push({ ...common, kind: "category", category: target.category })
     } else {
-      // Additive, in-memory only: the batch item carries the canonical id plus the legacy id when
-      // the caller submitted one, and nothing else about ResolvedSpawnItem changes.
-      items.push({
-        ...common,
-        kind: "subagent_type",
-        subagentType: target.subagentType,
-        ...(target.legacySubagentType === undefined ? {} : { legacySubagentType: target.legacySubagentType }),
-      })
+      items.push({ ...common, kind: "subagent_type", subagentType: target.subagentType })
     }
   }
 
