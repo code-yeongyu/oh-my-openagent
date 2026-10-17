@@ -188,7 +188,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
   }
 
-  const handleSessionError = async (props: Record<string, unknown> | undefined) => {
+  const handleSessionError = async (props: Record<string, unknown> | undefined, event: object) => {
     const sessionID = resolveSessionEventID(props)
     const error = props?.error
     const agent = props?.agent as string | undefined
@@ -216,9 +216,14 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     if (sessionRetryInFlight.has(sessionID)) {
+      // The dispatch in flight decides what happens to this error once it settles (hook.ts), so it is never dropped.
+      const deferred = deps.deferredSessionErrors?.get(sessionID) ?? []
+      deferred.push(event)
+      deps.deferredSessionErrors?.set(sessionID, deferred)
       log(`[${HOOK_NAME}] session.error skipped - retry in flight`, {
         sessionID,
         retryInFlight: true,
+        deferred: true,
       })
       return
     }
@@ -226,7 +231,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (sessionAwaitingFallbackResult.has(sessionID)) {
       const pendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
       const eventModel = resolveEventModel(props)
-      if (!pendingFallbackModel || eventModel !== pendingFallbackModel) {
+      // Real session.error events have no model. Once dispatch has finished,
+      // treat those as the retry's failure; only an explicitly older model is stale.
+      if (pendingFallbackModel && eventModel && eventModel !== pendingFallbackModel) {
         log(`[${HOOK_NAME}] session.error skipped - awaiting fallback result`, {
           sessionID,
           pendingFallbackModel,
@@ -307,6 +314,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (event.type === "message.updated") { handleMessageUpdated(props); return }
     if (event.type === "session.idle") { handleSessionIdle(props); return }
     if (event.type === "session.status") { await sessionStatusHandler(props); return }
-    if (event.type === "session.error") { await handleSessionError(props); return }
+    if (event.type === "session.error") { await handleSessionError(props, event); return }
   }
 }
