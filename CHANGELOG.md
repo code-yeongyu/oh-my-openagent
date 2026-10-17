@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A dead pinned compaction summarizer is now visible in the logs, and a stalled summarize can no longer deadlock compaction.** The summarizer pin resolves through a logged lookup chain (exact key, case-insensitive, then the persona-suffixed base key for canonical agents) with the observed agent as a fallback, so a pin that cannot be resolved no longer falls back to the session model silently. A summarize that never settles releases its admission guard, and the degradation monitor's recovery summarize honours the same pin. ([#8511](https://github.com/code-yeongyu/oh-my-openagent/pull/8511))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
