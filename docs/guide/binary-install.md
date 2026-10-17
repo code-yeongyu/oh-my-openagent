@@ -100,6 +100,8 @@ On first run the binary writes its runtime to `~/.omo/binary-runtime/<version>/`
 
 Re-run the one-line installer: it replaces the binary when the channel has a newer version and does nothing otherwise. For a manual install, download the new release's asset the same way and replace the binary; the `update` subcommand prints the exact `curl` command for your platform.
 
+The compiled `omo update` uses `GH_TOKEN`, or `GITHUB_TOKEN` when `GH_TOKEN` is unset or empty, to authenticate its GitHub release lookup. Without either token it queries anonymously, sharing GitHub's limit of 60 requests per hour per IP. If that quota is exhausted, set one of these variables to a valid GitHub token and run `omo update` again.
+
 ## Notes and limits
 
 - **Windows ARM64 is a true ARM64 binary.** This differs from the npm `oh-my-opencode-windows-arm64` package, which ships an x64 binary under emulation. The release asset runs natively on ARM64 Windows.

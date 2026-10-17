@@ -108,8 +108,13 @@ function ownedUpdateLine(owner: PackageOwner): string {
 }
 
 export const fetchGitHubReleases: FetchReleases = async () => {
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
   const response = await fetch(RELEASES_API, {
-    headers: { Accept: "application/vnd.github+json", "User-Agent": "omo" },
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "omo",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     signal: AbortSignal.timeout(15_000),
   })
   if (!response.ok) throw new Error(`GitHub answered ${response.status}`)
