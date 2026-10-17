@@ -28,6 +28,7 @@ export const CHECK_IDS = {
   TELEMETRY: "telemetry",
   TEAM_MODE: "team-mode",
   CODEX: "codex",
+  COMPONENTS: "components",
 } as const
 
 export const CHECK_NAMES: Record<string, string> = {
@@ -39,6 +40,7 @@ export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.TELEMETRY]: "Telemetry",
   [CHECK_IDS.TEAM_MODE]: "Team Mode",
   [CHECK_IDS.CODEX]: "Codex",
+  [CHECK_IDS.COMPONENTS]: "Components",
 } as const
 
 export const EXIT_CODES = {

@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+
 import { contextCwd } from "../request-context.js";
-import { getDisabledServerIds, getMergedServers } from "./config-loader.js";
+import { getDisabledServerIds, getMergedServers, type ServerWithSource } from "./config-loader.js";
 import { BUILTIN_SERVERS, LSP_INSTALL_HINTS } from "./server-definitions.js";
 import { isServerInstalled, resolveServerBinary } from "./server-installation.js";
 import type { ServerLookupResult } from "./types.js";
@@ -12,9 +15,37 @@ function withResolvedCommand(command: string[], binaryPath: string): string[] {
 	return [binaryPath, ...command.slice(1)];
 }
 
+/**
+ * Built-in servers that only belong to projects carrying one of these markers. `deno lsp`
+ * handles the same extensions as the TypeScript server, so without the gate a machine with
+ * Deno installed but no TypeScript server routes every Node/Bun file to Deno, which reports
+ * bogus diagnostics for npm imports. A server the user configures explicitly is never gated.
+ */
+export const BUILTIN_SERVER_PROJECT_MARKERS: Readonly<Record<string, readonly string[]>> = {
+	deno: ["deno.json", "deno.jsonc"],
+};
+
+/** Walks from `start` up to the repository root (a `.git` entry) looking for any marker. */
+export function hasProjectMarker(start: string, markers: readonly string[]): boolean {
+	let current = resolve(start);
+	while (true) {
+		if (markers.some((marker) => existsSync(join(current, marker)))) return true;
+		if (existsSync(join(current, ".git"))) return false;
+		const parent = dirname(current);
+		if (parent === current) return false;
+		current = parent;
+	}
+}
+
+function isApplicable(server: ServerWithSource, workingDirectory: string): boolean {
+	if (server.source !== "builtin") return true;
+	const markers = BUILTIN_SERVER_PROJECT_MARKERS[server.id];
+	return markers === undefined || hasProjectMarker(workingDirectory, markers);
+}
+
 export function findServerForExtension(ext: string): ServerLookupResult {
-	const servers = getMergedServers();
 	const workingDirectory = contextCwd();
+	const servers = getMergedServers().filter((server) => isApplicable(server, workingDirectory));
 
 	for (const server of servers) {
 		if (!server.extensions.includes(ext)) continue;

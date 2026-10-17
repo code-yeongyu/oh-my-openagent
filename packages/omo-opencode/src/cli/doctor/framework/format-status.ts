@@ -34,9 +34,14 @@ export function formatStatus(result: DoctorResult): string {
   const configStatus = systemInfo.configValid ? color.green("(valid)") : color.red("(invalid)")
   lines.push(` ${padding}Config     ${configPath} ${configStatus}`)
 
-  const serverCount = tools.lspServers.length
-  const lspMark = formatStatusMark(serverCount > 0)
-  const lspText = serverCount > 0 ? `${serverCount} server${serverCount === 1 ? "" : "s"}` : "none"
+  const languages = result.components?.lsp?.languages ?? []
+  const workingLanguages = languages.filter((language) => language.status === "ok").length
+  const lspMark = formatStatusMark(tools.lspServers.length > 0 && languages.every((language) => !language.required || language.status === "ok"))
+  const lspText = tools.lspServers.length === 0
+    ? "bridge unavailable"
+    : result.components === undefined
+      ? "bridge available"
+      : `${workingLanguages}/${languages.length} languages working`
   const astGrepMark = formatStatusMark(tools.astGrepCli)
   const ghMark = formatStatusMark(tools.ghCli.installed && tools.ghCli.authenticated)
   const ghUser = tools.ghCli.username ?? ""

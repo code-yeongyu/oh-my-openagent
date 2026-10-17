@@ -1,10 +1,11 @@
-import type { CheckDefinition } from "../framework/types"
+import type { CheckDefinition, DoctorComponentOptions } from "../framework/types"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import { checkSystem, gatherSystemInfo } from "./system"
 import { checkConfig } from "./config"
 import { checkBrowserProvider } from "./browser-provider"
 import { checkDeprecatedReasoningKeys } from "./deprecated-reasoning-keys"
-import { checkTools, gatherToolsSummary } from "./tools"
+import { createToolsCheck, gatherToolsSummary } from "./tools"
+import { createComponentsCheck, gatherComponents } from "./components"
 import { checkModels } from "./model-resolution"
 import { checkTelemetry } from "./telemetry"
 import { checkTeamMode } from "./team-mode"
@@ -16,11 +17,11 @@ import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
 
 export type { CheckDefinition }
 export * from "./model-resolution-types"
-export { gatherSystemInfo, gatherToolsSummary }
+export { gatherSystemInfo, gatherToolsSummary, gatherComponents }
 export { gatherCodexSummary }
 export { gatherEditionDistTags, resolveLatestVersion }
 
-export function getAllCheckDefinitions(): CheckDefinition[] {
+export function getAllCheckDefinitions(components: DoctorComponentOptions = {}): CheckDefinition[] {
   return [
     { id: "browser-provider", name: "Browser Provider", check: checkBrowserProvider },
     {
@@ -47,7 +48,12 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
     {
       id: CHECK_IDS.TOOLS,
       name: CHECK_NAMES[CHECK_IDS.TOOLS],
-      check: checkTools,
+      check: createToolsCheck(components),
+    },
+    {
+      id: CHECK_IDS.COMPONENTS,
+      name: CHECK_NAMES[CHECK_IDS.COMPONENTS] ?? "Components",
+      check: createComponentsCheck(components),
     },
     {
       id: CHECK_IDS.MODELS,
