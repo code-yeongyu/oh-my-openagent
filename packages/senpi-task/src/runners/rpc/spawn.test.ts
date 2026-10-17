@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   buildChildArgs,
+  buildModelCatalogArgs,
   buildRpcSpawn,
   detectBunBinary,
   detectCompiledEngine,
@@ -28,6 +29,14 @@ const baseSpec = {
 const noExecutable = { resolveSenpiExecutable: () => null }
 // A runtime that always resolves a fixed executable, isolating the executable-preferred path.
 const withExecutable = (path: string) => ({ resolveSenpiExecutable: () => path })
+
+function extensionArgs(args: readonly string[]): readonly string[] {
+  const extensions: string[] = []
+  for (let index = 0; index < args.length - 1; index += 1) {
+    if (args[index] === "--extension") extensions.push(args[index + 1]!)
+  }
+  return extensions
+}
 
 describe("detectBunBinary", () => {
   test("#given a bun virtual-fs url #when detecting #then it reports a bun binary", () => {
@@ -317,9 +326,12 @@ describe("readRunningEngineVersion", () => {
 describe("buildChildArgs", () => {
   test("#given a spec with model and extensions #when building child args #then no-extensions then no-ask-user lead, each -e follows, then --model", () => {
     // when
-    const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", extensions: ["/tmp/a.ts", "/tmp/b.ts"] })
+    const spec = { ...baseSpec, model: "omo-mock/mock-1", extensions: ["/tmp/a.ts", "/tmp/b.ts"] }
+    const args = buildChildArgs(spec)
+    const catalogArgs = buildModelCatalogArgs(spec)
     // then
     expect(args).toEqual(["--no-extensions", "--no-ask-user", "--extension", "/tmp/a.ts", "--extension", "/tmp/b.ts", "--model", "omo-mock/mock-1"])
+    expect(extensionArgs(catalogArgs)).toEqual(extensionArgs(args))
   })
 
   test("#given a spec with neither model nor extensions #when building child args #then no-extensions then no-ask-user are present", () => {
@@ -355,6 +367,34 @@ describe("buildChildArgs", () => {
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", variant: "ultra" })
     // then
     expect(args).toEqual(["--no-extensions", "--no-ask-user", "--model", "omo-mock/mock-1"])
+  })
+
+  test("#given a DAG-owned spec with a launcher and provider #when building child and catalog args #then both use the same provider-only extensions", () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "senpi-dag-extension-parity-"))
+    const taskId = "st_dag_extension_parity"
+    const launcherExtension = join(root, "omo-launcher.js")
+    const providerExtension = join(root, "provider.js")
+    mkdirSync(join(root, "tasks"), { recursive: true })
+    writeFileSync(join(root, "tasks", `${taskId}.json`), JSON.stringify({ owner: { kind: "dag" } }))
+    const spec = {
+      ...baseSpec,
+      task_id: taskId,
+      state_dir: join(root, "children", taskId),
+      extensions: [launcherExtension, providerExtension],
+    }
+
+    try {
+      // when
+      const childExtensions = extensionArgs(buildChildArgs(spec))
+      const catalogExtensions = extensionArgs(buildModelCatalogArgs(spec))
+
+      // then
+      expect(childExtensions).toEqual([providerExtension])
+      expect(catalogExtensions).toEqual(childExtensions)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 

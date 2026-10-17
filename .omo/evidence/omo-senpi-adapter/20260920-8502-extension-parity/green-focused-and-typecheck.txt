@@ -1,0 +1,18 @@
+WHAT WAS TESTED
+- `bun test packages/senpi-task/src/runners/rpc/spawn.test.ts packages/senpi-task/src/runners/rpc/model-admission.test.ts`
+- `bun test packages/senpi-task/src/dag/e2e-failure.test.ts`
+- `tsgo --noEmit -p packages/senpi-task/tsconfig.json`
+- `tsgo --noEmit -p packages/omo-senpi/tsconfig.json`
+
+WHAT WAS OBSERVED
+- RPC spawn and model-admission tests: 43 pass, 0 fail, 102 assertions.
+- DAG failure/retry integration tests: 17 pass, 0 fail, 113 assertions.
+- The existing DAG extension integration case confirmed that only a DAG child omits the leading OMO entry.
+- Both TypeScript no-emit checks exited 0 with no diagnostics.
+- `git diff --check` exited 0.
+
+WHY IT IS ENOUGH
+The focused tests cover the two argument builders changed by this patch, the model-admission consumer, and the existing DAG child behavior that must remain intact. The package and adapter typechecks cover both sides of the dependency boundary.
+
+WHAT WAS OMITTED
+Per-test timing lines and randomized temporary-directory suffixes were summarized. No credentials, environment dump, auth headers, or private logs were retained.
