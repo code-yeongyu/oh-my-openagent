@@ -234,6 +234,22 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "CREATE UNIQUE INDEX bindings_one_active_thread ON bindings (platform, account_id, chat_id, thread_id) WHERE status = 'active'",
     "CREATE INDEX bindings_session ON bindings (session_durable_id, status)",
   ],
+  // v8 (todo 14): who thread_create'd which session (`thread_creations`, durable so a parent is still
+  // recognised after a host handoff or restart), and each store extension's persisted descriptor
+  // (`extension_registrations`: module URL, migrations, session-callable ops, wake dir), upserted by
+  // name, so an engine process lists the session tools another process registered.
+  [
+    `CREATE TABLE thread_creations (
+      creator_durable_id TEXT NOT NULL,
+      created_durable_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (creator_durable_id, created_durable_id)
+    )`,
+    "CREATE TABLE extension_registrations (name TEXT PRIMARY KEY, descriptor_json TEXT NOT NULL, updated_at INTEGER NOT NULL)",
+    `INSERT OR IGNORE INTO extension_objects (type, name, owner)
+     SELECT s.type, s.name, NULL FROM sqlite_schema s
+     WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
+  ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects"] as const
+export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "thread_creations", "extension_registrations"] as const

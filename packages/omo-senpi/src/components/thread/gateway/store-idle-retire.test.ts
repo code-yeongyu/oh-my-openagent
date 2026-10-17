@@ -110,4 +110,6 @@ test("#given a target session whose store worker retired #when a peer sends to i
 
   expect(result.kind === "ok" ? result.delivery.kind : result.error.code).toBe("started")
   expect((await target.store.list({ target_durable_id: "B" })).map((row) => row.state)).toEqual(["applied"])
-})
+  // A worker retire plus a respawn under the send; no timer is under test beyond the 1 ms idle retire,
+  // and a CPU-capped runner measured 5.1 s, past the 5 s default.
+}, 20_000)

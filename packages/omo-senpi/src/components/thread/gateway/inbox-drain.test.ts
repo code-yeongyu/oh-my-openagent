@@ -398,7 +398,9 @@ describe("session inbox drain through the control endpoint registrant", () => {
     expect(first.control.referencedAtExit).toBe(true)
     expect(JSON.parse(readFileSync(w.sessionPath, "utf8").split("\n")[0] ?? "{}")).toMatchObject({ type: "session", id: "B" })
     expect({ state: await stateOf(reopened.store, id), tokens: tokensOnDisk(w.sessionPath), enqueued: reopened.runtime.enqueueCount(id) }).toEqual({ state: "applied", tokens: [id], enqueued: 1 })
-  })
+    // Two processes over the same store file plus the reopen; no timer is under test, and a CPU-capped
+    // runner measured 5.9 s, past the 5 s default.
+  }, 20_000)
 
   describe("crash between the two phases, then a fresh process for the same durable id", () => {
     type Fault = "after_claim" | "after_start" | "after_start_header_only" | "after_mid_turn_queue"
@@ -438,7 +440,9 @@ describe("session inbox drain through the control endpoint registrant", () => {
       const run = await crashThenResume("after_claim")
       expect({ crashed: run.crashedState, victimEnqueued: run.victim.runtime.enqueueCount(run.id), freshEnqueued: run.fresh.runtime.enqueueCount(run.id) }).toEqual({ crashed: "admitting", victimEnqueued: 0, freshEnqueued: 1 })
       expect(tokensOnDisk(run.sessionPath)).toEqual([run.id])
-    })
+      // The crash injection plus a fresh registrant over the same store; no timer is under test, and a
+      // CPU-capped runner measured 6.1 s, past the 5 s default.
+    }, 20_000)
 
     test("#given a crash after the runtime started the turn and wrote the entry, on a session that already had an assistant message #when a fresh process registers #then the disk token makes it applied and it is not re-admitted", async () => {
       const run = await crashThenResume("after_start")

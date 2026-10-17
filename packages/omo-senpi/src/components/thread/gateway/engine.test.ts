@@ -253,7 +253,9 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     }
     const fifth = await send(h, "H4", "H5", "hop 5", { cause_delivery_id: cause })
     expect(fifth.kind === "error" && { code: fifth.error.code, guard: fifth.error.details?.guard }).toEqual({ code: "loop_detected", guard: "hop_limit" })
-  })
+    // Six sessions and a store worker per hop, sequenced through quiesce; no timer is under test, and a
+    // CPU-capped runner measured 5.3 s, so the 5 s default needs room past it.
+  }, 30_000)
 
   test("#given one sender turn #when it reaches a 17th distinct session #then that send is refused while a second send to a known target passes", async () => {
     const h = open()

@@ -106,5 +106,7 @@ describe("a_taking_over_answer_refused_because_the_question_was_closed_elsewhere
     expect(q.row()).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from the dead claimant" })
     expect((await q.answer("from C") as { error: { message: string } }).error.message).toBe("This question was already answered.")
     expect(q.sent).toEqual([{ value: "from B" }])
-  })
+    // Two claims handed to the endpoint through the in-flight bound; no timer is under test beyond the
+    // clock jump, and a CPU-capped runner measured 7.1 s, past the 5 s default.
+  }, 20_000)
 })

@@ -124,6 +124,7 @@ describe("runSenpiStartupMigration", () => {
     expect(result.results.map((entry) => entry.status)).toEqual([
       "migrated",
       "migrated",
+      "skipped",
       "migrated",
       "skipped",
       "skipped",

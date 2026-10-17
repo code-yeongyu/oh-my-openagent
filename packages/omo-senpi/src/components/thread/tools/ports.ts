@@ -4,6 +4,7 @@ import type { EndpointKind } from "../endpoint-registry"
 import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
+import type { DoriReplay } from "./dori-replay"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -120,6 +121,8 @@ export type ThreadToolSurfaceOptions = {
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
+  /** Present only while the `dori` section is on: the journal every layer-2 toolkit call of the dori store extension runs through. */
+  readonly doriReplay?: () => Promise<DoriReplay>
   readonly now?: () => number
 }
 

@@ -1,3 +1,11 @@
+## 2026-10-17 - The agent toolkit gets the layer-2 namespace seam a dori host fills (#10316)
+
+With an enabled `dori` section in `omo.json`, the agent toolkit SDK gains eleven namespaces (`route`, `reply`, `room`, `send`, `thread`, `describe`, `file`, `rules`, `iam`, `call`, `work`); without one, the properties do not exist and no layer module is imported. omo ships no namespace behavior: each function calls the session tool a separately installed dori host declares through a store extension named `dori` (`ext_dori_<ns>_<fn>`), so the caller is stamped by the engine as for every session-callable op, and `help()` lists the registered functions with signatures rendered from their JSON Schemas.
+
+Every such call is journaled by the engine under a replay key, `JSON.stringify(["turn", turnId, callIndex])` (inbound deliveries use `["inbound", dedupeKey]`); dori-link derives its envelope ids from the same string, and `replay-key.test.ts` pins the vectors. The turn is the calling session plus the newest assistant entry on its branch. Replaying a turn returns each recorded result without dispatching again; a different op at a recorded index stops with `ToolkitReplayStopError` (`toolkit_replay_divergence`), and a call an earlier run started but never recorded stops as `toolkit_replay_pending` instead of being sent twice. Keys are kept seven days.
+
+Tests: the key vectors, the journal (replay, divergence, per-turn indices, released claims, pending, retention, missing turn), the session-tool wiring against a real gateway store (one dispatch on replay, divergence, off means no journal, other extensions untouched), the kernel namespaces and `help()`, and an import-graph walk proving the SDK and the thread component load no layer module statically. `scripts/qa/dori-toolkit-replay-qa.mjs` drives the same contract through real eval kernels, one process per phase.
+
 ## 2026-10-12 - Thread QA rides the neutral senpi qa-shared helpers (#10033)
 
 The thread-tools harness and runner no longer import senpi's app-server-named QA library. `scripts/qa/thread-tools/lib/harness.mjs` resolves `scripts/qa-shared/lib/{env,fake-model,cleanup}.mjs` from the senpi checkout (the prerequisite extraction in senpi #3177) and `run-all.mjs`'s legacy precondition checks the same path, so the suite keeps its coverage instead of silently skipping once the old helper location is removed. The ulw-loop delegation guidance and `docs/reference/mass-ulw-protocol.md` stop naming the retired protocol; the DAG widget's non-TUI suppression test uses the rpc mode fixture. No behavior changes: the harness still drives the real `--mode rpc --multi-session` host.
@@ -272,6 +280,17 @@ Tests (`model-miss.test.ts`, the exact advisory text):
 
 On the host-session runner the scenario requires the tool call (`tool_execution`) before the in-session hop (`retry_fallback_applied`), and the record's model to end on the fallback. On the per-child process runner the tool check reads `N/A`, because that runner cannot carry a per-session chain and falls back at the manager level instead. `task-runtime-fallback-mock-provider.ts` serves the `limit-after-tool` model.
 
+## 2026-10-05 - A store extension can declare a session op its component calls but the model never sees
+
+A session-callable op gave the model a tool (`ext_<extension>_<toolName>`). Some ops take a session id the session's own component already knows, while it assembles its prompt: a digest cursor write, a membership read. Declaring them session-callable would have handed the model tools it must not have. Leaving them public would have let any caller forge the session id.
+
+`SessionCallableOp` now has an internal form, `{ op, internal: true, parameters, targetArg?, description? }`. The caller is stamped and the public `extensionCall` refuses it with `caller_not_allowed`, exactly as for a tool op. It is reachable only through `extensionSessionAwait` with the caller the component knows, and `sessionCallableOps` leaves it out, so no tool is ever built for it. Registration refuses an internal entry that declares `toolName`, `await` or `wake`.
+
+Tests:
+- a session that declares a tool op and an internal op gets only the tool op's tool;
+- the public `extensionCall` refuses an internal op, and the op never runs;
+- `extensionSessionAwait` runs it with the engine caller stamped, and refuses a forged caller field;
+- an internal entry with `toolName`, `await`, `wake` or `internal: false` is refused, and the same entry without it registers.
 ## 2026-10-03 - Ultrawork routing item 4 carries a size test before it fans out (#9499)
 
 - `skills/ultrawork/SKILL.md` "Finding things" item 4: "Architecture / flow / blast radius across more files than one wave can read -> parallel explore agents armed with ast-grep, then synthesize; outside-repo research (library/API/docs/web) -> librarian. Run them in background; keep working." replaces the arrow table that sent every architecture question and every "unfamiliar layout" to background agents with no size test. `src/components/ultrawork/generated-directive.ts` is regenerated by `plugin/scripts/embed-directive.mjs` (22 words shorter; no forbidden harness tokens).
