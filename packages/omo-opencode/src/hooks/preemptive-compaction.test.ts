@@ -170,7 +170,10 @@ describe("preemptive-compaction", () => {
       output
     )
 
-    expect(ctx.client.session.messages).not.toHaveBeenCalled()
+    // the token source stays the cache; the single messages() call is the
+    // post-compaction summary verification, not a token re-fetch
+    expect(ctx.client.session.messages).toHaveBeenCalledTimes(1)
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 
@@ -918,5 +921,128 @@ describe("preemptive-compaction", () => {
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  // #given a summarize that outlived the plugin's timeout (observed live: 64-67s against a 60s budget)
+  // #when the abandoned summarize then finishes and replaces the prompt
+  // #then the pre-compaction measurement must not justify another compaction
+  it("should not re-fire from the pre-compaction measurement after a timed-out summarize completes", async () => {
+    const restoreTimeouts = setupImmediateTimeouts()
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_timeout_then_compacted"
+    let resolvePendingSummarize: () => void = () => undefined
+    const pendingSummarize = new Promise<void>((resolve) => {
+      resolvePendingSummarize = resolve
+    })
+    ctx.client.session.summarize.mockImplementationOnce(() => pendingSummarize)
+
+    try {
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              role: "assistant",
+              sessionID,
+              providerID: "anthropic",
+              modelID: "claude-sonnet-4-6",
+              finish: true,
+              tokens: { input: 800000, output: 0, reasoning: 0, cache: { read: 10000, write: 0 } },
+            },
+          },
+        },
+      })
+
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_1" },
+        { title: "", output: "test", metadata: null },
+      )
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+      // when - the abandoned summarize finishes anyway and replaces the prompt
+      await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
+      resolvePendingSummarize()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const originalNow = Date.now
+      Date.now = () => originalNow() + 61_000
+      try {
+        await hook["tool.execute.after"](
+          { tool: "bash", sessionID, callID: "call_2" },
+          { title: "", output: "test", metadata: null },
+        )
+
+        // then - the stale pre-compaction measurement is gone, so nothing re-fires
+        expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+      } finally {
+        Date.now = originalNow
+      }
+    } finally {
+      resolvePendingSummarize()
+      restoreTimeouts()
+    }
+  })
+
+  // #given the compaction model returns a summary message with no text and no output tokens
+  // #when the summarize resolves
+  // #then the session must not be latched as compacted and a retry must stay possible
+  it("should reject an empty compaction summary and allow a retry after cooldown", async () => {
+    ctx.client.session.messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: { id: "msg_summary", role: "assistant", summary: true, tokens: { output: 0 } },
+            parts: [],
+          },
+        ],
+      }),
+    )
+
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_empty_summary"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: { input: 800000, output: 0, reasoning: 0, cache: { read: 10000, write: 0 } },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null },
+    )
+
+    // then - the empty summary is surfaced instead of being treated as success
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+    const toastTitles = ctx.client.tui.showToast.mock.calls.map((call: unknown[]) =>
+      (call[0] as { body?: { title?: string } } | undefined)?.body?.title,
+    )
+    expect(toastTitles).toContain("Preemptive compaction produced no summary")
+
+    // and - because the session was not latched, a retry is allowed after the cooldown
+    const originalNow = Date.now
+    try {
+      Date.now = () => originalNow() + 61_000
+
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_2" },
+        { title: "", output: "test", metadata: null },
+      )
+
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+    } finally {
+      Date.now = originalNow
+    }
   })
 })
