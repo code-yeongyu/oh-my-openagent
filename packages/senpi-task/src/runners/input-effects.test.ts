@@ -149,6 +149,31 @@ test("#given an input left uncertain by an earlier run #when a later run reconci
   expect(store.load(taskId)?.uncertain_inputs).toBeUndefined()
 })
 
+test("#given an earlier-run input whose retry is still in flight #when a later run reconciles #then only that retry settles it and the log never records it both ways", async () => {
+  const { store, taskId } = fixture()
+  const inFlight = Promise.withResolvers<void>()
+  const retryStarted = Promise.withResolvers<void>()
+  const events: string[] = []
+  const append = store.appendEvent
+  const observed = { ...store, appendEvent: (id: string, event: { type: string; payload: unknown }) => {
+    events.push(event.type)
+    return append(id, event)
+  } }
+  let calls = 0
+  const effects = createInputEffects({ taskId, store: observed, send: async () => {
+    if (++calls === 1) throw new RpcRequestTimeout("steer", 30_000)
+    retryStarted.resolve()
+    await inFlight.promise
+  } })
+  await expect(effects.send({ type: "steer", message: "once" })).rejects.toBeInstanceOf(InputUncertainError)
+  await bounded(retryStarted.promise)
+  store.mutate(taskId, record => ({ ...record, notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 } }))
+  const reconciled = effects.reconcile()
+  inFlight.resolve()
+  await bounded(reconciled)
+  expect(events).toEqual(["effect_uncertain", "steered"])
+})
+
 async function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {

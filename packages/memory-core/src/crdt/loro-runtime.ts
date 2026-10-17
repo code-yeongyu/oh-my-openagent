@@ -3,9 +3,13 @@
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { readFile } from "../fs/resilient"
-import type { Container, ContainerID, LoroDoc, Value } from "loro-crdt"
+import type { Container, ContainerID, ContainerType, LoroDoc, PeerID, Value } from "loro-crdt"
 
 import wasmPath from "loro-crdt/bundler/loro_wasm_bg.wasm" with { type: "file" }
+
+// Type-only re-export: consumers take Loro/Container types from this loader so the loader
+// stays the only module that names "loro-crdt" (loro-runtime-packaging.test.ts enforces it).
+export type { ContainerID, ContainerType, LoroDoc, PeerID }
 
 /**
  * The sync engine's single Loro entry point. The stock `loro-crdt` bundler entry locates

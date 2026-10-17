@@ -36,6 +36,7 @@ export function createComputerRuntimeLoader(options: {
   readonly engineChild: ((enginePath: string | undefined) => ChildFactory) | undefined
   readonly onEngineError: (code: ComputerUseEngineErrorCode) => void
   readonly onPermissionRequired?: TrackedDesktopServiceOptions["onPermissionRequired"]
+  readonly fullAccess?: () => boolean
 }): ComputerRuntimeLoader {
   const { host, settings } = options
   // Providers without native deferred-tool search reach a tool only once it is active, so the
@@ -50,6 +51,7 @@ export function createComputerRuntimeLoader(options: {
       ...(options.engineChild === undefined ? {} : { engineChild: options.engineChild }),
       onEngineError: options.onEngineError,
       onPermissionRequired: options.onPermissionRequired,
+      ...(options.fullAccess === undefined ? {} : { fullAccess: options.fullAccess }),
     })
     runtime.handle.onActivationChange((active) => {
       const current = host.getActiveTools()

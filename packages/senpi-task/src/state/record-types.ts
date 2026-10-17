@@ -2,6 +2,7 @@ import type { DagTaskOwner } from "../dag/owner"
 import type { TaskStartFailureRecordFields } from "./start-failure"
 import type {
   BackgroundMode,
+  EffectiveModelRecord,
   HostSessionIdentity,
   IsolationRecord,
   ResolvedModelRecord,
@@ -82,12 +83,13 @@ export type TaskRecordInput = {
   readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly resolved_model?: ResolvedModelRecord
   /**
-   * The model the child ACTUALLY started on, recorded once the runner is up (#9722) and kept
-   * current from the child's own model observations - `model`/`resolved_model` state the plan,
+   * The model the child ACTUALLY runs, recorded once the runner is up (#9722) and kept current
+   * from the child's own model observations AND its live model events - model_changed (any
+   * source) plus the two retry-fallback events (F12). `model`/`resolved_model` state the plan,
    * this states the route that ran. Absent on records predating the field or a child whose
    * effective model could not be observed.
    */
-  readonly effective_model?: ResolvedModelRecord
+  readonly effective_model?: EffectiveModelRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]
   readonly notify_on_terminal: boolean
@@ -106,6 +108,8 @@ export type TaskRecordInput = {
 
 export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly effect_seq?: number
+  /** The exact id of the last identified input this task sent; reconciliation reads its receipt by it. */
+  readonly last_effect_id?: string
   readonly uncertain_inputs?: readonly import("../runners/input-effects").IdentifiedInput[]
   readonly isolation?: IsolationRecord
   readonly task_id: string
@@ -122,9 +126,11 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly child_session_id?: string
   readonly spawn_spec?: TaskSpawnSpec
   /** Mirrors TaskRecordInput.effective_model; see there. */
-  readonly effective_model?: ResolvedModelRecord
+  readonly effective_model?: EffectiveModelRecord
   readonly final_response?: string
   readonly error_message?: string
+  readonly stop_reason?: "deadline"
+  readonly deadline?: Readonly<Record<string, unknown>>
   // Exit observed, cause unconfirmed: status stays running until the owning manager confirms it.
   readonly provisional_exit?: {
     readonly observed_at: string

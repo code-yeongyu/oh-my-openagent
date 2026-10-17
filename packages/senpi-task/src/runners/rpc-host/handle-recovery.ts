@@ -1,13 +1,16 @@
 import type { HostSessionIdentity, HostSessionPort } from "./handle-port"
 import { recoverLostTransport, type HostShardEvents } from "./handle-reattach"
 import {
+  isRpcResponseTimeout,
   isTransportLossError,
   type HostSessionReattach,
   type HostSessionReattached,
   type HostSessionReattachRefused,
 } from "./reattach"
 import type { HostParkReason, HostSessionCommand } from "./session-client"
-import { armRecoveryBound, withinBound, type RecoveryBound, type TransportRecoveryOptions } from "./transport-recovery"
+import { log } from "@oh-my-opencode/utils"
+import type { HostTurnReconciliation } from "./reconcile-turn"
+import { armRecoveryBound, isTransportRecoveryExpired, withinBound, type RecoveryBound, type TransportRecoveryOptions } from "./transport-recovery"
 import { InputUncertainError } from "../input-effects"
 
 export interface HandleRecoveryHost {
@@ -16,12 +19,15 @@ export interface HandleRecoveryHost {
   readonly reattach: HostSessionReattach | undefined
   readonly events: HostShardEvents | undefined
   readonly bound: TransportRecoveryOptions | undefined
+  readonly closeGraceMs: number
   port(): HostSessionPort
   identity(): HostSessionIdentity
   alive(): boolean
   turnSettled(): boolean
   adopt(next: HostSessionReattached): void
   turnResumed(): void
+  reconcile(reopened: boolean): Promise<HostTurnReconciliation>
+  beginContinuation(): void
   endLost(): void
   park(reason: HostParkReason): void
   /** The continuation that re-drives the in-flight turn after a reattach was not delivered. */
@@ -52,7 +58,7 @@ type ReattachAnswer = HostSessionReattached | HostSessionReattachRefused | undef
  * when the loss hits is NOT a turn the host lost - its retry is the delivery - so recovery's in-flight
  * verdict ignores turns while a delivery is pending, whichever reaction runs first.
  *
- * Every recovery is BOUNDED (omo#9403): when the bound runs out first the child ends `transport lost`
+ * Every recovery is BOUNDED (omo#9403): when the bound runs out first the child parks for respawn
  * and whatever connection a late reattach still produces ends the session on the host, so the
  * child's processes go with it. A stop asked for while the transport is down is applied on the
  * recovered connection before anything else, and never continues the turn.
@@ -126,10 +132,12 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
           host.adopt(next)
         },
         turnResumed: host.turnResumed,
+        reconcile: host.reconcile,
         // A stop recorded while the reattached session was being read must run before any continuation:
         // the turn is not re-driven, and the recovery's end stops the adopted session (omo#9403).
         continueTurn: async (prompt) => {
           if (host.stopRequested()) return
+          host.beginContinuation()
           const command = { type: "prompt", message: prompt, streamingBehavior: "steer" } as const
           try {
             await withinBound(bound, host.continueInput === undefined ? host.port().send(command) : host.continueInput(command))
@@ -137,16 +145,31 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
             throw error instanceof InputUncertainError ? error.cause : error
           }
         },
-        // A refused reattach parks (the endpoint answered, but may not host this session); exhaustion ends.
-        giveUp: (reason) => (reason === undefined ? host.endLost() : host.park(reason)),
+        // Exhaustion hands the recorded launch and transcript to live-parent recovery (#9868),
+        // just like a typed refusal. It must not publish a terminal loss before respawn can run.
+        giveUp: (reason) => host.park(reason ?? "daemon_unavailable"),
       },
       boundedReattach(reattach, bound),
     )
-      .catch((error: unknown) => host.continuationFailed(error))
-      .finally(() => {
+      .catch((error: unknown) => {
+        log("senpi-task host session reattach continuation failed", { taskId: host.taskId, error: String(error) })
+        if (isTransportLossError(error) || isTransportRecoveryExpired(error)
+          || isRpcResponseTimeout(error)) {
+          if (host.alive() && !host.stopRequested()) host.park("daemon_unavailable")
+        } else host.continuationFailed(error)
+      })
+      .finally(async () => {
         bound.settle()
-        reattaching = undefined
         host.recoveryEnded(adopted)
+        // A parked adopted port is no longer owned by this handle. Leave the session intact for
+        // contextual revival, but release this connection before another handle reattaches.
+        if (adopted && !host.alive() && !host.stopRequested()) {
+          const cleanupBound = armRecoveryBound({ ...host.bound, boundMs: host.closeGraceMs })
+          try { await withinBound(cleanupBound, host.port().detach()) }
+          catch (error) { log("senpi-task parked recovery detach failed", { taskId: host.taskId, error: String(error) }) }
+          finally { cleanupBound.settle() }
+        }
+        reattaching = undefined
       })
   }
 

@@ -68,5 +68,5 @@ export async function ensureIdentityRuntimeDirs(paths: MemoryIdentityPaths): Pro
     paths.factsQueue,
     paths.facts,
     paths.notices,
-  ].map((path) => mkdir(path, { recursive: true })))
+  ].map((path) => mkdir(path, { recursive: true, mode: 0o700 })))
 }

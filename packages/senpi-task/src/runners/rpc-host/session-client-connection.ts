@@ -195,8 +195,11 @@ export class HostSessionClient {
     this.client = undefined
     this.routingId = undefined
     if (client === undefined) return
-    if (routingId !== undefined) await client.closeSession(routingId)
-    await client.stop()
+    try {
+      if (routingId !== undefined) await client.closeSession(routingId)
+    } finally {
+      await client.stop()
+    }
   }
 
   /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */
@@ -234,18 +237,35 @@ export class HostSessionClient {
       case "session_parked": {
         const sessionId = this.routingId ?? control.sessionId
         this.routingId = undefined
-        for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+        try {
+          for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+        } finally {
+          this.releaseEndedSession()
+        }
         return
       }
       case "session_closed": {
         const sessionId = this.routingId ?? control.sessionId ?? ""
         this.routingId = undefined
-        for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
+        try {
+          for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
+        } finally {
+          this.releaseEndedSession()
+        }
         return
       }
       default:
         unreachable(control)
     }
+  }
+
+  // Notify the handle first so it marks itself parked/exited before the client goes; the engine's
+  // deliberate stop() never fires onDisconnect, so this release cannot start a recovery attach.
+  // Detach only this session's client; retained transcripts and sibling attach holds stay intact.
+  private releaseEndedSession(): void {
+    void this.detach().catch((error: unknown) => {
+      log("senpi-task ended host session detach failed", { socket: this.socketPath, error: String(error) })
+    })
   }
 
   // The child must never wait on a human: the deny/cancel answer is written and NOT awaited, so a

@@ -232,6 +232,7 @@ export function recordSpawnedRunner(
 ): TaskRecord | undefined {
   if (isTerminalRecord(record) || kind !== "host-session" || hostSession === undefined) return undefined
   return { ...record, runner_kind: "host-session", host_session: {
+    ...record.host_session,
     ...hostSessionFacts(hostSession),
     ...(record.effect_seq === undefined ? {} : { effect_seq: record.effect_seq }),
   } }

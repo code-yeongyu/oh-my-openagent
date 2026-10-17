@@ -1,3 +1,7 @@
+## 2026-10-16 - Adopt senpi 2026.10.16
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.15 to 2026.10.16: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer/dev pins with their `senpi-tui` and `senpi-ai` aliases, the pin and package-shape assertions, and the engine-catalog note in the `senpi-task` coverage test. `bun.lock` resolves the senpi entries at 2026.10.16 (refreshed with `bun install --no-cache`). `packages/omo-native/bin/lib/provider-map.json` is re-derived from the installed engine's `builtinProviders()`: the builtin and OAuth provider ids are unchanged, only its derivation comment moves, and the committed Senpi plugin bundle (`omo.js`, which embeds that comment) is rebuilt on Linux (bun 1.4.2, the version `ci.yml` pins) with `bun run build:senpi-plugin`.
+
 ## 2026-10-15 - Adopt senpi 2026.10.15
 
 Every `@code-yeongyu/senpi` pin moves from 2026.10.13 to 2026.10.15: the root devDependency, `omo-native` and its provider map comment, the `omo-senpi` and `senpi-task` peer/dev pins with their `senpi-tui` and `senpi-ai` aliases, the pin and package-shape assertions, and the engine-catalog note in the `senpi-task` coverage test. `bun.lock` resolves the senpi entries at 2026.10.15 (refreshed with `bun install --no-cache`), and the committed Senpi plugin bundle (`omo.js`, whose embedded pin moves) is rebuilt on Linux (bun 1.4.2, the version `ci.yml` pins) with `bun run build:senpi-plugin`.

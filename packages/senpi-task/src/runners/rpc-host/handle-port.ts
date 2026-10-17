@@ -12,6 +12,8 @@ import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked } from "./session-client"
 import type { TransportRecoveryOptions } from "./transport-recovery"
 import type { CatalogModelIdentity } from "../pinned-model-equivalence"
+import type { TaskRecord } from "../../state"
+import type { HostTurnReconciliation, InputEffectStatus, ReconciledTurnNotice } from "./reconcile-turn"
 
 /**
  * What a child handle needs FROM a daemon session and what it exposes TO the manager. The seam is
@@ -90,6 +92,8 @@ export type HostSessionChildHandle = RpcChildHandle & {
   /** How the host answered the open behind the current port - never connection liveness. */
   readonly openDisposition: HostSessionOpenDisposition
   readonly hostSession: HostSessionFacts
+  reconcileTurn(record: Pick<TaskRecord, "host_session" | "final_response">): Promise<HostTurnReconciliation>
+  onReconciled(listener: (notice: ReconciledTurnNotice) => void): () => void
   /** Served by the CURRENT port, so they keep working after a reattach. */
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>

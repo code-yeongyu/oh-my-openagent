@@ -1,3 +1,9 @@
+## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
+
+- `agents/builtin/fallback-chains.ts` (mirrored from `model-core/src/agent-model-requirements.ts`, where `oracle` and `momus` get the same rung): a `{google, google-vertex, opencode}/gemini-4-argon` rung at `high` goes directly before the `gemini-3.1-pro` rung of `plan-reviewer`. The previous rung stays for Copilot (off the Argon rung until code-yeongyu/senpi#3379) and for engine pins without the Argon row. The GPT heads are unchanged: a blind eval put Argon ahead of the previous pro model in 16/16 judgments but behind the GPT heads on correctness, with a median latency of 57 s vs 15 s.
+- `agents/builtin/argon-plan-reviewer.test.ts` resolves the chain against Google, Vertex, pre-Argon and Copilot-only registries.
+- `omo-senpi` telemetry vocabulary gains `qwen3.7-plus` on `opencode-go` and `bailian-coding-plan`, the one agent-chain rung that exported as `custom`; `telemetry/agent-chain-vocabulary.test.ts` now covers every agent-chain rung the way `product-identity.test.ts` covers the category chains.
+
 ## 2026-10-15 - Argon (low) leads visual-engineering and writing (#10187)
 
 - `category/fallback-chains.ts`, `model-core/src/category-model-requirements.ts`: a `{google, google-vertex, opencode}/gemini-4-argon` rung at `low` (the catalog maps `off`/`minimal` to null for this model) is prepended to both chains; every existing rung keeps its order. Copilot is left off the rung until code-yeongyu/senpi#3379 verifies its thinking control. `category/google-categories.ts` / `kimi-categories.ts` (and the omo-opencode mirrors) move both defaults to `google/gemini-4-argon` at `low`.

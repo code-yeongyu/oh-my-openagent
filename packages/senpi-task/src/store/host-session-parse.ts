@@ -1,5 +1,5 @@
 import type { HostSessionIdentity, RunnerKind } from "../state"
-import { isRecord, readNumber, readOptionalNumber, readString } from "./scalar-read"
+import { isRecord, readNumber, readOptionalNumber, readOptionalString, readString } from "./scalar-read"
 
 export function parseOptionalHostSession(
   record: Record<string, unknown>,
@@ -12,6 +12,7 @@ export function parseOptionalHostSession(
   const sessionPath = readString(value, "session_path")
   const instanceId = readString(value, "instance_id")
   const daemonPid = readOptionalNumber(value, "daemon_pid")
+  const adoptedEntryId = readOptionalString(value, "adopted_entry_id")
   return {
     socket,
     routing_id: routingId,
@@ -19,6 +20,7 @@ export function parseOptionalHostSession(
     instance_id: instanceId,
     ...(value.effect_seq === undefined ? {} : { effect_seq: readNumber(value, "effect_seq") }),
     ...(daemonPid === undefined ? {} : { daemon_pid: daemonPid }),
+    ...(adoptedEntryId === undefined ? {} : { adopted_entry_id: adoptedEntryId }),
   }
 }
 
