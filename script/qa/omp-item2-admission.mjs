@@ -8,6 +8,7 @@ import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createSandbox, seedSandbox, credentialDigest } from "../../packages/omo-senpi/scripts/qa/drive.mjs"
+import { withTelemetryOptOut } from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const args = process.argv.slice(2)
@@ -171,8 +172,9 @@ await listening
 const baseUrl = `http://127.0.0.1:${server.address().port}/v1`
 writeFileSync(join(sandbox.agentDir, "models.json"), JSON.stringify({ providers: { fixture: { baseUrl, api: "openai-completions", apiKey: "fixture", models: [{ id: "fixture", name: "fixture", reasoning: false, input: ["text"], contextWindow: 128000, maxTokens: 4096, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }] } } }))
 writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), JSON.stringify({ task: { global_concurrency: 1, default_concurrency: 1, default_execution_mode: executionMode, ...(batched ? { resident_idle_timeout_ms: 37 } : {}) }, categories: { fixture: { model: "fixture/fixture" } }, memory: { enabled: false } }))
-const env = { ...process.env, HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir, OMO_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_DIR: sandbox.agentDir, PI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, XDG_DATA_HOME: sandbox.xdgDataHome, XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "xdg-state"), PI_OFFLINE: "1", OMO_SENPI_QA: "1", OMO_DISABLE_TELEMETRY: "1" }
-for (const key of Object.keys(env)) if (key.endsWith("_PACKAGE_DIR") || /API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key)) delete env[key]
+const baseEnv = { ...process.env, HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir, OMO_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_DIR: sandbox.agentDir, PI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, XDG_DATA_HOME: sandbox.xdgDataHome, XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "xdg-state"), PI_OFFLINE: "1", OMO_SENPI_QA: "1" }
+for (const key of Object.keys(baseEnv)) if (key.endsWith("_PACKAGE_DIR") || /API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key)) delete baseEnv[key]
+const env = withTelemetryOptOut(baseEnv)
 let stdout = ""
 let stderr = ""
 const child = spawn("node", [cli, "-p", "--mode", "json", "--provider", "fixture", "--model", "fixture", "Exercise host workpool admission"], { cwd: sandbox.cwd, env, stdio: ["ignore", "pipe", "pipe"] })
