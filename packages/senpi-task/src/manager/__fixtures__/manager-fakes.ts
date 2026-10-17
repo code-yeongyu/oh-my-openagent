@@ -179,6 +179,9 @@ export function makeManager(options: {
   process?: ManagedRunner
   admit?: AdmitResident
   executionModeGate?: ExecutionModeGate
+  // Widens the manager's start report window (#10042) so a test can observe a slow launch's own
+  // outcome instead of racing the default one (#10344).
+  startReportWindowMs?: number
 } = {}) {
   const project = options.project ?? tempProject()
   const store = options.store ?? createTaskRecordStore({ project_dir: project })
@@ -192,6 +195,7 @@ export function makeManager(options: {
     cwd: project,
     ...(options.admit !== undefined && { admit: options.admit }),
     ...(options.executionModeGate !== undefined && { executionModeGate: options.executionModeGate }),
+    ...(options.startReportWindowMs !== undefined && { startReportWindowMs: options.startReportWindowMs }),
   })
   return { manager, store, inProcess, process: processRunner, project }
 }
