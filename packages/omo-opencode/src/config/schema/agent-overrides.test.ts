@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { OhMyOpenCodeConfigSchema } from "../schema"
+import { findUnknownKeyPaths } from "../../plugin-config/unknown-key-diagnostics"
 import { AgentOverridesSchema } from "./agent-overrides"
 
 describe("AgentOverridesSchema", () => {
@@ -56,5 +58,30 @@ describe("AgentOverridesSchema", () => {
     const result = AgentOverridesSchema.safeParse(input)
 
     expect(result.success).toBe(false)
+  })
+
+  test("accepts installer-shaped mixed models chains without unknown-key diagnostics", () => {
+    // given — OpenCode Go install writes a string primary plus object fallbacks
+    const installerModels = [
+      "opencode-go/qwen3.7-plus",
+      { model: "opencode-go/minimax-m3" },
+      { model: "opencode-go/minimax-m2.7" },
+    ]
+    const config = {
+      agents: {
+        librarian: { models: installerModels },
+        explore: { models: installerModels },
+        atlas: { models: installerModels },
+        "sisyphus-junior": { models: installerModels },
+      },
+    }
+
+    // when
+    const parsed = AgentOverridesSchema.safeParse(config.agents)
+    const unknown = findUnknownKeyPaths(OhMyOpenCodeConfigSchema, config)
+
+    // then
+    expect(parsed.success).toBe(true)
+    expect(unknown).toEqual([])
   })
 })

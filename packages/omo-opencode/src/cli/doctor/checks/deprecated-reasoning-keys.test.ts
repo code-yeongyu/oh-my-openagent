@@ -378,4 +378,61 @@ describe("deprecated reasoning keys check", () => {
       }
     }
   })
+
+  it("#given installer-shaped agents.*.models #when the check runs #then models is not treated as a deprecated key", async () => {
+    const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const originalHome = process.env.HOME
+    const originalCwd = process.cwd()
+    const testRootDir = mkdtempSync(join(tmpdir(), "omo-doctor-installer-models-canonical-"))
+    const projectDir = join(testRootDir, "project")
+    const configPath = join(testRootDir, ".omo", "omo.jsonc")
+    const installerModels = [
+      "opencode-go/qwen3.7-plus",
+      { model: "opencode-go/minimax-m3" },
+      { model: "opencode-go/minimax-m2.7" },
+    ]
+
+    try {
+      mkdirSync(projectDir, { recursive: true })
+      mkdirSync(join(testRootDir, ".omo"), { recursive: true })
+      process.env.HOME = testRootDir
+      delete process.env.OPENCODE_CONFIG_DIR
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          agents: {
+            librarian: { models: installerModels },
+            explore: { models: installerModels },
+          },
+          "[opencode]": {
+            agents: {
+              atlas: { models: installerModels },
+              "sisyphus-junior": { models: installerModels },
+            },
+          },
+        }, null, 2) + "\n",
+        "utf-8",
+      )
+      process.chdir(projectDir)
+
+      const { checkDeprecatedReasoningKeys } = await import("./deprecated-reasoning-keys")
+      const result = await checkDeprecatedReasoningKeys()
+
+      expect(result.issues.filter((issue) => issue.description.includes(".models"))).toEqual([])
+      expect(result.status).toBe("pass")
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(testRootDir, { recursive: true, force: true })
+      if (originalConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+      }
+      if (originalHome === undefined) {
+        delete process.env.HOME
+      } else {
+        process.env.HOME = originalHome
+      }
+    }
+  })
 })
