@@ -228,7 +228,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-      })
+      }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.
