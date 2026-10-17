@@ -230,8 +230,8 @@ jobs:
       # unprivileged PID namespace, and the step fails loudly when no namespace can be made instead
       # of falling back to the host table (omo #10199). Even inside it, the user's own LIVE git
       # processes return EACCES on /proc/<pid>/fd (this runner's azure 7.0 kernel, and Boat alike),
-      # so the 7 rows that need the scan to answer are skipped here via
-      # OMO_CI_SAME_UID_GIT_UNINSPECTABLE. Behavior stays fail-closed (an unanswerable scan keeps
+      # so the 7 rows that need the scan to answer skip on Linux by themselves (host-scan-blind.test-support.ts,
+      # omo #10431); this step runs the plain command to keep that true. Behavior stays fail-closed (an unanswerable scan keeps
       # the lock). Coverage for those rows is macOS CI (and macOS hosts) until kernel-lock liveness
       # lands; running them on Linux CI is #10322's acceptance criterion:
       # https://github.com/code-yeongyu/oh-my-openagent/issues/10322
@@ -257,7 +257,7 @@ jobs:
             exit 1
           fi
           echo "PID namespace ready ($procs processes visible)"
-          unshare -Upf --mount-proc --map-current-user -- env CI=1 OMO_CI_SAME_UID_GIT_UNINSPECTABLE=1 bun test --timeout 20000 packages/memory-core
+          unshare -Upf --mount-proc --map-current-user -- env CI=1 bun test --timeout 20000 packages/memory-core
 
       - name: Run tests with Windows telemetry
         id: root-tests-windows-1
