@@ -209,7 +209,10 @@ if [ "$${SYNC_PUSH_ENV}" = "1" ]; then
   exit 0
 fi
 
-push_to_mirror &
+# Detach the background push from git's stdout/stderr: a child that keeps them open makes the
+# commit wait for it (omo #10199). A bare exec redirects for good; a redirect on the function
+# call would make dash keep saved copies of the originals open for the whole push.
+( exec </dev/null >/dev/null 2>&1; push_to_mirror ) &
 exit 0
 `
 }
