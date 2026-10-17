@@ -1,4 +1,4 @@
-## 2026-10-17 - Hand --help and -h directly to the engine without loading the extension (#10428)
+## 2026-10-17 - Hand --help and -h directly to the engine without loading the extension (#10428, #10433)
 
 The engine dispatches its one-shot commands on `argv[0]`, but `omo --help` and `omo -h` were not listed in `ENGINE_COMMANDS`. This caused the launcher and compiled binary to treat help requests as interactive chat launches and prepend `--extension <plugin>`, which invoked the OpenCode config migration and moved `oh-my-openagent.json` into a backup directory. `bin/lib/engine-commands.js` now includes `--help` and `-h` in `ENGINE_COMMANDS`, forwarding them directly to the engine without the extension.
 
