@@ -188,9 +188,16 @@ export class ParentWakeFlushRunner {
   // A retained reply-required wake is only liveness insurance for a deposit the
   // parent never saw. Assistant output created after the noReply admission means
   // the live turn consumed the deposit — re-dispatching it would inject a
-  // duplicate notification and fork a concurrent assistant chain.
+  // duplicate notification and fork a concurrent assistant turn.
+  //
+  // Only a reply-required wake that was genuinely admitted as noReply can be
+  // dropped this way (its shouldReply flag is retained on the pending entry).
+  // An unadmitted reply wake stays queued no matter what the parent produced
+  // (#6546 round 5): the parent's own turn may have merely run an unrelated
+  // tool or produced admit-only output, in which case the allComplete reply is
+  // still owed and the ledger must keep it visible to the recovery sweeps.
   private async dropAdmittedWakeConsumedByParent(sessionID: string, latestWake: PendingParentWake): Promise<boolean> {
-    if (latestWake.noReplyAdmittedAt === undefined) {
+    if (!latestWake.shouldReply || latestWake.noReplyAdmittedAt === undefined) {
       return false
     }
     if (!(await this.deps.sessionInspector.hasAssistantOutputAfterAdmittedWake(sessionID, latestWake))) {
@@ -198,6 +205,7 @@ export class ParentWakeFlushRunner {
     }
     this.deps.pendingQueue.deleteWake(sessionID)
     this.deps.dispatchedTracker.clearWake(sessionID)
+    this.deps.notifierDeps.onAdmittedWakeConsumed?.(sessionID)
     log("[background-agent] Dropped retained parent wake after parent consumed admitted notification:", { sessionID })
     return true
   }
