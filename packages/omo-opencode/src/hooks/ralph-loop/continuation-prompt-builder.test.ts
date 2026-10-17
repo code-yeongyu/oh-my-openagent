@@ -24,7 +24,7 @@ describe("ultrawork verification fallback prompts", () => {
 
 		expect(prompt).toContain("task(subagent_type=\"oracle\"")
 		expect(prompt).toContain("gate-verifier")
-		expect(prompt).toContain('category: "deep"')
+		expect(prompt).toContain('category: "deep-high"')
 		expect(prompt).toContain("unspecified-high")
 		expect(prompt).toContain("unspecified-low")
 	})
@@ -34,7 +34,7 @@ describe("ultrawork verification fallback prompts", () => {
 
 		expect(prompt).toContain("task(subagent_type=\"oracle\"")
 		expect(prompt).toContain("gate-verifier")
-		expect(prompt).toContain('category: "deep"')
+		expect(prompt).toContain('category: "deep-high"')
 		expect(prompt).toContain("unspecified-high")
 		expect(prompt).toContain("unspecified-low")
 	})

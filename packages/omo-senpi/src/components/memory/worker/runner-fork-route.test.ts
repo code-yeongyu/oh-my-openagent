@@ -33,7 +33,7 @@ describe("reflection launch route", () => {
       const route = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "anthropic/claude-opus-5", cost: OPUS },
+        session: { model: "anthropic/claude-opus-5-5", cost: OPUS },
         parentContextTokens: PARENT_P50,
         turns: MEMORY_WORKLOAD_PROFILES.reflection.turns,
         cacheHit: true,

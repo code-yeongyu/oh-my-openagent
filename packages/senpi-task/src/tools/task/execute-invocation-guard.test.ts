@@ -188,20 +188,26 @@ describe("buildTaskExecute plan-gated agents", () => {
     expect(plain?.status).not.toBe("error")
   })
 
-  test("#given the retired momus id (legacy alias of plan-reviewer) and no plan gate #when spawned #then it is denied with exactly the plan-reviewer message", async () => {
+  test("#given the retired momus id and no plan gate #when spawned #then it is not plan-gated while the canonical id still is", async () => {
     // given
     const calls = { count: 0 }
     const execute = buildTaskExecute(makeDeps(startedManager(calls), { resolveSkillInvocations: resolverFor({}) }))
 
     // when
-    const legacy = await execute("c-legacy", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
+    const retired = await execute(
+      "c-retired",
+      { prompt: "p", subagent_type: "momus", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
     const canonical = await execute("c-canonical", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
-    // then
-    expect(calls.count).toBe(0)
-    expect(legacy.details.status).toBe("denied")
-    expect(resultText(legacy)).toBe(resultText(canonical))
-    expect(resultText(legacy)).toContain("plan-reviewer")
-    expect(resultText(legacy)).toContain("ulw-plan")
+    // then: the retired id carries no plan gate of its own, so it reaches the manager
+    expect(retired.details.status).not.toBe("denied")
+    expect(calls.count).toBe(1)
+    expect(canonical.details.status).toBe("denied")
+    expect(resultText(canonical)).toContain("plan-reviewer")
+    expect(resultText(canonical)).toContain("ulw-plan")
   })
 })

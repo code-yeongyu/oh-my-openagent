@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { readDiscoverCwd, resolveContributedSkill } from "../bundled-skills/contributed-skill"
 import { hasXaiCredential } from "./auth"
 import type { XSearchFetch } from "./client"
 import { createXSearchTool } from "./tool"
@@ -61,7 +62,16 @@ export function createXSearchComponent(options: XSearchComponentOptions = {}): O
         })
         return
       }
-      pi.on("resources_discover", () => ({ skillPaths: [skillPath] }))
+      pi.on("resources_discover", (payload: unknown) => {
+        const skill = resolveContributedSkill({
+          pi,
+          name: X_SEARCH_COMPONENT_NAME,
+          path: () => skillPath,
+          cwd: readDiscoverCwd(payload) ?? pi.cwd ?? process.cwd(),
+          env,
+        })
+        return skill.kind === "contributed" ? { skillPaths: [skill.path] } : undefined
+      })
     },
   }
 }

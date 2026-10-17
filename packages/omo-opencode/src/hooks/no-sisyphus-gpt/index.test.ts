@@ -2,7 +2,7 @@
 
 import { describe, expect, spyOn, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoSisyphusGptHook } from "./index"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -30,7 +30,9 @@ function createHookContext(showToast: (input: unknown) => Promise<unknown>): Plu
 
 describe("no-sisyphus-gpt hook", () => {
   test("shows toast on every chat.message when sisyphus uses unsupported gpt model", async () => {
-    // given - sisyphus (display name) with a GPT model that lacks native support
+    // given - sisyphus (display name) with a GPT model that lacks native support, Hephaestus registered
+    _resetForTesting()
+    registerAgentName("hephaestus")
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))
 
@@ -201,6 +203,7 @@ describe("no-sisyphus-gpt hook", () => {
   test("uses session agent fallback when input agent is missing", async () => {
     // given - session agent saved with display name (as OpenCode stores it)
     _resetForTesting()
+    registerAgentName("hephaestus")
     updateSessionAgent("ses_4", SISYPHUS_DISPLAY)
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))

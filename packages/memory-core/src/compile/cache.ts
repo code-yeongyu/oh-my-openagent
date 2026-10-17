@@ -4,6 +4,7 @@ import {
   compileMemoryBlockAtRevision,
   type CompileMemoryBlockOptions,
 } from "./compile"
+import { DEFAULT_EXTERNAL_PROJECTION_LIMITS } from "./external-projection"
 
 export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 
@@ -27,13 +28,19 @@ export class MemoryBlockCache {
     return this.entries.size
   }
 
+  /**
+   * Compile at `revision`, or at HEAD when it is omitted. A caller that pins a session to one commit
+   * passes that commit so later memory commits cannot change the bytes it injects.
+   */
   async compile(
     repo: GitMemoryRepo,
     template: string,
     options: CompileMemoryBlockOptions,
+    pinnedRevision?: string | null,
   ): Promise<string> {
-    const revision = await repo.head()
-    const key = `${hashMemoryTemplate(template)}:${options.agentId}`
+    const revision = pinnedRevision === undefined ? await repo.head() : pinnedRevision
+    const limits = options.projection ?? DEFAULT_EXTERNAL_PROJECTION_LIMITS
+    const key = `${hashMemoryTemplate(template)}:${options.agentId}:${limits.maxEntriesPerDirectory}:${limits.maxBytes}`
     const variant = revision ?? "no-head"
     const existing = this.entries.get(key)
     if (existing?.variant === variant) return existing.pending

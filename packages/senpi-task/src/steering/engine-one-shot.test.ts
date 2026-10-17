@@ -36,10 +36,10 @@ describe("steering engine one-shot agent refusal", () => {
     expect(fake.followUpCalls).toEqual([])
   })
 
-  test("#given a record persisted with the retired momus id #when sent #then the one-shot refusal still applies through the alias", async () => {
+  test("#given a record persisted with the retired momus id #when sent #then it is an ordinary agent and the message is delivered", async () => {
     // given
-    // A task record persisted before the rename carries the retired id as agent_type; the alias
-    // lookup must keep refusing task_send for the deprecation window instead of loosening the gate.
+    // A record persisted before the rename carries the retired id as agent_type. The read alias is
+    // gone, so the id no longer inherits the plan-reviewer one-shot refusal.
     const harness = makeHarness()
     const record = harness.seedRecord({ agent_type: "momus" })
     toRunning(harness, record)
@@ -50,11 +50,8 @@ describe("steering engine one-shot agent refusal", () => {
     const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "steer attempt", deliverAs: "steer" })
 
     // then
-    if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
-    expect(outcome.agent).toBe("momus")
-    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
-    expect(fake.steerCalls).toEqual([])
-    expect(fake.followUpCalls).toEqual([])
+    expect(outcome.kind).not.toBe("one_shot_agent")
+    expect(fake.steerCalls).toEqual(["steer attempt"])
   })
 
   test("#given a pending plan-reviewer child #when sent #then the outcome is one_shot_agent and nothing is queued", async () => {

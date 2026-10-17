@@ -32,6 +32,8 @@ export function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartRes
         name: start.name,
         status: "error",
         error_message: start.error_message,
+        ...(start.failure_kind === undefined ? {} : { failure_kind: start.failure_kind }),
+        ...(start.failure_reason === undefined ? {} : { failure_reason: start.failure_reason }),
         ...(skills === undefined ? {} : { skills }),
       }
     case "residency_denied":
@@ -42,6 +44,7 @@ export function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartRes
 export function startedDetail(item: ResolvedSpawnItem, start: StartedResult, skills?: TaskSkillSummary): TaskToolItemDetail {
   return {
     task_id: start.task_id,
+    ...(start.run_epoch === undefined ? {} : { run_epoch: start.run_epoch }),
     name: start.name,
     ...(item.task_summary === undefined ? {} : { task_summary: item.task_summary }),
     ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),

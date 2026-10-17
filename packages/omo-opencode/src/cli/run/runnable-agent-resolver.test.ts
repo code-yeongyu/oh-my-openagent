@@ -79,4 +79,27 @@ describe("resolveRunnableRunAgent", () => {
     // then
     expect(agent).toBe("sisyphus")
   })
+
+  it("#given category name #when resolving runnable agent #then throws with category vs agent lists", async () => {
+    // given
+    const client = createClient(["Sisyphus - ultraworker"])
+
+    // when
+    const attempt = resolveRunnableRunAgent(client, "quick")
+
+    // then
+    await expect(attempt).rejects.toThrow(/task\(\) category/)
+    await expect(attempt).rejects.toThrow(/Runnable agents/)
+  })
+
+  it("#given unknown name #when agent list is loaded #then throws instead of returning the unknown name", async () => {
+    // given
+    const client = createClient(["Sisyphus - ultraworker"])
+
+    // when
+    const attempt = resolveRunnableRunAgent(client, "not-an-agent")
+
+    // then
+    await expect(attempt).rejects.toThrow(/Unknown agent "not-an-agent"/)
+  })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  OmoMemoryRecallLayerSchema,
   OmoMemorySettingsLayerSchema,
   OmoMemorySettingsSchema,
   type OmoMemorySettings,
@@ -40,7 +41,9 @@ const FULL_DEFAULTS: OmoMemorySettings = {
     sidecar_max_tokens: 48000,
     max_concurrent_wakes: 2,
     tool_budget: 8,
+    query_expansion: false,
   },
+  projection: { max_entries_per_directory: 40, max_bytes: 24576 },
   compile_warn_tokens: 30000,
   agents: {},
 }
@@ -93,7 +96,9 @@ describe("OmoMemorySettingsSchema defaults", () => {
         sidecar_max_tokens: 48000,
         max_concurrent_wakes: 2,
         tool_budget: 8,
+        query_expansion: false,
       },
+      projection: { max_entries_per_directory: 12, max_bytes: 4096 },
       compile_warn_tokens: 50000,
       agents: {
         "backend-lead": {
@@ -233,6 +238,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       sidecar_max_tokens: 48000,
       max_concurrent_wakes: 2,
       tool_budget: 8,
+      query_expansion: false,
     })
   })
 
@@ -261,6 +267,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         sidecar_max_tokens: 48000,
         max_concurrent_wakes: 2,
         tool_budget: 8,
+        query_expansion: false,
       },
     }
 
@@ -276,6 +283,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       sidecar_max_tokens: 48000,
       max_concurrent_wakes: 2,
       tool_budget: 8,
+      query_expansion: false,
     })
   })
 
@@ -350,5 +358,31 @@ describe("OmoMemorySettingsSchema defaults", () => {
 
     // then
     expect(parsed).toEqual(input)
+  })
+})
+
+describe("memory.recall.query_expansion", () => {
+  test("#given no recall block #when parsed #then query expansion is off", () => {
+    expect(OmoMemorySettingsSchema.parse({}).recall.query_expansion).toBe(false)
+  })
+
+  test("#given query expansion set at the root and for one agent #when parsed #then both values are kept", () => {
+    // given
+    const input = { recall: { query_expansion: true }, agents: { research: { recall: { query_expansion: false } } } }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall.query_expansion).toBe(true)
+    expect(parsed.agents.research?.recall).toEqual({ query_expansion: false })
+  })
+
+  test("#given a query expansion value that is not a boolean #when parsed #then validation fails", () => {
+    const recall = { query_expansion: "on" }
+    expect(OmoMemorySettingsSchema.safeParse({ recall }).success).toBe(false)
+    expect(OmoMemoryRecallLayerSchema.safeParse(recall).success).toBe(false)
+    expect(OmoMemorySettingsLayerSchema.safeParse({ recall }).success).toBe(false)
+    expect(OmoMemorySettingsLayerSchema.safeParse({ agents: { research: { recall } } }).success).toBe(false)
   })
 })

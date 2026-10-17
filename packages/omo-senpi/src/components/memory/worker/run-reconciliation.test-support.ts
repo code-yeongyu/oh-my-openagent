@@ -55,6 +55,7 @@ export async function reconciliationFixture(trigger: "step-count" | "dream" = "s
     conversationIds: ["conversation-a"],
     snapshots: [{ conversationId: "conversation-a", snapshot }],
   })
+  if (reserved.status === "parked") throw new Error("fixture reservation was parked")
   const worktree = await createReflectionWorktree(repo, reserved.run.runId, identity.paths.worktrees)
   const runDir = join(identity.paths.reflection, "runs", reserved.run.runId)
   await mkdir(runDir, { recursive: true, mode: 0o700 })

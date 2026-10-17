@@ -20,9 +20,9 @@ function registry(models: readonly FakeModel[]) {
   }
 }
 
-// A registry whose only providers serve none of the quick chain rungs; claude-opus-5 keeps
+// A registry whose only providers serve none of the quick chain rungs; claude-opus-5-5 keeps
 // visual-engineering/unspecified-high alive so the gated list is not simply empty.
-const OPUS_ONLY = registry([model("omo-mock", "mock-parent"), model("anthropic", "claude-opus-5")])
+const OPUS_ONLY = registry([model("omo-mock", "mock-parent"), model("anthropic", "claude-opus-5-5")])
 
 describe("dead-chain category disabling", () => {
   describe("#given a builtin category whose chain has no resolvable rung", () => {
@@ -35,18 +35,20 @@ describe("dead-chain category disabling", () => {
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
       expect(result.attempted_chain).toEqual(CATEGORY_FALLBACK_CHAINS.quick)
       expect(result.missing_providers).toEqual([
-        "kimi-coding",
-        "kimi-for-coding",
-        "openai-codex",
+        "chatgpt-subscription",
+        "openai",
+        "anthropic-subscription",
+        "anthropic-api",
+        "github-copilot",
         "deepseek",
         "qwen-token-plan",
         "alibaba-token-plan",
         "bailian-coding-plan",
         "opencode-go",
         "xai",
-        "claude-sdk-oauth",
-        "anthropic-api",
-        "github-copilot",
+        "zai",
+        "zai-coding-cn",
+        "xiaomi",
       ])
     })
 
@@ -96,9 +98,9 @@ describe("dead-chain category disabling", () => {
   })
 
   describe("#given a Copilot-only registry whose Claude ids use the engine's dotted spelling", () => {
-    test("#when the quick chain's copilot rung is claude-haiku-4-5 #then the transformed id keeps the category alive", () => {
+    test("#when the quick chain's copilot rung is claude-haiku-5-5 medium #then the transformed id keeps the category alive", () => {
       // given
-      const copilotOnly = registry([model("github-copilot", "claude-haiku-4.5")])
+      const copilotOnly = registry([model("github-copilot", "claude-haiku-5.5")])
 
       // when
       const result = resolveCategory("quick", {}, copilotOnly)
@@ -107,22 +109,60 @@ describe("dead-chain category disabling", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("github-copilot")
-      expect(result.spec.modelId).toBe("claude-haiku-4.5")
+      expect(result.spec.modelId).toBe("claude-haiku-5.5")
+      expect(result.spec.variant).toBe("medium")
       expect(result.availableCategories).toContain("quick")
     })
   })
 
+  describe("#given a registry without any of writing's Claude models", () => {
+    test("#when writing resolves #then it is unavailable and unlisted instead of borrowing another family", () => {
+      // given
+      const models = registry([model("chatgpt-subscription", "gpt-6-sol"), model("openai", "gpt-5.6-sol")])
+
+      // when
+      const result = resolveCategory("writing", {}, models)
+
+      // then
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("writing")
+    })
+
+    test("#when only Claude Fable 5.1 is connected #then writing is unavailable because Fable is no longer a writing rung", () => {
+      // given
+      const models = registry([model("anthropic", "claude-fable-5-1"), model("github-copilot", "claude-fable-5.1")])
+
+      // when
+      const result = resolveCategory("writing", {}, models)
+
+      // then
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("writing")
+    })
+
+    test("#when Copilot serves its dotted Opus 5.5 id #then writing resolves on it", () => {
+      // given
+      const models = registry([model("github-copilot", "claude-opus-5.5")])
+
+      // when
+      const result = resolveCategory("writing", {}, models)
+
+      // then
+      expect(result.kind).toBe("resolved")
+    })
+  })
+
   describe("#given a gateway-prefixed registry id", () => {
-    test("#when the unwrapped id matches a rung #then the category stays available", () => {
+    test("#when the gateway is not a rung provider #then its copy keeps the chain dead", () => {
       // given
       const models = registry([model("vercel", "openai/gpt-5.6-sol")])
 
       // when
-      const result = resolveCategory("deep", {}, models)
+      const result = resolveCategory("deep-low", {}, models)
 
       // then
-      expect(result.kind).toBe("resolved")
-      expect(result.availableCategories).toContain("deep")
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("deep-low")
     })
   })
 
@@ -171,7 +211,8 @@ describe("dead-chain category disabling", () => {
       expect(result.kind).toBe("disabled")
       expect(result.availableCategories).toContain("quick")
       expect(result.availableCategories).toContain("visual-engineering")
-      expect(result.availableCategories).not.toContain("deep")
+      expect(result.availableCategories).not.toContain("deep-low")
+      expect(result.availableCategories).not.toContain("deep-high")
     })
 
     test("#when the category is unknown #then the result still returns the gated list", () => {
@@ -182,7 +223,8 @@ describe("dead-chain category disabling", () => {
       expect(result.kind).toBe("not_found")
       expect(result.availableCategories).toContain("visual-engineering")
       expect(result.availableCategories).not.toContain("quick")
-      expect(result.availableCategories).not.toContain("deep")
+      expect(result.availableCategories).not.toContain("deep-low")
+      expect(result.availableCategories).not.toContain("deep-high")
     })
   })
 })

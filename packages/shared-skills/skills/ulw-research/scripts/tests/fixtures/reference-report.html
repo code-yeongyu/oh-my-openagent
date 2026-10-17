@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference report</title>
+<style>
+:root {
+  --bg: #faf6ef;
+  --bg-raise: #ffffff;
+  --fg: #24211b;
+  --fg-mute: #6d6759;
+  --rule: #e4dccb;
+  --accent: #c2410c;
+  --accent-soft: #fbe7d4;
+  --good: #15803d;
+  --measure: 720px;
+  --ff-body: "Inter Display", "Noto Sans KR", sans-serif;
+  --ff-head: "Fraunces", Georgia, serif;
+  --ff-mono: "Iosevka Term", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0b0a;
+    --bg-raise: #171512;
+    --fg: #fbf0df;
+    --fg-mute: #b3a992;
+    --rule: #2b2721;
+    --accent: #f8b878;
+    --accent-soft: #2a2013;
+    --good: #7cd992;
+  }
+}
+</style>
+<style>
+body {
+  margin: 0;
+  font-family: var(--ff-body);
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--fg);
+  background: var(--bg);
+}
+h1, h2, h3 { font-family: var(--ff-head); color: #24211b; }
+a { color: #c2410c; }
+code, pre { font-family: var(--ff-mono); }
+.wrap { max-width: var(--measure); margin: 0 auto; padding: 0 16px; }
+.fig { border: 1px solid #e4dccb; background: #ffffff; padding: 16px; }
+.fig img { max-width: 100%; height: auto; object-fit: contain; }
+.fig-cap { color: #6d6759; font-size: 14px; }
+@media (min-width: 560px) { .wrap { padding: 0 24px; } }
+@media (min-width: 640px) { .grid { display: grid; grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>How a small team ships every week</h1>
+<p>A reference report used as a format source. Weekly releases held for 19 months [S1].</p>
+<section>
+<h2>01 The release cadence</h2>
+<p>The team shipped 147 announcements in 16 months [S1]. The monthly mean is 8.75 [S2].</p>
+<figure class="fig chart">
+<svg viewBox="0 0 200 100" role="img"><title>Announcements per month</title><text x="4" y="12">count</text></svg>
+<figcaption class="fig-cap">Announcements per month, counted from the changelog [S1].</figcaption>
+</figure>
+</section>
+<section>
+<h2>02 How work is reviewed</h2>
+<p>Work lands on the main branch without a review queue [S3].</p>
+<div class="fig">
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Screenshot of the note">
+<p class="fig-cap">The published note, captured on the access date [S3].</p>
+</div>
+<pre><code>git push origin main</code></pre>
+</section>
+<section>
+<h2>03 Sources</h2>
+<ol>
+<li>[S1] Changelog, accessed 2026-09-16.</li>
+<li>[S2] Derived monthly mean.</li>
+<li>[S3] Engineering note, accessed 2026-09-16.</li>
+</ol>
+</section>
+</main>
+</body>
+</html>

@@ -87,6 +87,93 @@ describe("parsePlanChecklist", () => {
     expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "F1. Verify the result" })
   })
 
+  test("#given structured T, F, and H task IDs #when parsed #then common task formats are counted", () => {
+    // given
+    const markdown = [
+      "## TODOs",
+      "- [x] T1.1 Completed implementation",
+      "- [ ] T6.3a Remaining implementation",
+      "## Final Verification Wave",
+      "- [ ] F1 \u2014 Plan compliance audit",
+      "- [x] H1 \u2014 User approval",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({
+      completed: 2,
+      remaining: 2,
+      total: 4,
+      nextTaskLabel: "T6.3a Remaining implementation",
+    })
+  })
+
+  test("#given boilerplate structured sections and Progress Tracker rows #when parsed #then top-level rows fall back to simple parsing", () => {
+    // given
+    const markdown = [
+      "## TODOs",
+      "Template task guidance.",
+      "## Final Verification Wave",
+      "Template verification guidance.",
+      "## Progress Tracker",
+      "### Implementation Waves",
+      "- [x] T1.1 Completed implementation",
+      "- [ ] T6.3a Remaining implementation",
+      "### Final Verification Wave (all must APPROVE)",
+      "- [ ] F1 \u2014 Plan compliance audit",
+      "- [x] H1 \u2014 User approval",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({
+      completed: 2,
+      remaining: 2,
+      total: 4,
+      nextTaskLabel: "T6.3a Remaining implementation",
+    })
+  })
+
+  test("#given blocked [~] rows in structured sections #when parsed #then they count toward the total but are neither completed nor next", () => {
+    // given
+    const markdown = [
+      "## TODOs",
+      "- [x] 1. Done task",
+      "- [~] 2. Blocked on a user decision",
+      "- [ ] 3. Open task",
+      "## Final Verification Wave",
+      "- [~] F1. Blocked verifier",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({ completed: 1, remaining: 1, total: 4, nextTaskLabel: "3. Open task" })
+  })
+
+  test("#given only done and blocked rows outside canonical sections #when parsed #then the fallback sees them and nothing remains", () => {
+    // given
+    const markdown = [
+      "## TODOs",
+      "Template task guidance.",
+      "## Progress Tracker",
+      "- [x] T1.1 \u2014 Schema",
+      "- [~] T5.1 \u2014 Verification engine \u2014 BLOCKED: user decision",
+      "- [~] H1 \u2014 Push + PR \u2014 BLOCKED: user-only decision",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({ completed: 1, remaining: 0, total: 3, nextTaskLabel: null })
+  })
+
   test("#given noncanonical structured rows #when parsed #then only exact positive-number grammar is counted", () => {
     // given
     const markdown = [

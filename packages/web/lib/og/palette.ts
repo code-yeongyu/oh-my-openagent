@@ -8,3 +8,10 @@ export const ogPalette = {
   accent: "#00d4ff",
   accentHot: "#e6fdff",
 } as const
+
+// DESIGN.md §14: the supplied monochrome Figma composition is the OG contract.
+export const ogBrand = {
+  paper: "#ffffff",
+  ink: "#0a0a0a",
+  font: "Roboto Mono",
+} as const

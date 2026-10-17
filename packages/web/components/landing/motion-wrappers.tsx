@@ -19,8 +19,10 @@ function supportsScrollTimeline(): boolean {
 
 /**
  * `.reveal` wrapper (DESIGN.md §6). Browsers with `animation-timeline: view()` run the
- * scroll-driven entrance in pure CSS; others get `.is-visible` from an IntersectionObserver
- * that fires once. Reduced motion is handled by the stylesheet (final state, no transition).
+ * scroll-driven entrance in pure CSS. Elsewhere the content renders visible, and only an element
+ * that starts below the fold is armed with `data-reveal="pending"` after hydration, then released
+ * once by an IntersectionObserver, so server HTML, no-JS and above-the-fold content never wait
+ * on motion. Reduced motion is handled by the stylesheet (final state, no transition).
  */
 export function Reveal({
   children,
@@ -29,23 +31,25 @@ export function Reveal({
   as: Tag = "div",
 }: RevealProps): JSX.Element {
   const ref = useRef<HTMLElement>(null)
-  const [isVisible, setIsVisible] = useState(false)
+  const [isPending, setIsPending] = useState(false)
 
   useEffect(() => {
     const element = ref.current
-    if (!element || isVisible || supportsScrollTimeline()) return
+    if (!element || supportsScrollTimeline()) return
+    if (element.getBoundingClientRect().top < window.innerHeight) return
 
+    setIsPending(true)
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry?.isIntersecting) return
-        setIsVisible(true)
+        setIsPending(false)
         observer.disconnect()
       },
       { threshold: 0.15 },
     )
     observer.observe(element)
     return () => observer.disconnect()
-  }, [isVisible])
+  }, [])
 
   const style: CSSProperties & { "--index": number } = { "--index": index }
 
@@ -55,7 +59,8 @@ export function Reveal({
         ref.current = node
       }}
       style={style}
-      className={cn("reveal", isVisible && "is-visible", className)}
+      data-reveal={isPending ? "pending" : undefined}
+      className={cn("reveal", className)}
     >
       {children}
     </Tag>

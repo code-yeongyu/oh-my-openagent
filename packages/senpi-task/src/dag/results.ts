@@ -61,8 +61,13 @@ type StatsSidecar = {
  */
 export function persistDagNodeResult(input: DagNodeResultPersistInput): DagNodeResultPersistOutcome {
   const now = input.now ?? Date.now
-  const outputPath = input.store.paths.result(input.runId, input.nodeId)
+  let outputPath: string | undefined
   try {
+    // The store's path builder refuses an unsafe node id (a path-traversal backstop behind the
+    // graph compiler's boundary check). The refusal lands in the catch below as the same
+    // journal_corrupt diagnostic the caller already journals, instead of throwing out of a
+    // terminal-transition mutation.
+    outputPath = input.store.paths.result(input.runId, input.nodeId)
     const output = input.record.final_response ?? ""
     fs.mkdirSync(dirname(outputPath), { recursive: true })
     writeArtifact(outputPath, output)
@@ -75,12 +80,15 @@ export function persistDagNodeResult(input: DagNodeResultPersistInput): DagNodeR
       },
     }
   } catch (error) {
+    // A refused node id keeps the existing journal_corrupt kind so the scheduler's terminal
+    // transition and its reducer are unchanged; `path` names the results directory rather than the
+    // rejected id, because the diagnostic's `path` field is documented as a filesystem path.
     return {
       kind: "failed",
       diagnostic: {
         kind: "journal_corrupt",
         runId: input.runId,
-        path: outputPath,
+        path: outputPath ?? input.store.paths.results,
         message: `failed to persist dag node result for "${input.nodeId}": ${errorMessage(error)}`,
         at: new Date(now()).toISOString(),
       },
@@ -93,7 +101,16 @@ export function persistDagNodeResult(input: DagNodeResultPersistInput): DagNodeR
  * never TaskRecord.final_response / run_stats, so reuse survives the task TTL sweep.
  */
 export function readDagNodeResult(input: DagNodeResultReadInput): DagNodeResultRead | null {
-  const outputPath = input.store.paths.result(input.runId, input.nodeId)
+  let outputPath: string
+  try {
+    // Same backstop as persist: an unsafe node id reads nothing rather than escaping the state dir.
+    // Only paths.result is in the try, so this catch cannot swallow an unrelated I/O error; keep it
+    // that way if this function grows.
+    outputPath = input.store.paths.result(input.runId, input.nodeId)
+  } catch (error) {
+    if (error instanceof Error) return null
+    throw error
+  }
   const output = readTextFile(outputPath)
   if (output === null) return null
   const runStats = readStats(statsPath(outputPath))

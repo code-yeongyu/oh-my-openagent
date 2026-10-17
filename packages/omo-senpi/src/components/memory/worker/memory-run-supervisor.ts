@@ -4,10 +4,15 @@ import { closeSync, openSync, writeSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { maybeKillAt } from "@oh-my-opencode/memory-core"
+
 import {
+  CHILD_EXIT_FILENAME,
   readRunJson,
   unlinkRunArtifact,
   updateRunLedger,
+  writeRunJsonAtomic,
+  type RunChildExit,
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
@@ -59,11 +64,14 @@ async function runChildBootstrap(runDir: string): Promise<void> {
   }
   process.on("SIGTERM", cascadeGraceful)
   process.on("SIGINT", cascadeGraceful)
+  let deadlineFired = false
   const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
+    deadlineFired = true
     if (platform === "win32") terminateSupervisorChildGracefully(platform, child)
     else signalSupervisorProcessGroup(process.pid, "SIGTERM")
   })
   const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
+    deadlineFired = true
     terminateSupervisorChildHard(platform, process.pid)
   })
   const status = await new Promise<SupervisorChildExit>((resolve) => {
@@ -82,7 +90,23 @@ async function runChildBootstrap(runDir: string): Promise<void> {
     cancelTerm()
     cancelKill()
   })
+  // Durable before it is reported: a supervisor that dies after this point loses the pipe message,
+  // and recovery may only trust a tip whose child is recorded as having finished cleanly in time.
+  await writeRunJsonAtomic(join(runDir, CHILD_EXIT_FILENAME), {
+    version: 1,
+    runId: manifest.runId,
+    attempt: manifest.attempt,
+    code: status.code,
+    signal: status.signal,
+    finishedAt: new Date().toISOString(),
+    timedOut: deadlineFired || reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt),
+  } satisfies RunChildExit)
   writeBootstrapStatus(status)
+}
+
+/** A clock the bootstrap cannot read counts as past the deadline, so recovery stays closed. */
+function reachedDeadline(now: number, hardDeadlineAt: number): boolean {
+  return !Number.isFinite(now) || now >= hardDeadlineAt
 }
 
 async function runSupervisor(runDir: string): Promise<void> {
@@ -130,6 +154,8 @@ async function runSupervisor(runDir: string): Promise<void> {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     }
   }
+  // The exit handler is the last chance to contain the child, and nothing it queues will ever run,
+  // so this one containment is synchronous; the signal handlers below still run on a live loop.
   process.once("exit", () => containChild(true))
   process.once("SIGTERM", () => {
     containChild()
@@ -182,6 +208,7 @@ async function runSupervisor(runDir: string): Promise<void> {
   childPid = undefined
   closeSync(stdoutFd)
   closeSync(stderrFd)
+  maybeKillAt("after-child-exit")
 
   // Record the timeout from whether the deadline instant was actually reached, not from which
   // process's deadline callback happened to run first: the bootstrap's own enforcement can end
