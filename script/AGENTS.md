@@ -20,6 +20,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `build-omo-native.ts` | Build the native omo runtime artifacts |
 | `ensure-vendored-lsp-daemon.ts` | Build/watch the vendored LSP daemon (daemon bin + lock-dir watch) |
 | `verify-omo-ai-payload.mjs` | omo-ai npm payload gate: required artifact list, 18-skill minimum, 30 MB unpacked cap, no nested `node_modules`/source paths |
+| `verify-patch-hunks.ts` | Version-scoped patch guard: fetches each `patches/*.patch` target at its pinned registry version and `git apply --check`s every hunk; obsolete hunks (change already upstream) and conflicts fail with drop/rebase remediation (refs #7546) |
 | `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml`. Groups run detached (own process groups) and are killed with the parent on SIGINT/SIGTERM; a spawned group inherits `OMO_TEST_FAST_ACTIVE=1` and re-entry refuses to recurse |
 | `ci-fast-path.mjs` | CI skip classifier (`classifyCiMode`): runtime-touching paths (`isRuntimePath`: every path except an explicit allowlist of web, prose such as top-level Markdown and README/CHANGELOG/AGENTS-style Markdown outside `packages/*/src`, and listed repository metadata), platform-sensitive paths, and the `ci:full-matrix` label force the full OS matrix |
 | `ci-leg-tests-guard.mjs` | Last step of every OS test leg (`judgeLeg`): fails a leg whose required tests were all skipped; points to the optional label run for diagnosis and a push/reopen with the label for required checks; passes an intended skip with a notice and job-summary line |
@@ -48,7 +49,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 - `fixtures/` -- shared script test fixtures (vendored LSP build owner).
 - `agent/` -- dev-env contract: `setup.sh`, `cleanup.sh`, `cleanup-hook.sh`, `docker-dev.sh`, `qa-sandbox.sh`, `qa-docker.sh` (see root AGENTS.md DEVELOPMENT ENVIRONMENT).
 
-## TESTS (61 `*.test.ts`)
+## TESTS (62 `*.test.ts`)
 
 The `ci:full-matrix` label launches the separate `ci-full-matrix-label.yml` caller; its `full-matrix / ...` checks are optional and do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in required checks. Normal `ci.yml` does not trigger on labels. `ci-label-workflow-policy.test.ts` guards target branches, distinct workflow identity, the reusable call, and concurrency behind the exact job label gate. The classifier still receives the caller's PR labels.
 
