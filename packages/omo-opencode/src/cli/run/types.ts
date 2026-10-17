@@ -13,6 +13,7 @@ export interface RunOptions {
   onComplete?: string
   json?: boolean
   sessionId?: string
+  outputSchema?: string
 }
 
 export interface ServerConnection {
@@ -26,6 +27,7 @@ export interface RunResult {
   durationMs: number
   messageCount: number
   summary: string
+  output?: unknown
 }
 
 export interface RunContext {
@@ -77,6 +79,7 @@ export interface MessageUpdatedProps {
     providerID?: string
     agent?: string
     variant?: string
+    structured?: unknown
   }
 }
 
