@@ -5,7 +5,7 @@ import { lstat, readdir, readFile } from "../fs/resilient"
 import { LockContentionError, acquireWithoutDirectorySweep } from "./acquire-core"
 import { releaseLock } from "./lock-owner"
 import { isLockOwnerProvenDead } from "./stale-owner"
-import { createLockRecord, parseLockRecord } from "./lock-record"
+import { createLockRecord, parseLockRecord, type LockRecord } from "./lock-record"
 import { getPidLiveness } from "./process-identity"
 
 const LOCK_FILE_SUFFIX = ".lock"
@@ -15,29 +15,32 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined
 }
 
-async function ownerIsProvenDead(lockPath: string): Promise<boolean> {
+async function provenDeadOwner(lockPath: string): Promise<LockRecord | null> {
   let raw: string
   try {
     raw = await readFile(lockPath, "utf8")
   } catch (error) {
-    if (errorCode(error) === "ENOENT") return false
+    if (errorCode(error) === "ENOENT") return null
     throw error
   }
   const owner = parseLockRecord(raw)
   // A sweep checks only owners whose pid is already gone; a live pid would cost a start-identity probe
   // (a process spawn) per lock on every sweep. A recycled pid is still caught by the next contender.
-  if (owner === null || owner.hostname !== hostname() || getPidLiveness(owner.pid) !== "dead") return false
-  return isLockOwnerProvenDead(owner)
+  if (owner === null || owner.hostname !== hostname() || getPidLiveness(owner.pid) !== "dead") return null
+  return (await isLockOwnerProvenDead(owner)) ? owner : null
 }
 
 export interface DeadOwnerSweepOptions {
   /** Called for each lock (or the directory) the sweep could not inspect or reclaim; the sweep goes on. */
   readonly onFailure?: (lockPath: string, error: unknown) => void
+  /** Called with the proven-dead owner of each lock the sweep reclaimed. */
+  readonly onReclaimed?: (lockPath: string, previousOwner: LockRecord) => void
 }
 
-async function reclaimIfDeadOwner(lockPath: string): Promise<boolean> {
+async function reclaimIfDeadOwner(lockPath: string, options: DeadOwnerSweepOptions): Promise<boolean> {
   const status = await lstat(lockPath).catch(() => undefined)
-  if (status === undefined || !status.isFile() || !(await ownerIsProvenDead(lockPath))) return false
+  const previousOwner = status?.isFile() === true ? await provenDeadOwner(lockPath) : null
+  if (previousOwner === null) return false
   const sweeper = await createLockRecord("dead-owner-sweep")
   try {
     await acquireWithoutDirectorySweep(lockPath, sweeper, { waitTimeoutMs: 0 })
@@ -46,6 +49,7 @@ async function reclaimIfDeadOwner(lockPath: string): Promise<boolean> {
     throw error
   }
   await releaseLock(lockPath, sweeper)
+  options.onReclaimed?.(lockPath, previousOwner)
   return true
 }
 
@@ -70,7 +74,7 @@ export async function sweepDeadOwnerLocks(lockDirectory: string, options: DeadOw
     if (!name.endsWith(LOCK_FILE_SUFFIX)) continue
     const lockPath = path.join(lockDirectory, name)
     try {
-      if (await reclaimIfDeadOwner(lockPath)) reclaimed += 1
+      if (await reclaimIfDeadOwner(lockPath, options)) reclaimed += 1
     } catch (error) {
       options.onFailure?.(lockPath, error)
     }
