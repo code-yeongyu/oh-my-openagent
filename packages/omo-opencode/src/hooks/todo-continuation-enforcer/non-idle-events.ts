@@ -53,6 +53,7 @@ function hasAcceptedContinuationLifecycle(state: SessionState): boolean {
 function markContinuationResponseObserved(state: SessionState | undefined): void {
   if (state?.awaitingPostInjectionProgressCheck === true) {
     state.continuationResponseObserved = true
+    state.consecutiveProviderFailures = 0
   }
 }
 
@@ -69,6 +70,7 @@ function pauseForGenuineUserInterruption(args: {
   state.wasCancelled = false
   state.tokenLimitDetected = false
   state.unrecoverableErrorDetected = false
+  state.consecutiveProviderFailures = 0
   sessionStateStore.cancelCountdown(sessionID)
   log(`[${HOOK_NAME}] Paused continuation after genuine user interruption`, { sessionID })
 }
@@ -144,6 +146,7 @@ export function handleNonIdleEvent(args: {
         state.wasCancelled = false
         state.tokenLimitDetected = false
         state.unrecoverableErrorDetected = false
+        state.consecutiveProviderFailures = 0
       }
       sessionStateStore.cancelCountdown(sessionID)
       return
@@ -155,6 +158,7 @@ export function handleNonIdleEvent(args: {
         markContinuationResponseObserved(state)
         state.abortDetectedAt = undefined
         state.wasCancelled = false
+        state.consecutiveProviderFailures = 0
       }
       sessionStateStore.cancelCountdown(sessionID)
       return
@@ -211,6 +215,7 @@ export function handleNonIdleEvent(args: {
         const info = properties?.info as Record<string, unknown> | undefined
         if (info?.role === "assistant") {
           markContinuationResponseObserved(state)
+          state.consecutiveProviderFailures = 0
         }
         state.abortDetectedAt = undefined
         state.wasCancelled = false

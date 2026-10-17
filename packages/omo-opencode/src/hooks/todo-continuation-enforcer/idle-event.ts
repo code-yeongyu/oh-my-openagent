@@ -143,24 +143,37 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  if (
-    state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
-    && state.lastInjectedAt
-    && Date.now() - state.lastInjectedAt >= FAILURE_RESET_WINDOW_MS
-  ) {
+  let consecutiveProviderFailures = state.consecutiveProviderFailures ?? 0
+  const failureResetWindowElapsed =
+    state.lastInjectedAt !== undefined && Date.now() - state.lastInjectedAt >= FAILURE_RESET_WINDOW_MS
+  if (failureResetWindowElapsed && state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
     state.consecutiveFailures = 0
     log(`[${HOOK_NAME}] Reset consecutive failures after recovery window`, { sessionID, failureResetWindowMs: FAILURE_RESET_WINDOW_MS })
   }
+  if (failureResetWindowElapsed && consecutiveProviderFailures >= MAX_CONSECUTIVE_FAILURES) {
+    state.consecutiveProviderFailures = 0
+    consecutiveProviderFailures = 0
+    log(`[${HOOK_NAME}] Reset consecutive provider failures after recovery window`, { sessionID, failureResetWindowMs: FAILURE_RESET_WINDOW_MS })
+  }
 
-  if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-    log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, { sessionID, consecutiveFailures: state.consecutiveFailures })
+  if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES || consecutiveProviderFailures >= MAX_CONSECUTIVE_FAILURES) {
+    log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, {
+      sessionID,
+      consecutiveFailures: state.consecutiveFailures,
+      consecutiveProviderFailures,
+    })
     return
   }
 
   const effectiveCooldown =
-    CONTINUATION_COOLDOWN_MS * 2 ** Math.min(state.consecutiveFailures, 5)
+    CONTINUATION_COOLDOWN_MS * 2 ** Math.min(Math.max(state.consecutiveFailures, consecutiveProviderFailures), 5)
   if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
-    log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID, effectiveCooldown, consecutiveFailures: state.consecutiveFailures })
+    log(`[${HOOK_NAME}] Skipped: cooldown active`, {
+      sessionID,
+      effectiveCooldown,
+      consecutiveFailures: state.consecutiveFailures,
+      consecutiveProviderFailures,
+    })
     return
   }
 
