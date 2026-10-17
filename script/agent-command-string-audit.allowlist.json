@@ -97,7 +97,14 @@
     "script/install-codex-dev.ts: omo get-local-version",
     "script/qa/codex-marketplace-e2e.sh: =omo",
     "script/verify-omo-ai-payload.mjs: omo doctor",
-    "script/qa/omo-native-parity-smoke.mjs: omo doctor"
+    "script/qa/omo-native-parity-smoke.mjs: omo doctor",
+    "packages/memory-core/src/reflection/stale-holder.ts: omo doctor",
+    "packages/omo-native/bin/lib/doctor-reflection-lock.js: omo doctor",
+    "packages/omo-native/test/doctor-reflection-lock-parity.test.ts: omo doctor",
+    "packages/omo-native/test/doctor-reflection-lock.test.ts: omo doctor x2",
+    "packages/omo-senpi/src/components/memory/reflection-stale-active.ts: omo doctor",
+    "script/build-reflection-lock.test.ts: omo doctor",
+    "script/build-reflection-lock.ts: omo doctor"
   ],
   "literal-label": [
     "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo"

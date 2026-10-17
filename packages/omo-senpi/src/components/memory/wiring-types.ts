@@ -1,3 +1,4 @@
+import type { ActiveHolderSeams } from "./reflection-stale-active"
 import type { ComponentContext, ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { MemoryIdentityContext } from "./context"
@@ -29,6 +30,8 @@ export interface MemoryWiringOptions {
   readonly refreshStatus?: typeof refreshMemoryStatus
   /** Injectable animation timers; tests drive frames without touching the wall clock. */
   readonly footerTimers?: MemoryFooterTimers
+  /** Process-liveness and hostname seams for the stale reflection lock check (#10377). */
+  readonly reflectionHolderSeams?: ActiveHolderSeams
 }
 
 export interface MemoryWiring {
