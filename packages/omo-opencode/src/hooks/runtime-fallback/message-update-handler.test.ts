@@ -6,6 +6,7 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { clearAllCompactions, recordCompactionStart } from "../../shared/compaction-in-flight"
 import { createFallbackState } from "./fallback-state"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
@@ -193,6 +194,7 @@ function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): Aut
 
 describe("createMessageUpdateHandler runtime fallback dispatch", () => {
   afterEach(() => {
+    clearAllCompactions()
     SessionCategoryRegistry.clear()
   })
 
@@ -398,26 +400,79 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     expect(operations).toContain("retry:litellm/openai.eu.gpt-5.5")
   })
 
-  it("#given a retry error with registry-tracked compaction and no compaction metadata #when handled #then it leaves the native retry untouched", async () => {
+  // A real provider retry signal, so without the guard this update would override the in-flight retry
+  // (abort + dispatch); the guard must leave the compaction lane's native retry alone.
+  it("#given a provider retry signal while a registry-tracked compaction runs #when handled #then the primary chain is untouched", async () => {
+    // given
     const sessionID = "session-message-compaction-registry"
     const operations: string[] = []
     SessionCategoryRegistry.register(sessionID, "test")
     const deps = createRuntimeFallbackDeps(operations)
     deps.sessionRetryInFlight.add(sessionID)
     const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
-
-    const { recordCompactionStart } = await import("../../shared/compaction-in-flight")
     recordCompactionStart(sessionID)
+
+    // when
+    await handler({ sessionID, info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
+      } })
+
+    // then
+    expect(operations).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+  })
+
+  it("#given a provider retry signal and no fallback left #when the in-flight retry would be overridden #then it does not abort without a replacement", async () => {
+    // given
+    const sessionID = "session-message-override-exhausted"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    deps.sessionRetryInFlight.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
+    await handler({ sessionID, info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
+      } })
+
+    // then
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+  })
+
+  it("#given a retryable quota error and no fallback left #when message update is handled #then the quota retry is not aborted without a replacement", async () => {
+    // given
+    const sessionID = "session-message-quota-exhausted-retryable"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
     await handler({
       sessionID,
       info: {
         role: "assistant",
         model: "openai/gpt-5.4",
-        error: { name: "ProviderRateLimitError", message: "retrying in 1s" },
+        error: { name: "ProviderRateLimitError", message: "The usage limit has been reached for this model." },
       },
     })
 
-    expect(operations).toEqual([])
+    // then
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
   })
 })
 
