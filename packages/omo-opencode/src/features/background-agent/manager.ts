@@ -939,6 +939,7 @@ The fallback retry session is now created and can be inspected directly.
       task: false,
       call_omo_agent: true,
       question: false,
+      lsp_install_decision: true,
       ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
@@ -1528,6 +1529,7 @@ The fallback retry session is now created and can be inspected directly.
               task: false,
               call_omo_agent: true,
               question: false,
+              lsp_install_decision: true,
               ...getAgentToolRestrictions(existingTask.agent, {
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,
               }),
