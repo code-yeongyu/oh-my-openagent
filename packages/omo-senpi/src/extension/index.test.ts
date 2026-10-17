@@ -65,6 +65,9 @@ describe("omo-senpi extension entry", () => {
       {
         cwd: "/repo",
         sessionManager: {
+          getSessionId() {
+            return "01a0e000-0000-7000-8000-000000000001"
+          },
           getBranch() {
             return [
               {

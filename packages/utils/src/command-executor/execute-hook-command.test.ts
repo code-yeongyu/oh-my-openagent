@@ -1,7 +1,8 @@
 const { afterEach, beforeEach, describe, expect, test } = require("bun:test")
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const { executeHookCommand } = await import("./execute-hook-command")
 
@@ -18,8 +19,9 @@ describe("executeHookCommand", () => {
     tempDirectory = mkdtempSync(join(tmpdir(), "omo-exec-hook-cmd-"))
   })
 
-  afterEach(() => {
-    rmSync(tempDirectory, { recursive: true, force: true })
+  afterEach(async () => {
+    // Windows frees a timed-out child's cwd handle after taskkill returns; bun ignores rmSync's maxRetries (#9521).
+    await removeTree(tempDirectory)
   })
 
   test("#given allowedEnvVars provided #when executing command #then only allowed vars are in process.env", async () => {

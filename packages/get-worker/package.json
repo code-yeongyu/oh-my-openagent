@@ -1,0 +1,20 @@
+{
+  "name": "omo-get-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "type-check": "tsgo --noEmit",
+    "test": "bun test",
+    "lint:scripts": "shellcheck scripts/install.sh",
+    "cf-typegen": "wrangler types --include-runtime false"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260929.1",
+    "@types/bun": "1.4.2",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "wrangler": "4.143.0"
+  }
+}

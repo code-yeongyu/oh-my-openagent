@@ -22,6 +22,9 @@ export interface KibitzerDeliveryOptions {
 export interface KibitzerDelivery {
   markRunning(sessionId: string): void
   markSettled(sessionId: string): void
+  markToolStarted(sessionId: string, toolCallId: string): void
+  markToolFinished(sessionId: string, toolCallId: string): void
+  markTurnEnded(sessionId: string): void
   accept(sessionId: string, context: MemoryIdentityContext, nudges: readonly RecallNudge[]): Promise<void>
   onToolResult(sessionId: string, context: MemoryIdentityContext, eventCtx: unknown): Promise<void>
   drainForPrompt(sessionId: string, context: MemoryIdentityContext): RecallNudge[]
@@ -39,6 +42,9 @@ interface DeliveryState {
 export function createKibitzerDelivery(options: KibitzerDeliveryOptions): KibitzerDelivery {
   const sessions = new Map<string, DeliveryState>()
   const runningSessions = new Set<string>()
+  // A steer only rides the current turn when that turn is executing tools: the host reads its steering queue after
+  // every turn, so a steer queued once the final answer is streaming or streamed starts one more assistant turn.
+  const toolsInFlight = new Map<string, Set<string>>()
 
   function stateFor(sessionId: string): DeliveryState {
     const existing = sessions.get(sessionId)
@@ -87,7 +93,7 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
     } catch (error) {
       warn("omo-senpi kibitzer pending write skipped", { sessionId, error })
     }
-    if (runningSessions.has(sessionId) && !state.steering && state.nudges.size > 0) {
+    if (runningSessions.has(sessionId) && (toolsInFlight.get(sessionId)?.size ?? 0) > 0 && !state.steering && state.nudges.size > 0) {
       await steer(sessionId, context, state)
     }
   }
@@ -126,6 +132,7 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
 
   async function onCompactionAccepted(sessionId: string, context: MemoryIdentityContext): Promise<void> {
     runningSessions.delete(sessionId)
+    toolsInFlight.delete(sessionId)
     const state = sessions.get(sessionId)
     if (state !== undefined) {
       state.nudges.clear()
@@ -141,6 +148,7 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
 
   function onSessionShutdown(sessionId: string): void {
     runningSessions.delete(sessionId)
+    toolsInFlight.delete(sessionId)
     const state = sessions.get(sessionId)
     if (state === undefined) return
     state.nudges.clear()
@@ -189,8 +197,27 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
 
   return {
     accept, onToolResult, drainForPrompt, onCompactionAccepted, onSessionShutdown, markDelivered,
-    markRunning(sessionId): void { runningSessions.add(sessionId) },
-    markSettled(sessionId): void { runningSessions.delete(sessionId) },
+    markRunning(sessionId): void {
+      runningSessions.add(sessionId)
+      toolsInFlight.delete(sessionId)
+    },
+    markSettled(sessionId): void {
+      runningSessions.delete(sessionId)
+      toolsInFlight.delete(sessionId)
+    },
+    markToolStarted(sessionId, toolCallId): void {
+      const calls = toolsInFlight.get(sessionId) ?? new Set<string>()
+      calls.add(toolCallId)
+      toolsInFlight.set(sessionId, calls)
+    },
+    markToolFinished(sessionId, toolCallId): void {
+      const calls = toolsInFlight.get(sessionId)
+      if (calls === undefined) return
+      calls.delete(toolCallId)
+      if (calls.size === 0) toolsInFlight.delete(sessionId)
+    },
+    // A tool call that never reports a result (blocked or aborted before execution) must not outlive its turn.
+    markTurnEnded(sessionId): void { toolsInFlight.delete(sessionId) },
   }
 }
 

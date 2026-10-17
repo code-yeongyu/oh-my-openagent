@@ -223,11 +223,11 @@ result = fetch(
 python3 -c "import curl_cffi, bs4, yaml" 2>/dev/null || pip install curl_cffi beautifulsoup4 pyyaml -q
 ```
 
-Playwright 로컬 경로 사용 시 Node가 필요:
-```bash
-npm i -g playwright playwright-extra puppeteer-extra-plugin-stealth
-npx playwright install chrome
-```
+브라우저를 직접 제어할 때는 js eval에서 omowright를 쓴다(`browser` 스킬에 스테이징됨):
+직접 띄우는 브라우저는 `connectPipe` / 스텔스는 `connectCloakProfile`(CloakBrowser),
+사용자가 로그인해 둔 브라우저는 `connectBrowserSkill`. 이 엔진의 Playwright 템플릿은
+Tier 1 추출 폴백 전용이며 에이전트가 직접 브라우저를 다루는 경로가 아니다.
+인증이 필요한 페이지는 사용자 프로필을 복제하지 말고 attached 엔진으로 간다.
 
 ## 빠른 참조 — Phase 0 명령어
 

@@ -56,9 +56,53 @@ export const renderAcceptedTurnsEntry: EntryRenderer<AcceptedTurnsRecord> = (ent
   )
 }
 
+// The check runs inside before_agent_start, so it holds the prompt: a slow git answer costs a nudge,
+// never the turn.
+const NUDGE_GIT_TIMEOUT_MS = 5_000
+// Room for a save whose trailer fails the exact predicate below (a prefix collision in the grep).
+const NUDGE_SCAN_LIMIT = 20
+// A memory-tool commit cannot predate its session; the margin only absorbs clock adjustments.
+const SESSION_START_MARGIN_MS = 60 * 60 * 1000
+
+interface SaveScan {
+  /** HEAD this scan covered, so the next check reads only the commits after it. */
+  readonly head: string
+  /** The turn of this session's newest memory-tool save at that HEAD, if it has saved. */
+  readonly savedTurn: number | undefined
+}
+
 export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): MemoryNudgeWiring {
   const sessions = new Map<string, AcceptedTurnsRecord>()
   const pendingInputs = new Map<string, string>()
+  const sessionStarts = new Map<string, Date>()
+  const scans = new Map<string, SaveScan>()
+
+  /**
+   * This session's newest memory-tool save, without walking the identity's whole history on every
+   * prompt (#9667). The first check reads only commits since the session began and stops at the
+   * first match; every later check reads only the commits after the HEAD it already covered.
+   */
+  async function latestSaveTurn(repo: GitMemoryRepo, sessionId: string, head: string): Promise<number | undefined> {
+    const previous = scans.get(sessionId)
+    if (previous?.head === head) return previous.savedTurn
+    const since = sessionStarts.get(sessionId)
+    const commits = await repo.log({
+      grep: [`Omo-Writer: memory-tool`, `Omo-Session: ${sessionId}`],
+      limit: NUDGE_SCAN_LIMIT,
+      timeoutMs: NUDGE_GIT_TIMEOUT_MS,
+      ...(previous !== undefined
+        ? { range: `${previous.head}..${head}` }
+        : since === undefined ? {} : { since: new Date(since.getTime() - SESSION_START_MARGIN_MS) }),
+    })
+    const save = commits.find((commit) =>
+      commit.trailers["Omo-Writer"] === "memory-tool"
+      && commit.trailers["Omo-Session"] === sessionId
+      && parseTurn(commit.trailers["Omo-Turn"]) !== undefined
+    )
+    const savedTurn = save === undefined ? previous?.savedTurn : parseTurn(save.trailers["Omo-Turn"])
+    scans.set(sessionId, { head, savedTurn })
+    return savedTurn
+  }
 
   function persist(pi: MemoryExtensionAPI, record: AcceptedTurnsRecord): void {
     sessions.set(record.sessionId, record)
@@ -70,6 +114,8 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
       pi.on("session_start", (_payload, eventCtx) => {
         const session = readSession(eventCtx)
         if (session === undefined) return
+        sessionStarts.set(session.id, sessionStartedAt(eventCtx, session.entries) ?? new Date())
+        scans.delete(session.id)
         const hydrated = findLatestAcceptedTurns(session.entries, session.id)
         if (hydrated !== undefined) {
           sessions.set(session.id, hydrated)
@@ -132,15 +178,9 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
       if (state === undefined) return undefined
       const settings = options.resolveSettings(identity)
       if (!settings.enabled) return undefined
-      const history = await repo.head() === null ? [] : await repo.log()
-      const lastSave = history.find((commit) =>
-        commit.trailers["Omo-Writer"] === "memory-tool"
-        && commit.trailers["Omo-Session"] === sessionId
-        && parseTurn(commit.trailers["Omo-Turn"]) !== undefined
-      )
-      const savedAt = lastSave === undefined
-        ? state.sessionBaselineTurns
-        : parseTurn(lastSave.trailers["Omo-Turn"]) ?? state.sessionBaselineTurns
+      const head = await repo.head()
+      const savedAt = (head === null ? undefined : await latestSaveTurn(repo, sessionId, head))
+        ?? state.sessionBaselineTurns
       const pendingTurn = [...pendingInputs.values()].some((pendingSessionId) => pendingSessionId === sessionId) ? 1 : 0
       const turns = state.priorUserTurns + pendingTurn - savedAt
       return turns >= settings.everyUserTurns ? turns : undefined
@@ -183,6 +223,20 @@ function readSession(eventCtx: unknown): { id: string; entries: readonly unknown
   const id = Reflect.apply(getSessionId, manager, [])
   const entries = Reflect.apply(getEntries, manager, [])
   return typeof id === "string" && id.length > 0 && Array.isArray(entries) ? { id, entries } : undefined
+}
+
+/** When the session began: its header, else its oldest entry. Undefined when neither carries a time. */
+function sessionStartedAt(eventCtx: unknown, entries: readonly unknown[]): Date | undefined {
+  const manager = isRecord(eventCtx) && isRecord(eventCtx.sessionManager) ? eventCtx.sessionManager : undefined
+  const getHeader = manager?.getHeader
+  const header = typeof getHeader === "function" ? Reflect.apply(getHeader, manager, []) : undefined
+  const stamps = [isRecord(header) ? header.timestamp : undefined, ...entries.map((entry) => isRecord(entry) ? entry.timestamp : undefined)]
+  let earliest: number | undefined
+  for (const stamp of stamps) {
+    const time = typeof stamp === "string" ? Date.parse(stamp) : typeof stamp === "number" ? stamp : Number.NaN
+    if (Number.isFinite(time) && (earliest === undefined || time < earliest)) earliest = time
+  }
+  return earliest === undefined ? undefined : new Date(earliest)
 }
 
 function readSessionId(eventCtx: unknown): string | undefined {

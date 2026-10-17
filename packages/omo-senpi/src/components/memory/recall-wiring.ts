@@ -30,6 +30,7 @@ import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createRecallDrain, type PendingNudgesPort } from "./recall-drain"
+import { createTranscriptMentionIndex } from "./recall-transcript-mentions"
 import {
   judgeTranscript,
   readSession,
@@ -117,10 +118,10 @@ export interface MemoryRecallWiring {
 // reflection and facts sentinels are here for the sharper reason: those children must not judge
 // or consume the hints produced by the Kibitzer sidecar.
 const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
-const RECALL_PATH_ENTRY_WINDOW = 200
 
 export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): MemoryRecallWiring {
   const corpusCache = options.corpusCache ?? new RecallCorpusCache()
+  const transcriptMentions = createTranscriptMentionIndex()
   const createRepo = options.createRepo ?? defaultCreateRepo
   const ledgerFor = options.ledgerFor ?? ((context) => new RecallLedger(context.identityPaths.recallLedger))
   const pendingFor = options.pendingFor ?? ((context) => new PendingNudges(context.identityPaths.recallPending))
@@ -166,16 +167,14 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     const corpus = await corpusCache.load(repo)
     if (corpus.documents.length === 0) return undefined
 
-    // Raw entries include tool calls/results that the judge's text-only window omits.
-    // Serialize the bounded window once; the corpus supplies the exact memory paths to check.
-    const recentEntries = JSON.stringify(session.entries.slice(-RECALL_PATH_ENTRY_WINDOW))
-    const excludePaths = new Set<string>()
-    for (const document of corpus.documents) {
-      const path = JSON.stringify(document.path).slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      // Close at transcript delimiters (including JSON-escaped whitespace), not filename suffixes.
-      const mention = new RegExp(`${path}(?=$|[\\s"'\x60\\])}>:;,!?]|\\\\["nrtbf])`)
-      if (mention.test(recentEntries)) excludePaths.add(document.path)
-    }
+    // Raw entries include tool calls/results that the judge's text-only window omits. The index
+    // scans the bounded window per entry and caches by entry id, so a trigger costs only the new
+    // entries; see recall-transcript-mentions.ts for the equivalence with the whole-window scan.
+    const excludePaths = transcriptMentions.excludedPaths({
+      sessionId: session.id,
+      entries: session.entries,
+      documents: corpus.documents,
+    })
 
     const ledger = ledgerFor(context)
     const surfaced = await ledger.surfacedPaths(session.id)

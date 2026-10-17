@@ -9,7 +9,7 @@ import {
 } from "@/components/manifesto/manifesto-section"
 
 export async function TokenCostSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
   const outputKeys = ["parallelAgents", "completeWork", "selfVerification"] as const
   const efficiencyKeys = [
     "cheaperModels",

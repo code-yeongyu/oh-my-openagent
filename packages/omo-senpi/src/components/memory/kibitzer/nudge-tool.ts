@@ -1,7 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { Type, type Static } from "typebox"
 
-import { containsSecretLikeMaterial, isValidHint, type RecallNudge } from "@oh-my-opencode/memory-core"
+import { containsSecretLikeMaterial, describeInvalidHint, type RecallNudge } from "@oh-my-opencode/memory-core"
 
 export const KIBITZER_NUDGE_TOOL_NAME = "nudge"
 
@@ -10,7 +10,7 @@ const KIBITZER_NUDGE_DESCRIPTION =
 
 export const KibitzerNudgeParams = Type.Object({
   path: Type.String({ description: "Memory path copied exactly from the candidates input." }),
-  hint: Type.String({ description: "One factual sentence carrying the useful information from the memory, at most 200 characters, on a single line. State the fact itself, not a judgment about whether to nudge, and never filler such as 'placeholder'." }),
+  hint: Type.String({ description: "One factual sentence stating what the stored note records ('the note records that ...'), at most 200 characters, on a single line. It is reference the agent reads, so never address it or tell it what to do: no second person, no imperative, no judgment about whether to nudge, and never filler such as 'placeholder'." }),
 }, { additionalProperties: false })
 
 export interface KibitzerNudgeToolInput {
@@ -43,7 +43,7 @@ export type KibitzerNudgeTool = Omit<
  * The kibitzer judge's ONLY output channel, as an in-process closure over the launch input: the
  * same contract the old `-e` nudge extension enforced in the spawned child, but validated against
  * the live launch state synchronously at call time so a rejected call returns an error result the
- * judge can read and correct. Hint-shape rules come from memory-core's `isValidHint`; candidate
+ * judge can read and correct. Hint rules come from memory-core's `describeInvalidHint`; candidate
  * and surfaced membership mirror `validateNudges`, which the parent still runs over the collected
  * set before persisting (defence in depth - duplicates, should the judge repeat a path, are
  * dropped there, not here).
@@ -96,11 +96,17 @@ function rejectNudge(params: Static<typeof KibitzerNudgeParams>, input: Kibitzer
   if (params.path === "system/" || params.path.startsWith("system/")) {
     return `"${params.path}" is a system/ path and cannot be nudged.`
   }
-  if (!isValidHint(params.hint)) {
-    return "The hint must state a memory fact in one non-empty line of at most 200 characters, not comment on whether the memory is relevant or worth nudging."
-  }
+  // Secret-bearing material is named first: it is the more urgent correction when a hint breaks
+  // both rules at once.
   if (containsSecretLikeMaterial(params.hint)) {
     return "The hint was rejected because it contains secret-like material."
+  }
+  const invalidHint = describeInvalidHint(params.hint)
+  if (invalidHint === "addresses-agent") {
+    return "The hint addresses the agent (second person or imperative): restate what the note records as a plain observation."
+  }
+  if (invalidHint !== undefined) {
+    return "The hint must state a memory fact in one non-empty line of at most 200 characters, not comment on whether the memory is relevant or worth nudging."
   }
   if (input.accepted.length >= input.maxItems) {
     return `The maxItems limit (${input.maxItems}) for this run has been reached.`

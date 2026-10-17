@@ -48,7 +48,7 @@ async function hasActiveBoulderContinuation(
   if (!boulder || !boulder.active_plan) return false
 
   const progress = getPlanProgress(resolveBoulderPlanPath(directory, boulder))
-  if (progress.isComplete) return false
+  if (progress.isComplete || progress.total === 0) return false
   if (!client) return false
 
   const normalizedSessionID = normalizeSessionId(sessionID)

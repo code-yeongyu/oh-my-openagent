@@ -1,13 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { DOC_SECTION_IDS, type DocSectionId } from "@/lib/docs-sections"
 
 const ACTIVE_LINE_OFFSET_PX = 100
 
-export function findHashSectionId(hash: string): DocSectionId | null {
+export function findHashSectionId(hash: string, sectionIds: readonly string[]): string | null {
   const id = hash.replace(/^#/, "")
-  return DOC_SECTION_IDS.find((sectionId) => sectionId === id) ?? null
+  return sectionIds.find((sectionId) => sectionId === id) ?? null
 }
 
 /**
@@ -16,18 +15,22 @@ export function findHashSectionId(hash: string): DocSectionId | null {
  * every active-section measurement goes through `scrollIntoView` and the scroller's
  * bounding box instead of `window.scrollY` / `offsetTop`.
  */
-export function useDocsNavigation(scrollerRef: React.RefObject<HTMLElement | null>) {
-  const [activeSection, setActiveSection] = React.useState<DocSectionId>("overview")
-  const activeSectionRef = React.useRef<DocSectionId>("overview")
+export function useDocsNavigation(
+  scrollerRef: React.RefObject<HTMLElement | null>,
+  sectionIds: readonly string[],
+) {
+  const firstSection = sectionIds[0] ?? ""
+  const [activeSection, setActiveSection] = React.useState(firstSection)
+  const activeSectionRef = React.useRef(firstSection)
 
-  const markActive = React.useCallback((id: DocSectionId) => {
+  const markActive = React.useCallback((id: string) => {
     if (activeSectionRef.current === id) return
     activeSectionRef.current = id
     setActiveSection(id)
   }, [])
 
   const scrollToSection = React.useCallback(
-    (id: DocSectionId, updateHash = true) => {
+    (id: string, updateHash = true) => {
       const element = document.getElementById(id)
       if (!element) return
 
@@ -42,7 +45,7 @@ export function useDocsNavigation(scrollerRef: React.RefObject<HTMLElement | nul
 
   React.useEffect(() => {
     const scrollToHashSection = () => {
-      const sectionId = findHashSectionId(window.location.hash)
+      const sectionId = findHashSectionId(window.location.hash, sectionIds)
       if (!sectionId) return
       window.requestAnimationFrame(() => scrollToSection(sectionId, false))
     }
@@ -50,24 +53,24 @@ export function useDocsNavigation(scrollerRef: React.RefObject<HTMLElement | nul
     scrollToHashSection()
     window.addEventListener("hashchange", scrollToHashSection)
     return () => window.removeEventListener("hashchange", scrollToHashSection)
-  }, [scrollToSection])
+  }, [scrollToSection, sectionIds])
 
   React.useEffect(() => {
     const scroller = scrollerRef.current
     if (!scroller) return
 
-    const sectionEls = DOC_SECTION_IDS.map((id) => document.getElementById(id))
+    const sectionEls = sectionIds.map((id) => document.getElementById(id))
     let rafId: number | null = null
 
     const measure = () => {
       rafId = null
       const scrollerTop = Math.max(scroller.getBoundingClientRect().top, 0)
       const line = scrollerTop + ACTIVE_LINE_OFFSET_PX
-      let nextActive: DocSectionId | null = null
+      let nextActive: string | null = null
 
       for (const el of sectionEls) {
         if (!el) continue
-        const id = findHashSectionId(el.id)
+        const id = findHashSectionId(el.id, sectionIds)
         if (id && el.getBoundingClientRect().top <= line) nextActive = id
       }
 
@@ -88,7 +91,7 @@ export function useDocsNavigation(scrollerRef: React.RefObject<HTMLElement | nul
       window.removeEventListener("scroll", handleScroll)
       if (rafId !== null) window.cancelAnimationFrame(rafId)
     }
-  }, [markActive, scrollerRef])
+  }, [markActive, scrollerRef, sectionIds])
 
   const handleInternalLinkClick = React.useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
@@ -97,7 +100,7 @@ export function useDocsNavigation(scrollerRef: React.RefObject<HTMLElement | nul
       const anchor = event.target.closest("a[href]")
       if (!(anchor instanceof HTMLAnchorElement)) return
 
-      const sectionId = findHashSectionId(anchor.hash)
+      const sectionId = findHashSectionId(anchor.hash, sectionIds)
       if (!sectionId) return
 
       const href = anchor.getAttribute("href")
@@ -108,7 +111,7 @@ export function useDocsNavigation(scrollerRef: React.RefObject<HTMLElement | nul
       event.preventDefault()
       scrollToSection(sectionId)
     },
-    [scrollToSection],
+    [scrollToSection, sectionIds],
   )
 
   return { activeSection, scrollToSection, handleInternalLinkClick }

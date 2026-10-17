@@ -10,6 +10,9 @@ const CONTEXT7_URL = "https://mcp.context7.com/mcp"
 const CONTEXT7_API_KEY_ENV = "CONTEXT7_API_KEY"
 const GREP_APP_SERVER_NAME = "grep_app"
 const GREP_APP_URL = "https://mcp.grep.app"
+// Both servers are used in well under 1% of sessions while their schemas cost ~1.7K prompt tokens
+// per request; search exposure keeps them out of the resident tool list until called by name.
+const DEFERRED_EXPOSURE = "search"
 
 export function createBuiltinMcpsComponent(options: BuiltinMcpsComponentOptions = {}): OmoSenpiComponent {
   const env = options.env ?? process.env
@@ -31,6 +34,7 @@ export function createBuiltinMcpsComponent(options: BuiltinMcpsComponentOptions 
         enabled: true,
         auth: false,
         lifecycle: "lazy",
+        exposure: DEFERRED_EXPOSURE,
       })
     },
   }
@@ -47,6 +51,7 @@ function createContext7Declaration(env: Record<string, string | undefined>): Rec
     enabled: true,
     ...(authenticated ? { auth: "bearer", bearerTokenEnv: CONTEXT7_API_KEY_ENV } : { auth: false }),
     lifecycle: "lazy",
+    exposure: DEFERRED_EXPOSURE,
   }
 }
 

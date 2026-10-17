@@ -40,13 +40,29 @@ async function installerSourceFiles(): Promise<readonly string[]> {
     .sort()
 }
 
+// The bundler emits one `// <repo-relative path>` banner per inlined module, so the artifact
+// itself names every file it was built from. Reading them back is what lets the freshness digest
+// cover WORKSPACE DEPENDENCIES the installer only imports transitively: installerSourceFiles()
+// alone left omo-config-core outside the digest, and omo#8620's harness rename went undetected
+// while the marker still claimed the bundle was current (omo#8633).
+const BUNDLE_SOURCE_BANNER = /^\/\/ ((?:packages|script|scripts)\/[\w./@-]+\.(?:ts|tsx|mjs|js|json))$/gm
+
+export function bundledWorkspaceSources(bundleText: string): readonly string[] {
+  const found = new Set<string>()
+  for (const match of normalizeLineEndings(bundleText).matchAll(BUNDLE_SOURCE_BANNER)) {
+    if (match[1] !== undefined) found.add(match[1])
+  }
+  return [...found].sort()
+}
+
 // Digested over normalized text so a CRLF checkout on Windows and an LF checkout in CI agree.
-export async function digestCodexInstallerSources(): Promise<string> {
+export async function digestCodexInstallerSources(bundledSources: readonly string[] = []): Promise<string> {
   const hash = createHash("sha256").update(BUILD_SETTINGS)
   hash.update(normalizeLineEndings(await readFile(fileURLToPath(import.meta.url), "utf8")))
-  for (const sourcePath of await installerSourceFiles()) {
-    hash.update(toPortableBuildPath(relative(repositoryRoot, sourcePath)))
-    hash.update(normalizeLineEndings(await readFile(sourcePath, "utf8")))
+  const declared = (await installerSourceFiles()).map((path) => toPortableBuildPath(relative(repositoryRoot, path)))
+  for (const portablePath of [...new Set([...declared, ...bundledSources])].sort()) {
+    hash.update(portablePath)
+    hash.update(normalizeLineEndings(await readFile(join(repositoryRoot, portablePath), "utf8")))
   }
   return hash.digest("hex")
 }
@@ -92,7 +108,7 @@ export async function buildCodexInstaller(options: { readonly outputPath?: strin
   const body = nodeBuiltinSource.startsWith("#!/usr/bin/env node")
     ? nodeBuiltinSource.slice(nodeBuiltinSource.indexOf("\n") + 1)
     : nodeBuiltinSource
-  const marker = `${CODEX_INSTALL_BUILD_MARKER_PREFIX}${await digestCodexInstallerSources()}:${digestText(body)}`
+  const marker = `${CODEX_INSTALL_BUILD_MARKER_PREFIX}${await digestCodexInstallerSources(bundledWorkspaceSources(body))}:${digestText(body)}`
   await writeFile(outputPath, `#!/usr/bin/env node\n${marker}\n${body}`)
   await chmod(outputPath, 0o755)
   return outputPath

@@ -77,7 +77,19 @@ export async function restorePreservedServiceTier(input: {
   await writeFile(input.linkPath, replacement.content)
 }
 
-async function readTextIfExists(path: string): Promise<string | null> {
+export async function restorePreservedModel(input: {
+  readonly linkPath: string
+  readonly value: string | null
+}): Promise<void> {
+  if (input.value === null) return
+  const content = await readFile(input.linkPath, "utf8")
+  if (extractModel(content) === input.value) return
+  const replacement = replaceTopLevelStringSetting(content, "model", input.value, { insertIfMissing: true })
+  if (!replacement.replaced) return
+  await writeFile(input.linkPath, replacement.content)
+}
+
+export async function readTextIfExists(path: string): Promise<string | null> {
   try {
     return await readFile(path, "utf8")
   } catch (error) {
@@ -86,7 +98,7 @@ async function readTextIfExists(path: string): Promise<string | null> {
   }
 }
 
-function extractModel(content: string): string | null {
+export function extractModel(content: string): string | null {
   return extractTopLevelStringSetting(content, "model")
 }
 
@@ -98,7 +110,7 @@ function extractServiceTier(content: string): string | null {
   return extractTopLevelStringSetting(content, "service_tier")
 }
 
-function extractTopLevelStringSetting(content: string, key: string): string | null {
+export function extractTopLevelStringSetting(content: string, key: string): string | null {
   for (const line of content.split(/\n/)) {
     if (isSectionHeader(line)) return null
     const rawValue = topLevelStringSettingRawValue(line, key)
@@ -109,7 +121,7 @@ function extractTopLevelStringSetting(content: string, key: string): string | nu
   return null
 }
 
-function replaceTopLevelStringSetting(
+export function replaceTopLevelStringSetting(
   content: string,
   key: string,
   value: string | null,

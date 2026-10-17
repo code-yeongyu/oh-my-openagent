@@ -1,16 +1,18 @@
 /// <reference path="../../../bun-test.d.ts" />
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 
 import type { BoulderState, BoulderWorkState } from "./types"
 import { getWorkForSession, readBoulderState } from "./storage/read-state"
 import { normalizeSessionId } from "./storage/shared"
 
 function createTempDirectory(): string {
-  return mkdtempSync(join(tmpdir(), "boulder-read-state-"))
+  const directory = mkdtempSync(join(tmpdir(), "boulder-read-state-"))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  return directory
 }
 
 function writeState(directory: string, state: BoulderState): void {

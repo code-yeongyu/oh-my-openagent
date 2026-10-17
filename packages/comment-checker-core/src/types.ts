@@ -73,14 +73,32 @@ export interface HookInput {
 export interface CheckResult {
   readonly hasComments: boolean
   readonly message: string
+  /**
+   * Set when the checker exited outside its protocol (0 = clean, 2 = comments on stderr), e.g. a
+   * binary that cannot start. Still reported as "no comments", so callers that ignore it keep their
+   * behavior; a caller can use it to stop re-running a broken checker (#8850).
+   */
+  readonly failure?: CheckFailure
+}
+
+export interface CheckFailure {
+  /** `null` when the checker never started (a spawn error such as EACCES or ENOEXEC). */
+  readonly exitCode: number | null
+  /** The checker's stderr, or the spawn error message when it never started. */
+  readonly stderr: string
 }
 
 export type SpawnSignal = "SIGTERM" | "SIGKILL"
 
 export type SpawnProcess = {
   readonly stdin: {
-    write(input: string): void
-    end(): void
+    /**
+     * Writes `input`, closes stdin, and settles exactly once: resolves when the whole input was
+     * written, rejects with the stream error otherwise (EPIPE, or EOF on win32, when the checker
+     * exited without reading). The adapter owns every stdin `error` event for the stream's
+     * lifetime, so none can escape as an uncaught exception and end the host (#6396).
+     */
+    send(input: string): Promise<void>
   }
   readonly stdout: ReadableStream<Uint8Array>
   readonly stderr: ReadableStream<Uint8Array>
@@ -96,6 +114,15 @@ export interface ResolveCommentCheckerBinaryInput {
   readonly existsSync: (path: string) => boolean
   readonly importMetaUrl?: string
   readonly packageName?: string
+}
+
+export interface FindCommentCheckerPackageBinaryInput {
+  readonly packageJsonPath: string
+  readonly binaryName: string
+  readonly existsSync: (path: string) => boolean
+  readonly packageName?: string
+  readonly platform?: string
+  readonly arch?: string
 }
 
 export interface RunCommentCheckerInput {

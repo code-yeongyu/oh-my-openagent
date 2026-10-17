@@ -17,8 +17,8 @@ test("#given a parent model runtime #when the child session is constructed #then
   const session: ChildSession = {
     sessionId: "child-session",
     prompt: () => Promise.resolve(),
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe: () => () => {},
     getLastAssistantText: () => undefined,

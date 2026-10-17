@@ -11,7 +11,7 @@ import {
 } from "@/components/manifesto/manifesto-section"
 
 export async function PainPointsSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
   const painPointKeys = ["fixing", "syntax", "copyPasting", "reviewing"] as const
 
   return (

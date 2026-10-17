@@ -41,12 +41,18 @@ describe("createSisyphusAgent", () => {
         ["opencode-go/kimi-k3", "kimi-k3"],
         ["moonshotai/kimi-k2.6", "kimi-k2-6"],
         ["opencode-go/kimi-k2.7", "kimi-k2-7"],
+        ["moonshotai/kimi-k2.8", "kimi-k2-7"],
+        ["kimi-for-coding/kimi-for-coding", "kimi-k2-7"],
+        ["kimi-for-coding/kimi-for-coding-highspeed", "kimi-k2-7"],
         ["openai/gpt-5.6-sol", "gpt-5-5"],
         ["openai/gpt-5.5", "gpt-5-5"],
         ["openai/gpt-5.4", "gpt-5-4"],
         ["anthropic/claude-opus-4-7", "claude-opus-4-7"],
         ["anthropic/claude-opus-4-8", "claude-opus-4-8"],
         ["anthropic/claude-opus-5", "claude-opus-5"],
+        // Opus 5.5 deliberately shares the Opus 5 family: the guide's patterns carry over and the
+        // variant renders the running model's own name.
+        ["anthropic/claude-opus-5-5", "claude-opus-5"],
         ["anthropic/claude-fable-5", "claude-fable-5"],
         ["xai/grok-4.6", "grok-4"],
         ["x-ai/grok-4.5", "grok-4"],
@@ -102,7 +108,7 @@ describe("createSisyphusAgent", () => {
       // given
       const opus47Agent = createSisyphusAgent("anthropic/claude-opus-4-7");
       const opus48Agent = createSisyphusAgent("anthropic/claude-opus-4-8");
-      const opus5Agent = createSisyphusAgent("anthropic/claude-opus-5");
+      const opus5Agent = createSisyphusAgent("anthropic/claude-opus-5-5");
       const fable5Agent = createSisyphusAgent("anthropic/claude-fable-5");
       const sonnetAgent = createSisyphusAgent("anthropic/claude-sonnet-4-6");
 
@@ -213,4 +219,22 @@ describe("createSisyphusAgent", () => {
       });
     });
   });
+
+  // #9538: the model copies a format example as the shape of its reply, so one written as a markdown
+  // quote line turned whole answers into blockquotes.
+  describe("#given every routed prompt family", () => {
+    test("#when creating the agent #then no format example is a markdown quote line", () => {
+      const models = [
+        "opencode-go/kimi-k3", "moonshotai/kimi-k2.6", "opencode-go/kimi-k2.7", "openai/gpt-5.5", "openai/gpt-5.4",
+        "anthropic/claude-opus-4-7", "anthropic/claude-opus-4-8", "anthropic/claude-opus-5", "anthropic/claude-fable-5",
+        "xai/grok-4.6", "zai/glm-5.2", "google/gemini-3.1-pro", "anthropic/claude-sonnet-4-6",
+      ];
+
+      for (const model of models) {
+        const quoted = (createSisyphusAgent(model).prompt ?? "").split("\n").filter((line) => /^\s*>.*\[[^\]]+\]/.test(line));
+        expect({ model, quoted }).toEqual({ model, quoted: [] });
+      }
+    });
+  });
 });
+

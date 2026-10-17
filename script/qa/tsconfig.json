@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "typebox": ["../../packages/omo-senpi/node_modules/typebox/build/index.d.mts"],
+      "typebox/value": ["../../packages/omo-senpi/node_modules/typebox/build/value/index.d.mts"],
+      "@earendil-works/pi-tui": ["./types/senpi-pi-tui.d.ts"]
+    }
+  },
+  "include": ["dependency-audit*.ts", "dependency-audit/**/*.ts", "fixtures/dependency-audit/*.ts"]
+}

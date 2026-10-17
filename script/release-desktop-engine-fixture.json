@@ -1,0 +1,17 @@
+{
+  "$comment": "Desktop engine availability in compiled release payloads. Available targets must stage an executable at native/prebuilds/<host>/senpi-desktop-engine[.exe]. Baseline variants reuse their x64 host artifact; musl and arm64 Linux/Windows targets remain unavailable.",
+  "targets": {
+    "darwin-arm64": { "available": true, "host": "darwin-arm64" },
+    "darwin-x64": { "available": true, "host": "darwin-x64" },
+    "darwin-x64-baseline": { "available": true, "host": "darwin-x64" },
+    "linux-x64": { "available": true, "host": "linux-x64" },
+    "linux-x64-baseline": { "available": true, "host": "linux-x64" },
+    "linux-arm64": { "available": false, "host": null },
+    "linux-x64-musl": { "available": false, "host": null },
+    "linux-x64-musl-baseline": { "available": false, "host": null },
+    "linux-arm64-musl": { "available": false, "host": null },
+    "windows-x64": { "available": true, "host": "win32-x64" },
+    "windows-x64-baseline": { "available": true, "host": "win32-x64" },
+    "windows-arm64": { "available": false, "host": null }
+  }
+}

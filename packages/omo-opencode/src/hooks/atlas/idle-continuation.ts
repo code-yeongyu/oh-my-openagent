@@ -191,7 +191,7 @@ export function scheduleRetry(input: {
       if (!currentBoulder.session_ids?.includes(normalizedSessionID)) return
 
       const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
-      if (currentProgress.isComplete) return
+      if (currentProgress.isComplete || currentProgress.total === 0) return
       if (options?.isContinuationStopped?.(sessionID)) return
       const canContinueSession = await canContinueTrackedBoulderSession({
         client: ctx.client,
