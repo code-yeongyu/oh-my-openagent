@@ -26,9 +26,13 @@ function spawnParent(sandbox, project, prompt, session) {
     cwd: project.cwd, env: sandboxEnv(sandbox), detached: true, stdio: ["ignore", "pipe", "pipe"],
   })
   const events = []
+  const capture = { stdout: "", stderr: "" }
   let buffer = ""
   child.stdout.setEncoding("utf8")
+  child.stderr.setEncoding("utf8")
+  child.stderr.on("data", (chunk) => { capture.stderr += chunk })
   child.stdout.on("data", (chunk) => {
+    capture.stdout += chunk
     buffer += chunk
     for (let index = buffer.indexOf("\n"); index >= 0; index = buffer.indexOf("\n")) {
       const line = buffer.slice(0, index)
@@ -37,7 +41,7 @@ function spawnParent(sandbox, project, prompt, session) {
     }
   })
   const closed = new Promise((resolve) => child.once("close", (status, signal) => resolve({ status, signal })))
-  return { child, closed, events, sessionId: () => events.find((event) => event.type === "session")?.id }
+  return { child, closed, events, capture, sessionId: () => events.find((event) => event.type === "session")?.id }
 }
 
 const rows = (projects) =>
@@ -170,10 +174,15 @@ function interruptCompletedRecord(project, record) {
 function makeSandbox(current, name, count) {
   const sandbox = newSandbox(current, name, { omoConfig: config() })
   const projects = [mainProject(sandbox)]
+  // R0 predates the move from project/.omo to agent/projects. Pin the same store in both
+  // config scopes: this fixture tests endpoint rollback, not default-directory migration.
+  writeFileSync(join(sandbox.agentDir, "omo.json"), `${JSON.stringify(config(projects[0].stateDir), null, 2)}\n`)
+  writeFileSync(join(projects[0].cwd, ".omo", "omo.json"), `${JSON.stringify(config(projects[0].stateDir), null, 2)}\n`)
   if (count === 1) return { sandbox, projects }
   projects.push(addProject(sandbox, "project-b", {
     omoConfig: config(), script: { parentSteps: [], childSteps: [] },
   }))
+  writeFileSync(join(projects[1].cwd, ".omo", "omo.json"), `${JSON.stringify(config(projects[1].stateDir), null, 2)}\n`)
   const custom = join(current.root, "rollback-custom-store")
   mkdirSync(custom, { recursive: true })
   projects.push({ ...addProject(sandbox, "project-c", {
@@ -207,13 +216,18 @@ async function resumeOnR0(sandbox, r0, projects, sessions, original, provider) {
   { timeoutMs: 180_000 })
   const completed = midTurnDone === true ? rows(projects) : undefined
   provider.resumeRelease = true
-  await Promise.all(parents.map((parent) => awaitParent(parent, 60_000)))
+  const parentExits = await Promise.all(parents.map((parent) => awaitParent(parent, 60_000)))
   const summary = ({ project, record }) => ({
     project: project.name, task_id: record.task_id, status: record.status, socket: record.host_session?.socket,
     residency_state: record.residency_state, suspension_reason: record.suspension_reason ?? null,
     error_message: record.error_message ?? null,
   })
   return { daemon: lastJsonLine(daemon.stdout), status, mid_turn: midTurn, expected_workers: expectedWorkers,
+    parent_diagnostics: parents.map((parent, index) => ({
+      project: projects[index].name, requested_session: sessions[index],
+      actual_session_id: parent.sessionId(), exit: parentExits[index], ...parent.capture,
+      task_records: taskRecords(projects[index]),
+    })),
     records: completed?.map(summary) ?? [],
     ...(completed === undefined ? { unsettled: rows(projects).map(summary) } : {}) }
 }
@@ -288,11 +302,14 @@ export async function runRollbackScenario(current, r0, prepare, createProvider) 
         return record?.suspension_reason === "daemon_unavailable" ? record : undefined
       }, { timeoutMs: 180_000 })
       resumeProvider.resumeRelease = true
-      await awaitParent(parent, 60_000)
+      const parentExit = await awaitParent(parent, 60_000)
       parents = []
       facts = { interrupted_fixture: interruptedFixture,
         original_socket: beforeSockets[0], drain_wait_exit: drain.wait_exit,
-        r0_daemon_exit: daemon.status, parked: parked === undefined ? null : {
+        r0_daemon_exit: daemon.status,
+        parent_diagnostics: { requested_session: interrupted.sessions[0], actual_session_id: parent.sessionId(),
+          exit: parentExit, ...parent.capture, task_records: taskRecords(projects[0]) },
+        parked: parked === undefined ? null : {
           status: parked.status, suspension_reason: parked.suspension_reason,
           socket: parked.host_session?.socket } }
     }
