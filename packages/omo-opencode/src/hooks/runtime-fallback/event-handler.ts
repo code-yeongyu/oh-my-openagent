@@ -203,7 +203,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       return
     }
 
-    if (!isAbortError(error) && isCompactionInFlight(sessionID)) {
+    // A retry dispatch in flight owns this error's outcome even during a compaction: it falls through to the
+    // deferral below, so a refused dispatch still declines the claim instead of leaving the task waiting.
+    if (!isAbortError(error) && isCompactionInFlight(sessionID) && !sessionRetryInFlight.has(sessionID)) {
       log(`[${HOOK_NAME}] session.error belongs to compaction lane; preserving fallback state`, { sessionID })
       return
     }
