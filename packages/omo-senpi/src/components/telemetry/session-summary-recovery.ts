@@ -5,6 +5,7 @@ import type { SummaryPublisher } from "./session-summary-publisher"
 import type { LiveWindow } from "./omo-native-session-summary"
 import { adoptForeignWindow } from "./session-summary-adopt"
 import { withRecoveryOps, type RecoveryStorage } from "./session-summary-recovery-storage"
+import { purgeOptedOutQueue } from "./session-summary-optout-purge"
 import { newSummaryEpoch } from "./session-summary-window"
 import {
   OWNER_STALE_MS,
@@ -24,6 +25,11 @@ import {
 export { adoptForeignWindow, withRecoveryOps }
 export { sendSummaryRecord } from "./session-summary-delivery"
 export { createImmediateSender } from "@oh-my-opencode/telemetry-core/immediate-send"
+
+/** The opt-out purge over this process's summary storage, with the recovery-only operations it needs. */
+export function purgeOptedOutStorage(storage: SummaryStorage, isScopeConsented: (scope: ConsentScope) => boolean): void {
+  purgeOptedOutQueue({ storage: withRecoveryOps(storage), isScopeConsented })
+}
 
 export type SummaryRecovery = {
   /** One pass over the summary directory; safe to run concurrently from any number of processes. */

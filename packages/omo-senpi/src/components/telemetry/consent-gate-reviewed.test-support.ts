@@ -23,6 +23,7 @@ const SUMMARY_STORE = "window, pending and owner files are written only by the s
 const SUMMARY_REMOVAL = "deletes or rename-claims a summary file inside the state dir; it adds no data, and the opted-out purge relies on it"
 const SUMMARY_RECOVERY = "recovery re-creates a window only for a record whose consent mark is on and whose scope still consents (isRecordSendable)"
 const OWNER_LIVENESS = "owner liveness: links back an owner entry it moved aside only when that entry changed meanwhile; it re-creates existing data, never new data"
+const OPTOUT_PURGE_KEEP = "opted-out purge: links a claimed record back to its own name only when that record may still be sent (kept), never over a newer file; it re-creates existing data, never new data"
 const PROCESS_START = "reads a process start time to judge owner liveness; it sends nothing and writes nothing"
 const SUMMARY_SEND = "sends a pending session_summary only while the component's consent gate holds, the same per-event read the fan-in makes"
 
@@ -283,5 +284,10 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
     guard: "",
     call: "unlinkSync(temp)", reason: SUMMARY_REMOVAL,
+  },
+  {
+    file: "session-summary-optout-purge.ts", fn: "settleClaim",
+    guard: "if(keep)",
+    call: "linkSync(claimPath)", reason: OPTOUT_PURGE_KEEP,
   },
 ]

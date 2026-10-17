@@ -7,7 +7,7 @@ import type { RecoveryRuntime } from "./session-summary-recovery"
 import type { ConsentScope, SummaryStorage } from "./session-summary-storage"
 
 /** What the recorder takes from the `extensions/omo-telemetry-recovery.js` sidecar. */
-export type SummarySidecar = Pick<typeof import("./session-summary-recovery"), "createRecoveryRuntime" | "sendSummaryRecord">
+export type SummarySidecar = Pick<typeof import("./session-summary-recovery"), "createRecoveryRuntime" | "sendSummaryRecord" | "purgeOptedOutStorage">
 
 export type LoadSummaryRecovery = () => Promise<SummarySidecar>
 

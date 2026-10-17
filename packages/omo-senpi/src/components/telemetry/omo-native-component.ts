@@ -40,7 +40,9 @@ import {
   type NativeCaptureState,
 } from "./omo-native-summary-wiring"
 import { isTelemetryHostWarmup, resolveTelemetrySessionRole } from "./session-role-resolver"
-import { purgeUnconsentedQueue, type ConsentScope } from "./session-summary-storage"
+import type { LoadSummaryRecovery } from "./session-summary-lazy-recovery"
+import { startOptOutPurge } from "./session-summary-optout-start"
+import type { ConsentScope } from "./session-summary-storage"
 import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
@@ -69,6 +71,10 @@ export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
   readonly consentNow?: () => number
   /** Periodic consent check while a summary window is on disk; defaults to an unref'd interval. */
   readonly scheduleConsentCheck?: (check: () => void) => () => void
+  /** Loads the recovery sidecar (sweep, send step, opt-out purge); defaults to `#omo-telemetry-recovery-runtime`. */
+  readonly loadRecovery?: LoadSummaryRecovery
+  /** Receives the opt-out purge started at registration; tests await it. */
+  readonly onOptOutPurge?: (purge: Promise<void>) => void
 }
 
 /** A consent read is reused for this long on the per-turn path; the periodic check always reads fresh. */
@@ -113,10 +119,23 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       const sessionRole = resolveTelemetrySessionRole(pi, env)
       const consentOptions = { isConfigEnabled: options.isConfigEnabled }
       const consentNow = options.consentNow ?? Date.now
+      // Consent is read fresh before every write (one omo.json load, well under a millisecond): a cached
+      // read would let a turn right after an opt-out still persist a window.
       const readConsent = (cwd: string | undefined): boolean =>
         isOmoNativeTelemetryEnabled(consentOptions, cwd === undefined ? {} : { cwd }, env)
+      const isScopeConsented = (scope: ConsentScope): boolean => readConsent(scope.cwd)
       let consentCwd = typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : undefined
       const consentedAtRegistration = readConsent(consentCwd)
+      // An opted-out process deletes what dead processes left for it at once, not only when it quits.
+      const purgeQueue = () => startOptOutPurge({
+        stateDir,
+        isScopeConsented,
+        load: options.loadRecovery ?? (() => import("#omo-telemetry-recovery-runtime")),
+        ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
+        ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+      })
+      const startupPurge = consentedAtRegistration ? undefined : purgeQueue()
+      if (startupPurge !== undefined) options.onOptOutPurge?.(startupPurge)
       let cached = { cwd: consentCwd, at: consentNow(), value: consentedAtRegistration }
       const currentConsent = (fresh: boolean): boolean => {
         const at = consentNow()
@@ -159,9 +178,9 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         ? createNativeSummaryRecorder({
           state,
           consent: {
-            isConsented: (check) => currentConsent(check?.fresh === true),
+            isConsented: () => currentConsent(true),
             consentScope: () => (consentCwd === undefined ? {} : { cwd: consentCwd }),
-            isScopeConsented: (scope) => readConsent(scope.cwd),
+            isScopeConsented,
             scheduleConsentCheck: options.scheduleConsentCheck ?? scheduleUnrefInterval,
           },
           stateDir,
@@ -171,6 +190,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
           ...(options.rawTurnSampleRate === undefined ? {} : { rawTurnSampleRate: options.rawTurnSampleRate }),
           ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
           ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+          ...(options.loadRecovery === undefined ? {} : { loadRecovery: options.loadRecovery }),
         })
         : undefined
       // The first capture is when recovery runs: the capture path is installed by then.
@@ -178,9 +198,9 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         void summary?.recover()
       }
       pi.on("session_shutdown", async (payload, eventCtx) => {
-        consentCwd = cwdOf(eventCtx)
+        consentCwd = cwdOf(eventCtx) ?? consentCwd
         if (summary === undefined) {
-          purgeQueue(stateDir, (scope) => readConsent(scope.cwd), options)
+          await settleWithin(Promise.resolve(startupPurge).then(purgeQueue), SUMMARY_SHUTDOWN_WAIT_MS)
           return
         }
         const reason = isRecord(payload) && typeof payload.reason === "string" ? payload.reason : undefined
@@ -223,7 +243,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
 
       pi.on("turn_end", (payload, eventCtx) => {
         if (!isTurnEndEvent(payload)) return
-        consentCwd = cwdOf(eventCtx)
+        consentCwd = cwdOf(eventCtx) ?? consentCwd
         if (summary === undefined) return
         const sessionHash = state.sessionHash ?? hashForContext(eventCtx, hashSession)
         createOmoNativeTurnHandler({
@@ -387,21 +407,6 @@ function forwardValidatedCapture(transport: TelemetryTransport, message: Telemet
   }
   transport.capture(message)
   return undefined
-}
-
-// Queued records that may never be sent (no consent mark, or a scope that has opted out since) are deleted
-// even by a session that records nothing itself.
-function purgeQueue(stateDir: string, isScopeConsented: (scope: ConsentScope) => boolean, options: OmoNativeTelemetryComponentOptions): void {
-  try {
-    purgeUnconsentedQueue(stateDir, isScopeConsented)
-  } catch (error) {
-    options.diagnostics?.({
-      event: "telemetry_activity_state_write_failed",
-      source: "omo-native-component",
-      error,
-      errorKind: error instanceof Error ? "error" : "non_error",
-    })
-  }
 }
 
 function reportCaptureFailure(options: OmoNativeTelemetryComponentOptions, error: unknown): void {
