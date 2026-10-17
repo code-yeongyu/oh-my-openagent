@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { FallbackCycleRegistry, type FallbackCycleProbe } from "../shared/fallback-cycle-registry"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -65,6 +66,12 @@ export function createRuntimeFallbackHook(
   const chatMessageHandler = factories.createChatMessageHandler(deps)
   const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
 
+  // Expose retry-cycle state cross-hook so idle-driven hooks can suppress
+  // injections while a fallback is still resolving (#2063).
+  const fallbackCycleProbe: FallbackCycleProbe = (sessionID: string) =>
+    deps.sessionRetryInFlight.has(sessionID) || deps.sessionAwaitingFallbackResult.has(sessionID)
+  FallbackCycleRegistry.register(fallbackCycleProbe)
+
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
 
@@ -105,6 +112,8 @@ export function createRuntimeFallbackHook(
     }
 
     firstPromptWatchdog.dispose()
+
+    FallbackCycleRegistry.unregister(fallbackCycleProbe)
 
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
