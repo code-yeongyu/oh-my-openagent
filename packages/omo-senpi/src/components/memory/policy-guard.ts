@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { TRANSIENT_DIRNAME, isDurableIdentityRoot } from "./transient-identity"
 
 // Structural mirror of the Senpi filesystem policy API (senpi branch feat/extension-fs-policy:
 // pi.registerFilesystemPolicy(policy), deny-wins composition across policies, deniedRoots
@@ -58,19 +59,39 @@ export function registerMemoryFilesystemPolicy(
   return { status: "registered" }
 }
 
+/**
+ * The verdict is structural - "inside a memory area but outside your own root" - so it never
+ * depends on which sibling directories happen to exist. Both areas are denied because a transient
+ * run's own root lives under `transient-runs/` (transient-identity.ts) while durable memory stays
+ * under `agents/`; for a durable run the two lexical roots collapse into one.
+ *
+ * `deniedRoots` is metadata only (Senpi: reserved for inherited process sandboxes) and lists the
+ * durable sibling identities - the ones that own a `repo/` - so it cannot grow with the number of
+ * one-shot runs the machine has executed (#7765).
+ *
+ * That list is the ONLY part of the policy that reads the filesystem, and `check` never consults
+ * it, so it is resolved when a host first asks for it rather than while the session is binding
+ * (#8412: one readdir plus one stat per sibling identity, 157 stats on a real agents root, all on
+ * the session-start critical path for a value the pinned engine never reads). The first read is
+ * memoised, so a host that asks repeatedly - per spawned sandbox, say - still pays one enumeration
+ * per bound session, exactly as binding used to.
+ */
 function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): FilesystemPolicy {
   const ownRoot = resolve(context.identityPaths.root)
-  const agentsRoot = dirname(ownRoot)
+  const durableAgentsRoot = dirname(resolve(context.durableRoot))
   const ownRoots = stableRoots([ownRoot])
-  const agentsRoots = stableRoots([agentsRoot])
-  const deniedRoots = foreignIdentityRoots(agentsRoot, context.identity)
+  const deniedAreas = stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME)])
+  let resolvedDeniedRoots: readonly string[] | undefined
 
   return {
-    deniedRoots,
+    get deniedRoots(): readonly string[] {
+      resolvedDeniedRoots ??= durableForeignIdentityRoots(durableAgentsRoot, context.identity)
+      return resolvedDeniedRoots
+    },
     check(request: Readonly<FilesystemPolicyRequest>): FilesystemPolicyDecision {
       const target = resolve(request.canonicalPath)
       if (ownRoots.some((root) => isWithin(root, target))) return { allow: true }
-      if (agentsRoots.some((root) => isWithin(root, target))) {
+      if (deniedAreas.some((root) => isWithin(root, target))) {
         return {
           allow: false,
           reason: `cross-identity memory access denied: ${request.operation} ${request.canonicalPath}`,
@@ -81,10 +102,15 @@ function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): Filesystem
   }
 }
 
-function foreignIdentityRoots(agentsRoot: string, ownIdentity: string): string[] {
+function durableForeignIdentityRoots(agentsRoot: string, ownIdentity: string): string[] {
   try {
     const entries = readdirSync(agentsRoot, { withFileTypes: true })
-    return stableRoots(entries.filter((entry) => entry.name !== ownIdentity).map((entry) => join(agentsRoot, entry.name)))
+    return stableRoots(
+      entries
+        .filter((entry) => entry.name !== ownIdentity)
+        .map((entry) => join(agentsRoot, entry.name))
+        .filter((root) => isDurableIdentityRoot(root)),
+    )
   } catch (error) {
     if (isMissingPathError(error)) return []
     throw error

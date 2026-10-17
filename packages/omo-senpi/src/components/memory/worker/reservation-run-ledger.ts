@@ -22,6 +22,7 @@ export interface ReservationRunLedger {
   readonly processStart?: string | null
   readonly childPid?: number
   readonly childProcessStart?: string | null
+  readonly launcher?: import("./launcher-identity").ReflectionLauncher
   readonly startedAt: string
   readonly hardDeadlineAt: number
   readonly terminationGraceMs: number
@@ -45,6 +46,8 @@ export interface ReservationRunLedger {
   readonly finalizeReason?: string
   readonly finalizeDetail?: string
   readonly finalizedAt?: string
+  /** Cleanup left a worktree or branch behind; the reflection orphan sweep reclaims it later. */
+  readonly cleanupIncomplete?: boolean
 }
 
 export function parseReservationRunLedger(value: unknown): ReservationRunLedger {
@@ -97,6 +100,9 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
   }
   if (value.launching !== undefined && typeof value.launching !== "boolean") {
     throw new Error("Invalid reservation run launching state")
+  }
+  if (value.cleanupIncomplete !== undefined && typeof value.cleanupIncomplete !== "boolean") {
+    throw new Error("Invalid reservation run cleanup state")
   }
   if (value.commonConfigSnapshot !== null && typeof value.commonConfigSnapshot !== "string") {
     throw new Error("Invalid common config snapshot")

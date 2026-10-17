@@ -10,12 +10,12 @@ The thirteen memory slash commands, registered once by the memory component thro
 | `types.ts` | `MemoryCommandDeps` / `MemoryCommandContext` / identity seams: `respond` notifications, repo access, interactivity, process liveness. |
 | `args.ts` | Shared `parseCommandArgs` flag/positional parsing. |
 | `backup.ts` / `repo.ts` | Repository backup and git/repository access helpers. |
-| `memory.ts` / `memfs.ts` + `memfs-shared.ts` / `memfs-extra.ts` | `/memory` status; `/memfs` file tree. `/memfs` replacement is noninteractive and ALWAYS backs up first. |
+| `memory.ts` / `memfs.ts` + `memfs-runtime.ts` + `memfs-shared.ts` / `memfs-extra.ts` | `/memory` status; `/memfs` file tree. `/memfs` registers synchronously and lazy-loads its runtime on first invocation; replacement is noninteractive and ALWAYS backs up first. |
 | `init.ts` | `/init` - NEVER overwrites an existing memory repository. |
-| `doctor.ts` / `doctor-checks.ts` | Health checks; the `facts` line stays silent at zero state. |
+| `doctor.ts` / `doctor-runtime.ts` / `doctor-checks.ts` / `doctor-reservation.ts` | Synchronous command registration with a first-invocation lazy runtime; health checks; the `facts` line stays silent at zero state. `doctor-reservation` warns on a ghost `active.lock` (dead/missing launcher identity) with reclaim remediation. |
 | `recompile.ts` / `remember.ts` / `search.ts` / `sleeptime.ts` / `reflect.ts` / `dream.ts` + `dream-staging.ts` | Single-purpose commands; `/sleeptime` shows the resolved nudge/facts/dream/people/soul settings. |
 | `memory-repository.ts` | Push-only git mirror sync (the cloud-free sync story). |
-| `people.ts` / `people-ask.ts` / `people-query.ts` / `people-render.ts` / `people-search.ts` + `people.test-support.ts` | People cards: query/selection, ask runner (`createPeopleAskRunner`), roster/card rendering, search hits. |
+| `people.ts` / `people-runtime.ts` / `people-ask.ts` / `people-query.ts` / `people-render.ts` / `people-search.ts` + `people.test-support.ts` | People cards: query/selection, ask runner (`createPeopleAskRunner`), roster/card rendering, search hits. `people.ts` is only the registration shell; `runPeopleCommand` in `people-runtime.ts` ships in the memory palace sidecar (`../palace/runtime.ts`) and loads on the first `/people`. |
 | `facts.ts` / `facts-status.ts` | `/facts` queue depth, parked/backoff counts, next eligibility, bounded per-conversation last-failure list. Corrupt `failures.json` renders as UNREADABLE, never as zeros. `/facts retry [--conversation <id>]` is the ONLY unpark path: clears failure records and fires one reconcile/launch; never moves queue data or either watermark. |
 | `skill-frontmatter.ts` / `tokens.ts` | Skill-name frontmatter repair; token estimates (`estimateSystemTokens`). |
 | `commands.test-support.ts` | Shared fixtures. |

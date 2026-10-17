@@ -2,6 +2,29 @@ import { describe, expect, test } from "bun:test";
 import { createMomusAgent } from "./momus";
 
 describe("createMomusAgent", () => {
+  test("uses the GPT-5.6-class prompt and high reasoning for GPT-6 Astra", () => {
+    const agent = createMomusAgent("openai/gpt-6-astra")
+    expect(agent.reasoningEffort).toBe("high")
+    expect(agent.prompt).toBe(createMomusAgent("openai/gpt-5.6-sol").prompt)
+  })
+
+  test("keeps the GPT-5.6-class prompt for the Copilot and fast Astra ids momus now resolves to", () => {
+    // given
+    const solConfig = createMomusAgent("openai/gpt-5.6-sol")
+    const genericGptConfig = createMomusAgent("openai/gpt-5.5")
+
+    // when
+    const copilotConfig = createMomusAgent("github-copilot/gpt-6-astra")
+    const fastConfig = createMomusAgent("openai/gpt-6-astra-fast")
+
+    // then
+    for (const config of [copilotConfig, fastConfig]) {
+      expect(config.prompt).toBe(solConfig.prompt)
+      expect(config.prompt).not.toBe(genericGptConfig.prompt)
+      expect(config.reasoningEffort).toBe("high")
+      expect(config.textVerbosity).toBe("high")
+    }
+  })
   describe("#given a GPT-5.6 family model", () => {
     test("#when creating the agent #then it runs high reasoning with a GPT-5.6 tuned prompt", () => {
       // given

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ulwLoopCommand } from "../src/cli-commands.ts";
+import { CLI_TEST_SESSION_ID } from "./fixtures/cli-session.js";
 
 let testDir: string;
 let out: string[];
@@ -22,6 +23,7 @@ beforeEach(async () => {
 	delete process.env["CODEX_SESSION_ID"];
 	delete process.env["CODEX_THREAD_ID"];
 	delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+	process.env["OMO_ULW_LOOP_SESSION_ID"] = CLI_TEST_SESSION_ID;
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -74,6 +76,31 @@ describe("ulwLoopCommand --json error contract", () => {
 		expect(code).toBe(1);
 		expect(out.join("")).not.toContain("Usage:");
 		expect(stdoutJson()).toMatchObject({ ok: false, error: { code: expect.any(String) } });
+	});
+
+	it("#given an invalid codex snapshot token #when checkpoint --json #then emits the stable typed error", async () => {
+		const code = await ulwLoopCommand([
+			"checkpoint",
+			"--json",
+			"--goal-id",
+			"G001",
+			"--status",
+			"complete",
+			"--evidence",
+			"proof",
+			"--codex-goal-json",
+			"not-json-not-a-path",
+		]);
+
+		expect(code).toBe(1);
+		expect(err.join("")).toBe("");
+		expect(stdoutJson()).toMatchObject({
+			ok: false,
+			error: {
+				code: "ULW_LOOP_CODEX_GOAL_JSON_INVALID",
+				message: expect.stringContaining("neither valid JSON nor a readable path"),
+			},
+		});
 	});
 
 	it("#given a malformed required flag #when --json #then surfaces the UlwLoopError code with details on stdout", async () => {

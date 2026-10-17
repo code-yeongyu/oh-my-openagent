@@ -88,7 +88,7 @@ const rejected = store.transition(completed.task_id, {
 })
 if (rejected.applied) throw new Error("Illegal completed to running transition applied")
 if (store.load(completed.task_id)?.status !== "completed") throw new Error("Completed status changed")
-if (messageability(completed.status, completed.residency_state) !== "revive") {
+if (messageability(completed.status, completed.residency_state, completed.execution_mode) !== "revive") {
   throw new Error("Completed resident task was not revivable")
 }
 const evictedCompleted = transitionTaskRecord(completed, {
@@ -97,7 +97,7 @@ const evictedCompleted = transitionTaskRecord(completed, {
 })
 if (!evictedCompleted.applied) throw new Error("Completed resident eviction was rejected")
 if (evictedCompleted.record.status !== "completed") throw new Error("Completed eviction changed lifecycle status")
-if (messageability(evictedCompleted.record.status, evictedCompleted.record.residency_state) !== "not-continuable") {
+if (messageability(evictedCompleted.record.status, evictedCompleted.record.residency_state, evictedCompleted.record.execution_mode) !== "not-continuable") {
   throw new Error("Evicted completed task remained continuable")
 }
 const normalLost = transitionTaskRecord(running, {
@@ -140,12 +140,13 @@ const summary = {
   corruptDiagnostic,
   malformedOptionalDiagnostic,
   illegalTransitionApplied: rejected.applied,
-  completedResidentMessageability: messageability(completed.status, completed.residency_state),
+  completedResidentMessageability: messageability(completed.status, completed.residency_state, completed.execution_mode),
   evictedCompletedApplied: evictedCompleted.applied,
   evictedCompletedStatus: evictedCompleted.record.status,
   evictedCompletedMessageability: messageability(
     evictedCompleted.record.status,
     evictedCompleted.record.residency_state,
+    evictedCompleted.record.execution_mode,
   ),
   normalLostApplied: normalLost.applied,
   normalLostStatus: normalLost.record.status,

@@ -43,7 +43,7 @@ const EXPECTED_JOURNALED_EVENT_TYPES = [
 ] as const
 
 describe("dag domain types", () => {
-  test("#given the journaled payload union #when its type tags are enumerated #then it has exactly 14 members and excludes live activity", () => {
+  test("#given the journaled payload union #when its type tags are enumerated #then it has exactly 17 members and excludes live activity", () => {
     // given / when
     const tags = [...DAG_RUN_EVENT_TYPES]
 
@@ -105,7 +105,7 @@ describe("dag domain types", () => {
   test("#given a dag route #when kinds are enumerated #then category XOR agent holds and a pure model route is impossible", () => {
     // given
     const categoryRoute: DagRoute = { kind: "category", category: "quick" }
-    const agentRoute: DagRoute = { kind: "agent", agent: "momus", model: "openai/gpt-5" }
+    const agentRoute: DagRoute = { kind: "agent", agent: "plan-reviewer", model: "openai/gpt-5" }
 
     // when / then
     expect(categoryRoute.kind).toBe("category")
@@ -121,14 +121,14 @@ describe("dag domain types", () => {
     // given
     const byCategory: DagNodeTargetInput = { category: "quick", prompt: "do it" }
     const bySubagent: DagNodeTargetInput = {
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "openai/gpt-5",
       prompt: "do it",
     }
 
     // when / then
     expect(byCategory.category).toBe("quick")
-    expect(bySubagent.subagent_type).toBe("momus")
+    expect(bySubagent.subagent_type).toBe("plan-reviewer")
     expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["subagent_type"]>().toEqualTypeOf<
       undefined
     >()
@@ -190,6 +190,7 @@ describe("dag domain types", () => {
       "task_lost",
       "task_cancelled",
       "resume_task_missing",
+      "resume_task_orphaned",
       "journal_corrupt",
     ])
     expect(DAG_NODE_TRANSITION_REASONS).toEqual([

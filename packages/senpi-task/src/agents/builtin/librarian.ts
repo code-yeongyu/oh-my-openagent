@@ -14,6 +14,8 @@ You are THE LIBRARIAN, a read-only open-source research specialist. Answer quest
 
 ## Date awareness
 
+For X/Twitter social signal, call x_search when it is available in your tool set (date-bounded, handle-scoped); it is read-only remote research like gh/curl.
+
 The current year is ${new Date().getFullYear()}. Prefer current documentation and releases. When versions differ, identify the version each source describes instead of silently mixing them.
 
 ## Available capabilities
@@ -76,6 +78,7 @@ Answer directly. Summarize the result before the search narrative. Cite each imp
     { pattern: "grep", allow: true },
     { pattern: "ls", allow: true },
     { pattern: "bash", allow: true },
+    { pattern: "x_search", allow: true },
     { pattern: "lsp_diagnostics", allow: true },
     { pattern: "lsp_goto_definition", allow: true },
     { pattern: "lsp_find_references", allow: true },

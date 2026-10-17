@@ -17,6 +17,7 @@ Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed machine id, 
 | `machine-id.ts` | `getTelemetryDistinctId`, `getDefaultTelemetryOsProvider` |
 | `events.ts` | `createEventTelemetryClient` — typed event capture wrapper (see NOTES) + `EventTelemetryClient`, `EventPropertyAllowlist`, `CreateEventTelemetryClientInput`, … |
 | `diagnostics.ts` | `writeTelemetryDiagnostic`, `cleanupTelemetryDiagnostics` |
+| `consent-gated-fetch.ts` | `createConsentGatedFetch` — the PostHog `fetch` option gated on consent at send time; every SDK flush (interval, batch size, shutdown) goes through it, and a dropped batch answers 200 so it leaves the queue unsent |
 | `constants.ts` | `DEFAULT_POSTHOG_HOST`, `DEFAULT_POSTHOG_API_KEY` |
 | `types.ts` | `TelemetryProductConfig`, `TelemetryClient`, `TelemetryTransport(Factory)`, `TelemetryOsProvider`, … |
 

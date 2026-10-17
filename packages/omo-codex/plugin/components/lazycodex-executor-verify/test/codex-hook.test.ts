@@ -12,12 +12,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { platform } from "node:process";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runSubagentStopHook } from "../src/codex-hook.js";
-import type { SubagentStopInput } from "../src/types.js";
+import type { FileStat, HookFileSystem, SubagentStopInput } from "../src/types.js";
 
 const cleanupRoots: string[] = [];
 
@@ -71,7 +71,7 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		runSubagentStopHook(createInput(cwd), nodeFileSystem);
 		const artifactPath = join(cwd, ".omo", "evidence", "receipt.txt");
 		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
-		writeFileSync(artifactPath, "verified\n");
+		writeFileSync(artifactPath, "Command: verify\nExit code: 0\nOutput: all checks passed.\n");
 
 		// when
 		const output = runSubagentStopHook(
@@ -140,7 +140,7 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		const outsideReceipt = join(outsideRoot, "receipt.txt");
 		const linkPath = join(cwd, ".omo", "evidence", "outside-dir");
 		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
-		writeFileSync(outsideReceipt, "outside\n");
+		writeFileSync(outsideReceipt, "outside evidence root\n".repeat(3));
 		symlinkSync(outsideRoot, linkPath, platform === "win32" ? "junction" : "dir");
 
 		// when
@@ -186,7 +186,7 @@ describe("lazycodex executor SubagentStop verifier", () => {
 		// given
 		const cwd = createWorkspace();
 		mkdirSync(join(cwd, ".omo"), { recursive: true });
-		writeFileSync(join(cwd, ".omo", "outside.txt"), "outside\n");
+		writeFileSync(join(cwd, ".omo", "outside.txt"), "outside evidence root\n".repeat(3));
 
 		// when
 		const output = runSubagentStopHook(
@@ -251,6 +251,132 @@ describe("lazycodex executor SubagentStop verifier", () => {
 	});
 });
 
+describe("receipt content and freshness", () => {
+	it.each(["placeholder evidence\n", "x".repeat(39), `  ${"x".repeat(39)}\n`])(
+		"#given a short trimmed receipt %j #when the worker stops #then blocks as placeholder",
+		(content) => {
+			// given
+			const { input, fs } = createMemoryReceipt(content, { mtimeMs: 2_000 }, { birthtimeMs: 1_000 });
+
+			// when
+			const output = runSubagentStopHook(input, fs);
+
+			// then
+			expect(parseBlockOutput(output).reason).toContain("placeholder");
+		},
+	);
+
+	it("#given a 200-character receipt older than transcript birth #when the worker stops #then blocks as stale", () => {
+		// given
+		const { input, fs } = createMemoryReceipt("x".repeat(200), { mtimeMs: 999 }, { birthtimeMs: 1_000 });
+
+		// when
+		const output = runSubagentStopHook(input, fs);
+
+		// then
+		expect(parseBlockOutput(output).reason).toContain("stale");
+	});
+
+	it("#given a fresh 200-character receipt #when transcript birth precedes ctime #then passes using birthtime", () => {
+		// given
+		const { input, fs } = createMemoryReceipt(
+			"x".repeat(200),
+			{ mtimeMs: 1_001 },
+			{ birthtimeMs: 1_000, ctimeMs: 3_000 },
+		);
+
+		// when
+		const output = runSubagentStopHook(input, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given a 200-character receipt and unstatable transcript #when the worker stops #then skips freshness", () => {
+		// given
+		const { input, fs } = createMemoryReceipt("x".repeat(200), { mtimeMs: 0 });
+
+		// when
+		const output = runSubagentStopHook({ ...input, transcript_path: "/nonexistent" }, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given 40 trimmed characters with mtime equal to transcript birth #when the worker stops #then passes", () => {
+		// given
+		const { input, fs } = createMemoryReceipt(`  ${"x".repeat(40)}\n`, { mtimeMs: 1_000 }, { birthtimeMs: 1_000 });
+
+		// when
+		const output = runSubagentStopHook(input, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it.each([999, 1_000])(
+		"#given no transcript birthtime and receipt mtime %i #when the worker stops #then uses ctime",
+		(mtimeMs) => {
+			// given
+			const { input, fs } = createMemoryReceipt("x".repeat(200), { mtimeMs }, { ctimeMs: 1_000 });
+
+			// when
+			const output = runSubagentStopHook(input, fs);
+
+			// then
+			if (mtimeMs < 1_000) expect(parseBlockOutput(output).reason).toContain("stale");
+			else expect(output).toBe("");
+		},
+	);
+});
+
+function createMemoryReceipt(
+	content: string,
+	receiptStat: Partial<FileStat>,
+	transcriptStat?: Partial<FileStat>,
+): { readonly input: SubagentStopInput; readonly fs: HookFileSystem } {
+	const cwd = resolve("receipt-workspace");
+	const transcriptPath = join(cwd, "transcript.jsonl");
+	const files = new Map<string, { readonly content: string; readonly stat: Partial<FileStat> }>([
+		[join(cwd, ".omo", "evidence", "receipt.txt"), { content, stat: receiptStat }],
+	]);
+	if (transcriptStat !== undefined) files.set(transcriptPath, { content: "", stat: transcriptStat });
+	const fileAt = (path: string) => {
+		const file = files.get(path);
+		if (file === undefined) throw new Error(`ENOENT: ${path}`);
+		return file;
+	};
+	const statAt = (path: string): FileStat => {
+		const file = fileAt(path);
+		return { size: file.content.length, isFile: () => true, isSymbolicLink: () => false, ...file.stat };
+	};
+	const fs: HookFileSystem = {
+		existsSync: (path) => files.has(path),
+		lstatSync: statAt,
+		mkdirSync: () => undefined,
+		readFileSync: (path) => fileAt(path).content,
+		realpathSync: (path) => resolve(path),
+		renameSync: (oldPath, newPath) => {
+			files.set(newPath, fileAt(oldPath));
+			files.delete(oldPath);
+		},
+		rmSync: (path) => {
+			files.delete(path);
+		},
+		statSync: statAt,
+		writeFileSync: (path, data) => {
+			files.set(path, { content: data, stat: {} });
+		},
+	};
+	return {
+		input: createInput(cwd, {
+			transcript_path: transcriptPath,
+			last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt.txt",
+		}),
+		fs,
+	};
+}
+
 type BlockOutput = {
 	readonly decision: "block";
 	readonly reason: string;
@@ -278,7 +404,7 @@ function createWorkspaceWithParentOutsideReceipt(): { readonly cwd: string } {
 	const root = createWorkspace();
 	const cwd = join(root, "project");
 	mkdirSync(cwd, { recursive: true });
-	writeFileSync(join(root, "outside.txt"), "outside\n");
+	writeFileSync(join(root, "outside.txt"), "outside evidence root\n".repeat(3));
 	return { cwd };
 }
 
@@ -291,7 +417,7 @@ function existingReceiptTargetOutsideEvidenceRoot(): string {
 	if (existsSync("/etc/passwd") && statSync("/etc/passwd").size > 0) return "/etc/passwd";
 	const root = createWorkspace();
 	const receiptPath = join(root, "outside.txt");
-	writeFileSync(receiptPath, "outside\n");
+	writeFileSync(receiptPath, "outside evidence root\n".repeat(3));
 	return receiptPath;
 }
 

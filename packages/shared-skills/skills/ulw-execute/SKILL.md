@@ -1,6 +1,7 @@
 ---
 name: ulw-execute
-description: "Execute a Prometheus work plan with Boulder state, evidence ledger updates, worktree discipline, parallel subagents, and Stop-hook continuation. Use after planning when the user says ulw-execute, execute plan, continue plan, resume plan, or asks to run a .omo/plans plan."
+description: "Executes a written ulw-plan work plan with Boulder state, evidence ledger, worktree discipline, and parallel subagents. Use when the user says ulw-execute or asks to run a .omo/plans plan."
+argument-hint: "[plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]"
 ---
 
 ## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER
@@ -33,7 +34,7 @@ Plan and reviewer agents may run for a long time: spawn them in the background a
 
 # ulw-execute
 
-Execute a Prometheus work plan until every top-level checkbox is complete. This skill pairs with the harness's ulw-execute continuation hook, which re-injects the next turn while `.omo/boulder.json` says this `codex:<session_id>` still has unchecked plan work.
+Execute a work plan until every top-level checkbox is `[x]` or `[~]`. This skill pairs with the harness's ulw-execute continuation hook, which re-injects the next turn while `.omo/boulder.json` says this `codex:<session_id>` still has unchecked plan work.
 
 ## Usage
 
@@ -42,22 +43,22 @@ $ulw-execute [plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]
 ```
 
 - `plan-name` (optional): a full or partial file stem under `.omo/plans/`.
-- `--worktree` (required for PR/branch work; otherwise optional): the task-owned git worktree path.
-- `--make-pr` (optional): deliver the work as a pull request. IMPLIES worktree mode: when `--worktree` is absent, create a task-owned worktree (`git worktree add <absolute-path> <base-branch>`) before implementation and record it as `worktree_path`. On completion, push the branch and open a reviewer-readable PR, then hand off with the PR URL - merge only if the user asks.
+- `--worktree` (optional): reuse an existing task-owned worktree for the first phase instead of creating one; every phase runs in a task-owned worktree regardless.
+- `--make-pr` (optional): deliver each phase's worktree as a pull request — push the branch, open a reviewer-readable PR, hand off with the URL, and merge only if the user asks.
 - `--ship` (optional): full delivery lifecycle; implies `--make-pr`. After the PR opens, stay on the job until it is MERGED: watch CI and review gates, fix failures and address feedback from the worktree (fresh QA evidence for behavior changes), merge per the repository's merge policy, then remove the worktree and sync `.omo/` state back.
 
 ## Goal and todo discipline (MANDATORY)
 
 Do ALL of this immediately after the plan is selected, BEFORE the first implementation dispatch. Skipping any step is a defect.
 
-1. **Set the goal, in detail.** When a goal tool is available (`create_goal`), call it with a DETAILED objective: the plan name and path, the concrete end state, the phase and task counts, the delivery mode (direct, `--make-pr`, or `--ship`), and how completion will be verified. One work session = one goal. No goal tool -> record the same objective as the first ledger entry.
+1. **Set the goal, in detail.** When a goal tool is available (`create_goal`), call it with a DETAILED objective: the plan name and path, the concrete end state, the phase and task counts, the delivery mode (direct, `--make-pr`, or `--ship`), and how completion will be verified. One work session = one registered goal (the goal tool holds one active goal); each phase then carries its own concrete goal — the ledger entry Phase 2 records before the wave's first dispatch, defined from the previous phase's landed and verified evidence. No goal tool -> record the same objective as the first ledger entry.
 2. **Register every phase and task as todos.** Mirror the plan into the todo/plan tool of your harness: one phase per plan wave, one todo per column-zero checkbox (including the final verification wave). Register ALL of them up front - never keep tasks in memory only.
-3. **Keep them current at every moment.** Mark a todo in_progress when its work dispatches and done immediately after its verification passes. Never batch-complete at the end, never execute work that is not a registered todo; discovered work is appended as a todo before it runs. The todo list, Boulder state, and plan checkboxes must always tell the same story.
+3. **Keep them current at every moment.** Mark a todo in_progress when its work dispatches and done immediately after its verification passes. Never batch-complete at the end, never execute work that is not a registered todo; discovered work inside the change's blast radius — the request not delivered, a regression this change introduces, an invalid proof, a failing test or stale doc of touched code — is appended to the plan as a follow-up checkbox after the checkpoint in progress, mirrored as a todo, and fixed to the ideal state once that checkpoint closes; it joins the open checkpoint only when it blocks that checkpoint's acceptance; a defect outside it gets a tracked issue with reproduction and evidence and a line in the final report. A worker that meets a defect outside its assigned files reports it instead of fixing it; only the orchestrator appends the checkbox and dispatches it to a correctly scoped unit. The todo list, Boulder state, and plan checkboxes must always tell the same story.
 
 ## Phase 1: Select the plan
 
 1. Read `.omo/boulder.json` if it exists.
-2. List Prometheus plan files under `.omo/plans/`.
+2. List work plan files under `.omo/plans/`.
 3. If `plan-name` was provided, select the matching plan.
 4. If exactly one active or paused Boulder work exists for this session, resume it.
 5. If no active work exists and exactly one plan exists, select it.
@@ -69,7 +70,7 @@ Do ALL of this immediately after the plan is selected, BEFORE the first implemen
 When the user explicitly said `start work` / `$ulw-execute` and no selectable plan exists, treat that phrase as approval: bootstrap `ulw-plan` to create the approved plan before execution and implementation, instead of stalling or asking for generic approval again. A brief or notes file without waves, checkboxes, and acceptance criteria is NOT decision-complete — enter this bootstrap too.
 
 1. Invoke the `ulw-plan` skill from the current request and require its dynamic adversarial workflow: collect, verify, design, adversarial plan-review, synthesize.
-2. The generated Prometheus plan must be saved under `.omo/plans/<slug>.md` before implementation or Boulder state writes that point at plan work.
+2. The generated work plan must be saved under `.omo/plans/<slug>.md` before implementation or Boulder state writes that point at plan work.
 3. Use maximum safe parallelism in the generated plan: independent files/tasks fan out; same-file writes, shared state, and named dependencies serialize.
 4. Preserve safety boundaries. Ask one focused question only when the objective is missing, destructive, or has a safety/product ambiguity that repository exploration cannot resolve.
 5. After the plan exists, continue directly to Phase 2.
@@ -95,14 +96,14 @@ Write `.omo/boulder.json` before implementation starts. Prefix session ids with 
 }
 ```
 
-For PR/branch work, a task-owned worktree is mandatory before implementation starts: pass `--worktree`, or use `--make-pr`/`--ship`, which auto-create one. Verify the path with `git worktree list --porcelain` or create it with `git worktree add <path> <branch-or-HEAD>`, then store the absolute path as `worktree_path`. All edits, commands, tests, and evidence capture must run inside that worktree.
+Every phase (plan wave) runs in its own task-owned worktree with its own goal: before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then `git worktree add <repo>-wt/<plan>-<wave> <branch off the integration base>` (or verify a `--worktree` path with `git worktree list --porcelain`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once each of its checkboxes is verified or `[~]` (direct merge, or the PR under `--make-pr`/`--ship`; a `[~]` row's unverified changes do not land: a dispatched worker reverts them in the wave worktree before landing, and the `unmet` entry records the revert), and the next wave branches from that landed base. Use the bundled ultrawork directive’s Task resources and todo rules at wave/worktree creation; read those sections if absent from context.
 
 ## Parallel delivery lanes (teams and worktrees)
 
 Solo orchestration with parallel background workers is the default topology. Decide once, when the wave's lanes are known, and record the verdict in the ledger:
 
 - **Independent lanes -> parallel workers.** Separate files, no shared contract: one parallel spawn burst; no team.
-- **Dependency-ordered lanes -> a dag run.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `dag` tool: dispatch the wave as ONE dag run — one producer node per lane plus a verification node — instead of a spawn burst, and watch the run's lifecycle instead of arming per-lane watchers. Read the `mass-ulw` skill's `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
+- **Dependency-ordered lanes -> one `workflow` run per wave.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `workflow` tool: dispatch the wave as ONE run (one producer node per lane plus a verification node); recover inside it with `retry`/`amend`/`send`; let the run's settle wake you instead of arming per-lane watchers; the next wave is a NEW run (or `amend` when only the definition changed) — never one graph for the whole plan. Read the `mass-ulw` skill's `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
 - **Overlapping lanes -> a team.** The lanes touch the same module or contract AND running them concurrently actually finishes sooner: stand up a team (where the harness has one) so one lane's discoveries relay through you mid-flight.
 - **PR-mode independent lanes -> a worktree per lane.** Under `--make-pr`/`--ship`, when a wave holds independent checkboxes, give each lane its own branch and task-owned worktree, delivered as its own PR.
 
@@ -143,26 +144,27 @@ When the plan annotates a todo with `Recommended task executor category:`, follo
 | `visual-engineering` (medium) | frontend, UI/UX, styling, animation |
 | `writing` (low) | documentation and prose |
 | `git` (low) | git operations |
-| `deep` (high) | hairy debugging, research-heavy or subtle cross-module work |
+| `deep-low` (medium) | hairy debugging, research-heavy or subtle cross-module work the worker can settle from what it reads |
+| `deep-high` (high) | the same, when the central decision cannot be settled from evidence: a trade-off, a cross-package contract, or correctness argued from invariants |
 | `ultrabrain` (high) | ONE genuinely hard, logic-heavy problem — hand it the goal, not step-by-step instructions |
 
 Sizing is a two-branch decision made per checkbox, before dispatch:
 
 - **Splittable work splits.** When the checkbox decomposes into independent pieces, dispatch them as a swarm of `quick`/`unspecified-low` workers in ONE parallel burst — many small cheap workers in parallel beat one large delegation.
-- **Cohesive hard work stays whole.** When splitting would sever shared reasoning (one algorithm, one migration, one subtle bug), send the WHOLE problem to `deep` or `ultrabrain` as ONE delegation. Never force-split work whose parts share one insight.
+- **Cohesive hard work stays whole.** When splitting would sever shared reasoning (one algorithm, one migration, one subtle bug), send the WHOLE problem to `deep-low`, `deep-high` or `ultrabrain` as ONE delegation. Never force-split work whose parts share one insight.
 
 Each sub-task message must include:
 
 1. Goal and exact files or directories in scope.
-2. When the task touches existing behavior: a baseline characterization test, written first, that pins current observable behavior and passes on the unchanged code (exact inputs, exact observable, exact assertion). Then the failing-first proof for the new behavior before production changes — a unit test where a seam exists, otherwise the sub-task's Manual-QA scenario captured failing. A test that mirrors its implementation (mock-call assertions, pinned constants) is not evidence.
+2. The tests already covering the touched behavior, READ before any edit as the behavior of record (intent, coverage, pass); a bug's reproduction captured before the fix. A new test ONLY where the repository keeps tests for this behavior AND a regression would otherwise pass unnoticed by the sub-task's Manual-QA scenario — never one that mirrors its implementation (mock-call assertions, pinned constants) or restates the change.
 3. Implementation constraints from the plan and project rules.
 4. Automated verification commands to run.
-5. One Manual-QA channel, named with the exact tool and exact invocation (the literal `curl`, `send-keys`, `browser:control-in-app-browser` action, `page.click`, payload, selectors, and the binary observable that decides PASS/FAIL), not "verify it works". A LIGHT checkbox needs one real-surface proof of its deliverable, and auxiliary surfaces (CLI stdout, DB state diff, parsed config dump) are first-class when the surface is CLI- or data-shaped:
+5. One Manual-QA channel, named with the exact tool and exact invocation (the literal `curl`, `send-keys`, `page.click` / `session.click`, payload, selectors, and the binary observable that decides PASS/FAIL), not "verify it works". A LIGHT checkbox needs one real-surface proof of its deliverable, and auxiliary surfaces (CLI stdout, DB state diff, parsed config dump) are first-class when the surface is CLI- or data-shaped:
    - HTTP call: `curl -i` against the live endpoint.
    - Terminal / TUI: drive a real pty; `tmux send-keys` is fine for a boot/behavior smoke, but color/layout/CJK evidence goes through the xterm.js web terminal below, NEVER `tmux capture-pane`.
-   - Browser use: prefer the harness's in-app browser control when available and the scenario does not need an authenticated or persistent user browser profile; otherwise drive the real page with Chrome, or agent-browser (https://github.com/vercel-labs/agent-browser) when Chrome is unavailable.
+   - Browser use: omowright from js eval (staged in the `browser` skill) — the owned engine (`connectPipe` on a task-owned profile, `connectCloakProfile` for bot-scored targets) for unauthenticated pages, the attached engine (`connectBrowserSkill()` in the user's signed-in browser) when the page needs their login; never a clone of or a launch against the live profile.
    - Computer use: OS-level GUI automation against the running desktop app when the surface is not a page.
-   - TUI visual evidence: when a TUI claim needs visual QA or PR proof, run `node script/qa/web-terminal-visual-qa.mjs --command "<cmd>" --input "{Enter}" --evidence-dir <dir>` (real pty rendered through xterm.js in Chrome) and attach `terminal.png` plus `metadata.json`.
+   - TUI visual evidence: when a TUI claim needs visual QA or PR proof, run `bun script/qa/web-terminal-visual-qa.mjs --command "<cmd>" --input "{Enter}" --evidence-dir <dir>` (real pty rendered through xterm.js in Chrome) and attach `terminal.png` plus `metadata.json`.
 6. The adversarial classes that apply to this sub-task (from the 9 ultraqa classes) and how each is probed.
 7. Required artifact path and cleanup receipt.
 8. Tool-use expectations: batch independent tool calls in parallel; when the harness exposes a code-execution surface (eval), use it for multi-call steps instead of one-by-one calls.
@@ -179,9 +181,9 @@ For each checkbox, complete all five gates before marking it done:
 4. Adversarial QA: exercise every class the Phase 3 trigger map marks applicable and capture the observable result for each.
 5. Cleanup: register every QA resource teardown as its own todo when spawned (QA scripts, tmux assets, browser sessions, PIDs, ports, containers, temp dirs), execute each, and capture the receipt. No QA asset is left running.
 
-Append evidence to `.omo/ulw-execute/ledger.jsonl`, one JSON object per line. Include at least `event`, `plan`, `task`, `session_id`, `commands`, `artifact`, `adversarial_classes`, and `cleanup` fields. `adversarial_classes` lists each probed class with its observable result and each ruled-out class with a one-line reason.
+Append evidence to `.omo/ulw-execute/ledger.jsonl`, one JSON object per line. Include at least `event`, `plan`, `task`, `session_id`, `commands`, `artifact`, `adversarial_classes`, and `cleanup` fields, plus `attempt` and `checkpoint_opened_at` on every entry tied to a checkbox. `adversarial_classes` lists each probed class with its observable result and each ruled-out class with a one-line reason.
 
-### Sisyphus-style completion contract
+### Completion contract
 
 A worker done claim is never final: each implementation sub-task returns a `DoneClaim`, a different context runs `AdversarialVerify` probing or reproducing the claim, failures loop back to the executor, and only a confirmed verifier verdict becomes `FullyDone`.
 
@@ -197,6 +199,7 @@ A worker done claim is never final: each implementation sub-task returns a `Done
   },
   "AdversarialVerify": {
     "verdict": "confirmed | false-positive | needs-fix | needs-human-review",
+    "failure_class": "none | product | harness",
     "evidence": ["file path, command, log, artifact, or explicit not inspected"],
     "repro": "exact command or manual steps when available",
     "confidence": 0.0
@@ -208,7 +211,9 @@ Rules:
 - `confirmed` is the only pass verdict. `false-positive`, `needs-fix`, and `needs-human-review` all block checkbox completion.
 - The verifier must be independent from the executor: use the harness's gate reviewer (see the harness compatibility section) or a fresh reviewer worker on a strong model, or root only when root did not implement or materially rewrite that task.
 - A worker done claim must be independently verified before it becomes checkbox completion.
-- On any non-confirmed verdict, append the feedback to the ledger, reset the checkbox work to in-progress, and re-dispatch the executor with the exact failure.
+- On a non-confirmed verdict, append the feedback to the ledger with the attempt number and its failure signature (the failing check plus its first error line, with volatile values stripped: temp-dir paths, timestamps, process and run ids, durations). Attempts count per checkbox across all its sub-tasks and re-splits, timed from its first dispatch (`checkpoint_opened_at`). STOP when the same signature repeats on consecutive attempts, on the third failed attempt, or 4 hours after the first dispatch (a plan may change these numbers, never remove the stop). Check the 4-hour bound also when a lane's watcher fires or the turn resumes without a verdict; when it has passed, cancel that lane and stop the same way: mark the checkbox `- [~]` (the plan grammar's blocked state) with a one-line gap naming what is unmet and the last evidence, mark every checkbox that depends on it, directly or through another `[~]` row, `- [~]` with the gap `blocked by <id>`, close the todo of every row marked `[~]` here labelled `blocked: <gap>`, append an `unmet` ledger entry listing what each attempt changed, and continue in the same turn with the next checkpoint that depends on none of them, or with Completion when none remains. Otherwise leave the checkbox `- [ ]` and re-dispatch the executor with the exact failure.
+- A `[~]` row counts as closed, never as a met dependency: Phase 3 skips it, Completion starts once every top-level row is `[x]` or `[~]`, and the `ORCHESTRATION COMPLETE` block names each `[~]` row with its gap. Final Verification Wave rows are never dependents of a `[~]` row: they verify the landed work and report each `[~]` row as a known gap, which alone never fails a final-wave row. A `[~]` gap is never re-queued as a new checkbox in this run, by the blast-radius rule or by a final-wave verdict; the one harness-repair follow-up in the next rule is the only exception.
+- The verifier sets `failure_class`. A `harness` failure (the runner, fixture, CI job or environment failed and the product behavior was never exercised) gets one repair dispatch inside the checkpoint, which does not count as an attempt; when it recurs, stop as above with the harness gap named and append the harness repair once as a follow-up checkbox; a harness-repair follow-up that stops is reported, not re-appended.
 - The verifier must probe the applicable adversarial keys, including `stale_state`, `dirty_worktree`, and `misleading_success_output`, before allowing `FullyDone`.
 
 ## Phase 5: Mark progress
@@ -225,17 +230,17 @@ Only after verification passes:
 When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:
 
 1. Run the plan's final verification commands.
-2. For PR/branch work, finish the lifecycle from the task-owned worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
+2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.
 3. Remove or mark the Boulder work as completed.
 4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.
 
 ## Hard rules
 
-- No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.
+- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.
 - No `--dry-run` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
 - **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
-- No PR/branch implementation, review, or merge in the main worktree; use the task-owned git worktree.
+- No implementation, review, or merge in the main checkout; every phase works in its task-owned worktree.
 - No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.
 - No stale-memory execution. The plan and ledger are the durable source of truth.

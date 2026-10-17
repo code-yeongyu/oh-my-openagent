@@ -1,4 +1,4 @@
-export const STOP_HOOK_EVENTS = ["Stop", "SubagentStop"] as const;
+export const STOP_HOOK_EVENTS = ["Stop"] as const;
 export type StopHookEventName = (typeof STOP_HOOK_EVENTS)[number];
 
 export type StopInput = {

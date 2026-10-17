@@ -267,7 +267,7 @@ You may invoke \`task()\` with \`subagent_type\` set to \`explore\`, \`librarian
 
 - \`explore\`: internal codebase pattern search with synthesis. Parallel batches of 2-5 with \`run_in_background=true\`.
 - \`librarian\`: external docs, open-source code, web references. Same pattern.
-- \`oracle\`: high-reasoning consultant. \`run_in_background=false\` when their answer blocks your next step; \`true\` when you can continue productively while they think.
+- \`oracle\`: high-reasoning consultant. Run it in the background; continue with work that does not depend on the answer and never ship what it was asked to decide before the result arrives.
 
 Every \`task()\` call needs \`load_skills\` (empty array \`[]\` is valid). Reuse \`task_id\` for follow-ups to preserve sub-agent context.
 

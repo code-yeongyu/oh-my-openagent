@@ -7,18 +7,6 @@ payloads, and component NOTICE files.
 
 ## Components
 
-### @colbymchenry/codegraph@1.5.0
-- License: MIT, from npm package metadata and root third-party notice inspection.
-- Copyright: CodeGraph contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
-- Where-bundled: optional runtime dependency of `plugin/components/codegraph`.
-
-### @colbymchenry/codegraph platform bundles@1.5.0
-- License: MIT for CodeGraph package metadata; bundled payloads also include a Node.js v24.16.0 runtime and vendored JavaScript/WASM dependencies. The Codex CodeGraph component ships the Node.js runtime license and bundled third-party license text at `plugin/components/codegraph/NODE-RUNTIME-LICENSES.md`.
-- Copyright: CodeGraph contributors, Node.js contributors, and bundled dependency contributors.
-- Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
-- Where-bundled: optional platform packages selected by `@colbymchenry/codegraph` for darwin, linux, and win32 on arm64 and x64.
-
 ### @code-yeongyu/comment-checker@0.8.0
 - License: MIT, from package metadata and the root third-party notice.
 - Copyright: Yeongyu Kim and contributors.
@@ -120,11 +108,6 @@ payloads, and component NOTICE files.
 - License: private project component distributed as part of the codex plugin bundle.
 - Copyright: Yeongyu Kim and contributors.
 - Where-bundled: Codex `SessionStart` bootstrap provisioning component and reviewed checksum manifests.
-
-### @sisyphuslabs/codex-codegraph@4.12.1
-- License: MIT, from `plugin/components/codegraph/LICENSE`.
-- Notice: `plugin/components/codegraph/NOTICE`.
-- Where-bundled: Codex CodeGraph session bootstrap hooks and MCP wrapper component.
 
 ### @sisyphuslabs/codex-git-bash-hook@4.10.0
 - License: private project component distributed as part of the codex plugin bundle.

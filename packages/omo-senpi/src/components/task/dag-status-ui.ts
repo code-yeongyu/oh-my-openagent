@@ -106,7 +106,7 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
 
   function render(): void {
     const ui = deps.runtime.ui()
-    // TUI only: setWidget is a no-op in app-server mode, so skip the work entirely there.
+    // TUI only: no widget surface exists outside interactive mode, so skip the work entirely there.
     if (ui === undefined || deps.runtime.mode() !== "tui") {
       clearLiveRefresh()
       return

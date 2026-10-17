@@ -2,12 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 
 import { OmoGitMasterSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
-import { createTaskSkillLoader } from "./task-skill-loader"
+import { createTaskSkillLoader, packagedSkillDirs } from "./task-skill-loader"
 
-const CO_AUTHOR_TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+const CO_AUTHOR_TRAILER_PATTERN = /Co-authored-by:/i
 
 const roots: string[] = []
 
@@ -30,6 +31,56 @@ function writeSkill(root: string, body: string, name = "shared"): void {
   )
 }
 
+describe("packagedSkillDirs", () => {
+  test("#given the source-tree layout #when packaged dirs resolve #then load_skills [\"x-search\"] resolves from plugin/skills-conditional", () => {
+    // given
+    const root = tempDir()
+    const moduleDir = join(root, "packages", "omo-senpi", "src", "components", "task")
+    mkdirSync(moduleDir, { recursive: true })
+    const conditionalDir = join(root, "packages", "omo-senpi", "plugin", "skills-conditional")
+    writeSkill(conditionalDir, "SOURCE TREE X SEARCH BODY", "x-search")
+
+    // when
+    const dirs = packagedSkillDirs(pathToFileURL(join(moduleDir, "task-skill-loader.ts")).href)
+    const loader = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: dirs,
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+    })
+    const resolution = loader(["x-search"], tempDir())
+
+    // then
+    expect(dirs).toContain(conditionalDir)
+    expect(resolution.resolved).toEqual(["x-search"])
+    expect(resolution.prepend).toContain("SOURCE TREE X SEARCH BODY")
+  })
+
+  test("#given the bundled runtime layout #when packaged dirs resolve #then load_skills [\"x-search\"] resolves from ../skills-conditional", () => {
+    // given
+    const root = tempDir()
+    const moduleDir = join(root, "plugin", "extensions")
+    mkdirSync(moduleDir, { recursive: true })
+    const conditionalDir = join(root, "plugin", "skills-conditional")
+    writeSkill(conditionalDir, "BUNDLED X SEARCH BODY", "x-search")
+
+    // when
+    const dirs = packagedSkillDirs(pathToFileURL(join(moduleDir, "omo.js")).href)
+    const loader = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: dirs,
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+    })
+    const resolution = loader(["x-search"], tempDir())
+
+    // then
+    expect(dirs).toContain(conditionalDir)
+    expect(resolution.resolved).toEqual(["x-search"])
+    expect(resolution.prepend).toContain("BUNDLED X SEARCH BODY")
+  })
+})
+
 describe("createTaskSkillLoader", () => {
   test("#given canonical and packaged skill roots #when the loader resolves a collision #then canonical wins", () => {
     const cwd = tempDir()
@@ -50,7 +101,7 @@ describe("createTaskSkillLoader", () => {
     expect(resolution.prepend).not.toContain("PACKAGED BODY")
   })
 
-  test("#given default attribution settings #when the git-master skill is loaded #then the co-author directive rides the skill block", () => {
+  test("#given default attribution settings #when the git-master skill is loaded #then the skill block stays untouched", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
@@ -65,7 +116,28 @@ describe("createTaskSkillLoader", () => {
 
     expect(resolution.resolved).toEqual(["git-master"])
     expect(resolution.prepend).toContain("GIT MASTER BODY")
-    expect(resolution.prepend).toContain(CO_AUTHOR_TRAILER)
+    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
+    expect(resolution.prepend).not.toContain("sisyphus-dev-ai")
+    expect(resolution.prepend).not.toContain("Ultraworked with")
+  })
+
+  test("#given the footer opted in #when the git-master skill is loaded #then only the footer directive rides the skill block", () => {
+    const cwd = tempDir()
+    const pluginSkillsDir = tempDir()
+    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
+
+    const loader = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: [pluginSkillsDir],
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({ commit_footer: true, include_co_authored_by: true }),
+    })
+    const resolution = loader(["git-master"], cwd)
+
+    expect(resolution.prepend).toContain("GIT MASTER BODY")
+    expect(resolution.prepend).toContain("Ultraworked with")
+    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
+    expect(resolution.prepend).not.toContain("users.noreply.github.com")
   })
 
   test("#given attribution disabled #when the git-master skill is loaded #then the skill block stays untouched", () => {
@@ -83,11 +155,11 @@ describe("createTaskSkillLoader", () => {
     const resolution = loader(["git-master"], cwd)
 
     expect(resolution.prepend).toContain("GIT MASTER BODY")
-    expect(resolution.prepend).not.toContain(CO_AUTHOR_TRAILER)
+    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
     expect(resolution.prepend).not.toContain("Ultraworked with")
   })
 
-  test("#given default attribution settings #when a non-git-master skill is loaded #then no directive is injected", () => {
+  test("#given the footer opted in #when a non-git-master skill is loaded #then no directive is injected", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "SHARED BODY")
@@ -96,11 +168,11 @@ describe("createTaskSkillLoader", () => {
       agentDir: tempDir(),
       homeDir: tempDir(),
       pluginSkillsDirs: [pluginSkillsDir],
-      loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+      loadSettings: () => OmoGitMasterSettingsSchema.parse({ commit_footer: true }),
     })
     const resolution = loader(["shared"], cwd)
 
     expect(resolution.prepend).toContain("SHARED BODY")
-    expect(resolution.prepend).not.toContain(CO_AUTHOR_TRAILER)
+    expect(resolution.prepend).not.toContain("Ultraworked with")
   })
 })

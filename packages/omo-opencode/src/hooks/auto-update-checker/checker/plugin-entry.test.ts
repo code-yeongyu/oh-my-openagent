@@ -1,11 +1,11 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { PACKAGE_NAME } from "../constants"
+import { findPluginEntry } from "./plugin-entry"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../../shared/plugin-identity"
 
 type PluginEntryResult = {
@@ -22,26 +22,27 @@ function normalizePathForAssertion(filePath: string): string {
 function runFindPluginEntry(
   directory: string,
   envOverrides: Record<string, string | undefined> = {},
-): { status: number | null; stdout: string; stderr: string } {
-  const command = [
-    `import { findPluginEntry } from ${JSON.stringify("./packages/omo-opencode/src/hooks/auto-update-checker/checker/plugin-entry")};`,
-    `const result = findPluginEntry(${JSON.stringify(directory)});`,
-    "console.log(JSON.stringify(result));",
-  ].join("")
+): PluginEntryResult {
+  const originalEnvironment = new Map<string, string | undefined>()
+  for (const [key, value] of Object.entries(envOverrides)) {
+    originalEnvironment.set(key, process.env[key])
+    if (value === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = value
+    }
+  }
 
-  const execution = spawnSync(process.execPath, ["-e", command], {
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      ...envOverrides,
-    },
-    encoding: "utf-8",
-  })
-
-  return {
-    status: execution.status,
-    stdout: execution.stdout,
-    stderr: execution.stderr,
+  try {
+    return findPluginEntry(directory)
+  } finally {
+    for (const [key, value] of originalEnvironment) {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
   }
 }
 
@@ -76,14 +77,12 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: [PACKAGE_NAME] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then entry is not pinned
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.isPinned).toBe(false)
-    expect(pluginInfo?.pinnedVersion).toBeNull()
+    expect(result).not.toBeNull()
+    expect(result?.isPinned).toBe(false)
+    expect(result?.pinnedVersion).toBeNull()
   })
 
   test("returns unpinned for latest dist-tag", async () => {
@@ -91,14 +90,12 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: [`${PACKAGE_NAME}@latest`] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then latest is treated as channel, not pin
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.isPinned).toBe(false)
-    expect(pluginInfo?.pinnedVersion).toBe("latest")
+    expect(result).not.toBeNull()
+    expect(result?.isPinned).toBe(false)
+    expect(result?.pinnedVersion).toBe("latest")
   })
 
   test("returns unpinned for beta dist-tag", async () => {
@@ -106,14 +103,12 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: [`${PACKAGE_NAME}@beta`] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then beta is treated as channel, not pin
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.isPinned).toBe(false)
-    expect(pluginInfo?.pinnedVersion).toBe("beta")
+    expect(result).not.toBeNull()
+    expect(result?.isPinned).toBe(false)
+    expect(result?.pinnedVersion).toBe("beta")
   })
 
   test("returns pinned for explicit semver", async () => {
@@ -121,14 +116,12 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: [`${PACKAGE_NAME}@3.5.2`] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then explicit semver is treated as pin
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.isPinned).toBe(true)
-    expect(pluginInfo?.pinnedVersion).toBe("3.5.2")
+    expect(result).not.toBeNull()
+    expect(result?.isPinned).toBe(true)
+    expect(result?.pinnedVersion).toBe("3.5.2")
   })
 
   test("finds preferred plugin entry", async () => {
@@ -136,14 +129,12 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: [PLUGIN_NAME] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then preferred entry is returned
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo?.entry).toBe(PLUGIN_NAME)
-    expect(pluginInfo?.isPinned).toBe(false)
-    expect(pluginInfo?.pinnedVersion).toBeNull()
+    expect(result?.entry).toBe(PLUGIN_NAME)
+    expect(result?.isPinned).toBe(false)
+    expect(result?.pinnedVersion).toBeNull()
   })
 
   test("finds legacy plugin entry", async () => {
@@ -151,14 +142,12 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: [LEGACY_PLUGIN_NAME] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then legacy entry is returned
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo?.entry).toBe(LEGACY_PLUGIN_NAME)
-    expect(pluginInfo?.isPinned).toBe(false)
-    expect(pluginInfo?.pinnedVersion).toBeNull()
+    expect(result?.entry).toBe(LEGACY_PLUGIN_NAME)
+    expect(result?.isPinned).toBe(false)
+    expect(result?.pinnedVersion).toBeNull()
   })
 
   test("finds preferred plugin entry with pinned version", async () => {
@@ -166,14 +155,12 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: [`${PLUGIN_NAME}@3.15.0`] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then preferred versioned entry is returned
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo?.entry).toBe(`${PLUGIN_NAME}@3.15.0`)
-    expect(pluginInfo?.isPinned).toBe(true)
-    expect(pluginInfo?.pinnedVersion).toBe("3.15.0")
+    expect(result?.entry).toBe(`${PLUGIN_NAME}@3.15.0`)
+    expect(result?.isPinned).toBe(true)
+    expect(result?.pinnedVersion).toBe("3.15.0")
   })
 
   test("returns null for unrelated plugin entry", async () => {
@@ -181,12 +168,10 @@ describe("findPluginEntry", () => {
     fs.writeFileSync(configPath, JSON.stringify({ plugin: ["some-other-plugin"] }))
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(temporaryDirectory)
+    const result = runFindPluginEntry(temporaryDirectory)
 
     // #then no matching entry is returned
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo).toBeNull()
+    expect(result).toBeNull()
   })
 
   test("reads user config from profile dir even when OPENCODE_CONFIG_DIR changes after import", async () => {
@@ -199,17 +184,15 @@ describe("findPluginEntry", () => {
     )
 
     // #when plugin entry is detected
-    const execution = runFindPluginEntry(path.join(temporaryDirectory, "workspace"), {
+    const result = runFindPluginEntry(path.join(temporaryDirectory, "workspace"), {
       OPENCODE_CONFIG_DIR: profileConfigDir,
     })
 
     // #then profile dir is respected
-    expect(execution.status).toBe(0)
-    const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
-    expect(pluginInfo).not.toBeNull()
-    expect(normalizePathForAssertion(pluginInfo?.configPath ?? "")).toBe(
+    expect(result).not.toBeNull()
+    expect(normalizePathForAssertion(result?.configPath ?? "")).toBe(
       normalizePathForAssertion(path.join(profileConfigDir, "opencode.json")),
     )
-    expect(pluginInfo?.pinnedVersion).toBe("beta")
+    expect(result?.pinnedVersion).toBe("beta")
   })
 })

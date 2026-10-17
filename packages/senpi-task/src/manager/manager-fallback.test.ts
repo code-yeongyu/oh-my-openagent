@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import type { ManagedChildHandle } from "./child-handle"
 import {
@@ -270,5 +272,44 @@ describe("TaskManager configured runtime fallback", () => {
         { display: "vendor-c/fallback-two" },
       ],
     })
+  })
+
+  test("#given a native fallback spent its final rung #when it terminates without an exhaustion event #then the task transcript records exhaustion", async () => {
+    // given
+    const runner = new ObservableRunner()
+    const { manager, store } = makeManager({
+      planner: fallbackPlanner(),
+      inProcess: runner,
+    })
+    const result = await manager.start(baseSpec({ execution_mode: "in-process" }))
+    if (result.kind !== "started") throw new Error("expected started task")
+    const handle = runner.handles.get(result.task_id)
+    if (handle === undefined) throw new Error("expected initial handle")
+    await handle.waitForSubscription()
+    const nativeFallback = {
+      type: "retry_fallback_applied",
+      from: "vendor-a/primary-model",
+      to: "vendor-b/fallback-model",
+      chainKey: "vendor-a/primary-model",
+      reason: "hard-error",
+    } as const
+    handle.emit(nativeFallback)
+    const terminal = manager.waitFor(result.task_id)
+
+    // when
+    handle.settle({
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: "fallback unavailable",
+      },
+    })
+
+    // then
+    expect(await terminal).toMatchObject({ status: "error", model: "vendor-b/fallback-model" })
+    const events = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
+    expect(events).toContain('"type":"retry_fallback_exhausted"')
+    expect(events).toContain('"chain_key":"vendor-a/primary-model"')
+    expect(events).toContain('"last_error":"fallback unavailable"')
   })
 })

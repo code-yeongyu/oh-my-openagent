@@ -1,15 +1,17 @@
-import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { afterEach, describe, expect, it, spyOn } from "bun:test"
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
+import * as fs from "../fs/resilient"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
 import { TranscriptJournal, type ReflectionSnapshot } from "../journal"
-import { ReflectionReservationStore } from "./reservation"
-import type { ReflectionRequest } from "./machine"
+import { ReflectionReservationStore, type ReservationResult } from "./reservation"
+import type { ReflectionRequest, ReservedRun } from "./machine"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))))
 
 async function fixture(stepCount = 2, createRunId?: () => string | Promise<string>) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reservation-")))
@@ -47,7 +49,64 @@ async function captured(
   return { trigger, conversationIds: ["conversation-a"], snapshots: [{ conversationId: "conversation-a", snapshot }] }
 }
 
+function runOf(result: ReservationResult | null | undefined): ReservedRun {
+  if (result?.status === "active" || result?.status === "pending") return result.run
+  throw new Error(`expected a reserved run, got ${result?.status ?? "null"}`)
+}
+
 describe("persisted reflection reservation", () => {
+  it.each(["active.lock", "pending.json"])("#given %s rename fails #when reserving #then the temporary is removed and the error propagates", async (target) => {
+    const { identity, journal, store } = await fixture()
+    const request = await captured(journal, "manual")
+    if (target === "pending.json") await store.tryReserve(request)
+    const rename = fs.rename
+    const failure = new Error("injected reservation rename failure")
+    const intercepted = spyOn(fs, "rename").mockImplementation(async (source, destination) => {
+      if (String(destination) === join(identity.paths.reflection, target)) throw failure
+      await rename(source, destination)
+    })
+    try {
+      await expect(store.tryReserve(request)).rejects.toBe(failure)
+    } finally {
+      intercepted.mockRestore()
+    }
+    expect((await readdir(identity.paths.reflection)).filter((name) => name.includes(".tmp-"))).toEqual([])
+  })
+
+  it("#given crashed reservation writers #when startup reads state under the scheduler lock #then only their temporary siblings are swept", async () => {
+    const { identity, store } = await fixture()
+    await mkdir(identity.paths.reflection, { recursive: true })
+    for (const name of ["active.lock.tmp-old", "pending.json.tmp-old", "unrelated.tmp-keep"]) {
+      await writeFile(join(identity.paths.reflection, name), "partial")
+    }
+    await mkdir(join(identity.paths.reflection, "pending.json.tmp-directory"))
+
+    expect(await store.readState()).toEqual({})
+    expect((await readdir(identity.paths.reflection)).sort()).toEqual(["pending.json.tmp-directory", "unrelated.tmp-keep"])
+  })
+
+  it("#given many large pending captures #when reservations merge on disk #then pending.json stays bounded and no journal cursor advances", async () => {
+    const { identity, journal, store } = await fixture()
+    await store.tryReserve(await captured(journal, "manual"))
+    const snapshot = await journal.captureReflectionSnapshot()
+    if (snapshot === null) throw new Error("expected snapshot")
+    const large: ReflectionSnapshot = { ...snapshot, entries: [{
+      kind: "assistant", text: "x".repeat(512 * 1024), captured_at: "2026-08-10T00:00:00.000Z",
+      source_line_id: "line", source_message_id: "message",
+    }] }
+    for (let index = 0; index < 12; index += 1) {
+      const conversationId = `conversation-${index}`
+      await store.tryReserve({ trigger: "manual", conversationIds: [conversationId], snapshots: [{ conversationId, snapshot: large }] })
+    }
+
+    const persisted = await readFile(join(identity.paths.reflection, "pending.json"), "utf8")
+    expect(Buffer.byteLength(persisted, "utf8")).toBeLessThanOrEqual(4 * 1024 * 1024)
+    expect((await store.readState()).pending?.request.conversationIds).toEqual(
+      Array.from({ length: 7 }, (_, index) => `conversation-${index + 5}`),
+    )
+    expect((await journal.getState()).reflected_completed_steps).toBe(0)
+  })
+
   it("#given an aborted signal #when reservation starts #then active and pending state remain empty", async () => {
     // given
     const { store } = await fixture()
@@ -72,8 +131,8 @@ describe("persisted reflection reservation", () => {
     const result = await store.evaluate("conversation-a", { kind: "settled", success: true })
 
     expect(result?.status).toBe("active")
-    expect(result?.run.request.trigger).toBe("step-count")
-    expect(result?.run.request.snapshots[0]?.snapshot.end_message_id).toBe("assistant-2")
+    expect(runOf(result).request.trigger).toBe("step-count")
+    expect(runOf(result).request.snapshots[0]?.snapshot.end_message_id).toBe("assistant-2")
   })
 
   it("#given an async run-id factory #when a reservation is made #then the awaited id names the reserved run", async () => {
@@ -85,7 +144,7 @@ describe("persisted reflection reservation", () => {
 
     // then
     expect(result.status).toBe("active")
-    expect(result.run.runId).toBe("run-async-1")
+    expect(runOf(result).runId).toBe("run-async-1")
     expect((await store.readState()).active?.runId).toBe("run-async-1")
   })
 
@@ -108,7 +167,7 @@ describe("persisted reflection reservation", () => {
     ])
 
     // then
-    expect(new Set(results.map((result) => result.run.runId)).size).toBe(2)
+    expect(new Set(results.map((result) => runOf(result).runId)).size).toBe(2)
   })
 
   it("#given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record", async () => {
@@ -117,13 +176,13 @@ describe("persisted reflection reservation", () => {
     const result = await store.tryReserve(await captured(journal, "step-count"))
     const persisted = JSON.parse(await readFile(join(identity.paths.reflection, "active.lock"), "utf8"))
 
-    expect(result.run).toMatchObject({
+    expect(runOf(result)).toMatchObject({
       reservedAt: "2026-08-10T00:00:00.000Z",
       launcherPid: 4242,
       launcherHostname: "fixture-host",
       launcherProcessStart: "fixture-start",
     })
-    expect(persisted).toMatchObject(result.run)
+    expect(persisted).toMatchObject(runOf(result))
   })
 
   it("#given simultaneous trigger requests #when reserved #then one becomes active and all others collapse into one atomic pending record", async () => {
@@ -154,14 +213,14 @@ describe("persisted reflection reservation", () => {
         conversationIds: ["conversation-a"],
         snapshots: [],
       })
-      await store.complete(active.run.runId, outcome)
+      await store.complete(runOf(active).runId, outcome)
       const statePath = join(identity.paths.runtime, "dream", "state.json")
       if (outcome === "failed" || outcome === "timed_out") {
         expect(Bun.file(statePath).size).toBe(0)
       } else {
         expect(JSON.parse(await readFile(statePath, "utf8"))).toEqual({
           last_dream_at: "2026-08-10T00:00:00.000Z",
-          lastRunId: active.run.runId,
+          lastRunId: runOf(active).runId,
         })
       }
     }
@@ -173,13 +232,13 @@ describe("persisted reflection reservation", () => {
     const active = await store.tryReserve(request)
     const pending = await store.tryReserve({ ...request, trigger: "manual", focus: "retry manually" })
 
-    const completion = await store.complete(active.run.runId, "failed")
+    const completion = await store.complete(runOf(active).runId, "failed")
     const state = await journal.getState()
 
     expect(pending.status).toBe("pending")
     expect(state.reflected_completed_steps).toBe(0)
-    expect(completion.launch?.runId).toBe(pending.run.runId)
-    expect((await store.readState()).active?.runId).toBe(pending.run.runId)
+    expect(completion.launch?.runId).toBe(runOf(pending).runId)
+    expect((await store.readState()).active?.runId).toBe(runOf(pending).runId)
   })
 
   it("#given successful compaction-triggered work #when completed #then its snapshot advances and the compaction flag clears exactly once", async () => {
@@ -187,7 +246,7 @@ describe("persisted reflection reservation", () => {
     await journal.setPendingCompaction(true)
     const active = await store.tryReserve(await captured(journal, "compaction"))
 
-    const completion = await store.complete(active.run.runId, "merged")
+    const completion = await store.complete(runOf(active).runId, "merged")
     const state = await journal.getState()
 
     expect(completion.launch).toBeUndefined()
@@ -202,7 +261,7 @@ describe("persisted reflection reservation", () => {
     const active = await store.tryReserve(request)
     await store.tryReserve(request)
 
-    const completion = await store.complete(active.run.runId, "merged")
+    const completion = await store.complete(runOf(active).runId, "merged")
 
     expect(completion.launch).toBeUndefined()
     expect((await journal.getState()).steps_since_last_successful_reflection).toBe(0)
@@ -220,11 +279,11 @@ describe("persisted reflection reservation", () => {
     }
     const active = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
     await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [{ conversationId: "conversation-a", snapshot }] })
-    expect((await store.complete(active.run.runId, "failed")).launch).toBeUndefined()
+    expect((await store.complete(runOf(active).runId, "failed")).launch).toBeUndefined()
 
     const next = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
     const manual = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [], focus: "always" })
-    expect((await store.complete(next.run.runId, "failed")).launch?.runId).toBe(manual.run.runId)
+    expect((await store.complete(runOf(next).runId, "failed")).launch?.runId).toBe(runOf(manual).runId)
     expect((await journal.getState()).reflected_completed_steps).toBe(0)
   })
 })

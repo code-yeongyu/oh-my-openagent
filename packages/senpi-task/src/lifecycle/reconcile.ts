@@ -1,14 +1,22 @@
-import { readdirSync, statSync } from "node:fs"
-import { join } from "node:path"
+import { log } from "@oh-my-opencode/utils"
 
-import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
-import { delay, nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
+import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { isFallbackHandoff } from "./fallback-handoff"
+import { isHostSessionRecord } from "./host-session"
+import { reconcileHostSessionOrphan } from "./host-session-revive"
+import { reviveClaimed } from "./reconcile-reclamation"
+import { reclaimIsolations } from "./reclaim-isolations"
 import { getLifecycleReattachPorts } from "./port"
 import { beginLocalReclamation, reconcileScopedRevival } from "./reconcile-revival"
 import { reclaimOrphanedResident } from "./residency"
+import { newestSessionPath } from "./session-path"
+import { reconcileLegacyTerminal, terminateClaimedPid } from "./reconcile-terminal"
 import type { ReconcileOutcome, ReconcileResult } from "./types"
+import { reconcileProvisionalExit, settleProvisionalExitLoss } from "./provisional-exit"
+import { hasForeignLiveOwner } from "./reconcile-owner"
 
 const HEARTBEAT_FRESH_MS = 30_000
 
@@ -19,11 +27,18 @@ export async function reconcileOnSessionStart(
 ): Promise<ReconcileResult> {
   const outcomes: ReconcileOutcome[] = []
   const candidates: TaskRecord[] = []
+  const excludedFromRevival = new Set(context.reconcileAdmission.excludeTaskIds)
+  // ONE daemon snapshot per pass: every host-session record below is matched against it by session
+  // path, so a hundred children still cost one probeHost and one list_sessions.
+  context.hostSessionProbe.refresh()
 
   // Ownership is checked before terminality, residency, or mode. A live sibling owns the record in
   // every status and this process must not mutate it.
   for (const record of context.store.list().records) {
-    if (hasForeignLiveOwner(context, record)) {
+    if (await hasForeignLiveOwner(context, record, parentSessionId)) {
+      // Scoped admission re-reads the store rather than this candidate array. Carry the
+      // ownership exclusion into that selector too, or a suspended live-owner child is claimed.
+      excludedFromRevival.add(record.task_id)
       outcomes.push(parentSessionId === undefined
         ? {
             task_id: record.task_id,
@@ -34,7 +49,18 @@ export async function reconcileOnSessionStart(
       continue
     }
     if (hasLiveResidentHandle(context, record.task_id)) {
+      // Each retry can wait out a full request deadline; never hold session start on it.
+      if (record.uncertain_inputs !== undefined) {
+        void context.registry.get(record.task_id)?.reconcileInputs?.()
+          ?.catch((error: unknown) => log("senpi-task uncertain input reconcile failed", { taskId: record.task_id, error: String(error) }))
+      }
       outcomes.push({ task_id: record.task_id, kind: "resumed", reason: "owned by this process" })
+      continue
+    }
+    if (record.provisional_exit !== undefined && !TERMINAL_STATUSES.has(record.status)
+      && !(parentSessionId !== undefined && record.parent_session_id !== parentSessionId && isSameProcessSibling(context, record))) {
+      outcomes.push(await reconcileProvisionalExit(context, record))
+      excludedFromRevival.add(record.task_id)
       continue
     }
     candidates.push(record)
@@ -45,6 +71,7 @@ export async function reconcileOnSessionStart(
       if (isSuspended(record)) continue
       outcomes.push(await reconcileLegacyRecord(context, record))
     }
+    await reclaimIsolations(context)
     return { outcomes }
   }
 
@@ -66,15 +93,20 @@ export async function reconcileOnSessionStart(
   }
 
   outcomes.push(...await reconcileScopedRevival(
-    context,
+    {
+      ...context,
+      deferUnresumable: context.registry.ownsRecord?.({ parent_session_id: parentSessionId }) === true || context.deferUnresumable,
+      reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival },
+    },
     parentSessionId,
     candidates.filter((record) => record.parent_session_id === parentSessionId),
     (taskId) => newestSessionPath(context, taskId),
   ))
+  await reclaimIsolations(context)
   return { outcomes }
 }
 
-async function reconcileLegacyRecord(context: LifecycleContext, observed: TaskRecord): Promise<ReconcileOutcome> {
+export async function reconcileLegacyRecord(context: LifecycleContext, observed: TaskRecord): Promise<ReconcileOutcome> {
   if (observed.residency_state !== "resident") return reconcileLegacyRecordExclusive(context, observed)
   // Same-process sweeps cannot distinguish "our claim is in flight" from a switched-session orphan
   // using host_pid alone. This marker never waits or spans records: a loser defers immediately while
@@ -112,28 +144,38 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   }
 
   if (TERMINAL_STATUSES.has(record.status)) return reconcileLegacyTerminal(context, record)
+  if (record.provisional_exit !== undefined) return settleProvisionalExitLoss(context, record)
+
+  // A daemon-hosted child has no pid at all. Its liveness is the daemon plus its session path, and
+  // "the daemon is gone" parks it - the pid-shaped path below would mark it lost for having no pid.
+  if (isHostSessionRecord(record)) return reconcileHostSessionOrphan(context, record)
 
   if (record.execution_mode !== "process") {
-    await markLost(context, record, "in-process task from a previous process cannot be reattached")
+    await markLost(context, record.task_id, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
   }
 
   const pid = record.pid
   if (pid === undefined) {
-    await markLost(context, record, "rpc task had no recorded pid")
+    // A runtime-fallback handoff whose owner died is revived onto its selected next model; any other
+    // pid-less child (queued, or a workpool worker that may never be replayed) has nothing to revive.
+    if (isFallbackHandoff(record) && context.config.reattach_on_reconcile !== false) {
+      return reviveClaimed(context, record, "rpc_detached", undefined)
+    }
+    await markLost(context, record.task_id, "rpc task had no recorded pid")
     return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
   }
 
   const alive = context.signaller.isAlive(pid)
   if (context.config.reattach_on_reconcile === false) {
     if (!alive) {
-      await markLost(context, record, `rpc pid=${pid} is dead; mapping exit facts only`)
+      await markLost(context, record.task_id, `rpc pid=${pid} is dead; mapping exit facts only`)
       return { task_id: record.task_id, kind: "lost", reason: `dead pid ${pid}` }
     }
     const heartbeat = heartbeatState(context, record)
     await markLost(
       context,
-      record,
+      record.task_id,
       `rpc orphan pid=${pid} session=${record.child_session_id ?? "unknown"} heartbeat=${heartbeat}; reattach disabled, terminating orphan`,
     )
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
@@ -142,19 +184,19 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   const sessionPath = newestSessionPath(context, record.task_id)
   if (!alive) {
     if (sessionPath !== undefined) return reattachLegacyRecord(context, record, sessionPath)
-    await markLost(context, record, `rpc pid=${pid} is dead; mapping exit facts only`)
+    await markLost(context, record.task_id, `rpc pid=${pid} is dead; mapping exit facts only`)
     return { task_id: record.task_id, kind: "lost", reason: `dead pid ${pid}` }
   }
 
   const heartbeat = heartbeatState(context, record)
   if (!await terminateClaimedPid(context, record)) {
-    await markLost(context, record, `rpc orphan pid=${pid} could not be terminated`)
+    await markLost(context, record.task_id, `rpc orphan pid=${pid} could not be terminated`)
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
   }
   if (sessionPath === undefined) {
     await markLost(
       context,
-      record,
+      record.task_id,
       `rpc orphan pid=${pid} session=${record.child_session_id ?? "unknown"} heartbeat=${heartbeat}; terminating before reattach`,
     )
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
@@ -162,40 +204,20 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   return reattachLegacyRecord(context, context.store.load(record.task_id) ?? record, sessionPath)
 }
 
-async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (record.status === "lost" || record.status === "cancelled") {
-    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }
-  }
-  const pid = record.pid
-  if (record.execution_mode !== "process" || record.residency_state !== "resident" || pid === undefined) {
-    return { task_id: record.task_id, kind: "resumed" }
-  }
-
-  const alive = context.signaller.isAlive(pid)
-  const sessionPath = newestSessionPath(context, record.task_id)
-  if (alive) {
-    await terminateClaimedPid(context, record)
-    if (sessionPath === undefined || context.config.reattach_on_reconcile === false) {
-      await destroyResidentTask(context, record.task_id, "reconcile_lost")
-      return { task_id: record.task_id, kind: "lost_and_terminated", reason: `terminal resident orphan pid ${pid}` }
-    }
-    return reattachLegacyRecord(context, context.store.load(record.task_id) ?? record, sessionPath)
-  }
-  if (sessionPath !== undefined && context.config.reattach_on_reconcile !== false) {
-    return reattachLegacyRecord(context, record, sessionPath)
-  }
-  return { task_id: record.task_id, kind: "resumed" }
-}
-
 async function reattachLegacyRecord(
   context: LifecycleContext,
   record: TaskRecord,
   sessionPath: string,
 ): Promise<ReconcileOutcome> {
+  // The legacy process path reserves and respawns directly, so the reviveClaimed guard never sees
+  // it: an isolated record must be stopped HERE or it is relaunched inside a reclaimed clone.
+  if (record.isolation !== undefined) {
+    await markLost(context, record.task_id, "isolated record is never respawned")
+    return { task_id: record.task_id, kind: "lost", reason: "isolated_not_revivable" }
+  }
   const ports = context.reattachPorts ?? getLifecycleReattachPorts(context.store)
   if (ports === undefined) {
-    await markLost(context, record, "reattach ports unavailable")
+    await markLost(context, record.task_id, "reattach ports unavailable")
     return { task_id: record.task_id, kind: "lost", reason: "reattach ports unavailable" }
   }
 
@@ -210,12 +232,12 @@ async function reattachLegacyRecord(
   }
   if (!respawned.ok) {
     reservation.release()
-    await markLost(context, record, `reattach failed: ${respawned.reason}`)
+    await markLost(context, record.task_id, `reattach failed: ${respawned.reason}`)
     return { task_id: record.task_id, kind: "lost", reason: respawned.reason }
   }
   let reattached: Awaited<ReturnType<typeof ports.reattach>>
   try {
-    reattached = await ports.reattach(record, respawned.handle)
+    reattached = await ports.reattach(record, respawned.handle, respawned.ok ? respawned.awaitingInput : undefined)
   } catch (error) {
     reservation.release()
     throw error
@@ -225,28 +247,11 @@ async function reattachLegacyRecord(
     if (reattached.kind === "already_attached") {
       return { task_id: record.task_id, kind: "resumed", reason: reattached.reason }
     }
-    await markLost(context, context.store.load(record.task_id) ?? record, reattached.reason)
+    await markLost(context, record.task_id, reattached.reason)
     return { task_id: record.task_id, kind: "lost", reason: reattached.reason }
   }
   context.store.appendEvent(record.task_id, { type: "reconcile_reattached", payload: { session_path: sessionPath } })
   return { task_id: record.task_id, kind: "resumed", reason: "respawned and reattached" }
-}
-
-async function terminateClaimedPid(context: LifecycleContext, record: TaskRecord): Promise<boolean> {
-  const pid = record.pid
-  if (pid === undefined || !context.signaller.isAlive(pid)) return true
-  context.signaller.signal(pid, "SIGTERM")
-  context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
-  await delay(context.orphanKillDelayMs)
-  if (context.signaller.isAlive(pid)) {
-    context.signaller.signal(pid, "SIGKILL")
-    context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })
-  }
-  return !context.signaller.isAlive(pid)
-}
-
-function hasForeignLiveOwner(context: LifecycleContext, record: TaskRecord): boolean {
-  return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
 }
 
 // A record stamped with THIS host pid that reached the candidate list is owned by another engine in
@@ -264,38 +269,30 @@ function isSuspended(record: TaskRecord): boolean {
   return record.residency_state === "persisted_only" || record.residency_state === "rpc_detached"
 }
 
-function newestSessionPath(context: LifecycleContext, taskId: string): string | undefined {
-  const sessionDir = resolveChildSessionDir(join(context.store.stateDir, "children", taskId), taskId)
-  try {
-    let newest: { readonly path: string; readonly mtimeMs: number } | undefined
-    for (const entry of readdirSync(sessionDir, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue
-      const path = join(sessionDir, entry.name)
-      const mtimeMs = statSync(path).mtimeMs
-      if (newest === undefined || mtimeMs > newest.mtimeMs || (mtimeMs === newest.mtimeMs && path > newest.path)) {
-        newest = { path, mtimeMs }
-      }
-    }
-    return newest?.path
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
-    throw error
-  }
-}
-
 function heartbeatState(context: LifecycleContext, record: TaskRecord): "fresh" | "stale" {
   return context.now() - Date.parse(record.updated_at) < HEARTBEAT_FRESH_MS ? "fresh" : "stale"
 }
 
-async function markLost(context: LifecycleContext, record: TaskRecord, message: string): Promise<void> {
-  const result = markRecordLostForReconciliation(record, {
-    timestamp: nowIso(context),
-    error_message: message,
-    updateReason: record.status === "lost",
+async function markLost(context: LifecycleContext, taskId: string, message: string): Promise<void> {
+  let applied = false
+  // Respawn can persist launch evidence before failing. Reduce the current record under its
+  // lock, never the candidate captured before process I/O or a failed reattachment.
+  const record = context.store.mutate(taskId, (fresh) => {
+    const result = markRecordLostForReconciliation(fresh, {
+      timestamp: nowIso(context),
+      error_message: withDroppedSteeringNotice(message, fresh.pending_steering?.length ?? 0),
+      updateReason: fresh.status === "lost",
+    })
+    applied = result.applied
+    return result.record
   })
-  if (result.applied) {
-    context.store.replace(result.record)
-    context.store.appendEvent(record.task_id, { type: "reconcile_lost", payload: { reason: message } })
+  if (applied) {
+    context.store.appendEvent(taskId, { type: "reconcile_lost", payload: { reason: message } })
   }
-  if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
+  if (record?.residency_state === "resident") await destroyResidentTask(context, taskId, "target_gone")
+  else if (applied) context.registry.forget(taskId, { path: "end" })
 }
+
+// Startup order is load-bearing: records are reconciled FIRST so a crashed child is terminal, then
+// its delta is salvaged while the clone still exists, and only then may the sweep reclaim clones
+// whose owner is provably gone. Reversing salvage and sweep would delete unreviewed work.

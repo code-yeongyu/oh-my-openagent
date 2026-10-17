@@ -24,6 +24,7 @@ type Env = Readonly<Record<string, string | undefined>>
 
 export interface SenpiInstallOptions {
   readonly env?: Env
+  readonly homeDir?: string
   readonly repoRoot?: string
   readonly agentDir?: string
   readonly pluginPath?: string
@@ -37,6 +38,7 @@ export interface SenpiInstallResult {
   readonly agentDir: string
   readonly settingsPath: string
   readonly pluginPath: string
+  readonly launcherPath?: string | undefined
   readonly changed: boolean
   readonly backupPath: string
   readonly removed?: boolean
@@ -60,10 +62,12 @@ export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Prom
   settings.packages = packages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
   // The local route runs the user's own engine checkout, so it needs the same launcher the
-  // published package ships; without it this install would boot unbranded.
-  installLocalLauncher({
+  // published package ships; without it this install would boot unbranded. A launcher this
+  // installer did not write (another product's `omo`) is left alone and reported as absent.
+  const launcherPath = installLocalLauncher({
     pluginPath: context.pluginPath,
     senpiCliPath: join(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
+    homeDir: context.homeDir,
   })
 
   return {
@@ -72,6 +76,7 @@ export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Prom
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
+    launcherPath,
     changed: JSON.stringify(settings) !== before,
     backupPath,
   }
@@ -85,7 +90,7 @@ export async function runSenpiUninstaller(options: SenpiInstallOptions = {}): Pr
   const nextPackages = packages.filter((entry) => entry !== context.pluginPath)
   settings.packages = nextPackages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
-  uninstallLocalLauncher()
+  uninstallLocalLauncher(context.homeDir)
 
   return {
     ok: true,
@@ -93,6 +98,7 @@ export async function runSenpiUninstaller(options: SenpiInstallOptions = {}): Pr
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
+    launcherPath: undefined,
     changed: JSON.stringify(settings) !== before,
     backupPath,
     removed: nextPackages.length !== packages.length,
@@ -103,6 +109,7 @@ function resolveInstallContext(options: SenpiInstallOptions): {
   readonly env: Env
   readonly repoRoot: string
   readonly agentDir: string
+  readonly homeDir: string
   readonly settingsPath: string
   readonly pluginPath: string
   readonly platform: NodeJS.Platform
@@ -112,12 +119,14 @@ function resolveInstallContext(options: SenpiInstallOptions): {
   const env = options.env ?? process.env
   const allowBuild = options.pluginPath === undefined
   const repoRoot = resolve(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname(fileURLToPath(import.meta.url))) : dirname(resolve(options.pluginPath))))
-  const agentDir = resolve(options.agentDir ?? resolveAgentHome({ env, homeDir: env.HOME ?? homedir() }))
+  const homeDir = options.homeDir ?? env.HOME ?? homedir()
+  const agentDir = resolve(options.agentDir ?? resolveAgentHome({ env, homeDir }))
   const pluginPath = resolve(options.pluginPath ?? join(repoRoot, "packages", "omo-senpi", "plugin"))
   return {
     env,
     repoRoot,
     agentDir,
+    homeDir,
     settingsPath: join(agentDir, "settings.json"),
     pluginPath,
     platform: options.platform ?? process.platform,

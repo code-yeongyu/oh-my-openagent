@@ -29,6 +29,8 @@ export interface BoulderWorkState {
   ended_at?: string
   elapsed_ms?: number
   updated_at?: string
+  /** When a stale-work reconcile demoted this work to `paused`; cleared when a session resumes it. */
+  stale_since?: string
   session_ids: string[]
   session_origins?: Record<string, BoulderSessionOrigin>
   agent?: string
@@ -76,6 +78,25 @@ export interface BoulderWorkResumeOption {
   session_count: number
   progress: PlanProgress
   is_current_mirror: boolean
+}
+
+export interface ReconcileStaleWorksOptions {
+  readonly now?: number
+  readonly thresholdMs?: number
+  /** Agent sessions root holding `<encoded session cwd>/<timestamp>_<sessionId>.jsonl` transcripts. */
+  readonly sessionsDirectory?: string
+  readonly env?: Readonly<Record<string, string | undefined>>
+}
+
+export interface StaleWorkDemotion {
+  readonly work_id: string
+  readonly stale_since: string
+  readonly last_activity_at: string | null
+}
+
+export interface StaleWorkReconcileResult {
+  readonly demoted: readonly StaleWorkDemotion[]
+  readonly written: boolean
 }
 
 export interface TopLevelTaskRef {

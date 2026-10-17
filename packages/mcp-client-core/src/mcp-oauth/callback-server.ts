@@ -146,6 +146,8 @@ export async function startCallbackServer(
 
     if (url.pathname !== "/oauth/callback") {
       response.statusCode = 404
+      response.setHeader("Content-Type", "text/plain; charset=utf-8")
+      response.setHeader("X-Content-Type-Options", "nosniff")
       response.end("Not Found")
       return
     }
@@ -156,6 +158,8 @@ export async function startCallbackServer(
       timer.clearTimeout(timeoutId)
       rejectCallback?.(new Error(`OAuth authorization failed: ${description}`))
       response.statusCode = 400
+      response.setHeader("Content-Type", "text/plain; charset=utf-8")
+      response.setHeader("X-Content-Type-Options", "nosniff")
       response.end(`Authorization failed: ${description}`)
       timer.setTimeout(scheduleClose, 100)
       return
@@ -168,6 +172,8 @@ export async function startCallbackServer(
       timer.clearTimeout(timeoutId)
       rejectCallback?.(new Error("OAuth callback missing code or state parameter"))
       response.statusCode = 400
+      response.setHeader("Content-Type", "text/plain; charset=utf-8")
+      response.setHeader("X-Content-Type-Options", "nosniff")
       response.end("Missing code or state parameter")
       timer.setTimeout(scheduleClose, 100)
       return

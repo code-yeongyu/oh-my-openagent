@@ -280,14 +280,19 @@ For automated tests, expose a `--non-interactive` flag and gate all prompts behi
 ## Structured output
 
 ```rust
+use std::io::Write as _;
+
+// `println!` panics when stdout is closed (`mytool | head -1`); writing to a
+// locked handle returns the error instead, so a broken pipe exits cleanly.
+let mut out = std::io::stdout().lock();
 match cli.format {
     OutputFormat::Json => {
-        serde_json::to_writer(std::io::stdout().lock(), &result)?;
-        println!();
+        serde_json::to_writer(&mut out, &result)?;
+        writeln!(out)?;
     }
     OutputFormat::Plain => {
         for row in &result.rows {
-            println!("{}\t{}\t{}", row.a, row.b, row.c);
+            writeln!(out, "{}\t{}\t{}", row.a, row.b, row.c)?;
         }
     }
     OutputFormat::Pretty => {

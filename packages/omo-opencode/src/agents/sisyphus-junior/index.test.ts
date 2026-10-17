@@ -496,6 +496,22 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("kimi-k2-7")
   })
 
+  test("returns 'kimi-k2-7' for Kimi K2.8 and the Kimi Code rolling ids", () => {
+    // given
+    const models = [
+      "moonshotai/kimi-k2.8",
+      "kimi-for-coding/k2p8",
+      "kimi-for-coding/kimi-for-coding",
+      "kimi-for-coding/kimi-for-coding-highspeed",
+    ]
+
+    // when
+    const sources = models.map((model) => getSisyphusJuniorPromptSource(model))
+
+    // then
+    expect(sources).toEqual(["kimi-k2-7", "kimi-k2-7", "kimi-k2-7", "kimi-k2-7"])
+  })
+
   test("returns 'gpt-5-4' for GPT 5.4 models", () => {
     // given
     const model = "openai/gpt-5.4"

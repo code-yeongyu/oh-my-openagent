@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { callToolViaDaemon, currentRequestContext } from "../src/daemon-client.js";
+import { DaemonUnreachableError } from "../src/ensure-daemon.js";
 import { authEnvelope } from "../src/ipc-protocol.js";
 import type { DaemonPaths } from "../src/paths.js";
 import { createLineDecoder, encodeJsonLine } from "../src/socket-jsonrpc.js";
@@ -87,7 +88,125 @@ function recordMessages(socket: Socket, recorder: ReturnType<typeof createMessag
 	socket.on("data", (chunk: Buffer) => decoder.push(chunk));
 }
 
+function answerProbe(socket: Socket, message: unknown, paths: DaemonPaths): boolean {
+	if (jsonRpcMethod(message) !== "omo/ping") return false;
+	expect(extractToken(message)).toBe(readFileSync(paths.auth, "utf8").trim());
+	socket.write(
+		encodeJsonLine({
+			jsonrpc: "2.0",
+			id: jsonRpcId(message),
+			result: {
+				pid: process.pid,
+				nonce: "retry-test-owner",
+				startedAt: "test",
+				endpoint: { kind: "missing", path: paths.socket },
+			},
+		}),
+	);
+	return true;
+}
+
 describe("daemon-client retry discipline", () => {
+	it("does not delay the first attempt when the daemon is reachable", async () => {
+		const paths = tempPaths();
+		const delays: number[] = [];
+		let requestCount = 0;
+		const server = createServer((socket) => {
+			const decoder = createLineDecoder((message) => {
+				if (answerProbe(socket, message, paths)) return;
+				requestCount += 1;
+				socket.write(
+					encodeJsonLine({
+						jsonrpc: "2.0",
+						id: jsonRpcId(message),
+						result: { content: [{ type: "text", text: "ready" }] },
+					}),
+				);
+			});
+			socket.on("data", (chunk) => decoder.push(chunk));
+		});
+		servers.push(server);
+		await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
+
+		const result = await callToolViaDaemon(
+			"status",
+			{},
+			{
+				paths,
+				context: defaultContext(),
+				sleep: async (ms) => {
+					delays.push(ms);
+				},
+			},
+		);
+
+		expect(result.isError).not.toBe(true);
+		expect(result.content[0]?.text).toBe("ready");
+		expect(requestCount).toBe(1);
+		expect(delays).toEqual([]);
+	});
+
+	it("ensures once after failed startup and only probes on subsequent attempts", async () => {
+		const paths = tempPaths();
+		let ensureCount = 0;
+		let probeCount = 0;
+		const delays: number[] = [];
+		const result = await callToolViaDaemon(
+			"status",
+			{},
+			{
+				paths,
+				context: defaultContext(),
+				ensure: async () => {
+					ensureCount += 1;
+					throw new DaemonUnreachableError(paths.socket);
+				},
+				probe: async () => {
+					probeCount += 1;
+					return false;
+				},
+				sleep: async (ms: number) => {
+					delays.push(ms);
+				},
+			},
+		);
+		expect(result.isError).toBe(true);
+		expect(result.content[0]?.text).toContain("unreachable");
+		expect(ensureCount).toBe(1);
+		expect(probeCount).toBe(2);
+		expect(delays).toEqual([100, 300]);
+	});
+
+	it("cancels during retry backoff without another ensure or probe", async () => {
+		const paths = tempPaths();
+		const controller = new AbortController();
+		let ensureCount = 0;
+		let probeCount = 0;
+		const result = await callToolViaDaemon(
+			"status",
+			{},
+			{
+				paths,
+				context: defaultContext(),
+				signal: controller.signal,
+				ensure: async () => {
+					ensureCount += 1;
+					throw new DaemonUnreachableError(paths.socket);
+				},
+				sleep: async () => {
+					if (ensureCount > 0) controller.abort();
+				},
+				probe: async () => {
+					probeCount += 1;
+					return false;
+				},
+			},
+		);
+		expect(result.content[0]?.text).toContain("cancelled");
+		expect(ensureCount).toBe(1);
+		expect(probeCount).toBe(0);
+	});
+
 	it("#given a server that never answers in time #when the call times out #then the request is executed exactly once", async () => {
 		const paths = tempPaths();
 		let requestCount = 0;
@@ -175,9 +294,15 @@ describe("daemon-client retry discipline", () => {
 		const paths = tempPaths();
 		let requestCount = 0;
 		let ensureCallCount = 0;
+		let backoffCount = 0;
+		let probeCount = 0;
 
 		const server = createServer((socket) => {
 			const decoder = createLineDecoder((message) => {
+				if (answerProbe(socket, message, paths)) {
+					probeCount += 1;
+					return;
+				}
 				requestCount += 1;
 				const id = jsonRpcId(message);
 				socket.write(encodeJsonLine({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "ok" }] } }));
@@ -188,8 +313,6 @@ describe("daemon-client retry discipline", () => {
 
 		const ensure = async (): Promise<void> => {
 			ensureCallCount += 1;
-			if (ensureCallCount === 1) return;
-			await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
 		};
 
 		const result = await callToolViaDaemon(
@@ -198,6 +321,10 @@ describe("daemon-client retry discipline", () => {
 			{
 				paths,
 				ensure,
+				sleep: async () => {
+					backoffCount += 1;
+					if (backoffCount === 1) await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
+				},
 				requestTimeoutMs: 2000,
 				context: defaultContext(),
 			},
@@ -205,6 +332,8 @@ describe("daemon-client retry discipline", () => {
 
 		expect(result.content[0]?.text).toBe("ok");
 		expect(requestCount).toBe(1);
+		expect(ensureCallCount).toBe(1);
+		expect(probeCount).toBe(1);
 	});
 
 	it("#given the server closes the connection after reading the request #then no retry happens", async () => {
@@ -261,43 +390,49 @@ describe("daemon-client retry discipline", () => {
 		{ label: "null", result: null },
 		{ label: "array", result: [] },
 		{ label: "non-array content", result: { content: "not-an-array" } },
-	])("#given an invalid daemon result $label #when the response is received #then it is rejected without retry", async ({
-		result: invalidResult,
-	}) => {
-		const paths = tempPaths();
-		let requestCount = 0;
-		const server = createServer((socket) => {
-			const decoder = createLineDecoder((message) => {
-				requestCount += 1;
-				socket.write(encodeJsonLine({ jsonrpc: "2.0", id: jsonRpcId(message), result: invalidResult }));
+	])(
+		"#given an invalid daemon result $label #when the response is received #then it is rejected without retry",
+		async ({ result: invalidResult }) => {
+			const paths = tempPaths();
+			let requestCount = 0;
+			const server = createServer((socket) => {
+				const decoder = createLineDecoder((message) => {
+					requestCount += 1;
+					socket.write(encodeJsonLine({ jsonrpc: "2.0", id: jsonRpcId(message), result: invalidResult }));
+				});
+				socket.on("data", (chunk) => decoder.push(chunk));
 			});
-			socket.on("data", (chunk) => decoder.push(chunk));
-		});
-		servers.push(server);
-		await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
+			servers.push(server);
+			await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
 
-		const result = await callToolViaDaemon(
-			"status",
-			{},
-			{
-				paths,
-				ensure: async () => {},
-				requestTimeoutMs: 2000,
-				context: defaultContext(),
-			},
-		);
+			const result = await callToolViaDaemon(
+				"status",
+				{},
+				{
+					paths,
+					ensure: async () => {},
+					requestTimeoutMs: 2000,
+					context: defaultContext(),
+				},
+			);
 
-		expect(result.content[0]?.text).toContain("invalid daemon response");
-		expect(requestCount).toBe(1);
-	});
+			expect(result.content[0]?.text).toContain("invalid daemon response");
+			expect(requestCount).toBe(1);
+		},
+	);
 
 	it("given auth is rotated before Core dispatch when the client is rejected then it rereads auth exactly once", async () => {
 		const paths = tempPaths();
 		const freshToken = "fresh-retry-test-token";
 		let requestCount = 0;
+		let probeCount = 0;
 		const seenTokens: string[] = [];
 		const server = createServer((socket) => {
 			const decoder = createLineDecoder((message) => {
+				if (answerProbe(socket, message, paths)) {
+					probeCount += 1;
+					return;
+				}
 				requestCount += 1;
 				const token = extractToken(message);
 				if (token) seenTokens.push(token);
@@ -337,6 +472,7 @@ describe("daemon-client retry discipline", () => {
 
 		expect(result.content[0]?.text).toBe("ok");
 		expect(requestCount).toBe(2);
+		expect(probeCount).toBe(1);
 		expect(seenTokens).toEqual(["retry-test-token", freshToken]);
 		expect(readFileSync(paths.auth, "utf8").trim()).toBe(freshToken);
 	});

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { TaskRecord } from "../state"
 import { FakeRunner, baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
-import { recordSpawnedPid } from "./manager-helpers"
+import { recordSpawnedChildSession, recordSpawnedPid } from "./manager-helpers"
 
 afterEach(cleanupProjects)
 
@@ -49,6 +49,34 @@ describe("recordSpawnedPid", () => {
 
     // when / then a settled task is never resurrected
     expect(recordSpawnedPid(terminal, 4242)).toBeUndefined()
+  })
+})
+
+describe("recordSpawnedChildSession", () => {
+  test("#given a running record and a child session id #when folded #then child_session_id is set on a copy", () => {
+    // given a running record whose spawn handle exposed a session id
+    const record = runningRecord()
+
+    // when
+    const updated = recordSpawnedChildSession(record, "01a0815e-child-session")
+
+    // then the session id is recorded and the original is not mutated
+    expect(updated?.child_session_id).toBe("01a0815e-child-session")
+    expect(record.child_session_id).toBeUndefined()
+  })
+
+  test("#given no session id #when folded #then nothing changes", () => {
+    // given / when / then
+    expect(recordSpawnedChildSession(runningRecord(), undefined)).toBeUndefined()
+    expect(recordSpawnedChildSession(runningRecord(), "")).toBeUndefined()
+  })
+
+  test("#given a record that already went terminal #when folded #then it is left untouched", () => {
+    // given a task that settled between start and the session-id write
+    const terminal = runningRecord({ status: "completed" })
+
+    // when / then a settled task is never resurrected
+    expect(recordSpawnedChildSession(terminal, "01a0815e-child-session")).toBeUndefined()
   })
 })
 
@@ -101,5 +129,36 @@ describe("TaskManager spawn-fact persistence", () => {
     // then the record carries no pid (the in-process path is unchanged)
     if (result.kind !== "started") throw new Error("expected started")
     expect(store.load(result.task_id)?.pid).toBeUndefined()
+  })
+
+  test("#given an in-process runner whose handle exposes a session id #when a task starts #then the persisted record carries that child_session_id", async () => {
+    // given the default in-process runner (session id, no OS pid)
+    const { manager, store } = makeManager({})
+
+    // when a task is launched in in-process execution mode
+    const result = await manager.start(baseSpec({ execution_mode: "in-process" }))
+
+    // then the running record persisted the child's own session id so external readers can join it
+    if (result.kind !== "started") throw new Error("expected started")
+    const handle = manager.getResidentHandle(result.task_id)
+    expect(handle?.sessionId).toBeDefined()
+    expect(store.load(result.task_id)?.child_session_id).toBe(handle?.sessionId)
+  })
+
+  test("#given a process runner whose child has a pid and session id #when a process task starts #then the persisted record carries both", async () => {
+    // given a process runner that spawns a child reporting a real OS pid and a session id
+    const processRunner = new FakeRunner()
+    processRunner.childPid = 4242
+    const { manager, store } = makeManager({ process: processRunner })
+
+    // when a task is launched in process execution mode
+    const result = await manager.start(baseSpec({ execution_mode: "process" }))
+
+    // then pid and child_session_id both land on the running record
+    if (result.kind !== "started") throw new Error("expected started")
+    const handle = manager.getResidentHandle(result.task_id)
+    expect(store.load(result.task_id)?.pid).toBe(4242)
+    expect(handle?.sessionId).toBeDefined()
+    expect(store.load(result.task_id)?.child_session_id).toBe(handle?.sessionId)
   })
 })

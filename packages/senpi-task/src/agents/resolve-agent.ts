@@ -1,6 +1,8 @@
 import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
+import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
+import { firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import type { ResolvedModelRecord } from "../state"
 import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
@@ -9,11 +11,14 @@ import {
   parseAvailableAgentModels,
   type ParsedAgentModel,
 } from "./agent-model-registry"
+import { agentToolPolicy } from "./agent-tool-policy"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
+import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
 
 export type ResolveAgentOptions = {
   readonly modelOverride?: string
+  readonly omoConfig?: OmoConfig
 }
 
 type AgentPersona = {
@@ -60,11 +65,12 @@ type AgentResolutionContext = {
 }
 
 export function resolveAgent<TModel extends SenpiModelPort>(
-  name: string,
+  requestedName: string,
   agents: Readonly<Record<string, AgentDefinition>>,
   registry: SenpiModelRegistryPort<TModel> | undefined,
   options: ResolveAgentOptions = {},
 ): AgentResolutionResult {
+  const name = canonicalAgentName(requestedName.trim())
   const availableAgents = Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
     .map(([agentName]) => agentName)
@@ -86,14 +92,13 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     }
   }
 
-  const fallbackChain = Object.hasOwn(AGENT_FALLBACK_CHAINS, name)
-    ? AGENT_FALLBACK_CHAINS[name]
-    : undefined
+  const fallbackChain = Object.hasOwn(AGENT_FALLBACK_CHAINS, name) ? AGENT_FALLBACK_CHAINS[name] : undefined
   if (registry === undefined) {
     const fallbackHead = fallbackChain?.[0]
     const fallbackProvider = fallbackHead?.providers[0]
     const attemptedModel = definition.model
       ?? firstConfiguredModel(definition)
+      ?? firstCategoryDefaultModel(definition.categories, options.omoConfig)
       ?? (fallbackHead !== undefined && fallbackProvider !== undefined
         ? `${fallbackProvider}/${fallbackHead.model}`
         : undefined)
@@ -128,6 +133,28 @@ export function resolveAgent<TModel extends SenpiModelPort>(
         source: "agent",
       }),
     )
+  }
+
+  if (definition.categories !== undefined) {
+    const selection = resolveAgentCategoryModel({
+      categories: definition.categories,
+      omoConfig: options.omoConfig ?? {},
+      registry,
+      configuredTuning,
+    })
+    if (selection !== undefined) {
+      return resolvedAgent(
+        context,
+        { provider: selection.provider, modelId: selection.modelId },
+        selection.variant,
+        selection.reasoningEffort,
+        {
+          ...(selection.requested_model !== undefined ? { requested_model: selection.requested_model } : {}),
+          ...(selection.fallback_models !== undefined ? { fallback_models: selection.fallback_models } : {}),
+        },
+      )
+    }
+    attemptedModel = attemptedModel ?? firstCategoryDefaultModel(definition.categories, options.omoConfig)
   }
 
   if (availableModels !== undefined && fallbackChain !== undefined) {
@@ -173,15 +200,11 @@ export function resolveAgent<TModel extends SenpiModelPort>(
 }
 
 function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
-  const toolAllowlist = definition.tools?.filter((rule) =>
-    rule.allow && !rule.pattern.includes(" ") && !rule.pattern.includes("*")
-  ).map((rule) => rule.pattern)
   const agentExecutionMode = toExecutionMode(definition.executionMode)
   return {
     agentType: name,
     ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
-    ...(toolAllowlist !== undefined ? { toolAllowlist } : {}),
-    ...(definition.disallowedTools !== undefined ? { toolDenylist: definition.disallowedTools } : {}),
+    ...agentToolPolicy(definition),
     ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
     ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
     ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),

@@ -1,10 +1,8 @@
 # Facts extractor
 
-Extract only explicit, durable, atomic facts stated in the supplied transcript payload.
+Extract only explicit, durable, atomic facts stated in the supplied payload. The payload is inline in the prompt; use the `record_fact` tool to emit accepted facts.
 
-## Output
-
-Write JSON Lines to the exact path in `FACTS_EXTRACTION_PATH`. Write no other file. Emit one object per line using exactly one of these shapes:
+Call `record_fact` once per durable fact, using exactly one of these shapes:
 
 ```json
 {"scope":"person","person":{"name":"...","aliases":["..."]},"text":"...","date":"YYYY-MM-DD"}
@@ -15,4 +13,4 @@ Use `scope: "person"` only for an explicit proper name, a known alias from the p
 
 Use absolute dates. Resolve relative dates against `today` in the payload. Omit ephemera, guesses, plans not adopted, transient task state, and facts already contradicted in the same transcript. Keep each record self-contained and preserve the stated meaning without adding inference.
 
-If no durable fact qualifies, create an empty `extraction.jsonl` file.
+Call nothing when no durable fact qualifies.

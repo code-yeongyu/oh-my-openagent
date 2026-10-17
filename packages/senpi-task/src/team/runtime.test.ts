@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { readMemberTaskMap } from "./member-map"
 import { normalizeSenpiTeamSpec } from "./normalize"
 import { createTeam } from "./runtime"
+import { resolveStateDir } from "../store"
 import { resolveTeamRuntimeDirs } from "./storage"
 import {
   FakeTeamManager,
@@ -61,8 +62,8 @@ describe("createTeam", () => {
     expect(started?.memberEnv?.["SENPI_TASK_MEMBER"]).toBe(`${created.runtimeState.teamRunId}::alpha`)
     const config = JSON.parse(started?.memberEnv?.["SENPI_TASK_TEAM_CONFIG"] ?? "null")
     expect(config).toMatchObject({
-      stateDir: join(stateDir.project_dir, ".omo", "senpi-task"),
-      base_dir: join(stateDir.project_dir, ".omo", "senpi-task", "teams"),
+      stateDir: resolveStateDir(stateDir),
+      base_dir: join(resolveStateDir(stateDir), "teams"),
       members: ["alpha"],
     })
     expect(started?.memberScopedTools).toBeUndefined()

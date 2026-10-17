@@ -1,7 +1,7 @@
 import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
 import { readReflectionHealth } from "./worker/health"
@@ -37,6 +37,7 @@ export interface MemoryStatusSegments {
   readonly dirty: boolean
   readonly backlogSteps: number
   readonly streak: number
+  readonly parked: boolean
 }
 
 export interface MemoryStatusResult {
@@ -108,15 +109,16 @@ export async function readMemoryStatusSegments(
   context: MemoryIdentityContext,
   sessionId: string | undefined,
 ): Promise<MemoryStatusSegments> {
-  const [dirty, backlogSteps, streak] = await Promise.all([
+  const [dirty, backlogSteps, streak, parked] = await Promise.all([
     readDirty(repo),
     readBacklogSteps(context, sessionId),
     readStreak(context),
+    readParked(context),
   ])
-  return { dirty, backlogSteps, streak }
+  return { dirty, backlogSteps, streak, parked }
 }
 
-/** Assembles `mem:<identity> <age>[*][ (+N)][ !N]`, dropping segments right-to-left to fit. */
+/** Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused]`, dropping segments right-to-left to fit. */
 export function formatMemoryStatusLine(
   identity: string,
   age: string,
@@ -127,8 +129,9 @@ export function formatMemoryStatusLine(
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
     segments.streak >= STREAK_BADGE_THRESHOLD ? ` !${segments.streak}` : "",
+    segments.parked ? " paused" : "",
   ]
-  // Drop right-to-left (`!N`, then `(+N)`, then `*`) until the line fits the budget.
+  // Drop right-to-left (`paused`, then `!N`, then `(+N)`, then `*`) until the line fits the budget.
   for (let keep = optional.length; keep > 0; keep -= 1) {
     const candidate = base + optional.slice(0, keep).join("")
     if (candidate.length <= MEMORY_STATUS_MAX_WIDTH) return candidate
@@ -161,6 +164,14 @@ async function readBacklogSteps(
   }
 }
 
+async function readParked(context: MemoryIdentityContext): Promise<boolean> {
+  try {
+    return (await readReflectionParkFile(context.identityPaths.reflection)).parkedAt !== undefined
+  } catch {
+    return false
+  }
+}
+
 async function readStreak(context: MemoryIdentityContext): Promise<number> {
   try {
     const health = await readReflectionHealth(
@@ -171,6 +182,26 @@ async function readStreak(context: MemoryIdentityContext): Promise<number> {
   } catch {
     return 0
   }
+}
+
+/**
+ * The same estimate, computed once per commit. A commit is immutable, so a second caller at the same
+ * HEAD is owed the identical number and nothing has to be re-read to produce it; the prompt path asks
+ * on every turn and would otherwise list the tree and read every system blob each time.
+ *
+ * A failed read is NOT cached and NOT swallowed. Reporting zero for a repository whose size is merely
+ * unknown is the one answer that silences the advisory exactly when it cannot be trusted.
+ */
+export async function estimateSystemTokensCached(
+  repo: GitRepoForStatus,
+  head: string,
+  cache: Map<string, number>,
+): Promise<number> {
+  const cached = cache.get(head)
+  if (cached !== undefined) return cached
+  const estimate = await estimateSystemTokens(repo, head)
+  cache.set(head, estimate)
+  return estimate
 }
 
 export async function estimateSystemTokens(repo: GitRepoForStatus, head: string): Promise<number> {

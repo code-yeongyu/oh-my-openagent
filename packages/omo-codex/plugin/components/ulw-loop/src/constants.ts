@@ -2,6 +2,7 @@ export const ULW_LOOP_DIR = ".omo/ulw-loop";
 export const ULW_LOOP_BRIEF = "brief.md";
 export const ULW_LOOP_GOALS = "goals.json";
 export const ULW_LOOP_LEDGER = "ledger.jsonl";
+export const ULW_LOOP_STATE_LOCK = ".state.lock";
 
 export type UlwLoopStatus =
 	| "pending"

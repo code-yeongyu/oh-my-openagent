@@ -1,6 +1,5 @@
-import type { AgentToolResult } from "@code-yeongyu/senpi"
-
-import { toolResult } from "../control"
+import { toolErrorResult, toolResult } from "../control"
+import type { ToolExecutionResult } from "../control"
 import { classifyMailboxError, type MailboxErrorKind } from "./classify-error"
 import type { TeamToolsService } from "./types"
 
@@ -20,7 +19,7 @@ export async function runTeamSend(
   teamRunId: string,
   from: string,
   input: TeamSendInput,
-): Promise<AgentToolResult<TeamSendDetails>> {
+): Promise<ToolExecutionResult<TeamSendDetails>> {
   try {
     const result = await service.sendMessage(teamRunId, {
       from,
@@ -43,7 +42,7 @@ export async function runTeamSend(
     const mailbox = classifyMailboxError(error)
     if (mailbox !== undefined) {
       const reason = error instanceof Error ? error.message : String(error)
-      return toolResult(reason, { kind: mailbox, to: input.to, reason })
+      return toolErrorResult(reason, { kind: mailbox, to: input.to, reason })
     }
     throw error
   }

@@ -248,4 +248,87 @@ describe("createChatParamsHandler", () => {
     //#then
     expect(output.maxOutputTokens).toBe(4096)
   })
+
+  test("applies stored params and live limits for the SDK provider context", async () => {
+    //#given
+    setSessionPromptParams("ses_chat_params", {
+      temperature: 0.4,
+      topP: 0.7,
+      maxOutputTokens: 16_000,
+      options: { thinking: { type: "enabled", budgetTokens: 4096 } },
+    })
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: "oracle",
+      model: {
+        providerID: "custom-provider",
+        id: "live-capability-model",
+        capabilities: { temperature: false, reasoning: false },
+        limit: { output: 8192 },
+      },
+      provider: { source: "config", info: { id: "custom-provider" }, options: {} },
+      message: {},
+    }
+    const output: ChatParamsOutput = {
+      temperature: 0.1,
+      topP: 1,
+      maxOutputTokens: 2048,
+      options: { existing: true },
+    }
+
+    //#when
+    await createChatParamsHandler()(input, output)
+
+    //#then
+    expect(output).toEqual({
+      topP: 0.7,
+      maxOutputTokens: 8192,
+      options: { existing: true },
+    })
+  })
+
+  test("prefers the live model over stale cached capabilities", async () => {
+    //#given
+    sharedModule.writeProviderModelsCache({
+      connected: ["custom-provider"],
+      models: {
+        "custom-provider": [{
+          id: "live-capability-model",
+          temperature: false,
+          reasoning: false,
+          variants: { low: {} },
+          limit: { output: 2048 },
+        }],
+      },
+    })
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "oracle" },
+      model: {
+        providerID: "custom-provider",
+        id: "live-capability-model",
+        capabilities: { temperature: true, reasoning: true },
+        variants: { low: {}, high: {} },
+        limit: { output: 8192 },
+      },
+      provider: { id: "custom-provider" },
+      message: { variant: "high" },
+    }
+    const output: ChatParamsOutput = {
+      temperature: 0.4,
+      maxOutputTokens: 16_000,
+      options: { thinking: { type: "enabled", budgetTokens: 4096 } },
+    }
+
+    //#when
+    await createChatParamsHandler()(input, output)
+
+    //#then
+    expect(input.message.variant).toBe("high")
+    expect(output).toEqual({
+      temperature: 0.4,
+      maxOutputTokens: 8192,
+      options: { thinking: { type: "enabled", budgetTokens: 4096 } },
+    })
+  })
 })

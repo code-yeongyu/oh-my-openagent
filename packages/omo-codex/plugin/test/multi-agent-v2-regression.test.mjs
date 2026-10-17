@@ -36,7 +36,7 @@ test("#given relative model_catalog_json declares gpt-5.6 model as v1 #when migr
 
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /enabled = false/);
-	assert.match(content, /max_threads = 1000/);
+	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
 });
 
 test("#given no SessionStart model and root gpt-5.6 model without catalog #when migrating #then clears stale V2 disable", async () => {

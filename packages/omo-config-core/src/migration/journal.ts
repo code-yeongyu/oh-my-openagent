@@ -14,6 +14,8 @@ export type MigrationJournal = {
   readonly diagnostics: readonly string[]
   readonly completedMoves: readonly string[]
   readonly migrationId: string
+  /** Chosen before the target write, so recovery can name the copy even after a crash mid-write. */
+  readonly targetBackupPath?: string
   readonly targetPath: string
   readonly targetWrite: {
     readonly additions: Record<string, unknown>
@@ -59,6 +61,8 @@ function parseJournal(value: unknown): MigrationJournal {
   if (!value["completedMoves"].every((path) => typeof path === "string")) {
     throw new Error("Migration journal completed moves are invalid")
   }
+  const targetBackupPath = value["targetBackupPath"]
+  if (targetBackupPath !== undefined && typeof targetBackupPath !== "string") throw new Error("Migration journal target backup is invalid")
   if (!Array.isArray(value["backupMoves"])) throw new Error("Migration journal backup plan is invalid")
 
   const backupMoves: MigrationBackupMove[] = []
@@ -74,6 +78,7 @@ function parseJournal(value: unknown): MigrationJournal {
     completedMoves: [...value["completedMoves"]],
     diagnostics: diagnostics === undefined ? [] : [...diagnostics],
     migrationId: value["migrationId"],
+    ...(targetBackupPath === undefined ? {} : { targetBackupPath }),
     targetPath: value["targetPath"],
     targetWrite: {
       additions: { ...value["targetWrite"]["additions"] },

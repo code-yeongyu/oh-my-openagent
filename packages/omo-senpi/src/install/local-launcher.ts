@@ -30,7 +30,14 @@ export function localLauncherCmdPath(homeDir: string = homedir()): string {
   return join(homeDir, ".local", "bin", "omo.cmd")
 }
 
+/** The npm channel a build ships on: a prerelease version is on beta, a stable one on latest. */
+function releaseChannel(version: string | undefined): "beta" | "latest" {
+  return version !== undefined && version.includes("-") ? "beta" : "latest"
+}
+
 export function renderLocalLauncher(options: LocalLauncherOptions): string {
+  const channel = releaseChannel(options.version)
+  const updateCommand = channel === "beta" ? "bun add -g omo-ai@beta" : "bun add -g omo-ai"
   const brand = {
     name: "OmO",
     command: "omo",
@@ -42,12 +49,15 @@ export function renderLocalLauncher(options: LocalLauncherOptions): string {
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
+    changelog: {
+      path: join(options.pluginPath, "CHANGELOG.md").replaceAll("\\", "/"),
+    },
     // Same channel the published launcher declares, so a local install is never told to update
     // the engine it is pinned against.
     update: {
       packageName: "omo-ai",
-      distTag: "beta",
-      command: "npm i -g omo-ai@beta",
+      distTag: channel,
+      command: updateCommand,
       changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
     },
   }
@@ -77,9 +87,12 @@ const selfUpdate = process.argv[2] === "update"
   && process.argv.slice(3).every((arg) => arg.startsWith("-") || ["self", "senpi", "omo"].includes(arg))
   && !process.argv.slice(3).some((arg) => arg === "--extensions" || arg === "--models")
 if (selfUpdate) {
-  console.log("omo is updated via npm: npm i -g omo-ai@beta")
+  console.log(${JSON.stringify(`omo is updated via bun: ${updateCommand}`)})
   process.exit(0)
 }
+// windowsHide-exempt: this is the interactive foreground CLI, spawned with inherited stdio.
+// CREATE_NO_WINDOW would suppress the console a console-less launch needs to render the TUI,
+// so the launcher keeps the user's console instead of hiding it (#8501).
 const child = spawn(process.execPath, [cli, "--extension", plugin, ...process.argv.slice(2)], {
   env,
   stdio: "inherit",

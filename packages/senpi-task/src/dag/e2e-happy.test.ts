@@ -408,7 +408,7 @@ describe("DAG happy-path end to end", () => {
     const input = definition("linear-three", [
       categoryNode("plan"),
       categoryNode("build", ["plan"]),
-      agentNode("review", ["build"], "momus"),
+      agentNode("review", ["build"], "plan-reviewer"),
     ])
 
     // when
@@ -439,7 +439,7 @@ describe("DAG happy-path end to end", () => {
       categoryNode("root"),
       agentNode("left", ["root"]),
       categoryNode("right", ["root"], "deep"),
-      agentNode("join", ["left", "right"], "momus"),
+      agentNode("join", ["left", "right"], "plan-reviewer"),
     ])
 
     // when
@@ -469,9 +469,9 @@ describe("DAG happy-path end to end", () => {
       categoryNode("design", ["intake"], "visual-engineering"),
       agentNode("evidence", ["research"], "librarian"),
       categoryNode("budget", ["intake"], "deep"),
-      agentNode("build", ["design", "evidence"], "hephaestus"),
+      agentNode("build", ["design", "evidence"], "librarian"),
       categoryNode("docs", ["evidence", "budget"], "writing"),
-      agentNode("review", ["build", "docs"], "momus"),
+      agentNode("review", ["build", "docs"], "plan-reviewer"),
     ])
     const waves = [
       ["intake", "research"],
@@ -493,9 +493,9 @@ describe("DAG happy-path end to end", () => {
       { id: "design", route: { kind: "category", category: "visual-engineering" } },
       { id: "evidence", route: { kind: "agent", agent: "librarian" } },
       { id: "budget", route: { kind: "category", category: "deep" } },
-      { id: "build", route: { kind: "agent", agent: "hephaestus" } },
+      { id: "build", route: { kind: "agent", agent: "librarian" } },
       { id: "docs", route: { kind: "category", category: "writing" } },
-      { id: "review", route: { kind: "agent", agent: "momus" } },
+      { id: "review", route: { kind: "agent", agent: "plan-reviewer" } },
     ])
     // Launch order follows the frontier, not declaration: budget starts as soon as intake
     // settles, ahead of evidence whose dependency research folded one settlement later.
@@ -505,9 +505,9 @@ describe("DAG happy-path end to end", () => {
       ["design", "scripted/visual-engineering", undefined],
       ["budget", "scripted/deep", undefined],
       ["evidence", "scripted/librarian", "librarian"],
-      ["build", "scripted/hephaestus", "hephaestus"],
+      ["build", "scripted/librarian", "librarian"],
       ["docs", "scripted/writing", undefined],
-      ["review", "scripted/momus", "momus"],
+      ["review", "scripted/plan-reviewer", "plan-reviewer"],
     ])
     expect(Object.values(result.nodes).every((node) => node.state === "completed" && node.output.startsWith("output:"))).toBe(true)
     assertArtifacts(fixture, result.runId, input.key, input.nodes.map((node) => node.id))
