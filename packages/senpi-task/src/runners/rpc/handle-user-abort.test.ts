@@ -108,3 +108,103 @@ describe("rpc turn outcome user abort classification", () => {
     })
   })
 })
+
+describe("rpc turn outcome foreign user abort classification (F10a)", () => {
+  const PARTIAL_ANSWER = {
+    role: "assistant",
+    content: [{ type: "text", text: "partial answer before the foreign abort" }],
+    stopReason: "aborted",
+    errorMessage: "This operation was aborted",
+  }
+
+  describe("#given a turn another client's user abort ends", () => {
+    it("#when the terminating agent_end arrives #then the tracked outcome is interrupted and keeps the partial text", async () => {
+      // given
+      const harness = createHarness()
+      await harness.handle.startInitialPrompt("work")
+
+      // when
+      harness.emit(event({ type: "message_end", message: PARTIAL_ANSWER }))
+      harness.emit(event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "user",
+        abortedBy: "guest-client",
+        messages: [PARTIAL_ANSWER],
+      }))
+      harness.emit(event({ type: "agent_idle" }))
+
+      // then
+      expect(await harness.handle.waitForOutcome()).toEqual({
+        status: "interrupted",
+        finalResponse: "partial answer before the foreign abort",
+        abortedBy: "guest-client",
+      })
+      await harness.handle.dispose()
+    })
+  })
+
+  describe("#given a turn this parent aborts first", () => {
+    it("#when the host echoes the same user abortSource #then the tracked outcome stays cancelled", async () => {
+      // given
+      const harness = createHarness()
+      await harness.handle.startInitialPrompt("work")
+
+      // when
+      await harness.handle.abort()
+      harness.emit(event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "user",
+        messages: [PARTIAL_ANSWER],
+      }))
+      harness.emit(event({ type: "agent_idle" }))
+
+      // then
+      expect(await harness.handle.waitForOutcome()).toEqual({ status: "cancelled" })
+      await harness.handle.dispose()
+    })
+  })
+
+  describe("#given a provider abort", () => {
+    it("#when the terminating agent_end arrives #then the tracked outcome stays a turn failure", async () => {
+      // given
+      const harness = createHarness()
+      await harness.handle.startInitialPrompt("work")
+
+      // when
+      harness.emit(event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "provider",
+        messages: [PARTIAL_ANSWER],
+      }))
+      harness.emit(event({ type: "agent_idle" }))
+
+      // then
+      const outcome = await harness.handle.waitForOutcome()
+      expect(outcome.status).toBe("error")
+      expect(outcome.status === "error" ? outcome.failure.kind : undefined).toBe("child-turn-failed")
+      await harness.handle.dispose()
+    })
+  })
+
+  describe("#given an abort the child does not attribute", () => {
+    it("#when the terminating agent_end arrives #then the tracked outcome keeps today's error classification", async () => {
+      // given
+      const harness = createHarness()
+      await harness.handle.startInitialPrompt("work")
+
+      // when
+      harness.emit(event({ type: "agent_end", willRetry: false, aborted: true, messages: [] }))
+      harness.emit(event({ type: "agent_idle" }))
+
+      // then
+      expect((await harness.handle.waitForOutcome()).status).toBe("error")
+      await harness.handle.dispose()
+    })
+  })
+})

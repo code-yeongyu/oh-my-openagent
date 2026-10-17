@@ -25,6 +25,7 @@ import { createSteeringControls } from "./controls"
 import { createPendingSteering } from "./pending-steering"
 import { endDroppedSteering } from "../state/queued-steering"
 import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
+import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
@@ -168,6 +169,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       if (deliverAs === "steer") await handle.steer(message)
       else await handle.followUp(message)
     } catch (error) {
+      if (error instanceof InputUncertainError) return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
+      if (error instanceof InputConflictError) return { kind: "failed", task_id: record.task_id,
+        effect_id: error.effectId, reason: error.reason, detail: error.detail, action: error.action }
       // These typed refusals happen before delivery. Never replay an ambiguous transport failure.
       if (!(error instanceof HostSessionDetachedError) && !(error instanceof SessionHeldElsewhereError)) throw error
       const fresh = tryLoad(record.task_id)

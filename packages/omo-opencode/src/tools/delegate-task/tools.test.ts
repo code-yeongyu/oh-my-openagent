@@ -163,8 +163,8 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("anthropic/claude-fable-5-1")
-      expect(category.variant).toBe("max")
+      expect(category.model).toBe("google/gemini-4-argon")
+      expect(category.variant).toBe("low")
     })
 
     test("ultrabrain category has model and variant config", () => {
@@ -991,7 +991,7 @@ describe("sisyphus-task", () => {
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-fable-5-1")
+      expect(resolved.config.model).toBe("google/gemini-4-argon")
       expect(resolved.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -1077,7 +1077,7 @@ describe("sisyphus-task", () => {
 
       // then - category's built-in model wins over inheritedModel
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-fable-5-1")
+      expect(resolved.config.model).toBe("google/gemini-4-argon")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -1119,7 +1119,7 @@ describe("sisyphus-task", () => {
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-fable-5-1")
+      expect(resolved.config.model).toBe("google/gemini-4-argon")
     })
   })
 
@@ -3999,7 +3999,7 @@ describe("sisyphus-task", () => {
       
       // then should use category's built-in model (Opus 5 high for visual-engineering)
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.model).toBe("anthropic/claude-fable-5-1")
+      expect(category.model).toBe("google/gemini-4-argon")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {

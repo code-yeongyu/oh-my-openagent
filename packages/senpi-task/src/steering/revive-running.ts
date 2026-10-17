@@ -5,6 +5,7 @@ import type { TaskRecord } from "../state"
 import { evictionRefusal, lazyRevivalFailure } from "./engine-policy"
 import { bestEffortRollback } from "./revival-rollback"
 import type { SendOutcome, SteeringPort } from "./types"
+import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 const UNUSED_RESERVATION = { ok: true as const, commit: (): void => undefined, release: (): void => undefined }
 
@@ -48,6 +49,10 @@ export async function reviveRunningOnSend(
     try {
       await handle.followUp(message)
     } catch (error) {
+      if (error instanceof InputUncertainError) return { kind: "uncertain", task_id: record.task_id,
+        effect_id: error.effectId, reason: error.message }
+      if (error instanceof InputConflictError) return { kind: "failed", task_id: record.task_id,
+        effect_id: error.effectId, reason: error.reason, detail: error.detail, action: error.action }
       const failed = await refusedDelivery(port, record, handle, error)
       return (error instanceof HostSessionDetachedError || error instanceof SessionHeldElsewhereError)
         && queueRecovery !== undefined ? queueRecovery() : failed

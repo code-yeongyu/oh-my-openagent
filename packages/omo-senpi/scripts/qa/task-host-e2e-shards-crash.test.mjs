@@ -20,10 +20,7 @@ function facts() {
     bystanderSocket: SOCKET_B,
     crashedInstanceBefore: "inst-a-1",
     notices: {
-      crashed: [
-        `host_shard_crash:${KEY_A} Background task host crashed (shard ${KEY_A}, supervisor pid 42, SIGSEGV): reattaching 3 subagents...`,
-        `host_shard_crash_done:${KEY_A} 3 subagents reattached, 0 lost`,
-      ],
+      crashed: [],
       bystander: [],
     },
     // The engine records /private/tmp on darwin; rows are matched by shard basename.
@@ -47,36 +44,14 @@ const rows = (value) => crashRowsForReport(value, "/tmp/artifacts")
 const failed = (value) => Object.entries(rows(value)).filter(([, row]) => row.status !== "pass").map(([id]) => id)
 
 describe("crashRowsForReport", () => {
-  test("the crash notice and status facts of plan steps (6) and (7) pass every row", () => {
+  test("silent recovery with a new host generation and completed children passes every row", () => {
     expect(failed(facts())).toEqual([])
   })
 
-  test("a loss-led closing line in the current wording passes", () => {
-    const value = facts()
-    value.notices.crashed[1] = `host_shard_crash_done:${KEY_A} 1 subagent lost (reattach failed), 2 reattached`
-    expect(failed(value)).toEqual([])
-  })
-
   const crashedMutations = {
-    "the crash line is missing": (value) => value.notices.crashed.splice(0, 1),
-    "the crash line is announced twice": (value) => value.notices.crashed.push(value.notices.crashed[0]),
-    "the closing line is missing": (value) => value.notices.crashed.splice(1, 1),
-    "the closing line is announced twice": (value) => value.notices.crashed.push(value.notices.crashed[1]),
-    "the closing line uses the retired numeric tuple": (value) => {
-      value.notices.crashed[1] = `host_shard_crash_done:${KEY_A} 3 3 0`
-    },
-    "the closing line misses a child": (value) => {
-      value.notices.crashed[1] = `host_shard_crash_done:${KEY_A} 2 subagents reattached, 0 lost`
-    },
-    "the closing line count and noun disagree": (value) => {
-      value.notices.crashed[1] = `host_shard_crash_done:${KEY_A} 3 subagent reattached, 0 lost`
-    },
-    "the crash line names another shard": (value) => {
-      value.notices.crashed[0] = value.notices.crashed[0].replace(`host_shard_crash:${KEY_A}`, `host_shard_crash:${KEY_B}`)
-    },
-    "a crash line for another shard also appears": (value) => {
-      value.notices.crashed.push(value.notices.crashed[0].replace(`host_shard_crash:${KEY_A}`, `host_shard_crash:${KEY_B}`))
-    },
+    "a recovered crash emits a warning": (value) => value.notices.crashed.push(`host_shard_crash:${KEY_A} crash`),
+    "a recovered crash emits a closing line": (value) => value.notices.crashed.push(`host_shard_crash_done:${KEY_A} done`),
+    "another shard leaks a warning": (value) => value.notices.crashed.push(`host_shard_crash:${KEY_B} crash`),
     "the notice list was never read": (value) => {
       value.notices.crashed = null
     },
@@ -105,8 +80,8 @@ describe("crashRowsForReport", () => {
   }
 
   const bystanderMutations = {
-    "the bystander is told of the crash": (value) => value.notices.bystander.push(value.notices.crashed[0]),
-    "the bystander gets a closing line": (value) => value.notices.bystander.push(value.notices.crashed[1]),
+    "the bystander is told of the crash": (value) => value.notices.bystander.push(`host_shard_crash:${KEY_A} crash`),
+    "the bystander gets a closing line": (value) => value.notices.bystander.push(`host_shard_crash_done:${KEY_A} done`),
     "the bystander notice list was never read": (value) => {
       value.notices.bystander = null
     },
