@@ -230,36 +230,6 @@ describe("createConfigStartupComponent", () => {
     expect(logs).toEqual([])
   })
 
-  // Migration contract (#10428): the OpenCode config migration runs at the first session, never on a
-  // launch that only prints help, a model list or the tips, although senpi loads extensions for those.
-  test.each([
-    { argv: ["--extension", "/omo/plugin", "--help"], migrates: false },
-    { argv: ["--extension", "/omo/plugin", "-h"], migrates: false },
-    { argv: ["--extension", "/omo/plugin", "--list-models", "gpt"], migrates: false },
-    { argv: ["--extension", "/omo/plugin", "--list-tips"], migrates: false },
-    { argv: ["--extension", "/omo/plugin"], migrates: true },
-    { argv: ["--extension", "/omo/plugin", "-p", "hi", "--", "--help"], migrates: true },
-  ])("#given a legacy OpenCode config #when the extension registers for $argv #then the file is migrated only on a session launch ($migrates)", ({ argv, migrates }) => {
-    // given
-    const legacyPath = "/home/alice/.config/opencode/oh-my-openagent.json"
-    const legacy = '{"agents":{"oracle":{"model":"openai/gpt-5.5"}}}'
-    const fileSystem = memoryFileSystem()
-    fileSystem.files.set(legacyPath, legacy)
-    const component = createConfigStartupComponent({
-      argv,
-      loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
-      resolveCwd: () => "/home/alice/project",
-      runMigration: ({ cwd }) => runSenpiStartupMigration({ ...migrationOptions(fileSystem), cwd }),
-    })
-
-    // when
-    withProcessPlatform("win32", () => component.register(new FakeExtensionAPI(), context([])))
-
-    // then
-    expect(fileSystem.files.get(legacyPath)).toBe(migrates ? undefined : legacy)
-    expect(fileSystem.files.has("/home/alice/.omo/omo.jsonc")).toBe(migrates)
-  })
-
   test("#given a migration target with a conflicting provider setting #when session_start captures a UI #then it reports the skipped-conflict diagnostic once", async () => {
     // given
     const fileSystem = memoryFileSystem()

@@ -2,7 +2,7 @@
 
 Thanks to @bluet for the report and the clean reproduction, and to @twotnguyen for #10433, which first routed `--help` around the extension. Senpi loads every extension to list their flags for `--help`, and it builds the runtime for `--list-models` and `--list-tips` before exiting, so `config-startup` ran the legacy migration on those launches and moved `~/.config/opencode/oh-my-openagent.json` into `~/.omo/migration-backup-*` before the user ever started a session. A 4.19.x OpenCode plugin then ran on its defaults. The migration guide says the move happens the first time omo starts a session.
 
-`config-startup` now skips its migration and config notices when the engine's argv asks only for `--help`/`-h`, `--list-models` or `--list-tips` (`metadata-launch.ts`); arguments after `--` are message text and do not count. Every launch that can start a session migrates as before. The component test runs the real migration over a fixture home for each metadata option and for two session launches.
+`config-startup` now skips its migration and config notices when the engine was started only for `--help`/`-h`, `--list-models` or `--list-tips` (`metadata-launch.ts`). The argv walk mirrors senpi's `cli/args.js`: an option's value is never read as an option (`--name -h` still starts a session), a `--multi-session`/`--listen` host always migrates, and arguments after `--` are message text. Every launch that can start a session migrates as before. `metadata-launch.test.ts` runs the real migration over a temp home for each case and checks the legacy file's bytes and mtime on metadata launches.
 
 ## 2026-10-12 - Thread QA rides the neutral senpi qa-shared helpers (#10033)
 
