@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A post-compaction autocontinue runs on the session's working model, not the compaction model.** OpenCode's synthetic continue inherits the summarize request's model, so with `agents.<name>.compaction.model` set the compaction model silently ran the continuation turns. The continue is now re-issued through `session.promptAsync` with the working model, the working agent and the `compaction_continue` marker. ([#8397](https://github.com/code-yeongyu/oh-my-openagent/pull/8397))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
