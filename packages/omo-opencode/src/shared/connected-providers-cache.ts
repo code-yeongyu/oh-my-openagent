@@ -7,8 +7,8 @@ import { createJsonFileCacheStore } from "./json-file-cache-store"
 // This helps in sandbox environments where filesystem state may not persist across contexts
 let providerModelsCacheWrittenInCurrentProcess = false
 
-const CONNECTED_PROVIDERS_CACHE_FILE = "connected-providers.json"
-const PROVIDER_MODELS_CACHE_FILE = "provider-models.json"
+export const CONNECTED_PROVIDERS_CACHE_FILE = "connected-providers.json"
+export const PROVIDER_MODELS_CACHE_FILE = "provider-models.json"
 
 interface ConnectedProvidersCache {
 	connected: string[]

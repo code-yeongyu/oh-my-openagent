@@ -29,6 +29,91 @@ describe("loadAvailableModelsFromCache", () => {
     expect(result.modelCount).toBe(0)
   })
 
+  test("reads providers from the omo provider-models.json cache written by refresh", () => {
+    // given: the cache file that `opencode models --refresh` actually writes
+    mkdirSync(join(tempDir, "cache", "oh-my-opencode"), { recursive: true })
+    writeFileSync(
+      join(tempDir, "cache", "oh-my-opencode", "provider-models.json"),
+      JSON.stringify({
+        models: {
+          openai: ["gpt-5.4", { id: "gpt-5.5" }],
+          anthropic: [{ id: "claude-opus-4-7" }],
+        },
+        connected: ["openai", "anthropic"],
+        updatedAt: "2026-08-26T00:00:00.000Z",
+      })
+    )
+
+    // when
+    const result = loadAvailableModelsFromCache()
+
+    // then: doctor must find the refreshed cache instead of reporting it missing
+    expect(result.cacheExists).toBe(true)
+    expect(result.providers).toContain("openai")
+    expect(result.providers).toContain("anthropic")
+    expect(result.modelCount).toBe(3)
+    expect(result.cachePath).toBe(join(tempDir, "cache", "oh-my-opencode", "provider-models.json"))
+  })
+
+  test("prefers the omo provider-models.json cache over the legacy models.json", () => {
+    // given: both caches exist with disjoint providers
+    writeFileSync(
+      join(tempDir, "cache", "opencode", "models.json"),
+      JSON.stringify({ legacy: { models: { "legacy-model": {} } } })
+    )
+    mkdirSync(join(tempDir, "cache", "oh-my-opencode"), { recursive: true })
+    writeFileSync(
+      join(tempDir, "cache", "oh-my-opencode", "provider-models.json"),
+      JSON.stringify({
+        models: { openai: ["gpt-5.4"] },
+        connected: ["openai"],
+        updatedAt: "2026-08-26T00:00:00.000Z",
+      })
+    )
+
+    // when
+    const result = loadAvailableModelsFromCache()
+
+    // then: the refreshed omo cache wins
+    expect(result.cacheExists).toBe(true)
+    expect(result.providers).toContain("openai")
+    expect(result.providers).not.toContain("legacy")
+    expect(result.modelCount).toBe(1)
+  })
+
+  test("falls back to legacy models.json when the omo provider-models.json is malformed", () => {
+    // given: a corrupt omo cache and a valid legacy cache
+    mkdirSync(join(tempDir, "cache", "oh-my-opencode"), { recursive: true })
+    writeFileSync(join(tempDir, "cache", "oh-my-opencode", "provider-models.json"), "{ not json")
+    writeFileSync(
+      join(tempDir, "cache", "opencode", "models.json"),
+      JSON.stringify({ openai: { models: { "gpt-5.4": {} } } })
+    )
+
+    // when
+    const result = loadAvailableModelsFromCache()
+
+    // then
+    expect(result.cacheExists).toBe(true)
+    expect(result.providers).toContain("openai")
+    expect(result.modelCount).toBe(1)
+    expect(result.cachePath).toBe(join(tempDir, "cache", "opencode", "models.json"))
+  })
+
+  test("reports no cache when only a malformed legacy models.json exists", () => {
+    // given: no omo cache and a corrupt legacy cache
+    mkdirSync(join(tempDir, "cache", "opencode"), { recursive: true })
+    writeFileSync(join(tempDir, "cache", "opencode", "models.json"), "{ not json")
+
+    // when
+    const result = loadAvailableModelsFromCache()
+
+    // then: malformed legacy cache keeps its pre-fix semantics (no usable cache)
+    expect(result.cacheExists).toBe(false)
+    expect(result.providers).toEqual([])
+    expect(result.modelCount).toBe(0)
+  })
+
   test("reads providers from models.json cache", () => {
     writeFileSync(
       join(tempDir, "cache", "opencode", "models.json"),
