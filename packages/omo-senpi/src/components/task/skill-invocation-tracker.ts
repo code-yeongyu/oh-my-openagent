@@ -17,11 +17,71 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 // - plan artifact: a successful read/write/edit on a .omo/plans/*.md path at ANY root (worktrees
 //   and external checkouts included), or an apply_patch whose patch body touches one. Touches are
 //   counted per normalized path (backslashes become forward slashes; roots stay distinct) with a
-//   monotonic per-tracker sequence for recency, feeding planArtifactReferences.
+//   monotonic per-store sequence for recency, feeding planArtifactReferences.
 // load_skills on a task spawn arms the CHILD only and is deliberately not a parent-session record.
+//
+// The three channels live in a store held OUTSIDE the factory. senpi tears down the extension runner
+// and re-registers every component on a reload, a session switch and a resume, and it loads packaged
+// extensions through an uncached importer, so a store built inside createSkillInvocationTracker()
+// comes back empty the moment the extension reloads: a session that had been planning for hours
+// silently loses the gate and can no longer spawn plan-consultant/plan-reviewer. The ultrawork
+// component documents the same failure and fixes it the same way (see components/ultrawork/index.ts).
+// The store also has to survive the reload's own teardown: senpi emits `session_shutdown` with
+// reason "reload" to the retiring runner while the SAME session continues, so that one reason keeps
+// the session's evidence and every other reason (quit/new/fork/resume) still drops it.
 
 export type SkillInvocationTracker = {
   readonly stateFor: (sessionId: string) => SkillInvocationState
+}
+
+// The tracker's whole state. A value rather than a closure so it can outlive one registration;
+// tests build their own through createSkillInvocationStore().
+export type SkillInvocationStore = {
+  readonly revision: number
+  readonly invokedBySession: Map<string, Set<string>>
+  readonly requestedBySession: Map<string, Set<string>>
+  readonly planTouchesBySession: Map<string, Map<string, { count: number; lastTouchedAt: number }>>
+  planTouchSequence: number
+}
+
+// Bumped when a channel's meaning changes (a new pattern, a new recording rule), so a slot left by an
+// older bundle starts clean instead of arming the gate on evidence this build would not record.
+const SKILL_INVOCATION_STORE_REVISION = 1
+
+export function createSkillInvocationStore(): SkillInvocationStore {
+  return {
+    revision: SKILL_INVOCATION_STORE_REVISION,
+    invokedBySession: new Map(),
+    requestedBySession: new Map(),
+    planTouchesBySession: new Map(),
+    planTouchSequence: 0,
+  }
+}
+
+// One store per process, shared by every evaluation of this bundle, so a re-registration picks the
+// recorded channels up again. Exported so a test can pin the cross-bundle key itself, exactly as
+// TASK_TERMINAL_OBSERVERS_KEY does for the terminal-edge ledger.
+export const SKILL_INVOCATION_STORE_KEY = Symbol.for("omo.skillInvocationTracker")
+
+export function sharedSkillInvocationStore(): SkillInvocationStore {
+  const registry = globalThis as unknown as Record<symbol, unknown>
+  const existing = registry[SKILL_INVOCATION_STORE_KEY]
+  if (isSkillInvocationStore(existing)) return existing
+  const created = createSkillInvocationStore()
+  registry[SKILL_INVOCATION_STORE_KEY] = created
+  return created
+}
+
+function isSkillInvocationStore(value: unknown): value is SkillInvocationStore {
+  if (typeof value !== "object" || value === null) return false
+  const store = value as SkillInvocationStore
+  return (
+    store.revision === SKILL_INVOCATION_STORE_REVISION &&
+    store.invokedBySession instanceof Map &&
+    store.requestedBySession instanceof Map &&
+    store.planTouchesBySession instanceof Map &&
+    typeof store.planTouchSequence === "number"
+  )
 }
 
 const SKILL_COMMAND_PREFIX = "/skill:"
@@ -81,11 +141,15 @@ function expandedSkillBlockNames(text: string): readonly string[] {
 }
 const PLAN_ARTIFACT_PATH_TOOLS: ReadonlySet<string> = new Set(["read", "write", "edit"])
 
-export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvocationTracker {
-  const invokedBySession = new Map<string, Set<string>>()
-  const requestedBySession = new Map<string, Set<string>>()
-  const planTouchesBySession = new Map<string, Map<string, { count: number; lastTouchedAt: number }>>()
-  let planTouchSequence = 0
+// The one teardown that does not end a session: senpi rebuilds the runtime for the same session when
+// the config changes, and everything the user already asked for still stands afterwards.
+const SESSION_CONTINUING_SHUTDOWN_REASON = "reload"
+
+export function createSkillInvocationTracker(
+  pi: SenpiExtensionAPI,
+  store: SkillInvocationStore = sharedSkillInvocationStore(),
+): SkillInvocationTracker {
+  const { invokedBySession, requestedBySession, planTouchesBySession } = store
 
   const record = (target: Map<string, Set<string>>, sessionId: string | undefined, skill: string | undefined): void => {
     if (sessionId === undefined || skill === undefined || skill.length === 0) return
@@ -111,9 +175,9 @@ export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvoca
       planTouchesBySession.set(sessionId, touches)
     }
     for (const path of touched) {
-      planTouchSequence += 1
+      store.planTouchSequence += 1
       const prior = touches.get(path)
-      touches.set(path, { count: (prior?.count ?? 0) + 1, lastTouchedAt: planTouchSequence })
+      touches.set(path, { count: (prior?.count ?? 0) + 1, lastTouchedAt: store.planTouchSequence })
     }
   })
 
@@ -148,7 +212,8 @@ export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvoca
     if (isOwnWordsPlanRequest(visible)) record(requestedBySession, sessionId, "ulw-plan")
   })
 
-  pi.on("session_shutdown", (_payload, eventCtx) => {
+  pi.on("session_shutdown", (payload, eventCtx) => {
+    if (shutdownReason(payload) === SESSION_CONTINUING_SHUTDOWN_REASON) return
     const sessionId = extractSessionId(eventCtx)
     if (sessionId === undefined) return
     invokedBySession.delete(sessionId)
@@ -182,6 +247,14 @@ function extractSessionId(eventCtx: unknown): string | undefined {
   if (typeof getSessionId !== "function") return undefined
   const id: unknown = getSessionId.call(eventCtx["sessionManager"])
   return typeof id === "string" && id.length > 0 ? id : undefined
+}
+
+// Absent or malformed reasons come from hosts that predate the field, and they drop the state exactly
+// as they did before.
+function shutdownReason(payload: unknown): string | undefined {
+  if (!isRecord(payload)) return undefined
+  const reason = payload["reason"]
+  return typeof reason === "string" ? reason : undefined
 }
 
 type ToolResultEvent = {
