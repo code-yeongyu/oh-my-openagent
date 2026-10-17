@@ -1,5 +1,5 @@
 import { isTerminalRecord, nowIso } from "./manager-helpers"
-import type { ResolvedModelRecord, TaskRecord } from "../state"
+import type { EffectiveModelRecord, TaskRecord } from "../state"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
 import type { EffectiveModel } from "../runners/pinned-model-equivalence"
 
@@ -55,11 +55,13 @@ export function observeChildEffectiveModel(port: EffectiveModelPort, provider: s
   const sameRoute = current.effective_model?.provider === provider && current.effective_model.model_id === modelId
   const tier = serviceTier ?? (sameRoute ? current.effective_model?.service_tier : undefined)
   if (sameRoute && current.effective_model?.service_tier === tier) return
-  const effective: ResolvedModelRecord = {
+  const effective: EffectiveModelRecord = {
     provider,
     model_id: modelId,
     display: `${provider}/${modelId}`,
-    source: current.effective_model?.source ?? current.resolved_model?.source ?? "explicit",
+    // A newly observed route must not inherit a live-event source: "set" says who switched TO
+    // the previous route, not this one. The plan's source is the honest fallback.
+    source: current.resolved_model?.source ?? "explicit",
     ...(tier === undefined ? {} : { service_tier: tier }),
   }
   port.store.replace({ ...current, effective_model: effective, updated_at: nowIso(port.now) })

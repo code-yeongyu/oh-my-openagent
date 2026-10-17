@@ -3,6 +3,9 @@ import { join } from "node:path"
 
 import type { SummaryWindow } from "./session-summary-window"
 
+/** Where the writing session read its consent: recovery re-reads consent for this scope before sending. */
+export type ConsentScope = { readonly cwd?: string }
+
 export type StoredRollup = {
   readonly v: 1
   readonly pid: number
@@ -11,11 +14,15 @@ export type StoredRollup = {
   readonly nextSeq: number
   readonly window: SummaryWindow | null
   readonly updatedAt: number
+  /** Consent at write time. Only a rollup marked `enabled` may ever be sent; files without it predate the mark. */
+  readonly consent?: "enabled"
+  /** Absent on files older than the scope; such a file cannot have its consent re-read and is never sent. */
+  readonly scope?: ConsentScope
 }
 
 export type SummaryStore = {
   readonly read: (sessionHash: string) => StoredRollup | undefined
-  readonly write: (rollup: Omit<StoredRollup, "v" | "pid" | "updatedAt"> & { readonly updatedAt?: number }) => void
+  readonly write: (rollup: Omit<StoredRollup, "v" | "pid" | "updatedAt" | "consent" | "scope"> & { readonly consent: "enabled"; readonly scope: ConsentScope; readonly updatedAt?: number }) => void
   readonly remove: (sessionHash: string) => void
   /** Claims every rollup whose owning process is gone; each is returned once across racing processes. */
   readonly claimOrphans: () => readonly StoredRollup[]

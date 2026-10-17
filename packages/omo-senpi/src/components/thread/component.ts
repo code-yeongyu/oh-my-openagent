@@ -219,7 +219,6 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         store,
         diskSessions: options.diskSessions,
         sessionsDirectory: options.sessionsDirectory ?? (() => join(agentDir(), "sessions")),
-        agentDir,
         ensureHost: options.ensureHost,
         callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
         callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),

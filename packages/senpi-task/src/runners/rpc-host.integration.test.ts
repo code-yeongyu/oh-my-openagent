@@ -198,13 +198,14 @@ describe("two parents on one daemon", () => {
     for (const path of paths) world.host.releasePath(path)
     const attached = await b2.lifecycle.reconcileOnSessionStart("parent-b")
 
-    // then - one session per path, one writer per JSONL, no replayed prompt
+    // then - one session per path, one writer per JSONL, one continuation per interrupted turn
     expect(of(attached.outcomes, "resumed")).toHaveLength(16)
     expect(world.host.sessions()).toHaveLength(16)
     expect(distinct(paths.map((path) => world.host.peakAttachments(path)))).toEqual([1])
     expect(distinct(b2.records().map((record) => record.host_session?.instance_id))).toEqual([world.host.instanceId])
     expect(distinct(b2.records().map((record) => record.suspension_reason))).toEqual([undefined])
-    expect(world.prompts()).toHaveLength(16)
+    expect(world.prompts()).toHaveLength(32)
+    expect(world.host.commands.filter(command => command.type === "prompt" && command.payload.streamingBehavior === "followUp")).toHaveLength(16)
   })
 })
 
