@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs"
 
-import { toV1Event } from "../../v2/event-shape"
+import { createV1EventShaper } from "../../v2/event-shape"
 import { filesFromPrompt, type PromptFile } from "../../v2/session-actions"
 
 export type V2RunTransport = {
@@ -121,7 +121,8 @@ export function createV2RunClient(input: {
         const source = input.transport.events()
         return {
           stream: (async function* events() {
-            for await (const event of source) yield toV1Event(event)
+            const shape = createV1EventShaper()
+            for await (const event of source) yield shape(event)
           })(),
         }
       },

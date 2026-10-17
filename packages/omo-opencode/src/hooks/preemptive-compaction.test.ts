@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterAll, describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { createV1EventShaper } from "../v2/event-shape"
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -1113,5 +1114,46 @@ describe("preemptive-compaction", () => {
     } finally {
       restoreTimeouts()
     }
+  })
+
+  // #given raw V2 step events (started carries the model, ended carries usage)
+  // #when they are shaped like V1 message.updated events and a tool finishes
+  // #then the token cache fills and the preemptive compaction fires
+  it("caches V2 step usage through the event shaper and triggers compaction", async () => {
+    const shape = createV1EventShaper()
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_v2_step"
+    const assistantMessageID = "msg_v2_step"
+
+    await hook.event({
+      event: shape({
+        type: "session.step.started",
+        data: {
+          sessionID,
+          assistantMessageID,
+          agent: "sisyphus",
+          model: { id: "claude-sonnet-4-6", providerID: "anthropic" },
+          started: 1,
+        },
+      }),
+    })
+    await hook.event({
+      event: shape({
+        type: "session.step.ended",
+        data: {
+          sessionID,
+          assistantMessageID,
+          finish: "stop",
+          tokens: { input: 800000, output: 1000, reasoning: 0, cache: { read: 10000, write: 0 } },
+        },
+      }),
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_v2_step" },
+      { title: "", output: "test", metadata: null },
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 })
