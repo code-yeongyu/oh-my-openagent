@@ -24,6 +24,8 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
+
 const here = dirname(fileURLToPath(import.meta.url))
 const omoRoot = resolve(here, "..", "..", "..", "..", "..")
 // The legacy checkouts have no portable default location; the legacy suite is SKIPPED until both are set.
@@ -106,7 +108,7 @@ function runOne(name, file, extraArgs = [], reportDir = outDir) {
   const args = [process.execPath, join(here, file), ...extraArgs]
   const outFile = reportDir === undefined ? undefined : join(reportDir, `${name}.txt`)
   if (outFile !== undefined) args.push("--out", outFile, "--evidence-dir", join(reportDir, name))
-  const child = Bun.spawnSync(args, { stdout: "inherit", stderr: "inherit" })
+  const child = Bun.spawnSync(args, { env: withTelemetryOptOut(process.env), stdout: "inherit", stderr: "inherit" })
   let text = ""
   if (outFile !== undefined) {
     try {

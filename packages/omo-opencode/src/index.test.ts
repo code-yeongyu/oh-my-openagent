@@ -20,6 +20,7 @@ const mockRunOpenCodeStartupMigration = mock(() => ({
   reloadRequired: false,
   results: [],
   skippedConflictCount: 0,
+  targetBackupPaths: [] as string[],
 }))
 const mockLoadPluginConfig = mock(() => ({}))
 const mockLoadConfigChain = mock((directory: string) => ({
