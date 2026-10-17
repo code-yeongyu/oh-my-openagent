@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
-import type { StateDirConfig } from "../store"
+import { resolveStateDir, type StateDirConfig } from "../store"
 import {
   ensureTeamRuntimeDirs,
   resolveProjectTeamSpecPath,
@@ -38,7 +38,7 @@ describe("team storage layout", () => {
     const baseDir = teamStorageBaseDir(config)
 
     // then
-    expect(baseDir).toBe(join(projectDir, ".omo", "senpi-task", "teams"))
+    expect(baseDir).toBe(join(resolveStateDir(config), "teams"))
   })
 
   test("#given a team run id #when runtime dirs are resolved #then runtime and tasks dirs live under the base dir", () => {
@@ -51,7 +51,7 @@ describe("team storage layout", () => {
     const dirs = resolveTeamRuntimeDirs(config, teamRunId)
 
     // then
-    expect(dirs.baseDir).toBe(join(projectDir, ".omo", "senpi-task", "teams"))
+    expect(dirs.baseDir).toBe(join(resolveStateDir(config), "teams"))
     expect(dirs.runtimeDir).toBe(join(dirs.baseDir, "runtime", teamRunId))
     expect(dirs.tasksDir).toBe(join(dirs.baseDir, "runtime", teamRunId, "tasks"))
     expect(resolveTeamMemberInboxDir(config, teamRunId, "finder")).toBe(

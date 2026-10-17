@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { realpathSync } from "node:fs"
@@ -8,6 +8,7 @@ import { buildIdentityPaths, type MemoryIdentity } from "@oh-my-opencode/memory-
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { writeCompletionRecord } from "./completion-records"
 import { reconcileReflectionRuns } from "./run-reconciliation"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const roots: string[] = []
 const NOW = Date.parse("2026-09-08T00:00:00.000Z")
@@ -15,7 +16,7 @@ const OLD = new Date(NOW - 2 * 24 * 60 * 60_000)
 const UUID = "abcdef12-1234-4234-8234-123456789abc"
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function workspace(): Promise<string> {

@@ -54,11 +54,11 @@ type BunSpawnedProcess = Omit<
   unref?(): void
 }
 
+type BunSpawnOptions = SpawnOptions & { readonly windowsHide: true }
+
 type BunSpawnRuntime = {
-  spawn(command: readonly string[], options?: SpawnOptions): BunSpawnedProcess
-  spawn(options: SpawnOptions & { readonly cmd: readonly string[] }): BunSpawnedProcess
-  spawnSync(command: readonly string[], options?: SpawnOptions): SpawnSyncResult
-  spawnSync(options: SpawnOptions & { readonly cmd: readonly string[] }): SpawnSyncResult
+  spawn(command: readonly string[], options?: BunSpawnOptions): BunSpawnedProcess
+  spawnSync(command: readonly string[], options?: BunSpawnOptions): SpawnSyncResult
 }
 
 const runtime = globalThis as typeof globalThis & { readonly Bun?: BunSpawnRuntime }
@@ -124,6 +124,11 @@ function resolveStdio(options: SpawnOptions): StdioTuple {
   }
 
   return [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"]
+}
+
+// Bun applies windowsHide only on Windows, so the flag is set unconditionally, as for the Node path.
+export function createBunSpawnOptions(options: SpawnOptions): BunSpawnOptions {
+  return { ...options, windowsHide: true }
 }
 
 export function createNodeSpawnOptions(
@@ -246,7 +251,7 @@ export function spawn(
 ): SpawnedProcess {
   const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
   const bun = getBunRuntime()
-  if (bun) return wrapBunProcess(bun.spawn(cmd, options))
+  if (bun) return wrapBunProcess(bun.spawn(cmd, createBunSpawnOptions(options)))
 
   const [bin, ...args] = cmd
   if (!bin) throw new Error("spawn requires a command")
@@ -262,7 +267,7 @@ export function spawnSync(
 ): SpawnSyncResult {
   const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
   const bun = getBunRuntime()
-  if (bun) return bun.spawnSync(cmd, options)
+  if (bun) return bun.spawnSync(cmd, createBunSpawnOptions(options))
 
   const [bin, ...args] = cmd
   if (!bin) throw new Error("spawnSync requires a command")

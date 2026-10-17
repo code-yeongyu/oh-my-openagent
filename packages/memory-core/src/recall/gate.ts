@@ -25,6 +25,19 @@ export const NUDGE_HINT_MAX_CHARS = 200
 /** Decision commentary is not a memory fact. Internal, deliberately not a config knob. */
 const NUDGE_DECISION_LANGUAGE_PATTERN = /\b(?:no\s+stored\s+memory|clears\s+the\s+bar|not?\s+relevant|memor(?:y|ies)\s+(?:(?:is|are)\s+(?:unrelated\s+to|not\s+about)|(?:does|do)\s+not\s+(?:cover|address|pertain))|memor(?:y|ies)\s+covers?\s+.*\s+not\s+the)\b/i
 
+// The nudge block is reference material about a stored note, never a line of instruction: the
+// primary agent's own task stands and it decides what to do with the note. A hint that speaks TO
+// the agent is therefore rejected at admission. Three shapes carry that voice: the second person,
+// an imperative (or negated imperative) opening the sentence, and a Korean request/imperative
+// ending. Only the OPENING is scanned for imperative verbs, so an observation that quotes a rule
+// mid-sentence ("the note records that publish must follow the guard") stays valid.
+const NUDGE_SECOND_PERSON_PATTERN = /\b(?:you|your|yours|yourself)\b/i
+const NUDGE_IMPERATIVE_OPENING_PATTERN = /^[\s"'`\u00ab\u2018\u2019\u201c\u201d]*(?:do\s+not|don['\u2019]t|never|always|make\s+sure|ensure|verify|check|run|use|read|stop|avoid|remember|keep|prefer|skip|consider)\b/i
+/** 세요/십시오 (and the 십시요 misspelling), 하라/해라, 합니다 and a trailing ...지 마(라); the plain form a note is
+ * written in (...한다 / ...이다) is untouched. */
+const NUDGE_KOREAN_REQUEST_ENDING_PATTERN = /(?:세요|십시오|십시요|하라|해라|합니다|지\s*마(?:라)?)\s*[.!]?$/
+const NUDGE_KOREAN_PROHIBITION_PATTERN = /하지\s*마/
+
 /** Pending payloads older than this are junk from an abandoned session. */
 const PENDING_TTL_MS = 24 * 60 * 60_000
 
@@ -51,13 +64,46 @@ export interface ValidateNudgesOptions {
   readonly maxItems: number
 }
 
+/** Why a hint cannot be admitted, in the order the rules are checked. */
+export type InvalidHintReason = "empty" | "too-long" | "multiline" | "decision-commentary" | "addresses-agent"
+
 /**
- * Hint budget predicate, shared with the in-process sidecar's nudge tool: one factual sentence,
- * non-empty, at most `NUDGE_HINT_MAX_CHARS`, on a single line, without nudge-decision commentary.
+ * The full nudge contract, used at ADMISSION - the sidecar's nudge tool (which names the reason
+ * back to the judge) and the parent's `validateNudges` over freshly judged output. `undefined`
+ * means the hint may be delivered.
+ */
+export function describeInvalidHint(hint: string): InvalidHintReason | undefined {
+  return describeHintShape(hint) ?? (addressesAgent(hint) ? "addresses-agent" : undefined)
+}
+
+/**
+ * Hint budget predicate: one factual sentence, non-empty, at most `NUDGE_HINT_MAX_CHARS`, on a
+ * single line, without nudge-decision commentary.
+ *
+ * This is the REPLAY half of the contract, and deliberately not `describeInvalidHint`: pending
+ * payloads and stored `omo-kibitzer:nudged` entries were admitted under whatever contract held when
+ * they were accepted, so reading them back (`parseNudge` below, omo-senpi's notice renderers) must
+ * not retroactively drop a nudge that was phrased as an instruction. Admission is where the
+ * nudge-only rule bites.
  */
 export function isValidHint(hint: string): boolean {
-  if (hint.length === 0 || hint.length > NUDGE_HINT_MAX_CHARS) return false
-  return !/[\r\n]/.test(hint) && !NUDGE_DECISION_LANGUAGE_PATTERN.test(hint)
+  return describeHintShape(hint) === undefined
+}
+
+function describeHintShape(hint: string): Exclude<InvalidHintReason, "addresses-agent"> | undefined {
+  if (hint.length === 0) return "empty"
+  if (hint.length > NUDGE_HINT_MAX_CHARS) return "too-long"
+  if (/[\r\n]/.test(hint)) return "multiline"
+  if (NUDGE_DECISION_LANGUAGE_PATTERN.test(hint)) return "decision-commentary"
+  return undefined
+}
+
+function addressesAgent(hint: string): boolean {
+  const trimmed = hint.trim()
+  return NUDGE_SECOND_PERSON_PATTERN.test(trimmed)
+    || NUDGE_IMPERATIVE_OPENING_PATTERN.test(trimmed)
+    || NUDGE_KOREAN_REQUEST_ENDING_PATTERN.test(trimmed)
+    || NUDGE_KOREAN_PROHIBITION_PATTERN.test(trimmed)
 }
 
 /**
@@ -66,8 +112,8 @@ export function isValidHint(hint: string): boolean {
  */
 
 /**
- * Parent-side validation of sidecar output. Order is preserved so the cap keeps
- * the sidecar's own priority.
+ * Parent-side validation of sidecar output, against the full admission contract
+ * (`describeInvalidHint`). Order is preserved so the cap keeps the sidecar's own priority.
  */
 export function validateNudges(
   nudges: readonly RecallNudge[],
@@ -83,7 +129,7 @@ export function validateNudges(
     if (seen.has(nudge.path)) continue
     if (!options.candidates.has(nudge.path)) continue
     if (options.surfaced.has(nudge.path)) continue
-    if (!isValidHint(nudge.hint)) continue
+    if (describeInvalidHint(nudge.hint) !== undefined) continue
     seen.add(nudge.path)
     accepted.push({ path: nudge.path, hint: nudge.hint })
   }

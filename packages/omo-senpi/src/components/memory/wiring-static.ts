@@ -25,6 +25,7 @@ import { registerMemoryToolSurface } from "./tools"
 import {
   registerReflectionCompletionRenderer,
   registerReflectionHealthRenderer,
+  registerReflectionParkedRenderer,
   type ReflectionCompletionApi,
 } from "./worker"
 import { branchEntryCount, sessionIdFrom } from "./wiring-context"
@@ -32,6 +33,10 @@ import { registerMemoryWriteListener } from "./wiring-memory-write"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { MemoryIdentityContext } from "./context"
 import { createMemoryPromptHandler as createPromptHandler } from "./prompt"
+import { createProjectionPins, PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
+import { projectionLimits } from "./projection-limits"
+import { resolveMemoryModelRegistry } from "./model-registry-resolver"
+import { resolveMemorySessionModel } from "./session-model-resolver"
 
 export function registerMemoryStatic(input: {
   readonly pi: SenpiExtensionAPI
@@ -55,6 +60,7 @@ export function registerMemoryStatic(input: {
   readonly activeSession: { current?: string }
   readonly skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> }
   readonly memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> }
+  readonly hasUserActivity: (sessionId: string) => boolean
   /** Fires at the manual reflection launch site so the footer animates while the run is in flight. */
   readonly onReflectionLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
   /** Fires after each settle so the footer can refresh its segments behind the fingerprint gate. */
@@ -72,16 +78,30 @@ export function registerMemoryStatic(input: {
   if (api !== undefined) {
     registerReflectionCompletionRenderer(api)
     registerReflectionHealthRenderer(api)
+    registerReflectionParkedRenderer(api)
   }
   if (hasMemoryCapabilities(pi)) {
     nudgeWiring.register(pi)
     noticeWiring.register(pi)
   }
+  const projectionPins = createProjectionPins()
+  const entryApi = hasMemoryCapabilities(pi) ? pi : undefined
   const promptHandler = createPromptHandler({
     resolveContext,
     cache: promptCache,
+    pins: projectionPins,
+    ...(entryApi === undefined ? {} : { recordPin: (record) => entryApi.appendEntry(PROJECTION_PIN_ENTRY_TYPE, record) }),
+    onRepin: (sessionId, reason) => options.logger?.info("omo-senpi memory projection repinned", { sessionId, reason }),
     resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
+    resolveProjectionLimits: (identity) => projectionLimits(loadCommandSettings().settings, identity),
     resolveNudgeTurns: (repo, sessionId, identity) => nudgeWiring.nudgeTurns(repo, sessionId, identity),
+    onNoticeInputFailed: (notice, sessionId, error) => {
+      options.logger?.warn("omo-senpi memory notice input failed; this turn has no such notice", {
+        notice,
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    },
     resolveSoulNotice: async (repo, sessionId, identity) => {
       const context = resolveContext(sessionId)
       if (context === undefined || context.identity !== identity) return undefined
@@ -92,9 +112,9 @@ export function registerMemoryStatic(input: {
     },
   })
   pi.on("before_agent_start", (payload, eventCtx) => {
-    lastEventCtx.current = eventCtx
+    if (!isPreview(payload)) lastEventCtx.current = eventCtx
     return promptHandler(payload, eventCtx)
-  })
+  }, { previewSafe: true })
   // Recall owns a SEPARATE before_agent_start handler registered AFTER the projection handler:
   // senpi merges one message per handler in registration order, so the hint lands last and the
   // prompt handler stays the only writer of systemPrompt.
@@ -118,8 +138,12 @@ export function registerMemoryStatic(input: {
       await onSettled?.(sessionId, eventCtx)
       return undefined
     }
+    // Read host getters while this event context is live, before journal or queue I/O.
+    const selection = input.hasUserActivity(sessionId) ? {
+      registry: resolveMemoryModelRegistry(eventCtx), sessionModel: resolveMemorySessionModel(eventCtx),
+    } : undefined
     const result = await journalWiringFor(identity).reconcileSession(eventCtx)
-    await factsWiringFor(identity).onSettled(sessionId)
+    if (input.hasUserActivity(sessionId)) await factsWiringFor(identity).onSettled(sessionId, selection)
     await onSettled?.(sessionId, eventCtx)
     return result
   })
@@ -173,7 +197,10 @@ export function registerMemoryStatic(input: {
     contextForSession: (sessionId) => asCommandIdentity(resolveContext(sessionId)),
     resolveIdentity: () => (activeSession.current === undefined ? undefined : asCommandIdentity(resolveContext(activeSession.current))),
     loadSettings: loadCommandSettings,
-    bustPromptCache: () => promptCache.clear(),
+    bustPromptCache: () => {
+      promptCache.clear()
+      projectionPins.requestRefresh()
+    },
     reflectionSink: {
       request: async (request) => {
         if (activeSession.current === undefined) throw new Error("no bound memory session")
@@ -187,8 +214,9 @@ export function registerMemoryStatic(input: {
           ...(request.conversationIds === undefined ? {} : { conversationIds: request.conversationIds }),
         })
         if (result === null) throw new Error("reflection reservation rejected")
+        if (result.status === "parked") throw new Error("manual reflection must bypass the park gate")
         if (result.status === "active") {
-          runtime.launch(result.run)
+          void runtime.launch(result.run)
           await onReflectionLaunch?.(identity.identity, result.run)
         }
         return { disposition: result.status === "active" ? "reserved" : "pending", runId: result.run.runId }
@@ -196,11 +224,10 @@ export function registerMemoryStatic(input: {
     },
     dreamSink: { request: (request) => dreamTriggerWiring.requestManualDream(request) },
     factsSink: {
-      // ONE attempt after a manual unpark: `reconcileExtractor` fires the extractor's own
-      // reconcile-then-launch path, which owns the re-entrancy latch, so this never loops.
+      // An explicit unpark is a user action, not boot reconciliation.
       reconcile: async () => {
         const identity = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
-        if (identity !== undefined) factsWiringFor(identity).reconcileExtractor()
+        if (identity !== undefined) factsWiringFor(identity).launchExtractor()
       },
     },
     sessionsDir: () => join(options.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"), "sessions"),
@@ -214,6 +241,10 @@ export function registerMemoryStatic(input: {
   })
   triggerWiring.register(pi)
   dreamTriggerWiring.register(pi)
+}
+
+function isPreview(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }
 
 /** memory.write_notice.enabled for the bound identity, honouring its per-agent override. */

@@ -1,4 +1,5 @@
 import {
+  awaitingInputDetails,
   createChildProgress,
   runTaskCancel,
   runTaskOutput,
@@ -156,6 +157,8 @@ export function wireTaskRpcBridge(
           model: record.model,
         },
         Date.parse(record.created_at),
+        Date.now,
+        { awaitingInput: awaitingInputDetails(record) !== undefined },
       )
       const unsubscribe = engine.manager.subscribeChild(record.task_id, (event: ManagedChildEvent) => {
         if (!progress.accept(event)) return

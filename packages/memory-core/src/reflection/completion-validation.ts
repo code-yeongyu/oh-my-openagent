@@ -1,6 +1,10 @@
 import { isAbsolute, relative, resolve, sep } from "node:path"
 import { readFile } from "../fs/resilient"
 import { createNodeGitExec, type GitExec } from "../git"
+import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
+import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
+import { isMemoryContentPath } from "../memfs/paths"
+import { findSecretLikeFailure } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -56,6 +60,12 @@ export async function validateCompletion(
     }
     if (tipSha === recordedBase) return { status: "no_changes", tipSha, changedPaths: [] }
 
+    const secretFailure = await findSecretLikeFailure(
+      (argv, stdin) => run(exec, worktree.dir, argv, stdin),
+      recordedBase,
+      tipSha,
+    )
+    if (secretFailure !== null) return { status: "failed", detail: secretFailure }
     const changed = await git(exec, worktree.dir, ["diff", "--name-only", "-z", `${recordedBase}..${tipSha}`, "--"])
     const changedPaths = changed.stdout.split("\0").filter(Boolean)
     if (changedPaths.length === 0) {
@@ -66,10 +76,48 @@ export async function validateCompletion(
         return { status: "failed", detail: `Changed path escapes the memory repository: ${path}` }
       }
     }
+    const frontmatterFailure = await findFrontmatterFailure(exec, worktree.dir, recordedBase, tipSha, changedPaths)
+    if (frontmatterFailure !== null) return { status: "failed", detail: frontmatterFailure }
     return { status: "valid", tipSha, changedPaths }
   } catch (error) {
     return { status: "failed", detail: errorMessage(error) }
   }
+}
+
+/**
+ * A reflection may not introduce or alter frontmatter that a strict YAML
+ * consumer rejects. Legacy files whose frontmatter block is byte-identical to
+ * the base are the normalizer's job, not the reflection's, so a body-only edit
+ * of one still passes.
+ */
+async function findFrontmatterFailure(
+  exec: GitExec,
+  dir: string,
+  baseSha: string,
+  tipSha: string,
+  changedPaths: readonly string[],
+): Promise<string | null> {
+  for (const path of changedPaths) {
+    if (!isMemoryContentPath(path)) continue
+    const tipContent = await showOptional(exec, dir, tipSha, path)
+    if (tipContent === null) continue
+    const violation = describeFrontmatterViolation(tipContent)
+    if (violation === null) continue
+    const baseContent = await showOptional(exec, dir, baseSha, path)
+    if (baseContent !== null && frontmatterBlock(baseContent) === frontmatterBlock(tipContent)) continue
+    return `Reflection commit contains invalid frontmatter in ${path}: ${violation}`
+  }
+  return null
+}
+
+function frontmatterBlock(content: string): string | null {
+  const match = FRONTMATTER_RE.exec(content.replace(/\r\n?/g, "\n"))
+  return match?.[1] ?? null
+}
+
+async function showOptional(exec: GitExec, dir: string, revision: string, path: string): Promise<string | null> {
+  const result = await run(exec, dir, ["show", `${revision}:${path}`])
+  return result.code === 0 ? result.stdout : null
 }
 
 function isConfinedRepoPath(root: string, path: string): boolean {
@@ -94,8 +142,13 @@ async function git(exec: GitExec, cwd: string, argv: readonly string[]) {
   return result
 }
 
-function run(exec: GitExec, cwd: string, argv: readonly string[]) {
-  return exec.run(argv, { cwd, timeoutMs: GIT_TIMEOUT_MS, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } })
+function run(exec: GitExec, cwd: string, argv: readonly string[], stdin?: string) {
+  return exec.run(argv, {
+    cwd,
+    timeoutMs: GIT_TIMEOUT_MS,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    ...(stdin === undefined ? {} : { stdin }),
+  })
 }
 
 function errorMessage(error: unknown): string {

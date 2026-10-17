@@ -73,6 +73,7 @@ export interface PrepareReflectionSpawnInput {
   readonly category: string
   readonly model: string
   readonly thinking?: string
+  readonly loadExtensions?: boolean
   readonly attempt?: number
   readonly hardDeadlineAt?: number
   readonly nextAttempt?: RunAttempt

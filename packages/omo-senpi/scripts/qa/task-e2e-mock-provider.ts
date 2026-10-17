@@ -43,8 +43,8 @@ interface MockStepUsage {
 }
 
 type MockStep =
-  | { type: "text"; text: string; usage?: MockStepUsage }
-  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string; usage?: MockStepUsage }
+  | { type: "text"; text: string; usage?: MockStepUsage; delayMs?: number }
+  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string; usage?: MockStepUsage; delayMs?: number }
 
 interface MockScript {
   parentSteps: MockStep[]
@@ -274,7 +274,11 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
   else parentCallCount += 1
   const message = stepToAssistantMessage(step, index + 1, streamModel.id)
 
-  queueMicrotask(() => {
+  // A step may hold the turn open for a while before answering, the way a real model call
+  // does: it is how a child stays BUSY without depending on any tool existing in the child.
+  // The wait is abort-aware so a parent's teardown still ends the child promptly.
+  const delayMs = typeof step.delayMs === "number" && step.delayMs > 0 ? step.delayMs : 0
+  const emit = () => {
     if (options?.signal?.aborted) {
       const aborted = { ...message, stopReason: "aborted" as const }
       stream.push({ type: "error", reason: "aborted", error: aborted })
@@ -295,7 +299,12 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
     }
     stream.push({ type: "done", reason: message.stopReason, message })
     stream.end(message)
-  })
+  }
+  if (delayMs === 0) queueMicrotask(emit)
+  else {
+    const timer = setTimeout(emit, delayMs)
+    options?.signal?.addEventListener("abort", () => { clearTimeout(timer); emit() }, { once: true })
+  }
 
   return stream
 }

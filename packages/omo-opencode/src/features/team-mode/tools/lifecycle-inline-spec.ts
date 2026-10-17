@@ -33,6 +33,7 @@ export type TeamCreateExecutorConfig = {
   userCategories?: CategoriesConfig
   sisyphusJuniorModel?: string
   agentOverrides?: AgentOverrides
+  claudeCodeAgentsEnabled?: boolean
 }
 
 export function resolveDefaultInlineCategory(userCategories?: CategoriesConfig): string | undefined {

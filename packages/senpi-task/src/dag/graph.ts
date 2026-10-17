@@ -1,6 +1,6 @@
-import { canonicalAgentName } from "../agents/legacy-agent-names"
 import {
   DAG_SETTINGS_DEFAULTS,
+  isSafeDagPathSegment,
   type DagBottleneck,
   type DagDiagnostic,
   type DagEdge,
@@ -30,6 +30,7 @@ export type DagDefinition = {
 }
 
 export const DAG_COMPILE_ERROR_CODES = [
+  "invalid_node_id",
   "duplicate_node_id",
   "unknown_dependency",
   "self_dependency",
@@ -84,13 +85,11 @@ function compareSequences(a: readonly DagNodeId[], b: readonly DagNodeId[]): num
 }
 
 function routeOf(input: DagNodeInput): DagRoute {
-  // Only the canonical agent is stored: DagRoute is hashed by dag/fingerprint.ts, so a legacy
-  // subagent_type must never leak into the persisted route.
   return input.category !== undefined
     ? { kind: "category", category: input.category }
     : {
         kind: "agent",
-        agent: canonicalAgentName(input.subagent_type).name,
+        agent: input.subagent_type.trim(),
         ...(input.model === undefined ? {} : { model: input.model }),
       }
 }
@@ -179,6 +178,17 @@ export function compileDag(definition: DagDefinition, options?: DagCompileOption
   const duplicates: DagNodeId[] = []
   for (const [index, input] of definition.nodes.entries()) {
     const id = input.id as DagNodeId
+    // A node id becomes one path segment under the state dir (<stateDir>/dag/results/<runId>/<id>.txt).
+    // Reject an unsafe id here, at the boundary, so a bad definition creates no run and the store's
+    // path builder is never reached with it. The unsafe id is excluded from the graph either way.
+    if (!isSafeDagPathSegment(input.id)) {
+      errors.push({
+        code: "invalid_node_id",
+        message: `node id ${JSON.stringify(input.id)} must not be empty, "." or "..", and must not contain "/", "\\", ":" or a NUL byte`,
+        nodeIds: [id],
+      })
+      continue
+    }
     if (seenIds.has(input.id)) {
       if (!duplicates.includes(id)) {
         duplicates.push(id)

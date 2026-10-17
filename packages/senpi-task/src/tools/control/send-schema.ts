@@ -26,6 +26,11 @@ export const TaskSendParams = Type.Object({
   all_scope: Type.Optional(
     Type.Boolean({ description: "Allow messaging a child owned by another session. Off by default." }),
   ),
+  redispatch: Type.Optional(
+    Type.Boolean({
+      description: "Re-dispatch a flagged 'resumed, waiting for input' task onto a fresh live session, replaying its persisted prompt. Off by default; message is forbidden with it.",
+    }),
+  ),
 })
 
 export const MemberScopedTaskSendParams = Type.Object({

@@ -7,13 +7,12 @@ description: "Guides a first-time omo user through setup and the core workflow. 
 
 ## Purpose
 
-This skill runs the first conversation a new omo user ever has. You are the guide. Walk the user
-through six lanes, in order: the feature tour, migration help, session archaeology, value mapping,
+This skill introduces OmO through six lanes, in order: the feature tour, migration help, session archaeology, value mapping,
 memory recording (which runs through the whole flow, not at the end), and the first-session
 init-deep proposal. Three of the lanes are opt-in. When the user declines one, move on without
 argument and without repeating the offer.
 
-Detect the user's language from their first reply and respond in that language for the rest of the
+Detect the user's language from their message and respond in that language for the rest of the
 conversation. The skill is written in English; your output is not. Match them exactly, including
 tone.
 
@@ -23,6 +22,15 @@ invocations. Never assume a tool from another agent product exists here.
 Be concrete, never generic. "omo caches your context" is a failure of this skill. "Your last week
 of Claude Code sessions read 4.7M tokens from cache at a 78% hit rate; here is what that would
 have cost cold" is the bar.
+
+## Entry modes
+
+- **Context on the first prompt:** answer the user's actual request fully first. Then greet them
+  briefly in their language and offer the tour in one line. Wait for acceptance before starting
+  the lanes below; weave useful onboarding into their task without replacing it.
+- **Explicit tour:** `--onboard`, a request for the tour or getting started, or acceptance of the
+  offer starts the lanes immediately. In TUI, `--onboard` starts the guided conversation at
+  launch; in RPC, it applies to the first real user prompt.
 
 ## 1. Feature tour
 
@@ -67,13 +75,17 @@ The baked catalog:
   later drift detection keep project instructions aligned with the codebase. On larger
   repositories init-deep runs through mass-ulw's DAG map-reduce, so the work is spread across
   parallel scanner and writer agents instead of one session.
-- **Tips with a live source of truth**: run `senpi --list-tips` during the tour, then read and
-  follow `give-me-tips` for any visible tip the user wants explained from the implementation.
+- **Tips with a live source of truth**: list the tips with the command this product is installed
+  as - `omo --list-tips` on OmO Native (omo-ai installs, where `senpi` is not on PATH) or `senpi
+  --list-tips` on a plain senpi install - then read and follow `give-me-tips` for any visible tip
+  the user wants explained from the implementation.
 - **Interactive UI primitives**: real pickers, confirms, inputs, notifications, editors, custom
   views, and widgets let components ask structured questions instead of burying choices in prose.
-- **Re-running this tour**: onboarding auto-starts once, ever. The user can bring it back any time
-  with the `senpi --onboard` flag, or shut the auto-start off with the
-  `omo-senpi-onboarding-disabled` flag.
+- **Re-running this tour**: onboarding context accompanies the first real message, not launch.
+  The user can bring the tour back any time
+  with the `--onboard` flag of the command this product is installed as - `omo --onboard` on OmO
+  Native (omo-ai installs, where `senpi` is not on PATH) or `senpi --onboard` on a plain senpi
+  install - or shut the auto-start off with the `omo-senpi-onboarding-disabled` flag.
 - **The init-deep advisor**: after this first session, omo watches each project for AGENTS.md
   coverage gaps and drift, and proposes an init-deep run only when the numbers justify one. On
   this first session, you carry that proposal yourself in lane 6.
@@ -96,9 +108,20 @@ machine. Check at least:
   `~/.config/opencode/oh-my-opencode.jsonc`, project `.mcp.json`, and existing `AGENTS.md` files.
 - Anything else the user names.
 
+Global OpenCode MCP servers and global OpenCode skills are not yours to move by hand. `omo setup`
+imports them: MCP servers from `~/.config/opencode/opencode.json[c]` into the engine's global
+`~/.omo/agent/mcp.json`, and skills from `~/.config/opencode/skills/` into `~/.omo/agent/skills/`,
+converted to the shapes omo reads, consent-gated, and never overwriting a name that already exists.
+Run `omo setup --dry-run` to show the user exactly what would land. Once they accept, run
+`omo setup --yes`: your shell is not a terminal, so plain `omo setup` stops at its consent prompt
+and imports nothing.
+Copying a global server into a project `.mcp.json` yourself is a bug: it disappears the moment the
+user opens any other directory.
+
 Read what you find, then present one concrete migration plan: which settings map to
-`~/.omo/omo.json[c]`, which MCP servers move to the project `.mcp.json`, which `CLAUDE.md` content
-becomes project `AGENTS.md` content, and which personal facts belong in memory instead of files.
+`~/.omo/omo.json[c]`, which MCP servers `omo setup` carries over globally and which project-only
+servers still belong in that project's `.mcp.json`, which `CLAUDE.md` content becomes project
+`AGENTS.md` content, and which personal facts belong in memory instead of files.
 Show the plan and WAIT for the user to accept it. Apply nothing before they say yes. If they accept
 part of it, apply that part only. Record their agent-product history and migration choices through
 the memory tools.
@@ -230,7 +253,8 @@ not proposing, do not hint that a check ran. Close the conversation warmly inste
 If all gates pass, ask in the user's language: "want me to set up AGENTS.md for this project?"
 This is opt-in. On yes, read the `init-deep` skill at its SKILL.md path and follow it. On no,
 record the decline through the memory tools and finish the conversation gracefully: a short
-send-off in their language, an invitation to come back with `senpi --onboard`, and nothing more.
+send-off in their language, an invitation to come back with `omo --onboard` on OmO Native or
+`senpi --onboard` on a plain senpi install, and nothing more.
 
 After init-deep finishes, tell the user in their language that init-deep ran through mass-ulw's
 DAG orchestration — the work was spread across parallel child agents in dependency-ordered

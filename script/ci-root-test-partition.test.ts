@@ -13,6 +13,7 @@ const windowsTelemetryScript = readFileSync(
 const rootConfig = readFileSync(new URL("../bunfig.root.toml", import.meta.url), "utf8")
 const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
+const win2WindowsParallelConfigPath = new URL("../bunfig.win2.parallel.windows.toml", import.meta.url)
 
 function quarantinedTestPaths(config: string): readonly string[] {
   return [...config.matchAll(/"([^"]+\.test\.ts)"/g)].map((match) => match[1] ?? "")
@@ -71,10 +72,11 @@ describe("root test CI partition", () => {
 
     expect(job).toContain("bun test --timeout 20000 packages/omo-opencode packages/memory-core")
     expect(job).toContain(
-      '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")',
+      '-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")',
     )
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
+    expect(existsSync(win2WindowsParallelConfigPath)).toBe(true)
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-opencode/**")
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/memory-core/**")
   })
@@ -90,19 +92,23 @@ describe("root test CI partition", () => {
     }
   })
 
-  test("#given the shared quarantine module #when the shard-2 bunfig is read #then it ignores exactly the quarantined files", () => {
-    expect(existsSync(win2ParallelConfigPath)).toBe(true)
+  test("#given the shared quarantine module #when the shard-2 bunfigs are read #then each ignores exactly the quarantined files", () => {
+    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath]) {
+      expect(existsSync(configPath)).toBe(true)
 
-    expect(quarantinedTestPaths(readFileSync(win2ParallelConfigPath, "utf8"))).toEqual([
-      ...ROOT_TEST_SERIAL_QUARANTINE_PATHS,
-    ])
+      expect(quarantinedTestPaths(readFileSync(configPath, "utf8"))).toEqual([
+        ...ROOT_TEST_SERIAL_QUARANTINE_PATHS,
+      ])
+    }
   })
 
-  test("#given bunfig.win2.parallel.toml #when a shard-2 leg runs the remainder #then it keeps every bunfig.root.toml exclusion", () => {
-    const parallelPatterns = quotedPatterns(readFileSync(win2ParallelConfigPath, "utf8"))
+  test("#given the shard-2 remainder bunfigs #when a shard-2 leg runs the remainder #then each keeps every bunfig.root.toml exclusion", () => {
+    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath]) {
+      const parallelPatterns = quotedPatterns(readFileSync(configPath, "utf8"))
 
-    for (const pattern of quotedPatterns(rootConfig)) {
-      expect(parallelPatterns).toContain(pattern)
+      for (const pattern of quotedPatterns(rootConfig)) {
+        expect(parallelPatterns).toContain(pattern)
+      }
     }
   })
 
@@ -204,9 +210,10 @@ describe("root test CI partition", () => {
 
     expect([
       ...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g),
-    ]).toHaveLength(3)
+    ]).toHaveLength(4)
     expect(job).toContain('-Invocation "shard-1"')
     expect(job).toContain('-Invocation "shard-2-quarantine"')
+    expect(job).toContain('-Invocation "shard-2-rpc-host"')
     expect(job).toContain('-Invocation "shard-2-remainder"')
     expect(job).toContain("WINDOWS_TEST_SHARD: ${{ matrix.shard }}")
   })

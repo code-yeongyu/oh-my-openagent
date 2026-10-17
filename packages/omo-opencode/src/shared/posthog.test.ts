@@ -139,10 +139,12 @@ describe("posthog client creation", () => {
         enableLocalEvaluation: false,
         strictLocalEvaluation: true,
         disableRemoteConfig: true,
-        flushAt: 1,
         flushInterval: 0,
       })
     }
+    const [cliOptions, pluginOptions] = capturedOptions
+    expect(cliOptions?.flushAt).toBe(1)
+    expect(pluginOptions?.flushAt).toBe(20)
   })
 
   it("constructs clients through the configured telemetry transport", async () => {

@@ -27,6 +27,18 @@ const MODEL_CONTEXT_BUDGETS: readonly ModelContextBudget[] = [
 		contextWindowTokens: 600_000,
 		effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT,
 	},
+	{ slug: "gpt-6-sol", contextWindowTokens: 400_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
+	{
+		slug: "gpt-6-sol-fast",
+		contextWindowTokens: 400_000,
+		effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT,
+	},
+	{ slug: "gpt-6-luna", contextWindowTokens: 922_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
+	{
+		slug: "gpt-6-luna-fast",
+		contextWindowTokens: 922_000,
+		effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT,
+	},
 	{ slug: "gpt-5.6-sol", contextWindowTokens: 650_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
 	{
 		slug: "gpt-5.6-terra",

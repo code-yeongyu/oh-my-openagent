@@ -46,8 +46,8 @@ async function runCancelLane(ctx) {
   const run1 = startRun(ctx, sandbox, cancelRun1Script(sentinel1))
   const seeded = await pollUntil(
     () => ({
-      cancelled: findTaskByName(sandbox.cwd, "cancelchild")?.status === "cancelled",
-      witnessDone: findTaskByName(sandbox.cwd, "cancelwitness")?.status === "completed",
+      cancelled: findTaskByName(sandbox, "cancelchild")?.status === "cancelled",
+      witnessDone: findTaskByName(sandbox, "cancelwitness")?.status === "completed",
     }),
     (v) => v.cancelled && v.witnessDone,
     POLL_MS,
@@ -56,21 +56,21 @@ async function runCancelLane(ctx) {
   const result1 = await run1.completion
   writeLaneLog(ctx, "resume-cancel-run1", result1)
   ctx.checks.resume_cancel_setup = verdict(result1.status === 0 && seeded.cancelled && seeded.witnessDone)
-  const cancelTask = findTaskByName(sandbox.cwd, "cancelchild")
-  const logBefore = taskEventText(sandbox.cwd, cancelTask?.task_id ?? "")
+  const cancelTask = findTaskByName(sandbox, "cancelchild")
+  const logBefore = taskEventText(sandbox, cancelTask?.task_id ?? "")
   const sentinel2 = join(sandbox.root, "cancel-release-2")
   const run2 = startRun(ctx, sandbox, resumeProbeScript(sentinel2), sessionIdFromEvents(result1.events))
-  const witnessUp = await pollUntil(() => witnessRevived(sandbox.cwd, "cancelwitness"), (v) => v === true, POLL_MS)
+  const witnessUp = await pollUntil(() => witnessRevived(sandbox, "cancelwitness"), (v) => v === true, POLL_MS)
   writeFileSync(sentinel2, "go\n")
   const result2 = await run2.completion
   writeLaneLog(ctx, "resume-cancel-run2", result2)
-  const cancelAfter = findTaskByName(sandbox.cwd, "cancelchild")
+  const cancelAfter = findTaskByName(sandbox, "cancelchild")
   ctx.checks.resume_cancel_not_revived = verdict(
     result2.status === 0
     && cancelTask !== undefined
     && cancelAfter?.status === "cancelled"
     && cancelAfter?.residency_state !== "resident"
-    && taskEventText(sandbox.cwd, cancelTask.task_id) === logBefore
+    && taskEventText(sandbox, cancelTask.task_id) === logBefore
     && witnessUp === true,
   )
 }
@@ -83,8 +83,8 @@ async function runKillLane(ctx) {
   const run1 = startRun(ctx, sandbox, killRun1Script(sentinel1))
   const seeded = await pollUntil(
     () => ({
-      targetDone: findTaskByName(sandbox.cwd, "killchild")?.status === "completed",
-      witnessDone: findTaskByName(sandbox.cwd, "killwitness")?.status === "completed",
+      targetDone: findTaskByName(sandbox, "killchild")?.status === "completed",
+      witnessDone: findTaskByName(sandbox, "killwitness")?.status === "completed",
     }),
     (v) => v.targetDone && v.witnessDone,
     POLL_MS,
@@ -92,27 +92,27 @@ async function runKillLane(ctx) {
   writeFileSync(sentinel1, "go\n")
   const result1 = await run1.completion
   writeLaneLog(ctx, "resume-kill-run1", result1)
-  const killTask = findTaskByName(sandbox.cwd, "killchild")
+  const killTask = findTaskByName(sandbox, "killchild")
   ctx.checks.resume_kill_setup = verdict(result1.status === 0 && seeded.targetDone && seeded.witnessDone && killTask !== undefined)
-  const logBefore = taskEventText(sandbox.cwd, killTask?.task_id ?? "")
+  const logBefore = taskEventText(sandbox, killTask?.task_id ?? "")
   if (killTask !== undefined) {
-    const recordPath = join(taskStateDir(sandbox.cwd), "tasks", `${killTask.task_id}.json`)
+    const recordPath = join(taskStateDir(sandbox), "tasks", `${killTask.task_id}.json`)
     const record = JSON.parse(readFileSync(recordPath, "utf8"))
     record.killed = true
     writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`)
   }
   const sentinel2 = join(sandbox.root, "kill-release-2")
   const run2 = startRun(ctx, sandbox, resumeProbeScript(sentinel2), sessionIdFromEvents(result1.events))
-  const witnessUp = await pollUntil(() => witnessRevived(sandbox.cwd, "killwitness"), (v) => v === true, POLL_MS)
+  const witnessUp = await pollUntil(() => witnessRevived(sandbox, "killwitness"), (v) => v === true, POLL_MS)
   writeFileSync(sentinel2, "go\n")
   const result2 = await run2.completion
   writeLaneLog(ctx, "resume-kill-run2", result2)
-  const killAfter = findTaskByName(sandbox.cwd, "killchild")
+  const killAfter = findTaskByName(sandbox, "killchild")
   ctx.checks.resume_killed_not_revived = verdict(
     result2.status === 0
     && killAfter?.killed === true
     && killAfter?.residency_state === "persisted_only"
-    && taskEventText(sandbox.cwd, killTask?.task_id ?? "") === logBefore
+    && taskEventText(sandbox, killTask?.task_id ?? "") === logBefore
     && witnessUp === true,
   )
 }
@@ -122,11 +122,11 @@ async function runLruLane(ctx) {
   ctx.sandboxes.push(sandbox)
   seedResumeProject(sandbox, resumeOmoConfig({ residency_max_children: 1 }))
   const sentinel1 = join(sandbox.root, "lru-release-1")
-  const run1 = startRun(ctx, sandbox, lruRun1Script(sandbox.cwd, sentinel1))
+  const run1 = startRun(ctx, sandbox, lruRun1Script(sandbox, sentinel1))
   const seeded = await pollUntil(
     () => ({
-      evicted: findTaskByName(sandbox.cwd, "lruone")?.residency_state === "evicted",
-      newestDone: findTaskByName(sandbox.cwd, "lrutwo")?.status === "completed",
+      evicted: findTaskByName(sandbox, "lruone")?.residency_state === "evicted",
+      newestDone: findTaskByName(sandbox, "lrutwo")?.status === "completed",
     }),
     (v) => v.evicted && v.newestDone,
     POLL_MS,
@@ -134,19 +134,19 @@ async function runLruLane(ctx) {
   writeFileSync(sentinel1, "go\n")
   const result1 = await run1.completion
   writeLaneLog(ctx, "resume-lru-run1", result1)
-  const lruOne = findTaskByName(sandbox.cwd, "lruone")
+  const lruOne = findTaskByName(sandbox, "lruone")
   ctx.checks.resume_lru_setup = verdict(result1.status === 0 && seeded.evicted && seeded.newestDone && lruOne !== undefined)
-  const logBefore = taskEventText(sandbox.cwd, lruOne?.task_id ?? "")
+  const logBefore = taskEventText(sandbox, lruOne?.task_id ?? "")
   const sentinel2 = join(sandbox.root, "lru-release-2")
   const run2 = startRun(ctx, sandbox, resumeProbeScript(sentinel2), sessionIdFromEvents(result1.events))
-  const newestUp = await pollUntil(() => witnessRevived(sandbox.cwd, "lrutwo"), (v) => v === true, POLL_MS)
+  const newestUp = await pollUntil(() => witnessRevived(sandbox, "lrutwo"), (v) => v === true, POLL_MS)
   writeFileSync(sentinel2, "go\n")
   const result2 = await run2.completion
   writeLaneLog(ctx, "resume-lru-run2", result2)
   ctx.checks.resume_lru_evict_not_revived = verdict(
     result2.status === 0
-    && findTaskByName(sandbox.cwd, "lruone")?.residency_state === "evicted"
-    && taskEventText(sandbox.cwd, lruOne?.task_id ?? "") === logBefore
+    && findTaskByName(sandbox, "lruone")?.residency_state === "evicted"
+    && taskEventText(sandbox, lruOne?.task_id ?? "") === logBefore
     && newestUp === true,
   )
 }
@@ -156,11 +156,11 @@ async function runTtlLane(ctx) {
   ctx.sandboxes.push(sandbox)
   seedResumeProject(sandbox, resumeOmoConfig({ ttl_ms: 1 }))
   const sentinel1 = join(sandbox.root, "ttl-release-1")
-  const run1 = startRun(ctx, sandbox, ttlRun1Script(sandbox.cwd, sentinel1))
+  const run1 = startRun(ctx, sandbox, ttlRun1Script(sandbox, sentinel1))
   const seeded = await pollUntil(
     () => ({
-      targetDone: findTaskByName(sandbox.cwd, "ttlchild")?.status === "completed",
-      witnessAssistant: childSessionHasAssistant(sandbox.cwd, findTaskByName(sandbox.cwd, "ttlwitness")?.task_id ?? ""),
+      targetDone: findTaskByName(sandbox, "ttlchild")?.status === "completed",
+      witnessAssistant: childSessionHasAssistant(sandbox, findTaskByName(sandbox, "ttlwitness")?.task_id ?? ""),
     }),
     (v) => v.targetDone && v.witnessAssistant,
     POLL_MS,
@@ -168,17 +168,17 @@ async function runTtlLane(ctx) {
   writeFileSync(sentinel1, "go\n")
   const result1 = await run1.completion
   writeLaneLog(ctx, "resume-ttl-run1", result1)
-  const ttlTask = findTaskByName(sandbox.cwd, "ttlchild")
+  const ttlTask = findTaskByName(sandbox, "ttlchild")
   ctx.checks.resume_ttl_setup = verdict(result1.status === 0 && seeded.targetDone && seeded.witnessAssistant && ttlTask !== undefined)
   const run2 = startRun(ctx, sandbox, UNRELATED_SESSION_SCRIPT)
   const result2 = await run2.completion
   writeLaneLog(ctx, "resume-ttl-run2", result2)
-  const expunged = ttlTask !== undefined && !recordFileExists(sandbox.cwd, ttlTask.task_id) && taskEventText(sandbox.cwd, ttlTask.task_id) === ""
-  ctx.checks.resume_ttl_expunged = verdict(result2.status === 0 && expunged && findTaskByName(sandbox.cwd, "ttlwitness") !== undefined)
+  const expunged = ttlTask !== undefined && !recordFileExists(sandbox, ttlTask.task_id) && taskEventText(sandbox, ttlTask.task_id) === ""
+  ctx.checks.resume_ttl_expunged = verdict(result2.status === 0 && expunged && findTaskByName(sandbox, "ttlwitness") !== undefined)
   const sentinel3 = join(sandbox.root, "ttl-release-3")
   const run3 = startRun(ctx, sandbox, resumeProbeScript(sentinel3), sessionIdFromEvents(result1.events))
   const continued = await pollUntil(
-    () => childSessionText(sandbox.cwd, findTaskByName(sandbox.cwd, "ttlwitness")?.task_id ?? "").includes(MIDTURN_CONTINUED_TOKEN),
+    () => childSessionText(sandbox, findTaskByName(sandbox, "ttlwitness")?.task_id ?? "").includes(MIDTURN_CONTINUED_TOKEN),
     (v) => v === true,
     POLL_MS,
   )
@@ -188,7 +188,7 @@ async function runTtlLane(ctx) {
   ctx.checks.resume_ttl_not_revived = verdict(
     result3.status === 0
     && ttlTask !== undefined
-    && !recordFileExists(sandbox.cwd, ttlTask.task_id)
+    && !recordFileExists(sandbox, ttlTask.task_id)
     && continued === true,
   )
 }

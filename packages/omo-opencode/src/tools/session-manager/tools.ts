@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { createOpencodeClient as createGlobalSessionClient } from "@opencode-ai/sdk/v2/client"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import {
   SESSION_LIST_DESCRIPTION,
@@ -6,6 +7,7 @@ import {
   SESSION_SEARCH_DESCRIPTION,
   SESSION_INFO_DESCRIPTION,
 } from "./constants"
+import { getServerBasicAuthHeader } from "../../shared"
 import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
 import {
   filterSessionsByDate,
@@ -16,9 +18,20 @@ import {
   searchInSession,
 } from "./session-formatter"
 import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
+import { describeSessionError, formatSkippedSessions, type SkippedSession } from "./session-error"
 
 const SEARCH_TIMEOUT_MS = 60_000
 const MAX_SESSIONS_TO_SCAN = 50
+
+function createGlobalSessionSdkClient(serverUrl: URL | undefined) {
+  if (!serverUrl) return undefined
+
+  const authorization = getServerBasicAuthHeader()
+  return createGlobalSessionClient({
+    baseUrl: serverUrl.toString(),
+    ...(authorization ? { headers: { Authorization: authorization } } : {}),
+  })
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
   return Promise.race([
@@ -67,8 +80,8 @@ export function createSessionManagerTools(
     ...defaultSessionManagerToolDeps,
     ...deps,
   }
-  // Initialize storage client for SDK-based operations (beta mode)
-  resolvedDeps.setStorageClient(ctx.client)
+  // Initialize storage clients for SDK-based operations (beta mode)
+  resolvedDeps.setStorageClient(ctx.client, createGlobalSessionSdkClient(ctx.serverUrl))
 
   const session_list: ToolDefinition = tool({
     description: SESSION_LIST_DESCRIPTION,
@@ -81,7 +94,8 @@ export function createSessionManagerTools(
     execute: async (args: SessionListArgs, _context) => {
       try {
         const directory = args.project_path ?? ctx.directory
-        let sessions = await resolvedDeps.getMainSessions({ directory })
+        const limit = !args.from_date && !args.to_date && args.limit && args.limit > 0 ? args.limit : undefined
+        let sessions = await resolvedDeps.getMainSessions({ directory, limit })
         let sessionIDs = sessions.map((s) => s.id)
 
         if (args.from_date || args.to_date) {
@@ -94,7 +108,7 @@ export function createSessionManagerTools(
 
         return await resolvedDeps.formatSessionList(sessionIDs)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })
@@ -130,7 +144,7 @@ export function createSessionManagerTools(
 
         return resolvedDeps.formatSessionMessages(messages, args.include_todos, todos)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })
@@ -147,12 +161,13 @@ export function createSessionManagerTools(
       try {
         const resultLimit = args.limit && args.limit > 0 ? args.limit : 20
 
+        const skipped: SkippedSession[] = []
         const searchOperation = async (): Promise<SearchResult[]> => {
           if (args.session_id) {
             return resolvedDeps.searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
           }
 
-          const allSessions = await resolvedDeps.getAllSessions()
+          const allSessions = await resolvedDeps.getAllSessions(MAX_SESSIONS_TO_SCAN)
           const sessionsToScan = allSessions.slice(0, MAX_SESSIONS_TO_SCAN)
 
           const allResults: SearchResult[] = []
@@ -160,8 +175,12 @@ export function createSessionManagerTools(
             if (allResults.length >= resultLimit) break
 
             const remaining = resultLimit - allResults.length
-            const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining)
-            allResults.push(...sessionResults)
+            try {
+              const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining)
+              allResults.push(...sessionResults)
+            } catch (error) {
+              skipped.push({ id: sid, reason: describeSessionError(error) })
+            }
           }
 
           return allResults.slice(0, resultLimit)
@@ -169,9 +188,9 @@ export function createSessionManagerTools(
 
         const results = await withTimeout(searchOperation(), SEARCH_TIMEOUT_MS, "Search")
 
-        return resolvedDeps.formatSearchResults(results)
+        return resolvedDeps.formatSearchResults(results) + formatSkippedSessions(skipped)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })
@@ -191,7 +210,7 @@ export function createSessionManagerTools(
 
         return resolvedDeps.formatSessionInfo(info)
       } catch (e) {
-        return `Error: ${e instanceof Error ? e.message : String(e)}`
+        return `Error: ${describeSessionError(e)}`
       }
     },
   })

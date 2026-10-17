@@ -160,11 +160,11 @@ describe("validateSenpiTeamMembers", () => {
     }
   })
 
-  test("#given a member with a legacy subagent_type #when validated #then the canonical id drives every check", () => {
+  test("#given a member naming a retired curated id #when validated #then it is an ordinary unknown subagent_type, named verbatim", () => {
     // given
     const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "momus" }, { kind: "agent", subagent_type: "metis" }] },
-      "legacy-agent-team",
+      { members: [{ kind: "agent", subagent_type: "momus" }] },
+      "retired-agent-team",
     )
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => true,
@@ -179,58 +179,24 @@ describe("validateSenpiTeamMembers", () => {
       caught = error
     }
 
-    // then: the first member is rejected with the canonical id in the message, never the legacy id
-    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
-    if (caught instanceof SenpiTeamSpecError) {
-      expect(caught.message).toBe(
-        'curated read-only agent "plan-reviewer" (requested as "momus") cannot be a team member; delegate via the task tool instead',
-      )
-    }
-
-    // when: a spec whose first member is the metis alias
-    const metisSpec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "metis" }] },
-      "legacy-agent-team",
-    )
-    let metisCaught: unknown
-    try {
-      validateSenpiTeamMembers(metisSpec, ports)
-    } catch (error) {
-      metisCaught = error
-    }
-
-    // then
-    expect(metisCaught).toBeInstanceOf(SenpiTeamSpecError)
-    if (metisCaught instanceof SenpiTeamSpecError) {
-      expect(metisCaught.message).toBe(
-        'curated read-only agent "plan-consultant" (requested as "metis") cannot be a team member; delegate via the task tool instead',
-      )
-    }
-  })
-
-  test("#given a curated read-only agent requested by its legacy id #when validated #then the rejection names the canonical id and the requested legacy id", () => {
-    // given
-    const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "momus" }] },
-      "legacy-curated-team",
-    )
-
-    // when
-    let caught: unknown
-    try {
-      validateSenpiTeamMembers(spec, allowAll)
-    } catch (error) {
-      caught = error
-    }
-
-    // then
+    // then: the retired id is neither canonicalized nor treated as a curated agent
     expect(caught).toBeInstanceOf(SenpiTeamSpecError)
     if (caught instanceof SenpiTeamSpecError) {
       expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
-      expect(caught.message).toBe(
-        'curated read-only agent "plan-reviewer" (requested as "momus") cannot be a team member; delegate via the task tool instead',
-      )
+      expect(caught.message).toContain("unknown subagent_type 'momus'")
+      expect(caught.message).not.toContain("plan-reviewer")
     }
+  })
+
+  test("#given a retired curated id that the host resolves as a user-defined agent #when validated #then it is admitted like any custom agent", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "agent", subagent_type: "metis" }] },
+      "retired-curated-team",
+    )
+
+    // when / then: no curated-agent rejection fires for the retired id anymore
+    expect(() => validateSenpiTeamMembers(spec, allowAll)).not.toThrow()
   })
 
   test("#given an ulw reviewer agent #when validated #then it is rejected before the known-agent check", () => {

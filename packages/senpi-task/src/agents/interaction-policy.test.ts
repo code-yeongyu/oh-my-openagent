@@ -61,11 +61,11 @@ describe("interactionPolicyForAgent", () => {
     expect(interactionPolicyForAgent("plan-consultant")).toBeUndefined()
   })
 
-  test("#given the legacy momus id #when looked up #then it resolves onto the plan-reviewer policy", () => {
+  test("#given a retired curated id #when looked up #then no policy is returned", () => {
     // given / when / then
-    // A task record persisted before the rename still carries agent_type "momus"; the alias keeps
-    // its task_send refusal alive for the deprecation window instead of silently loosening the gate.
-    expect(interactionPolicyForAgent("momus")).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"])
+    // The retired ids carry no policy of their own now that the read alias is gone: a record
+    // persisted under one of them is an ordinary unknown agent name.
+    expect(interactionPolicyForAgent("momus")).toBeUndefined()
     expect(interactionPolicyForAgent("metis")).toBeUndefined()
   })
 })

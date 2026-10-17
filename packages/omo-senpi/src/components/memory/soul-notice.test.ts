@@ -9,7 +9,6 @@ const SOUL_COMMIT = {
   subject: "rewrite my persona",
   affectedPaths: ["system/persona.md"],
 }
-const SOUL_SHA7 = SOUL_COMMIT.sha.slice(0, 7)
 
 const BOLD = "\u001b[1m"
 const BOLD_OFF = "\u001b[22m"
@@ -53,14 +52,12 @@ function renderSoul(
 }
 
 describe("renderSoulUpdatedEntry house notice contract", () => {
-  test("#given a persona soul commit #when it renders collapsed #then the title carries the glyph and sha7 and the why names the file", () => {
+  test("#given a persona soul commit #when it renders collapsed #then it reads as remembering about myself and the why names the file", () => {
     // when
     const lines = renderSoul(SOUL_COMMIT)
 
     // then
-    expect(lines[0]).toBe(bold(`● Memory soul updated · ${SOUL_SHA7}`))
-    expect(lines[0]).toContain("●")
-    expect(lines[0]).toContain(SOUL_SHA7)
+    expect(lines[0]).toBe(bold("● Remembered · about myself"))
     expect(lines[1]).toContain("system/persona.md")
     expect(lines.join("\n")).not.toContain(SOUL_COMMIT.sha)
   })
@@ -71,7 +68,7 @@ describe("renderSoulUpdatedEntry house notice contract", () => {
 
     // then
     expect(lines).toEqual([
-      bold(`● Memory soul updated · ${SOUL_SHA7}`),
+      bold("● Remembered · about myself"),
       "The soul file system/persona.md changed.",
       "system/persona.md",
     ])

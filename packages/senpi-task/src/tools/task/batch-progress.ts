@@ -51,6 +51,7 @@ export function trackBatchProgress(input: BatchProgressInput): BatchProgressTrac
       content: [{ type: "text", text: rows.map((row, index) => `${index + 1}. ${rowText(row, settled)}`).join("\n") }],
       details: {
         task_id: input.live[0]?.result.task_id ?? "",
+        ...(input.live[0]?.result.run_epoch === undefined ? {} : { run_epoch: input.live[0].result.run_epoch }),
         status: "running",
         mode: "spawn",
         run_in_background: false,

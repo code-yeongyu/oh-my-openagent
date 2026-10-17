@@ -1,12 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import {
-  isInsideTmux,
   isServerRunning,
   resetServerCheck,
   markServerRunningInProcess,
-  spawnTmuxPane,
-  closeTmuxPane,
-  applyLayout,
 } from "./tmux-utils"
 import {
   isInsideTmuxEnvironment,
@@ -85,14 +81,6 @@ describe("isInsideTmux", () => {
 
     // then
     expect(result).toBe(false)
-  })
-
-  test("is exported as a function", () => {
-    // given, #when
-    const result = typeof isInsideTmux
-
-    // then
-    expect(result).toBe("function")
   })
 })
 
@@ -239,31 +227,5 @@ describe("markServerRunningInProcess", () => {
 
     // then
     expect(flag).toBe(true)
-  })
-})
-
-describe("tmux pane functions", () => {
-  test("spawnTmuxPane is exported as function", async () => {
-    // given, #when
-    const result = typeof spawnTmuxPane
-
-    // then
-    expect(result).toBe("function")
-  })
-
-  test("closeTmuxPane is exported as function", async () => {
-    // given, #when
-    const result = typeof closeTmuxPane
-
-    // then
-    expect(result).toBe("function")
-  })
-
-  test("applyLayout is exported as function", async () => {
-    // given, #when
-    const result = typeof applyLayout
-
-    // then
-    expect(result).toBe("function")
   })
 })

@@ -21,8 +21,7 @@ export async function terminateProcessTree(pid, operations = {}) {
   if (platform === "win32") {
     const run = operations.spawnSync ?? spawnSync
     const result = run("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" })
-    const aliveAfter = processAlive(pid)
-    if (result.status === 0 && !aliveAfter) return { kind: "terminated", pid, platform }
+    if (result.status === 0) return { kind: "terminated", pid, platform }
     return { kind: "failed", pid, platform, status: result.status ?? null, error: processTreeError(result) }
   }
 

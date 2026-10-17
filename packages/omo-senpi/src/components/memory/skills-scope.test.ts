@@ -56,7 +56,6 @@ import {
   createMemorySkillsScopeHandler,
   memorySkillsDir,
   registerMemorySkillsScope,
-  type MemorySkillsDiscoverResult,
 } from "./skills-scope"
 
 const IDENTITY = "skills-scope-agent"
@@ -81,20 +80,22 @@ async function fixture(createSkills = true): Promise<{ context: MemoryIdentityCo
   return { context, skillsDir }
 }
 
-function discoverPayload(reason: "startup" | "reload", cwd: string): unknown {
-  return { type: "resources_discover", cwd, reason }
+function discoverPayload(reason: "startup" | "reload", cwd: string, scopedEntries?: true): unknown {
+  return scopedEntries === true
+    ? { type: "resources_discover", cwd, reason, scopedEntries }
+    : { type: "resources_discover", cwd, reason }
 }
 
 function eventContext(sessionId: string): unknown {
   return { sessionManager: { getSessionId: () => sessionId } }
 }
 
-function expectDiscoverResult(value: unknown): MemorySkillsDiscoverResult {
+function expectDiscoverResult(value: unknown): { skillPaths: string[] } {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("expected a resources_discover result object")
   }
-  const skillPaths = Reflect.get(value, "skillPaths")
-  if (!Array.isArray(skillPaths) || skillPaths.some((path) => typeof path !== "string")) {
+  const skillPaths: unknown = Reflect.get(value, "skillPaths")
+  if (!Array.isArray(skillPaths) || !skillPaths.every((path): path is string => typeof path === "string")) {
     throw new Error("expected resources_discover result with string skillPaths")
   }
   return { skillPaths }
@@ -177,6 +178,37 @@ describe("createMemorySkillsScopeHandler", () => {
     expect(other).toBeUndefined()
   })
 
+  test("pins the user scope when the host advertises scoped entries", async () => {
+    // #given
+    const { context, skillsDir } = await fixture()
+    const handler = createMemorySkillsScopeHandler({ resolveContext: () => context })
+
+    // #when
+    const result = handler(discoverPayload("startup", "/tmp/project", true), eventContext("session-1"))
+
+    // #then: memory-repo skills are user-owned data, never harness payload, so a host that
+    // understands scoped entries files them under `user` instead of a temporary path
+    expect(result).toEqual({ skillPaths: [{ path: skillsDir, scope: "user" }] })
+  })
+
+  test("keeps the plain path when the host does not advertise scoped entries", async () => {
+    // #given: an engine that predates scoped entries treats an object entry as a path string
+    // and aborts session start, so the field's absence must yield a string
+    const { context, skillsDir } = await fixture()
+    const handler = createMemorySkillsScopeHandler({ resolveContext: () => context })
+
+    // #when
+    const absent = handler(discoverPayload("startup", "/tmp/project"), eventContext("session-1"))
+    const wrongType = handler(
+      { type: "resources_discover", cwd: "/tmp/project", reason: "startup", scopedEntries: "yes" },
+      eventContext("session-1"),
+    )
+
+    // #then
+    expect(absent).toEqual({ skillPaths: [skillsDir] })
+    expect(wrongType).toEqual({ skillPaths: [skillsDir] })
+  })
+
   test("returns undefined for an unbound session so the chain passes through", async () => {
     // #given
     const handler = createMemorySkillsScopeHandler({ resolveContext: () => undefined })
@@ -241,8 +273,8 @@ describe("createMemorySkillsScopeHandler", () => {
     const preExisting = ["/tmp/project/.pi/skills", "/home/user/.pi/agent/skills"]
 
     // #when
-    const result = handler(discoverPayload("startup", "/tmp/project"), eventContext("session-1"))
-    const merged = mergeSkillPaths(preExisting, result?.skillPaths ?? [])
+    const result = expectDiscoverResult(handler(discoverPayload("startup", "/tmp/project"), eventContext("session-1")))
+    const merged = mergeSkillPaths(preExisting, result.skillPaths)
 
     // #then
     expect(merged).toEqual([...preExisting.map((path) => resolve(path)), resolve(skillsDir)])
@@ -257,8 +289,8 @@ describe("createMemorySkillsScopeHandler", () => {
     const handler = createMemorySkillsScopeHandler({ resolveContext: () => context })
 
     // #when
-    const result = handler(discoverPayload("reload", "/tmp/project"), eventContext("session-1"))
-    const merged = mergeSkillPaths([skillsDir], result?.skillPaths ?? [])
+    const result = expectDiscoverResult(handler(discoverPayload("reload", "/tmp/project"), eventContext("session-1")))
+    const merged = mergeSkillPaths([skillsDir], result.skillPaths)
 
     // #then
     expect(merged).toEqual([resolve(skillsDir)])
