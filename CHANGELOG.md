@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A task start slower than the report window can now be waited on for its own outcome.** `createTaskManager` accepts an optional `startReportWindowMs`; the default stays the 250 ms window that reports a slow start as still starting (#10042), so a caller — tests included — can widen it instead of racing the window. ([#10257](https://github.com/code-yeongyu/oh-my-openagent/issues/10257), [#10344](https://github.com/code-yeongyu/oh-my-openagent/pull/10344))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
