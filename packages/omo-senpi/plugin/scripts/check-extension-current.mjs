@@ -19,6 +19,7 @@ export async function checkExtensionCurrent(options = {}) {
     computerUseOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
+    memoryPalaceOutput,
     threadClientOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
@@ -41,9 +42,11 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentSidePanelRuntime === undefined) return { ok: false, reason: "missing-output", output: sidePanelRuntimeOutput }
   const currentMemoryDoctor = await readBuiltEntry(memoryDoctorOutput)
   const currentMemoryMemfs = await readBuiltEntry(memoryMemfsOutput)
+  const currentMemoryPalace = await readBuiltEntry(memoryPalaceOutput)
   const currentThreadClient = await readBuiltEntry(threadClientOutput)
   if (currentMemoryDoctor === undefined) return { ok: false, reason: "missing-output", output: memoryDoctorOutput }
   if (currentMemoryMemfs === undefined) return { ok: false, reason: "missing-output", output: memoryMemfsOutput }
+  if (currentMemoryPalace === undefined) return { ok: false, reason: "missing-output", output: memoryPalaceOutput }
   if (currentThreadClient === undefined) return { ok: false, reason: "missing-output", output: threadClientOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
@@ -64,6 +67,7 @@ export async function checkExtensionCurrent(options = {}) {
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
+    memoryPalaceOutputPath: join(tempRoot, "omo-memory-palace.js"),
     threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
@@ -82,6 +86,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentSidePanelRuntime, expected.sidePanelRuntimeOutputPath, sidePanelRuntimeOutput],
       [currentMemoryDoctor, expected.memoryDoctorOutputPath, memoryDoctorOutput],
       [currentMemoryMemfs, expected.memoryMemfsOutputPath, memoryMemfsOutput],
+      [currentMemoryPalace, expected.memoryPalaceOutputPath, memoryPalaceOutput],
       [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],

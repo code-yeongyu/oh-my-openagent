@@ -181,6 +181,7 @@ export interface EngineHostRuntime {
 }
 
 export interface EngineHostRuntimeOverrides {
+  readonly crashLog?: (event: string, facts: Record<string, unknown>) => void
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly platform?: NodeJS.Platform
   readonly agentDir?: string
@@ -210,7 +211,10 @@ export function createEngineHostRuntime(
     agentDir,
     env,
     notices,
-    shardEvents: createShardCrashNotices({ agentDir, notices, ui: () => runtime.ui?.() }),
+    shardEvents: createShardCrashNotices({
+      agentDir,
+      ...(overrides.crashLog === undefined ? {} : { log: overrides.crashLog }),
+    }),
     ...(overrides.ensureDaemon === undefined ? {} : { ensureDaemon: overrides.ensureDaemon }),
     ...(overrides.probeHost === undefined ? {} : { probeHost: overrides.probeHost }),
   })

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
@@ -215,9 +215,44 @@ describe("session_summary review findings", () => {
     expect(readdirSync(rollupDir(dir)).filter((name) => name.includes(".tmp") || name.includes(".claimed-"))).toEqual([])
   })
 
+  // #10229: a rollup written before consent was recorded (or by an opted-out session) carries no
+  // opted-in mark, so nothing proves its session agreed to be sent: recovery deletes it unsent.
+  test("#given a dead process's rollup without a consent mark #when recovery runs #then it is deleted and never sent", () => {
+    const dir = stateDir()
+    recorder({ dir, pid: 999_995 }).summary.recordTurn("legacy", turn())
+    const path = join(rollupDir(dir), "legacy.json")
+    const unmarked: Record<string, unknown> = JSON.parse(readFileSync(path, "utf8"))
+    Reflect.deleteProperty(unmarked, "consent")
+    writeFileSync(path, JSON.stringify(unmarked))
+    const next = recorder({ dir, alive: false })
+    next.summary.recordTurn("s2", turn())
+    next.summary.finish("s2", "quit")
+    expect(next.captured.filter(({ properties }) => properties.$session_id === "legacy")).toEqual([])
+    expect(readdirSync(rollupDir(dir))).toEqual([])
+  })
+
+  test("#given a session that sent seq 0, opted out, and opted back in #when it sends again #then it never reuses a sent seq", () => {
+    const captured: Captured[] = []
+    let consent = true
+    const summary = createSessionSummaryRecorder({
+      captureEvent: (name, properties) => captured.push({ name, properties }),
+      store: createSummaryStore({ stateDir: stateDir() }),
+      isConsented: () => consent,
+      sampleRate: 0,
+    })
+    summary.recordTurn("s1", turn())
+    summary.finish("s1", "reload")
+    consent = false
+    summary.recordTurn("s1", turn({ turnIndex: 1 }))
+    consent = true
+    summary.recordTurn("s1", turn({ turnIndex: 2 }))
+    summary.finish("s1", "quit")
+    expect(seqs(captured)).toEqual([[0, "reload", 1], [1, "shutdown", 1]])
+  })
+
   test("#given an orphan with no window and nothing sent #when its session resumes #then seq starts at 0", () => {
     const dir = stateDir()
-    createSummaryStore({ stateDir: dir, pid: 999_994 }).write({ sessionHash: "s1", sessionRole: "main", nextSeq: 0, window: null })
+    createSummaryStore({ stateDir: dir, pid: 999_994 }).write({ sessionHash: "s1", sessionRole: "main", nextSeq: 0, window: null, consent: "enabled", scope: {} })
     const resumed = recorder({ dir, alive: false })
     resumed.summary.recordTurn("s1", turn())
     resumed.summary.finish("s1", "quit")

@@ -21,8 +21,8 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `session_started` | `$os_version` | `string` | - |
 | `session_started` | `arch` | `string` | - |
 | `session_started` | `cpu_count` | `number` | - |
-| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
-| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
+| `session_started` | `default_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `session_started` | `default_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `session_started` | `memory_bucket` | `string` | `lt_8_gb`, `8_15_gb`, `16_31_gb`, `32_63_gb`, `64_plus_gb` |
 | `session_started` | `model_count` | `number` | - |
 | `session_started` | `provider_count` | `number` | - |
@@ -49,9 +49,9 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `turn_completed` | `cache_write_tokens` | `number` | - |
 | `turn_completed` | `cost_usd` | `number` | - |
 | `turn_completed` | `input_tokens` | `number` | - |
-| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `turn_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
 | `turn_completed` | `output_tokens` | `number` | - |
-| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
+| `turn_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `turn_completed` | `reasoning_tokens` | `number` | - |
 | `turn_completed` | `sample_rate` | `number` | - |
 | `turn_completed` | `total_tokens` | `number` | - |
@@ -71,23 +71,23 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `session_summary` | `last_turn_index` | `number` | - |
 | `session_summary` | `m1_cost_usd` | `number` | - |
 | `session_summary` | `m1_input_tokens` | `number` | - |
-| `session_summary` | `m1_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m1_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
 | `session_summary` | `m1_output_tokens` | `number` | - |
-| `session_summary` | `m1_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m1_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
 | `session_summary` | `m1_total_tokens` | `number` | - |
 | `session_summary` | `m1_turns` | `number` | - |
 | `session_summary` | `m2_cost_usd` | `number` | - |
 | `session_summary` | `m2_input_tokens` | `number` | - |
-| `session_summary` | `m2_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m2_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
 | `session_summary` | `m2_output_tokens` | `number` | - |
-| `session_summary` | `m2_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m2_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
 | `session_summary` | `m2_total_tokens` | `number` | - |
 | `session_summary` | `m2_turns` | `number` | - |
 | `session_summary` | `m3_cost_usd` | `number` | - |
 | `session_summary` | `m3_input_tokens` | `number` | - |
-| `session_summary` | `m3_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
+| `session_summary` | `m3_model` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom`, `none` |
 | `session_summary` | `m3_output_tokens` | `number` | - |
-| `session_summary` | `m3_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
+| `session_summary` | `m3_provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom`, `none` |
 | `session_summary` | `m3_total_tokens` | `number` | - |
 | `session_summary` | `m3_turns` | `number` | - |
 | `session_summary` | `model_count` | `number` | - |
@@ -199,11 +199,11 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `delegation_completed` | `execution_mode` | `string` | `in-process`, `process` |
 | `delegation_completed` | `fallback_attempts` | `number` | - |
 | `delegation_completed` | `input_tokens` | `number` | - |
-| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `delegation_completed` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
 | `delegation_completed` | `model_source` | `string` | `category`, `explicit`, `agent`, `none` |
 | `delegation_completed` | `output_tokens` | `number` | - |
 | `delegation_completed` | `owner_kind` | `string` | `plain_child`, `dag_node`, `team_member`, `unknown` |
-| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
+| `delegation_completed` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
 | `delegation_completed` | `reasoning_effort` | `string` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `other`, `none` |
 | `delegation_completed` | `run_epoch` | `number` | - |
 | `delegation_completed` | `start_reason` | `string` | `initial_spawn`, `runtime_fallback`, `session_resume`, `dag_retry`, `revive_after_completed`, `revive_after_error`, `revive_after_cancelled`, `revive_after_interrupted`, `revive_after_lost`, `unknown` |
@@ -244,6 +244,23 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `process_crashed` | `signal` | `string` | `SIGSEGV`, `SIGBUS`, `SIGILL`, `SIGTRAP`, `SIGABRT`, `SIGFPE`, `SIGKILL`, `SIGTERM`, `SIGHUP`, `SIGINT`, `SIGQUIT`, `SIGSYS`, `other`, `none`, `unknown` |
 | `process_crashed` | `uptime_bucket` | `string` | `lt_1m`, `1_10m`, `10_60m`, `1_6h`, `6_24h`, `24h_plus` |
 | `process_crashed` | `uptime_ms` | `number` | - |
+
+## Common properties
+
+Every event above also carries these properties.
+
+| Property | Type | Allowed values |
+|----------|------|----------------|
+| `$process_person_profile` | `boolean` | - |
+| `ci` | `boolean` | - |
+| `event_id` | `string` | - |
+| `install_hash` | `string` | - |
+| `machine_hash` | `string` | - |
+| `package_version` | `string` | - |
+| `platform` | `string` | `omo-senpi` |
+| `product_name` | `string` | `omo-native` |
+| `schema_version` | `number` | - |
+| `surface` | `string` | `cli`, `desktop` |
 <!-- END GENERATED SCHEMA -->
 
 ### Computer-use events
@@ -327,23 +344,32 @@ A process that dies natively cannot report its own death, so `process_crashed` i
 
 ## Identity model
 
-Identity is machine-level, not person-level:
+Identity is installation-level, not person-level:
 
-- The anonymous machine id is `sha256("omo-senpi:" + hostname)`. The raw hostname never leaves the machine; it's only hashed locally.
+- As of schema version 4, every OmO Native event's `distinct_id` is `install_hash` = `sha256(install id)`, where the install id is the random file described below. The same value is sent as the `install_hash` property; the raw install id never leaves the machine.
+- Schema versions 1 to 3 used the machine id `sha256("omo-senpi:" + hostname)` as `distinct_id`. Until `2026-12-15` (UTC, exclusive) every event also carries that value as `machine_hash`, so rows from before and after the switch can be joined per installation; after that date the property is no longer sent. The raw hostname never leaves the machine; it's only hashed locally. The legacy `omo_senpi_daily_active` event keeps the machine id as its `distinct_id`.
 - The `$session_id` value is a keyed hash: a per-machine random salt combined with the raw session id, then hashed. The raw session id is never sent, and sessions from different machines can't be correlated by session id.
 - Person profiles are disabled on every event (`$process_person_profile: false`), so PostHog builds no person records.
 - GeoIP enrichment is enabled as of schema version 2: native events are sent without the `$geoip_disable` transport flag, so PostHog may derive an approximate country (`$geoip_country_code`) from the sending IP server side. The application never authors `$ip` or any location property itself, and stores no IP locally. Earlier schema versions disabled GeoIP; a prior revision of this document wrongly claimed it was already on.
 
-Because identity is machine-level, a shared machine conflates its users into one id. That's an accepted, documented limitation, not a bug.
+Because identity is per installation, a shared machine conflates its users into one id. That's an accepted, documented limitation, not a bug.
 
 ### Surface attribution and install ids (schema version 3)
 
 Every event carries two shared attribution properties as of schema version 3:
 
 - `surface` is `cli` for standalone CLI sessions, or `desktop` when the runtime is embedded in OmO Desktop. The Desktop host sets `OMO_NATIVE_SURFACE=desktop` in the child environment; anything else is the CLI. A Desktop-driven turn is Desktop usage, not CLI adoption, and must never be counted as one.
-- `install_id` is a random 64-hex value stored (like the session-id salt) under the agent home at `omo-senpi/omo-native/install-id`, created with mode 0600 on first use. It is generated locally and derived from nothing: not the hostname, not hardware, not accounts. The standalone CLI and the Desktop-bundled runtime on one machine converge on the same file, which is what joins the two surfaces without fingerprinting the machine. A valid `OMO_NATIVE_INSTALL_ID` env value overrides the file, so a Desktop host can pin a remote (SSH/WSL) runtime to the local installation's id; a malformed override is ignored.
+- The install id is a random 64-hex value stored (like the session-id salt) under the agent home at `omo-senpi/omo-native/install-id`, created with mode 0600 on first use. It is generated locally and derived from nothing: not the hostname, not hardware, not accounts. The standalone CLI and the Desktop-bundled runtime on one machine converge on the same file, which is what joins the two surfaces without fingerprinting the machine. A valid `OMO_NATIVE_INSTALL_ID` env value overrides the file, so a Desktop host can pin a remote (SSH/WSL) runtime to the local installation's id; a malformed override is ignored.
 
-Rows written before schema version 3 carry neither property. Segment on `schema_version` when mixing eras.
+Schema version 3 sent this value raw as the `install_id` property; schema version 4 sends only its hash (`install_hash`). Rows written before schema version 3 carry neither property. Segment on `schema_version` when mixing eras.
+
+### CI attribution
+
+Every event carries `ci`: `true` when the process runs with the `CI` environment variable set to anything other than empty, `0` or `false` (the convention GitHub Actions and most CI runners follow), else `false`. It lets analysis separate automated runs from people; it does not turn telemetry off. Rows written before this field existed carry no `ci`.
+
+### Event ids
+
+Every event carries `event_id`, a UUIDv7 minted on the client at capture time from a monotonic clock and random bits; it is derived from nothing in the event. PostHog's top-level `uuid` is set to the same value, so a delivery that is retried or relayed through a second path deduplicates to one row. Rows written before this field existed carry no `event_id`.
 
 ## SDK-added properties
 
@@ -358,12 +384,17 @@ Each switch below turns telemetry fully off: both the OmO Native events in the s
 | `DO_NOT_TRACK` | `1` | The consoledonottrack.com convention, honored across all omo adapters |
 | `OMO_SENPI_DISABLE_POSTHOG` | `1` | Adapter-specific kill switch |
 | `OMO_DISABLE_POSTHOG` | `1` | Global kill switch across omo packages |
+| `OMO_DISABLE_TELEMETRY` | `1`, `true` or `yes` | Global kill switch across omo packages, named for the product rather than the vendor |
 | `OMO_SENPI_SEND_ANONYMOUS_TELEMETRY` | any opt-out value, including `yes` | See the quirk note below |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | any opt-out value, including `yes` | See the quirk note below |
 | `omo.json` | `telemetry.enabled: false` | Config-file opt-out |
 | Component flag | `omo-senpi-telemetry-disabled` | Per-component disable flag |
 
 Quirk, documented honestly: the `*_SEND_ANONYMOUS_TELEMETRY` variables treat the value `yes` as an opt-out. This is a pre-existing behavior in the shared telemetry core, knowingly preserved for compatibility. Don't set `yes` expecting it to opt in; leaving the variable unset is what keeps telemetry on.
+
+## Known issue fixed in 5.1.35
+
+OmO Native versions v5.0.0-beta.6 through v5.1.34 kept sending usage events for the rest of a session after telemetry was turned off while that session was running ([#10328](https://github.com/code-yeongyu/oh-my-openagent/issues/10328)). These events are personless and carry a session hash; the ones confirmed in that report are `turn_completed`, `feature_used` and `computer_use_activation`, other usage events may have been sent the same way, and like every OmO Native event they never contain prompt or response text, file paths, or file contents. Turning telemetry off before a session started, or through one of the opt-out environment variables, was never affected. Since v5.1.35 consent is checked when events are sent (a check is reused for at most 5 seconds), and events already queued are dropped once the opt-out is read. Those events can't be told apart from consented ones, so erasure is per install: send a private request through this repository's [private vulnerability reporting form](https://github.com/code-yeongyu/oh-my-openagent/security/advisories/new), titled "Telemetry erasure request", with your install id (the file `omo-senpi/omo-native/install-id` under the agent home), and an operator erases that install's events. Put the id only in that private report, never in a public issue or comment. Events from older versions that are keyed only by the machine hash are erased only where our records pair that hash with your install id and no other install. A history shared by several machines or installs (the same hostname hash) can't be erased automatically; it needs that private request, and where nothing proves the events are yours, they can't be erased.
 
 ## What is never collected
 

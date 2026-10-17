@@ -256,6 +256,32 @@ describe("checkExtensionCurrent", () => {
     expect(threadClientInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
   })
 
+  test("#given the split extension build #when palace inputs are inspected #then the /palace and /people runtime loads only from the lazy entry", async () => {
+    const { mainInputs, memoryPalaceInputs } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/palace/runtime.ts",
+      "packages/omo-senpi/src/components/memory/palace/generator.ts",
+      "packages/omo-senpi/src/components/memory/palace/client-script.ts",
+      "packages/omo-senpi/src/components/memory/palace/styles.ts",
+      "packages/omo-senpi/src/components/memory/commands/people-runtime.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(memoryPalaceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+  })
+
+  test("#given the split extension build #when the palace sidecar is inspected #then it carries no runtime loader of its own", async () => {
+    const { memoryPalaceInputs, memoryPalaceOutputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/palace/runtime-loader.ts",
+      "packages/omo-senpi/src/components/memory/palace/command.ts",
+      "packages/omo-senpi/src/components/memory/commands/people.ts",
+    ]) {
+      expect(memoryPalaceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+    }
+    expect(await readFile(memoryPalaceOutputPath, "utf8")).not.toContain("#omo-memory-palace-runtime")
+  })
+
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
@@ -264,6 +290,7 @@ describe("checkExtensionCurrent", () => {
 
     expect(main).toContain('import("#omo-task-runtime")')
     expect(main).toContain('import("#omo-memory-memfs-runtime")')
+    expect(main).toContain('import("#omo-memory-palace-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
@@ -273,6 +300,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
       "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
+      "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })

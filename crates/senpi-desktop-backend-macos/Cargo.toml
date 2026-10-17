@@ -27,3 +27,7 @@ serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 xcap.workspace = true
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+# Tests inject a recording fatal exit; only dev builds enable this feature.
+senpi-desktop-safety = { path = "../senpi-desktop-safety", features = ["test-support"] }
