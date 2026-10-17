@@ -46,6 +46,45 @@ function normalizeSkillName(name: string): string {
   return name.toLowerCase()
 }
 
+function normalizeSkillLocation(location: string): string {
+  return location.replace(/\\/g, "/").replace(/\/+$/, "")
+}
+
+function isOmoBundledSkillLocation(location: string | undefined): boolean {
+  if (!location) return false
+  const normalized = normalizeSkillLocation(location)
+  if (normalized === "<builtin>" || normalized.startsWith("<builtin>/")) return true
+  return (
+    /(?:^|\/)dist\/skills(?:\/|$)/.test(normalized)
+    || /(?:^|\/)(?:packages\/)?shared-skills(?:\/skills)?(?:\/|$)/.test(normalized)
+  )
+}
+
+function isOpenCodeCoreBuiltinLocation(location: string | undefined): boolean {
+  if (location === undefined) return false
+  const normalized = normalizeSkillLocation(location).trim()
+  return normalized === "" || normalized === "<built-in>"
+}
+
+const CORE_SCANNED_DIR_RE =
+  /(?:^|\/)(?:\.opencode\/skills?(?:\/|$)|(?:\.claude|\.agents)\/skills(?:\/|$)|(?:\.config\/opencode(?:\/profiles\/[^/]+)?\/skills?(?:\/|$)))/i
+
+function hasCoreScannedSkillLocation(location: string | undefined): boolean {
+  if (!location) return false
+  if (isOpenCodeCoreBuiltinLocation(location)) return true
+  const normalized = normalizeSkillLocation(location)
+  if (CORE_SCANNED_DIR_RE.test(normalized)) return true
+  return /ai\.opencode\.desktop(?:\.dev)?(?:\/.*)?\/skills?(?:\/|$)/i.test(normalized)
+}
+
+export function isDiscoverableByOpenCodeCore(skill: SkillInfo): boolean {
+  // OpenCode core already emits these in <available_skills>. OMO-bundled
+  // builtin/shared skills live under dist/skills and are invisible to that scan.
+  if (skill.scope === "builtin" || skill.scope === "shared") return false
+  if (isOmoBundledSkillLocation(skill.location)) return false
+  return hasCoreScannedSkillLocation(skill.location)
+}
+
 export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
   // After the shared/ prefix cutover, skills register under bare names only.
   // Exact-name deduplication is handled by the upstream merge; this pass is now
@@ -72,8 +111,9 @@ export function formatCombinedDescription(
   commands?: CommandInfo[],
   options: CombinedDescriptionOptions = {}
 ): string {
-  const availableSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
-  const availableCommands = deduplicateCommandsForPathAliasedSkills(commands ?? [], availableSkills)
+  const allSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
+  const availableSkills = allSkills.filter((skill) => !isDiscoverableByOpenCodeCore(skill))
+  const availableCommands = deduplicateCommandsForPathAliasedSkills(commands ?? [], allSkills)
 
   if (availableSkills.length === 0 && availableCommands.length === 0) {
     if ((skills?.length ?? 0) > 0) {

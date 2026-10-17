@@ -31,7 +31,7 @@ describe("skill tool - nativeSkills integration", () => {
     expect(tool.description).toContain("native-visible-skill")
   })
 
-  it("keeps OpenCode-injected native skills in the description after the shared/ prefix cutover", () => {
+  it("omits OpenCode-injected native skills from available_items because core already lists them", () => {
     const tool = createSkillTool({
       skills: [],
       includeSkillsInDescription: true,
@@ -59,8 +59,10 @@ describe("skill tool - nativeSkills integration", () => {
 
     const description = tool.description
 
-    expect(description).toContain("<name>/customize-opencode</name>")
-    expect(description).toContain("Customize OpenCode")
+    expect(description).not.toContain("<name>/customize-opencode</name>")
+    expect(description).not.toContain("<name>/opencode/customize-opencode</name>")
+    expect(description).not.toContain("Customize OpenCode")
+    expect(description).not.toContain("Qualified OpenCode customize entry")
   })
 
   it("merges native skills exposed by PluginInput.skills.all()", async () => {
