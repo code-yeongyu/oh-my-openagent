@@ -222,7 +222,7 @@
     "@typescript/typescript6": "6.0.2",
     "@xterm/addon-unicode11": "^0.9.0",
     "@xterm/xterm": "^6.0.0",
-    "bun-types": "1.4.2",
+    "bun-types": "1.4.3",
     "commander": "^15.0.0",
     "diff": "^9.0.0",
     "js-yaml": "^5.4.2",

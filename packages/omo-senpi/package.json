@@ -70,7 +70,7 @@
     "@code-yeongyu/senpi": "2026.10.16",
     "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.16",
     "@types/node": "26.6.2",
-    "bun-types": "1.4.2",
+    "bun-types": "1.4.3",
     "terser": "5.51.2"
   }
 }

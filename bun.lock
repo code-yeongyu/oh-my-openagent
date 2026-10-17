@@ -56,7 +56,7 @@
         "@typescript/typescript6": "6.0.2",
         "@xterm/addon-unicode11": "^0.9.0",
         "@xterm/xterm": "^6.0.0",
-        "bun-types": "1.4.2",
+        "bun-types": "1.4.3",
         "commander": "^15.0.0",
         "diff": "^9.0.0",
         "js-yaml": "^5.4.2",
@@ -102,7 +102,7 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
       "devDependencies": {
-        "bun-types": "1.4.2",
+        "bun-types": "1.4.3",
       },
     },
     "packages/boulder-state": {
@@ -142,7 +142,7 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
       "devDependencies": {
-        "bun-types": "1.4.2",
+        "bun-types": "1.4.3",
       },
     },
     "packages/hashline-core": {
@@ -176,14 +176,14 @@
         "zod": "^4.6.5",
       },
       "devDependencies": {
-        "bun-types": "1.4.2",
+        "bun-types": "1.4.3",
       },
     },
     "packages/mcp-stdio-core": {
       "name": "@oh-my-opencode/mcp-stdio-core",
       "version": "0.1.0",
       "devDependencies": {
-        "bun-types": "1.4.2",
+        "bun-types": "1.4.3",
       },
     },
     "packages/memory-core": {
@@ -206,7 +206,7 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
       "devDependencies": {
-        "bun-types": "1.4.2",
+        "bun-types": "1.4.3",
       },
     },
     "packages/omo-config-core": {
@@ -289,7 +289,7 @@
         "@code-yeongyu/senpi": "2026.10.16",
         "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.16",
         "@types/node": "26.6.2",
-        "bun-types": "1.4.2",
+        "bun-types": "1.4.3",
         "terser": "5.51.2",
       },
       "peerDependencies": {
@@ -1030,7 +1030,7 @@
 
     "bun-ffi-structs": ["bun-ffi-structs@0.3.1", "", { "peerDependencies": { "typescript": "^5" } }, "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="],
 
-    "bun-types": ["bun-types@1.4.2", "", { "dependencies": { "@types/node": "*" } }, "sha512-bxV1FgK7yBIzjRe5zBozIM4Bem11ZJcCXSrjWRG3YWLt8yFDePu4cLjpebO8OvPeIE9trbyPF4fuj3Cia4Fj3w=="],
+    "bun-types": ["bun-types@1.4.3", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-tinRJNGOmUN+tEAsn2y2e942n9JHRHR42iUYzDH75NmhJqVBokGSQkkfSFdNWwsANIdrK6ACH9t01M452YyTwg=="],
 
     "bytes": ["bytes@3.1.2", "", {}, "sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg=="],
 
