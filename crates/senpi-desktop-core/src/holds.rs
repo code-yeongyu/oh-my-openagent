@@ -3,7 +3,7 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::backend::MouseButton;
-use crate::error::{CoreResult, DesktopError};
+use crate::error::{CoreResult, DesktopError, ErrorCode};
 use crate::keys::KeyName;
 
 /// A mouse hold in global logical coordinates, already mapped by the session.
@@ -53,13 +53,23 @@ pub fn with_held<C, K: Copy>(
     result
 }
 
+const RELEASE_ALSO_FAILED: &str = "; input release also failed: ";
+
+/// Whether a hold's error carries an input-release failure: either the release
+/// itself failed, or it failed after a cancel or stop (merged by
+/// [`merge_release`]). A caller that answers `Cancelled` must surface these.
+#[must_use]
+pub fn reports_release_failure(error: &DesktopError) -> bool {
+    error.code != ErrorCode::Cancelled || error.message.contains(RELEASE_ALSO_FAILED)
+}
+
 /// Append a cleanup failure without discarding the original failure/code.
 pub fn merge_release(result: &mut CoreResult<()>, released: CoreResult<()>) {
     if let Err(release) = released {
         match result {
             Ok(()) => *result = Err(release),
             Err(primary) => {
-                primary.message.push_str("; input release also failed: ");
+                primary.message.push_str(RELEASE_ALSO_FAILED);
                 primary.message.push_str(&release.to_string());
             }
         }
@@ -69,4 +79,33 @@ pub fn merge_release(result: &mut CoreResult<()>, released: CoreResult<()>) {
 fn guarded(action: impl FnOnce() -> CoreResult<()>) -> CoreResult<()> {
     catch_unwind(AssertUnwindSafe(action))
         .unwrap_or_else(|_| Err(DesktopError::internal("the held input backend panicked")))
+}
+
+#[cfg(test)]
+mod release_failure_tests {
+    use super::{merge_release, reports_release_failure};
+    use crate::error::{CoreResult, DesktopError, ErrorCode};
+
+    fn cancelled() -> DesktopError {
+        DesktopError::new(ErrorCode::Cancelled, "the hold request was cancelled")
+    }
+
+    #[test]
+    fn a_plain_cancel_is_not_a_release_failure() {
+        assert!(!reports_release_failure(&cancelled()));
+    }
+
+    #[test]
+    fn a_cancel_whose_release_failed_is_a_release_failure() {
+        let mut outcome: CoreResult<()> = Err(cancelled());
+        merge_release(&mut outcome, Err(DesktopError::input_failed("key up failed")));
+        assert!(reports_release_failure(&outcome.unwrap_err()));
+    }
+
+    #[test]
+    fn a_release_failure_after_a_clean_hold_is_a_release_failure() {
+        let mut outcome: CoreResult<()> = Ok(());
+        merge_release(&mut outcome, Err(DesktopError::input_failed("key up failed")));
+        assert!(reports_release_failure(&outcome.unwrap_err()));
+    }
 }

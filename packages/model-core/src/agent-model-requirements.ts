@@ -43,6 +43,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "xhigh" },
       { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
       {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "high",
+      },
+      {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3.1-pro",
         variant: "high",
@@ -130,6 +135,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
         variant: "max",
+      },
+      {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "high",
       },
       {
         providers: ["google", "github-copilot", "opencode"],

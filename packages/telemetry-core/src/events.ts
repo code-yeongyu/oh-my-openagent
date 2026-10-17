@@ -1,4 +1,5 @@
 import { getTelemetryApiKey, getTelemetryHost } from "./env"
+import { createEventId } from "./event-id"
 import { createDefaultPostHogTransport, isTelemetryClientEnabled } from "./posthog-client"
 import type {
   TelemetryCaptureMessage,
@@ -133,10 +134,14 @@ export function createEventTelemetryClient(
         projected[key] = typeof value === "string" ? value.slice(0, 64) : value
       }
 
+      // event_id is minted last so neither the product nor the caller can supply it; PostHog dedupes
+      // on `uuid`, so mirroring it there makes a direct and a relayed delivery of one event collapse.
+      const eventId = createEventId()
       const payload: TelemetryCaptureMessage = {
         distinctId: input.distinctId,
         event: name,
-        properties: { ...projected, ...sharedProperties },
+        uuid: eventId,
+        properties: { ...projected, ...sharedProperties, event_id: eventId },
       }
       try {
         transport.capture(payload)

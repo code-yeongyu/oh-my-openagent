@@ -1,5 +1,5 @@
 import type { IsolationDetails } from "../isolation/details"
-import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
+import type { EffectiveModelRecord, ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
@@ -27,6 +27,7 @@ export type CompletionDetails = {
   readonly requested_model?: ResolvedModelRecord
   readonly fallback_models?: readonly ResolvedModelRecord[]
   readonly resolved_model?: ResolvedModelRecord
+  readonly effective_model?: EffectiveModelRecord
   readonly duration_ms: number
   readonly tokens?: number
   readonly run_stats?: TaskRunStats

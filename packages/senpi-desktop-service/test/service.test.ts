@@ -1,9 +1,16 @@
 import { DesktopEngineAbiMismatchError } from "@oh-my-opencode/senpi-desktop-engine";
 import type { AuditEvent, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DesktopServiceError } from "../src/service/rpc-client";
+import { DesktopEngineRpcError, DesktopServiceError } from "../src/service/rpc-client";
 import { DesktopService } from "../src/service/service";
-import { GRACE_MS, HEARTBEAT_MS, RESTART_MESSAGE, START_TIMEOUT_MS } from "../src/service/timeouts";
+import {
+	CLOSE_TIMEOUT_MS,
+	GRACE_MS,
+	HEARTBEAT_MS,
+	HOLD_RELEASE_GRACE_MS,
+	RESTART_MESSAGE,
+	START_TIMEOUT_MS,
+} from "../src/service/timeouts";
 import { exitOf, fakeEngineFactory, rejectionOf, type SpawnLog } from "./harness";
 
 // Every case waits on real child-process I/O; the guard only catches a hang, it never times behavior.
@@ -167,6 +174,28 @@ describe("DesktopService", HANG_GUARD, () => {
 		expect((await log.nthRequest("session.open", 2)).params).toEqual({ display: "all", showCursor: true });
 	});
 
+	it("gives a cancelled hold the longer release grace before killing the engine", async () => {
+		// Given
+		vi.useFakeTimers(TIMERS);
+		const log = fakeEngineFactory();
+		const service = serviceOver(log);
+		await service.open({});
+		const hung = rejectionOf(service.call("holdKeys", { keys: ["shift"], duration: 1, fake: "hang" }, { timeoutMs: 100 }));
+		await log.nthRequest("holdKeys", 1);
+		await vi.advanceTimersByTimeAsync(100);
+		await log.nthRequest("$/cancel", 1);
+
+		// When the ordinary grace has passed, the engine may still be releasing the held input
+		await vi.advanceTimersByTimeAsync(GRACE_MS);
+		const killedDuringRelease = log.kills();
+		await vi.advanceTimersByTimeAsync(HOLD_RELEASE_GRACE_MS - GRACE_MS);
+		await hung;
+
+		// Then
+		expect(killedDuringRelease).toBe(0);
+		expect(log.kills()).toBe(1);
+	});
+
 	it("closes quietly right after a grace kill, before the killed child has exited", async () => {
 		// Given
 		vi.useFakeTimers(TIMERS);
@@ -203,6 +232,70 @@ describe("DesktopService", HANG_GUARD, () => {
 		// Then
 		expect(log.requests.filter((request) => request.method === "stopPath.heartbeat")).toHaveLength(3);
 		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it("cancels an in-flight hold before sending session.close", async () => {
+		// Given a call that only answers cancellation.
+		const log = fakeEngineFactory();
+		const service = serviceOver(log);
+		await service.open({});
+		const pending = rejectionOf(service.call("holdKeys", { fake: "cancellable" }));
+		const sent = await log.nthRequest("holdKeys", 1);
+		// When the service closes.
+		await service.close();
+		// Then cancellation precedes close on the same stream.
+		expect(await pending).toHaveProperty("code", "Cancelled");
+		const cancel = log.requests.findIndex((request) => request.method === "$/cancel");
+		const close = log.requests.findIndex((request) => request.method === "session.close");
+		expect(cancel).toBeGreaterThanOrEqual(0);
+		expect(close).toBeGreaterThan(cancel);
+		expect(log.requests[cancel]?.params).toEqual({ id: sent.id });
+	});
+
+	it("surfaces a cancelled hold's input release failure instead of a plain Timeout", async () => {
+		// Given a hold whose cancel reply carries the engine's merged release failure
+		const log = fakeEngineFactory();
+		const service = serviceOver(log);
+		await service.open({});
+		const pending = rejectionOf(
+			service.call("holdKeys", { keys: ["shift"], duration: 1, fake: "release-fails" }, { timeoutMs: 50 }),
+		);
+		await log.nthRequest("holdKeys", 1);
+
+		// When the timeout cancels it
+		const error = await pending;
+
+		// Then the caller sees the engine's release failure, not the service's own Timeout
+		expect(error).toBeInstanceOf(DesktopEngineRpcError);
+		expect(String((error as Error).message)).toContain("input release also failed");
+		expect(log.kills()).toBe(0);
+	});
+
+	it("leaves a pipelined non-hold request running when the service closes", async () => {
+		// Given a held non-hold request and an in-flight hold
+		const log = fakeEngineFactory();
+		const service = serviceOver(log);
+		await service.open({});
+		const grant = service.call("displays", { fake: "hold" });
+		const hold = rejectionOf(service.call("holdKeys", { fake: "cancellable" }));
+		await log.nthRequest("holdKeys", 1);
+		const grantId = (await log.nthRequest("displays", 1)).id;
+
+		// When the service closes
+		const closing = service.close();
+		await hold;
+
+		// Then only the hold is cancelled
+		const cancelled = log.requests.filter((request) => request.method === "$/cancel").map((request) => request.params);
+		expect(cancelled).not.toContainEqual({ id: grantId });
+		expect(cancelled).toHaveLength(1);
+		void grant.catch(() => undefined);
+		await closing;
+	});
+
+	it("gives close at least the engine's hold release window before killing the child", () => {
+		// The engine waits up to 2 s for a cancelled hold's release; close must not kill it sooner.
+		expect(CLOSE_TIMEOUT_MS).toBeGreaterThanOrEqual(HOLD_RELEASE_GRACE_MS);
 	});
 
 	it("fans audit and stopPath.changed notifications out to every current listener", async () => {
