@@ -74,11 +74,25 @@ touch "\${@: -1}"
 }
 
 function runSigning(root: string, env: NodeJS.ProcessEnv, binary: string) {
-  return spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary], { cwd: root, env, encoding: "utf8" })
+  // Bound a stalled child without using wall-clock time to drive the polling assertions.
+  return spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary], { cwd: root, env, encoding: "utf8", timeout: 20_000 })
 }
 
 function spctlCalls(root: string): number {
   return readFileSync(join(root, "spctl-calls"), "utf8").trim().split("\n").length
+}
+
+/** Advance whole seconds only when the script sleeps, regardless of process startup or runner speed. */
+function mockClock(root: string): void {
+  const clock = join(root, "clock")
+  writeFileSync(clock, "0\n")
+  writeFileSync(join(root, "bin", "date"), `#!/bin/bash
+cat "${clock}"
+`)
+  writeFileSync(join(root, "bin", "sleep"), `#!/bin/bash
+echo "$(( $(cat "${clock}") + $1 ))" > "${clock}"
+`)
+  for (const tool of ["date", "sleep"]) chmodSync(join(root, "bin", tool), 0o755)
 }
 
 describe("notarization polling", () => {
@@ -131,22 +145,29 @@ describe("Gatekeeper check after notarization", () => {
   posixBashTest("waits for the ticket while Gatekeeper still reads the binary as unnotarized", () => {
     const { root, env, binary } = notarySandbox(["Accepted"], [NOT_YET, NOT_YET, NOTARIZED])
     try {
-      const result = runSigning(root, env, binary)
+      mockClock(root)
+      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "2", GATEKEEPER_POLL_SECONDS: "1" }, binary)
       expect(result.status, result.stderr).toBe(0)
       expect(spctlCalls(root)).toBe(3)
       expect(result.stdout).toContain("(attempt 3)")
+      expect(readFileSync(join(root, "clock"), "utf8")).toBe("2\n")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
   })
 
-  posixBashTest("fails when the ticket never arrives within the window", () => {
+  posixBashTest.each([
+    { timeout: "0", polls: 1 },
+    { timeout: "2", polls: 3 },
+  ])("fails when the ticket never arrives within $timeout seconds", ({ timeout, polls }) => {
     const { root, env, binary } = notarySandbox(["Accepted"], [NOT_YET])
     try {
-      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "1", GATEKEEPER_POLL_SECONDS: "0.2" }, binary)
+      mockClock(root)
+      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: timeout, GATEKEEPER_POLL_SECONDS: "1" }, binary)
       expect(result.status).toBe(1)
       expect(result.stderr).toContain("Gatekeeper does not accept")
-      expect(spctlCalls(root)).toBeGreaterThan(1)
+      expect(spctlCalls(root)).toBe(polls)
+      expect(readFileSync(join(root, "clock"), "utf8")).toBe(`${timeout}\n`)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
