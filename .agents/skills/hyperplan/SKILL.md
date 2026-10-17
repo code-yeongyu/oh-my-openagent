@@ -20,6 +20,9 @@ Before starting, verify:
 1. **`team_*` tools must be available.** If they are not, STOP and tell the user:
    > "Hyperplan requires team-mode. Set `team_mode.enabled: true` in `~/.config/opencode/oh-my-opencode.jsonc` and restart opencode, then retry."
 2. **You are running as `sisyphus` (or another lead-eligible agent).** If you are running as a planner (`prometheus`, `plan`), this skill is the wrong tool — direct the user to use `/start-work` instead.
+   > ENFORCEMENT (do not skip): resolve your own agent type via `resolveCallerTeamLead` semantics — `sisyphus`, `atlas`, `sisyphus-junior`, and `hephaestus` (with teammate permission) are lead-eligible. If your caller is NOT lead-eligible, STOP immediately and tell the user:
+   > "Hyperplan requires a lead-eligible caller session (sisyphus, atlas, sisyphus-junior, or hephaestus). The current session cannot receive injected member replies, so orchestration would deadlock. Restart from a lead-eligible session and retry."
+   > Do not proceed — a non-eligible orchestrator will never receive the `<peer_message>` injections this skill's `[WAIT]` protocol depends on, and the run will stall silently.
 3. **You are in the main session** (not a background subagent). Hyperplan only works as a top-level orchestration.
 
 ## THE 5 ADVERSARIAL MEMBERS — RnR & CHARACTERISTICS
@@ -189,6 +192,11 @@ Output format: numbered findings/critiques, each proposes a concrete alternative
 ## EXECUTION WORKFLOW
 
 You execute this in **7 phases**. End your turn at every phase boundary marked **[WAIT]** so the team's async messages can flow back to you. Resume on the next turn after `<peer_message>` blocks arrive.
+
+**[WAIT] PROTOCOL (applies at every [WAIT] boundary):** the system injects `<peer_message>` blocks when replies arrive. If you resume and expected replies are missing, do NOT proceed and do NOT loop silently. First check `team_status({ teamRunId })` to see which members have replied and which are still working (SKILL.md:445). Then:
+1. If replies are still in flight (members not idle), end your turn again and wait one more cycle.
+2. If a member is idle but never replied, or replies are absent after 2 consecutive [WAIT] cycles, treat it as a lost-injection failure: surface a clear error to the user naming the missing member(s), and either retry the round once or abort with the error. Never proceed to aggregate a round with missing member findings — the insight bundle would silently drop that member's contribution.
+3. `team_send_message` is fire-and-forget with no ack path (SKILL.md:443). If a send may have failed, re-send once before declaring failure.
 
 **Critical separation**: You (the Lead) **distill** the surviving insights in Phase 5, but you DO NOT write the work plan. The work plan is produced by the `plan` agent in Phase 6 — this handoff is **mandatory**, not optional. Hyperplan = adversarial distillation + dedicated planner formalization. Skipping the handoff turns it back into vanilla orchestration.
 
