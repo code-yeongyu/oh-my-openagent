@@ -1,5 +1,6 @@
 import type { TurnEndEvent } from "@code-yeongyu/senpi"
 import {
+  createConsentGatedFetch,
   createDefaultPostHogTransport,
   createEventTelemetryClient,
 } from "@oh-my-opencode/telemetry-core"
@@ -47,6 +48,12 @@ import {
 type SharedState = {
   capture?: (name: OmoNativeEventName, properties: EventTelemetryProperties) => void
   sessionHash?: string
+  /** The one consent gate as of now; unset until registration, so nothing leaves the fan-in before it. */
+  isConsented?: () => boolean
+  /** The same gate read fresh, at the moment a queued batch would leave the process. */
+  isSendAllowed?: () => boolean
+  /** Empties the native SDK queue without sending it; set while a native transport is live. */
+  dropQueued?: () => void
 }
 
 export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
@@ -69,6 +76,10 @@ export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
 export const CONSENT_CACHE_MS = 5_000
 /** How often a persisted window re-checks consent, so an opt-out deletes it even if no turn follows. */
 export const CONSENT_CHECK_INTERVAL_MS = 5_000
+/** How long a failed drop flush waits before draining the still-queued events again; the gate stays closed meanwhile. */
+const DROP_RETRY_MS = 5_000
+/** What a session hashes to while consent is off: no salt is read or created, and no event carrying it is sent. */
+const OPTED_OUT_SESSION_HASH = "opted-out"
 
 export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryComponentOptions = {}): OmoSenpiComponent {
   const env = options.env ?? process.env
@@ -76,6 +87,8 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
   const state: SharedState = {}
   const client: Pick<EventTelemetryClient, "captureEvent"> = {
     captureEvent(name, properties) {
+      if (state.isConsented?.() !== true) return
+      if (properties.$session_id === OPTED_OUT_SESSION_HASH) return
       if (isOmoNativeEventName(name)) state.capture?.(name, properties)
     },
   }
@@ -92,28 +105,10 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       // counted as one, nor report the crashes and daily activity the real session reports.
       if (isHostWarmupSession(pi)) return
 
-      // Must precede the session component: its `session_shutdown` handler shuts the client down,
-      // which clears `state.capture`, after which `parallelism_summary` would capture nothing.
-      registerOmoNativeParallelSummary(pi, {
-        captureEvent: client.captureEvent,
-        hashSessionId: options.hashSessionId ?? hashSessionId,
-      })
-
-      // Same ordering constraint as the parallelism summary: the session component's shutdown
-      // handler clears `state.capture`, so this registration must precede it. Its own detach runs
-      // after the emission because it is registered second.
-      const detachKibitzerSummary = registerOmoNativeKibitzerSummary(pi, {
-        captureEvent: client.captureEvent,
-        hashSessionId: options.hashSessionId ?? hashSessionId,
-      })
-      pi.on("session_shutdown", () => {
-        detachKibitzerSummary()
-      })
-
-      // Same ordering constraint again: the final summary window must be captured before the session
-      // component's shutdown handler clears `state.capture`.
-      // Consent is the session component's own decision, taken at registration and again before every
-      // summary write: an opted-out session must leave nothing on disk that a later process could send.
+      // Consent is the session component's own decision (`isOmoNativeTelemetryEnabled`, the single gate),
+      // taken at registration and again before every summary write and every session hash: an opted-out
+      // session must leave nothing on disk that a later process could send, and deriving a hash alone
+      // persists the hashing salt.
       // Every persisted window carries the cwd its consent was read for, and recovery re-reads consent
       // for that cwd: a later process in another project cannot send a window its own project opted out of.
       const consentOptions = { isConfigEnabled: options.isConfigEnabled }
@@ -126,9 +121,40 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       const currentConsent = (fresh: boolean): boolean => {
         const at = consentNow()
         if (!fresh && cached.cwd === consentCwd && at - cached.at < CONSENT_CACHE_MS) return cached.value
+        const wasConsented = cached.value
         cached = { cwd: consentCwd, at, value: readConsent(consentCwd) }
+        // Events queued before the withdrawal are dropped the moment it is read, not sent by a later flush.
+        if (wasConsented && !cached.value) state.dropQueued?.()
         return cached.value
       }
+      // Read before EVERY event leaves the fan-in, not only when a session is hashed or sampled: a
+      // session sampled while opted in keeps its real hash after a withdrawal, so the sentinel cannot
+      // stop its later events.
+      state.isConsented = () => currentConsent(false)
+      state.isSendAllowed = () => currentConsent(true)
+      const hashSession = (rawId: string): string =>
+        currentConsent(false) ? (options.hashSessionId ?? hashSessionId)(rawId) : OPTED_OUT_SESSION_HASH
+
+      // Must precede the session component: its `session_shutdown` handler shuts the client down,
+      // which clears `state.capture`, after which `parallelism_summary` would capture nothing.
+      registerOmoNativeParallelSummary(pi, {
+        captureEvent: client.captureEvent,
+        hashSessionId: hashSession,
+      })
+
+      // Same ordering constraint as the parallelism summary: the session component's shutdown
+      // handler clears `state.capture`, so this registration must precede it. Its own detach runs
+      // after the emission because it is registered second.
+      const detachKibitzerSummary = registerOmoNativeKibitzerSummary(pi, {
+        captureEvent: client.captureEvent,
+        hashSessionId: hashSession,
+      })
+      pi.on("session_shutdown", () => {
+        detachKibitzerSummary()
+      })
+
+      // Same ordering constraint again: the final summary window must be captured before the session
+      // component's shutdown handler clears `state.capture`.
       const summary = createSessionSummaryRecorder({
         captureEvent: client.captureEvent,
         store: createSummaryStore({ stateDir }),
@@ -143,18 +169,18 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       pi.on("session_shutdown", (payload, eventCtx) => {
         const reason = isRecord(payload) && typeof payload.reason === "string" ? payload.reason : undefined
         consentCwd = cwdOf(eventCtx)
-        summary.finish(state.sessionHash ?? hashForContext(eventCtx, options.hashSessionId), reason)
+        summary.finish(state.sessionHash ?? hashForContext(eventCtx, hashSession), reason)
         summary.dispose()
       })
 
       createOmoNativePromptComponent({
         client,
-        hashSessionId: options.hashSessionId,
+        hashSessionId: hashSession,
       }).register(pi, ctx)
 
       registerOmoNativeComputerUseTelemetry(pi, {
         captureEvent: client.captureEvent,
-        hashSessionId: options.hashSessionId,
+        hashSessionId: hashSession,
         ...(options.computerUseTelemetryObservers === undefined
           ? {}
           : { observers: options.computerUseTelemetryObservers }),
@@ -172,7 +198,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       const detachDelegation = createOmoNativeDelegationCapture({
         captureEvent: client.captureEvent,
         ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
-        hashSessionId: options.hashSessionId ?? hashSessionId,
+        hashSessionId: hashSession,
         observers: options.taskTerminalObservers ?? sharedTaskTerminalObservers(),
         stateDir: options.taskStateDir ?? resolveTaskStateDir(pi),
       })
@@ -183,10 +209,11 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       pi.on("turn_end", (payload, eventCtx) => {
         if (!isTurnEndEvent(payload)) return
         consentCwd = cwdOf(eventCtx)
-        const sessionHash = state.sessionHash ?? hashForContext(eventCtx, options.hashSessionId)
+        const sessionHash = state.sessionHash ?? hashForContext(eventCtx, hashSession)
         createOmoNativeTurnHandler({
           client,
           diagnostics: options.diagnostics,
+          isConsented: () => currentConsent(false),
           sessionId: sessionHash,
           summary,
         })(payload)
@@ -195,7 +222,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       registerOmoNativeToolTelemetry(pi, {
         captureEvent: client.captureEvent,
         diagnostics: (message, details) => ctx.logger.warn(message, details),
-        hashSessionId: options.hashSessionId,
+        hashSessionId: hashSession,
         skillsRoot: options.skillsRoot,
       })
 
@@ -215,8 +242,51 @@ function sharedTransportFactory(
   options: OmoNativeTelemetryComponentOptions,
 ): TelemetryTransportFactory {
   return (apiKey, transportOptions) => {
-    const transport = factory(apiKey, transportOptions)
-    if (!isNativeTransport(transportOptions)) return transport
+    if (!isNativeTransport(transportOptions)) return factory(apiKey, transportOptions)
+
+    // The SDK sends its interval, batch-size and shutdown flushes through this one fetch, so the gate
+    // read here stops an event that was queued while consented and is still unsent at withdrawal.
+    let dropping = 0
+    let dropRetry: ReturnType<typeof setTimeout> | undefined
+    const transport = factory(apiKey, {
+      ...transportOptions,
+      fetch: createConsentGatedFetch({
+        isSendAllowed: () => dropping === 0 && state.isSendAllowed?.() === true,
+        onDropped: (count) => options.diagnostics?.({
+          event: "telemetry_events_dropped_by_consent",
+          source: "omo-native-component",
+          count,
+        }),
+        ...(transportOptions.fetch === undefined ? {} : { fetch: transportOptions.fetch }),
+      }),
+    })
+    // Holds the gate closed until one drain of the queue has finished. A drop flush that fails keeps
+    // its hold and drains again later: whatever it left queued was captured before the withdrawal, so no
+    // later flush may send it, even after consent comes back.
+    const drainUnsent = (): void => {
+      if (transport.flush === undefined) return
+      dropping += 1
+      transport.flush().then(
+        () => {
+          dropping -= 1
+        },
+        (error: unknown) => {
+          options.diagnostics?.({
+            event: "telemetry_drop_flush_failed",
+            source: "omo-native-component",
+            error,
+            errorKind: error instanceof Error ? "error" : "non_error",
+          })
+          dropRetry = setTimeout(() => {
+            dropRetry = undefined
+            dropping -= 1
+            drainUnsent()
+          }, DROP_RETRY_MS)
+          dropRetry.unref?.()
+        },
+      )
+    }
+    state.dropQueued = drainUnsent
 
     const wrapped: TelemetryTransport = {
       capture(message) {
@@ -226,8 +296,12 @@ function sharedTransportFactory(
       flush: transport.flush === undefined ? undefined : () => transport.flush?.() ?? Promise.resolve(),
       async shutdown() {
         try {
+          // A drop still held here keeps the gate closed, so the shutdown drain discards what is queued.
           await transport.shutdown()
         } finally {
+          clearTimeout(dropRetry)
+          dropRetry = undefined
+          state.dropQueued = undefined
           if (state.capture !== undefined) {
             state.capture = undefined
             state.sessionHash = undefined
@@ -256,7 +330,11 @@ function installCaptureFacade(
     diagnostics: options.diagnostics,
     distinctId: template.distinctId,
     env: options.env,
-    product: withOmoNativeAttribution(createOmoNativeProductConfig(), { env: options.env }),
+    product: withOmoNativeAttribution(createOmoNativeProductConfig(), {
+      env: options.env,
+      now: options.now,
+      osProvider: options.osProvider,
+    }),
     propertyAllowlist: OMO_NATIVE_PROPERTY_ALLOWLISTS,
     schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
     source: "omo-native-component",
@@ -295,18 +373,15 @@ function cwdOf(eventCtx: unknown): string | undefined {
   return typeof cwd === "string" && cwd.length > 0 ? cwd : undefined
 }
 
-function hashForContext(
-  value: unknown,
-  hash: ((rawId: string) => string) | undefined,
-): string {
+function hashForContext(value: unknown, hash: (rawId: string) => string): string {
   if (isRecord(value) && isRecord(value.sessionManager)) {
     const getter = value.sessionManager.getSessionId
     if (typeof getter === "function") {
       const sessionId: unknown = getter.call(value.sessionManager)
-      if (typeof sessionId === "string" && sessionId.length > 0) return (hash ?? hashSessionId)(sessionId)
+      if (typeof sessionId === "string" && sessionId.length > 0) return hash(sessionId)
     }
   }
-  return (hash ?? hashSessionId)("unknown")
+  return hash("unknown")
 }
 
 function isNativeTransport(options: TelemetryTransportOptions): boolean {

@@ -11,8 +11,10 @@ export function redactEvents(events) {
     if (typeof distinctId === "string") distinctIds.add(distinctId)
     const sessionHash = event.properties.$session_id
     if (typeof sessionHash === "string") sessionHashes.add(sessionHash)
-    const installId = event.properties.install_id
-    if (typeof installId === "string") installIds.add(installId)
+    for (const key of ["install_hash", "machine_hash"]) {
+      const installKey = event.properties[key]
+      if (typeof installKey === "string") installIds.add(installKey)
+    }
   }
   const replace = (value) => {
     if (typeof value === "string") {
