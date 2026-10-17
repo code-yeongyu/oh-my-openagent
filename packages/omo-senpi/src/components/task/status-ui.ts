@@ -2,6 +2,7 @@ import {
   assistantLastLine,
   excerptRendererText,
   formatToolActivity,
+  HOST_TURN_RESUMED_EVENT,
   type ListScope,
   type ListedTask,
   type ManagedChildEvent,
@@ -13,6 +14,7 @@ import type { CapturedUi } from "./runtime-context"
 import {
   backgroundWidgetRows,
   buildWidgetRows,
+  isSuspended,
   isTerminal,
   LIVE_STATUS_REFRESH_MS,
 } from "./status-row-format"
@@ -148,7 +150,8 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       return
     }
     ui.setWidget(UI_KEY, rows, { placement: "belowEditor" })
-    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status))) {
+    // Only a live child needs the 250 ms repaint; a parked one renders a still row.
+    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status) && !isSuspended(record))) {
       scheduleLiveRefresh()
     } else clearLiveRefresh()
   }
@@ -231,6 +234,8 @@ function activityFromEvent(event: ManagedChildEvent): string | undefined {
     return excerptRendererText(formatToolActivity(event.toolName, event.args ?? event.input), 32)
   }
   if (event.type === "tool_execution_end") return "running"
+  // A host reattach found this child's turn in flight and it runs again on the new generation.
+  if (event.type === HOST_TURN_RESUMED_EVENT) return "running"
   if (event.type === "message_end") {
     const line = assistantLastLine(event.message)
     return line === undefined ? undefined : excerptRendererText(line, 32)

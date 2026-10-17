@@ -41,6 +41,7 @@ export function prepareReflectionCandidateSpawn(input: ReflectionSpawnInput) {
     category: input.category,
     model: input.candidate.model,
     thinking: input.candidate.thinking,
+    ...(input.candidate.loadExtensions === true ? { loadExtensions: true } : {}),
     attempt: input.attempt,
     hardDeadlineAt: input.hardDeadlineAt,
     nextAttempt: input.nextAttempt,

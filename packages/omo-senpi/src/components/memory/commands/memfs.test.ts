@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -16,6 +16,7 @@ import {
   type FakeCommandContext,
 } from "./commands.test-support"
 import { registerMemfsCommand } from "./memfs"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
@@ -23,7 +24,7 @@ afterEach(async () => {
   // Windows releases git's handles slightly after the child exits, so a bare recursive remove
   // throws EBUSY. Retry the unlink instead of failing an otherwise passing case.
   await Promise.all(
-    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })),
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 50 })),
   )
 })
 

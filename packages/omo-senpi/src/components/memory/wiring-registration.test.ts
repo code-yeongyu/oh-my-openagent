@@ -16,7 +16,6 @@ import { NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
 import { fakeChild, withinMs, type FakeChild } from "./kibitzer/sidecar.test-support"
 import type { AnyKibitzerSidecarTool } from "./kibitzer/tools/result"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
-import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-session-read"
 import { createMemoryWiring, type MemoryWiring } from "./wiring"
 
@@ -94,6 +93,7 @@ async function fixture(): Promise<Fixture> {
     modelRegistry: registry,
   }
   wiring.registerStatic(pi, { ...componentContext(), idleCoordinator: new IdleInjectionCoordinator(() => {}) })
+  await pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Drain nodes before rollout." }, eventCtx)
   return {
     pi,
     wiring,
@@ -115,6 +115,24 @@ async function nudgedThroughToolCall(f: Fixture): Promise<FakeChild> {
 }
 
 describe("kibitzer registration wiring", () => {
+  test("#given the engine's input-before-started event order #when before_agent_start carries the first prompt #then the resident sidecar sees it", async () => {
+    const f = await fixture()
+    const childStarted = f.nextChild()
+
+    await f.pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: "Drain nodes before rollout.", systemPrompt: "BASE" },
+      f.eventCtx,
+    )
+    const child = await childStarted
+    child.settle(completed)
+    await f.wiring.whenIdle()
+    await f.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, f.eventCtx)
+
+    expect(f.specs).toHaveLength(1)
+    expect(f.specs[0]?.taskId).toBe(`kibitzer-${f.sessionId}-1`)
+  })
+
   test("#given a resident child seam and idle coordinator #when tool_call wakes the sidecar and tool_result follows #then one steer and one nudged entry are emitted", async () => {
     const f = await fixture()
 
@@ -136,12 +154,15 @@ describe("kibitzer registration wiring", () => {
 
     const results = await f.pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" }, f.eventCtx)
 
-    expect(f.pi.handlers.filter((registration) => registration.event === "before_agent_start")).toHaveLength(3)
+    const beforeAgentStartHandlers = f.pi.handlers.filter((registration) => registration.event === "before_agent_start")
+    expect(beforeAgentStartHandlers).toHaveLength(3)
+    expect(beforeAgentStartHandlers.every((registration) => registration.options?.previewSafe === true)).toBe(true)
     expect(results).toHaveLength(3)
     const [projection, recall, kibitzer] = results as Array<{ systemPrompt?: string; message?: { customType?: string; content?: string } } | undefined>
-    // Projection first: it is the only writer of systemPrompt, and its message is the memory notice.
+    // Projection first: it is the only writer of systemPrompt. Its memory notice is session-volatile,
+    // and this branch never compacted, so it has nothing to say and injects no message.
     expect(projection?.systemPrompt).toContain("persona")
-    expect(projection?.message?.customType).toBe(MEMORY_NOTICE_CUSTOM_TYPE)
+    expect(projection?.message).toBeUndefined()
     expect(recall?.message?.customType).toBe(RECALL_CUSTOM_TYPE)
     expect(recall?.message?.content).toContain(HINT)
     expect(recall?.systemPrompt).toBeUndefined()

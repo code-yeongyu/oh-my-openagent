@@ -1,8 +1,6 @@
 import { realpathSync } from "node:fs"
 import { isAbsolute, relative, resolve, sep, win32 } from "node:path"
 
-import { canonicalAgentName } from "@oh-my-opencode/senpi-task"
-
 import type { SenpiExtensionAPI } from "../../extension/types"
 import {
   BUILTIN_CATEGORY_NAMES,
@@ -158,10 +156,8 @@ function spawnTarget(item: Record<string, unknown>, parent: Record<string, unkno
   const category = itemCategory ?? (itemSubagent === undefined ? identifier(parent.category) : undefined)
   const subagent = itemSubagent ?? (itemCategory === undefined ? identifier(parent.subagent_type) : undefined)
   if ((category === undefined) === (subagent === undefined)) return undefined
-  // A retired curated id is canonicalized so the allowlist reports the real agent
-  // rather than "custom" for the one release the alias is honored.
   return category === undefined
-    ? { kind: "subagent", name: canonicalAgentName(subagent ?? "").name }
+    ? { kind: "subagent", name: subagent ?? "" }
     : { kind: "category", name: category }
 }
 

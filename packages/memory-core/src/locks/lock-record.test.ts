@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, stat, unlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -10,10 +10,13 @@ import {
   getProcessStartIdentity,
   isHeld,
   releaseLock,
+  setLockCandidateFsForTests,
   withLock,
 } from "./index"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const temporaryDirectories: string[] = []
+const restoreLockFs: Array<() => void> = []
 
 async function createLockPath(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), "memory-lock-unit-"))
@@ -39,10 +42,15 @@ async function captureError(promise: Promise<unknown>): Promise<unknown> {
 }
 
 afterEach(async () => {
+  for (const restore of restoreLockFs.splice(0).reverse()) restore()
   await Promise.all(temporaryDirectories.splice(0).map(async (directory) => {
-    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
   }))
 })
+
+function codedError(code: string): Error & { code: string } {
+  return Object.assign(new Error(code), { code })
+}
 
 describe("cross-process lock protocol", () => {
   test("#given an absent lock #when it is acquired and released #then the complete record is published and removed", async () => {
@@ -59,6 +67,111 @@ describe("cross-process lock protocol", () => {
     expect(await isHeld(lockPath)).toBe(true)
     expect(await releaseLock(lockPath, record)).toBe(true)
     expect(await isHeld(lockPath)).toBe(false)
+  })
+
+  test("#given a link-published lock truncated by a power loss #when two contenders arrive after the incomplete grace #then one reclaims it and the other sees the new owner", async () => {
+    // #given: normal link publication, followed by the empty durable state a power loss can leave
+    const lockPath = await createLockPath()
+    const original = await createLockRecord("memory-write")
+    await acquireLock(lockPath, original)
+    await writeFile(lockPath, "")
+    const modifiedAt = (await stat(lockPath)).mtimeMs
+    let now = modifiedAt
+    const options = { incompleteLockGraceMs: 100, now: () => now }
+
+    // #when: the empty file is still inside its grace period
+    const early = await captureError(acquireLock(lockPath, await createLockRecord("memory-write"), options))
+
+    // #then: it is held, never stolen while a writer could still be completing it
+    expect(early).toBeInstanceOf(LockContentionError)
+    expect(await readFile(lockPath, "utf8")).toBe("")
+
+    // #when: after the injected clock passes the grace period, two contenders race the reclaim
+    now += 101
+    const contenders = await Promise.allSettled([
+      acquireLock(lockPath, await createLockRecord("memory-write", { runId: "first" }), options),
+      acquireLock(lockPath, await createLockRecord("memory-write", { runId: "second" }), options),
+    ])
+
+    // #then: exactly one owns the replacement and the other observes contention
+    expect(contenders.filter((result) => result.status === "fulfilled")).toHaveLength(1)
+    const rejected = contenders.filter((result) => result.status === "rejected")
+    expect(rejected).toHaveLength(1)
+    expect(rejected[0]?.reason).toBeInstanceOf(LockContentionError)
+    expect(JSON.parse(await readFile(lockPath, "utf8"))).toMatchObject({ purpose: "memory-write" })
+  })
+
+  test("#given link EACCES #when two contenders race the exclusive-create fallback #then exactly one wins", async () => {
+    // #given
+    const lockPath = await createLockPath()
+    restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError("EACCES") } }))
+
+    // #when
+    const contenders = await Promise.allSettled([
+      acquireLock(lockPath, await createLockRecord("facts-queue", { runId: "first" })),
+      acquireLock(lockPath, await createLockRecord("facts-queue", { runId: "second" })),
+    ])
+
+    // #then
+    expect(contenders.filter((result) => result.status === "fulfilled")).toHaveLength(1)
+    const rejected = contenders.filter((result) => result.status === "rejected")
+    expect(rejected).toHaveLength(1)
+    expect(rejected[0]?.reason).toBeInstanceOf(LockContentionError)
+    expect(JSON.parse(await readFile(lockPath, "utf8"))).toMatchObject({ purpose: "facts-queue" })
+  })
+
+  for (const code of ["EPERM", "ENOTSUP"]) {
+    test(`#given link ${code} #when a lock is published #then the exclusive-create fallback succeeds`, async () => {
+      const lockPath = await createLockPath()
+      restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError(code) } }))
+      const record = await createLockRecord("reflection-scheduler")
+
+      await acquireLock(lockPath, record)
+
+      expect(JSON.parse(await readFile(lockPath, "utf8"))).toEqual(record)
+    })
+  }
+
+  test("#given the fallback writer crashes after exclusive create #when contenders arrive across the grace boundary #then the empty file is held before one contender reclaims it", async () => {
+    // #given
+    const lockPath = await createLockPath()
+    let now = Date.now()
+    const events: string[] = []
+    restoreLockFs.push(setLockCandidateFsForTests({
+      link: async () => { throw codedError("EACCES") },
+      writeFallback: async () => {
+        events.push("fallback-write")
+        throw new Error("simulated writer crash")
+      },
+      unlink: async (candidatePath) => {
+        events.push("candidate-unlink")
+        await unlink(candidatePath)
+      },
+    }))
+    const options = { incompleteLockGraceMs: 100, now: () => now }
+    await expect(acquireLock(lockPath, await createLockRecord("facts-queue"), options)).rejects.toThrow("simulated writer crash")
+    // The candidate is removed only after the fallback settled, so the crash is this call's own
+    // rejection and never a promise left pending without a handler while the cleanup runs.
+    expect(events).toEqual(["fallback-write", "candidate-unlink"])
+    restoreLockFs.pop()?.()
+    restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError("EACCES") } }))
+    now = (await stat(lockPath)).mtimeMs
+
+    // #when / #then: held during grace
+    await expect(acquireLock(lockPath, await createLockRecord("facts-queue"), options)).rejects.toBeInstanceOf(LockContentionError)
+
+    // #when / #then: stale after grace and recoverable
+    now += 101
+    const replacement = await createLockRecord("facts-queue")
+    await acquireLock(lockPath, replacement, options)
+    expect(JSON.parse(await readFile(lockPath, "utf8"))).toEqual(replacement)
+  })
+
+  test("#given a non-fallback link error #when a lock is published #then the original error is thrown", async () => {
+    const lockPath = await createLockPath()
+    restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError("EIO") } }))
+
+    await expect(acquireLock(lockPath, await createLockRecord("memory-write"))).rejects.toMatchObject({ code: "EIO" })
   })
 
   test("#given an owned lock #when another owner acquires it #then a typed retriable contention error is raised", async () => {

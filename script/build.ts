@@ -2,6 +2,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
+import { BUILD_NODES, selectBuildNodes, type BuildNode } from "./build-nodes";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const isWindows = process.platform === "win32";
@@ -35,44 +36,13 @@ function killTree(child: ReturnType<typeof spawn>): void {
 // once up front; OMO_SKIP_MATERIALIZE=1 makes the downstream copies inside codex-plugin and
 // shared-skills-assets no-ops, avoiding a git submodule index.lock and torn writes.
 //
-// Node deps encode the remaining read/write edges:
-// - shared-skills-assets `cp -R ... dist/skills` needs dist/ to exist, which the index
-//   bundle creates.
-// - node-require-shim patches dist/index.js, produced by the index bundle.
-// - codex-plugin's build-bundled-mcp-runtimes reads (and rebuilds when missing) the
-//   git-bash-mcp / lsp-tools-mcp / lsp-daemon dists, so those must finish first or the two
-//   builds race on the same vendored dist directory.
-// - senpi-plugin stages the Codex ulw-loop component and may run npm ci in that plugin
-//   workspace, so codex-plugin must finish its own npm ci before Senpi staging begins.
-type BuildNode = {
-	id: string;
-	command: string;
-	args: string[];
-	deps: string[];
-};
-
-const OPENTUI_EXTERNALS = ["@opentui/core", "@opentui/keymap", "@opentui/solid"];
-
-const nodes: BuildNode[] = [
-	{ id: "git-bash-mcp", command: "bun", args: ["run", "build:git-bash-mcp"], deps: [] },
-	{ id: "ast-grep-mcp", command: "bun", args: ["run", "build:ast-grep-mcp"], deps: [] },
-	{ id: "lsp-tools-mcp", command: "bun", args: ["run", "build:lsp-tools-mcp"], deps: [] },
-	{ id: "lsp-daemon", command: "bun", args: ["run", "build:lsp-daemon"], deps: [] },
-	{ id: "codex-plugin", command: "bun", args: ["run", "build:codex-plugin"], deps: ["git-bash-mcp", "lsp-tools-mcp", "lsp-daemon"] },
-	{ id: "senpi-plugin", command: "bun", args: ["run", "build:senpi-plugin:stage"], deps: ["ast-grep-mcp", "lsp-daemon", "codex-plugin"] },
-	{ id: "index", command: "bun", args: ["build", "packages/omo-opencode/src/index.ts", "--outdir", "dist", "--target", "bun", "--format", "esm", "--external", "zod"], deps: [] },
-	{ id: "tui", command: "bun", args: ["build", "packages/omo-opencode/src/tui.ts", "--outdir", "dist", "--target", "bun", "--format", "esm", ...OPENTUI_EXTERNALS.flatMap((name) => ["--external", name])], deps: [] },
-	{ id: "shared-skills-assets", command: "bun", args: ["run", "build:shared-skills-assets"], deps: ["index"] },
-	{ id: "node-require-shim", command: "bun", args: ["run", "build:node-require-shim"], deps: ["index"] },
-	{ id: "declarations", command: "tsc", args: ["--emitDeclarationOnly"], deps: [] },
-	{ id: "cli", command: "bun", args: ["build", "packages/omo-opencode/src/cli/index.ts", "--outdir", "dist/cli", "--target", "bun", "--format", "esm"], deps: [] },
-	{ id: "cli-node", command: "bun", args: ["run", "build:cli-node"], deps: [] },
-	{ id: "codex-install", command: "bun", args: ["run", "build:codex-install"], deps: [] },
-	{ id: "schema", command: "bun", args: ["run", "build:schema"], deps: [] },
-	{ id: "omo-schema", command: "bun", args: ["run", "build:omo-schema"], deps: [] },
-];
+// The graph itself, its dependency edges and the consumer profiles live in build-nodes.ts so
+// they can be inspected without running a build.
+const nodes: BuildNode[] = selectBuildNodes(BUILD_NODES, process.env.OMO_BUILD_PROFILE)
 
 async function run() {
+	const profile = process.env.OMO_BUILD_PROFILE;
+	if (profile) process.stdout.write(`build: profile ${profile} selected ${nodes.length} of ${BUILD_NODES.length} nodes\n`);
 	await materializeOnce();
 	const childEnv = { ...process.env, OMO_SKIP_MATERIALIZE: "1" };
 	await runGraph(nodes, childEnv);

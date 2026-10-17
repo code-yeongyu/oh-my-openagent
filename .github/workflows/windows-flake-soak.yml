@@ -17,8 +17,10 @@ on:
           - reply-listener
           - dag-race
           - memfs-restore
+          - memory-two-process
           - senpi-overflow
           - full-shard-2
+          - member-residency
       iterations:
         description: Number of identical iterations to run
         required: true
@@ -129,15 +131,33 @@ jobs:
                 Arguments = [string[]]@("test", "packages/omo-senpi/src/components/memory/commands/memfs-extra.test.ts")
               }
             )
+            "memory-two-process" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/memory-core/src/concurrency/two-process.test.ts")
+              }
+            )
             "senpi-overflow" = @()
+            "member-residency" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/senpi-task/src/team/member-extension/residency.test.ts", "packages/senpi-task/src/runners/rpc-host/handle-detached.test.ts")
+              }
+            )
             "full-shard-2" = @(
               [ordered]@{
                 Phase = "quarantine"
-                Arguments = [string[]]@("test", "packages/senpi-task/src/runners/rpc-process.windows.test.ts", "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts", "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts", "script/codex-installer-version.test.ts", "packages/shared-skills/provenance-gate.test.ts", "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts", "packages/senpi-task/src/dag/scheduler.test.ts", "packages/omo-native/test/payload.test.ts", "script/build-omo-binary.test.ts")
+                Arguments = [string[]]@("test", "packages/senpi-task/src/runners/rpc-process.windows.test.ts", "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts", "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts", "script/codex-installer-version.test.ts", "packages/shared-skills/provenance-gate.test.ts", "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts", "packages/senpi-task/src/dag/scheduler.test.ts", "packages/omo-native/test/payload.test.ts", "script/build-omo-binary.test.ts", "packages/senpi-task/src/team/member-extension/residency.test.ts", "script/omob-refresh.test.ts", "script/release-version.test.ts")
+              }
+              [ordered]@{
+                # Unwrapped on purpose: a soak exists to surface the oven-sh/bun#44390 worker crash,
+                # which ci.yml retries once through script/bun-panic-retry.ts.
+                Phase = "rpc-host"
+                Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test", "--parallel", "./packages/senpi-task/src/runners/rpc-host")
               }
               [ordered]@{
                 Phase = "remainder"
-                Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test", "--parallel")
+                Arguments = [string[]]@("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")
               }
             )
           }
@@ -164,12 +184,12 @@ jobs:
 
           if ($target -eq "full-shard-2") {
             $ciWorkflow = Get-Content -Path ".github/workflows/ci.yml" -Raw
-            $serialRemainder = '-TestArguments @("--config=bunfig.win2.parallel.toml", "test")'
-            $parallelRemainder = '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel")'
+            $serialRemainder = '-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test")'
+            $parallelRemainder = '-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")'
             if ($ciWorkflow.Contains($parallelRemainder)) {
-              $targets[$target][1].Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test", "--parallel")
+              $targets[$target][2].Arguments = [string[]]@("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")
             } elseif ($ciWorkflow.Contains($serialRemainder)) {
-              $targets[$target][1].Arguments = [string[]]@("--config=bunfig.win2.parallel.toml", "test")
+              $targets[$target][2].Arguments = [string[]]@("--config=bunfig.win2.parallel.windows.toml", "test")
             } else {
               Write-Error "checked-out ci.yml has an unsupported Windows shard-2 remainder command"
               exit 1

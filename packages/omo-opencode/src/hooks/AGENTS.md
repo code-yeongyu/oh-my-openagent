@@ -1,12 +1,12 @@
-# src/hooks/ -- ~54 Lifecycle Hooks Across 62 Dirs
+# src/hooks/ -- ~54 Lifecycle Hooks Across 60 Dirs
 
 **Generated:** 2026-07-17
 
 ## OVERVIEW
 
-54 base registered hooks on default config (61 with team-mode; `monitor-status-injector` adds 1 more with `monitor.enabled` → 62 max), composed from 54 `index.ts` hook dirs (52 wired; `task-reminder/` and `ralph-loop/` unwired) plus 5 standalone hook `.ts` files at the `src/hooks/` top level (bash-file-read-guard, empty-task-response-detector, preemptive-compaction, session-notification, tool-output-truncator). The 62 directories = 54 with `index.ts` + 8 without (`shared/`, `team-session-events/`, `hashline-edit-diff-enhancer/` unwired, and 5 `zauc-mocks-*`/`zauc-sync-mocks`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) -> HookFunction` factory pattern.
+54 base registered hooks on default config (61 with team-mode; `monitor-status-injector` adds 1 more with `monitor.enabled` → 62 max), composed from 54 `index.ts` hook dirs (52 wired; `task-reminder/` and `ralph-loop/` unwired) plus 5 standalone hook `.ts` files at the `src/hooks/` top level (bash-file-read-guard, empty-task-response-detector, preemptive-compaction, session-notification, tool-output-truncator). The 60 directories = 54 with `index.ts` + 6 without (`shared/`, `team-session-events/`, and 4 `zauc-mocks-*`/`zauc-sync-mocks`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) -> HookFunction` factory pattern.
 
-**Unwired WIP (do not modify casually):** `task-reminder/` (has `index.ts` + `createTaskReminderHook` but NOT exported from barrel, NOT imported by any composer), `ralph-loop/` (exported from barrel but NOT imported by any composer; retained for migration, superseded by `goal/`), and `hashline-edit-diff-enhancer/` (has only `hook.ts`, NOT registered). Treat as orphaned until wired in.
+**Unwired WIP (do not modify casually):** `task-reminder/` (has `index.ts` + `createTaskReminderHook` but NOT exported from barrel, NOT imported by any composer) and `ralph-loop/` (exported from barrel but NOT imported by any composer; retained for migration, superseded by `goal/`). Treat as orphaned until wired in.
 
 ## TIER COMPOSITION
 
@@ -123,7 +123,7 @@ hooks/
 ├── shared/                                  # Cross-hook helpers (timing, prompt builders, etc.)
 ├── team-session-events/                     # 4 team event handlers (wired via src/plugin/event.ts)
 ├── (54 index.ts hook directories incl. `task-reminder/` and `ralph-loop/` unwired -- see tier tables above)
-├── zauc-mocks-{bg,cache,hook,ws}, zauc-sync-mocks  # 5 test mocks (NOT hooks; named for sort-order isolation)
+├── zauc-mocks-{bg,cache,ws}, zauc-sync-mocks  # 4 test mocks (NOT hooks; named for sort-order isolation)
 └── (each hook dir)/
     ├── index.ts        # createXXXHook factory + barrel
     ├── *.ts            # implementation

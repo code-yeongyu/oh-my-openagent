@@ -1,15 +1,24 @@
 import type { CreateAgentSessionOptions, SessionManager, ToolDefinition } from "@code-yeongyu/senpi"
 
-import { CURATED_READONLY_AGENT_NAMES } from "../../agents/builtin"
+import { BUILTIN_AGENTS, CURATED_READONLY_AGENT_NAMES } from "../../agents/builtin"
+import type { KernelToolBindingRegistry } from "../../kernel-tools/bindings"
+import { senpiBarrel } from "../../lazy/senpi-barrel"
+import { isWorkpoolYieldTool } from "../../workpool/worker-tool-identity"
 import type { ChildSpec } from "../in-process"
 import { createChildResourceLoader } from "./child-loader"
 import { createCuratedReadonlyBashTool } from "./curated-readonly-bash"
+import { buildChildKernelTools, buildRevivedChildKernelTools } from "./kernel-tool-surface"
 import { RunnerError } from "./runner-error"
 import { createRuntimeFallbackSettings } from "./runtime-fallback-settings"
+import { childStructuralToolNames } from "./host-tools"
 import { mergeChildCustomTools } from "./shared-tool-filter"
 
 export type BuildChildSessionOptionsInput = {
   readonly spec: ChildSpec
+  // Resume only: the child's recorded transcript, used to restore typed error stubs for parent
+  // kernel tools whose runtime binding did not survive (never to reconstruct authority).
+  readonly revivedSessionPath?: string
+  readonly kernelToolBindings?: KernelToolBindingRegistry
   // The caller owns session-lifecycle: start passes SessionManager.create(cwd, spec.sessionDir),
   // resume (todo 10) passes SessionManager.open(sessionPath, spec.sessionDir, cwd). Everything else
   // about the child's construction is assembled here so both modes share ONE option builder.
@@ -70,6 +79,20 @@ export function resolveMemberScopedToolNames(
 }
 
 /**
+ * The identity gate a STARTED child's wrappers evaluate on every call: a grant that is no longer
+ * this child's current binding (released on destruction, expunge or shutdown) must fail closed
+ * instead of reaching a kernel it no longer belongs to during the teardown window.
+ */
+function liveBindingGuard(
+  spec: ChildSpec,
+  bindings: KernelToolBindingRegistry | undefined,
+): { readonly isCurrent?: () => boolean } {
+  const granted = spec.kernelTools
+  if (bindings === undefined || granted === undefined) return {}
+  return { isCurrent: () => bindings.get(spec.taskId) === granted }
+}
+
+/**
  * Assemble the full CreateAgentSessionOptions for an in-process child: shared parent tools minus
  * the task/team family, member-scoped tools (the sanctioned bypass), the curated read-only bash
  * override, the allowlist on `tools`, the denylist on senpi's real deny field `excludeTools`
@@ -79,26 +102,51 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
   const { spec, sessionManager, uiOnlyToolNames } = input
   const mergedCustomTools = mergeChildCustomTools(input.sharedParentTools, spec.memberScopedTools, {
     uiOnlyToolNames,
+    includeTaskTools: spec.includeTaskTools === true,
   })
-  const customTools = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
-    ? [...mergedCustomTools.filter((tool) => tool.name !== "bash"), createCuratedReadonlyBashTool(spec.cwd)]
-    : mergedCustomTools
-  const settingsManager = createRuntimeFallbackSettings(spec.selectedModel, spec.fallbackModels, spec.retry)
+  const existingToolNames = childStructuralToolNames(mergedCustomTools.map((tool) => tool.name))
+  const curated = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
+  const floor = curated ? (BUILTIN_AGENTS[spec.agentType ?? ""]?.tools ?? []).filter((rule) => rule.allow).map((rule) => rule.pattern) : undefined
+  const toolAllowlist = floor === undefined ? spec.toolAllowlist : floor.filter((name) => spec.toolAllowlist === undefined || spec.toolAllowlist.includes(name))
+  const kernelTools = input.revivedSessionPath === undefined
+    ? buildChildKernelTools(spec, existingToolNames, liveBindingGuard(spec, input.kernelToolBindings))
+    : buildRevivedChildKernelTools({
+      spec,
+      sessionPath: input.revivedSessionPath,
+      existingToolNames,
+      bindings: input.kernelToolBindings,
+    })
+  const customTools = curated
+    ? [...mergedCustomTools.filter((tool) => tool.name !== "bash" && (toolAllowlist?.includes(tool.name) || isWorkpoolYieldTool(tool))), createCuratedReadonlyBashTool(spec.cwd)]
+    : [...mergedCustomTools, ...kernelTools]
+  const caller = {
+    cwd: spec.cwd,
+    agentDir: spec.agentDir ?? senpiBarrel().getAgentDir(),
+    projectTrusted: spec.projectTrusted ?? false,
+  }
+  const settingsManager = createRuntimeFallbackSettings(caller, spec.selectedModel, spec.fallbackModels, spec.retry)
   return {
     cwd: spec.cwd,
     sessionManager,
-    resourceLoader: createChildResourceLoader(
-      spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt },
-    ),
+    resourceLoader: createChildResourceLoader({
+      cwd: spec.cwd,
+      settingsManager,
+      ...(spec.agentDir === undefined ? {} : { agentDir: spec.agentDir }),
+      ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
+    }),
     customTools,
     ...(spec.agentDir !== undefined && { agentDir: spec.agentDir }),
     ...(spec.authStorage !== undefined && { authStorage: spec.authStorage }),
     ...(spec.modelRegistry !== undefined && { modelRegistry: spec.modelRegistry }),
     ...(spec.modelRuntime !== undefined && { modelRuntime: spec.modelRuntime }),
     ...(spec.model !== undefined && { model: spec.model }),
+    // A child handed a concrete model was PINNED, so its provenance is "cli": model-aware builtins
+    // (recommended-models) auto-switch only provider-default/first-available routes and leave a
+    // pinned child on exactly what it was given (#9722).
+    ...(spec.model !== undefined && { initialModelProvenance: "cli" }),
     ...(spec.thinkingLevel !== undefined && { thinkingLevel: spec.thinkingLevel }),
     settingsManager,
-    ...(spec.toolAllowlist !== undefined && { tools: [...spec.toolAllowlist] }),
+    ...(toolAllowlist !== undefined && { tools: [...toolAllowlist, ...mergedCustomTools.filter(isWorkpoolYieldTool).map(tool => tool.name), ...kernelTools.map(tool => tool.name)] }),
     ...(spec.toolDenylist !== undefined && { excludeTools: [...spec.toolDenylist] }),
   }
 }

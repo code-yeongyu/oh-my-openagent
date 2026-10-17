@@ -56,7 +56,6 @@ export function createGitMasterAttributionComponent(
           if (directive === undefined) return undefined
           ctx.logger.info("omo-senpi git-master attribution appended", {
             commitFooter: settings.commit_footer,
-            includeCoAuthoredBy: settings.include_co_authored_by,
           })
           return { content: [...event.content, { type: "text", text: directive }] }
         },

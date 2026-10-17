@@ -1,0 +1,25 @@
+[package]
+name = "senpi-desktop-backend-wayland"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd.workspace = true
+futures = "=0.3.32"
+image.workspace = true
+libloading.workspace = true
+parking_lot.workspace = true
+reis.workspace = true
+senpi-desktop-backend-atspi = { path = "../senpi-desktop-backend-atspi" }
+senpi-desktop-core = { path = "../senpi-desktop-core", features = ["system-clipboard"] }
+senpi-desktop-safety = { path = "../senpi-desktop-safety" }
+tokio = { workspace = true, features = ["macros", "sync", "time"] }
+xkeysym.workspace = true
+zbus.workspace = true
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+tempfile.workspace = true

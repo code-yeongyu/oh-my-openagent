@@ -22,6 +22,14 @@ const { existsSync, readFileSync } = process.getBuiltinModule<FsModule>("fs");
 const { join } = process.getBuiltinModule<PathModule>("path");
 
 export const PRIMARY_MODEL_ID = "claude-fable-5";
+/** A second primary that is NOT in the fable family, so a scenario can refuse off one. */
+export const ALT_PRIMARY_MODEL_ID = "claude-opus-5";
+/**
+ * Registry-only model. The builtin architect category is gated on `requiresModel: "claude-fable-5-1"`,
+ * so the undeclared-category scenario can only reach an active architect when the live registry
+ * exposes that exact id. No scenario drives it.
+ */
+export const ARCHITECT_GATE_MODEL_ID = "claude-fable-5-1";
 export const FALLBACK_MODEL_ID = "mock-weak";
 export const POLICY_REJECTION_MESSAGE =
 	"This request triggered restrictions on mock content and was blocked under Anthropic's Usage Policy";
@@ -71,8 +79,8 @@ function baseMessage(modelId: string): Record<string, unknown> {
 	};
 }
 
-export function buildPrimaryFailure(outcome: PrimaryOutcome): Record<string, unknown> {
-	const message = { ...baseMessage(PRIMARY_MODEL_ID), stopReason: "error" };
+export function buildPrimaryFailure(outcome: PrimaryOutcome, modelId: string = PRIMARY_MODEL_ID): Record<string, unknown> {
+	const message = { ...baseMessage(modelId), stopReason: "error" };
 	if (outcome === "refusal") return { ...message, stopDetails: { type: "refusal" }, errorMessage: "mock classifier refusal" };
 	if (outcome === "policy_error") return { ...message, errorMessage: `${POLICY_REJECTION_MESSAGE}.` };
 	return { ...message, errorMessage: "Request timed out." };
@@ -86,14 +94,19 @@ export default function registerFallbackArchitectMockProvider(pi: {
 		baseUrl: "file://fallback-architect-mock-provider",
 		apiKey: "mock",
 		api: "openai-completions",
-		models: [mockModel(PRIMARY_MODEL_ID, "Mock Fable 5"), mockModel(FALLBACK_MODEL_ID, "Mock Weak")],
+		models: [
+			mockModel(PRIMARY_MODEL_ID, "Mock Fable 5"),
+			mockModel(ALT_PRIMARY_MODEL_ID, "Mock Opus 5"),
+			mockModel(ARCHITECT_GATE_MODEL_ID, "Mock Fable 5.1"),
+			mockModel(FALLBACK_MODEL_ID, "Mock Weak"),
+		],
 		streamSimple(model: { id: string }, context: { cwd?: string }) {
 			const stream = createLocalAssistantMessageEventStream();
 			const cwd = context.cwd ?? process.cwd();
 
 			queueMicrotask(() => {
-				if (model.id === PRIMARY_MODEL_ID) {
-					const failure = buildPrimaryFailure(loadPrimaryOutcome(cwd));
+				if (model.id !== FALLBACK_MODEL_ID) {
+					const failure = buildPrimaryFailure(loadPrimaryOutcome(cwd), model.id);
 					stream.push({ type: "start", partial: failure });
 					stream.push({ type: "error", reason: "error", error: failure });
 					stream.end(failure as never);

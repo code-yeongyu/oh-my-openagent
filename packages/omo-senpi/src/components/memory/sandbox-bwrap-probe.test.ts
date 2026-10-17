@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -78,7 +78,7 @@ describe("classifyBwrapSmoke", () => {
 })
 
 describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
-  test("#given an executable whose behavior changes after the first probe #when probed twice #then the first verdict is memoized per path", () => {
+  test("#given an executable whose behavior changes after the first probe #when probed twice #then the first verdict is memoized per path", async () => {
     // given: a stand-in executable that succeeds, is probed, and is then rewritten to fail.
     const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-"))
     const executable = join(binDir, "bwrap")
@@ -86,9 +86,9 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
     chmodSync(executable, 0o755)
 
     // when
-    const first = probeBwrapUsability(executable)
+    const first = await probeBwrapUsability(executable)
     writeFileSync(executable, "#!/bin/sh\nexit 1\n")
-    const second = probeBwrapUsability(executable)
+    const second = await probeBwrapUsability(executable)
 
     // then: a fresh classification would now be unusable, so an identical second verdict is only
     // reachable through the per-process memo.
@@ -96,7 +96,7 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
     expect(second).toEqual({ usable: true })
   }, 30_000)
 
-  test("#given an executable that fails its sandbox setup #when probed #then the verdict is unusable and carries its stderr", () => {
+  test("#given an executable that fails its sandbox setup #when probed #then the verdict is unusable and carries its stderr", async () => {
     // given: a stand-in that reproduces the uid-map denial bwrap emits under AppArmor.
     const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-denied-"))
     const executable = join(binDir, "bwrap")
@@ -104,7 +104,7 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
     chmodSync(executable, 0o755)
 
     // when
-    const usability = probeBwrapUsability(executable)
+    const usability = await probeBwrapUsability(executable)
 
     // then
     expect(usability.usable).toBe(false)
@@ -112,11 +112,33 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
     expect(usability.reason).toContain("setting up uid map: Permission denied")
   }, 30_000)
 
-  test("#given a path that is not an executable at all #when probed #then it is unusable rather than throwing", () => {
+  test("#given a path that is not an executable at all #when probed #then it is unusable rather than throwing", async () => {
     // when
-    const usability = probeBwrapUsability(join(tmpdir(), "omo-bwrap-probe-absent-binary"))
+    const usability = await probeBwrapUsability(join(tmpdir(), "omo-bwrap-probe-absent-binary"))
 
     // then
     expect(usability.usable).toBe(false)
+  }, 30_000)
+
+  test("#given concurrent probes #when both complete #then they share one executable invocation", async () => {
+    // given
+    const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-concurrent-"))
+    const executable = join(binDir, "bwrap")
+    writeFileSync(executable, "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\nexit 0\n")
+    chmodSync(executable, 0o755)
+
+    try {
+      // when: both requests start before the event loop can deliver the first child close.
+      const firstPromise = probeBwrapUsability(executable)
+      const secondPromise = probeBwrapUsability(executable)
+      const [first, second] = await Promise.all([firstPromise, secondPromise])
+
+      // then
+      expect(first).toEqual({ usable: true })
+      expect(second).toEqual({ usable: true })
+      expect(readFileSync(`${executable}.spawns`, "utf8")).toBe("spawn\n")
+    } finally {
+      rmSync(binDir, { recursive: true, force: true })
+    }
   }, 30_000)
 })

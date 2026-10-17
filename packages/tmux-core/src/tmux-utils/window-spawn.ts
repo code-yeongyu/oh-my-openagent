@@ -4,7 +4,7 @@ import { isCmuxCompatEnvironment } from "../cmux-detect"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildSubagentPaneTitle, buildTmuxPlaceholderCommand } from "./pane-command"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -96,7 +96,7 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+	const title = buildSubagentPaneTitle(description)
 	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
 	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxWindow] WARNING: failed to set pane title", {

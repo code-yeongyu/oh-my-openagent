@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, watch, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -71,7 +71,10 @@ export function createWorkspaceEditTestHarness() {
 }
 
 function createFixture(scenario: Record<string, unknown>, tempDirectories: string[]) {
-	const workspace = mkdtempSync(join(tmpdir(), "lsp-apply-edit-"));
+	// The fixture server echoes URIs built from the canonical temp path, so the client root must be
+	// canonical too. On macOS tmpdir() is a /var -> /private/var symlink; without realpath the
+	// publishes target a document the client never opened (#9476).
+	const workspace = mkdtempSync(join(realpathSync(tmpdir()), "lsp-apply-edit-"));
 	tempDirectories.push(workspace);
 	const source = join(workspace, "source.ts");
 	const destination = join(workspace, "destination.ts");

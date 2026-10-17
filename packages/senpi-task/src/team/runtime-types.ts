@@ -4,6 +4,7 @@ import type { TaskLifecycle } from "../lifecycle"
 import type { ManagerStartSpec, StartResult } from "../manager"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import type { CancelOutcome } from "../steering"
+import type { InheritedExtensions } from "../runners/rpc/parent-extensions"
 import type { StateDirConfig } from "../store"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { MemberTaskMap } from "./member-map"
@@ -37,6 +38,7 @@ export class SenpiTeamRuntimeError extends Error {
 // this structurally; kept narrow so the runtime never reaches past start/cancel/read.
 export type TeamRuntimeManagerPort = {
   start(spec: ManagerStartSpec): Promise<StartResult>
+  whenLaunched?(taskId: string): Promise<void>
   cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   getResidentHandle(taskId: string): { readonly sessionId: string | undefined } | undefined
@@ -44,7 +46,9 @@ export type TeamRuntimeManagerPort = {
 
 export type TeamMemberExtensionConfig = {
   readonly entryPath: string
-  readonly inheritedExtensions?: readonly string[]
+  // Resolved at spawn and at respawn rather than snapshotted here, so a member reproduces the same
+  // package providers an ordinary child gets (#8492) instead of the parent's argv alone.
+  readonly inheritedExtensions?: InheritedExtensions
 }
 
 export type SpawnMemberExtensionConfig = TeamMemberExtensionConfig & {
