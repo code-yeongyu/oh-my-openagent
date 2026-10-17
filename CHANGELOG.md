@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A session no longer continues on its compaction model after a compaction.** With `agents.<name>.compaction.model` set, the compaction marker row carries the working agent's name and the summarizer's model, and the agent-name check let the compaction context injector and the session lifecycle take that model as the session's working model. A row with a `compaction` part is no longer used as the working model, and the checkpoint taken before compaction skips the model the summarize request is running on. ([#10120](https://github.com/code-yeongyu/oh-my-openagent/issues/10120), [#10211](https://github.com/code-yeongyu/oh-my-openagent/pull/10211))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
@@ -138,8 +140,6 @@ Fixed: OmO Native versions v5.0.0-beta.6 through v5.1.34 kept sending usage even
 **The file changes summary after a subagent run lists renamed, non-ASCII and newly created files under their real paths.** It read git's output without `-z`, so a renamed file was listed as `old => new` (or `dir/{a => b}/x`) instead of its new name, a path with non-ASCII characters or a tab came out C-quoted (and an untracked one lost its line count, +0), and an untracked file with a space in its name or inside a new directory was listed as modified instead of created. Paths are now read NUL-separated, with rename detection on regardless of `diff.renames` and `status.renames`: each file appears once under its real path, a rename under its new name and a copy as created. A path that contains control characters is still shown quoted and escaped, so a file name cannot add lines to the summary. Thanks to @spicysharkco. ([#10133](https://github.com/code-yeongyu/oh-my-openagent/pull/10133))
 
 **`omo worktree-sweep --apply` started inside a linked worktree no longer deletes that worktree.** It ran its git commands from the worktree it was started in, so it removed that worktree, every git call after that failed (`cannot change to`, or `ENOENT ... posix_spawn 'git'` from the CLI), the command exited 1, and the merged worktrees listed after it were left behind. It now runs git from the main worktree, reports the worktree it was started from as `KEEP current`, and removes every merged sibling. ([#10130](https://github.com/code-yeongyu/oh-my-openagent/pull/10130))
-
-**A session no longer continues on its compaction model after a compaction.** With `agents.<name>.compaction.model` set, the compaction marker row carries the working agent's name and the summarizer's model, and the agent-name check let the compaction context injector and the session lifecycle take that model as the session's working model. A row with a `compaction` part is no longer used as the working model, and the checkpoint taken before compaction skips the model the summarize request is running on. ([#10120](https://github.com/code-yeongyu/oh-my-openagent/issues/10120))
 
 ## [5.1.33] - 2026-10-13
 
