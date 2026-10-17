@@ -46,10 +46,10 @@ describe("loadOmoConfig telemetry resolution", () => {
     }
   })
 
-  test("#given base telemetry is disabled and the senpi block enables it #when loading the senpi view #then the senpi override wins", () => {
+  test("#given base telemetry is disabled and the native block enables it #when loading the senpi view #then the harness override wins", () => {
     // given
     const fixture = makeFixture()
-    writeUserConfig(fixture.homeDir, `{"telemetry":{"enabled":false},"[senpi]":{"telemetry":{"enabled":true}}}`)
+    writeUserConfig(fixture.homeDir, `{"telemetry":{"enabled":false},"[native]":{"telemetry":{"enabled":true}}}`)
 
     try {
       // when

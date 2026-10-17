@@ -34,7 +34,7 @@ export type SkillContext = {
 
 export { collectDisabledSkillAliases }
 
-const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "dev-browser", "playwright"])
+const PROVIDER_GATED_SKILL_NAMES = new Set(["dev-browser", "playwright"])
 
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"

@@ -1,6 +1,7 @@
 ---
 name: init-deep
 description: "Initializes a hierarchical AGENTS.md knowledge base for a project. Use when a repo needs its structure, commands, and conventions documented for agents."
+argument-hint: "[--create-new] [--max-depth=N]"
 ---
 # /init-deep
 

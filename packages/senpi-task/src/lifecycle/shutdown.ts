@@ -4,22 +4,23 @@ import type { TaskRecord } from "../state"
 import { nowIso, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ResidentHandle } from "./port"
+import { withinTeardownBudget } from "./teardown-budget"
 import type { SuspendFailure, SuspendInput, SuspendSummary } from "./types"
 
 /**
  * On session_shutdown, SUSPEND this session's children instead of destroying them: live handles
- * are still torn down (no-orphan law) but the records survive as persisted_only / rpc_detached so
+ * are detached or torn down, but the records survive as persisted_only / rpc_detached so
  * a later session resume can revive them. The scan covers TWO populations: registry handles AND
  * pending records owned by this session/host (pending children have no handle and no session file
  * yet, so a handle-only scan would strand them). Deliberately-stopped children (cancelled/lost
  * status, or the durable killed fact) are still DISPOSED through the destruction port - they must
- * never revive. When resume_children is off, the pre-feature dispose-all behavior runs unchanged.
+ * never revive. When resume_children is off, local children use the legacy destruction path.
  */
 export async function suspendOnSessionShutdown(
   context: LifecycleContext,
   input: SuspendInput,
 ): Promise<SuspendSummary> {
-  if (context.config.resume_children === false) return disposeAllOnShutdown(context)
+  if (context.config.resume_children === false) return disposeAllOnShutdown(context, input)
 
   const failures: SuspendFailure[] = []
   let suspendedInProcess = 0
@@ -82,14 +83,23 @@ export async function suspendOnSessionShutdown(
 }
 
 // Suspend one resident handle: the registry forgets it FIRST (stale outcome tracking loses
-// ownership before abort settles the turn, so no cancelled/error terminal can land on the
-// suspended record), then live resources are torn down and the record is parked at its suspended
+// ownership before teardown settles the turn, so no cancelled/error terminal can land on the
+// suspended record), then local resources are torn down and the record is parked at its suspended
 // residency. The pre-dispose steps are best-effort so dispose ALWAYS runs.
-async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
-  context.registry.forget(handle.task_id)
-  await bestEffort(handle.task_id, "abort", () => handle.abort())
-  if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => handle.terminate())
-  await handle.dispose()
+export async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
+  context.registry.forget(handle.task_id, { path: "park" })
+  const target = { taskId: handle.task_id, pid: handle.pid }
+  if (handle.kind !== "host-session") {
+    await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
+  }
+  if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()))
+  try {
+    await withinTeardownBudget(context.teardownStepDeadline, target, "dispose", () => handle.dispose())
+  } catch (error) {
+    context.failedTeardowns.add(handle.task_id)
+    throw error
+  }
+  context.failedTeardowns.delete(handle.task_id)
   context.store.transition(handle.task_id, {
     type: handle.kind === "in-process" ? "persist_only" : "detach_rpc",
     timestamp: nowIso(context),
@@ -97,18 +107,27 @@ async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, 
   context.store.appendEvent(handle.task_id, { type: "suspended", payload: { reason } })
 }
 
-// resume_children === false restores the pre-feature behavior exactly: every resident handle is
-// destroyed through the port (cancel family) and pending records are left untouched.
-async function disposeAllOnShutdown(context: LifecycleContext): Promise<SuspendSummary> {
+// The opt-out still destroys local children and leaves pending records untouched. A daemon turn
+// belongs to the host, not the exiting parent; it detaches even when automatic revival is disabled.
+async function disposeAllOnShutdown(context: LifecycleContext, input: SuspendInput): Promise<SuspendSummary> {
   const entries = [...context.registry.entries()]
+  let suspendedRpc = 0
+  let disposed = 0
   for (const handle of entries) {
+    if (handle.kind === "host-session") {
+      if (!isOwnedChild(context.store.load(handle.task_id), context, input.parentSessionId)) continue
+      await suspendHandle(context, handle, input.reason)
+      suspendedRpc += 1
+      continue
+    }
     await destroyResidentTask(context, handle.task_id, "cancel")
+    disposed += 1
   }
   const summary: SuspendSummary = {
     suspended_in_process: 0,
-    suspended_rpc: 0,
+    suspended_rpc: suspendedRpc,
     suspended_pending: 0,
-    disposed: entries.length,
+    disposed,
     failures: [],
   }
   log("senpi-task session shutdown dispose-all (resume_children=false)", { total: entries.length })

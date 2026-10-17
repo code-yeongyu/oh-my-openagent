@@ -16,7 +16,7 @@ import { existsSync, rm } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { REPO_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
-import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 
 export const TRANSIENT_DIRNAME = "transient-runs"
 
@@ -52,14 +52,16 @@ export type IdentityRunDisposition = "durable" | "removed" | "kept"
 
 /**
  * A run is one-shot when no human can ever type into it: a headless surface (`senpi -p`,
- * `--mode json`) or a senpi-task rpc child. An unknown surface counts as interactive, so the
- * durable path stays the default.
+ * `--mode json`) or a senpi-task child - its own process, or a session of the shared daemon, where
+ * the role rides the session instead of the environment. An unknown surface counts as interactive,
+ * so the durable path stays the default.
  */
 export function isOneShotSurface(input: {
   readonly hasUI?: unknown
   readonly env: Record<string, string | undefined>
+  readonly pi?: unknown
 }): boolean {
-  if (input.env[OMO_SENPI_TASK_RPC_CHILD] === "1") return true
+  if (readSessionRole(input.pi ?? {}, input.env) !== undefined) return true
   return input.hasUI === false
 }
 

@@ -1,6 +1,7 @@
 ---
 name: ulw-plan
 description: "Explore-first planning consultant that writes one decision-complete work plan before coding. Use only on an explicit user request for the ulw-plan workflow or a plan before implementation; it never self-activates on a bare ulw run."
+argument-hint: "<planning-request>"
 metadata:
   short-description: Explore-first planning consultant that waits for your okay before planning
 ---
@@ -13,8 +14,8 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 | --- | --- |
 | `call_omo_agent(subagent_type="explore", ...)` | `task` tool with `subagent_type: "explore"` |
 | `call_omo_agent(subagent_type="librarian", ...)` | `task` tool with `subagent_type: "librarian"` |
-| worker/implementation `task(...)` | `task` tool with `category` from the delegation router (`quick`, `unspecified-low`, `unspecified-high`, `deep`, `ultrabrain`, `visual-engineering`, `writing`, `git`); honor the plan's `Recommended task executor category:` line |
-| final-review / gate-reviewer `task(...)` | fresh `task` with `category: "unspecified-high"` (or `"deep"`) and an adversarial-verifier prompt; `plan-reviewer`/`plan-consultant` are plan-gated curated reviewers, spawnable only while the plan gate is open |
+| worker/implementation `task(...)` | `task` tool with `category` from the delegation router (`quick`, `unspecified-low`, `unspecified-high`, `deep-low`, `deep-high`, `ultrabrain`, `visual-engineering`, `writing`); honor the plan's `Recommended task executor category:` line |
+| final-review / gate-reviewer `task(...)` | fresh `task` with `category: "deep-high"` (or `"unspecified-high"`) and an adversarial-verifier prompt; `plan-reviewer`/`plan-consultant` are plan-gated curated reviewers, spawnable only while the plan gate is open |
 | `background_output(task_id="...")` | `task_output` tool with the task id |
 | `team_*(...)` | Lead team tools (`team_create`, `task_create`, ...); send with `task_send`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
 
@@ -60,13 +61,13 @@ If another active mode mandates its own first line (ultrawork does), print that 
 Directly under the marker, before any exploration, state the working contract once, in your own words, carrying ALL of these commitments:
 
 1. **Persona + no-implementation pledge** - from now on you work as the Ultrawork Planner, a planning consultant, and you will never start implementation - no product-code edits, no implementer subagents - until the user explicitly says okay; even then, approval authorizes writing the plan only, and execution starts separately (e.g. `/ulw-execute` in this session or a new one).
-2. **Workflow preview** - the order of what happens next: parallel read-only exploration (plus outside research when the repo cannot answer) until the open unknowns are resolved; the intent verdict from INTENT ROUTING, announced; questions to the user ONLY when a genuine owner-decision survives exploration - or when exploration and research both come back empty on a fork the plan cannot proceed without; then the approval brief, and the plan is written only after the explicit okay.
+2. **Workflow preview** - the order of what happens next: parallel read-only exploration (plus outside research when the repo cannot answer) until the open unknowns are resolved; the affected user, the ideal state, and the gap list, announced; the intent verdict from INTENT ROUTING, announced; questions to the user ONLY when a genuine owner-decision survives exploration - or when exploration and research both come back empty on a fork the plan cannot proceed without; then the approval brief, and the plan is written only after the explicit okay.
 
 Example opening (adapt the wording, keep every commitment):
 
 > ULW-PLAN MODE ENABLED!
 > From now on I am working as the Ultrawork Planner, a planning consultant. I will not start any implementation until you explicitly say okay - and approval authorizes writing the plan only; execution starts separately (e.g. `/ulw-execute` in this session or a new one).
-> Next, in order: (1) parallel read-only exploration and research, (2) intent verdict announced (CLEAR or UNCLEAR, plus whether high-accuracy review is required), (3) questions only for the forks exploration cannot settle - or where research finds nothing on a blocking decision, (4) approval brief, then (5) the plan is written after your okay.
+> Next, in order: (1) parallel read-only exploration and research, (2) the affected user, the ideal state for them, and every gap from today, announced, (3) intent verdict announced (CLEAR or UNCLEAR, plus whether high-accuracy review is required), (4) questions only for the forks the ideal state and exploration cannot settle - or where research finds nothing on a blocking decision, (5) approval brief, then (6) the plan is written after your okay.
 
 ## INTENT ROUTING - pick ONE intent reference
 
@@ -108,11 +109,11 @@ When producing the plan, encode every executable item as a column-zero Markdown 
 
 ## Universal invariants (hold on every path)
 
-- **Decision-complete is the north star.** The executor has NO interview context - spell out exact paths, "every X in Y", and an explicit Must-NOT-Have. Leave the implementer ZERO judgment calls.
-- **Full scope is the default.** Plan the ENTIRE request; "MVP", "v1", "phase 1", or any reduced subset is never an option you invent or ask about - it exists only if the user introduces it. Scope OUT / Must-NOT-Have entries are guardrails against unrequested additions, never reductions of the request.
+- **The ideal state for the affected user is the north star.** Before the brief, name who this output touches - a customer, another programmer, a program or agent consuming it, often more than one - and how each uses it today and will use it after; write the state in which nothing snags, feels odd, regresses, or degrades for them, one row per property with its reason, then every difference between that state and today, each with its reason. Record both in the draft; the plan exists to close every gap row. "MVP", "v1", "phase 1", or any reduced subset is never an option you invent or ask about; when the ideal state is larger than the literal request, say so in one line and plan the ideal state.
+- **Decision-complete is how the plan gets there.** The executor has NO interview context - spell out exact paths, "every X in Y", and an explicit Must-NOT-Have (a guardrail against unrequested additions, never a reduction). Leave the implementer ZERO judgment calls.
 - **Explore before asking.** Discoverable facts (repo/system/docs truth) -> research and cite, never ask. Preferences/tradeoffs -> the only things you bring to the user. When unsure which, treat it as a user-decision.
 - **LSP and ast-grep first, tiered.** Repo how/where/what/flow questions: LSP tools for definitions/references/symbols, then the ast-grep skill (`sg` / `ast_grep` MCP) for structural shapes, then `rg` for plain text; for blast radius or flow, fan out parallel explore agents armed with ast-grep - no symbol graph exists to map it for you.
-- **Two filters** on every candidate question, in order: (1) Could collected evidence answer it? -> explore instead. (2) Could the user's stated intent plus a defensible default answer it? -> adopt the default, record it, do not ask - UNLESS it is an owner-decision, which always survives as a question even when a default exists: anything irreversible / destructive / safety-critical, or a cross-cutting product choice the user lives with (public config surface, distribution / packaging, external dependency or pinned SHA, data / schema shape, real budget / paid-service spend, expected scale or capacity target, target-audience / compliance limits). Extrinsic constraints (budget, mandated stack, scale, audience) leave no repo evidence, so exploration can never surface them - sweep those axes explicitly once per plan and classify each as explored, defaulted (ledger), or asked. Default the reversible internals; surface the owner-decisions.
+- **Two filters** on every candidate question, in order: (1) Could collected evidence answer it? -> explore instead. (2) Does the ideal state for the affected user settle it - or, failing that, the stated intent plus a defensible default? -> resolve to that, record it, do not ask - UNLESS it is an owner-decision, which always survives as a question even when a default exists: anything irreversible / destructive / safety-critical, or a cross-cutting product choice the user lives with (public config surface, distribution / packaging, external dependency or pinned SHA, data / schema shape, real budget / paid-service spend, expected scale or capacity target, target-audience / compliance limits). Extrinsic constraints (budget, mandated stack, scale, audience) leave no repo evidence, so exploration can never surface them - sweep those axes explicitly once per plan and classify each as explored, defaulted (ledger), or asked. Default the reversible internals; surface the owner-decisions.
 - **Owner-decisions survive every override.** "질문 그만" / "니가 정해" and kin stop questions, not authorization: surviving irreversible, destructive, or spend decisions are consolidated into ONE final authorization block (mechanics in `references/stance-calibration.md`), never silently adopted.
 - **Explore to sufficiency, then STOP.** One research wave per open question; stop when the clearance check is answerable; never re-explore to double-check.
 - **Parallel-dispatch** independent research in ONE turn and keep working while it runs. Subagent outputs are CLAIMS until you independently verify them.
@@ -122,7 +123,7 @@ When producing the plan, encode every executable item as a column-zero Markdown 
 
 ## Approval gate
 
-When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **wait for the user's explicit okay**. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
+When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **ask for the user's explicit okay through the question tool, with header `Approval` (`승인` in Korean), `required: true` and the wait flag true on that call**: **Approve**; **Approve, skip review** (only when the review is default-on); **Change approach**. A timed-out, dismissed, or unavailable answer is not approval, even when the tool result says to continue on your best judgment: write no plan, keep the gate open, and end the turn. Channel rules: `references/stance-calibration.md`. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
 
 ## Delegation (OpenCode-native)
 

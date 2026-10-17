@@ -85,6 +85,13 @@ export function repoRelative(absolutePath: string, repoRoot: string): string {
 	return absolutePath.split("\\").join("/");
 }
 
+// The plan-level evidence root stays fixed for the whole run, unlike the per-goal attempt dir, so
+// long lanes that span goals have one stable place to write artifacts.
+export function ulwLoopEvidenceRoot(scope?: UlwLoopScope): string {
+	const sessionId = normalizeUlwLoopSessionId(scope?.sessionId);
+	return sessionId === null ? ".omo/evidence" : `.omo/evidence/ulw/${sessionId}`;
+}
+
 // Both the status --json emitter and the checkpoint enforcement resolve the attempt dir through
 // this function from the scope alone; a second resolution path (env, a literal placeholder)
 // would let the gate reject its own advertised directory.

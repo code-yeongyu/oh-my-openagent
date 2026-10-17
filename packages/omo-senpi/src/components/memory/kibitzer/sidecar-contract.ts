@@ -17,6 +17,14 @@ import type { KibitzerWakeSlot } from "./wake-slot"
 export const KIBITZER_WAKE_TOOL_BUDGET = 8
 /** A wake that has not settled in this long is aborted; whatever it accepted so far is kept. */
 export const KIBITZER_WAKE_DEADLINE_MS = 90_000
+/**
+ * The hard ceiling on ONE wake, measured from the admission that opened it (`turn.startedAt`), not
+ * from the last steer. `KIBITZER_WAKE_DEADLINE_MS` is a quiet period every steer re-arms, so a
+ * steady stream of steers could keep a turn - and its machine-wide wake lease - alive without
+ * bound; the deadline is always armed at `min(now + KIBITZER_WAKE_DEADLINE_MS, startedAt +
+ * KIBITZER_WAKE_MAX_TOTAL_MS)`, so no re-arm can push a wake past this.
+ */
+export const KIBITZER_WAKE_MAX_TOTAL_MS = 300_000
 /** `memory.recall.sidecar_max_tokens` default: the context window the reseed threshold is taken from. */
 export const KIBITZER_SIDECAR_MAX_TOKENS = 48_000
 /** The child is replaced once its context estimate reaches this share of `sidecarMaxTokens`. */

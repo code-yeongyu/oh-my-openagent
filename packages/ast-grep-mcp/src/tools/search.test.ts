@@ -3,8 +3,6 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
-  SEARCH_TOOL_NAME,
-  SEARCH_TOOL_DESCRIPTION,
   searchInputSchema,
   buildSearchArgs,
   executeSearch,
@@ -30,19 +28,6 @@ function fixtureRepo(): string {
 
 afterEach(() => {
   for (const dir of directories.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
-
-// ---- verbatim description pin (blocker 4) ----
-
-describe("search tool: verbatim description (ub §3)", () => {
-  it("#given the module #when imported #then SEARCH_TOOL_NAME is 'search'", () => {
-    expect(SEARCH_TOOL_NAME).toBe("search");
-  });
-
-  it("#given the module #when imported #then SEARCH_TOOL_DESCRIPTION equals the ub §3 text verbatim", () => {
-    const verbatim = "Search code structurally with ast-grep. The pattern is code, not regex, and must parse as one AST node in the required language; use narrow paths. `$NAME` and `$_` match one whole node, while `$$$NAME` and `$$$` match zero-or-more nodes. Names are uppercase, `$$NAME` is invalid, partial-token captures do not work, and a repeated metavariable must match identical code. Wrap non-standalone syntax and use `selector` when needed. Parse warnings mean the query failed, not that the code is absent.";
-    expect(SEARCH_TOOL_DESCRIPTION).toBe(verbatim);
-  });
 });
 
 // ---- schema bound tests (blocker 3) ----

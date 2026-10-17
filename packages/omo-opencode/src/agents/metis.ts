@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
-import { buildClaudeThinkingConfig, isKimiK27Model } from "./types"
+import { buildClaudeThinkingConfig, isKimiK2CodeModel } from "./types"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
@@ -396,7 +396,7 @@ const metisRestrictions = createAgentToolRestrictions([
 ])
 
 export function createMetisAgent(model: string): AgentConfig {
-  const prompt = isKimiK27Model(model) ? METIS_K2_7_SYSTEM_PROMPT : METIS_SYSTEM_PROMPT
+  const prompt = isKimiK2CodeModel(model) ? METIS_K2_7_SYSTEM_PROMPT : METIS_SYSTEM_PROMPT
   return {
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",

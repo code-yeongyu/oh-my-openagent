@@ -8,41 +8,34 @@ import {
   FactsQueue,
   GitMemoryRepo,
   buildDefaultSeedFiles,
-  createLockRecord,
-  memoryWriterLockPath,
-  runFinalizationLockPath,
   selectCappedFactsBatch,
   selectLaunchable,
-  withLock,
   type FactsFailureReason,
   type FactsPayload,
   type FactsQueueEntry,
 } from "@oh-my-opencode/memory-core"
 import { hasFailureReader, readLaunchableFailures, type FactsFailureReadPort } from "./facts-launch-selection"
-import { ledgerTargets, preflightFailureId, queueEntryTargets, type FactsFailurePort } from "./facts-failure-recording"
+import { queueEntryTargets, type FactsFailurePort } from "./facts-failure-recording"
 import { drainFactsLaunches } from "./facts-drain"
 import { classifyOversizePayload } from "./facts-oversize"
+import { admitOversizedFacts } from "./facts-oversized-budget"
 import { FactsTerminalWrites } from "./facts-terminal-writes"
 import { readFactsPeoplePayload } from "./facts-people-payload"
 import { launchFactsInProcess } from "./facts-in-process-launch"
-import { resolveReflectionModel } from "./worker/resolve-model"
+import { resolveFactsModel } from "./facts-model"
 import { readRunJson } from "./worker/run-artifacts"
 
-const WRITER_WAIT_MS = 2_000
-
 export type { FactsExtractorRunnerOptions, FactsLaunchResult } from "./facts-runner-types"
-import type { FactsExtractorRunnerOptions, FactsFinalRecord, FactsLaunchResult, FactsRunLedger } from "./facts-runner-types"
-import { describe, FACTS_DEADLINE_MS, finalResult, queueKeys, reserveFactsRunDir } from "./facts-run-storage"
-import { finalizeClaimedFactsRun } from "./facts-run-finalize"
-import { reconcileFactsRuns } from "./facts-run-reconcile"
-import { sweepTerminalFactsRuns } from "./facts-run-cleanup"
-import { pruneTerminalFactsRuns } from "./facts-run-prune"
+import type { FactsExtractorRunnerOptions, FactsLaunchResult, FactsModelSelection, FactsRunLedger } from "./facts-runner-types"
+import { describe, FACTS_DEADLINE_MS, queueKeys, reserveFactsRunDir } from "./facts-run-storage"
+import { createFactsRunMaintenance } from "./facts-run-maintenance"
 
 export class FactsExtractorRunner {
   private readonly queue: FactsQueue
   private readonly now: () => Date
   private readonly terminal: FactsTerminalWrites
   private readonly failureReader: FactsFailureReadPort
+  private readonly maintenance: ReturnType<typeof createFactsRunMaintenance>
   private activeLaunch: Promise<FactsLaunchResult> | undefined; private activeCancel: (() => void) | undefined
   private readonly activeReconciles = new Map<Promise<FactsLaunchResult>, AbortController>()
 
@@ -58,16 +51,21 @@ export class FactsExtractorRunner {
       failures,
       now: this.now,
       markConsumed: (entries) => this.queue.markConsumed(entries),
+      receiptsDir: options.identity.paths.runtime,
       ...(options.writeTerminalSentinel === undefined ? {} : { write: options.writeTerminalSentinel }),
       ...(options.removeRunArtifact === undefined ? {} : { remove: options.removeRunArtifact }),
       ...(options.logger === undefined ? {} : { warn: (message, fields) => options.logger?.warn(message, fields) }),
     })
+    this.maintenance = createFactsRunMaintenance(options, this.terminal, this.now)
   }
 
-  async launchPending(signal?: AbortSignal): Promise<FactsLaunchResult> {
+  async launchPending(signal?: AbortSignal, selection?: FactsModelSelection): Promise<FactsLaunchResult> {
     if (signal?.aborted === true) return { status: "skipped" }
     if (this.activeLaunch !== undefined) return { status: "active" }
-    const operation = drainFactsLaunches(() => this.launchPendingOnce(signal), signal)
+    const captured = selection ?? {
+      registry: this.options.resolveModelRegistry(), sessionModel: this.options.resolveSessionModel?.(),
+    }
+    const operation = drainFactsLaunches(() => this.launchPendingOnce(captured, signal), signal)
     this.activeLaunch = operation
     try {
       return await operation
@@ -100,15 +98,16 @@ export class FactsExtractorRunner {
   }
 
   private async reconcilePendingOnce(signal: AbortSignal): Promise<FactsLaunchResult> {
-    const active = await this.reconcileRuns()
+    const active = await this.maintenance.reconcile()
     if (active) return { status: "active" }
-    return this.launchPending(signal)
+    if (signal.aborted) return { status: "skipped" }
+    return { status: "empty" }
   }
 
-  private async launchPendingOnce(signal?: AbortSignal): Promise<FactsLaunchResult> {
+  private async launchPendingOnce(modelSelection: FactsModelSelection, signal?: AbortSignal): Promise<FactsLaunchResult> {
     const isAborted = (): boolean => signal?.aborted === true
     if (isAborted()) return { status: "skipped" }
-    if (await this.reconcileRuns()) return { status: "active" }
+    if (await this.maintenance.reconcile()) return { status: "active" }
     const pending = await this.queue.listPending()
     if (isAborted()) return { status: "skipped" }
     if (pending.length === 0) return { status: "empty" }
@@ -123,17 +122,13 @@ export class FactsExtractorRunner {
     if (entries.length === 0) return { status: "active" }
     const releaseClaim = async (): Promise<void> => this.queue.releaseClaim(entries, claimId)
     const loaded = this.options.loadConfig(); const deadlineMs = this.options.deadlineMs ?? FACTS_DEADLINE_MS
-    const modelRegistry = this.options.resolveModelRegistry(); const resolution = resolveReflectionModel("quick", loaded.config, modelRegistry)
+    const modelRegistry = modelSelection.registry; const resolution = resolveFactsModel(
+      loaded.config, modelRegistry, modelSelection.sessionModel, this.options.identity.id,
+    )
     const childModelRegistry = isChildModelRegistry(modelRegistry) ? modelRegistry : undefined
     if (childModelRegistry === undefined || resolution.kind === "category_unavailable" || resolution.source !== undefined) {
       const cause = resolution.kind === "category_unavailable" ? resolution.cause : resolution.source
-      this.options.logger?.warn("facts extractor quick category unavailable", { cause })
-      await this.terminal.preflightFail(
-        queueEntryTargets(entries),
-        preflightFailureId(this.options.createPreflightId),
-        "quick_category_unavailable",
-        cause ?? "unknown",
-      )
+      this.options.logger?.warn("facts extraction skipped: no usable user-selected model", { cause })
       await releaseClaim()
       return { status: "skipped" }
     }
@@ -149,10 +144,15 @@ export class FactsExtractorRunner {
     const people = await readFactsPeoplePayload(repo.dir)
     const envelope = { version: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people } as const
     const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
+    const oversizedModel = capped.oversized.length === 0 ? undefined
+      : (await import("#omo-task-runtime")).findModelReference(childModelRegistry, resolution.model)
+    const admitted = capped.envelopeOversized ? [] : capped.oversized.filter((entry) =>
+      admitOversizedFacts({ ...envelope, entries: [entry] }, oversizedModel),
+    )
     const envelopeRefused = await classifyOversizePayload({
       terminal: this.terminal,
       envelope,
-      oversized: capped.oversized,
+      oversized: capped.oversized.filter((entry) => !admitted.includes(entry)),
       pending: entries,
       envelopeOversized: capped.envelopeOversized,
       ...(this.options.createPreflightId === undefined ? {} : { createFailureId: this.options.createPreflightId }),
@@ -162,7 +162,8 @@ export class FactsExtractorRunner {
       await releaseClaim()
       return { status: "skipped" }
     }
-    if (capped.selected.length === 0) {
+    const batch: readonly FactsQueueEntry[] = capped.selected.length > 0 ? capped.selected : admitted.slice(0, 1)
+    if (batch.length === 0) {
       this.options.logger?.warn("facts batch selection carried nothing within the payload cap", {
         pending: entries.length,
         oversized: capped.oversized.length,
@@ -170,7 +171,6 @@ export class FactsExtractorRunner {
       await releaseClaim()
       return { status: "empty" }
     }
-    const batch: readonly FactsQueueEntry[] = capped.selected
     await this.queue.releaseClaim(entries.filter((entry) => !batch.includes(entry)), claimId)
     const batchId = (this.options.createBatchId ?? randomUUID)()
     const launchedAt = this.now().getTime(); if (isAborted()) {
@@ -187,6 +187,8 @@ export class FactsExtractorRunner {
         launchedAt,
         deadlineMs,
         terminationGraceMs: this.options.terminationGraceMs,
+        receiptsDir: this.options.identity.paths.runtime,
+        warn: (message, fields) => this.options.logger?.warn(message, fields),
       })
     } catch (error) {
       await this.queue.releaseClaim(batch, claimId)
@@ -206,6 +208,7 @@ export class FactsExtractorRunner {
         runId,
         runDir,
         payload,
+        oversized: capped.selected.length === 0,
         resolution,
         modelRegistry: childModelRegistry,
         options: this.options,
@@ -239,51 +242,9 @@ export class FactsExtractorRunner {
       if (isAborted()) await this.queue.releaseClaim(batch, claimId)
     }
     try {
-      return await this.finalizeRun(runDir, repo)
+      return await this.maintenance.finalize(runDir, repo)
     } finally {
       await this.queue.releaseClaim(batch, claimId)
-    }
-  }
-
-  private async reconcileRuns(): Promise<boolean> {
-    // Maintenance first: terminal dirs that crashed between their sentinel and their cleanup
-    // still hold a payload, and reconciliation itself never revisits a terminal dir.
-    await sweepTerminalFactsRuns({
-      factsDir: this.options.identity.paths.facts,
-      ...(this.options.removeRunArtifact === undefined ? {} : { remove: this.options.removeRunArtifact }),
-      ...(this.options.logger === undefined ? {} : { warn: (message, fields) => this.options.logger?.warn(message, fields) }),
-    })
-    const active = await reconcileFactsRuns({
-      factsDir: this.options.identity.paths.facts,
-      now: this.now,
-      finalize: async (runDir) => {
-        const repo = new GitMemoryRepo({ dir: this.options.identity.paths.repo, agentId: this.options.identity.id })
-        await this.finalizeRun(runDir, repo)
-      },
-      fail: (runDir, ledger, detail) => this.terminal.fail({
-        runDir,
-        runId: ledger.runId,
-        batchId: ledger.batchId,
-        targets: ledgerTargets(ledger.queued),
-        reason: "child_exit",
-        detail,
-      }),
-      abandon: (runDir, ledger, reason) => this.terminal.abandon(runDir, ledger, reason),
-      warn: (message, fields) => this.options.logger?.warn(message, fields),
-    })
-    await this.prune()
-    return active
-  }
-
-  private async prune(): Promise<void> {
-    try {
-      await pruneTerminalFactsRuns({
-        factsDir: this.options.identity.paths.facts,
-        locksDir: this.options.identity.paths.locks,
-        warn: (message, fields) => this.options.logger?.warn(message, fields),
-      })
-    } catch (error) {
-      this.options.logger?.warn("facts run retention pruning failed", { error: describe(error) })
     }
   }
 
@@ -293,36 +254,6 @@ export class FactsExtractorRunner {
     return { status: "failed", runId }
   }
 
-  private async finalizeRun(runDir: string, repo: GitMemoryRepo): Promise<FactsLaunchResult> {
-    const ledger = await readRunJson<FactsRunLedger>(join(runDir, "ledger.json"))
-    const record = await createLockRecord("facts-finalize", { runId: ledger.runId })
-    const finalizeLock = runFinalizationLockPath(this.options.identity.paths.locks, ledger.runId)
-    const result = await withLock<FactsLaunchResult>(finalizeLock, record, async () => {
-      const finalPath = join(runDir, "final.json")
-      if (existsSync(finalPath)) return finalResult(await readRunJson<FactsFinalRecord>(finalPath))
-      if (existsSync(join(runDir, "abandoned.json"))) return { status: "failed", runId: ledger.runId }
-      return finalizeClaimedFactsRun({
-        runDir,
-        repo,
-        ledger,
-        identity: this.options.identity,
-        terminal: this.terminal,
-        options: this.options,
-        ...(this.options.logger === undefined ? {} : { logger: this.options.logger }),
-        withWriterLock: (operation, attempt) => this.withWriterLock(operation, attempt),
-      })
-    }, { waitTimeoutMs: WRITER_WAIT_MS })
-    await this.prune()
-    return result
-  }
-
-  private async withWriterLock<T>(operation: () => Promise<T>, attempt: number): Promise<T> {
-    if (this.options.withWriterLock !== undefined) return this.options.withWriterLock(operation, attempt)
-    const record = await createLockRecord("memory-write", { runId: `facts-${attempt}` })
-    return withLock(memoryWriterLockPath(this.options.identity.paths.locks), record, operation, {
-      waitTimeoutMs: WRITER_WAIT_MS,
-    })
-  }
 }
 
 function isChildModelRegistry(value: unknown): value is ChildModelRegistry {

@@ -8,9 +8,10 @@ import {
   ULW_REVIEWER_AGENT_DEFAULTS,
   ULW_REVIEWER_AGENT_NAMES,
 } from "./index"
+import { BUILTIN_AGENT_NAMES } from "./names"
 
 const CURATED_AGENT_NAMES = ["explore", "librarian", "plan-consultant", "plan-reviewer"] as const
-const REVIEWER_AGENT_NAMES = ["omo-senpi-code-reviewer", "omo-senpi-gate-reviewer", "omo-senpi-qa-executor"] as const
+const REVIEWER_AGENT_NAMES = ["omo-native-code-reviewer", "omo-native-gate-reviewer", "omo-native-qa-executor"] as const
 const ALL_BUILTIN_NAMES = [...CURATED_AGENT_NAMES, ...REVIEWER_AGENT_NAMES].sort()
 
 const EXPECTED_TOOL_ALLOWLIST = [
@@ -33,6 +34,10 @@ describe("builtin curated agents", () => {
   test("#given the builtin defaults #when listing names sorted #then the 4 curated and 3 reviewer agents are present", () => {
     const names = BUILTIN_AGENT_DEFAULTS.map((definition) => definition.name).sort()
     expect(names).toEqual([...ALL_BUILTIN_NAMES])
+  })
+
+  test("#given the prompt-free builtin name list #when compared with the builtin record #then it names exactly the builtin agents", () => {
+    expect([...BUILTIN_AGENT_NAMES].sort()).toEqual(Object.keys(BUILTIN_AGENTS).sort())
   })
 
   test("#given the builtin record #when listing keys sorted #then every builtin maps to its definition", () => {
@@ -93,9 +98,9 @@ describe("builtin curated agents", () => {
 
   test("#given the reviewer definitions #when reading their names #then they match the ulw-loop omo-senpi quality-gate identities", () => {
     expect(ULW_REVIEWER_AGENT_DEFAULTS.map((definition) => definition.name)).toEqual([
-      "omo-senpi-code-reviewer",
-      "omo-senpi-qa-executor",
-      "omo-senpi-gate-reviewer",
+      "omo-native-code-reviewer",
+      "omo-native-qa-executor",
+      "omo-native-gate-reviewer",
     ])
   })
 

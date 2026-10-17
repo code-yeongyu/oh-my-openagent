@@ -11,8 +11,9 @@ import {
   parseAvailableAgentModels,
   type ParsedAgentModel,
 } from "./agent-model-registry"
+import { agentToolPolicy } from "./agent-tool-policy"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
-import { canonicalAgentName, LEGACY_AGENT_NAME_ALIASES } from "./legacy-agent-names"
+import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
 
 export type ResolveAgentOptions = {
@@ -69,9 +70,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   registry: SenpiModelRegistryPort<TModel> | undefined,
   options: ResolveAgentOptions = {},
 ): AgentResolutionResult {
-  // Canonicalized first so a direct caller passing a retired curated id resolves as
-  // the canonical id and can never miss the lookup; unknown names pass through untouched.
-  const name = canonicalAgentName(requestedName).name
+  const name = canonicalAgentName(requestedName.trim())
   const availableAgents = Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
     .map(([agentName]) => agentName)
@@ -93,11 +92,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     }
   }
 
-  // The builtin chain table is keyed by agent id; during the deprecation window it may still be
-  // keyed by the legacy id, so the canonical key is tried first and the legacy alias second.
-  const fallbackChain = Object.hasOwn(AGENT_FALLBACK_CHAINS, name)
-    ? AGENT_FALLBACK_CHAINS[name]
-    : legacyFallbackChain(name)
+  const fallbackChain = Object.hasOwn(AGENT_FALLBACK_CHAINS, name) ? AGENT_FALLBACK_CHAINS[name] : undefined
   if (registry === undefined) {
     const fallbackHead = fallbackChain?.[0]
     const fallbackProvider = fallbackHead?.providers[0]
@@ -204,30 +199,12 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   return { kind: "model_unavailable", agent: name, attemptedModel, availableAgents }
 }
 
-// Read-alias for the builtin chain table during the deprecation window: the canonical key is
-// absent while the table is still keyed by the legacy id. Inert once the table is renamed.
-function legacyFallbackChain(canonical: string) {
-  for (const [legacy, canonicalId] of Object.entries(LEGACY_AGENT_NAME_ALIASES)) {
-    if (canonicalId === canonical && Object.hasOwn(AGENT_FALLBACK_CHAINS, legacy)) {
-      return AGENT_FALLBACK_CHAINS[legacy]
-    }
-  }
-  return undefined
-}
-
 function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
-  const literalToolRules = definition.tools?.filter((rule) =>
-    !rule.pattern.includes(" ") && !rule.pattern.includes("*")
-  )
-  const toolAllowlist = literalToolRules?.filter((rule) => rule.allow).map((rule) => rule.pattern)
-  const toolRuleDenylist = literalToolRules?.filter((rule) => !rule.allow).map((rule) => rule.pattern)
-  const toolDenylist = [...(definition.disallowedTools ?? []), ...(toolRuleDenylist ?? [])]
   const agentExecutionMode = toExecutionMode(definition.executionMode)
   return {
     agentType: name,
     ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
-    ...(toolAllowlist !== undefined ? { toolAllowlist } : {}),
-    ...(toolDenylist.length > 0 ? { toolDenylist } : {}),
+    ...agentToolPolicy(definition),
     ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
     ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
     ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),

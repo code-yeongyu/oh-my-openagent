@@ -26,12 +26,15 @@ interface FakePi extends SenpiExtensionAPI {
   readonly handlers: Map<string, Array<(payload: unknown, ctx?: unknown) => unknown>>
 }
 
-function fakePi(): FakePi {
+/** `loadedSkills` stands for skills the host loaded before extensions contributed theirs. */
+function fakePi(loadedSkills: ReadonlyArray<{ readonly name: string; readonly path: string }> = []): FakePi {
   const tools: Array<Record<string, unknown>> = []
   const handlers = new Map<string, Array<(payload: unknown, ctx?: unknown) => unknown>>()
   return {
     tools,
     handlers,
+    getCommands: () =>
+      loadedSkills.map((skill) => ({ name: `skill:${skill.name}`, source: "skill", sourceInfo: { path: skill.path } })),
     on(event, handler) {
       handlers.set(event, [...(handlers.get(event) ?? []), handler])
     },
@@ -86,6 +89,62 @@ function fakeEctx(stored: unknown, apiKey: string | undefined = "stored-token") 
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
+function homeWith(config: Record<string, unknown>): string {
+  const home = mkdtempSync(join(tmpdir(), "omo-x-search-home-"))
+  tempDirs.push(home)
+  mkdirSync(join(home, ".omo"), { recursive: true })
+  writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify(config), "utf8")
+  return home
+}
+
+function discoveredSkillPaths(pi: FakePi): unknown[] {
+  return (pi.handlers.get("resources_discover") ?? []).flatMap((handler) => {
+    const result = handler({ type: "resources_discover", cwd: tmpdir(), reason: "startup" }) as
+      | { skillPaths?: unknown[] }
+      | undefined
+    return result?.skillPaths ?? []
+  })
+}
+
+describe("createXSearchComponent skill contribution", () => {
+  const credential = { xai: { type: "oauth", refresh: "r" } }
+
+  it("#given the host already loaded a user skill named x-search #when resources_discover fires #then the conditional skill yields and the tool stays", () => {
+    const pi = fakePi([{ name: "x-search", path: "/home/me/.omo/agent/skills/x-search/SKILL.md" }])
+    createXSearchComponent({
+      agentDir: agentDirWith(credential),
+      env: { HOME: homeWith({}) },
+      resolveSkillPath: () => "/plugin/skills-conditional/x-search/SKILL.md",
+    }).register(pi, fakeCtx())
+
+    expect(discoveredSkillPaths(pi)).toEqual([])
+    expect(pi.tools.map((tool) => tool.name)).toEqual(["x_search"])
+  })
+
+  it("#given disabled_skills names x-search #when resources_discover fires #then the conditional skill is not contributed and the tool stays", () => {
+    const pi = fakePi()
+    createXSearchComponent({
+      agentDir: agentDirWith(credential),
+      env: { HOME: homeWith({ disabled_skills: ["x-search"] }) },
+      resolveSkillPath: () => "/plugin/skills-conditional/x-search/SKILL.md",
+    }).register(pi, fakeCtx())
+
+    expect(discoveredSkillPaths(pi)).toEqual([])
+    expect(pi.tools.map((tool) => tool.name)).toEqual(["x_search"])
+  })
+
+  it("#given no same-name skill and an empty denylist #when resources_discover fires #then the conditional skill is contributed", () => {
+    const pi = fakePi([{ name: "frontend", path: "/home/me/.omo/agent/skills/frontend/SKILL.md" }])
+    createXSearchComponent({
+      agentDir: agentDirWith(credential),
+      env: { HOME: homeWith({}) },
+      resolveSkillPath: () => "/plugin/skills-conditional/x-search/SKILL.md",
+    }).register(pi, fakeCtx())
+
+    expect(discoveredSkillPaths(pi)).toEqual(["/plugin/skills-conditional/x-search/SKILL.md"])
+  })
 })
 
 describe("createXSearchComponent registration gate", () => {

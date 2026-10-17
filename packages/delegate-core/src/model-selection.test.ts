@@ -133,11 +133,21 @@ describe("resolveModelForDelegateTask", () => {
     })
   })
 
-  test("#given a fallback model exists through an unlisted provider #when fallback resolves #then cross-provider matching remains", () => {
+  test("#given a fallback model exists only through an unlisted provider #when fallback resolves #then nothing is selected", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["custom-provider/gpt-5.5"]),
+      fallbackChain: [{ providers: ["openai"], model: "gpt-5.5", variant: "high" }],
+    }, noCacheDeps)
+
+    expect(result).toBeUndefined()
+  })
+
+  test("#given the caller opts into unlisted providers #when only an unlisted provider serves the model #then it is selected", () => {
     const fallbackEntry = { providers: ["openai"], model: "gpt-5.5", variant: "high" }
     const result = resolveModelForDelegateTask({
       availableModels: new Set(["custom-provider/gpt-5.5"]),
       fallbackChain: [fallbackEntry],
+      allowUnlistedProviders: true,
     }, noCacheDeps)
 
     expect(result).toEqual({
@@ -148,7 +158,33 @@ describe("resolveModelForDelegateTask", () => {
     })
   })
 
-  test("#given custom and later-rung providers expose the same model #when fallback resolves #then the custom provider keeps the earlier variant", () => {
+  test("#given a gateway re-publishes every rung model #when no listed provider is connected #then nothing is selected", () => {
+    const claudeProviders = ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"]
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set([
+        "openrouter/anthropic/claude-opus-5.5",
+        "opengateway/anthropic/claude-fable-5-1",
+      ]),
+      fallbackChain: [
+        { providers: claudeProviders, model: "claude-fable-5-1", variant: "max" },
+        { providers: claudeProviders, model: "claude-opus-5-5", variant: "max" },
+      ],
+    }, noCacheDeps)
+
+    expect(result).toBeUndefined()
+  })
+
+  test("#given a listed provider publishes the rung id untransformed #when fallback resolves #then it still matches on that provider", () => {
+    const fallbackEntry = { providers: ["kimi-coding"], model: "kimi-k3", variant: "max" }
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["kimi-coding/kimi-k3"]),
+      fallbackChain: [fallbackEntry],
+    }, noCacheDeps)
+
+    expect(result).toEqual({ model: "kimi-coding/kimi-k3", variant: "max", fallbackEntry, matchedFallback: true })
+  })
+
+  test("#given an unlisted provider and a later-rung provider expose the same model #when fallback resolves #then the listed later rung wins", () => {
     const result = resolveModelForDelegateTask({
       availableModels: new Set([
         "long-custom-provider/gpt-5.6-sol",
@@ -158,9 +194,9 @@ describe("resolveModelForDelegateTask", () => {
     }, noCacheDeps)
 
     expect(result).toEqual({
-      model: "long-custom-provider/gpt-5.6-sol",
-      variant: "xhigh",
-      fallbackEntry: nativeSolEntry,
+      model: "github-copilot/gpt-5.6-sol",
+      variant: "high",
+      fallbackEntry: copilotSolEntry,
       matchedFallback: true,
     })
   })

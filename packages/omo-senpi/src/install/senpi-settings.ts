@@ -7,6 +7,7 @@ export type SettingsRecord = Record<string, unknown>
 const OMO_SENPI_PACKAGE_NAME = "@code-yeongyu/omo-senpi"
 const GENERATED_PLUGIN_BASENAME = /^omo-senpi-cli-plugin-[A-Za-z0-9]{6}$/
 
+// Keep removing stale installed copies; these workspaces are gone.
 const LEGACY_BUILTIN_SHADOW_PACKAGES = [
   join("packages", "pi-goal"),
   join("packages", "pi-webfetch"),

@@ -401,4 +401,17 @@ describe("memory journal wiring", () => {
       await foreign.exited
     }
   }, 30_000)
+
+  test("#given a session that never carried a message #when session_start and agent_settled fire #then no journal is created (#9737)", async () => {
+    const { paths } = fixture()
+    const pi = new FakeExtensionAPI()
+    createMemoryJournalWiring({ identityPaths: paths }).register(pi)
+
+    const started = await pi.dispatch("session_start", {}, sessionCtx([], "control-session"))
+    const settled = await pi.dispatch("agent_settled", {}, sessionCtx([], "control-session"))
+
+    expect(started).toEqual([{ appended: 0, skipped: 0 }])
+    expect(settled).toEqual([{ appended: 0, skipped: 0 }])
+    expect(existsSync(join(paths.transcripts, "control-session"))).toBe(false)
+  })
 })

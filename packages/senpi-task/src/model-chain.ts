@@ -58,22 +58,31 @@ export function chainRungCandidates(options: ChainRungCandidateOptions): readonl
   const selectedIndex = locateSelectedRung(options)
   if (selectedIndex === -1) return []
 
-  const rungs: ModelChainCandidate[] = [{ model: options.selectedModel }]
-  for (const entry of options.chain.slice(selectedIndex + 1)) {
+  return [{ model: options.selectedModel }, ...availableChainCandidates(options.chain.slice(selectedIndex + 1), options.availableModels)]
+}
+
+/**
+ * Every rung of `chain`, in chain order, resolved to its first available provider with the
+ * provider-specific model-id transform applied. Rungs with no available provider are skipped.
+ */
+export function availableChainCandidates(
+  chain: readonly DelegateFallbackEntry[],
+  availableModels: ReadonlySet<string>,
+): readonly ModelChainCandidate[] {
+  return chain.flatMap((entry): readonly ModelChainCandidate[] => {
     for (const provider of entry.providers) {
       const modelID = entry.model.startsWith(`${provider}/`)
         ? entry.model.slice(provider.length + 1)
         : entry.model
       const concrete = `${provider}/${transformModelForProvider(provider, modelID)}`
-      if (!options.availableModels.has(concrete)) continue
-      rungs.push({
+      if (!availableModels.has(concrete)) continue
+      return [{
         model: concrete,
         ...(entry.variant !== undefined ? { variant: entry.variant } : {}),
-      })
-      break
+      }]
     }
-  }
-  return rungs
+    return []
+  })
 }
 
 function locateSelectedRung(options: ChainRungCandidateOptions): number {

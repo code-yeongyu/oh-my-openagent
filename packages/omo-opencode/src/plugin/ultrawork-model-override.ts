@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { AgentOverrides } from "../config/schema/agent-overrides"
 import { getSessionAgent } from "../features/claude-code-session-state"
+import { ULTRAWORK_PATTERN } from "../hooks/keyword-detector/constants"
 import { log } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { scheduleDeferredModelOverride } from "./ultrawork-db-model-override"
@@ -8,7 +9,6 @@ import { resolveValidUltraworkVariant } from "./ultrawork-variant-availability"
 
 const CODE_BLOCK = /```[\s\S]*?```/g
 const INLINE_CODE = /`[^`]+`/g
-const ULTRAWORK_PATTERN = /\b(ultrawork|ulw)\b/i
 
 export function detectUltrawork(text: string): boolean {
   const clean = text.replace(CODE_BLOCK, "").replace(INLINE_CODE, "")

@@ -131,7 +131,7 @@ describe("dispatchInternalPrompt", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first" })
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first", expiresAt: expect.any(Number) })
     expect(calls).toEqual(["async"])
   })
 
@@ -305,7 +305,7 @@ describe("dispatchInternalPrompt", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:queue-defer:first" })
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:queue-defer:first", expiresAt: expect.any(Number) })
     expect(calls).toEqual(["first"])
   })
 

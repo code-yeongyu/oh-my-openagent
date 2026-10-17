@@ -4,6 +4,7 @@ import { $ } from "bun"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { resolveLatestFlag } from "./release-latest-flag"
+import { resolveReleaseVersion } from "./release-version.mjs"
 
 const PACKAGE_NAME = "oh-my-opencode"
 const bump = process.env.BUMP as "major" | "minor" | "patch" | undefined
@@ -401,6 +402,8 @@ async function checkVersionExists(version: string): Promise<boolean> {
 }
 
 async function main() {
+  // The local preparation/publish entrypoint must respect the same reserved namespace.
+  if (versionOverride) resolveReleaseVersion(versionOverride, false)
   const previous = await fetchPreviousVersion()
   const newVersion = versionOverride || (bump ? bumpVersion(previous, bump) : bumpVersion(previous, "patch"))
   console.log(`New version: ${newVersion}\n`)

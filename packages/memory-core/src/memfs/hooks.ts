@@ -44,7 +44,7 @@ export function resolveHooksDir(repoPath: string): string {
   return join(resolveCommonGitDir(repoPath), "hooks")
 }
 
-function resolveCommonGitDir(repoPath: string): string {
+export function resolveCommonGitDir(repoPath: string): string {
   const dotGit = join(repoPath, ".git")
   if (!existsSync(dotGit) || statSync(dotGit).isDirectory()) return dotGit
 

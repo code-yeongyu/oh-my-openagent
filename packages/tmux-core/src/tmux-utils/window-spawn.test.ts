@@ -95,6 +95,25 @@ describe("spawnTmuxWindow runner integration", () => {
 		expect(harness.getNewWindowCommand()).not.toContain("opencode attach")
 	})
 
+	it("#given a description holding tmux format syntax #when the pane title is set #then # is doubled so tmux keeps it literal and runs nothing (#10228)", async () => {
+		// given
+		const harness = createHarness()
+		const directory = "/tmp/omo-project/(window)"
+
+		// when
+		const result = await spawnTmuxWindow("session-1", "#(touch x)#{pane_id} and more", enabledTmuxConfig, "http://127.0.0.1:1234", directory, harness.deps)
+
+		// then
+		const firstCall = harness.getRunTmuxCommandCall(0)
+		const secondCall = harness.getRunTmuxCommandCall(1)
+		expect(result).toEqual({ success: true, paneId: "%42" })
+		expect(firstCall[1].slice(0, 7)).toEqual(["new-window", "-d", "-n", "omo-agents", "-P", "-F", "#{pane_id}"])
+		expect(secondCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-##(touch x)##{pane_id}"])
+		expect(harness.getNewWindowCommand()).toContain("Focus this pane to attach.")
+		expect(harness.getNewWindowCommand()).toContain("while :; do sleep 86400; done")
+		expect(harness.getNewWindowCommand()).not.toContain("opencode attach")
+	})
+
 	it("#given description with spaces #when spawnTmuxWindow called #then includes it in the placeholder", async () => {
 		// given
 		const harness = createHarness()

@@ -52,6 +52,42 @@ describe("parseTarListingOutput", () => {
 		mock.restore()
 	})
 
+	describe("#given a tar listing month token", () => {
+		it("#when the month is ASCII #then parses the entry", async () => {
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+
+			expect(
+				parseTarListingOutput("-rw-r--r--  0 0 0 12 Sep 30 12:00 a.txt")
+			).toEqual([{ path: "a.txt", type: "file" }])
+		})
+
+		it("#when the month is localized #then parses the entry", async () => {
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+
+			expect(
+				parseTarListingOutput("-rw-r--r--  0 0 0 12 сен 30 12:00 a.txt")
+			).toEqual([{ path: "a.txt", type: "file" }])
+		})
+
+		it("#when the month contains replacement characters #then parses the entry", async () => {
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+
+			expect(
+				parseTarListingOutput("-rw-r--r--  0 0 0 12 ��� 30 12:00 a.txt")
+			).toEqual([{ path: "a.txt", type: "file" }])
+		})
+
+		it("#when the listing is malformed #then throws the fail-closed error", async () => {
+			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+
+			expect(() => parseTarListingOutput("malformed listing line")).toThrow(
+				"zip entry listing failed: 1/1 tar listing lines could not be parsed (fail-closed)"
+			)
+			expect(getWarnedUnparsedLines(logSpy)).toEqual(["malformed listing line"])
+		})
+	})
+
 	describe("#given a tar listing line with trailing filename whitespace", () => {
 		it("#when parsing the line #then preserves the original trailing whitespace", async () => {
 			// given

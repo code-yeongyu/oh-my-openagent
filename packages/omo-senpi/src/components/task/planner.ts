@@ -1,11 +1,13 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
+import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
 import {
   resolveAgent,
   resolveCategory,
   type AgentDefinition,
   type ChildPlanner,
+  type ExplicitPinRuntime,
   type PlanResolution,
   type ResolvedAgentResult,
   type SenpiModelPort,
@@ -16,19 +18,26 @@ type ResolvedPlan = Extract<PlanResolution, { readonly kind: "resolved" }>["plan
 type ResolvedModelMetadata = NonNullable<ResolvedPlan["resolved_model"]>
 
 // The live senpi model registry surface the planner needs. ExtensionContext.modelRegistry satisfies
-// it structurally; a fake with getAvailable/find satisfies it in tests.
-export type TaskModelRegistry = SenpiModelRegistryPort<SenpiModelPort>
+// it structurally; a fake with getAvailable/find satisfies it in tests. `modelRuntime` rides along
+// on the concrete registry: explicit pins resolve through senpi's own `resolveCliModel`, which
+// needs the runtime's catalog, so a registry without one can only offer exact-id `find` matching.
+export type TaskModelRegistry = SenpiModelRegistryPort<SenpiModelPort> & {
+  readonly modelRuntime?: ExplicitPinRuntime
+}
 
 export type ResolveModelRegistry = () => TaskModelRegistry | undefined
 
-const NO_REGISTRY_MESSAGE = "No senpi model registry is available yet to resolve a task model."
+export type { ResolveDefaultRoute } from "./planner-explicit-pin"
 
 // The category-and-agent resolving ChildPlanner the manager consumes. Resolution order:
-// 1. a subagent_type naming a known agent wins: an explicit `model` keeps the headless explicit
-//    path (agent persona attached, no registry access); otherwise the agent's model chain resolves
-//    against the live registry and a missing registry fails closed as model_unavailable.
-// 2. an explicit `model` alone is honored verbatim, before any registry access.
-// 3. a category (or a subagent_type naming a category) resolves against omo.json + the registry.
+// 1. a subagent_type naming a known agent wins: an explicit `model` pin is parsed ONCE with
+//    senpi's own resolver and must resolve against the live registry, or the spawn fails typed
+//    (#9722); otherwise the agent's model chain resolves against the live registry and a missing
+//    registry fails closed as model_unavailable. A subagent_type naming no enabled agent is a
+//    typed unknown_target error - never a category lookup of the same string (#8348).
+// 2. an explicit `model` alone is the same parsed pin: canonical provider/model_id plus thinking
+//    level, resolved or failed.
+// 3. a category resolves against omo.json + the registry.
 // Whatever path resolved, the plan then inherits the parent's effective execution tier
 // (fast-mode-inheritance.ts) so a fast parent never delegates to a standard-tier child.
 export function createTaskChildPlanner(
@@ -36,26 +45,29 @@ export function createTaskChildPlanner(
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
+  resolveDefaultRoute?: ResolveDefaultRoute,
 ): ChildPlanner {
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig)
-      if (agentResolution !== undefined) return agentResolution
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, resolveDefaultRoute)
+      return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
     }
 
     if (spec.model !== undefined && spec.model.length > 0) {
-      const resolvedModel = explicitModelMetadata(spec.model)
+      const pin = resolveExplicitPin(spec.model, resolveRegistry, resolveDefaultRoute)
+      if (pin.kind !== "resolved") return { kind: "error", error: pin.error }
       return {
         kind: "resolved",
         plan: {
-          model: spec.model,
-          ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
+          model: pin.canonical,
+          resolved_model: pin.metadata,
+          ...(pin.thinkingLevel === undefined ? {} : { variant: pin.thinkingLevel }),
         },
       }
     }
 
-    const categoryName = spec.category ?? spec.subagent_type
+    const categoryName = spec.category
     if (categoryName === undefined) {
       return { kind: "error", error: { code: "invalid_target", message: "A task requires a category, subagent_type, or model." } }
     }
@@ -81,32 +93,23 @@ export function createTaskChildPlanner(
   }
 }
 
-// Agent-first target handling. Unknown and disabled names may retain category fallback, but a known
-// disabled name cannot use an explicit model to bypass agent disablement.
+// Agent-first target handling. `undefined` means "this name is no enabled agent" - unknown or
+// disabled alike, with or without an explicit model, so a disabled agent can never be revived by a
+// call-site model. The caller turns that into a typed error; it is never a category lookup.
 function resolveAgentTarget(
   agentName: string,
   explicitModel: string | undefined,
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   omoConfig: OmoConfig,
+  resolveDefaultRoute?: ResolveDefaultRoute,
 ): PlanResolution | undefined {
-  const definition = Object.hasOwn(agents, agentName) ? agents[agentName] : undefined
-  if (definition?.disable === true) {
-    if (explicitModel === undefined || explicitModel.length === 0) return undefined
-    return {
-      kind: "error",
-      error: {
-        code: "unknown_target",
-        message: `Target "${agentName}" not found.`,
-        availableAgents: listAvailableAgents(agents),
-      },
-    }
-  }
-
   if (explicitModel !== undefined && explicitModel.length > 0) {
     const resolution = resolveAgent(agentName, agents, undefined, { modelOverride: explicitModel })
     if (resolution.kind !== "resolved") return undefined
-    return { kind: "resolved", plan: toAgentPlan(resolution, explicitModelMetadata(explicitModel)) }
+    const pin = resolveExplicitPin(explicitModel, resolveRegistry, resolveDefaultRoute)
+    if (pin.kind !== "resolved") return { kind: "error", error: pin.error }
+    return { kind: "resolved", plan: toAgentPlan(resolution, pin.metadata, pin.canonical) }
   }
 
   const registry = resolveRegistry()
@@ -130,13 +133,40 @@ function resolveAgentTarget(
   return undefined
 }
 
-function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined): ResolvedPlan {
+// A subagent_type names an AGENT. When it names none, the caller is told so by name and pointed at
+// the valid targets - and, when the string happens to be a category key, at the `category` field it
+// meant. Falling through to a category lookup instead (the pre-#8348 behavior) silently handed the
+// caller another family's model with no error and no warning.
+function unresolvableAgentTarget(
+  agentName: string,
+  availableAgents: readonly string[],
+  resolveRegistry: ResolveModelRegistry,
+  omoConfig: OmoConfig,
+): PlanResolution {
+  const registry = resolveRegistry()
+  const category = registry === undefined ? undefined : resolveCategory(agentName, omoConfig, registry)
+  const categoryHint =
+    category !== undefined && category.kind !== "not_found"
+      ? ` "${agentName}" is a category, not an agent — use category="${agentName}" instead.`
+      : ""
+  return {
+    kind: "error",
+    error: {
+      code: "unknown_target",
+      message: `Subagent type "${agentName}" is not an available agent.${categoryHint}`,
+      availableAgents,
+      ...(category !== undefined ? { availableCategories: category.availableCategories } : {}),
+    },
+  }
+}
+
+function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined, canonicalModel?: string): ResolvedPlan {
   const resolvedModel = resolution.resolved_model ?? explicitModel
   // Identical precedence to the category path below: reasoning outranks reasoningEffort outranks
   // variant, and whichever is chosen becomes the child's thinking level through asSenpiThinkingLevel.
-  const appliedVariant = resolution.resolved_model?.reasoning ?? resolution.resolved_model?.reasoning_effort ?? resolution.resolved_model?.variant
+  const appliedVariant = resolvedModel?.reasoning ?? resolvedModel?.reasoning_effort ?? resolvedModel?.variant
   return {
-    model: resolution.model,
+    model: canonicalModel ?? resolution.model,
     ...(resolution.requested_model !== undefined
       ? { requested_model: resolution.requested_model }
       : {}),
@@ -148,6 +178,9 @@ function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedMod
     agentType: resolution.agentType,
     ...(resolution.instructions !== undefined ? { instructions: resolution.instructions } : {}),
     ...(resolution.toolAllowlist !== undefined ? { toolAllowlist: resolution.toolAllowlist } : {}),
+    // The denylist must travel too: it becomes the record's tool_deny -> ChildSpec.toolDenylist ->
+    // senpi excludeTools, and a deny-only agent is otherwise invisible to every policy check.
+    ...(resolution.toolDenylist !== undefined ? { toolDenylist: resolution.toolDenylist } : {}),
     ...(resolution.agentExecutionMode !== undefined ? { agentExecutionMode: resolution.agentExecutionMode } : {}),
     ...(resolution.allowedSubagents !== undefined ? { allowedSubagents: resolution.allowedSubagents } : {}),
     ...(resolution.maxDepth !== undefined ? { maxDepth: resolution.maxDepth } : {}),
@@ -220,19 +253,7 @@ function toPlanResolution(
       category: categoryName,
       ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
       ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
+      ...(resolution.unlisted_provider_model !== undefined && { unlisted_provider_model: resolution.unlisted_provider_model }),
     },
-  }
-}
-
-function explicitModelMetadata(model: string): ResolvedModelMetadata | undefined {
-  const separatorIndex = model.indexOf("/")
-  if (separatorIndex <= 0 || separatorIndex === model.length - 1) {
-    return undefined
-  }
-  return {
-    source: "explicit",
-    provider: model.slice(0, separatorIndex),
-    model_id: model.slice(separatorIndex + 1),
-    display: model,
   }
 }

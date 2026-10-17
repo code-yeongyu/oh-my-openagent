@@ -24,8 +24,14 @@ the tip text they already read.
 
 Never explain from memory. Get the ground truth of what tips exist:
 
-1. Run `senpi --list-tips`. It prints JSON: `[{id, text, requiresCommand?}]`. Match the user's tip
-   against this list by id or by text fragment.
+1. Run the tip-listing flag of the command this product is installed as: `omo --list-tips`
+   under OmO Native (omo-ai installs; the session environment carries `OMO_NATIVE=1` and
+   `OMO_BIN`), or `senpi --list-tips` under a plain senpi install. Never spell it `senpi` on an
+   OmO Native machine: package managers link only the top-level `omo` bin, so `senpi` is not on
+   PATH there. If the brand command is not on PATH either (bunx/npx launches), invoke the
+   launcher the `OMO_BIN` variable points at: `"$OMO_BIN" --list-tips`. The command prints JSON:
+   `[{id, text, requiresCommand?}]`. Match the user's tip against this list by id or by text
+   fragment.
 2. If the flag is unavailable on this senpi version, fall back to reading the catalog sources
    directly at `packages/coding-agent/src/modes/interactive/tips/catalog/` inside the installed
    `@code-yeongyu/senpi` package (find it via the senpi install path or node_modules) or in a

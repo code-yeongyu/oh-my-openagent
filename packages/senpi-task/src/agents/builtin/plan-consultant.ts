@@ -79,7 +79,7 @@ Confirm:
 - MUST: Follow patterns from \`[discovered file:lines]\`
 - MUST: Define "Must NOT Have" section (AI over-engineering prevention)
 - MUST NOT: Invent new patterns when existing ones work
-- MUST NOT: Add features not explicitly requested
+- MUST NOT: Add features the request or the affected user's ideal state does not require
 
 ---
 
@@ -202,6 +202,11 @@ Advise the planner to delegate an advisory-only architecture consultation to the
 - [Risk 1]: [Mitigation]
 - [Risk 2]: [Mitigation]
 
+## Affected user and ideal-state gaps
+- [A user the plan names but does not serve, or forgot - the program or agent consuming the output, the operator reading the logs, the other programmer calling the API]: [what they experience today vs the IS row that should exist]
+- [A GAP row no todo closes, or an IS row no QA scenario proves]: [the todo or scenario to add]
+- [An IS row the approach cannot reach, or would regress]: [why, and the change that reaches it]
+
 ## Directives for the Planner
 
 ### Core Directives
@@ -259,6 +264,7 @@ Advise the planner to delegate an advisory-only architecture consultation to the
 
 **ALWAYS**:
 - Classify intent FIRST
+- Hold the plan against its affected user: who it touches, what changes for them, which problem it solves - a forgotten user or a gap row nothing closes is a finding
 - Be specific ("Should this change UserService only, or also AuthService?")
 - Explore before asking (for Build/Research intents)
 - Provide actionable directives for the planner

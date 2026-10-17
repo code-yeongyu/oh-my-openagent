@@ -69,7 +69,7 @@ describe("RpcProcessRunner model admission", () => {
     await expect(result).resolves.toMatchObject({ code: 0, timedOut: false })
     expect(spawnOptions).toMatchObject({
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", expect.any(Number), "pipe"],
       windowsHide: true,
       detached: process.platform !== "win32",
     })
@@ -195,5 +195,22 @@ describe("RpcProcessRunner model admission", () => {
 
     // then
     expect(order).toEqual(["admit", "spawn"])
+  })
+
+  test("#given a catalog listing only the base id #when the pin carries a thinking level #then admission accepts it (#9722)", async () => {
+    // given: the child profile lists fixture/visible, never fixture/visible:medium
+    const { createRpcModelAdmission } = await import("./model-admission")
+    const catalogOutput = "fixture  visible  128K  8K  yes  no\n"
+    const admission = createRpcModelAdmission({
+      probe: () => Promise.resolve({ code: 0, stdout: catalogOutput, stderr: "", timedOut: false }),
+    })
+
+    // when / then: a :level pin is admitted against the base id, not rejected as absent
+    await expect(admission(makeSpec("fixture/visible:medium"))).resolves.toBeUndefined()
+
+    // and: an id the base catalog truly lacks still fails admission after the confirming re-probe
+    await expect(admission(makeSpec("fixture/missing:medium"))).rejects.toMatchObject({
+      failure: { kind: "model_unavailable" },
+    })
   })
 })
