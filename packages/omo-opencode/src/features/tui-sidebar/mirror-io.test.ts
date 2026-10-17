@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, sym
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
-import { MIRROR_DIR_NAME, MIRROR_SCHEMA_VERSION, STALE_MS } from "./constants"
-import { readMirror, writeMirror } from "./mirror-io"
-import { mirrorFilePath, mirrorStorageDir } from "./mirror-path"
+import { MIRROR_DIR_NAME, MIRROR_SCHEMA_VERSION, READER_LEASE_MS, READER_LEASE_TOUCH_MS, STALE_MS } from "./constants"
+import { readMirror, readerLeaseFresh, resetReaderLeaseThrottle, touchReaderLease, writeMirror } from "./mirror-io"
+import { mirrorFilePath, mirrorReaderLeasePath, mirrorStorageDir } from "./mirror-path"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
@@ -228,5 +228,44 @@ describe("tui-sidebar mirror IPC", () => {
     const snapshot = snapshotFor(projectDir, Date.now())
 
     expect(() => writeMirror(projectDir, snapshot)).toThrow()
+  })
+})
+
+describe("tui-sidebar reader lease (local fix 48)", () => {
+  const original = process.env.XDG_DATA_HOME
+  let root = ""
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "omo-tui-lease-"))
+    process.env.XDG_DATA_HOME = root
+    resetReaderLeaseThrottle()
+  })
+  afterEach(() => {
+    if (original === undefined) delete process.env.XDG_DATA_HOME
+    else process.env.XDG_DATA_HOME = original
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  it("#given no lease #when checking #then no reader is active", () => {
+    expect(readerLeaseFresh(join(root, "project"))).toBe(false)
+  })
+
+  it("#given a touched lease #when checking within the lease window #then a reader is active, and stale after it", () => {
+    const project = join(root, "project")
+    const now = Date.now()
+    touchReaderLease(project, now)
+    expect(existsSync(mirrorReaderLeasePath(project))).toBe(true)
+    expect(readerLeaseFresh(project, now + 1_000)).toBe(true)
+    expect(readerLeaseFresh(project, now + READER_LEASE_MS + 5_000)).toBe(false)
+  })
+
+  it("#given repeated touches #when within the touch interval #then the lease file is written once", () => {
+    const project = join(root, "project")
+    const now = Date.now()
+    touchReaderLease(project, now)
+    rmSync(mirrorReaderLeasePath(project))
+    touchReaderLease(project, now + READER_LEASE_TOUCH_MS - 1)
+    expect(existsSync(mirrorReaderLeasePath(project))).toBe(false)
+    touchReaderLease(project, now + READER_LEASE_TOUCH_MS)
+    expect(existsSync(mirrorReaderLeasePath(project))).toBe(true)
   })
 })

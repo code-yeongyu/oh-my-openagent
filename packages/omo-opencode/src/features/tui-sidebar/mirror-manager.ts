@@ -1,6 +1,7 @@
 import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
 import { log } from "../../shared/logger"
-import { writeMirror } from "./mirror-io"
+import { readerLeaseFreshAt, writeMirror } from "./mirror-io"
+import { mirrorReaderLeasePath } from "./mirror-path"
 import { buildTuiRuntimeSnapshot } from "./snapshot-builder"
 import type {
   BuildTuiRuntimeSnapshotInput,
@@ -18,11 +19,14 @@ export type TuiStateMirrorInput = {
   readonly getStatuses?: () => Promise<SessionStatusMap>
   readonly sessionAgentResolver?: SessionAgentResolver
   readonly reportFlushError?: (error: Error) => void
+  /** Whether a TUI is reading this mirror; defaults to the reader lease next to the mirror file. */
+  readonly isReaderActive?: () => boolean
 }
 
 export class TuiStateMirror {
   private readonly snapshotInput: BuildTuiRuntimeSnapshotInput
   private readonly reportFlushError: (error: Error) => void
+  private readonly isReaderActive: () => boolean
   private heartbeatID: ReturnType<typeof setInterval> | null = null
   private debounceID: ReturnType<typeof setTimeout> | null = null
   private pendingFlush: Promise<void> | null = null
@@ -33,6 +37,12 @@ export class TuiStateMirror {
   constructor(input: TuiStateMirrorInput) {
     this.snapshotInput = input
     this.reportFlushError = input.reportFlushError ?? ((error) => log("[tui-sidebar] mirror flush failed", { error }))
+    if (input.isReaderActive) {
+      this.isReaderActive = input.isReaderActive
+    } else {
+      let leasePath: string | undefined
+      this.isReaderActive = () => readerLeaseFreshAt((leasePath ??= mirrorReaderLeasePath(input.projectDir)))
+    }
   }
 
   buildSnapshot(): Promise<TuiRuntimeSnapshot> {
@@ -78,8 +88,10 @@ export class TuiStateMirror {
     if (this.heartbeatID !== null) {
       return
     }
+    // The heartbeat only keeps the mirror fresh for a reader (STALE_MS); events still flush unconditionally.
+    // Without a TUI reader it costs one stat instead of a snapshot build and an atomic file write per folder.
     this.heartbeatID = setInterval(() => {
-      void this.flush()
+      if (this.isReaderActive()) void this.flush()
     }, HEARTBEAT_MS)
     this.heartbeatID.unref?.()
   }

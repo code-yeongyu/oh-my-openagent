@@ -30,3 +30,7 @@ export function mirrorFilePath(projectDir: string): string {
   const projectHash = createHash("sha1").update(canonicalProjectDir(projectDir)).digest("hex").slice(0, 16)
   return join(mirrorStorageDir(), `${projectHash}.json`)
 }
+
+export function mirrorReaderLeasePath(projectDir: string): string {
+  return mirrorFilePath(projectDir).replace(/\.json$/, ".reader")
+}

@@ -7,7 +7,7 @@ import { computeView, viewKey } from "./features/tui-sidebar/compute-view"
 import { POLL_INTERVAL_MS } from "./features/tui-sidebar/constants"
 import { deriveAgents, deriveConfig, deriveJobBoard, deriveLoop, deriveRoster } from "./features/tui-sidebar/derivers"
 import type { ViewNode } from "./features/tui-sidebar/element-helpers"
-import { readMirror } from "./features/tui-sidebar/mirror-io"
+import { readMirror, touchReaderLease } from "./features/tui-sidebar/mirror-io"
 import { buildViewNodes } from "./features/tui-sidebar/render-view"
 import type { RosterRow } from "./features/tui-sidebar/state-types"
 import type { SidebarView } from "./features/tui-sidebar/state-types"
@@ -96,6 +96,7 @@ async function loadRosterRows(directory: string): Promise<readonly RosterRow[]> 
 
 async function readView(directory: string): Promise<SidebarView> {
   const validation = await loadPluginValidation(directory)
+  touchReaderLease(directory)
   const mirror = readMirror(directory)
   const roster = await loadRosterRows(directory)
   return computeView({

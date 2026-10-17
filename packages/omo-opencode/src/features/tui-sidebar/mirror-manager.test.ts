@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { HEARTBEAT_MS, WRITE_DEBOUNCE_MS } from "./constants"
-import { readMirror } from "./mirror-io"
+import { readMirror, resetReaderLeaseThrottle, touchReaderLease } from "./mirror-io"
 import { TuiStateMirror } from "./mirror-manager"
 import type { SessionAgentResolver } from "./snapshot-builder"
 import type { BackgroundTaskSnapshot } from "../background-agent/types"
@@ -61,6 +61,7 @@ function createMirror(input?: {
   readonly backgroundManager?: FakeBackgroundManager
   readonly sessionAgentResolver?: SessionAgentResolver
   readonly reportFlushError?: (error: Error) => void
+  readonly isReaderActive?: () => boolean
 }): TuiStateMirror {
   const projectDir = input?.projectDir ?? makeTempDir("project")
   return new TuiStateMirror({
@@ -69,6 +70,7 @@ function createMirror(input?: {
     backgroundManager: input?.backgroundManager ?? createBackgroundManager([]),
     sessionAgentResolver: input?.sessionAgentResolver ?? resolveTestSessionAgent,
     reportFlushError: input?.reportFlushError,
+    isReaderActive: input?.isReaderActive,
   })
 }
 
@@ -118,6 +120,7 @@ describe("TuiStateMirror", () => {
     const mirror = createMirror({
       projectDir,
       client: createClient({ "ses-main": { type: "busy" } }),
+      isReaderActive: () => true,
     })
     mirror.start()
 
@@ -131,6 +134,63 @@ describe("TuiStateMirror", () => {
     expect(readMirror(projectDir)?.activeAgents).toEqual([{ name: "sisyphus", status: "busy" }])
     mirror.stop()
   })
+
+  it("#given no TUI reader #when the heartbeat fires #then it neither builds nor writes the mirror (local fix 48)", async () => {
+    jest.useFakeTimers()
+    // given
+    const projectDir = makeTempDir("idle-project")
+    let builds = 0
+    const client = createClient({ "ses-main": { type: "busy" } })
+    const counting: FakeClient = { session: { ...client.session, status: async () => { builds++; return client.session.status() } } }
+    const mirror = createMirror({ projectDir, client: counting, isReaderActive: () => false })
+    mirror.start()
+
+    // when
+    for (let i = 0; i < 5; i++) jest.advanceTimersByTime(HEARTBEAT_MS + WRITE_DEBOUNCE_MS)
+    jest.useRealTimers()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    // then
+    expect(builds).toBe(0)
+    expect(readMirror(projectDir)).toBeNull()
+    mirror.stop()
+  })
+
+  it("#given no TUI reader #when an event arrives #then the mirror is still flushed (local fix 48)", async () => {
+    jest.useFakeTimers()
+    // given
+    const projectDir = makeTempDir("event-project")
+    const mirror = createMirror({ projectDir, client: createClient({ "ses-main": { type: "running" } }), isReaderActive: () => false })
+    mirror.start()
+
+    // when
+    mirror.onEvent({ type: "session.status" })
+    const write = mirror.flush()
+    jest.advanceTimersByTime(WRITE_DEBOUNCE_MS)
+    await write
+
+    // then
+    expect(readMirror(projectDir)?.activeAgents).toEqual([{ name: "sisyphus", status: "running" }])
+    mirror.stop()
+  })
+
+  it("#given the default reader check #when a TUI touches the lease #then the heartbeat writes again (local fix 48)", async () => {
+    // given (real timers: the default check stats the lease file next to the mirror)
+    const projectDir = makeTempDir("lease-project")
+    const mirror = createMirror({ projectDir, client: createClient({ "ses-main": { type: "busy" } }) })
+    mirror.start()
+    await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_MS + WRITE_DEBOUNCE_MS + 400))
+    expect(readMirror(projectDir)).toBeNull()
+
+    // when
+    resetReaderLeaseThrottle()
+    touchReaderLease(projectDir)
+    await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_MS + WRITE_DEBOUNCE_MS + 400))
+
+    // then
+    expect(readMirror(projectDir)?.activeAgents).toEqual([{ name: "sisyphus", status: "busy" }])
+    mirror.stop()
+  }, 15_000)
 
   it("#given a started mirror #when started #then heartbeat handle is unref'd", () => {
     jest.useFakeTimers()
