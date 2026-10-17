@@ -20,7 +20,7 @@ export const GATEWAY_RULES_EXTENSION_BUNDLE_NAME = "gateway-rules-extension.mjs"
 export interface GatewayComponentOptions {
   readonly agentDir?: () => string
   readonly createStore?: (agentDir: string) => GatewayRulesStore & { readonly registerStoreExtension: (descriptor: { readonly name: string; readonly migrations: readonly (readonly string[])[]; readonly moduleUrl: string }) => Promise<unknown> }
-  /** The raw `gateway` config section; a non-empty `scopes` array activates the component. */
+  /** The raw `dori` config section; a non-empty `scopes` array activates the component. */
   readonly loadGatewaySection?: () => unknown
   readonly resolveModuleUrl?: () => string | undefined
 }
@@ -78,7 +78,7 @@ function hasScopes(section: unknown): boolean {
 }
 
 function defaultGatewaySection(): unknown {
-  return loadSenpiOmoConfig().config.gateway
+  return loadSenpiOmoConfig().config.dori
 }
 
 function defaultAgentDir(): string {

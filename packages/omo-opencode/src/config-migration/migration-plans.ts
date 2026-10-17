@@ -13,7 +13,7 @@ import {
   SUBSCRIPTION_PROVIDER_RENAME_MIGRATION_ID,
   transformSubscriptionProviderRename,
 } from "./subscription-provider-rename"
-import { hasLegacyCategoryNames, hasLegacyHarnessBlocks } from "@oh-my-opencode/omo-config-core"
+import { hasLegacyCategoryNames, hasLegacyHarnessBlocks, hasLegacyGatewaySection, migrateLegacyDoriSection } from "@oh-my-opencode/omo-config-core"
 import type { ConfigMigrationDiscoveryOptions, DiscoveredLegacyConfigSource } from "./types"
 import type { ConfigMigrationTransformResult, OpenCodeTransformScope } from "./transform-types"
 
@@ -175,6 +175,20 @@ function subscriptionProviderRenamePlan(targetPath: string): LegacyConfigMigrati
   }
 }
 
+function doriSectionRenamePlan(targetPath: string): LegacyConfigMigrationPlan {
+  const inspect = (sources: Parameters<MigrationTransform>[0]): ConfigMigrationTransformResult =>
+    migrateLegacyDoriSection(sources[0]?.value)
+  return {
+    id: "2026-10-dori-section-rename",
+    inspect,
+    mode: "replace-target",
+    shouldRun: hasLegacyGatewaySection,
+    sources: [],
+    targetPath,
+    transform: inspect,
+  }
+}
+
 function existingOmoConfigPath(directory: string, options: ConfigMigrationDiscoveryOptions): string | undefined {
   const fileSystem = discoveryFileSystem(options)
   for (const fileName of ["omo.jsonc", "omo.json"] as const) {
@@ -241,6 +255,7 @@ export function createLegacyConfigMigrationPlans(
 
   const inPlaceTargets = [...reasoningTargets.values()]
   return [
+    ...inPlaceTargets.map(doriSectionRenamePlan),
     ...legacyPlans,
     ...inPlaceTargets.map(reasoningPlan),
     ...inPlaceTargets.map(categoryDeepSplitPlan),
