@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **A memory that already exists on a device joins its synced space without losing anything.** Each project's synced memory gets one identity that every device computes the same way from the repository, so two devices enabling sync offline land in one space. When local files meet the space's copy, nothing is deleted: body lines are only added, a list keeps every element from both sides, and a frontmatter value that differs keeps both whole values side by side, never spliced together and never a conflict note in the file. Leftover hub conflict copies are folded in and removed only after a read-back proves every line made it. Nothing syncs to a server yet. ([#10206](https://github.com/code-yeongyu/oh-my-openagent/pull/10206))
 
+**Binary downloads validate and extract tar archives in the same environment.** Both commands now share locale handling and ignore `TAR_OPTIONS`, so archive names and extraction options cannot differ between the validated listing and extraction. ([#9790](https://github.com/code-yeongyu/oh-my-openagent/issues/9790), [#9926](https://github.com/code-yeongyu/oh-my-openagent/pull/9926))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
