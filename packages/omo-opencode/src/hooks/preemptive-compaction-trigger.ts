@@ -4,6 +4,7 @@ import {
   type ContextLimitModelCacheState,
 } from "../shared/context-limit-resolver"
 import { log } from "../shared/logger"
+import { clearActiveCompactionPin, setActiveCompactionPin } from "../shared/compaction-pin-state"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 import type {
@@ -94,14 +95,22 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       cached.modelID,
     )
 
+    // Exclude the summarize target from working-model checkpoint capture.
+    setActiveCompactionPin(sessionID, { providerID: targetProviderID, modelID: targetModelID })
     const summarizePromise = ctx.client.session.summarize({
       path: { id: sessionID },
       body: { providerID: targetProviderID, modelID: targetModelID, auto: true },
       query: { directory: ctx.directory },
     })
     void summarizePromise.then(
-      () => compactionInProgress.delete(sessionID),
-      () => compactionInProgress.delete(sessionID),
+      () => {
+        compactionInProgress.delete(sessionID)
+        clearActiveCompactionPin(sessionID)
+      },
+      () => {
+        compactionInProgress.delete(sessionID)
+        clearActiveCompactionPin(sessionID)
+      },
     )
 
     await withTimeout(
