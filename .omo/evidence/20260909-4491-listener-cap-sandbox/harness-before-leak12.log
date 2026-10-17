@@ -1,0 +1,15 @@
+[08:06:58] fake LLM on 127.0.0.1:33833
+[08:06:58] phase=startup
+[08:06:59] serve healthy: {"healthy":true,"version":"1.18.21"}
+[08:07:53] agents registered: 17 (omo agents seen: explore,librarian,oracle)
+[08:07:56] phase=sessions-active
+[08:07:56] created+prompted 2 sessions
+[08:08:00] sessions with a completed assistant reply: 2/2; assistant messages: 2; fake LLM default-branch calls so far: 2; busy: 0
+[08:08:03] phase=sessions-deleted
+[08:08:03] deleted 2 sessions; remaining in sandbox instance: 0
+[08:08:07] phase=cli-run
+[08:08:07] phase=disposed
+[08:08:07] POST /global/dispose -> 200
+[08:08:11] phase=shutdown
+[08:08:12] warnings: serve=0 run=0 probe=0; fake LLM calls=2
+[08:08:12] done (before-leak12)
