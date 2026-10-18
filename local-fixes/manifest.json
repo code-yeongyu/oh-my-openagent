@@ -728,6 +728,24 @@
       "overlapsWith": [],
       "orderNote": "Independent of 01-48; touches v2/event-shape.ts, v2/hook-bridge.ts, cli/run/v2-client.ts plus tests. Tests: v2/event-shape.test.ts (started mapping, join, stateless tokens) + preemptive-compaction.test.ts integration (raw step events -> shaper -> hook -> session.summarize; RED against the pre-fix bridge shape: 'Received number of calls: 0'; GREEN 21 pass across the two files, plus 38 pass across v2-client/host/hook-bridge/loop-regression/limit-status). LSP clean; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS. Upstream: issue #10465 + stacked PR SwarmStorm/oh-my-openagent#4 (base = #9016's branch, the only carrier of the v2 bridge). Post-restart acceptance: %TEMP%/oh-my-opencode.log shows [preemptive-compaction] lines again (summarize model resolved; fires above 78% usage), and v2 sessions compact preemptively.",
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10465"
+    },
+    {
+      "id": "50-v2-session-event-ownership",
+      "title": "Deliver V2 session events only to the folder that owns the session tree",
+      "commit": "a807c46758a180d0124c32dfb2888827548fa23a",
+      "patch": "patches/50-v2-session-event-ownership.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/5",
+      "why": "OpenCode V2 hands every folder's plugin instance the whole process's event stream (plugin.ts runs plugins without Location.Service; plugin/host.ts event.subscribe is unscoped; bus.ts local() returns the unfiltered stream without an ambient Location). The bridge's subscription loop handed every event to the V1 hooks without an ownership check, so with 12 warm folders one probe session's session.error (ses_eb374b19dffe6xaXCskoSuTlqv, 2026-10-18T01:07Z, 503 auth_not_found) got 12 runtime-fallback retries: agent-switched x12, model-switched x1, 12 copies of the prompt, each instance applying its own folder's config (a second session got 13). createSessionOwnership() guards the loop: an instance owns a session when the session tree's root lives in ctx.location.directory (a child this instance created stays owned after a move); the folder comes from session.get (2 s timeout, cached), never from the envelope; non-session events pass; unresolvable sessions fail open, uncached.",
+      "markers": [
+        "createSessionOwnership",
+        "rawEventSessionID",
+        "v2 event skipped: session belongs to another folder"
+      ],
+      "overlapsWith": [
+        "49-v2-step-usage-forwarding"
+      ],
+      "orderNote": "After 49: both edit the subscription loop in v2/hook-bridge.ts (49 adds the shaper; 50 guards the loop before shaping). Also exports directoryOf/sameDirectory from v2/session-actions.ts; new v2/session-ownership.ts. Tests: v2/host.test.ts (two-folder single-retry, foreign filter, moved child root ownership, fail-open uncached, one lookup per session, non-session pass) — RED 5 fail / GREEN 23 pass. Upstream variant (self-contained helpers) on #9016 head: SwarmStorm/oh-my-openagent#5.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10473"
     }
   ],
   "externalFixes": [
