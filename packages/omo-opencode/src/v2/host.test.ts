@@ -19,8 +19,11 @@ type RegisteredHook = {
   fn: (event: Record<string, unknown>) => Promise<void> | void
 }
 
-function createFakeContext(): {
+type FakeSessions = Record<string, { directory: string; parentID?: string }>
+
+function createFakeContext(opts: { directory?: string; sessions?: FakeSessions; getThrows?: boolean } = {}): {
   ctx: Plugin.Context
+  gets: string[]
   hooks: RegisteredHook[]
   tools: Array<{ name: string; execute: (input: unknown, context: { sessionID: string; id: string; signal: AbortSignal }) => Promise<{ content: string }> }>
   commands: Array<{ name: string; execute: (input: { sessionID: string; prompt: { text: string }; delivery: "steer" }) => Promise<void> }>
@@ -36,6 +39,8 @@ function createFakeContext(): {
   const mcps: Array<[string, { type: string; url?: string; disabled?: boolean }]> = []
   const prompts: Array<{ sessionID: string; text: string }> = []
   const calls = { agent: [] as string[], model: [] as unknown[], synthetic: [] as string[], create: [] as unknown[], move: [] as unknown[] }
+  const gets: string[] = []
+  const directory = opts.directory ?? "/tmp/project"
   const pendingEvents: unknown[] = []
   let notifyEvent: (() => void) | undefined
   const agents = new Map<string, { description?: string; mode?: string; system?: string }>([
@@ -46,12 +51,19 @@ function createFakeContext(): {
   const ctx = {
     app: { name: "opencode", version: "2.0.16", channel: "stable" },
     location: {
-      directory: "/tmp/project",
-      project: { id: "proj", directory: "/tmp/project", canonical: "/tmp/project" },
+      directory,
+      project: { id: "proj", directory, canonical: directory },
     },
     options: {},
     session: {
-      get: async (input: { sessionID: string }) => ({ id: input.sessionID, title: "demo" }),
+      get: async (input: { sessionID: string }) => {
+        gets.push(input.sessionID)
+        if (opts.getThrows) throw new Error("host unavailable")
+        const known = opts.sessions?.[input.sessionID]
+        // Unknown sessions keep the old shape (no location), as before fix 50.
+        if (!known) return { id: input.sessionID, title: "demo" }
+        return { id: input.sessionID, title: "demo", location: { directory: known.directory }, ...(known.parentID ? { parentID: known.parentID } : {}) }
+      },
       context: async () => [{ type: "user", id: "msg", text: "hi" }],
       prompt: async (input: { sessionID: string; text: string }) => {
         prompts.push(input)
@@ -236,6 +248,7 @@ function createFakeContext(): {
   }
 
   return {
+    gets,
     ctx: ctx as unknown as Plugin.Context,
     hooks,
     tools,
@@ -686,3 +699,109 @@ async function waitFor(ready: () => boolean): Promise<void> {
   }
   throw new Error("timed out waiting for adapter event")
 }
+
+// fix 50 (opencode-v2): the V2 host hands every folder's plugin instance the whole process's event
+// stream; V1 hooks assume it is scoped. One errored probe session got 12 runtime-fallback retries,
+// one from each warm folder (2026-10-18). Only the folder that owns the session tree may react.
+describe("fix 50 session ownership (opencode-v2)", () => {
+  type Seen = { type?: string; properties?: { sessionID?: string } }
+  const retryingServer = (seen: Seen[]) => async (input: unknown) => {
+    const v1 = input as { client: { session: { promptAsync: (request: unknown) => Promise<unknown> } } }
+    return {
+      event: async ({ event }: { event: Seen }) => {
+        seen.push(event)
+        if (event.properties?.sessionID !== "ses_probe" || event.type === "session.idle") return
+        // runtime-fallback's call shape: switch agent + model, then prompt the same session.
+        await v1.client.session.promptAsync({
+          path: { id: "ses_probe" },
+          body: { agent: "sisyphus", model: { providerID: "claude-code", modelID: "claude-opus-5-5" }, variant: "xhigh", parts: [{ type: "text", text: "retry" }] },
+        })
+      },
+    }
+  }
+  const failed = { type: "session.execution.failed", data: { sessionID: "ses_probe", error: { type: "provider.internal", status: 503, message: "auth_not_found" } } }
+  const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  test("two folders, one failed session: exactly one retry, and only the owner switches the model", async () => {
+    const sessions: FakeSessions = { ses_probe: { directory: "/tmp/project" } }
+    const owner = createFakeContext({ directory: "/tmp/project", sessions })
+    const other = createFakeContext({ directory: "/tmp/other", sessions })
+    const ownerSeen: Seen[] = []
+    const otherSeen: Seen[] = []
+    const cleanups = [
+      await setupOpenCodeV2(owner.ctx, { server: retryingServer(ownerSeen) }),
+      await setupOpenCodeV2(other.ctx, { server: retryingServer(otherSeen) }),
+    ]
+    // The V2 bus every instance shares: the same raw event reaches both folders.
+    for (const fake of [owner, other]) fake.pushEvent(failed)
+    await waitFor(() => owner.prompts.length > 0)
+    await pause(40)
+    expect(owner.prompts.length + other.prompts.length).toBe(1)
+    expect(other.calls.model).toHaveLength(0)
+    expect(other.calls.agent).toHaveLength(0)
+    expect(otherSeen.some((event) => event.properties?.sessionID === "ses_probe")).toBe(false)
+    for (const cleanup of cleanups) await cleanup?.()
+  })
+
+  test("events of a session owned by another folder never reach the V1 handler", async () => {
+    const fake = createFakeContext({ sessions: { ses_foreign: { directory: "/tmp/other" }, ses_local: { directory: "/tmp/project" } } })
+    const seen: Seen[] = []
+    const cleanup = await setupOpenCodeV2(fake.ctx, { server: async () => ({ event: async ({ event }: { event: Seen }) => { seen.push(event) } }) })
+    fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_foreign" } })
+    fake.pushEvent({ ...failed, data: { ...failed.data, sessionID: "ses_foreign" } })
+    fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_local" } })
+    await waitFor(() => seen.some((event) => event.properties?.sessionID === "ses_local"))
+    expect(seen.some((event) => event.properties?.sessionID === "ses_foreign")).toBe(false)
+    await cleanup?.()
+  })
+
+  test("a child moved to another folder belongs to the folder that owns its root", async () => {
+    const sessions: FakeSessions = { ses_root: { directory: "/tmp/project" }, ses_child: { directory: "/tmp/elsewhere", parentID: "ses_root" } }
+    const root = createFakeContext({ directory: "/tmp/project", sessions })
+    const elsewhere = createFakeContext({ directory: "/tmp/elsewhere", sessions })
+    const rootSeen: Seen[] = []
+    const elsewhereSeen: Seen[] = []
+    const cleanups = [
+      await setupOpenCodeV2(root.ctx, { server: async () => ({ event: async ({ event }: { event: Seen }) => { rootSeen.push(event) } }) }),
+      await setupOpenCodeV2(elsewhere.ctx, { server: async () => ({ event: async ({ event }: { event: Seen }) => { elsewhereSeen.push(event) } }) }),
+    ]
+    for (const fake of [root, elsewhere]) fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_child" } })
+    await waitFor(() => rootSeen.some((event) => event.properties?.sessionID === "ses_child"))
+    await pause(40)
+    expect(elsewhereSeen.some((event) => event.properties?.sessionID === "ses_child")).toBe(false)
+    for (const cleanup of cleanups) await cleanup?.()
+  })
+
+  test("an unresolvable session fails open (delivered) and is not cached", async () => {
+    const fake = createFakeContext({ getThrows: true })
+    const seen: Seen[] = []
+    const cleanup = await setupOpenCodeV2(fake.ctx, { server: async () => ({ event: async ({ event }: { event: Seen }) => { seen.push(event) } }) })
+    fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_unknown" } })
+    fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_unknown" } })
+    await waitFor(() => seen.filter((event) => event.properties?.sessionID === "ses_unknown").length === 2)
+    expect(fake.gets.filter((id) => id === "ses_unknown").length).toBe(2)
+    await cleanup?.()
+  })
+
+  test("ownership is resolved once per session", async () => {
+    const fake = createFakeContext({ sessions: { ses_foreign: { directory: "/tmp/other" }, ses_local: { directory: "/tmp/project" } } })
+    const seen: Seen[] = []
+    const cleanup = await setupOpenCodeV2(fake.ctx, { server: async () => ({ event: async ({ event }: { event: Seen }) => { seen.push(event) } }) })
+    fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_foreign" } })
+    fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_foreign" } })
+    fake.pushEvent({ type: "session.idle", data: { sessionID: "ses_local" } })
+    await waitFor(() => seen.some((event) => event.properties?.sessionID === "ses_local"))
+    expect(fake.gets.filter((id) => id === "ses_foreign").length).toBe(1)
+    await cleanup?.()
+  })
+
+  test("events without a session still reach the V1 handler", async () => {
+    const fake = createFakeContext({ sessions: { ses_foreign: { directory: "/tmp/other" } } })
+    const seen: Seen[] = []
+    const cleanup = await setupOpenCodeV2(fake.ctx, { server: async () => ({ event: async ({ event }: { event: Seen }) => { seen.push(event) } }) })
+    fake.pushEvent({ type: "config.updated", data: {} })
+    await waitFor(() => seen.some((event) => event.type === "config.updated"))
+    expect(seen.some((event) => event.type === "config.updated")).toBe(true)
+    await cleanup?.()
+  })
+})

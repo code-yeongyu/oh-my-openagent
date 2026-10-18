@@ -5,6 +5,7 @@ import type { AdapterState } from "./adapter-state"
 import { createV1EventShaper, toV1Event } from "./event-shape"
 import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
 import { createOmoDelegationRouting } from "./delegation-routing"
+import { createSessionOwnership } from "./session-ownership"
 
 type V2Context = Plugin.Context
 
@@ -308,7 +309,11 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: 
         // fix 49 (opencode-v2): one shaper per subscription joins each step's
         // started model with its ended usage before the V1 handlers see it.
         const shape = createV1EventShaper()
+        // fix 50 (opencode-v2): V2 delivers every folder's events to every plugin instance; only
+        // the folder that owns the session tree may run the V1 hooks for it (one retry, not N).
+        const ownsSessionEvent = createSessionOwnership(ctx, state)
         for await (const raw of ctx.event.subscribe({ signal: controller.signal })) {
+          if (!(await ownsSessionEvent(raw))) continue
           const event = shape(raw)
           noteRuntimeEvent(state, event)
           const retryKey = retryEventKey(event)

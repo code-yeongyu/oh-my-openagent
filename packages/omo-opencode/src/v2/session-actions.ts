@@ -114,12 +114,12 @@ export function withParent(session: Record<string, unknown>, state: AdapterState
   return parentID ? { ...session, parentID, directory: directoryOf(session) } : { ...session, directory: directoryOf(session) }
 }
 
-function directoryOf(session: Record<string, unknown>): unknown {
+export function directoryOf(session: Record<string, unknown>): unknown {
   if (typeof session.directory === "string") return session.directory
   return isRecord(session.location) ? session.location.directory : undefined
 }
 
-function sameDirectory(left: string, right: string): boolean {
+export function sameDirectory(left: string, right: string): boolean {
   const normalize = (value: string) => {
     const resolved = resolve(value).replaceAll("\\", "/").replace(/\/+$/, "")
     return process.platform === "win32" ? resolved.toLowerCase() : resolved
