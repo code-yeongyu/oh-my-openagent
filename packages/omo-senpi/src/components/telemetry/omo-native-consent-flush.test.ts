@@ -17,10 +17,14 @@ import { FIXED_NOW, createEnabledEnv, createOsProvider, createSilentLogger, with
 type Sink = {
   readonly url: string
   readonly posted: string[]
+  readonly transports: TelemetryTransport[]
+  isOpen(): boolean
 }
 
 async function withPostHogSink(run: (sink: Sink) => Promise<void>): Promise<void> {
   const posted: string[] = []
+  const transports: TelemetryTransport[] = []
+  let open = true
   const server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
@@ -34,8 +38,12 @@ async function withPostHogSink(run: (sink: Sink) => Promise<void>): Promise<void
     },
   })
   try {
-    await run({ url: `http://127.0.0.1:${server.port}`, posted })
+    await run({ url: `http://127.0.0.1:${server.port}`, posted, transports, isOpen: () => open })
   } finally {
+    // A session a test leaves running, or an event it captures after the test, would flush into a
+    // later test's fetch (#10394): close the queue to new events, then drain and stop every client.
+    open = false
+    await Promise.all(transports.map((transport) => transport.shutdown()))
     await server.stop(true)
   }
 }
@@ -97,11 +105,16 @@ function startSession(agentDir: string, sink: Sink): Harness {
   let failingFlushes = 0
   const diagnostics: DiagnosticRecord[] = []
   const factory: TelemetryTransportFactory = (apiKey, options) => {
+    // Only the native queue is under test. The legacy daily-active ping runs fire-and-forget and can
+    // build its client after the test ended, so it gets an inert transport instead of a real one.
+    if (options.flushAt !== 20) return { capture: () => undefined, flush: async () => undefined, shutdown: async () => undefined }
     const transport = createDefaultPostHogTransport(apiKey, options)
-    if (options.flushAt !== 20) return transport
+    sink.transports.push(transport)
     nativeTransport = transport
     return {
-      capture: (message) => transport.capture(message),
+      capture: (message) => {
+        if (sink.isOpen()) transport.capture(message)
+      },
       shutdown: () => transport.shutdown(),
       flush: async () => {
         if (failingFlushes > 0) {
