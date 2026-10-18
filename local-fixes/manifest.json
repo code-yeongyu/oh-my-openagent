@@ -204,7 +204,8 @@
       "overlapsWith": [
         "02-hijack-working-model"
       ],
-      "orderNote": "Independent of 02 (which fixes the reroute side); this fixes the injector side. Apply after 02."
+      "orderNote": "Independent of 02 (which fixes the reroute side); this fixes the injector side. Apply after 02.",
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/10211"
     },
     {
       "id": "14-compaction-part-marker",
@@ -219,7 +220,8 @@
         "13-compaction-pin-checkpoint"
       ],
       "orderNote": "Independent of 13 (pin-state guard); this fixes the structural detection. Apply after 13.",
-      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10120"
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10120",
+      "pr": "https://github.com/code-yeongyu/oh-my-openagent/pull/10211"
     },
     {
       "id": "15-opencode-v2-compaction-event-alias",
@@ -233,7 +235,8 @@
       ],
       "overlapsWith": [],
       "orderNote": "Patches packages/omo-opencode/src/v2/hook-bridge.ts, which only exists after PR #9016 merges. Apply last; no interaction with fixes 01-12 (different files). Numbered 15 because the v1 line claimed #14 (compaction-context-injector working-model fix, session ses_f26289d0).",
-      "notOursReference": "https://github.com/code-yeongyu/oh-my-openagent/pull/9016"
+      "notOursReference": "https://github.com/code-yeongyu/oh-my-openagent/pull/9016",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10248"
     },
     {
       "id": "16-compaction-loop-breaker",
@@ -248,7 +251,8 @@
         "13-compaction-pin-checkpoint",
         "14-compaction-part-marker"
       ],
-      "orderNote": "Apply after 14. Grafted from the main ledger 2026-10-02; patch path relative to local-fixes/ per v2-int convention."
+      "orderNote": "Apply after 14. Grafted from the main ledger 2026-10-02; patch path relative to local-fixes/ per v2-int convention.",
+      "upstream": "N/A — environment-specific Claude bridge safety policy: independent unreduced transcript, two-round/30% threshold and local .omo/handoffs policy; not a general OMO compaction fix."
     },
     {
       "id": "18-runtime-fallback-recovery-arbitration",
@@ -312,7 +316,8 @@
         "agent file is user-authored; not overwriting"
       ],
       "overlapsWith": [],
-      "orderNote": "Independent of 01-20; touches only packages/omo-opencode/src/v2/agent-markdown.ts. Complemented outside this repo by carrying v1's opencode.json agent block and default_agent into the v2 profile config (the cutover dropped both)."
+      "orderNote": "Independent of 01-20; touches only packages/omo-opencode/src/v2/agent-markdown.ts. Complemented outside this repo by carrying v1's opencode.json agent block and default_agent into the v2 profile config (the cutover dropped both).",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10249"
     },
     {
       "id": "23-skill-v2-ctx-ask-guard",
@@ -343,7 +348,8 @@
       "overlapsWith": [
         "21-agent-registration-flat"
       ],
-      "orderNote": "Must come after 21: it edits writeAgentMarkdown from 21 and relies on the stamp 21 introduced. Two of the three markers live in packages/claude-code-compat-core/src, which is why apply.mjs and verify.mjs search that package as well. An agent file WITHOUT the stamp is user-authored: the writer never overwrites it and the loader still loads it as a custom agent. To hand a file back to the plugin, put '# generated-by: oh-my-openagent' as the first frontmatter line. pr is null: the writer and the stamp exist only on the v2 integration line."
+      "orderNote": "Must come after 21: it edits writeAgentMarkdown from 21 and relies on the stamp 21 introduced. Two of the three markers live in packages/claude-code-compat-core/src, which is why apply.mjs and verify.mjs search that package as well. An agent file WITHOUT the stamp is user-authored: the writer never overwrites it and the loader still loads it as a custom agent. To hand a file back to the plugin, put '# generated-by: oh-my-openagent' as the first frontmatter line. pr is null: the writer and the stamp exist only on the v2 integration line.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10249"
     },
     {
       "id": "25-v2-todo-tool-schema",
@@ -357,7 +363,8 @@
         "Read this session's current todo list; takes no arguments"
       ],
       "overlapsWith": [],
-      "orderNote": "Independent of 01-24; touches only packages/omo-opencode/src/v2/project-config.ts and adds project-config.todo.test.ts. Runtime description literals survive bundling. Tests cover exact schemas, per-session persistence, whole-list replacement/clear, and preserving host-provided tools. Use the staging lane introduced in b7151fa79: fixes:apply stages beside the checkout and fixes:verify accepts that bundle path. Do not write live dist/index.js under active OpenChamber; activation is owner-initiated offline. pr is null because src/v2 is not in upstream dev."
+      "orderNote": "Independent of 01-24; touches only packages/omo-opencode/src/v2/project-config.ts and adds project-config.todo.test.ts. Runtime description literals survive bundling. Tests cover exact schemas, per-session persistence, whole-list replacement/clear, and preserving host-provided tools. Use the staging lane introduced in b7151fa79: fixes:apply stages beside the checkout and fixes:verify accepts that bundle path. Do not write live dist/index.js under active OpenChamber; activation is owner-initiated offline. pr is null because src/v2 is not in upstream dev.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10250"
     },
     {
       "id": "26-startup-check-once-per-process",
@@ -405,7 +412,8 @@
       "overlapsWith": [
         "24-agent-writer-self-ingest"
       ],
-      "orderNote": "First-message-drop F5c. test-setup.ts is part of this commit because it imports resetProcessConfigCacheForTests (fix 26 startup-check reset coexists there via the leaf module). Cross-folder agent reuse is output-equivalent by test: two distinct empty folders produce deep-equal agent configs through the REAL applyAgentConfig (config-handler.process-cache.test.ts). The snapshot replay still deep-clones agents per instance because attachHiddenConfigKeyAliases and applyToolConfig mutate config.agent."
+      "orderNote": "First-message-drop F5c. test-setup.ts is part of this commit because it imports resetProcessConfigCacheForTests (fix 26 startup-check reset coexists there via the leaf module). Cross-folder agent reuse is output-equivalent by test: two distinct empty folders produce deep-equal agent configs through the REAL applyAgentConfig (config-handler.process-cache.test.ts). The snapshot replay still deep-clones agents per instance because attachHiddenConfigKeyAliases and applyToolConfig mutate config.agent.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10251"
     },
     {
       "id": "29-setup-phase-timing",
@@ -421,7 +429,8 @@
       "overlapsWith": [
         "28-config-handler-cross-folder-reuse"
       ],
-      "orderNote": "First-message-drop F16 (OMO lane). Must come after 28: the timing record reports the 28 cache-hit flags. The lazy-loading half of F16 is NOT implemented by design: the process cache already removes the repeat cost deterministically, and deferring the plugin-components load would change what the first config hook returns; the proposal lives in the fix report instead. getLastConfigHandlerPhaseTiming() and getPluginComponentsRealLoadCount() are observability seams so the hermetic suite needs no module mocks (mocking the ../shared barrel leaked across test files sharing a worker)."
+      "orderNote": "First-message-drop F16 (OMO lane). Must come after 28: the timing record reports the 28 cache-hit flags. The lazy-loading half of F16 is NOT implemented by design: the process cache already removes the repeat cost deterministically, and deferring the plugin-components load would change what the first config hook returns; the proposal lives in the fix report instead. getLastConfigHandlerPhaseTiming() and getPluginComponentsRealLoadCount() are observability seams so the hermetic suite needs no module mocks (mocking the ../shared barrel leaked across test files sharing a worker).",
+      "upstream": "N/A — local diagnostic/performance instrumentation for workstation cold-setup attribution; no standalone upstream product defect or universal timing policy asserted."
     },
     {
       "id": "30-skill-v2-permission-bridge",
@@ -437,7 +446,9 @@
       "overlapsWith": [
         "23-skill-v2-ctx-ask-guard"
       ],
-      "orderNote": "After 23 (renumbered from 26 to avoid colliding with the lane agent's cold-start fixes 26-29): tools.ts is unchanged - fix 23's typeof-ask guard now finds the bridge-provided ask() on the projected context, so v1 hosts keep their native ask and v2 gets the prompt. Origin resolution adds a netstat fallback for Windows where the lsof-based listenPortOf cannot work, covering OpenChamber's embedded server. pr is null: src/v2 is not in upstream dev; the upstreamable slice (the fix-23 guard itself) is filed as a separate upstream PR."
+      "orderNote": "After 23 (renumbered from 26 to avoid colliding with the lane agent's cold-start fixes 26-29): tools.ts is unchanged - fix 23's typeof-ask guard now finds the bridge-provided ask() on the projected context, so v1 hosts keep their native ask and v2 gets the prompt. Origin resolution adds a netstat fallback for Windows where the lsof-based listenPortOf cannot work, covering OpenChamber's embedded server. pr is null: src/v2 is not in upstream dev; the upstreamable slice (the fix-23 guard itself) is filed as a separate upstream PR.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10068",
+      "upstreamNote": "API-gap issue coverage; the local transport workaround is not a submitted or accepted permission API."
     },
     {
       "id": "31-test-host-agent-id",
@@ -450,7 +461,8 @@
       "overlapsWith": [
         "21-agent-registration-flat"
       ],
-      "orderNote": "Test-only: markers are empty because nothing in it reaches dist/index.js (see fix 09)."
+      "orderNote": "Test-only: markers are empty because nothing in it reaches dist/index.js (see fix 09).",
+      "upstream": "N/A — test bookkeeping for local fix 21, not an independent runtime defect; fix 21 is covered by https://github.com/code-yeongyu/oh-my-openagent/issues/10249."
     },
     {
       "id": "32-test-prefailures-spawn-shim",
@@ -463,7 +475,9 @@
       "overlapsWith": [
         "30-skill-v2-permission-bridge"
       ],
-      "orderNote": "The production change adds no runtime string, so markers are empty; packages/omo-opencode/src/shared/opencode-adapter-bun-runtime-audit.test.ts is its regression test. Must come before 33, which removes the last raw Bun.spawn."
+      "orderNote": "The production change adds no runtime string, so markers are empty; packages/omo-opencode/src/shared/opencode-adapter-bun-runtime-audit.test.ts is its regression test. Must come before 33, which removes the last raw Bun.spawn.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10253",
+      "upstreamNote": "Issue covers the runtime Bun.spawn defect only; remaining test hygiene is not separately posted."
     },
     {
       "id": "33-permission-bridge-verified-outcomes",
@@ -480,7 +494,9 @@
         "30-skill-v2-permission-bridge",
         "23-skill-v2-ctx-ask-guard"
       ],
-      "orderNote": "After 30 and 32. The two fix-30 marker strings are kept verbatim. Cross-review A findings B1, M1, M2, M6."
+      "orderNote": "After 30 and 32. The two fix-30 marker strings are kept verbatim. Cross-review A findings B1, M1, M2, M6.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10068",
+      "upstreamNote": "API-gap issue coverage for hardening local fix 30; not a claim upstream accepted the local fail-open policy."
     },
     {
       "id": "34-process-cache-effective-keys",
@@ -497,7 +513,8 @@
       "overlapsWith": [
         "28-config-handler-cross-folder-reuse"
       ],
-      "orderNote": "After 28 and 29. Removes the in-place-edit limitation documented for 28. Cross-review A findings M3, M4, M7."
+      "orderNote": "After 28 and 29. Removes the in-place-edit limitation documented for 28. Cross-review A findings M3, M4, M7.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10251"
     },
     {
       "id": "35-model-capabilities-catalog-compare",
@@ -525,7 +542,8 @@
       "overlapsWith": [
         "32-test-prefailures-spawn-shim"
       ],
-      "orderNote": "Test-only: markers are empty because nothing in it reaches dist/index.js. Cross-review A finding N1."
+      "orderNote": "Test-only: markers are empty because nothing in it reaches dist/index.js. Cross-review A finding N1.",
+      "upstream": "N/A — local test/audit policy for carried raw prompt accesses; not an independent upstream feature."
     },
     {
       "id": "37-compaction-recovery-control-plane",
@@ -541,7 +559,8 @@
       "overlapsWith": [
         "13-compaction-pin-checkpoint"
       ],
-      "orderNote": "Rebased onto the activated 36-fix lane without dropping entries 30-36. Original side-branch slot 30 was renumbered to 37. Pair with the opencode-claude-v2 parked-history-boundary-changed fix (original 27fcc05): it stops reuse of the old parked Claude turn after another provider summarized. Tests: compaction-context-injector/loop-regression.test.ts and v2/session-actions.recovery.test.ts. Existing preemptive-compaction timeout/cache-clear and runtime-fallback protections remain carried. Stage only while OpenChamber runs; import source and activate during the closed window."
+      "orderNote": "Rebased onto the activated 36-fix lane without dropping entries 30-36. Original side-branch slot 30 was renumbered to 37. Pair with the opencode-claude-v2 parked-history-boundary-changed fix (original 27fcc05): it stops reuse of the old parked Claude turn after another provider summarized. Tests: compaction-context-injector/loop-regression.test.ts and v2/session-actions.recovery.test.ts. Existing preemptive-compaction timeout/cache-clear and runtime-fallback protections remain carried. Stage only while OpenChamber runs; import source and activate during the closed window.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10252"
     },
     {
       "id": "38-v2-native-parent-linkage",
@@ -559,7 +578,8 @@
         "19-compaction-aware-timeout-lane-guards",
         "31-test-host-agent-id"
       ],
-      "orderNote": "Touches createSession in src/v2/session-actions.ts (fix 37 edits sendPrompt in the same file) and the v2 host.test.ts owner test (fixes 19 and 31). Apply after 37. Tests: v2/host.test.ts. src/v2 comes from upstream PR #9016, not dev; the same change rebased on the #9016 head is https://github.com/mradwankhalil/oh-my-openagent/tree/fix/v2-native-parent-linkage-on-9016 for when #9016 lands."
+      "orderNote": "Touches createSession in src/v2/session-actions.ts (fix 37 edits sendPrompt in the same file) and the v2 host.test.ts owner test (fixes 19 and 31). Apply after 37. Tests: v2/host.test.ts. src/v2 comes from upstream PR #9016, not dev; the same change rebased on the #9016 head is https://github.com/mradwankhalil/oh-my-openagent/tree/fix/v2-native-parent-linkage-on-9016 for when #9016 lands.",
+      "upstreamPR": "https://github.com/SwarmStorm/oh-my-openagent/pull/2"
     },
     {
       "id": "39-v2-agent-native-id",
@@ -577,7 +597,8 @@
         "19-compaction-aware-timeout-lane-guards",
         "31-test-host-agent-id"
       ],
-      "orderNote": "One line in src/v2/catalog.ts agentsFrom plus the v2 host.test.ts owner test. Apply after 38 (same test file). Tests: v2/host.test.ts. Rebased on the #9016 head at https://github.com/mradwankhalil/oh-my-openagent/tree/fix/v2-native-parent-linkage-on-9016."
+      "orderNote": "One line in src/v2/catalog.ts agentsFrom plus the v2 host.test.ts owner test. Apply after 38 (same test file). Tests: v2/host.test.ts. Rebased on the #9016 head at https://github.com/mradwankhalil/oh-my-openagent/tree/fix/v2-native-parent-linkage-on-9016.",
+      "upstreamPR": "https://github.com/SwarmStorm/oh-my-openagent/pull/2"
     },
     {
       "id": "40-v2-hook-writeback-identity",
@@ -636,7 +657,8 @@
       "overlapsWith": [
         "42-v2-shared-mcp-registry"
       ],
-      "orderNote": "Depends on native pre-plugin config ordering (core plugin/internal.ts + supervisor.ts). New regressions RED 0/5 then GREEN; expanded adapter suite 29 passes/104 assertions. Stage in final owner batch with fix41/fix42, F21, context-mode hooks and #55756 amendment. No upstream post/PR without owner go. Rename-back is post-restart final batch step, gated by live precedence + visibility verification and exactly-one original-name gateway-route proof."
+      "orderNote": "Depends on native pre-plugin config ordering (core plugin/internal.ts + supervisor.ts). New regressions RED 0/5 then GREEN; expanded adapter suite 29 passes/104 assertions. Stage in final owner batch with fix41/fix42, F21, context-mode hooks and #55756 amendment. No upstream post/PR without owner go. Rename-back is post-restart final batch step, gated by live precedence + visibility verification and exactly-one original-name gateway-route proof.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10245"
     },
     {
       "id": "44-v2-scoped-delegation-routing",
