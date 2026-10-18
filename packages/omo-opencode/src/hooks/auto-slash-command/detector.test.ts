@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import {
+  detectAllSlashCommands,
   detectSlashCommand,
   extractPromptText,
+  findMatchingSlashCommandPartIndex,
   findSlashCommandPartIndex,
   isExcludedCommand,
+  parseAllSlashCommands,
   parseSlashCommand,
   removeCodeBlocks,
 } from "./detector"
@@ -426,6 +429,67 @@ After`
 
       // then
       expect(result).toBe(-1)
+    })
+  })
+
+  describe("parseAllSlashCommands", () => {
+    it("should find multiple slash command candidates on the same line", () => {
+      // given text with multiple slashes
+      const text = "check /var/log then /my-skill now"
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then should find both candidates with accurate spans and args
+      expect(results).toHaveLength(2)
+      expect(results[0].command).toBe("var/log")
+      expect(results[0].args).toBe("then /my-skill now")
+      expect(results[1].command).toBe("my-skill")
+      expect(results[1].args).toBe("now")
+      expect(results[1].start).toBe(20)
+    })
+
+    it("should ignore candidates inside code blocks", () => {
+      // given text with slash inside code block and another outside
+      const text = "run `/ignore/me` and then /real-cmd arg"
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then only real candidate is returned
+      expect(results).toHaveLength(1)
+      expect(results[0].command).toBe("real-cmd")
+      expect(results[0].args).toBe("arg")
+    })
+  })
+
+  describe("findMatchingSlashCommandPartIndex", () => {
+    it("finds the part matching the specific command when an earlier part has an unrelated path", () => {
+      // given parts where first part has /var/log and second part has /my-skill
+      const parts = [
+        { type: "text", text: "see /var/log" },
+        { type: "text", text: "/my-skill go" },
+      ]
+
+      // when finding matching part for my-skill
+      const idx = findMatchingSlashCommandPartIndex(parts, "my-skill")
+
+      // then index 1 is returned
+      expect(idx).toBe(1)
+    })
+
+    it("returns minus one when no part contains the requested command", () => {
+      // given parts
+      const parts = [
+        { type: "text", text: "see /var/log" },
+        { type: "text", text: "/my-skill go" },
+      ]
+
+      // when looking for absent command
+      const idx = findMatchingSlashCommandPartIndex(parts, "nonexistent")
+
+      // then -1 is returned
+      expect(idx).toBe(-1)
     })
   })
 })

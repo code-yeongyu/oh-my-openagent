@@ -1,7 +1,9 @@
 import { isRecord } from "@oh-my-opencode/utils"
 import {
+  detectAllSlashCommands,
   detectSlashCommand,
   extractPromptText,
+  findMatchingSlashCommandPartIndex,
   findSlashCommandPartIndex,
   parseSlashCommand,
 } from "./detector"
@@ -112,24 +114,11 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
-      const parsed = detectSlashCommand(promptText)
+      const candidates = detectAllSlashCommands(promptText)
 
-      if (!parsed) {
+      if (candidates.length === 0) {
         return
       }
-
-      const commandKey = input.messageID
-        ? `${input.sessionID}:${input.messageID}:${parsed.command}`
-        : `${input.sessionID}:${parsed.command}`
-      if (sessionProcessedCommands.has(commandKey)) {
-        return
-      }
-      sessionProcessedCommands.add(commandKey)
-
-      log(`[auto-slash-command] Detected: /${parsed.command}`, {
-        sessionID: input.sessionID,
-        args: parsed.args,
-      })
 
       const executionOptions: ExecutorOptions = {
         ...executorOptions,
@@ -137,31 +126,49 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         sessionID: input.sessionID,
       }
 
-      const result = await executeSlashCommand(parsed, executionOptions)
+      for (const parsed of candidates) {
+        const commandKey = input.messageID
+          ? `${input.sessionID}:${input.messageID}:${parsed.command}`
+          : `${input.sessionID}:${parsed.command}`
+        if (sessionProcessedCommands.has(commandKey)) {
+          continue
+        }
 
-      const idx = findSlashCommandPartIndex(output.parts)
-      if (idx < 0) {
-        return
-      }
+        const result = await executeSlashCommand(parsed, executionOptions)
 
-      if (!result.success || !result.replacementText) {
-        log(`[auto-slash-command] Command not found, skipping`, {
+        if (!result.success || !result.replacementText) {
+          log(`[auto-slash-command] Command not found, skipping candidate`, {
+            sessionID: input.sessionID,
+            command: parsed.command,
+            error: result.error,
+          })
+          continue
+        }
+
+        sessionProcessedCommands.add(commandKey)
+
+        log(`[auto-slash-command] Detected: /${parsed.command}`, {
+          sessionID: input.sessionID,
+          args: parsed.args,
+        })
+
+        const idx = findMatchingSlashCommandPartIndex(output.parts, parsed.command)
+        const targetIdx = idx >= 0 ? idx : findSlashCommandPartIndex(output.parts)
+        if (targetIdx < 0) {
+          return
+        }
+
+        const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
+        if (!replaceSlashCommandSpan(output.parts[targetIdx], taggedContent, parsed.command)) {
+          output.parts[targetIdx].text = taggedContent
+        }
+
+        log(`[auto-slash-command] Replaced message with command template`, {
           sessionID: input.sessionID,
           command: parsed.command,
-          error: result.error,
         })
         return
       }
-
-      const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
-      if (!replaceSlashCommandSpan(output.parts[idx], taggedContent)) {
-        output.parts[idx].text = taggedContent
-      }
-
-      log(`[auto-slash-command] Replaced message with command template`, {
-        sessionID: input.sessionID,
-        command: parsed.command,
-      })
     },
 
     "command.execute.before": async (
@@ -216,25 +223,25 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
 
-      const idx = findSlashCommandPartIndex(output.parts)
-      if (idx >= 0) {
-        const partParsed = parseSlashCommand(output.parts[idx].text ?? "")
-        if (partParsed && partParsed.command.toLowerCase() === input.command.toLowerCase()) {
-          if (!replaceSlashCommandSpan(output.parts[idx], taggedContent)) {
-            output.parts[idx].text = taggedContent
-          }
-        } else {
-          const startIdx = output.parts.findIndex(
-            (part) => isRealUserTextPart(part) && (part.text ?? "").trim().startsWith("/")
-          )
-          if (startIdx >= 0) {
+      const matchingIdx = findMatchingSlashCommandPartIndex(output.parts, input.command)
+      if (matchingIdx >= 0) {
+        if (!replaceSlashCommandSpan(output.parts[matchingIdx], taggedContent, input.command)) {
+          output.parts[matchingIdx].text = taggedContent
+        }
+      } else {
+        const startIdx = output.parts.findIndex(
+          (part) => isRealUserTextPart(part) && (part.text ?? "").trim().startsWith("/")
+        )
+        if (startIdx >= 0) {
+          const partParsed = parseSlashCommand(output.parts[startIdx].text ?? "", input.command)
+          if (partParsed && partParsed.command.toLowerCase() === input.command.toLowerCase()) {
             output.parts[startIdx].text = taggedContent
           } else {
             output.parts.unshift({ type: "text", text: taggedContent })
           }
+        } else {
+          output.parts.unshift({ type: "text", text: taggedContent })
         }
-      } else {
-        output.parts.unshift({ type: "text", text: taggedContent })
       }
 
       log(`[auto-slash-command] command.execute.before - injected template`, {

@@ -41,51 +41,55 @@ function isIgnored(index: number, ranges: Array<{ start: number; end: number }>)
   return ranges.some((r) => index >= r.start && index < r.end)
 }
 
-export function parseSlashCommand(text: string): ParsedSlashCommand | null {
+export function parseAllSlashCommands(text: string): ParsedSlashCommand[] {
   const ignored = getIgnoredRanges(text)
-  const pattern = new RegExp(SLASH_COMMAND_PATTERN_ANYWHERE.source, "g")
+  const pattern = /(?:^|(?<=\s))\/([a-zA-Z@][\w.:@/-]*)/g
+  const results: ParsedSlashCommand[] = []
   let match: RegExpExecArray | null
   while ((match = pattern.exec(text)) !== null) {
-    if (match[0].length === 0) {
-      pattern.lastIndex += 1
-      continue
-    }
-    const [fullMatch, boundary, command, args] = match
-    if (!command) {
-      continue
-    }
-    const start = (match.index ?? 0) + boundary.length
+    const start = match.index
     if (isIgnored(start, ignored)) {
       continue
     }
-    const raw = fullMatch.slice(boundary.length)
-    return {
+    const command = match[1]
+    const afterCmd = start + 1 + command.length
+    const lineBreakMatch = text.slice(afterCmd).search(/[\r\n]/)
+    const lineEnd = lineBreakMatch === -1 ? text.length : afterCmd + lineBreakMatch
+    const lineRest = text.slice(afterCmd, lineEnd)
+    const matchArgs = lineRest.match(/^[^\S\r\n]*(.*)/)
+    const args = (matchArgs ? matchArgs[1] : "").trim()
+    const raw = text.slice(start, lineEnd)
+    results.push({
       command: command.toLowerCase(),
-      args: (args ?? "").trim(),
+      args,
       raw,
       start,
-      end: start + raw.length,
-    }
+      end: lineEnd,
+    })
   }
-  return null
+  return results
+}
+
+export function parseSlashCommand(text: string, commandName?: string): ParsedSlashCommand | null {
+  const all = parseAllSlashCommands(text)
+  if (commandName !== undefined) {
+    const target = commandName.toLowerCase()
+    return all.find((c) => c.command === target) ?? null
+  }
+  return all.length > 0 ? all[0] : null
 }
 
 export function isExcludedCommand(command: string): boolean {
   return EXCLUDED_COMMANDS.has(command.toLowerCase())
 }
 
+export function detectAllSlashCommands(text: string): ParsedSlashCommand[] {
+  return parseAllSlashCommands(text).filter((parsed) => !isExcludedCommand(parsed.command))
+}
+
 export function detectSlashCommand(text: string): ParsedSlashCommand | null {
-  const parsed = parseSlashCommand(text)
-
-  if (!parsed) {
-    return null
-  }
-
-  if (isExcludedCommand(parsed.command)) {
-    return null
-  }
-
-  return parsed
+  const all = detectAllSlashCommands(text)
+  return all.length > 0 ? all[0] : null
 }
 
 export function extractPromptText(
@@ -98,6 +102,22 @@ export function extractPromptText(
   }
 
   return textParts.map((p) => p.text || "").join(" ")
+}
+
+export function findMatchingSlashCommandPartIndex(
+  parts: Array<{ type: string; text?: string; synthetic?: boolean }>,
+  commandName: string
+): number {
+  const target = commandName.toLowerCase()
+  for (let idx = 0; idx < parts.length; idx += 1) {
+    const part = parts[idx]
+    if (!isRealUserTextPart(part)) continue
+    const candidates = parseAllSlashCommands(part.text ?? "")
+    if (candidates.some((c) => c.command === target)) {
+      return idx
+    }
+  }
+  return -1
 }
 
 export function findSlashCommandPartIndex(

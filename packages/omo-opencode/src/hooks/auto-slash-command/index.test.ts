@@ -597,5 +597,95 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("MY SKILL TEMPLATE CONTENT")
     })
 
+    it("review 2 item 1: two-part path-first multi-part message replaces only matching command part in chat.message", async () => {
+      // given multi-part message where part 0 has an unrelated path and part 1 has the skill command
+      const skill = createTestSkill("my-skill", "MY SKILL TEMPLATE CONTENT")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const sessionID = `test-session-multipart-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output: AutoSlashCommandHookOutput = {
+        message: {},
+        parts: [
+          { type: "text", text: "see /var/log" },
+          { type: "text", text: "/my-skill go" },
+        ],
+      }
+
+      // when hook processes the message
+      await hook["chat.message"](input, output)
+
+      // then part 0 is untouched and part 1 is expanded
+      expect(output.parts[0].text).toBe("see /var/log")
+      expect(output.parts[1].text).toContain("<auto-slash-command>")
+      expect(output.parts[1].text).toContain("MY SKILL TEMPLATE CONTENT")
+      expect(output.parts[1].text).toContain("User Arguments")
+      expect(output.parts[1].text).toContain("go")
+    })
+
+    it("review 2 item 1: two-part path-first multi-part message replaces only matching command part in command.execute.before", async () => {
+      // given multi-part message in command.execute.before
+      const skill = createTestSkill("my-skill", "MY SKILL TEMPLATE CONTENT")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const input: CommandExecuteBeforeInput = {
+        command: "my-skill",
+        sessionID: `test-session-cmd-multipart-${Date.now()}-${Math.random()}`,
+        arguments: "go",
+      }
+      const output: CommandExecuteBeforeOutput = {
+        parts: [
+          { type: "text", text: "see /var/log" },
+          { type: "text", text: "/my-skill go" },
+        ],
+      }
+
+      // when hook processes the command
+      await hook["command.execute.before"](input, output)
+
+      // then part 0 is untouched and part 1 is expanded
+      expect(output.parts[0].text).toBe("see /var/log")
+      expect(output.parts[1].text).toContain("<auto-slash-command>")
+      expect(output.parts[1].text).toContain("MY SKILL TEMPLATE CONTENT")
+    })
+
+    it("review 2 item 2: path earlier on same line resolves the valid skill candidate in chat.message", async () => {
+      // given message with unrelated path earlier on the same line
+      const skill = createTestSkill("my-skill", "MY SKILL TEMPLATE CONTENT")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const sessionID = `test-session-sameline-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("check /var/log then /my-skill now")
+
+      // when hook processes the message
+      await hook["chat.message"](input, output)
+
+      // then path prose is preserved and only the skill command is expanded
+      const text = output.parts[0].text ?? ""
+      expect(text).toContain("check /var/log then ")
+      expect(text).toContain("<auto-slash-command>")
+      expect(text).toContain("MY SKILL TEMPLATE CONTENT")
+      expect(text).toContain("User Arguments")
+      expect(text).toContain("now")
+      expect(text).not.toContain("/my-skill now")
+    })
+
+    it("review 2 item 3: command last on line does not swallow next line in chat.message", async () => {
+      // given command followed by a newline and next line of prose
+      const skill = createTestSkill("my-skill", "MY SKILL TEMPLATE CONTENT")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const sessionID = `test-session-newline-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("please use /my-skill\nthen summarize the result")
+
+      // when hook processes the message
+      await hook["chat.message"](input, output)
+
+      // then command expands and the next line is preserved
+      const text = output.parts[0].text ?? ""
+      expect(text).toContain("please use ")
+      expect(text).toContain("<auto-slash-command>")
+      expect(text).toContain("MY SKILL TEMPLATE CONTENT")
+      expect(text).toContain("then summarize the result")
+      expect(text).not.toContain("please use /my-skill")
+    })
   })
 })
