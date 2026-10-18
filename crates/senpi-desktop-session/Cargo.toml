@@ -32,5 +32,6 @@ senpi-desktop-backend-x11 = { path = "../senpi-desktop-backend-x11" }
 senpi-desktop-backend-win32 = { path = "../senpi-desktop-backend-win32" }
 
 [dev-dependencies]
+senpi-desktop-safety = { path = "../senpi-desktop-safety", features = ["test-support"] }
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "time"] }

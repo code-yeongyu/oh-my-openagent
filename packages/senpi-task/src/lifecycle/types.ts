@@ -18,6 +18,7 @@ export type ReconcileDeferredReason =
   | "tools_unavailable"
   | "session_unavailable"
   | "spawn_spec_unavailable"
+  | "transcript_unavailable"
   | "team_inactive"
   | "reattach_disabled"
   | "rollback_failed"
@@ -40,6 +41,7 @@ export type ReconcileOutcome = {
   readonly task_id: string
   readonly kind: ReconcileOutcomeKind
   readonly reason?: string
+  readonly permanent?: boolean
 }
 
 export type ReconcileResult = {
@@ -73,6 +75,8 @@ export type TaskLifecycle = {
   destroyResidentTask(taskId: string, cause: DestroyCause): Promise<void>
   rollbackDetachedRevival(prior: TaskRecord): DetachedRevivalRollbackResult
   reclaimIdleResidents?(): Promise<readonly string[]>
+  // Release a finished child still resident here (task_cancel on a terminal task, omo#9785); false when there is none.
+  parkTerminalResident(taskId: string): Promise<boolean>
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.
   dispose?(): void
   admitResident(parentSessionId: string): Promise<AdmissionResult>

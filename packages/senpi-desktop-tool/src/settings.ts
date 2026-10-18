@@ -9,7 +9,8 @@ import { defaultStopHotkey, isSupportedHost } from "./host-policy";
 export const ComputerSettingsSchema = Type.Object(
 	{
 		enabled: Type.Optional(Type.Boolean({ description: "Register the computer tool (experimental; default: host supported)" })),
-		display: Type.Optional(Type.String({ description: "`all` composites every display; otherwise a display id" })),
+		showCursor: Type.Optional(Type.Boolean({ default: true, description: "Show the display-only virtual cursor on macOS" })),
+		display: Type.Optional(Type.String({ description: "`active` (default) follows the focused monitor; `all` composites every display; otherwise a display id" })),
 		maxWidth: Type.Optional(Type.Integer({ minimum: 1, default: 3840 })),
 		maxHeight: Type.Optional(Type.Integer({ minimum: 1, default: 2400 })),
 		screenshotMaxBytes: Type.Optional(Type.Integer({ minimum: 1, default: 5_000_000 })),
@@ -42,6 +43,7 @@ export type ComputerSettingsInput = Static<typeof ComputerSettingsSchema>;
 /** Fully resolved `computer.*` settings. */
 export interface ComputerSettings {
 	readonly enabled: boolean;
+	readonly showCursor: boolean;
 	readonly display: string;
 	readonly maxWidth: number;
 	readonly maxHeight: number;
@@ -77,7 +79,8 @@ export function resolveComputerSettings(raw: unknown, platform: string = process
 	}
 	return {
 		enabled: value.enabled ?? isSupportedHost(platform),
-		display: value.display ?? "all",
+		showCursor: value.showCursor ?? true,
+		display: value.display ?? "active",
 		maxWidth: value.maxWidth ?? 3840,
 		maxHeight: value.maxHeight ?? 2400,
 		screenshotMaxBytes: value.screenshotMaxBytes ?? 5_000_000,

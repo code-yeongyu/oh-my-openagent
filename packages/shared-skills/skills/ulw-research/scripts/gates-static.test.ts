@@ -42,14 +42,14 @@ describe("checkStatic fixtures", () => {
 		expect([...result.gatesRun].sort()).toEqual([...STATIC_CODES].sort())
 	})
 
-	test("#given the failing fixture report #when every gate runs #then each static code is raised exactly once", () => {
+	test("#given the failing fixture report #when every gate runs #then each static code except the no-visual one is raised exactly once", () => {
 		// given
 		const options = { requireSections: [/risks/i] }
 		// when
 		const result = run(BAD, options)
 		// then
-		expect([...codes(result)].sort()).toEqual([...STATIC_CODES].sort())
-		expect(STATIC_CODES).toHaveLength(17)
+		expect([...codes(result)].sort()).toEqual(STATIC_CODES.filter((code) => code !== "report_without_visual").sort())
+		expect(STATIC_CODES).toHaveLength(19)
 		expect(codes(result)).not.toContain("missing_promised_deliverable")
 	})
 
@@ -225,6 +225,72 @@ describe("figures and charts", () => {
 		const found = codes(run(`<figure>${svg}<figcaption>Deploys per week</figcaption></figure>`)).filter((code) => code.startsWith("chart_"))
 		// then
 		expect(found).toEqual([])
+	})
+})
+
+describe("report-level visuals", () => {
+	const figures = /<figure\b[\s\S]*?<\/figure>/g
+
+	test("#given the passing fixture with every figure removed #when checked #then only report_without_visual is raised", () => {
+		// given
+		const html = GOOD.replace(figures, "")
+		// when
+		const result = run(html, { requireSections: [/sources/i, /review/i] })
+		// then
+		expect(codes(result)).toEqual(["report_without_visual"])
+		expect(result.defects[0]?.severity).toBe("major")
+	})
+
+	test("#given a header logo, an unrendered Mermaid source block, a zero-size svg, then a rendered diagram #when checked #then only the rendered diagram counts as a visual", () => {
+		// given
+		const logo = '<header><img src="data:image/png;base64,iVBORw0KGgo=" alt="logo" width="120" height="40"></header><p>x</p>'
+		const unrendered = `${logo}<pre class="mermaid">flowchart LR\n  A --> B</pre><figure><svg width="0" height="0"><text>A</text></svg><figcaption>c</figcaption></figure>`
+		const rendered = `${logo}<figure><svg width="600" height="300" aria-roledescription="flowchart-v2"><text>A</text><text>B</text></svg><figcaption>c</figcaption></figure>`
+		// when / then
+		expect(has(unrendered, "report_without_visual")).toBe(true)
+		expect(has(rendered, "report_without_visual")).toBe(false)
+	})
+
+	test("#given rendered Mermaid diagrams with SVG text labels and with HTML-only labels #when checked #then only the HTML-only one is flagged and neither needs chart ticks", () => {
+		// given
+		const diagram = (labels: string) => `<figure><svg width="600" height="300" aria-roledescription="flowchart-v2">${labels}</svg><figcaption>Gate order</figcaption></figure>`
+		const textLabels = diagram("<text>static check</text><text>repair decide</text>")
+		const htmlLabels = diagram("<foreignObject><div>static check</div></foreignObject>")
+		// when
+		const chartCodes = (html: string) => codes(run(html)).filter((code) => code.startsWith("chart_"))
+		// then
+		expect(chartCodes(textLabels)).toEqual([])
+		expect(chartCodes(htmlLabels)).toEqual(["chart_svg_no_text"])
+	})
+
+	test("#given a single visual with one zero dimension #when checked #then report_without_visual is raised; viewBox-only and unsized visuals still count", () => {
+		// given
+		const only = (el: string) => `<figure>${el}<figcaption>c</figcaption></figure>`
+		const flat = only('<img src="data:image/png;base64,iVBORw0KGgo=" alt="chart" width="600" height="0">')
+		const narrow = only('<svg width="0" height="300"><text>A</text></svg>')
+		const styled = only('<img src="data:image/png;base64,iVBORw0KGgo=" alt="chart" width="600" height="300" style="height: 0">')
+		const viewBoxOnly = only('<svg viewBox="0 0 600 300" aria-roledescription="flowchart-v2"><text>A</text></svg>')
+		const unsized = only('<img src="data:image/png;base64,iVBORw0KGgo=" alt="Deploys per week">')
+		// when / then
+		for (const html of [flat, narrow, styled]) expect(has(html, "report_without_visual")).toBe(true)
+		for (const html of [viewBoxOnly, unsized]) expect(has(html, "report_without_visual")).toBe(false)
+	})
+
+	test("#given figure images with no alt, a bare empty alt, role- and aria-marked decorative alts and a descriptive alt #when checked #then only the unmarked two raise image_missing_alt", () => {
+		// given
+		const img = (alt: string) => `<figure><img src="data:image/png;base64,iVBORw0KGgo=" ${alt} width="480" height="240"><figcaption>c</figcaption></figure>`
+		const html = ["", 'alt=""', 'alt="" role="presentation"', 'alt="" aria-hidden="true"', 'alt="Deploys per week, 2025"'].map(img).join("")
+		// when
+		const found = run(html).defects.filter((d) => d.code === "image_missing_alt")
+		// then
+		expect(found).toHaveLength(2)
+	})
+
+	test("#given a report whose only image is marked decorative #when checked #then report_without_visual is raised", () => {
+		// given
+		const html = '<figure><img src="data:image/png;base64,iVBORw0KGgo=" alt="" role="presentation" width="480" height="240"><figcaption>c</figcaption></figure>'
+		// when / then
+		expect(has(html, "report_without_visual")).toBe(true)
 	})
 })
 

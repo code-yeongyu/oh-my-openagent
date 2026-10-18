@@ -9,7 +9,9 @@ import {
   createTeamMemberRespawnLaunchResolver,
   createTaskRecordStore,
   readSessionAncestry,
+  readSettingsDefaultRoute,
   resolveMemberExtensionEntryPath,
+  TASK_CHILD_EXTENSION_EVENT,
   type AgentDefinition,
   type ChildPlanner,
   type CompletionNotifier,
@@ -26,6 +28,7 @@ import {
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { EngineHostRuntime } from "./host-execution-mode"
 import {
   createCategoryConfigGenerations,
@@ -49,7 +52,6 @@ import type { TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "./terminal-observers"
-import { TASK_CHILD_EXTENSION_EVENT } from "../computer-use/permission-events"
 import { admitAdapter } from "./engine-admission"
 
 export { admitAdapter } from "./engine-admission"
@@ -152,6 +154,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     deps.coordinator,
     () => runtime.parentState().kind === "streaming",
     (taskIds, error) => notifier.recordDeliveryFailure({ taskIds, error }),
+    () => runtime.parentModel(),
   )
   const notifier = createCompletionNotifier({
     notifier: parentNotifier,
@@ -194,7 +197,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     generations: categoryConfigGenerations,
   })
 
-  const registry = createManagerResidencyRegistry(getManager)
+  const registry = createManagerResidencyRegistry(getManager, () => runtime.sessionId())
   // The engine owns ONE isolation runtime: the manager clones the checkout for an isolated child
   // with it, and the lifecycle salvages and sweeps a crashed host's clones through the same object.
   // Without it every `isolated: true` spawn is refused as `isolation_unavailable`.
@@ -208,13 +211,18 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     ...(deps.host === undefined ? {} : { host: deps.host }),
     baseStore,
     generations: categoryConfigGenerations,
-    lifecycle: { store: storeChain.store, registry, kernelToolBindings, isolation },
+    lifecycle: { store: storeChain.store, registry, kernelToolBindings, isolation, onStoreMutation: storeChain.onMutation },
   })
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const resolveRegistry: ResolveModelRegistry = () => runtime.modelRegistry()
+  // The default route a pin-less child would ride, named in model_unavailable refusals (#9722) so
+  // the caller sees the substitution the failure prevented. Read lazily per plan: a mid-session
+  // default change reaches the next spawn's message.
+  const resolveDefaultRoute = () =>
+    readSettingsDefaultRoute({ cwd: runtime.cwd(), agentDir: host.agentDir ?? resolveAgentHome({ env: deps.env ?? process.env }) })
   const basePlanner = createGenerationObservingPlanner({
-    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier()),
+    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier(), resolveDefaultRoute),
     omoConfig: deps.omoConfig,
     resolveRegistry,
     generations: categoryConfigGenerations,
@@ -245,6 +253,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     destruction: {
       destroyResidentTask: (taskId, cause) =>
         lifecycle.destroyResidentTask(taskId, cause),
+      parkTerminalResident: (taskId) => lifecycle.parkTerminalResident(taskId),
     },
     admit: (parentSessionId) => admitAdapter(lifecycle, parentSessionId),
     trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({

@@ -3,15 +3,16 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { MASS_ULW_CUSTOM_TYPE, ULTIMATE_BROWSING_CUSTOM_TYPE, ULW_LOOP_CUSTOM_TYPE, ULW_RESEARCH_CUSTOM_TYPE } from "./index"
+import { BROWSER_CUSTOM_TYPE, MASS_ULW_CUSTOM_TYPE, ULTIMATE_BROWSING_CUSTOM_TYPE, ULW_LOOP_CUSTOM_TYPE, ULW_RESEARCH_CUSTOM_TYPE } from "./index"
 import { dispatchInput, expectNoInjection, expectPointerInjections, injectedContent, registerSkillPointers } from "./test-support"
 
 const RESEARCH = { customType: ULW_RESEARCH_CUSTOM_TYPE, skillName: "ulw-research" } as const
+const BROWSER = { customType: BROWSER_CUSTOM_TYPE, skillName: "browser" } as const
 const COMPANION = { customType: ULTIMATE_BROWSING_CUSTOM_TYPE, skillName: "ultimate-browsing" } as const
 
 describe("omo-senpi skill-pointers companion", () => {
   describe("#given a ulw-research invocation", () => {
-    it("#when research is mentioned #then the ultimate-browsing companion rides behind the research pointer", async () => {
+    it("#when research is mentioned #then the browser and ultimate-browsing companions ride behind the research pointer", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -20,7 +21,8 @@ describe("omo-senpi skill-pointers companion", () => {
       const result = await dispatchInput(pi, "ulw research the gateway options")
 
       // then
-      expectPointerInjections(pi, result, [RESEARCH, COMPANION])
+      expectPointerInjections(pi, result, [RESEARCH, BROWSER, COMPANION])
+      expect(injectedContent(pi, BROWSER_CUSTOM_TYPE)).toContain("ulw-research")
       const companion = injectedContent(pi, ULTIMATE_BROWSING_CUSTOM_TYPE)
       expect(companion).toContain("ulw-research")
       expect(companion).toContain('load_skills: ["ultimate-browsing"]')
@@ -35,7 +37,7 @@ describe("omo-senpi skill-pointers companion", () => {
       const result = await dispatchInput(pi, "/skill:ulw-research the gateway options")
 
       // then
-      expectPointerInjections(pi, result, [COMPANION])
+      expectPointerInjections(pi, result, [BROWSER, COMPANION])
     })
 
     it("#when the prompt carries an expanded ulw-research block #then only the companion is injected", async () => {
@@ -50,7 +52,7 @@ describe("omo-senpi skill-pointers companion", () => {
       )
 
       // then
-      expectPointerInjections(pi, result, [COMPANION])
+      expectPointerInjections(pi, result, [BROWSER, COMPANION])
     })
 
     it("#when mass ulw research is mentioned #then the companion is injected once, after every keyword pointer", async () => {
@@ -65,6 +67,7 @@ describe("omo-senpi skill-pointers companion", () => {
       expectPointerInjections(pi, result, [
         { customType: MASS_ULW_CUSTOM_TYPE, skillName: "mass-ulw" },
         RESEARCH,
+        BROWSER,
         COMPANION,
       ])
     })
@@ -83,13 +86,27 @@ describe("omo-senpi skill-pointers companion", () => {
         throw new Error("expected the queued prompt to be transformed")
       }
       expect(result.text.startsWith("ulw research the gateway options\n")).toBe(true)
-      expect(result.text.indexOf("<omo-ulw-research-pointer>")).toBeLessThan(result.text.indexOf("<omo-ultimate-browsing-pointer>"))
+      expect(result.text.indexOf("<omo-ulw-research-pointer>")).toBeLessThan(result.text.indexOf("<omo-browser-pointer>"))
+      expect(result.text.indexOf("<omo-browser-pointer>")).toBeLessThan(result.text.indexOf("<omo-ultimate-browsing-pointer>"))
+      expect(result.text).toContain("browser/SKILL.md")
       expect(result.text).toContain("ultimate-browsing/SKILL.md")
     })
   })
 
-  describe("#given the companion is already loaded", () => {
-    it("#when the prompt carries an expanded ultimate-browsing block #then the companion is not re-injected", async () => {
+  describe("#given a companion is already loaded", () => {
+    it("#when the prompt carries an expanded browser block #then only ultimate-browsing rides behind the research pointer", async () => {
+      // given
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+
+      // when
+      const result = await dispatchInput(pi, '<skill name="browser" path="skills/browser/SKILL.md">engines</skill> ulw research the gateway options')
+
+      // then
+      expectPointerInjections(pi, result, [RESEARCH, COMPANION])
+    })
+
+    it("#when the prompt carries an expanded ultimate-browsing block #then that companion is not re-injected", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -101,30 +118,30 @@ describe("omo-senpi skill-pointers companion", () => {
       )
 
       // then
-      expectPointerInjections(pi, result, [RESEARCH])
+      expectPointerInjections(pi, result, [RESEARCH, BROWSER])
     })
 
-    it("#when the prompt is a raw /skill:ultimate-browsing command mentioning ulw research #then the companion is not injected", async () => {
+    it("#when the prompt is a raw /skill:browser command mentioning ulw research #then the browser companion is not injected", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
 
       // when
-      const result = await dispatchInput(pi, "/skill:ultimate-browsing then ulw research the fallout")
+      const result = await dispatchInput(pi, "/skill:browser then ulw research the fallout")
 
       // then
-      expectPointerInjections(pi, result, [RESEARCH])
+      expectPointerInjections(pi, result, [RESEARCH, COMPANION])
     })
   })
 
   describe("#given no ulw-research invocation", () => {
-    it("#when ultimate-browsing is mentioned on its own #then nothing is injected", async () => {
+    it("#when a companion skill is mentioned on its own #then nothing is injected", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
 
       // when
-      const result = await dispatchInput(pi, "use ultimate-browsing to screenshot the page")
+      const result = await dispatchInput(pi, "use the browser skill, then ultimate-browsing, to screenshot the page")
 
       // then
       expectNoInjection(pi, result)

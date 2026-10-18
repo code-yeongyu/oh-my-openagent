@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "@oh-my-opencode/memory-core/fs"
+import { existsSync, lstatSync, mkdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
 import { dirname, join } from "node:path"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
@@ -136,18 +136,25 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     return identityTransform(`${input.surface} sandbox unavailable: inner command "${input.command}" is not absolute and could not be resolved; running unsandboxed`)
   }
 
-  const buildTransform = (spawnArgs: T): T => ({
-    ...spawnArgs,
-    command: executable,
-    args: [
-      "--ro-bind", "/", "/",
-      "--dev-bind", "/dev", "/dev",
-      "--tmpfs", "/tmp",
-      ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
-      "--chdir", spawnArgs.cwd,
-      "--", innerCommand, ...spawnArgs.args,
-    ],
-  })
+  const buildTransform = (spawnArgs: T): T => {
+    // bwrap --bind source target dies child_exit when source does not exist. Reflection runtime
+    // dirs are granted before anything creates them; mkdir the declared path (0700) so the bind
+    // names that exact directory instead of dying or widening to an existing ancestor. Only here,
+    // when bwrap will actually bind it: an off or unavailable sandbox must not create the path.
+    for (const writableDir of writableDirs) createPlannedDirNoFollow(writableDir, input.surface)
+    return {
+      ...spawnArgs,
+      command: executable,
+      args: [
+        "--ro-bind", "/", "/",
+        "--dev-bind", "/dev", "/dev",
+        "--tmpfs", "/tmp",
+        ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
+        "--chdir", spawnArgs.cwd,
+        "--", innerCommand, ...spawnArgs.args,
+      ],
+    }
+  }
 
   const linuxTransform = (spawnArgs: T): T | Promise<T> => {
     // If probe error was detected at build time, throw it now
@@ -303,4 +310,47 @@ function guardedSandboxedTransform<T extends SandboxableSpawnArgs>(
     return identityTransform(`${surface} sandbox unavailable: inner command "${command}" is not absolute and could not be resolved; running unsandboxed`)
   }
   return Object.assign((spawnArgs: T) => transform(spawnArgs, innerCommand), { wasSandboxed: true })
+}
+
+// Create a planned writable dir one missing segment at a time without following links: the existing
+// prefix must still be the canonical path planned earlier, and each created (or raced-in) segment must
+// be a real directory, so a link planted on any missing segment is refused before anything is written
+// through it. The final realpath equality also refuses a link anywhere on the path.
+function createPlannedDirNoFollow(dir: string, surface: string): void {
+  const refuse = (resolved: string): never => {
+    throw new Error(`${surface} sandbox refused to bind ${dir}: it now resolves to ${resolved} (a symlink appeared on the path after the sandbox was planned); remove the link and run again`)
+  }
+  const missing: string[] = []
+  let cursor = dir
+  while (!lexists(cursor)) {
+    missing.unshift(cursor)
+    const parent = dirname(cursor)
+    if (parent === cursor) break
+    cursor = parent
+  }
+  if (lexists(cursor) && realpathSync(cursor) !== cursor) refuse(realpathSync(cursor))
+  // Documented residual (accepted, #10329): each segment is lstat-checked and the next one created in a
+  // separate step, so a link swapped in between those two calls could still get one directory made through
+  // it. Node has no mkdirat / O_NOFOLLOW directory walk to close that, and planting the link needs write
+  // access to the identity's own 0700 runtime root, which already means owning this user.
+  for (const segment of missing) {
+    try {
+      mkdirSync(segment, { mode: 0o700 })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+    }
+    if (lstatSync(segment).isSymbolicLink()) refuse(realpathSync(segment))
+  }
+  const resolved = realpathSync(dir)
+  if (resolved !== dir) refuse(resolved)
+}
+
+function lexists(path: string): boolean {
+  try {
+    lstatSync(path)
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
+    throw error
+  }
 }

@@ -49,10 +49,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: darwin-arm64, runner: macos-15, rust_target: aarch64-apple-darwin, binary: senpi-desktop-engine }
-          - { host: darwin-x64, runner: macos-15, rust_target: x86_64-apple-darwin, binary: senpi-desktop-engine }
+          - { host: darwin-arm64, runner: macos-15, rust_target: aarch64-apple-darwin, clang_arch: arm64, binary: senpi-desktop-engine }
+          - { host: darwin-x64, runner: macos-15, rust_target: x86_64-apple-darwin, clang_arch: x86_64, binary: senpi-desktop-engine }
           - { host: linux-x64, runner: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu, binary: senpi-desktop-engine }
+          # Native arm64 runners, so --selftest below executes the arm64 build itself; 22.04 keeps the
+          # same glibc floor as the x64 engine.
+          - { host: linux-arm64, runner: ubuntu-22.04-arm, rust_target: aarch64-unknown-linux-gnu, binary: senpi-desktop-engine }
           - { host: win32-x64, runner: windows-latest, rust_target: x86_64-pc-windows-msvc, binary: senpi-desktop-engine.exe }
+          - { host: win32-arm64, runner: windows-11-arm, rust_target: aarch64-pc-windows-msvc, binary: senpi-desktop-engine.exe }
     steps:
       - uses: actions/checkout@v7
 
@@ -66,6 +70,40 @@ jobs:
           rustup toolchain install "$toolchain" --profile minimal
           rustup default "$toolchain"
           rustup target add "${{ matrix.rust_target }}"
+
+      - name: Build and sign Darwin capture helper
+        if: startsWith(matrix.host, 'darwin-')
+        timeout-minutes: 75
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
+          CLANG_ARCH: ${{ matrix.clang_arch }}
+        run: |
+          set -euo pipefail
+          HELPER_DIR="${RUNNER_TEMP}/desktop-capture-helper"
+          HELPER="${HELPER_DIR}/senpi-desktop-capture-helper"
+          mkdir -p "$HELPER_DIR"
+          /usr/bin/clang -arch "$CLANG_ARCH" \
+            -x objective-c -std=c11 -fobjc-arc -O2 -Wall \
+            -mmacosx-version-min=13.0 \
+            -framework AppKit -framework ScreenCaptureKit -framework CoreVideo \
+            crates/senpi-desktop-backend-macos/native/senpi-desktop-capture-helper.m \
+            -o "$HELPER"
+          # The helper carries the engine's identifier (build.rs signs dev builds the same way). The
+          # engine stages it at a fresh temp path on every start, so TCC charges Screen Recording to the
+          # responsible process (the app that launched OmO), not to the helper. It is signed, not
+          # notarized: the engine writes it unquarantined into a private directory at runtime, so
+          # Gatekeeper never assesses it.
+          bash .github/scripts/macos-sign-and-notarize.sh --sign-only \
+            --identifier ai.sisyphuslabs.senpi-desktop-engine "$HELPER"
+          test -s "$HELPER"
+          codesign -dv --verbose=2 "$HELPER" 2>&1 | grep -qx "Identifier=ai.sisyphuslabs.senpi-desktop-engine" \
+            || { echo "::error::the capture helper is not signed with the engine identifier" >&2; exit 1; }
+          echo "SENPI_DESKTOP_CAPTURE_HELPER_SIGNED=$HELPER_DIR" >> "$GITHUB_ENV"
 
       - name: Build desktop engine
         env:
@@ -143,7 +181,8 @@ jobs:
   build:
     needs: desktop-engine
     if: github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9945.
+    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-24.04' }}
     defaults:
       run:
         shell: bash
@@ -447,8 +486,9 @@ jobs:
             # musl binaries cannot run on the glibc runner: alpine container.
             docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
               alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && ${BIN} --version" | grep -F "$EXPECTED_VERSION_LINE"
-            # Mount the parent so the driver can rename the source checkout.
-            docker run --rm -v "${PWD}/..:/workspace" -w "/workspace/$(basename "$PWD")" \
+            # Mount the parent so the driver can rename the source checkout. --init gives the container a
+            # PID 1 that reaps orphans; node as PID 1 leaves an exited host supervisor as a zombie.
+            docker run --rm --init -v "${PWD}/..:/workspace" -w "/workspace/$(basename "$PWD")" \
               alpine:3.21 sh -c "apk add --no-cache libstdc++ python3 nodejs procps >/dev/null && node script/qa/omo-native-eval-smoke.mjs ${BIN}"
           }
 
@@ -460,11 +500,19 @@ jobs:
             else
               ( cd .omo/release-binaries && sha256sum -c SHA256SUMS )
             fi
-            local size
+            # Same 160 MiB budget as MAX_BINARY_BYTES in script/build-omo-binary.ts: it bounds the
+            # download every install and update makes. Print the headroom; warn under 5 MiB.
+            local size budget=167772160 warn=5242880
             size="$(wc -c < "$BIN")"
-            if [ "$size" -gt 157286400 ]; then
-              echo "release binary ${TARGET} exceeds the 150MB size budget (${size} bytes)"
+            if [ "$size" -gt "$budget" ]; then
+              echo "release binary ${TARGET} exceeds the 160 MiB size budget (${size} bytes)"
               return 1
+            fi
+            local headroom=$(( budget - size ))
+            if [ "$headroom" -lt "$warn" ]; then
+              echo "::warning::release binary ${TARGET} is within 5 MiB of its size budget (${size} bytes, ${headroom} bytes headroom)"
+            else
+              echo "release binary ${TARGET}: ${size} bytes, ${headroom} bytes headroom under the 160 MiB budget"
             fi
           }
 
@@ -582,7 +630,8 @@ jobs:
   publish:
     needs: [build, smoke-linux-arm64]
     if: always() && !cancelled() && github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9946.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       # Each matrix leg is an independent OIDC-provenance npm publish with no shared
@@ -892,7 +941,7 @@ jobs:
             docker run --rm -v "${PWD}:/work" -w /work -e HOME=/tmp/omo-smoke-home \
               alpine:3.21 sh -c "apk add --no-cache libstdc++ >/dev/null && chmod +x .omo/release-binaries/omo-linux-arm64-musl && .omo/release-binaries/omo-linux-arm64-musl --version" \
               | grep -F "$EXPECTED_VERSION_LINE"
-            docker run --rm -v "${PWD}/..:/workspace" -w "/workspace/$(basename "$PWD")" \
+            docker run --rm --init -v "${PWD}/..:/workspace" -w "/workspace/$(basename "$PWD")" \
               alpine:3.21 sh -c "apk add --no-cache libstdc++ python3 nodejs procps >/dev/null && node script/qa/omo-native-eval-smoke.mjs .omo/release-binaries/omo-linux-arm64-musl"
           fi
 

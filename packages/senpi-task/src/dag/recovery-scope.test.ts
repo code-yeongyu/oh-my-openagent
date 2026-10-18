@@ -82,7 +82,7 @@ class SettledTasks implements TaskManager {
       .filter((record) => scope.scope === "all" || record.parent_session_id === scope.session_id)
       .map((record) => ({ record }))
   }
-  forget(): void { throw new Error("unexpected forget") }
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void { throw new Error("unexpected forget") }
   getResidentHandle(): undefined { return undefined }
   subscribeChild(id: string): () => void { this.touches.push(id); return () => undefined }
   residentTaskIds(): readonly string[] { return [] }

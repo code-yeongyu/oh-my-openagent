@@ -5,6 +5,7 @@ import {
   cleanupReflectionWorktree,
   createLockRecord,
   integrateValidatedReflection,
+  maybeKillAt,
   memoryWriterLockPath,
   probeLegacyAutoRunReceipt,
   probeReflectionIntegration,
@@ -66,6 +67,7 @@ export async function resolveFinalizationDecision(
   if (validated === undefined && existsSync(worktree.dir)) {
     const validation = await validateCompletion(worktree, ledger.baseSha, worktree.exec)
     if (validation.status === "valid") {
+      maybeKillAt("after-validate")
       if (ledger.targetDoc !== undefined
         && validation.changedPaths.some((path) => path !== ledger.targetDoc)) {
         const decision = { outcome: "failed" as const, reason: "invalid_target", detail: "Dream changed paths outside targetDoc" }
@@ -150,6 +152,7 @@ export async function resolveFinalizationDecision(
     validated,
     withWriterLock: (operation) => writerLock(context, operation),
   })
+  maybeKillAt("after-merge")
   const budget = integrated.outcome === "merged"
     ? await validateIntegratedDreamBudget(context, ledger)
     : {}

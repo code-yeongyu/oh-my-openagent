@@ -180,7 +180,9 @@ test.skipIf(!isWin32)(
     const payload = parsed as DriverPayload
     const route = check(payload, "process_mode_routes_to_rpc_runner")
     const spawnProof = check(payload, "spawn_process_pid_and_session_jsonl")
-    const killProof = check(payload, "kill_marks_error_killed_true")
+    // Windows cannot attribute an external TerminateProcess to a kill, so its check proves the honest
+    // outcome: status=error, killed=false, an unexpected-exit message (#9471).
+    const killProof = check(payload, "external_termination_reports_unexpected_exit")
     const leakProof = check(payload, "no_leaked_rpc_child_pids")
 
     // then

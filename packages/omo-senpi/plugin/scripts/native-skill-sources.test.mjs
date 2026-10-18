@@ -24,6 +24,7 @@ describe("createNativeSkillSources", () => {
     "ultrawork",
     "ulw-plan",
     "ulw-research",
+    "visualize",
   ]
 
   test("#given the registry #when ordered names are extracted #then they match the expected alphabetical sequence including onboarding", () => {
@@ -50,7 +51,7 @@ describe("createNativeSkillSources", () => {
     assert.deepEqual(withSharedAssets, ["ulw-research"])
 
     const ulwResearch = sources.find(({ name }) => name === "ulw-research")
-    assert.deepEqual(ulwResearch?.sharedAssets, ["scripts", "references/report-gates.md", "references/deliverable-phase.md"])
+    assert.deepEqual(ulwResearch?.sharedAssets, ["scripts", "references/report-gates.md", "references/deliverable-phase.md", "references/report-visualization.md"])
   })
 
   test("#given each sharedAssets path #when resolved against the shared skill #then it is relative, contained, and exists", () => {

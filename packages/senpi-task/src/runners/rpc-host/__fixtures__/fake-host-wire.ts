@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from "node:path"
 import type { Socket } from "node:net"
 
 import type { FakeSessionTable } from "./fake-host-sessions"
+import type { FakeInputAdmissions } from "./fake-input-admissions"
 
 /**
  * The fake daemon's wire half: one JSONL line in, one response (or nothing, when a suite withholds
@@ -33,6 +34,7 @@ export type FakeHostWarmAnswer =
   | { readonly refuse: string }
 
 export interface FakeHostWirePorts {
+  readonly admissions: FakeInputAdmissions
   readonly table: FakeSessionTable
   readonly warm: FakeHostWarmAnswer
   /** Read per line so a handoff's rotated instance answers the very next probe. */
@@ -57,6 +59,24 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
   const type = typeof payload.type === "string" ? payload.type : "unknown"
   const routingId = typeof payload.sessionId === "string" ? payload.sessionId : undefined
   ports.record({ type, sessionId: routingId, payload })
+  if (["prompt", "steer", "follow_up"].includes(type) && typeof payload.clientMessageId === "string") {
+    const session = ports.table.view().find(candidate => candidate.routingId === routingId)
+    const answer = ports.admissions.admit(session?.sessionPath ?? "", payload)
+    if (answer === "conflict") {
+      if (ports.withheld.has(type)) return
+      return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
+        error: "client_message_id_conflict: different payload", errorCode: "client_message_id_conflict" })
+    }
+    if (!answer.replayed && routingId !== undefined && typeof payload.message === "string") {
+      ports.table.appendTranscript(routingId, { role: "user", content: payload.message })
+      if (type === "prompt") ports.table.setStreaming(routingId, true)
+    }
+    if (ports.withheld.has(type)) return
+    const failure = ports.failed.get(type)
+    if (failure !== undefined) return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
+    return writeFrame(socket, { type: "response", id: payload.id, command: type, success: true,
+      data: { disposition: answer.disposition, replayed: answer.replayed } })
+  }
   if (ports.withheld.has(type)) return
   const failure = ports.failed.get(type)
   if (failure !== undefined) {
@@ -82,13 +102,18 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
         ports.table.setStreaming(routingId, true)
       }
       return ok({})
-    case "get_state":
+    case "get_state": {
+      const model = routingId === undefined ? undefined : openedModels.get(ports)?.get(routingId)
       return ok({
         sessionId: `durable-${payload.sessionId}`,
         isStreaming: routingId !== undefined && ports.table.isStreaming(routingId),
+        ...(model === undefined ? {} : { model }),
       })
+    }
     case "get_entries":
       return ok({ entries: [], leafId: null })
+    case "get_available_models":
+      return ok({ models: [] })
     case "switch_session":
       return ok({ cancelled: false })
     case "warm":
@@ -123,6 +148,7 @@ function openSession(ports: FakeHostWirePorts, socket: Socket, payload: Readonly
       data: { owner: opened.hold.owner, retry_after_ms: opened.hold.retryAfterMs },
     })
   }
+  rememberOpenedModel(ports, opened.routingId, payload)
   writeFrame(socket, {
     type: "response",
     id: payload.id,
@@ -135,6 +161,19 @@ function openSession(ports: FakeHostWirePorts, socket: Socket, payload: Readonly
       attached: opened.attached,
     },
   })
+}
+
+// The real host's get_state reports the session's model (senpi buildRpcSessionState: `model: session.model`), which an
+// open with provider and modelId sets; a re-joined session keeps the model it already runs.
+const openedModels = new WeakMap<FakeHostWirePorts, Map<string, { readonly provider: string; readonly id: string }>>()
+
+function rememberOpenedModel(ports: FakeHostWirePorts, routingId: string, payload: Readonly<Record<string, unknown>>): void {
+  const models = openedModels.get(ports) ?? new Map<string, { readonly provider: string; readonly id: string }>()
+  openedModels.set(ports, models)
+  if (models.has(routingId)) return
+  if (typeof payload.provider === "string" && typeof payload.modelId === "string") {
+    models.set(routingId, { provider: payload.provider, id: payload.modelId })
+  }
 }
 
 function refuse(socket: Socket, payload: Readonly<Record<string, unknown>>, failure: FakeHostOpenFailure): void {

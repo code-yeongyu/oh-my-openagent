@@ -33,7 +33,7 @@ describe("host-session teardown: detach on shutdown, close on destroy, close on 
     const summary = await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
 
     // then
-    expect(order).toEqual(["abort:st_0a000001", "detach:st_0a000001"])
+    expect(order).toEqual(["detach:st_0a000001"])
     expect(fixture.daemon.closed).toEqual([])
     expect(store.load("st_0a000001")?.residency_state).toBe("rpc_detached")
     expect(summary.suspended_rpc).toBe(1)

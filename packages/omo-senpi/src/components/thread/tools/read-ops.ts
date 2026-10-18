@@ -1,6 +1,7 @@
 import { workspaceEntries } from "../addressing"
 import type { ThreadReadInput, ThreadToolResult } from "../contracts"
 import { readTranscript } from "../reader"
+import { threadLink } from "../thread-link"
 import { addressBook, degradedSummary, failure, resolution, resolveEntries, routingId, sessionPort, summary, targetSession, transcriptRole } from "./internals"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
@@ -24,17 +25,26 @@ export function listThreads(options: ThreadToolSurfaceOptions, current: ThreadHo
 }
 
 /** `thread_read` over one host view: the live transcript from the session's endpoint, else its JSONL when that endpoint is dead. */
+/**
+ * A first read takes the trailing window; a read that carries a cursor continues forward from it.
+ * Tail mode ignores the cursor, so following next_cursor in tail mode returned the same slice again.
+ */
+function readWindow(value: ThreadReadInput): { mode: "tail" | "page"; max_bytes?: number; cursor?: string } {
+  return { mode: value.cursor === undefined ? "tail" : "page", max_bytes: value.max_bytes, cursor: value.cursor }
+}
+
 export async function readThread(options: ThreadToolSurfaceOptions, current: ThreadHostView, value: ThreadReadInput, callerId: string): Promise<ThreadToolResult> {
   const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope)
   if (resolved.kind === "error") return { kind: "error", error: resolved }
   const session = targetSession(current, resolved.entry.thread_id)
   if (session === undefined) return readDegraded(options, current, resolved.entry.thread_id, value)
   const messages = await sessionPort(options, session).getMessages(routingId(session))
-  const live = readTranscript({ kind: "live", entries: () => messages }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor })
+  const live = readTranscript({ kind: "live", entries: () => messages }, readWindow(value))
   if (live.kind === "error") return { kind: "error", error: live.error }
   return {
     kind: "ok",
     thread_id: resolved.entry.thread_id,
+    link: threadLink(resolved.entry.thread_id, resolved.entry.name),
     items: live.items.map((item, index) => ({ seq: index + 1, role: transcriptRole(item.role), content: JSON.stringify(item.content ?? item) })),
     truncated: live.truncated,
     ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }),
@@ -50,7 +60,7 @@ export async function readThread(options: ThreadToolSurfaceOptions, current: Thr
 function readDegraded(options: ThreadToolSurfaceOptions, current: ThreadHostView, threadId: string, value: ThreadReadInput): ThreadToolResult {
   const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
   if (entry === undefined || entry.error_note === undefined || entry.session_path === null) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
-  const durable = readTranscript({ kind: "jsonl", path: entry.session_path, live_host_present: false }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor })
+  const durable = readTranscript({ kind: "jsonl", path: entry.session_path, live_host_present: false }, readWindow(value))
   if (durable.kind === "error") return { kind: "error", error: durable.error }
   // A session file interleaves messages with bookkeeping (the session header, model and thinking
   // changes, names): only message entries are transcript, rendered with the live path's roles.
@@ -60,5 +70,5 @@ function readDegraded(options: ThreadToolSurfaceOptions, current: ThreadHostView
     return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
   })
   const items = messages.map((message, index) => ({ seq: index + 1, role: transcriptRole(message.role), content: JSON.stringify(message.content ?? message) }))
-  return { kind: "ok", thread_id: threadId, items, truncated: durable.truncated, ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }), source: durable.source, source_incomplete: durable.source_incomplete, error_note: entry.error_note }
+  return { kind: "ok", thread_id: threadId, link: threadLink(threadId, entry.title), items, truncated: durable.truncated, ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }), source: durable.source, source_incomplete: durable.source_incomplete, error_note: entry.error_note }
 }

@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process"
-import { existsSync, realpathSync } from "node:fs"
-import { delimiter, isAbsolute, join, relative, sep } from "node:path"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
+import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { doctorCoverageLines } from "./category-coverage.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
@@ -12,55 +13,15 @@ import { runDoctor } from "./doctor.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
-import { nearestNodeBin, packageManifest, packageRoot, readJson, releaseBanner, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
+import { senpiEnvironment } from "./engine-environment.js"
+import { withHerdrAgentHint } from "./herdr-agent-hint.js"
+import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
 import { runSelfUpdate } from "./self-update.js"
 import { isSelfUpdate } from "./update-args.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
 import { printSetupReport } from "./setup-report.js"
-
-const earlyCommands = new Set(["install", "remove", "list", "config", "auth", "app-server", "host"])
-// Identity the engine adopts for this install: what the user sees, where state lives, which
-// environment prefix is read first, what goes on the wire, and which channel to check for
-// updates. The engine consumes this once and scrubs it, so nested engine processes are
-// unaffected.
-function pluginChangelogSource() {
-  try {
-    const pluginRoot = join(packageRoot, "plugin")
-    const changelogPath = join(pluginRoot, "CHANGELOG.md")
-    if (!existsSync(changelogPath)) return undefined
-    const version = readJson(join(pluginRoot, "package.json")).version
-    return typeof version === "string" && version ? { path: changelogPath, version } : { path: changelogPath }
-  } catch {
-    return undefined
-  }
-}
-
-function brandProfile() {
-  const update = updateTarget()
-  // The changelog source is advisory: a missing plugin manifest or file must disable
-  // startup notes, never fail the launch.
-  const changelog = pluginChangelogSource()
-  return {
-    name: "OmO",
-    command: "omo",
-    displayVersion: packageManifest().version,
-    configDir: ".omo",
-    // Engine state lives at the canonical `~/.omo/agent`, never directly under the config
-    // directory: a flat home would disagree with the directory every omo surface resolves.
-    flatLayout: false,
-    envPrefix: "OMO",
-    userAgent: "omo",
-    originator: "omo",
-    ...(changelog ? { changelog } : {}),
-    update: {
-      packageName: "omo-ai",
-      distTag: releaseChannel(),
-      command: update.command,
-      changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
-    },
-  }
-}
+import { refuseRetiredCommand } from "./retired-command.js"
 
 function engineVersion() {
   try {
@@ -68,62 +29,6 @@ function engineVersion() {
   } catch {
     return "unknown"
   }
-}
-
-function canonicalPath(path) {
-  try {
-    return realpathSync.native(path)
-  } catch {
-    return path
-  }
-}
-
-function containsPath(root, target) {
-  const rel = relative(canonicalPath(root), canonicalPath(target))
-  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
-}
-
-// A compiled omo session exports its own payload as the brand-scoped package dir, and every shell it
-// spawns inherits that. The engine reads these names before the legacy PI_PACKAGE_DIR, so a release
-// omo started from such a shell would run on the foreign payload. A deliberate relocation names this
-// install's engine and survives; a root that does not contain the engine belongs to another install.
-function dropForeignPackageDirs(env, senpiRoot) {
-  for (const name of ["OMO_PACKAGE_DIR", "SENPI_PACKAGE_DIR"]) {
-    const root = env[name]
-    if (root && !containsPath(root, senpiRoot)) delete env[name]
-  }
-}
-
-function senpiEnvironment(senpiRoot) {
-  const env = { ...process.env }
-  delete env.OMO_BIN
-  delete env.SENPI_BIN
-  dropForeignPackageDirs(env, senpiRoot)
-  // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
-  // tool inherits the same state instead of falling back to its own home.
-  const agentDir = canonicalAgentDir(env)
-  env.OMO_CODING_AGENT_DIR = agentDir
-  env.SENPI_CODING_AGENT_DIR = agentDir
-  // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load
-  // the plugin via --extension and therefore never match the settings-packages detection gates.
-  env.OMO_NATIVE = "1"
-  // This launcher already decided which runtime the product runs on, possibly by re-execing itself
-  // under bun. Handing that answer down stops the engine from making its own, conflicting choice.
-  env.SENPI_RUNTIME = process.versions.bun ? "bun" : "node"
-  env.SENPI_BRAND = JSON.stringify(brandProfile())
-
-  const binDir = nearestNodeBin(senpiRoot)
-  if (binDir) {
-    const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH"
-    const path = env[pathKey]
-    env[pathKey] = path ? `${binDir}${delimiter}${path}` : binDir
-    const shim = join(binDir, process.platform === "win32" ? "senpi.cmd" : "senpi")
-    if (existsSync(shim)) env.SENPI_BIN = shim
-  }
-  // Anything resolving the product by name must re-enter through this launcher, otherwise it
-  // would reach the engine directly and lose the brand.
-  env.OMO_BIN = join(packageRoot, "bin", "omo.js")
-  return env
 }
 
 function preparedSenpi() {
@@ -143,6 +48,7 @@ async function spawnSenpi(args, withExtension) {
     ? ["--extension", join(packageRoot, "plugin"), ...args]
     : args
   const env = senpiEnvironment(senpi.packageRoot)
+  if (withExtension) withHerdrAgentHint(env, args)
   if (process.platform !== "win32" && typeof process.execve === "function") {
     try {
       process.execve(process.execPath, [process.execPath, senpi.cliPath, ...finalArgs], env)
@@ -202,7 +108,7 @@ export function engineHostCall(engineArgs, options) {
   const senpi = preparedSenpi()
   const result = spawnSync(process.execPath, [senpi.cliPath, ...engineArgs], {
     encoding: "utf8",
-    env: { ...senpiEnvironment(senpi.packageRoot), ...options.env },
+    env: senpiEnvironment(senpi.packageRoot, options.env),
     windowsHide: true,
   })
   return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
@@ -309,12 +215,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     process.exitCode = await runSelfUpdate(args)
     return
   }
-  // app-server takes the plugin after its subcommand: a leading --extension never reaches the
-  // engine's app-server dispatch. It loads into every thread, including the daemon's.
-  if (command === "app-server") {
-    await spawnSenpi(args.includes("--no-extensions") ? args : [...args, "--extension", join(packageRoot, "plugin")], false)
-    return
-  }
+  if (refuseRetiredCommand(args)) return
   // `host status --all` stays the engine's answer; omo only adds each terminal row's last activity.
   if (isHostStatusAll(args, process.env)) {
     process.exitCode = await runHostStatusAll(args, {
@@ -326,7 +227,8 @@ export async function runLauncher(args = process.argv.slice(2)) {
     })
     return
   }
-  if (earlyCommands.has(command) || command === "update") {
+  // One-shot engine commands go over unchanged: the engine dispatches them on argv[0] (#9572).
+  if (isEngineCommand(args)) {
     await spawnSenpi(args, false)
     return
   }

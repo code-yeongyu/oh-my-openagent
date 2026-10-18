@@ -13,28 +13,34 @@ pub enum MutatingAction {
     Scroll,
     TypeText,
     KeyChord,
+    HoldKeys,
+    HoldMouse,
     RaiseWindow,
     AxPerform,
     AxSetValue,
     AxFocus,
     AxClick,
     ClipboardWrite,
+    MenuSelect,
 }
 
 impl MutatingAction {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 15] = [
         Self::Click,
         Self::MoveMouse,
         Self::Drag,
         Self::Scroll,
         Self::TypeText,
         Self::KeyChord,
+        Self::HoldKeys,
+        Self::HoldMouse,
         Self::RaiseWindow,
         Self::AxPerform,
         Self::AxSetValue,
         Self::AxFocus,
         Self::AxClick,
         Self::ClipboardWrite,
+        Self::MenuSelect,
     ];
 
     /// The engine method this action is requested through.
@@ -47,12 +53,15 @@ impl MutatingAction {
             Self::Scroll => Method::Scroll,
             Self::TypeText => Method::TypeText,
             Self::KeyChord => Method::KeyChord,
+            Self::HoldKeys => Method::HoldKeys,
+            Self::HoldMouse => Method::HoldMouse,
             Self::RaiseWindow => Method::RaiseWindow,
             Self::AxPerform => Method::AxPerform,
             Self::AxSetValue => Method::AxSetValue,
             Self::AxFocus => Method::AxFocus,
             Self::AxClick => Method::AxClick,
             Self::ClipboardWrite => Method::ClipboardWrite,
+            Self::MenuSelect => Method::MenusSelect,
         }
     }
 
@@ -61,15 +70,17 @@ impl MutatingAction {
     #[must_use]
     pub const fn is_coordinate(self) -> bool {
         match self {
-            Self::Click | Self::MoveMouse | Self::Drag | Self::Scroll => true,
+            Self::Click | Self::MoveMouse | Self::Drag | Self::Scroll | Self::HoldMouse => true,
             Self::TypeText
             | Self::KeyChord
+            | Self::HoldKeys
             | Self::RaiseWindow
             | Self::AxPerform
             | Self::AxSetValue
             | Self::AxFocus
             | Self::AxClick
-            | Self::ClipboardWrite => false,
+            | Self::ClipboardWrite
+            | Self::MenuSelect => false,
         }
     }
 }

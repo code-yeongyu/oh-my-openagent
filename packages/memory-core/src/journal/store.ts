@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
@@ -27,6 +27,8 @@ export type TranscriptJournalOptions = {
   readonly lock?: JournalLock
   /** Byte budget for one reflection payload; the remainder is carried into later captures. */
   readonly snapshotMaxBytes?: number
+  /** Replaces the state rename, so a test can simulate a rename the platform refuses. */
+  readonly renameFile?: (from: string, to: string) => Promise<void>
 }
 
 export type AppendResult = { readonly appended: number; readonly skipped: number }
@@ -114,23 +116,23 @@ export class TranscriptJournal {
   }
 
   async reconcile(messages: readonly TranscriptProjection[]): Promise<AppendResult> {
-    return this.locked(async () => {
-      const capturedAt = this.now().toISOString()
-      return this.appendUnlocked(
-        messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)),
-      )
-    })
+    const capturedAt = this.now().toISOString()
+    return this.append(messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)))
   }
 
+  /** A journal is created by its first entry: appending nothing to a journal that does not exist writes nothing (#9737). */
   async append(entries: readonly TranscriptEntry[]): Promise<AppendResult> {
+    if (entries.length === 0 && !(await this.exists())) return { appended: 0, skipped: 0 }
     return this.locked(() => this.appendUnlocked(entries))
   }
 
   async readEntries(): Promise<TranscriptEntry[]> {
+    if (!(await this.exists())) return []
     return this.locked(() => this.readEntriesUnlocked())
   }
 
   async getState(): Promise<ReflectionTranscriptState> {
+    if (!(await this.exists())) return deriveState(initialReflectionState(), [])
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
@@ -151,6 +153,8 @@ export class TranscriptJournal {
     signal?: AbortSignal,
     options: { readonly maxBytes?: number } = {},
   ): Promise<ReflectionSnapshot | null> {
+    signal?.throwIfAborted()
+    if (!(await this.exists())) return null
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
@@ -249,6 +253,15 @@ export class TranscriptJournal {
     })
   }
 
+  private async exists(): Promise<boolean> {
+    try {
+      return (await stat(this.options.journalDir)).isDirectory()
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") return false
+      throw error
+    }
+  }
+
   private async locked<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     signal?.throwIfAborted()
     await mkdir(this.options.journalDir, { recursive: true, mode: 0o700 })
@@ -286,7 +299,6 @@ export class TranscriptJournal {
       raw = await readFile(this.transcriptPath, "utf8")
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error
-      await writeFile(this.transcriptPath, "", { encoding: "utf8", flag: "a" })
       return []
     }
     return raw
@@ -320,6 +332,16 @@ export class TranscriptJournal {
     }, entries)
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
-    await rename(temporaryPath, this.statePath)
+    try {
+      await (this.options.renameFile ?? rename)(temporaryPath, this.statePath)
+    } catch (error) {
+      // A refused rename must not strand the temporary copy beside state.json.
+      try {
+        await rm(temporaryPath, { force: true })
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "state rename failed and its temporary file could not be removed")
+      }
+      throw error
+    }
   }
 }

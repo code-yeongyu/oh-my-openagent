@@ -9,6 +9,7 @@ use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
     FrontWindow, Target,
@@ -129,14 +130,14 @@ impl<S: XServer + Send, I: InputServer + Send> Backend for X11Backend<S, I> {
     }
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
-        self.capture.displays()
+        self.capture.all_displays()
     }
 
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         self.capture.windows()
     }
 
-    fn capture(&mut self, target: &Target, _caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         self.capture.capture(target)
     }
 
@@ -191,9 +192,59 @@ impl<S: XServer + Send, I: InputServer + Send> Backend for X11Backend<S, I> {
         self.input()?.key_chord(target, keys, mode)
     }
 
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.focus_restore_owner = foreground_owner(target, mode);
+        self.pointer_restore_owner = None;
+        self.input()?.hold_keys(target, keys, mode, control)
+    }
+
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.focus_restore_owner = foreground_owner(target, mode);
+        self.pointer_restore_owner = None;
+        let (result, cursor) = {
+            let input = self.input()?;
+            let result = input.hold_mouse(target, hold, mode, control);
+            (result, input.last_pointer_motion())
+        };
+        self.pointer_restore_owner = cursor;
+        result
+    }
+
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         self.window(id)?;
         self.input()?.raise_window(id)
+    }
+
+    fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+        let windows = self.capture.windows()?;
+        self.ax
+            .as_mut()
+            .ok_or_else(DesktopError::ax_unsupported)?
+            .menu_items(window, &windows, path)
+    }
+
+    /// The command runs through its own AT-SPI action, which needs neither
+    /// focus nor a raised window, so both delivery modes dispatch the same way
+    /// and a refused request never moves focus.
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        _delivery: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        let windows = self.capture.windows()?;
+        let capture = &self.capture;
+        self.ax
+            .as_mut()
+            .ok_or_else(DesktopError::ax_unsupported)?
+            .menu_select(window, &windows, &|| capture.windows(), path, check_stop)
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
@@ -256,6 +307,6 @@ impl<S: XServer + Send, I: InputServer + Send> Backend for X11Backend<S, I> {
 fn foreground_owner(target: &Target, mode: DeliveryMode) -> Option<String> {
     match (target, mode) {
         (Target::Window(id), DeliveryMode::Foreground) => Some(id.clone()),
-        (Target::Desktop, _) | (Target::Window(_), DeliveryMode::Background) => None,
+        (Target::Desktop | Target::Display(_), _) | (Target::Window(_), DeliveryMode::Background) => None,
     }
 }

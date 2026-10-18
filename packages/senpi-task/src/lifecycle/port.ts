@@ -1,7 +1,9 @@
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import type { TeardownStepDeadline } from "./teardown-budget"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
-import type { TaskRecord } from "../state"
+import type { ForgetOptions } from "../manager/types"
+import type { AwaitingInputReason, TaskRecord } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
@@ -21,11 +23,15 @@ export type DestroyCause =
   | "reconcile_lost"
   | "fallback_handoff"
   | "revive_failure"
+  | "recovery_detach"
+  | "target_gone"
+  | "redispatch"
 
 // The teardown surface the destruction port operates against. In production this wraps a live
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle
 // code ever calls abort/dispose/terminate on it - that is the single-writer rule.
 export type ResidentHandle = {
+  reconcileInputs?(): Promise<void>
   readonly task_id: string
   // "host-session" is a SESSION of the shared daemon: it has no pid, so nothing may signal it.
   readonly kind: "in-process" | "rpc" | "host-session"
@@ -45,9 +51,12 @@ export type ResidentHandle = {
 export type ResidencyRegistry = {
   get(taskId: string): ResidentHandle | undefined
   entries(): readonly ResidentHandle[]
-  forget(taskId: string): void
+  forget(taskId: string, options: ForgetOptions): void
   // A terminal resident with a queued send must NOT be evicted (codex is_unloadable parity).
   hasPendingSends(taskId: string): boolean
+  // Only sends being delivered right now (no durable queue). A finished child's durable queue does not
+  // pin its slot: it parks with the queue kept on its record for the next revival (#9861).
+  hasInFlightSends?(taskId: string): boolean
   // Synchronous per-task arbitration held across async teardown. Eviction and sends are mutually
   // exclusive; callers that lose the race must not touch the child handle.
   tryClaimEviction?(taskId: string): boolean
@@ -55,6 +64,9 @@ export type ResidencyRegistry = {
   isEvicting?(taskId: string): boolean
   tryBeginSend?(taskId: string): boolean
   endSend?(taskId: string): void
+  // Whether THIS engine's session owns the record (omo#9785). One process can host one engine per
+  // session, so host_pid alone cannot tell a handle-less child of this session from a live sibling's.
+  ownsRecord?(record: Pick<TaskRecord, "parent_session_id">): boolean
 }
 
 // Injectable OS-process signalling so unit tests never spawn real children. Defaults use
@@ -80,7 +92,13 @@ export type RespawnFailureCode =
   | "respawn_failed"
 
 export type RespawnResult =
-  | { readonly ok: true; readonly handle: ManagedChildHandle }
+  | {
+      readonly ok: true
+      readonly handle: ManagedChildHandle
+      // The respawn re-joined a session whose last turn ended aborted (or never answered) and idle:
+      // the reattach stamps this on the record so the task reads "resumed, waiting for input" (senpi#3266).
+      readonly awaitingInput?: { readonly reason: AwaitingInputReason }
+    }
   | {
       readonly ok: false
       readonly disposition: "retryable" | "unrecoverable"
@@ -111,7 +129,11 @@ export type CapacityReservation =
   | { readonly ok: true; release(): void }
 
 export type RespawnPort = (record: TaskRecord, resumeSessionPath?: string) => Promise<RespawnResult>
-export type ReattachPort = (record: TaskRecord, handle: ManagedChildHandle) => Promise<ReattachResult>
+export type ReattachPort = (
+  record: TaskRecord,
+  handle: ManagedChildHandle,
+  awaitingInput?: { readonly reason: AwaitingInputReason },
+) => Promise<ReattachResult>
 export type ReserveReattachPort = (record: TaskRecord) => CapacityReservation
 
 export type LifecycleReattachPorts = {
@@ -171,6 +193,8 @@ export type IdleReclaimerScheduler = {
 }
 
 export type LifecycleDeps = {
+  // Adapter's existing mutation channel: parks from manager, daemon loss and reconcile all flow here.
+  readonly onStoreMutation?: (listener: () => void) => () => void
   readonly revivePolicy?: RevivePolicyPort
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
@@ -195,6 +219,9 @@ export type LifecycleDeps = {
   readonly reconcileAdmission?: BatchAdmissionOptions
   // Injectable timer seam keeps lifecycle tests deterministic and prevents test-created timers.
   readonly idleReclaimerScheduler?: IdleReclaimerScheduler
+  readonly hostCloseScheduler?: IdleReclaimerScheduler
+  // How long one teardown step (abort, terminate, dispose) may hold its caller (omo#9785).
+  readonly teardownStepDeadline?: TeardownStepDeadline
   // The engine's runtime-only parent kernel-tool map. Destruction and expunge release a child's
   // binding through it; idle parking keeps the binding so a same-host revive still reaches it.
   readonly kernelToolBindings?: KernelToolBindingRegistry

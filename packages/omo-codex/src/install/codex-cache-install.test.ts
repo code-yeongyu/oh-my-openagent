@@ -2,12 +2,57 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { installCachedPlugin } from "./codex-cache"
 
 describe("codex-cache install", () => {
+  test.each(["local", "dev", "99.0.0", "0.0.9"])(
+    "#given cached version %s #when installing another version #then only the installed payload remains selectable",
+    async (previousVersion) => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-activation-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      const pluginCache = join(codexHome, "plugins", "cache", "debug", "omo")
+      const preservedPaths = [
+        join(codexHome, "plugins", "cache", "debug", "other", "local"),
+        join(codexHome, "plugins", "data", "omo-debug"),
+        join(pluginCache, ".tmp-in-flight"),
+      ]
+      try {
+        await mkdir(sourceRoot, { recursive: true })
+        await writeFile(join(sourceRoot, "payload.txt"), "installed payload\n")
+        await mkdir(join(pluginCache, previousVersion), { recursive: true })
+        await writeFile(join(pluginCache, previousVersion, "payload.txt"), "previous payload\n")
+        for (const path of preservedPaths) {
+          await mkdir(path, { recursive: true })
+          await writeFile(join(path, "keep.txt"), "unrelated data\n")
+        }
+
+        // when
+        const installed = await installCachedPlugin({
+          codexHome,
+          marketplaceName: "debug",
+          name: "omo",
+          sourcePath: sourceRoot,
+          version: "0.1.0",
+          runCommand: async () => undefined,
+        })
+
+        // then
+        expect(await readFile(join(installed.path, "payload.txt"), "utf8")).toBe("installed payload\n")
+        await expect(stat(join(pluginCache, previousVersion))).rejects.toThrow()
+        for (const path of preservedPaths) {
+          expect(await readFile(join(path, "keep.txt"), "utf8")).toBe("unrelated data\n")
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    },
+  )
+
   test(
     "#given source plugin has development-only directories #when caching plugin #then writes only the plugin payload under the versioned cache",
     async () => {
@@ -201,9 +246,12 @@ describe("codex-cache install", () => {
     const codexHome = join(root, "codex-home")
     const sourceRoot = join(root, "plugin")
     const cacheRoot = join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0")
+    const localCacheRoot = join(codexHome, "plugins", "cache", "debug", "omo", "local")
     await mkdir(join(sourceRoot, ".codex-plugin"), { recursive: true })
     await mkdir(join(sourceRoot, "hooks"), { recursive: true })
     await mkdir(cacheRoot, { recursive: true })
+    await mkdir(localCacheRoot, { recursive: true })
+    await writeFile(join(localCacheRoot, "payload.txt"), "previous local payload\n")
     await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
     await writeFile(join(sourceRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", hooks: "hooks/hooks.json" }))
     await writeFile(
@@ -230,7 +278,8 @@ describe("codex-cache install", () => {
 
     // then
     expect(await readFile(join(cacheRoot, "package.json"), "utf8")).toBe(JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }))
-    expect(await readdir(join(codexHome, "plugins", "cache", "debug", "omo"))).toEqual(["0.1.0"])
+    expect(await readFile(join(localCacheRoot, "payload.txt"), "utf8")).toBe("previous local payload\n")
+    expect((await readdir(join(codexHome, "plugins", "cache", "debug", "omo"))).sort()).toEqual(["0.1.0", "local"])
   })
 
   test("#given npm creates workspace bin shims in the cache #when caching plugin #then plugin-owned shims are removed", async () => {

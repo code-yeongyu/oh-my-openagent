@@ -11,7 +11,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import type { ExternalAuthor, StoreRefusal } from "./types"
 
 export const BINDING_SCHEMA_VERSION = 1
-export const BINDING_PLATFORMS = ["discord", "telegram", "slack", "notion", "feishu", "herdr", "custom"] as const
+export const BINDING_PLATFORMS = ["discord", "telegram", "slack", "notion", "feishu", "herdr", "custom", "whatsapp"] as const
 export const OUTBOUND_EVENTS = ["milestone", "report", "question", "completion"] as const
 export const BINDING_STATUSES = ["active", "detached", "expired"] as const
 export const INBOUND_MODES = ["auto", "follow_up"] as const
@@ -114,6 +114,12 @@ export type OutboxRow = {
   readonly outcome: CompletionOutcome | null
   /** For an answered `question`: the human the connector named with the answer; null without one. */
   readonly answered_by: ExternalAuthor | null
+  /**
+   * For an answered `question`: `in_flight` while a `thread_answer` claim is still being handed to the session (it goes back to
+   * `pending` if that fails), `delivered` once the session took it or closed the question itself. Only `delivered` is settled; a
+   * connector holding the binding's later rows behind the question waits for it. Null for an unanswered question or another event.
+   */
+  readonly answer_state: "in_flight" | "delivered" | null
 }
 
 export function rfc3339(ms: number): string {

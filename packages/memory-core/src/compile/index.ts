@@ -1,4 +1,5 @@
 export * from "./cache"
 export * from "./changes"
 export * from "./compile"
+export * from "./external-projection"
 export * from "./render"

@@ -22,7 +22,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `verify-omo-ai-payload.mjs` | omo-ai npm payload gate: required artifact list, 18-skill minimum, 30 MB unpacked cap, no nested `node_modules`/source paths |
 | `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml`. Groups run detached (own process groups) and are killed with the parent on SIGINT/SIGTERM; a spawned group inherits `OMO_TEST_FAST_ACTIVE=1` and re-entry refuses to recurse |
 | `ci-fast-path.mjs` | CI skip classifier (`classifyCiMode`): runtime-touching paths (`isRuntimePath`: every path except an explicit allowlist of web, prose such as top-level Markdown and README/CHANGELOG/AGENTS-style Markdown outside `packages/*/src`, and listed repository metadata), platform-sensitive paths, and the `ci:full-matrix` label force the full OS matrix |
-| `ci-leg-tests-guard.mjs` | Last step of every OS test leg (`judgeLeg`): fails a leg whose test steps were all skipped though the change needed them (`tests not run: add ci:full-matrix`), passes an intended skip with a `tests intentionally not run` notice and job-summary line |
+| `ci-leg-tests-guard.mjs` | Last step of every OS test leg (`judgeLeg`): fails a leg whose required tests were all skipped; points to the optional label run for diagnosis and a push/reopen with the label for required checks; passes an intended skip with a notice and job-summary line |
 | `telemetry-schema-block.mjs` | Generate the telemetry schema doc block (`generateTelemetrySchemaBlock`) |
 | `remove-stale-self-package-tests.ts` | Prune self-package tests that reference deleted sources |
 | `agent-command-string-scan.ts` | Scan tracked sources for unsafe agent command strings; allowlisted exceptions live in `agent-command-string-audit.allowlist.json` |
@@ -49,6 +49,8 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 - `agent/` -- dev-env contract: `setup.sh`, `cleanup.sh`, `cleanup-hook.sh`, `docker-dev.sh`, `qa-sandbox.sh`, `qa-docker.sh` (see root AGENTS.md DEVELOPMENT ENVIRONMENT).
 
 ## TESTS (61 `*.test.ts`)
+
+The `ci:full-matrix` label launches the separate `ci-full-matrix-label.yml` caller; its `full-matrix / ...` checks are optional and do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in required checks. Normal `ci.yml` does not trigger on labels. `ci-label-workflow-policy.test.ts` guards target branches, distinct workflow identity, the reusable call, and concurrency behind the exact job label gate. The classifier still receives the caller's PR labels.
 
 Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
 

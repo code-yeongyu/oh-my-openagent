@@ -174,6 +174,8 @@ export interface StubChannel extends HostSessionChannel {
  */
 export function stubChannel(sendFailure: Error | undefined): StubChannel {
   const calls: string[] = []
+  // Like the real host, get_state reports the model the session was opened with.
+  let openedModel: { readonly provider: string; readonly id: string } | undefined
   const record = <T>(name: string, value: T): T => {
     calls.push(name)
     return value
@@ -184,8 +186,9 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
     get calls() {
       return calls
     },
-    open: () =>
-      record(
+    open: (request) => {
+      if (request.provider !== undefined && request.modelId !== undefined) openedModel = { provider: request.provider, id: request.modelId }
+      return record(
         "open",
         Promise.resolve({
           sessionId: "routing-stub",
@@ -193,10 +196,11 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
           instanceId: "inst-stub",
           engineVersion: "2026.9.18",
         }),
-      ),
+      )
+    },
     send: (command) =>
       record(command.type, sendFailure === undefined ? Promise.resolve() : Promise.reject(sendFailure)),
-    getState: () => Promise.resolve({ sessionId: "durable-stub" }),
+    getState: () => Promise.resolve({ sessionId: "durable-stub", ...(openedModel === undefined ? {} : { model: openedModel }) }),
     getEntries: () => Promise.resolve({ entries: [], leafId: null }),
     switchSession: () => record("switch_session", Promise.resolve({ cancelled: false })),
     onEvent: (_listener: (event: AgentSessionEvent) => void) => () => undefined,

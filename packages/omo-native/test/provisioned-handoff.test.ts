@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { handOffToProvisionedRuntime, planProvisionedLaunch, PROVISIONED_HANDOFF_ENV } from "../provisioned-handoff"
+import { removeTree } from "../../../test-support/remove-tree"
 
 const exe = process.platform === "win32" ? ".exe" : ""
 const root = mkdtempSync(join(tmpdir(), "omo-provisioned-handoff-"))
@@ -40,7 +41,7 @@ beforeAll(async () => {
   copyFileSync(built, download)
 }, 120_000)
 
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => removeTree(root))
 
 describe("provisioned launch plan", () => {
   const expected = join(root, "runtime", `omo${exe}`)

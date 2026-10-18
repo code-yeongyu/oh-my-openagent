@@ -5,8 +5,7 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::keys::parse_keys;
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, DragParams, KeyChordParams, PointParams,
-    ClipboardText, RaiseWindowParams, ScrollParams, TypeTextParams,
+    DragParams, KeyChordParams, PointParams, TypeTextParams,
 };
 use senpi_desktop_core::types::{DesktopPoint, Target};
 use senpi_desktop_safety::{MutatingAction, StopPathId, StopSource};
@@ -15,6 +14,9 @@ use serde_json::json;
 use super::Mutation;
 use crate::request::Op;
 use crate::test_support::{click_window, harness, Harness};
+
+mod requests;
+use requests::request_for;
 
 fn click_desktop_mutation() -> Mutation<'static> {
     Mutation::new(
@@ -98,72 +100,17 @@ fn suspension_observed_midflight_releases_all() {
     assert!(released(&harness), "{:?}", harness.sink.ops());
 }
 
-/// A valid request for `action` against the fixture.
-fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
-    let frame = harness.capture("101");
-    let frame_id = Some(frame.clone());
-    let reference = harness.focused_ref();
-    let target = "101".to_owned();
-    let point = |x, y| DesktopPoint { x, y };
-    match action {
-        MutatingAction::Click => click_window(&frame, None),
-        MutatingAction::MoveMouse => Op::MoveMouse(PointParams {
-            target,
-            x: 10.0,
-            y: 10.0,
-            frame_id,
-            opts: None,
-        }),
-        MutatingAction::Drag => Op::Drag(DragParams {
-            target,
-            path: vec![point(10.0, 10.0), point(40.0, 40.0)],
-            frame_id,
-            opts: None,
-        }),
-        MutatingAction::Scroll => Op::Scroll(ScrollParams {
-            target,
-            x: 10.0,
-            y: 10.0,
-            dx: 0.0,
-            dy: 3.0,
-            frame_id,
-            opts: None,
-        }),
-        MutatingAction::TypeText => Op::TypeText(TypeTextParams {
-            target,
-            text: "hello".to_owned(),
-            opts: None,
-        }),
-        MutatingAction::KeyChord => Op::KeyChord(KeyChordParams {
-            target,
-            keys: vec!["shift+a".to_owned()],
-            opts: None,
-        }),
-        MutatingAction::RaiseWindow => Op::RaiseWindow(RaiseWindowParams { window_id: target }),
-        MutatingAction::AxPerform => Op::AxPerform(AxPerformParams {
-            ref_: reference,
-            action: "focus".to_owned(),
-        }),
-        MutatingAction::AxSetValue => Op::AxSetValue(AxSetValueParams {
-            ref_: reference,
-            value: "hello".to_owned(),
-        }),
-        MutatingAction::AxFocus => Op::AxFocus(AxRefParams { ref_: reference }),
-        MutatingAction::AxClick => Op::AxClick(AxClickParams {
-            ref_: reference,
-            opts: None,
-        }),
-        MutatingAction::ClipboardWrite => Op::ClipboardWrite(ClipboardText {
-            text: "hello".to_owned(),
-        }),
-    }
-}
-
 #[test]
 fn every_mutating_request_emits_one_audit_event() {
     for action in MutatingAction::ALL {
-        // Given
-        let mut harness = harness(&json!({}));
+        // Given: window 101 has a File > Save menu, so a menu selection is
+        // admitted like every other mutation; raiseWindow and foreground
+        // deliveries need the grant.
+        let mut harness = harness(&json!({
+            "menus": {"101": [{"title": "File", "children": [{"title": "Save"}]}]}
+        }));
+        harness.grant("audit sweep");
+        harness.audits.lock().clear();
         let op = request_for(&mut harness, action);
         // When
         let reply = harness.process(op);

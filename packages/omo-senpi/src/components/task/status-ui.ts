@@ -14,6 +14,7 @@ import type { CapturedUi } from "./runtime-context"
 import {
   backgroundWidgetRows,
   buildWidgetRows,
+  isSuspended,
   isTerminal,
   LIVE_STATUS_REFRESH_MS,
 } from "./status-row-format"
@@ -149,7 +150,8 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       return
     }
     ui.setWidget(UI_KEY, rows, { placement: "belowEditor" })
-    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status))) {
+    // Only a live child needs the 250 ms repaint; a parked one renders a still row.
+    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status) && !isSuspended(record))) {
       scheduleLiveRefresh()
     } else clearLiveRefresh()
   }

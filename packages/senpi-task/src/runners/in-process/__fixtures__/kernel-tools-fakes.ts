@@ -1,4 +1,5 @@
 import type {
+  KernelToolLanguage,
   KernelToolDescriptor,
   KernelToolInvokeOptions,
   KernelToolInvokeRequest,
@@ -17,6 +18,7 @@ export type FakeKernelToolDefinition = {
   readonly name: string
   readonly description?: string
   readonly input_schema?: Record<string, unknown>
+  readonly language?: KernelToolLanguage
   readonly run?: (args: unknown, host: FakeHostCall) => unknown
 }
 
@@ -97,7 +99,7 @@ export function fakeKernelTools(options: FakeKernelToolsOptions = {}): FakeKerne
         properties: { value: { type: "string" } },
         additionalProperties: false,
       },
-      language: "js",
+      language: definition.language ?? "js",
       kernel_generation: generation,
       definition_revision: (previous?.descriptor.definition_revision ?? 0) + 1,
     }

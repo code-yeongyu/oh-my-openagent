@@ -3,16 +3,18 @@ import { createConnection, type Socket } from "node:net"
 import { randomUUID } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { resolveTaskHostSocket, TASK_HOST_SOCKET_ENV_NAMES } from "../../../../senpi-task/src/runners/rpc-host/daemon-contract"
-import { resolveProjectStateDirectory } from "../../../../senpi-task/src/store/project-state-directory"
+import { StringDecoder } from "node:string_decoder"
+import { resolveThreadSocket } from "./live-surface-paths"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../memory/worker/senpi-command"
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
+import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
 import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegistryEndpoints, type EndpointKind, type RegistryEndpoint } from "./endpoint-registry"
 import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
+import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { answerUiRequest } from "./ui-answer"
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorData?: unknown }
@@ -48,22 +50,8 @@ export const HOST_STATUS_ALL_ARGS = ["host", "status", "--all", "--include-worke
  */
 const OBSERVE = { observe: true } as const
 
-/**
- * The whole command surface of a terminal control endpoint (senpi `session-control-commands.ts`).
- * Nothing that starts, steers or queues a turn is sent to a terminal: messages reach it only through
- * the gateway, whose inbox the terminal's own extension drains. Any other command is refused here as
- * `unsupported` before a connection is opened.
- */
-export const TUI_ENDPOINT_COMMANDS: ReadonlySet<string> = new Set([
-  "get_protocol_info",
-  "list_sessions",
-  "get_state",
-  "get_messages",
-  "set_session_name",
-  "wake",
-  "subscribe",
-  "extension_ui_response",
-])
+/** The commands any terminal control endpoint answers, an older one included (senpi before its session controls). */
+export const TUI_ENDPOINT_COMMANDS: ReadonlySet<string> = LEGACY_TUI_COMMANDS
 
 type RequestOptions = { readonly timeoutMs?: number; readonly secret?: Uint8Array }
 
@@ -82,6 +70,8 @@ async function requestFrame(socketPath: string, command: Record<string, unknown>
   return await new Promise((resolve, reject) => {
     const socket = connect(socketPath)
     let buffer = ""
+    // One streaming decoder per connection: a character split across two reads stays whole.
+    const decoder = new StringDecoder("utf8")
     const timer = setTimeout(() => { socket.destroy(); reject(new Error("thread RPC request timed out")) }, options.timeoutMs ?? REQUEST_TIMEOUT_MS)
     const finish = (error?: Error, value?: RpcFrame) => { clearTimeout(timer); socket.destroy(); error === undefined ? resolve(value as RpcFrame) : reject(error) }
     socket.once("error", (error) => finish(error))
@@ -91,7 +81,7 @@ async function requestFrame(socketPath: string, command: Record<string, unknown>
       socket.write(`${JSON.stringify({ ...command, id })}\n`)
     })
     socket.on("data", (chunk) => {
-      buffer += chunk.toString("utf8")
+      buffer += decoder.write(chunk)
       let newline = buffer.indexOf("\n")
       while (newline >= 0) {
         const line = buffer.slice(0, newline)
@@ -108,18 +98,7 @@ async function requestFrame(socketPath: string, command: Record<string, unknown>
   })
 }
 
-/**
- * Socket overrides, most specific first: the engine's own brand-prefixed `RPC_SOCKET` names
- * (`envValue("RPC_SOCKET")` in senpi), then `OMO_RPC_SOCKET_PATH`, which the desktop sets on the
- * host it spawns so that host binds beside the CLI host instead of replacing it. The list and the
- * precedence live ONCE, beside the task daemon that attaches to the same socket.
- */
-export const THREAD_SOCKET_ENV_NAMES = TASK_HOST_SOCKET_ENV_NAMES
-
-/** Client for Senpi's existing supervisor-owned unix socket. It never starts or replaces a host. */
-export function resolveThreadSocket(env: Readonly<Record<string, string | undefined>> = process.env): string {
-  return resolveTaskHostSocket(env, resolveAgentHome({ env }))
-}
+export { resolveThreadSocket, THREAD_SOCKET_ENV_NAMES, defaultThreadStateDirectory } from "./live-surface-paths"
 
 /**
  * One endpoint row of `senpi host status --all --include-workers --json` (`{ endpoints: [...] }`),
@@ -192,6 +171,8 @@ function engineHostStatusAll(env: Readonly<Record<string, string | undefined>>):
 }
 
 export type LiveThreadSurfaceOptions = {
+  /** Socket already resolved by a synchronous registrar before the runtime is loaded. */
+  readonly socket?: string
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly exists?: (path: string) => boolean
   /** Replaces the engine CLI enumeration; tests answer it without spawning anything. */
@@ -206,7 +187,7 @@ type EndpointVerdict = { readonly alive?: boolean; readonly reason?: "live_unres
 type KnownEndpoint = { readonly socket: string; readonly paths: readonly string[]; readonly kind: EndpointKind; readonly verdict: EndpointVerdict }
 type EndpointListing = { readonly host: AddressBookHost; readonly sessions: readonly ThreadHostSession[]; readonly disk: readonly DiskSession[]; readonly failure?: unknown }
 
-export type LiveThreadSurface = ThreadHost & { readonly gateway: GatewayEndpointPort }
+export type LiveThreadSurface = ThreadHost & Required<Pick<ThreadHost, "endpoint" | "listView" | "listTarget">> & { readonly gateway: GatewayEndpointPort }
 
 function isConnectRefusal(error: unknown): boolean {
   const code = record(error) ? error.code : undefined
@@ -254,7 +235,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   const statusAll = options.statusAll ?? engineHostStatusAll(env)
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
-  const legacy = resolveThreadSocket(options.env)
+  const legacy = options.socket ?? resolveThreadSocket(options.env)
   let enumeration: { readonly expiresAt: number; readonly endpoints: Promise<readonly KnownEndpoint[]> } | undefined
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
@@ -262,11 +243,22 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   // What serves each socket, as the last enumeration said; a socket's name decides before that.
   const kinds = new Map<string, EndpointKind>()
 
+  // What each terminal answered get_protocol_info with: the commands it accepts beyond the read-mostly set.
+  const tuiCommands = new Map<string, ReadonlySet<string>>()
+  const learnTuiCommands = async (socket: string): Promise<ReadonlySet<string>> => {
+    const known = tuiCommands.get(resolve(socket))
+    if (known !== undefined) return known
+    const info = await callFrame(socket, "get_protocol_info", {}, TUI_REQUEST_TIMEOUT_MS)
+    const commands = tuiCommandsFrom(info.success === true ? info.data : undefined)
+    tuiCommands.set(resolve(socket), commands)
+    return commands
+  }
+
   const kindOf = (socket: string): EndpointKind => kinds.get(resolve(socket)) ?? (isTuiControlSocket(socket) ? "tui" : "rpc_host")
 
   const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number): Promise<RpcFrame> => {
     const tui = kindOf(socket) === "tui"
-    if (tui && !TUI_ENDPOINT_COMMANDS.has(type)) throw new Error(`unsupported:${type}`)
+    if (tui && !LEGACY_TUI_COMMANDS.has(type) && !(await learnTuiCommands(socket)).has(type)) throw new Error(`unsupported:${type}`)
     if (!exists(socket)) throw new Error(`host_unavailable:${socket}`)
     let secret: Uint8Array | undefined
     if (tui) {
@@ -323,11 +315,16 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     // suspended or remote terminal is reported, never dialed again, reaped or reopened elsewhere.
     if (tui && endpoint.verdict.alive === false) return degraded(endpoint, new Error(endpoint.verdict.reason ?? "live_unresponsive"), endpoint.verdict.reason ?? "live_unresponsive")
     try {
-      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", tui ? {} : OBSERVE, tui ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS)
+      const [{ sessions }, commands] = await Promise.all([
+        callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", tui ? {} : OBSERVE, tui ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS),
+        tui ? learnTuiCommands(endpoint.socket).catch(() => LEGACY_TUI_COMMANDS) : Promise.resolve(undefined),
+      ])
+      const controls = acceptedControls(endpoint.kind, commands)
       const tagged = sessions.map((session) => ({
         ...session,
         socket: endpoint.socket,
         endpoint_kind: endpoint.kind,
+        controls,
         ...(tui && session.durableSessionId === undefined ? { durableSessionId: session.sessionId } : {}),
       }))
       lastListed.set(endpoint.socket, tagged.flatMap((session) => (typeof session.sessionPath === "string" ? [session.sessionPath] : [])))
@@ -437,7 +434,9 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
-      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...(params as Record<string, unknown>), retain_on_disconnect: true })
+      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field.
+      const { initialSkills, ...openParams } = params as Record<string, unknown> & { readonly initialSkills?: readonly string[] }
+      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...openParams, retain_on_disconnect: true, ...(initialSkills === undefined ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }) })
       const routingId = result.sessionId
       const name = (params as { readonly name?: string }).name
       if (name !== undefined && name.trim() !== "") await call("set_session_name", { sessionId: routingId, name })
@@ -448,5 +447,3 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     ...sessionMethods(undefined, call),
   }
 }
-
-export function defaultThreadStateDirectory(pi: SenpiExtensionAPI): string { return resolveProjectStateDirectory(pi.cwd ?? process.cwd(), "thread-tools") }

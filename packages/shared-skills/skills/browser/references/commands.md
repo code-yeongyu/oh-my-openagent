@@ -98,8 +98,17 @@ Every refusal is a `BskRpcError` with the daemon's own `code`:
 | `invalid_params` | wrong option shape | fix the call, do not retry as-is |
 | `permission_denied` | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
 | `timeout` | the tool did not finish in its budget | read the page state before retrying once |
-| `user_aborted` | the user pressed Stop in the browser | stop the task and report |
+| `user_aborted` | the user pressed Stop in the browser | stop the task and report; under `OMO_BROWSER_ENGINE` this surfaces as `BrowserUserStoppedError` and no session starts again this turn |
 | `cdp_failed` | the page cannot be attached (restricted URL, DevTools open) | say which page and why |
+
+Typed errors under `OMO_BROWSER_ENGINE` (see SKILL.md Step 0):
+
+| Error | `code` | Meaning |
+|---|---|---|
+| `BrowserNotConnectedError` | `browser_not_connected` | the user's browser is not connected; ask them to connect it |
+| `BrowserEngineRefusal` | `browser_engine_none` / `browser_engine_builtin` / `browser_engine_unsupported` / `browser_tool_blocked` | this engine setting does not allow that call |
+| `BrowserActionDeclinedError` | `user_declined` | the user said no, or no question could be asked; do not retry |
+| `BrowserUserStoppedError` | `user_stopped` | the user stopped browser use |
 
 Long calls can be cancelled: `const h = session.client.callWithHandle("tool.navigate", {...})`
 then `await session.client.cancel(h.rpcId)`.

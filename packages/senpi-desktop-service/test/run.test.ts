@@ -126,6 +126,19 @@ describe("runComputerCode", HANG_GUARD, () => {
 		]);
 	});
 
+	it("rejects with the error of code that throws before its first await, leaving nothing unhandled", async () => {
+		// Given: the vm rejects its evaluation promise while its own microtasks drain, before the host has
+		// attached a handler; that used to surface as an unhandled rejection in the host (Vitest fails the
+		// run on one, so this test guards that too)
+		const { service } = await openDesktop();
+
+		// When
+		const error = await rejectionOf(run(service, `throw new Error("thrown before any await");`));
+
+		// Then
+		expect(error).toMatchObject({ message: "thrown before any await" });
+	});
+
 	it("rejects click in a read-only run before it reaches the engine", async () => {
 		// Given
 		const { service, log } = await openDesktop();
@@ -138,6 +151,81 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(error).toHaveProperty("reason", "readOnly");
 		expect(error).toHaveProperty("message", "read-only run: 'click' requires read_only: false");
 		expect(methods(log)).not.toContain("click");
+	});
+
+	it("rejects menu.select in a read-only run before it reaches the engine", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+		const code = `
+			const editor = await desktop.window({ app: "Code" });
+			await editor.menu.select(["File", "Save"]);
+		`;
+
+		// When
+		const error = await rejectionOf(run(service, code, { readOnly: true }));
+
+		// Then
+		expect(error).toBeInstanceOf(ComputerRunError);
+		expect(error).toHaveProperty("reason", "readOnly");
+		expect(error).toHaveProperty("message", "read-only run: 'menu.select' requires read_only: false");
+		expect(methods(log)).not.toContain("menus.select");
+	});
+
+	it("allows menu.items in a read-only run and returns the menu tree", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+		const code = `
+			const editor = await desktop.window({ app: "Code" });
+			return {
+				root: (await editor.menu.items()).map((item) => item.title),
+				file: (await editor.menu.items(["File"])).map((item) => item.title),
+			};
+		`;
+
+		// When
+		const result = await run(service, code, { readOnly: true });
+
+		// Then
+		expect(result.returnValue).toEqual({ root: ["File", "Edit", "View"], file: ["Save", "Export…"] });
+		expect(methods(log)).toContain("menus.items");
+		expect(methods(log)).not.toContain("menus.select");
+	});
+
+	it("forwards the window id and the full menu path to the engine", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+		const code = `
+			const editor = await desktop.window({ app: "Code" });
+			await editor.menu.items(["File"]);
+			await editor.menu.select(["File", "Export…", "PDF"]);
+		`;
+
+		// When
+		await run(service, code);
+
+		// Then
+		const items = log.requests.find((request) => request.method === "menus.items");
+		expect(items?.params).toEqual({ windowId: "101", path: ["File"] });
+		const select = log.requests.find((request) => request.method === "menus.select");
+		expect(select?.params).toEqual({ windowId: "101", path: ["File", "Export…", "PDF"] });
+	});
+
+	it("forwards an explicit menu.select delivery as deliveryMode and omits it otherwise (#9888)", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+		const code = `
+			const editor = await desktop.window({ app: "Code" });
+			await editor.menu.select(["File", "Save"]);
+			await editor.menu.select(["File", "Save"], { delivery: "foreground" });
+		`;
+
+		// When
+		await run(service, code);
+
+		// Then
+		const selects = log.requests.filter((request) => request.method === "menus.select").map((request) => request.params);
+		expect(selects[0]).toEqual({ windowId: "101", path: ["File", "Save"] });
+		expect(selects[1]).toEqual({ windowId: "101", path: ["File", "Save"], deliveryMode: "foreground" });
 	});
 
 	it("allows screenshot in a read-only run", async () => {

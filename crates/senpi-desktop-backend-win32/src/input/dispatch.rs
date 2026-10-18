@@ -34,7 +34,7 @@ pub(super) enum Via {
 }
 
 impl Via {
-    const fn route(self) -> Route {
+    pub(super) const fn route(self) -> Route {
         match self {
             Self::Enigo | Self::SendInput(_) => Route::System,
             Self::Post(window) => Route::Window(window.address()),
@@ -76,7 +76,7 @@ impl Win32Input {
         mode: DeliveryMode,
     ) -> CoreResult<()> {
         match (target, mode) {
-            (Target::Desktop, _) => self.system_pointer(event, None),
+            (Target::Desktop | Target::Display(_), _) => self.system_pointer(event, None),
             (Target::Window(id), DeliveryMode::Foreground) => {
                 self.with_foreground(id, |this, target| {
                     compositor::await_next_present();
@@ -102,7 +102,7 @@ impl Win32Input {
             .collect::<CoreResult<Vec<_>>>()?;
         let vks = chord_virtual_keys(&strokes);
         match (target, mode) {
-            (Target::Desktop, _) => self.holding(Via::Enigo, &vks, |_| Ok(())),
+            (Target::Desktop | Target::Display(_), _) => self.holding(Via::Enigo, &vks, |_| Ok(())),
             (Target::Window(id), DeliveryMode::Foreground) => {
                 self.with_foreground(id, |this, target| {
                     this.holding(Via::SendInput(Some(target)), &vks, |_| Ok(()))
@@ -144,7 +144,7 @@ impl Win32Input {
     }
 
     /// One key transition, recorded in the ledger once it was delivered.
-    fn transition(&mut self, via: Via, vk: u16, down: bool) -> CoreResult<()> {
+    pub(super) fn transition(&mut self, via: Via, vk: u16, down: bool) -> CoreResult<()> {
         let held = HeldKey {
             route: via.route(),
             vk,
@@ -239,7 +239,7 @@ pub(super) fn to_physical(x: f64, y: f64) -> CoreResult<(i32, i32)> {
         .ok_or_else(|| DesktopError::input_failed("Win32 reported no displays to map the point onto"))
 }
 
-fn char_stroke(key: KeyName) -> CoreResult<Stroke> {
+pub(super) fn char_stroke(key: KeyName) -> CoreResult<Stroke> {
     match key {
         KeyName::Char(character) => native::layout_stroke(character),
         named => Err(DesktopError::invalid_key(format!(

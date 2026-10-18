@@ -97,7 +97,7 @@ Landing pages fail on taste; app shells fail on *content*. Before declaring any 
 - **Long label** — a 40-char name in a 12-char slot. Truncate (`text-overflow: ellipsis`) or wrap by design, never by accident.
 - **Long paragraph** — does the measure stay readable, or does text run 200 chars wide?
 - **Unbroken string** — a URL or token with no spaces. Needs `overflow-wrap: anywhere` / `min-inline-size: 0`, or it forces horizontal scroll.
-- **Reflow** — at 375px width the layout reflows to a single readable column with NO horizontal scrollbar. Two-dimensional scrolling of primary content is a fail.
+- **Reflow** — at 390px width the layout reflows to a single readable column with NO horizontal scrollbar. Two-dimensional scrolling of primary content is a fail.
 - **Direction** — if the app supports RTL, the layout uses logical properties (`margin-inline`, `inset-inline-start`) so it mirrors correctly.
 
 A layout that only holds the happy-path mock is not finished. Drive these states in `/visual-qa` alongside the interaction states the style skill requires.

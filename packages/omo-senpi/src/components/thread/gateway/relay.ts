@@ -47,7 +47,7 @@ export type GatewayRelay = {
 }
 
 export type GatewayRelayOptions = {
-  readonly store: GatewayStore
+  readonly store: Pick<GatewayStore, "now" | "busyTimeoutMs" | "bind" | "unbind" | "rebind" | "listBindings" | "report" | "readOutbox" | "ackOutbox" | "claimAnswer" | "releaseAnswer" | "confirmAnswer" | "markPriorDelivered" | "bindingView" | "emitCompletions" | "deliveryReceipt" | "recoverDelivery">
   readonly engine: GatewayEngine
   readonly endpoints: GatewayEndpointPort
   /** The endpoint serving a session right now, or null when nothing answers for it. */

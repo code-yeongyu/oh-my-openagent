@@ -224,6 +224,7 @@ export async function runAutoUpdateCheck({
 			const result = spawnSync(invocation.command, invocation.args, {
 				env: plan.env,
 				stdio: "ignore",
+				windowsHide: true,
 			});
 			const status = result.status ?? (result.error === undefined ? 0 : 1);
 			await appendUpdateLog(env, now, "finished", { status });
@@ -241,6 +242,7 @@ export async function runAutoUpdateCheck({
 			env: plan.env,
 			stdio: "ignore",
 			detached: true,
+			windowsHide: true,
 		});
 		await writeState(statePath, { lastAttemptedAt: now, lastStatus: "started", pendingNotice });
 		await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan });

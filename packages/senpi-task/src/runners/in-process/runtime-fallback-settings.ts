@@ -76,7 +76,8 @@ class SnapshotSettingsStorage implements SettingsStorage {
   }
 }
 
-function modelSelector(model: ResolvedModelRecord): string {
+/** `provider/model[:thinking]`: how a fallback rung is named in a retry fallback chain. */
+export function modelSelector(model: ResolvedModelRecord): string {
   const thinking = model.reasoning ?? model.reasoning_effort ?? model.variant
   return thinking === undefined
     ? `${model.provider}/${model.model_id}`

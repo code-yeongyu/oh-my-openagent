@@ -10,6 +10,8 @@ The tool's parameters and permission classification are in [the computer tool re
 
 Computer use is on by default on macOS, Linux and Windows hosts: the `computer` tool is registered in every OmO Native session, and nothing touches your desktop until the agent (or you) activates it. The agent finds the tool with `tool_search` for `computer`, or calls it by name. After activation, JavaScript and Python eval kernels also receive a `computer` global.
 
+On macOS, a display-only virtual cursor shows where the agent is working without moving your physical pointer. Its default-ON setting is intentional: the overlay is visible in your own screen recordings and screen shares. Agents never see any session's cursor overlay in screenshots or window lists. On macOS 14 or later, native screenshots exclude known cursor-helper windows while other sessions' cursors remain visible. A capture is refused if a helper cannot be identified or excluded; it never falls back to unfiltered pixels when exclusion is required. Set `computer.showCursor: false` to keep it off, or use `/computer cursor off` for this session.
+
 You control it with these commands:
 
 | Command | Effect |
@@ -17,6 +19,7 @@ You control it with these commands:
 | `/computer` or `/computer status` | Report whether the tool is enabled and active, the engine state, the stop path, and the current capabilities (backend, capture/input/accessibility permissions, screen lock) |
 | `/computer on` | Enable and activate computer use for this session |
 | `/computer off` | Deactivate computer use for this session |
+| `/computer cursor on` or `/computer cursor off` | Show or hide the display-only macOS virtual cursor without disabling computer use |
 | `/computer stop` | Suspend desktop input and release held keys and buttons |
 | `/computer resume` | Lift a suspension; only you can do this, the model has no action that reaches it |
 
@@ -26,7 +29,7 @@ The tool comes with a `computer-use` skill, the full helper reference. If you al
 
 ### Where the engine comes from
 
-- **Compiled OmO binary:** the engine is staged inside the extracted runtime on macOS (arm64, x64), Linux x64 (glibc) and Windows x64.
+- **Compiled OmO binary:** the engine is staged inside the extracted runtime on macOS (arm64, x64), Linux (x64 and arm64, glibc) and Windows (x64 and arm64). Musl Linux has no released engine.
 - **npm install (`omo-ai`):** the npm package carries no native binaries. On first use, OmO looks for an engine for its own release version under `~/.omo/cache/senpi-desktop-engine/<version>/<host>/`, and when none is there it downloads the matching asset from the OmO GitHub release and verifies it against the release's checksum file before running it.
 - **Your own build:** set `computer.engine_path` to a binary, or build one in a checkout with `cargo build --release -p senpi-desktop-engine`.
 
@@ -77,7 +80,7 @@ Background delivery depends on the target toolkit and the requested action. Chro
 
 ## Configure it
 
-Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your account, or `.omo/omo.jsonc` in a project. The closest project layer wins. You may place it under `"[native]"` or at the shared top level; either way it is effective only in OmO Native. All keys are **snake_case** and optional:
+Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your account, or `.omo/omo.jsonc` in a project. The closest project layer wins. You may place it under `"[native]"` or at the shared top level; either way it is effective only in OmO Native. All keys are optional. Most use **snake_case**; the virtual-cursor setting is `showCursor`:
 
 ```jsonc
 {
@@ -95,7 +98,8 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `enabled` | `true` on macOS, Linux and Windows | Register the `computer` tool and `/computer` controls |
-| `display` | `"all"` | `all` composites every display; otherwise one display id from `computer.displays()` |
+| `showCursor` | `true` | Show the macOS virtual cursor in your own recordings/shares; it is excluded from agent captures and lists |
+| `display` | `"active"` | `active` follows the focused window's monitor (primary fallback); `all` composites every display; otherwise one display id from `computer.displays()` |
 | `max_width` | `3840` | Largest screenshot width in pixels; bigger captures are scaled down |
 | `max_height` | `2400` | Largest screenshot height in pixels |
 | `screenshot_max_bytes` | `5000000` | Largest inline screenshot; a bigger one is returned only as a file path |
@@ -111,6 +115,10 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 
 The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults are resolved in `packages/senpi-desktop-tool/src/settings.ts`. An invalid block is reported in the log and the component stays unregistered for that session. Start a new session after changing the file.
 
+`await computer.display(id)` returns a screenshot/input handle for one display; `"active"` follows focus and `"all"` composites every display. For example, `await (await computer.display("all")).screenshot()` observes every monitor without reopening or changing the session default. Each target has its own screenshot frame. `computer.displays()` lists all known monitors; its pixel rectangles describe the `"all"` composite, not the default active capture. Active chooses the monitor with the largest focused-window intersection; ties or missing focus use the primary display.
+
+Wayland has no focused-window geometry and uses the first display the portal reports, not a known compositor primary. The explicit id `"wayland-portal-0"` still means the whole Screenshot-portal image, even when libei proves a multi-monitor layout; other `"wayland-portal-N"` ids select a region through the Screenshot portal. Without a proven layout, only the whole-desktop image is available and coordinate input is refused. Explicit `"wayland-screencast-N"` ids now fail `InvalidTarget` if ScreenCast is unavailable instead of silently returning an unrelated Screenshot image; use `"all"` or `"wayland-portal-0"` for that fallback.
+
 ## Safety model
 
 **Permission tiers.** Screenshots, window lists, accessibility reads and `run` with `read_only: true` require `computer:read`. Input, mutations, `close`, unknown methods and malformed requests require `computer:exec`. The host checks the tier before the engine sees the call, and an approval for read never approves exec. A non-interactive run cannot answer an `ask` decision, so allow the tier explicitly or the call is blocked. To let the agent look but never touch:
@@ -119,7 +127,9 @@ The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults ar
 omo --permission computer:read=allow --permission computer:exec=deny
 ```
 
-**The stop chord.** While input is possible, a global stop chord is armed (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape on Linux and Windows, or `stop_hotkey`). Pressing it suspends all computer input immediately: a `type` already in progress stops at the next character, and an action cut short by the suspension releases any keys and buttons it was holding; `/computer stop` does the same from the prompt. Input stays suspended until you run `/computer resume`. If the chord cannot be armed, input is refused with `StopPathUnavailable` rather than running without a way to stop it; `allow_host_relay_only_stop: true` accepts `/computer stop` as the only stop path, and is meant for hosts that relay a stop reliably.
+**The stop chord.** While input is possible, a global stop chord is armed (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape on Linux and Windows, or `stop_hotkey`). Pressing it suspends all computer input immediately: a `type` already in progress stops at the next character, and an action cut short by the suspension releases any keys and buttons it was holding; `/computer stop` does the same from the prompt. Input stays suspended until you run `/computer resume`. Every running session watches the chord itself, so one press stops all of them. On macOS and Linux X11 only a physical key press counts: a chord a program sends (the agent's own `press`, `xdotool`, another app posting key events) is ignored, so no program sending key events can stop computer use or keep it stopped. A virtual keyboard installed at the system level (a driver, or Linux `uinput`, which need administrator rights) looks like hardware and is not filtered. The Wayland GlobalShortcuts portal cannot tell the two apart, and Windows still accepts a sent chord until #10444 is finished. If the chord cannot be armed, input is refused with `StopPathUnavailable` rather than running without a way to stop it; `allow_host_relay_only_stop: true` accepts `/computer stop` as the only stop path, and is meant for hosts that relay a stop reliably.
+
+**Foreground control asks you first.** Background input, the default, needs no extra approval. Before the agent can take your foreground (input with `delivery: "foreground"`, or raising a window with `win.raise()`), OmO shows "Allow foreground computer control?" with the agent's reason. Only your answer grants it: a non-interactive run has no one to ask, so it never grants. When OmO runs inside another app (OmO Desktop or an RPC client), that app shows the question, and an app that never answers leaves control off. Declining, letting the question time out, or interrupting while it is open all leave control off. Until you approve, foreground actions fail with `ControlRequired`. The approval covers foreground input for the current task only and does not authorize anything else, such as sending messages or deleting data. It ends when the task finishes, when any `computer` run in it fails or is interrupted, when the session closes, and when you press the stop chord; `/computer resume` never brings it back, so the next foreground action asks again. Only one session holds foreground control at a time: if another session asks meanwhile, its question still appears, and even after you approve it gets `InputBusy` instead of taking control over. In full access mode (`--permission-preset full-access`) OmO grants foreground control without asking and says so in the session, and the same revocation rules apply.
 
 **Before input reaches an application,** the engine refuses it when input is suspended, the screen is locked, the stop path is gone, or the OS permission is missing.
 
@@ -151,17 +161,19 @@ omo --permission computer:read=allow --permission computer:exec=deny
 | `BackgroundUnavailable` | The target app or platform rejects this background action (a macOS app with several windows for keystrokes, a Windows toolkit restriction or non-client drag, some Linux toolkits, Wayland) | Read the named action and toolkit in the error; use accessibility `setValue` / `press`, or request `delivery: "foreground"` where supported. Windows may invoke an accessible control for an unmodified single left click, but never bypasses UIPI |
 | `StopPathUnavailable` | The global stop chord could not be armed (commonly Wayland without GlobalShortcuts) | Use a compositor with GlobalShortcuts, or set `allow_host_relay_only_stop: true` knowing `/computer stop` is then the only stop |
 | `Suspended` | You pressed the stop chord or ran `/computer stop` | Run `/computer resume` when you want input back |
+| `ControlRequired` | A foreground action or `win.raise()` ran without your foreground-control approval, or after it ended | Approve the "Allow foreground computer control?" question when the agent asks; background delivery needs no approval |
+| `InputBusy` | Another session holds foreground control | Finish or interrupt that session's task, then retry |
 
 ## Known limitations
 
 Computer use is experimental on every OS. These are the known gaps:
 
 - macOS (experimental): a background click can raise the clicked window to just below the frontmost window; your frontmost app, front window, focus, cursor and next-keystroke destination are kept. Restoring the full previous window order is tracked in [#8930](https://github.com/code-yeongyu/oh-my-openagent/issues/8930).
-- Linux (experimental): on Wayland, no single-window capture, no per-window input, no `raise()`; the stop chord needs the GlobalShortcuts portal. No released engine for Linux arm64 yet.
-- Windows (experimental): no input into elevated applications from a non-elevated OmO (UIPI), including accessibility click fallback. Background input is action-specific: WPF pointer/text and Chromium posted input remain restricted; see [Windows](#windows). No released engine for Windows arm64 yet.
+- Linux (experimental): on Wayland, no single-window capture, no per-window input, no `raise()`; the stop chord needs the GlobalShortcuts portal. No released engine for musl Linux (Alpine).
+- Windows (experimental): no input into elevated applications from a non-elevated OmO (UIPI), including accessibility click fallback. Background input is action-specific: WPF pointer/text and Chromium posted input remain restricted; see [Windows](#windows).
 
 ## Engine modes and bunshin
 
-The engine supports `--stdio` (JSON-RPC over NDJSON), `--serve <socket>` (daemon), `--oneshot` (one request forwarded to the daemon), `--resume` (user-controlled stop recovery), `--mcp` (MCP stdio server), `--selftest` and `--schema`. In `--mcp` mode, `tools/list` offers engine methods as `desktop_<method>` tools; capture results include MCP images, and input still goes through the same safety gate. Never expose the user-only resume operation as a model tool.
+The engine supports `--stdio` (JSON-RPC over NDJSON), `--serve <socket>` (daemon), `--oneshot` (one request forwarded to the daemon), `--resume` (user-controlled stop recovery), `--mcp` (MCP stdio server), `--selftest` and `--schema`. `--serve`, `--oneshot` and `--mcp` run only with `--enable-daemon`; the flag prevents an accidental daemon and is not a security boundary. On macOS the engine refuses every mode when it is its own responsible process (a disclaimed spawn, a launchd job, or a host that fork-execs it through a shell): start it as an ordinary child of the app or terminal that holds the computer-use grants. In `--mcp` mode, `tools/list` offers engine methods as `desktop_<method>` tools; capture results include MCP images, and input still goes through the same safety gate. Never expose the user-only resume operation as a model tool.
 
 The descriptor in `packages/senpi-desktop-engine/bunshin/descriptor.mjs` uses the `--oneshot` bridge. `bun script/install-bunshin-desktop-capability.mjs` installs it into the bunshin agent capability directory for a locally available engine; use `--engine <path>` for a specific binary or `--remove` to uninstall the descriptor. Installing a descriptor does not itself start an agent or grant desktop permissions.

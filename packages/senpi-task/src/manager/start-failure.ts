@@ -1,6 +1,7 @@
 import { homedir } from "node:os"
 
 import { RunnerError } from "../runners/in-process/runner-error"
+import { RpcRequestTimeout } from "../runners/rpc/errors"
 import {
   HOST_START_FAILURE_REASONS,
   SESSION_START_FAILURE_REASONS,
@@ -8,6 +9,7 @@ import {
   type TaskStartFailureKind,
   type TaskStartFailureReason,
 } from "../state/start-failure"
+import { classifyStartCause, describeStartCause, type StartCause } from "./start-failure-cause"
 
 const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 const MODEL_UNAVAILABLE_MESSAGE = "The task child cannot serve this model."
@@ -52,7 +54,20 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
   const reason = isTaskStartFailureReason(error.failure.reason) ? error.failure.reason : undefined
   const { rejected_while: rejectedWhile, exit, launch_spec_path: specPath } = error.failure
   const namedSpec = reason === "launch_spec_insecure" && specPath !== undefined ? homeRelative(specPath) : undefined
-  const errorMessage = namedSpec === undefined ? publicMessage(failureKind, reason) : launchSpecInsecureMessage(namedSpec)
+  // A reason that is present but outside the closed enum marks the failure as untrusted: nothing
+  // beyond the stable classification is derived from it, including its cause.
+  const trusted = error.failure.reason === undefined
+  const cause = trusted ? causeOf(failureKind, error.failure.cause) : undefined
+  const exited = trusted && cause === undefined && rejectedWhile === "exited" ? exit : undefined
+  const errorMessage = trusted && error.failure.cause instanceof RpcRequestTimeout
+    ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect task_output; run it again with task.`
+    : namedSpec !== undefined
+    ? launchSpecInsecureMessage(namedSpec)
+    : cause !== undefined
+      ? causedMessage(failureKind, cause)
+      : exited !== undefined && failureKind === "child-prompt-failed"
+        ? `Child prompt failed to start: ${describeChildExit(exited)}.`
+        : publicMessage(failureKind, reason)
   return {
     errorMessage,
     failureKind,
@@ -65,8 +80,24 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
       ...(exit === undefined
         ? {}
         : { exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }),
+      ...(cause ?? {}),
     },
   }
+}
+
+function causeOf(kind: TaskStartFailureKind, cause: unknown): StartCause | undefined {
+  return kind === "child-prompt-failed" || kind === "session_unavailable" ? classifyStartCause(cause) : undefined
+}
+
+function causedMessage(kind: TaskStartFailureKind, cause: StartCause): string {
+  return kind === "child-prompt-failed"
+    ? `Child prompt failed to start: ${describeStartCause(cause, "prompt")}.`
+    : `The child session could not be opened: ${describeStartCause(cause, "session")}.`
+}
+
+function describeChildExit(exit: NonNullable<RunnerError["failure"]["exit"]>): string {
+  const how = exit.signal !== null ? `signal ${exit.signal}` : exit.code !== null ? `code ${exit.code}` : "no exit code"
+  return `the child process exited before accepting it (${exit.kind}, ${how})`
 }
 
 function homeRelative(path: string): string {
@@ -106,6 +137,10 @@ function publicMessage(
         : "The task host is unavailable."
     case "child-turn-failed":
       return GENERIC_START_FAILURE_MESSAGE
+    case "child-unresponsive":
+      return "The child stopped answering. Action: inspect task_output; run it again with task."
+    case "suspended_unresumable":
+      return "The child could not be resumed."
     default:
       return assertNever(kind)
   }

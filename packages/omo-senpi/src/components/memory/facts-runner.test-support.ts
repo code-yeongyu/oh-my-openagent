@@ -1,7 +1,7 @@
-import { afterEach, expect } from "bun:test"
+import { expect, onTestFinished } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
-import { appendFile, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
+import { appendFile, mkdtemp, readFile, readdir, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -20,17 +20,16 @@ import { ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import { FactsExtractorRunner, type FactsExtractorRunnerOptions } from "./facts-runner"
 import { createFactsRecordTool } from "./facts-record-tool"
 import type { FactsRunLedger } from "./facts-runner-types"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 export const AVAILABLE_MODEL: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
-const tempDirs: string[] = []
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
-})
-
-export async function fixture(now?: () => Date) {
+export async function fixture(
+  now?: () => Date,
+  options: { readonly registerCleanup?: boolean } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), "omo-facts-runner-"))
-  tempDirs.push(root)
+  const cleanup = () => rmEfaultTolerant(root, { recursive: true, force: true })
+  if (options.registerCleanup !== false) onTestFinished(cleanup)
   const identity: MemoryIdentity = {
     id: "facts-agent",
     safeSlug: "facts-agent",
@@ -38,7 +37,7 @@ export async function fixture(now?: () => Date) {
   }
   const queue = new FactsQueue({ identityPaths: identity.paths, ...(now === undefined ? {} : { now }) })
   await enqueue(queue, identity, "session-1", "m1", "The project uses Bun.")
-  return { root, identity, queue }
+  return { root, identity, queue, cleanup }
 }
 
 /**
@@ -147,6 +146,7 @@ export function runnerOptions(
         return {
           task_id: spec.taskId,
           sessionId: `session-${spec.taskId}`,
+          effectiveModel: () => undefined,
           steer: async () => undefined,
           followUp: async () => undefined,
           abort: async () => undefined,

@@ -54,13 +54,13 @@ export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellTy
 export function injectGitMasterConfig(
 	template: string,
 	config?: GitMasterConfig,
+	shellType: ShellType = detectShellType(),
 	options?: GitAttributionCheckOptions,
 ): string {
 	const attribution = resolveGitAttribution(config, options)
 	const commitFooter = attribution.commitFooter
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
-	const shellType = detectShellType()
 	const shellPrefix = gitEnvPrefix ? buildShellAwareGitPrefix(gitEnvPrefix, shellType) : ""
 	const codeBlockLang = shellType === "powershell" ? "pwsh" : shellType === "csh" ? "csh" : "bash"
 	const skipBashBlockPrefixing = shellType === "powershell" || shellType === "cmd" || shellType === "csh"

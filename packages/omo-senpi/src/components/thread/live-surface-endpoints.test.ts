@@ -208,6 +208,37 @@ describe("thread tools across host endpoints", () => {
     expect(w.dialed).not.toContain(shard)
   })
 
+  test("#given a dead endpoint's session file longer than one byte window #when thread_read follows next_cursor #then the JSONL fallback pages forward to the end", async () => {
+    // given
+    const dir = tempDir("thr-ep-")
+    const legacy = join(dir, "rpc.sock")
+    const shard = join(dir, "i-0123456789abcdef.sock")
+    const desktopJsonl = join(dir, "desktop.jsonl")
+    const texts = Array.from({ length: 12 }, (_, index) => `m${index}:${"x".repeat(200)}`)
+    writeFileSync(desktopJsonl, [
+      { type: "session", id: "dur-desktop", cwd: process.cwd(), timestamp: "2026-09-27T00:00:00.000Z" },
+      ...texts.map((text, index) => ({ type: "message", timestamp: `2026-09-27T00:01:${String(index).padStart(2, "0")}.000Z`, message: { role: "user", content: text } })),
+    ].map((entry) => `${JSON.stringify(entry)}\n`).join(""))
+    await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")))
+    const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, false, [desktopJsonl])] })
+
+    // when
+    const contents: string[] = []
+    let reads = 0
+    let cursor: string | undefined
+    do {
+      const page = await w.run("thread_read", { thread: "dur-desktop", max_bytes: 1000, ...(cursor === undefined ? {} : { cursor }) })
+      expect(page).toMatchObject({ kind: "ok", source: "session_jsonl" })
+      reads += 1
+      contents.push(...(page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
+      cursor = (page as { next_cursor?: string }).next_cursor
+    } while (cursor !== undefined && reads < 20)
+
+    // then
+    expect(reads).toBeGreaterThan(1)
+    expect(contents).toEqual(texts.map((text) => JSON.stringify(text)))
+  })
+
   test("#given the legacy endpoint stopped answering after it claimed a session file #when thread_list and thread_read run #then its thread is listed from disk as resumable on the legacy socket and reads from JSONL, while the live i-* thread stays live", async () => {
     // given: the legacy socket path names nothing; host status --all still reports its claim
     const dir = tempDir("thr-ep-")

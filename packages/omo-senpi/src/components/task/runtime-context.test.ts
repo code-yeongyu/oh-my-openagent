@@ -3,6 +3,28 @@ import { describe, expect, test } from "bun:test"
 import { TaskRuntimeContext } from "./runtime-context"
 
 describe("TaskRuntimeContext session facts", () => {
+  test("#given an Astra receiver #when a new context omits model #then stale receiver identity is cleared", () => {
+    // given
+    const runtime = new TaskRuntimeContext("/project")
+    runtime.captureFrom({ model: { id: "gpt-6-astra" } })
+    // when
+    runtime.captureFrom({ cwd: "/other-project" })
+    // then
+    expect(runtime.parentModel()).toBeUndefined()
+  })
+
+  for (const model of [undefined, null, {}, { id: undefined }, { id: 42 }]) {
+    test(`#given a previous Astra model #when the latest context model is ${JSON.stringify(model)} #then receiver selection becomes unknown`, () => {
+      // given
+      const runtime = new TaskRuntimeContext("/project")
+      runtime.captureFrom({ model: { id: "gpt-6-astra" } })
+      // when
+      runtime.captureFrom({ model })
+      // then
+      expect(runtime.parentModel()).toBeUndefined()
+    })
+  }
+
   test("#given a live session manager with its file #when captured #then the exact file path is retained", () => {
     // given
     const runtime = new TaskRuntimeContext("/project")

@@ -75,13 +75,13 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6-astra"])
   })
 
-  test("visual-engineering starts with Fable 5.1 max", () => {
+  test("visual-engineering starts with Argon low (#10187)", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["visual-engineering"].fallbackChain.at(0)).toEqual({
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max",
+      providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low",
     })
   })
 
-  test("visual-engineering follows the approved 3-rung chain", () => {
+  test("visual-engineering follows the approved 4-rung chain", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -90,6 +90,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(chain).toEqual([
+      {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -108,7 +113,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("quick follows the approved 9-rung chain", () => {
+  test("quick follows the approved 9-rung chain with Haiku 5.5 medium after Luna Fast", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -121,6 +126,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["openai", "chatgpt-subscription"],
         model: "gpt-6-luna-fast",
         variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot"],
+        model: "claude-haiku-5-5",
+        variant: "medium",
       },
       {
         providers: ["deepseek"],
@@ -145,11 +155,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["xai"],
         model: "grok-4.20-0309-non-reasoning",
-      },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot"],
-        model: "claude-haiku-4-5",
-        variant: "off",
       },
       { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
       { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
@@ -181,9 +186,14 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "xhigh",
       },
       {
+        providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.1-sol",
+        variant: "medium",
+      },
+      {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-terra",
-        variant: "high",
+        model: "gpt-5.6-sol",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -262,7 +272,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("writing leads with claude-opus-5-5 low and no longer carries claude-fable-5-1", () => {
+  test("writing leads with Argon low, then claude-opus-5-5 low, and never carries claude-fable-5-1", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
@@ -272,6 +282,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     // then
     expect(chain.map(({ model }) => model)).not.toContain("claude-fable-5-1")
     expect(chain).toEqual([
+      {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",

@@ -5,10 +5,13 @@ on:
     branches: [master, dev]
   pull_request:
     branches: [master, dev]
-    # `labeled` lets the ci:full-matrix label retrigger CI; concurrency cancel-in-progress absorbs bot-label churn.
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
+  merge_group:
+    types: [checks_requested]
+  workflow_call:
 
 concurrency:
+  # Queue refs are unique per group, so unrelated groups never cancel each other.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -17,7 +20,7 @@ permissions:
 
 jobs:
   ci-mode:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -33,7 +36,7 @@ jobs:
         id: classify
         shell: bash
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before) }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
@@ -68,6 +71,14 @@ jobs:
           jq -r '"runtime_touching=\(.runtimeTouching)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq . <<< "$MODE_JSON"
 
+      # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
+      - name: Report-only temp-leak list only shrinks
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node script/check-temp-leak-report-only.mjs "$(git merge-base "$BASE_SHA" "$GITHUB_SHA")"
+
       - name: Write job summary
         if: always()
         shell: bash
@@ -79,13 +90,13 @@ jobs:
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
             - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (true runs every OS leg; only web, docs, and repository-metadata changes stay ubuntu-only).
-            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (false keeps heavy work on ubuntu and every skipped leg says so; add the `ci:full-matrix` label to force it).
+            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (false keeps heavy work on ubuntu; add `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
           JOB_SUMMARY_NEXT: Classification failures default to heavy validation on the full matrix; inspect the changed-path diff and event metadata.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   # Block PRs targeting master branch (comment + auto-close, then fail the check)
   block-master-pr:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: github.event_name == 'pull_request'
     permissions:
       pull-requests: write
@@ -147,10 +158,14 @@ jobs:
 
   test:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
+      # merge_group uses these same six required contexts, without PR labels.
+      # Queue commits always run heavy validation on every OS leg, including
+      # docs/web-only groups; the fast path remains a pull-request optimization.
       matrix:
         include:
           - os: ubuntu-latest
@@ -210,10 +225,39 @@ jobs:
       # `bun test --parallel` is not used on POSIX: --isolate re-runs the heavy
       # preload per file and OOM-kills the 7 GB runners, and --no-isolate leaks
       # module state between files. Job-level sharding is the parallelism.
+      # Linux: memory-core's stranded-git-lock tests read the host process table. On hosted runners
+      # same-uid processes of other sessions cannot be inspected, so on Linux memory-core runs in an
+      # unprivileged PID namespace, and the step fails loudly when no namespace can be made instead
+      # of falling back to the host table (omo #10199). Even inside it, the user's own LIVE git
+      # processes return EACCES on /proc/<pid>/fd (this runner's azure 7.0 kernel, and Boat alike),
+      # so the 7 rows that need the scan to answer are skipped here via
+      # OMO_CI_SAME_UID_GIT_UNINSPECTABLE. Behavior stays fail-closed (an unanswerable scan keeps
+      # the lock). Coverage for those rows is macOS CI (and macOS hosts) until kernel-lock liveness
+      # lands; running them on Linux CI is #10322's acceptance criterion:
+      # https://github.com/code-yeongyu/oh-my-openagent/issues/10322
       - name: Run tests
         id: root-tests-posix-1
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: bun test --timeout 20000 packages/omo-opencode packages/memory-core
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" != "Linux" ]; then
+            bun test --timeout 20000 packages/omo-opencode packages/memory-core
+            exit 0
+          fi
+          bun test --timeout 20000 packages/omo-opencode
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if ! procs="$(unshare -Upf --mount-proc --map-current-user -- sh -c 'ls /proc | grep -c "^[0-9]"')"; then
+            echo "::error::cannot create an unprivileged PID namespace; memory-core's lock tests must not fall back to the host process table (omo #10199)"
+            exit 1
+          fi
+          if [ "$procs" -gt 8 ]; then
+            echo "::error::the PID namespace sees $procs processes, so it is not isolated from the host (omo #10199)"
+            exit 1
+          fi
+          echo "PID namespace ready ($procs processes visible)"
+          unshare -Upf --mount-proc --map-current-user -- env CI=1 OMO_CI_SAME_UID_GIT_UNINSPECTABLE=1 bun test --timeout 20000 packages/memory-core
 
       - name: Run tests with Windows telemetry
         id: root-tests-windows-1
@@ -304,7 +348,7 @@ jobs:
 
   typecheck:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -346,9 +390,11 @@ jobs:
 
   codex-compatibility:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains all three required compatibility contexts.
       matrix:
         include:
           - os: ubuntu-latest
@@ -462,9 +508,11 @@ jobs:
 
   senpi-compatibility:
     needs: [ci-mode]
-    runs-on: ${{ matrix.os }}
+    # Preserve required matrix check names during the Ubuntu image migration.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
+      # merge_group retains this matrix, including the required ubuntu context.
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
@@ -587,7 +635,7 @@ jobs:
 
   lazycodex-published-smoke:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/setup-node@v7
@@ -676,7 +724,7 @@ jobs:
 
   build:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -741,7 +789,7 @@ jobs:
 
   omo-ai-payload-check:
     needs: [ci-mode]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -905,7 +953,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   auto-commit-schema:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
+    runs-on: ubuntu-24.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
@@ -955,7 +1004,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   draft-release:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
+    runs-on: ubuntu-24.04
     needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&

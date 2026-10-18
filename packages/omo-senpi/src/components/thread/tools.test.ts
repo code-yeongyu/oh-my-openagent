@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
+import { deliverySender } from "./gateway/provenance"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -6,6 +7,7 @@ import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { GatewayEndpointRef } from "./gateway/adapter"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { parseThreadLinkUrl } from "./thread-link"
 import { createThreadTools, RECEIPT_RECOVERY_MAX_KEYS, registerThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
 const directories: string[] = []
@@ -109,6 +111,57 @@ describe("thread tool registration", () => {
     const result = await list[2].execute("call-1", { thread: "missing" }, undefined, undefined, {} as never)
     expect((result.details as { result: { kind: string; error?: { code: string } } }).result).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
+
+  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then each read returns the next slice until the end", async () => {
+    // given
+    const f = fixture()
+    const transcript = Array.from({ length: 12 }, (_, index) => ({ role: "assistant", content: `m${index}:${"x".repeat(200)}` }))
+    const run = runner({ ...f, host: { ...f.host, getMessages: async () => transcript } })
+
+    // when
+    const pages: Array<{ contents: string[]; next_cursor?: string }> = []
+    let cursor: string | undefined
+    do {
+      const page = await run("thread_read", { thread: "dur-peer", max_bytes: 1000, ...(cursor === undefined ? {} : { cursor }) }, undefined, `read-${pages.length}`) as Extract<ThreadToolResult, { kind: "ok"; items: unknown }>
+      expect(page).toMatchObject({ kind: "ok" })
+      cursor = (page as { next_cursor?: string }).next_cursor
+      pages.push({ contents: (page.items as ReadonlyArray<{ content: string }>).map((item) => item.content), ...(cursor === undefined ? {} : { next_cursor: cursor }) })
+    } while (cursor !== undefined && pages.length < 20)
+
+    // then
+    expect(pages.length).toBeGreaterThan(1)
+    expect(pages.flatMap((page) => page.contents)).toEqual(transcript.map((message) => JSON.stringify(message.content)))
+  })
+})
+
+describe("thread links", () => {
+  const linkTarget = (link: unknown) => {
+    const match = /^\[[^\]]+\]\((omo-thread:\/\/v1\/[^)]+)\)$/.exec(String(link))
+    return match === null ? null : parseThreadLinkUrl(match[1])
+  }
+
+  test("#given thread tools that name a thread #when they succeed #then each result carries a link that names that thread", async () => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "other" })
+    const run = runner(f)
+
+    // when
+    const listed = await run("thread_list", {}, undefined, "call-list") as unknown as { threads: Array<{ thread_id: string; link?: string }> }
+    const created = await run("thread_create", { name: "fresh" }, undefined, "call-create") as unknown as { thread: { thread_id: string; link?: string } }
+    const read = await run("thread_read", { thread: "peer" }, undefined, "call-read") as unknown as { thread_id: string; link?: string }
+    const sent = await run("thread_send", { thread: "peer", message: "hi" }, "dur-other", "call-send") as unknown as { thread_id: string; link?: string }
+    const handed = await run("thread_handoff", { thread: "peer", message: "go" }, "dur-other", "call-handoff") as unknown as { thread: { thread_id: string; link?: string } }
+
+    // then
+    expect(listed.threads.length).toBeGreaterThan(0)
+    for (const thread of listed.threads) expect(linkTarget(thread.link)).toEqual({ threadId: thread.thread_id })
+    expect(linkTarget(created.thread.link)).toEqual({ threadId: created.thread.thread_id })
+    expect(linkTarget(read.link)).toEqual({ threadId: "dur-peer" })
+    expect(linkTarget(sent.link)).toEqual({ threadId: "dur-peer" })
+    expect(linkTarget(handed.thread.link)).toEqual({ threadId: "dur-peer" })
+    expect(String(read.link)).toStartWith("[peer]")
+  })
 })
 
 describe("thread session controls", () => {
@@ -122,6 +175,18 @@ describe("thread session controls", () => {
     const f = fixture()
     f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "  Taken  " })
     expect(await runner(f)("thread_rename", { thread: "peer", name: " TAKEN " })).toMatchObject({ kind: "error", error: { code: "name_conflict", next_action: expect.any(String) } })
+    expect(f.setSessionName).not.toHaveBeenCalled()
+  })
+
+  test.each([["alpha", "\uff41\uff4c\uff50\uff48\uff41"], ["alpha beta", "alpha  beta"]])("#given a thread named %p #when another is created or renamed to %p #then both are name_conflict, as addressing would treat the names as equal", async (existing, requested) => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: existing })
+    const run = runner(f)
+
+    // when / then
+    expect(await run("thread_create", { name: requested }, undefined, "call-create")).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(await run("thread_rename", { thread: "peer", name: requested }, undefined, "call-rename")).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 
@@ -294,6 +359,38 @@ describe("thread session controls", () => {
     expect(f.prompt).not.toHaveBeenCalled()
   })
 
+  test("#given the best fuzzy match is a session in another workspace #when handing off without all_scope #then the best match in this workspace is chosen, and all_scope reaches the other one", async () => {
+    // given
+    const f = fixture()
+    const otherWorkspace = mkdtempSync(join(tmpdir(), "thread-fuzzy-scope-"))
+    directories.push(otherWorkspace)
+    f.sessions[0] = { ...f.sessions[0], name: "unrelated notes" }
+    f.sessions.push({ sessionId: "route-far", durableSessionId: "dur-far", cwd: otherWorkspace, name: "payments work" })
+    f.sessions.push({ sessionId: "route-near", durableSessionId: "dur-near", cwd: process.cwd(), name: "payments worker" })
+    const run = runner(f)
+
+    // when
+    const scoped = await run("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue" }, "dur-self", "call-scoped")
+    const wide = await run("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue", all_scope: true }, "dur-self", "call-wide")
+
+    // then
+    expect(scoped).toMatchObject({ kind: "ok", thread: { thread_id: "dur-near" }, resolved_by: "fuzzy" })
+    expect(wide).toMatchObject({ kind: "ok", thread: { thread_id: "dur-far" }, resolved_by: "fuzzy" })
+  })
+
+  test("#given a caller with no workspace root #when a fuzzy handoff runs without all_scope #then it is caller_context_missing, as the exact ladder answers, not not_found", async () => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-self", durableSessionId: "dur-self", cwd: process.cwd(), name: "self" })
+
+    // when
+    const result = await runner(f, "unknown-caller", "")("thread_handoff", { thread: "peer", match: "fuzzy", message: "continue" }, "dur-self", "call-blank-root")
+
+    // then
+    expect(result).toMatchObject({ kind: "error", error: { code: "caller_context_missing", next_action: expect.stringContaining("all_scope") } })
+    expect(f.prompt).not.toHaveBeenCalled()
+  })
+
   test("fuzzy handoff cannot select the caller when it is the only candidate", async () => {
     const f = fixture()
     expect(await runner(f)("thread_handoff", { thread: "peer", match: "fuzzy", message: "continue" }, "dur-peer")).toMatchObject({ kind: "error", error: { code: "not_found" } })
@@ -336,8 +433,8 @@ function gatewayFixture() {
       },
     },
   }
-  const run = async (name: ThreadToolName, args: unknown, callerId: string, callId: string): Promise<ThreadToolResult> => {
-    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, sessionsDirectory: () => join(f.stateDirectory, "sessions"), store: f.store, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd() })
+  const run = async (name: ThreadToolName, args: unknown, callerId: string, callId: string, callerName?: string): Promise<ThreadToolResult> => {
+    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, sessionsDirectory: () => join(f.stateDirectory, "sessions"), store: f.store, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd(), callerName: () => callerName })
     const tool = tools.find((candidate) => candidate.name === name)
     const result = await tool!.execute(callId, args, undefined, undefined, { sessionManager: { getSessionId: () => callerId } } as never)
     return result.details.result as ThreadToolResult
@@ -367,6 +464,17 @@ describe("thread_send through the session gateway", () => {
     expect(second).toMatchObject({ kind: "ok", deduplicated: true })
     expect(await g.f.store.list({ target_durable_id: "dur-tui" })).toHaveLength(1)
     expect(g.wakes).toHaveLength(1)
+  })
+
+  test("#given a named caller and an unnamed one #when each sends to a terminal #then the receiver is told the sending session's id and, only when it has one, its current name", async () => {
+    const g = gatewayFixture()
+    await g.run("thread_send", { thread: "dur-tui", message: "from the planner" }, "dur-host", "call-1", "  planner ")
+    await g.run("thread_send", { thread: "dur-tui", message: "from an unnamed session" }, "dur-other", "call-2")
+    const rows = await g.f.store.list({ target_durable_id: "dur-tui" })
+    expect(rows.map((row) => ({ body: row.body, sender: deliverySender(row) }))).toEqual([
+      { body: "from the planner", sender: { kind: "agent", session_id: "dur-host", name: "planner" } },
+      { body: "from an unnamed session", sender: { kind: "agent", session_id: "dur-other" } },
+    ])
   })
 
   test("#given the gateway send path #when a session sends to itself #then it is refused loop_detected before any row is written", async () => {

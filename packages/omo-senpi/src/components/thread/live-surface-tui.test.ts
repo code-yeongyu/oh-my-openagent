@@ -39,7 +39,9 @@ const SECRET = Buffer.alloc(32, 7)
  * every connection must be the secret (else the connection is dropped), then JSONL requests answered
  * from `session-control-commands.ts`'s surface; every other command is `unsupported` as data.
  */
-async function tuiEndpoint(socketPath: string, session: { id: string; path: string; name: string | null }): Promise<{ readonly frames: Frame[]; readonly rejected: { count: number } }> {
+type TerminalControls = { model: { provider: string; id: string }; level: string; running: boolean }
+
+async function tuiEndpoint(socketPath: string, session: { id: string; path: string; name: string | null }, controls?: TerminalControls): Promise<{ readonly frames: Frame[]; readonly rejected: { count: number } }> {
   writeFileSync(`${socketPath}.secret`, SECRET)
   const frames: Frame[] = []
   const rejected = { count: 0 }
@@ -70,12 +72,41 @@ async function tuiEndpoint(socketPath: string, session: { id: string; path: stri
         case "get_state": return reply({ success: true, data: { isStreaming: false, turn_epoch: 3 } })
         case "set_session_name": return reply({ success: true })
         case "wake": return reply({ success: true, data: { admitted: (frame.delivery_ids as string[]).map((id) => ({ delivery_id: id, kind: "started" })) } })
-        default: return reply({ success: false, error: "unsupported" })
+        default: return controls === undefined ? reply({ success: false, error: "unsupported" }) : reply(sessionControl(frame, controls))
       }
     })
   })
   await listen(server, socketPath, sockets)
   return { frames, rejected }
+}
+
+const TERMINAL_MODELS = [{ provider: "faux", id: "faux-reasoner", name: "Faux Reasoner" }, { provider: "faux", id: "faux-plain", name: "Faux Plain" }]
+
+/** senpi's terminal session controls (`session-control-session-commands.ts`), answered as that module answers them. */
+function sessionControl(frame: Frame, controls: TerminalControls): Record<string, unknown> {
+  switch (frame.type) {
+    case "get_protocol_info": return { success: true, data: { mode: "tui", commands: ["get_protocol_info", "list_sessions", "get_state", "get_messages", "set_session_name", "subscribe", "wake", "extension_ui_response", "get_available_models", "get_available_thinking_levels", "set_model", "set_thinking_level", "interrupt"] } }
+    case "get_available_models": return { success: true, data: { models: TERMINAL_MODELS } }
+    case "get_available_thinking_levels": return { success: true, data: { levels: controls.model.id === "faux-plain" ? ["off"] : ["off", "low", "medium", "high"] } }
+    case "set_model": {
+      const model = TERMINAL_MODELS.find((candidate) => candidate.provider === frame.provider && candidate.id === frame.modelId)
+      if (model === undefined) return { success: false, error: `Model not found: ${String(frame.provider)}/${String(frame.modelId)}` }
+      controls.model = { provider: model.provider, id: model.id }
+      return { success: true, data: model }
+    }
+    case "set_thinking_level": {
+      const levels = controls.model.id === "faux-plain" ? ["off"] : ["off", "low", "medium", "high"]
+      if (!levels.includes(String(frame.level))) return { success: false, error: `Thinking level ${String(frame.level)} is not supported by the active model.` }
+      controls.level = String(frame.level)
+      return { success: true }
+    }
+    case "interrupt": {
+      if (!controls.running) return { success: true, data: { interrupted: false } }
+      controls.running = false
+      return { success: true, data: { interrupted: true, turnId: "3" } }
+    }
+    default: return { success: false, error: "unsupported" }
+  }
 }
 
 async function hostEndpoint(socketPath: string, replies: Readonly<Record<string, unknown>> = {}): Promise<{ readonly frames: Frame[] }> {
@@ -127,7 +158,7 @@ function surfaceFor(legacy: string, reports: readonly HostEndpointReport[], opti
   return { surface, run, dialed }
 }
 
-type ListedThread = { thread_id: string; name: string; surface?: string; alive?: boolean; created_at: string; endpoint?: { kind: string; socket: string; routing_id: string | null }; error_note?: string; status: string }
+type ListedThread = { controls?: readonly string[]; thread_id: string; name: string; surface?: string; alive?: boolean; created_at: string; endpoint?: { kind: string; socket: string; routing_id: string | null }; error_note?: string; status: string }
 function threadsOf(result: ThreadToolResult): readonly ListedThread[] {
   if (result.kind !== "ok" || !("threads" in result)) throw new Error(`expected a thread list, got ${JSON.stringify(result)}`)
   return result.threads as unknown as readonly ListedThread[]
@@ -150,8 +181,8 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(threads.find((thread) => thread.thread_id === "dur-tui")).toMatchObject({ name: "my-tui", surface: "tui", alive: true, status: "live", created_at: "2026-09-28T04:19:00.000Z", endpoint: { kind: "tui", socket: tui, routing_id: "dur-tui" } })
     expect(threads.find((thread) => thread.thread_id === "dur-host")).toMatchObject({ surface: "daemon", endpoint: { kind: "rpc_host", socket: legacy, routing_id: "rpc-1" } })
     expect(terminal.rejected.count).toBe(0)
-    expect(terminal.frames.map((frame) => frame.type)).toEqual(["list_sessions"])
-    expect("observe" in (terminal.frames[0] ?? {})).toBe(false)
+    expect(terminal.frames.map((frame) => frame.type).sort()).toEqual(["get_protocol_info", "list_sessions"])
+    expect(terminal.frames.some((frame) => "observe" in frame)).toBe(false)
     expect(host.frames.every((frame) => frame.type !== "list_sessions" || frame.observe === true)).toBe(true)
   })
 
@@ -183,6 +214,48 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     for (const type of sent) expect(TUI_ENDPOINT_COMMANDS.has(type)).toBe(true)
     expect(sent.has("wake")).toBe(true)
     for (const forbidden of ["prompt", "steer", "follow_up", "open_session", "interrupt", "set_model", "get_available_models", "set_thinking_level", "release_session"]) expect(sent.has(forbidden)).toBe(false)
+  })
+
+  test("#given a terminal whose engine has session controls #when the thread tools act on it #then the model switches, an unsupported level and an unknown model are refused with their reasons, an interrupt answers whether it stopped a turn, and thread_list says which controls each endpoint takes", async () => {
+    // given
+    const dir = tempDir("thr-tui-")
+    const legacy = join(dir, "rpc.sock")
+    const current = join(dir, "t-0123456789abcdef.sock")
+    const older = join(dir, "t-fedcba9876543210.sock")
+    await hostEndpoint(legacy)
+    const state: TerminalControls = { model: { provider: "faux", id: "faux-reasoner" }, level: "medium", running: true }
+    const terminal = await tuiEndpoint(current, { id: "dur-new", path: join(dir, "new.jsonl"), name: "new-tui" }, state)
+    await tuiEndpoint(older, { id: "dur-old", path: join(dir, "old.jsonl"), name: "old-tui" })
+    const w = surfaceFor(legacy, [
+      { socket: legacy, reachable: true, session_paths: [], endpoint_kind: "rpc_host", alive: true, reason: null },
+      { socket: current, reachable: true, session_paths: [], endpoint_kind: "tui", alive: true, reason: null },
+      { socket: older, reachable: true, session_paths: [], endpoint_kind: "tui", alive: true, reason: null },
+    ])
+
+    // when
+    const listed = threadsOf(await w.run("thread_list", { all_scope: true }))
+    const reasoning = await w.run("thread_set_reasoning", { thread: "dur-new", level: "high", scope: "turn", all_scope: true })
+    const interrupted = await w.run("thread_interrupt", { thread: "dur-new", all_scope: true })
+    const idle = await w.run("thread_interrupt", { thread: "dur-new", all_scope: true })
+    const unknown = await w.run("thread_set_model", { thread: "dur-new", model: "no-such-model", all_scope: true })
+    const switched = await w.run("thread_set_model", { thread: "dur-new", model: "faux-plain", all_scope: true })
+    const refused = await w.run("thread_set_reasoning", { thread: "dur-new", level: "high", all_scope: true })
+    const olderRefused = await w.run("thread_set_model", { thread: "dur-old", model: "faux-plain", all_scope: true })
+
+    // then
+    expect(listed.find((thread) => thread.thread_id === "dur-new")?.controls).toEqual(["send", "read", "rename", "set_model", "set_reasoning", "interrupt"])
+    expect(listed.find((thread) => thread.thread_id === "dur-old")?.controls).toEqual(["send", "read", "rename"])
+    expect(listed.find((thread) => thread.thread_id === "dur-host")?.controls).toEqual(["send", "read", "rename", "set_model", "set_reasoning", "interrupt"])
+    expect(reasoning).toMatchObject({ kind: "ok", level: "high", scope: "turn" })
+    expect(interrupted).toMatchObject({ kind: "ok", thread_id: "dur-new", interrupted: true, turn_id: "3" })
+    expect(idle).toMatchObject({ kind: "ok", interrupted: false })
+    expect(unknown).toMatchObject({ kind: "error", error: { code: "model_not_found" } })
+    expect(switched).toMatchObject({ kind: "ok", model: { provider: "faux", id: "faux-plain" } })
+    expect(state.model).toEqual({ provider: "faux", id: "faux-plain" })
+    expect(refused).toMatchObject({ kind: "error", error: { code: "thinking_level_unsupported", details: { supported: ["off"] } } })
+    expect(state.level).toBe("high")
+    expect(olderRefused).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    expect(terminal.frames.filter((frame) => frame.type === "get_protocol_info")).toHaveLength(1)
   })
 
   test("#given the engine reports a stopped terminal live_unresponsive #when thread_list runs #then the terminal is not dialed and its thread shows alive false with error_note live_unresponsive from disk", async () => {
@@ -237,7 +310,9 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const terminal = await tuiEndpoint(tui, { id: "dur-tui", path: join(dir, "tui.jsonl"), name: "my-tui" })
     const w = surfaceFor(legacy, [{ socket: tui, reachable: true, session_paths: [], endpoint_kind: "tui", alive: true, reason: null }], { secret: Buffer.alloc(32, 9) })
     const threads = threadsOf(await w.run("thread_list", { all_scope: true }))
-    expect(terminal.rejected.count).toBe(1)
+    // every connection the listing opened (sessions and the protocol probe) was refused
+    expect(terminal.rejected.count).toBeGreaterThan(0)
+    expect(terminal.rejected.count).toBe(w.dialed.filter((path) => path === tui).length)
     expect(threads.some((thread) => thread.thread_id === "dur-tui")).toBe(false)
   })
 

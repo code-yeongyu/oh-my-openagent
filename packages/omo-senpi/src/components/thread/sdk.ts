@@ -10,9 +10,11 @@ import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/b
 import type { GatewayRelay, RelayResult } from "./gateway/relay"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { ReportOpResult } from "./gateway/store-relay-ops"
+import type { StoreExtensionApi } from "./gateway/store-extensions"
+export type { StoreExtensionApi, StoreExtensionRegistration, StoreExtensionTransaction, StoreExtensionOperation, StoreExtensionResult, StoreExtensionRefusal, StoreExtensionRefusalCode } from "./gateway/store-extensions"
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
-import { createGatewayServices } from "./tools/gateway-services"
+import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
@@ -43,7 +45,7 @@ type Reported = Promise<RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
 export type LocatedThread = Pick<AddressEntry, "thread_id" | "title" | "cwd" | "status" | "session_path" | "endpoint" | "surface" | "alive">
 
-export type ThreadSdk = {
+export type ThreadSdk = StoreExtensionApi & {
   /** `cli:<uid>`: the principal every receipt, budget and bindingless send of this SDK is keyed by. */
   readonly principal: string
   readonly list: (request: Scoped) => Promise<ThreadToolResult>
@@ -100,11 +102,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     env,
     ...(engineStatusAll === undefined ? {} : { statusAll: async () => parseHostStatusAll(await engineStatusAll()) }),
   })
-  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
+  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, resolveTarget: (address, request) => resolveForExtension(address, request), ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
   const now = options.now ?? store.now
   const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }
   const view = () => hostView(surface)
   const { engine, relay, endpoints, locate } = createGatewayServices(surface, () => hostView(surface, { offline: true }))
+  // An extension call resolves its target while the store worker runs that call's transaction, so it
+  // takes the store-free live-and-disk resolver: the send path's `resolve` first asks this same store
+  // for the session's owner, a request the busy worker would only answer after the call's budget.
+  const resolveForExtension = createGatewayResolver(surface, () => hostView(surface, { offline: true }))
 
   // A running session writes a completion only once it knows of the arm; the arm is durable, so a
   // wake that does not get through leaves it to the session's next start instead.
@@ -144,6 +150,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   }
 
   return {
+    registerStoreExtension: store.registerStoreExtension,
+    extensionCall: store.extensionCall,
     principal,
     list: (request) => guarded(async () => listThreads(surface, await view(), request.all_scope)),
     read: (request) => guarded(async () => readThread(surface, await view(), { thread: request.thread, max_bytes: request.max_bytes, cursor: request.cursor, all_scope: request.all_scope }, UNKNOWN_CALLER)),

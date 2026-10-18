@@ -20,7 +20,7 @@ The contract, in order:
 3. **Extract the mechanism**, not the pixels: the render loop and what drives it (pointer, scroll, time), the shader uniforms or split strategy, what starts and stops the loop, how it sizes to its container, and what it depends on.
 4. **Run the retrofit checklist** (section 4). Assume the reduced-motion path, the off-screen pause, and the accessibility contract are missing until you have read them in the source.
 5. **Adapt to the project.** Colors, durations, easings, and intensities come from the project `DESIGN.md`; react-bits defaults are demo values. A value that is not in `DESIGN.md` gets added there first, then used.
-6. **No matching pattern?** Compose from the nearest two, or state explicitly that the effect is novel and record its mechanism in `DESIGN.md` before building it.
+6. **No matching pattern?** Run `component-catalogs.md` section 3. If nothing fits there either, compose from the nearest two, or state explicitly that the effect is novel and record its mechanism in `DESIGN.md` before building it.
 
 ## 2. Consultation recipe (curl-only, verified 2026-09)
 

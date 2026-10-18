@@ -141,6 +141,142 @@ per message would still be bounded by the target's 128-message backlog. It passe
 busy human in a thread spends only their own budget; without an author every human in the thread
 shares the binding's one bucket.
 
+## Store extensions
+
+JavaScript packages register extensions on the `createThreadSdk(...)` result exported by the
+shipped `runtime/thread-sdk/sdk.js`. `createGatewayStore` is an internal source factory, not an
+export of a shipped bundle. Registration is local to the SDK's store handle; each process
+registers the extensions it uses. When the handle's store worker exits and the next call starts
+a fresh one, the handle registers the extensions its previous worker held again before that
+call runs.
+
+```typescript
+const { createThreadSdk } = await import(`${pluginRoot}/runtime/thread-sdk/sdk.js`)
+const store = createThreadSdk({ agentDir, cwd: process.cwd(), uid: process.getuid(), user: "connector" })
+const registered = await store.registerStoreExtension({
+  name: "notes",
+  migrations: [["CREATE TABLE notes_items (id INTEGER PRIMARY KEY, text TEXT)"]],
+  moduleUrl: new URL("./dist/store-ops.mjs", import.meta.url).href,
+})
+const result = await store.extensionCall("notes", "remember", { id: 1, text: "hello" })
+await store.dispose()
+```
+
+The compiled `.js`, `.mjs` or `.cjs` module exports named operations `(tx, args) => result`
+(async is supported). TypeScript is not stripped in the worker. Arguments and results must be
+structured-cloneable. Both API methods return `{ kind: "ok", value }` or
+`{ kind: "refused", code, message }`; registration's value is `{ version }`.
+
+`name` matches `^[a-z][a-z0-9_]{1,31}$` and must not collide with a core namespace or prefix
+any core object name. Names such as `gateway`, `thread`, and `sqlite` are rejected at registration.
+Each migration step is an array of SQL statements,
+tracked in `extension_schema`, independently of core `user_version`. Registration and calls
+ensure pending steps after core migrations. Each step takes `BEGIN IMMEDIATE` and re-reads the
+version under the lock, so concurrent processes apply it once. Overlapping namespaces such as
+`alpha` and `alpha_beta` are allowed in either registration order, but neither owns the other's
+objects. An unowned object already bearing the namespace prefix blocks its first registration.
+
+Operations run in one `BEGIN IMMEDIATE`. The transaction surface is:
+
+- `all(columns, sql, params?, orderBy?)`, `one(columns, sql, params?)`, and `exec(sql, params?)`:
+  one SQLite statement per call, using `?` parameters (`string | number | null`). Reads return
+  records keyed by the explicit columns; `one` returns `undefined` when absent; `exec` returns
+  the changed-row count. Use `orderBy` for ordered reads: it lists the statement's output columns,
+  each optionally with `COLLATE BINARY|NOCASE|RTRIM`, `ASC`/`DESC` or `NULLS FIRST`/`NULLS LAST`
+  (`"created_at, id"`). Each name must match a column the statement returns (ASCII
+  case-insensitively), and the ORDER BY is rebuilt from that column's name and the fixed keywords.
+  Anything else, such as a `LIMIT`, an `OFFSET`, a table-qualified, quoted or unknown column, is
+  refused with `extension_schema_violation`; put a `LIMIT` in the statement itself
+  (`... ORDER BY created_at, id LIMIT ?`). Only anonymous parameter tokens are
+  replaced; literal question marks in SQL strings, quoted identifiers and comments are preserved.
+  `exec` can also create, alter and drop the extension's own objects during an operation, not
+  just during migration. Identifiers and schema qualifiers follow SQLite's ASCII case folding.
+- `enqueue({ binding_id, event_id, text, author?, mode? })`: the relay's inbound validation,
+  including resolution through its shared live-and-disk address book, author-specific rate
+  limits, mode ceiling and idempotency. A missing target returns `not_found`, just as relay
+  inbound does. Like a core enqueue, it creates the target's wake marker inside the
+  transaction, so a committed delivery always has its marker and a rolled-back one never
+  keeps it; the wake is only ever early, and a marker that cannot be created refuses the
+  call. Enqueue requires a binding;
+  there is no `enqueueToSession` operation.
+  `deliveries.actor_user_id` records `author.user_id`, or NULL without it.
+- `bind({ principal, binding, idempotency_key? })`, `unbind({ principal, binding_id,
+  expected_revision, idempotency_key? })`, `rebind({ principal, binding_id, expected_revision,
+  session_durable_id, idempotency_key? })`, and `outboxAck({ binding_id, cursor,
+  provider_message_id? })`: the existing relay operations, joined to this transaction.
+- `bindingFor({ platform, account_id, chat_id, thread_id })`: the active, unexpired binding
+  or NULL. `outboxPending({ binding_id, after_cursor?, limit? })`: the relay page shape, pending
+  rows only, ordered by cursor; default 100 and maximum 500.
+
+SQL can access only objects recorded as owned by this extension in the persistent
+`extension_objects` registry. Core migration v6 snapshots every existing schema object as
+core-owned before extensions run. Each extension's new `<name>_*` objects are recorded under its
+owner in the same transaction; a prefix alone never grants access. Names in the registry are
+ASCII-case normalized. SQLite's automatic indexes for TEXT/composite primary keys and UNIQUE
+constraints inherit their table's owner; a core automatic index remains core-owned.
+Ownership survives reopening the store, and a newly appearing lookalike does not become
+extension-owned.
+
+SQLite authorizes resolved statements, including `DELETE FROM table` without a WHERE clause.
+`sqlite_schema` (`type`, `name`, `tbl_name`, `sql`) is also compared before and after migration
+steps and calls. Creating, dropping, renaming or altering an object the extension does not own
+rolls back the transaction. Triggers and views are rejected outright, both during statement
+authorization and in the schema-effect check, even with a matching prefix.
+Transaction-control SQL, PRAGMAs and attached/temporary databases are refused. Table-valued
+sources such as `json_each` and `pragma_table_info` are not owned objects and are refused.
+This is a store API contract, not a sandbox for untrusted JavaScript modules.
+A foreign key from an extension table to a core table makes every write to that table read the
+core table, so those writes are refused; keep core ids such as `binding_id` as plain values.
+
+The [retention](#retention) sweep deletes only core rows, never rows of an extension's tables,
+and never a core row an extension can still act on through `tx`: an active binding, a closed
+binding that still has outbox rows, completion arms or undelivered messages, or an undelivered
+message. A core id an extension keeps by value can name a row that retention has since pruned.
+
+A thrown operation rolls back extension rows and joined core writes together. Inbox wake
+markers are created inside the transaction, exactly as a core enqueue creates them: a
+committed delivery always has its marker, and a marker that cannot be created fails the
+operation. A rollback removes the markers the operation created (a failed removal is an
+`extension_error` with phase `after_rollback`), and a marker left by a crash before COMMIT
+names no row, so the next reconcile removes it. Marker removals still run only after COMMIT.
+Each post-commit effect runs independently: a failed effect emits an `extension_error` store
+event with phase `after_commit`, does not skip later effects, and does not turn committed
+data into a refused call. A returned relay refusal is data, so an operation that wants to
+undo its earlier work must throw. Catching an error from `all`, `one` or `exec` does not
+clear it: the whole call still rolls back, including for a caught constraint error.
+
+Refusal codes are `extension_import_failed`, `extension_unknown_op`, `extension_unknown_name`,
+`extension_schema_violation`, `gateway_lock_wait_exceeded`, and `gateway_schema_too_new`.
+Invalid registration input and uncloneable call arguments are `invalid_arguments`; a thrown
+operation or expired operation deadline is `extension_operation_failed`. The worker keeps
+serving core requests after operation refusals on a supported database. Reserved names, unowned object access, triggers,
+views, and forbidden DDL all use `extension_schema_violation`; rejecting a reserved name leaves
+that name unregistered. Lock acquisition uses the core busy timeout and
+30-second total bound, not an unbounded retry. An operation and its pending helpers have the
+same time budget after acquiring the transaction lock. That budget equals the bound other writers
+wait for the lock, so a writer queued behind an operation that runs out its budget can itself
+receive the retryable `gateway_lock_wait_exceeded`. On expiry, the transaction is revoked
+and rolled back before the next request runs. This bounds asynchronous waits, not synchronous
+JavaScript that blocks the worker's event loop. Using a retained `tx` after the operation
+returns throws a typed error (async helpers reject); an unhandled expired-transaction error
+is reported as an `extension_error` event with phase `stale_transaction`, without killing
+the worker. Any other late asynchronous error from extension code - a timer or an unawaited
+promise that fails after the operation returned - is reported as an `extension_error` with
+phase `async`, attributed to the most recent extension activity on a best effort, and never
+closes the store. If the worker ever does exit, the facade opens a fresh one on the next
+call and restores that worker's registrations.
+
+A core schema newer than this binary supports is refused with `gateway_schema_too_new`
+without applying migrations or lowering `user_version`. Extension registration/calls return
+the refusal; internal core store methods reject with an error carrying that code. Use a compatible binary
+to access that database.
+
+The same `gateway_schema_too_new` refusal applies when an extension's stored
+`extension_schema.version` exceeds the caller's `migrations.length`. Registration and
+lazy migration checks compare versions under the migration lock. Refusal leaves stored
+version, timestamps, ownership and data unchanged and does not replace an existing
+compatible registration. Core operations and compatible extensions remain usable.
+
 ## Connector loop
 
 ```bash
@@ -229,7 +365,7 @@ that such a question closed only from a refused answer: `already_answered` after
 
 A binding attaches one session to one external thread, named by `(platform, account, chat,
 thread)`; `--thread` defaults to `@chat` (the chat itself). `--platform` is one of `discord`,
-`telegram`, `slack`, `notion`, `feishu`, `herdr` or `custom` (any other connector). Nothing here talks to a chat platform:
+`telegram`, `slack`, `notion`, `feishu`, `herdr`, `custom` or `whatsapp`. Nothing here talks to a chat platform:
 a connector drives the binding.
 
 - At most one `active` binding holds a thread. Binding a thread that is already held is

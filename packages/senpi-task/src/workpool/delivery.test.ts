@@ -123,3 +123,34 @@ test("#given a crash before steering append #when a new manager attaches #then o
     expect(restarted.manager.workpools.inspect(f.caller, f.pool.pool_id).items[1]).toMatchObject({ status: "completed", data: 42 })
   } finally { await restarted.cleanup() }
 })
+
+test("#given a rollback burnt the worker's next epoch #when a crashed turn bound above the burn is recovered #then it is dispatched instead of refused (#9562)", async () => {
+  // given
+  const f = deliveryFixture()
+  const worker = await f.start()
+  await f.settle(worker.taskId)
+  await f.park(worker.taskId)
+  f.manager.workpools.dispose()
+  // A revive of this task ran at epoch 1 and was rolled back: the task is back at epoch 0 with epoch 1 burnt.
+  f.store.mutate(worker.taskId, (task) => ({ ...task, burnt_epoch: 1 }))
+  f.push("recovered")
+  // The next pool turn was bound at epoch 2 (above the burn), and the host died before dispatch.
+  createWorkpoolStore(f.store.stateDir).mutate(f.pool.pool_id, pool => ({ ...pool,
+    items: pool.items.map(item => item.key === "recovered" ? { ...item, status: "assigned", binding: { task_id: worker.taskId, run_epoch: 2, generation: 1 }, delivery: { phase: "queued" } } : item),
+    workers: pool.workers.map(item => ({ ...item, status: "busy", run_epoch: 2 })),
+  }))
+  const restarted = restartedFixture(f.root)
+  try {
+    const dispatched = restarted.manager.workpools.waitForEvent(f.pool.pool_id, "dispatched", signal())
+    // when
+    restarted.manager.workpools.attach(f.caller)
+    const turn = await dispatched
+    // then
+    expect(turn).toMatchObject({ task_id: worker.taskId, run_epoch: 2 })
+    expect(restarted.manager.workpools.yieldResults(worker.taskId, 2, { op: "yield", results: [{ key: "recovered", data: 7 }] }).results[0]?.status).toBe("accepted")
+    const idle = restarted.manager.workpools.waitForEvent(f.pool.pool_id, "worker_idle", signal())
+    restarted.children.get(worker.taskId)?.settle({ status: "completed", finalResponse: "fixture" })
+    await idle
+    expect(restarted.manager.workpools.inspect(f.caller, f.pool.pool_id).items[1]).toMatchObject({ status: "completed", data: 7 })
+  } finally { await restarted.cleanup() }
+})

@@ -140,6 +140,10 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
     ...(spec.modelRegistry !== undefined && { modelRegistry: spec.modelRegistry }),
     ...(spec.modelRuntime !== undefined && { modelRuntime: spec.modelRuntime }),
     ...(spec.model !== undefined && { model: spec.model }),
+    // A child handed a concrete model was PINNED, so its provenance is "cli": model-aware builtins
+    // (recommended-models) auto-switch only provider-default/first-available routes and leave a
+    // pinned child on exactly what it was given (#9722).
+    ...(spec.model !== undefined && { initialModelProvenance: "cli" }),
     ...(spec.thinkingLevel !== undefined && { thinkingLevel: spec.thinkingLevel }),
     settingsManager,
     ...(toolAllowlist !== undefined && { tools: [...toolAllowlist, ...mergedCustomTools.filter(isWorkpoolYieldTool).map(tool => tool.name), ...kernelTools.map(tool => tool.name)] }),

@@ -317,12 +317,12 @@ describe("resolveAgent curated explore/librarian chain", () => {
     model("opencode-go", "minimax-m3"),
     model("minimax-coding-plan", "MiniMax-M3"),
     model("opencode-go", "minimax-m2.7"),
-    model("anthropic-subscription", "claude-haiku-4-5"),
+    model("anthropic-subscription", "claude-haiku-5-5"),
     model("chatgpt-subscription", "gpt-5.4-nano"),
   ])
 
   for (const agent of ["explore", "librarian"] as const) {
-    test(`#given every rung model is available #when ${agent} resolves #then it runs Kimi HighSpeed, Luna Fast, DeepSeek V4.1 Flash, Qwen 3.7 Plus, M2.7, then Haiku`, () => {
+    test(`#given every rung model is available #when ${agent} resolves #then it runs Kimi HighSpeed, Luna Fast, Haiku 5.5 medium, DeepSeek V4.1 Flash, Qwen 3.7 Plus, then M2.7`, () => {
       // when
       const result = expectResolved(resolveAgent(agent, BUILTIN_AGENTS, everyRungModel))
 
@@ -330,11 +330,12 @@ describe("resolveAgent curated explore/librarian chain", () => {
       expect(result.model).toBe("kimi-coding/kimi-for-coding-highspeed")
       expect(result.fallback_models?.map((record) => record.display)).toEqual([
         "chatgpt-subscription/gpt-6-luna-fast",
+        "anthropic-subscription/claude-haiku-5-5",
         "deepseek/deepseek-flash",
         "opencode-go/qwen3.7-plus",
         "opencode-go/minimax-m2.7",
-        "anthropic-subscription/claude-haiku-4-5",
       ])
+      expect(result.fallback_models?.[1]?.variant).toBe("medium")
     })
   }
 })

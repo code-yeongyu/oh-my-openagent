@@ -13,6 +13,7 @@ export const designOriginals = [
 	"ambience-skill.md",
 	"aside.md",
 	"clone-from-url.md",
+	"component-catalogs.md",
 	"design-system-architecture.md",
 	"interaction-skill.md",
 	"layout-skill.md",

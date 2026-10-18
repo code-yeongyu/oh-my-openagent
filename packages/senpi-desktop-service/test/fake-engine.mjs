@@ -10,6 +10,8 @@
 //   "release"     - reply, then flush every held reply
 //   "hang"        - never reply, ignore $/cancel
 //   "cancellable" - never reply until $/cancel names this id, then reply Cancelled
+//   "release-fails" - never reply until $/cancel names this id, then reply InputFailed with the
+//                   engine's merged "input release also failed" text (a hold whose key-up failed)
 //   "notify"      - emit one audit and one stopPath.changed notification, then reply
 //   "exit"        - exit with code 7 without replying
 //   otherwise     - reply { method, params, pid }
@@ -34,6 +36,7 @@ const capabilities = {
 	input: true,
 	ax: true,
 	backgroundWindowInput: true,
+	...(process.env.FAKE_ENGINE_CURSOR_OMITTED === "1" ? {} : { cursorOverlay: false }),
 	deliveryModes: ["background", "foreground"],
 	capturePermission: "granted",
 	inputPermission: "granted",
@@ -46,6 +49,9 @@ const capabilities = {
 	screenLocked: false,
 };
 let suspended = false;
+// The foreground control grant this fake holds (B5); FAKE_ENGINE_CONTROL_BUSY=1 refuses grants InputBusy.
+let control = { active: false };
+const CONTROL_GRANTED_AT = "2026-10-11T00:00:00.000Z";
 const status = () => ({
 	suspended,
 	globalLive: true,
@@ -57,9 +63,11 @@ const status = () => ({
 
 const send = (message) => process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
 const reply = (id, result) => send({ id, result });
-const fail = (id, code, message) => send({ id, error: { code: -32000, message, data: { code, hint: null } } });
+const fail = (id, code, message, rpcCode = -32000) =>
+	send({ id, error: { code: rpcCode, message, data: { code, hint: null } } });
 const held = [];
 const cancellable = new Set();
+const releaseFails = new Set();
 
 function handle(request) {
 	const { id, method, params } = request;
@@ -85,8 +93,28 @@ function handle(request) {
 			suspended = false;
 			send({ method: "stopPath.changed", params: status() });
 			return reply(id, status());
+		case "control.state":
+			return reply(id, control);
+		case "control.grant":
+			if (process.env.FAKE_ENGINE_CONTROL_BUSY === "1") {
+				return fail(id, "InputBusy", "another session holds the foreground control grant", -32021);
+			}
+			if (process.env.FAKE_ENGINE_GRANT_ERROR !== undefined) {
+				return fail(id, process.env.FAKE_ENGINE_GRANT_ERROR, `grant refused: ${process.env.FAKE_ENGINE_GRANT_ERROR}`);
+			}
+			control = { active: true, reason: params?.reason ?? null, grantedAt: CONTROL_GRANTED_AT };
+			return reply(id, control);
+		case "control.revoke":
+			if (process.env.FAKE_ENGINE_REVOKE_ERROR !== undefined) {
+				return fail(id, process.env.FAKE_ENGINE_REVOKE_ERROR, `revoke failed: ${process.env.FAKE_ENGINE_REVOKE_ERROR}`);
+			}
+			control = { active: false };
+			return reply(id, null);
 		case "$/cancel":
 			if (cancellable.delete(params.id)) fail(params.id, "Cancelled", "request was cancelled by $/cancel");
+			if (releaseFails.delete(params.id)) {
+				fail(params.id, "Cancelled", "the hold request was cancelled; input release also failed: key up for shift failed");
+			}
 			return;
 	}
 	if (desktop !== undefined && params?.fake === undefined) {
@@ -109,6 +137,8 @@ function handle(request) {
 			return;
 		case "cancellable":
 			return cancellable.add(id);
+		case "release-fails":
+			return releaseFails.add(id);
 		case "notify":
 			send({ method: "audit", params: { action: method, target: "screen", delivery: "background", durationMs: 3 } });
 			send({ method: "stopPath.changed", params: status() });

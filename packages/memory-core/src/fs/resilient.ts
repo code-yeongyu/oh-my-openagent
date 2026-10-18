@@ -17,6 +17,7 @@ import { Buffer } from "node:buffer"
 import * as fsSync from "node:fs"
 import * as fsp from "node:fs/promises"
 
+import { renameWithContentionRetry } from "./rename-contention"
 import { fsErrorCode, retryOnEintr, retryOnEintrSync } from "./retry"
 import { isExclusiveFlag, openSyncWithExclusivePolicy, writeHandleAll, writePathAll } from "./write-all"
 
@@ -88,6 +89,11 @@ export function wrapFileHandle<H extends object>(handle: H): H {
 }
 
 const promises = resilientNamespace(fsp, "async")
+
+/** EINTR-retried like every call here, and retried while Windows briefly holds the target open. */
+export function rename(from: fsSync.PathLike, to: fsSync.PathLike): Promise<void> {
+  return renameWithContentionRetry(from, to, { rename: promises.rename, platform: process.platform })
+}
 const sync = resilientNamespace(fsSync, "sync")
 
 export const {
@@ -101,8 +107,8 @@ export const {
   mkdtemp,
   readFile,
   readdir,
+  readlink,
   realpath,
-  rename,
   rm,
   rmdir,
   stat,
@@ -188,5 +194,5 @@ export function existsSync(path: fsSync.PathLike): boolean {
   }
 }
 
-export type { Dirent, FSWatcher, PathLike, Stats } from "node:fs"
+export type { BigIntStats, Dirent, FSWatcher, PathLike, Stats } from "node:fs"
 export type { FileHandle } from "node:fs/promises"

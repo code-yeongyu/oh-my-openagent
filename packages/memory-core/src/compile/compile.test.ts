@@ -120,3 +120,60 @@ describe("compileMemoryBlock", () => {
     expect(block).not.toContain("DESCRIPTION_SENTINEL")
   }, 30_000)
 })
+
+const PRE_CHANGE_CLEAN_BLOCK: string = "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call.\n\n<memory>\n<human>\n  <projection>$MEMORY_DIR/system/human.md</projection>\n  <description>HUMAN_DESCRIPTION</description>\n  Prefers concise answers.\n</human>\n<external_projection>\n$MEMORY_DIR/\nreference/: notes.md\n</external_projection>\n</memory>\n\n<memory_metadata>\n- AGENT_ID: boundary-agent\n</memory_metadata>"
+
+describe("compileMemoryBlock secret screening", () => {
+  it("#given a system file whose body and description carry secret-like text #when compiled #then both are masked and the block is deterministic across compiles", async () => {
+    // given
+    const ghpToken = "ghp_Ab3dEf5hJ7kL9mN1pQ3rS5tU7vW9xY1zB3C5"
+    const { repo } = await repoWith([
+      { relativePath: "system/human.md", content: memory(ghpToken, "prefers password=Hunter2Hunter2 in examples\n") },
+    ])
+
+    // when
+    const first = await compileMemoryBlock(repo, { agentId: "secret-body-agent" })
+    const second = await compileMemoryBlock(repo, { agentId: "secret-body-agent" })
+
+    // then
+    expect(first).toBe(second)
+    expect(first).toContain("***")
+    expect(first).not.toContain("Hunter2Hunter2")
+    expect(first).not.toContain(ghpToken)
+  }, 30_000)
+
+  it("#given a clean system file #when compiled #then the block is byte-identical to the pre-change renderer output", async () => {
+    // given
+    const { repo } = await repoWith([
+      { relativePath: "system/human.md", content: memory("HUMAN_DESCRIPTION", "Prefers concise answers.\n") },
+      { relativePath: "reference/notes.md", content: memory("NOTES_DESCRIPTION", "External note body.\n") },
+    ])
+
+    // when
+    const block = await compileMemoryBlock(repo, { agentId: "boundary-agent" })
+
+    // then
+    expect(block).toBe(PRE_CHANGE_CLEAN_BLOCK)
+  }, 30_000)
+
+  it("#given committed files with secret-like names #when compiled #then every rendered path, label and name is masked", async () => {
+    // given: legacy content committed before the commit gate existed, seeded with raw git
+    const ghpToken = "ghp_Ab3dEf5hJ7kL9mN1pQ3rS5tU7vW9xY1zB3C5"
+    const { dir, repo } = await repoWith([])
+    await Bun.write(`${dir}/system/token=abc123456.md`, memory("CLEAN_DESCRIPTION", "CLEAN_BODY\n"))
+    await Bun.write(`${dir}/reference/${ghpToken}.md`, memory("REFERENCE_DESCRIPTION", "REFERENCE_BODY\n"))
+    await Bun.$`git -C ${dir} add -A`
+    await Bun.$`git -C ${dir} -c user.email=fixture@example.com -c user.name=fixture commit -qm "legacy secret names"`
+
+    // when
+    const first = await compileMemoryBlock(repo, { agentId: "secret-name-agent" })
+    const second = await compileMemoryBlock(repo, { agentId: "secret-name-agent" })
+
+    // then
+    expect(first).toBe(second)
+    expect(first).not.toContain("abc123456")
+    expect(first).not.toContain(ghpToken)
+    expect(first).toContain("$MEMORY_DIR/system/***.md")
+    expect(first).toContain("reference/: ***.md")
+  }, 30_000)
+})

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -22,13 +22,14 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-type Fixture = { home: string, agentDir: string, configHome: string, dataHome: string, launcher: string }
+type Fixture = { home: string, agentDir: string, configHome: string, dataHome: string, tmp: string, launcher: string }
 
 function fixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), "omo-providers-e2e-"))
   roots.push(root)
   const app = join(root, "app")
   mkdirSync(join(root, "home"), { recursive: true })
+  mkdirSync(join(root, "tmp"), { recursive: true })
   cpSync(join(SOURCE_ROOT, "bin"), join(app, "bin"), { recursive: true })
   write(join(app, "package.json"), JSON.stringify({ name: "omo-ai", version: "test", type: "module" }))
   return {
@@ -36,6 +37,7 @@ function fixture(): Fixture {
     agentDir: join(root, "senpi-agent"),
     configHome: join(root, "config"),
     dataHome: join(root, "data"),
+    tmp: join(root, "tmp"),
     launcher: join(app, "bin", "omo.js"),
   }
 }
@@ -45,9 +47,18 @@ function opencode(item: Fixture, config: unknown, auth?: unknown): void {
   if (auth !== undefined) write(join(item.dataHome, "opencode", "auth.json"), JSON.stringify(auth))
 }
 
-function run(item: Fixture, args: string[]) {
+// The launcher runs from a copied app with no node_modules, so Bun auto-installs the engine's dependencies
+// on first import and extracts them under the temp dir. On Windows those extraction directories outlive the
+// child (#9766 guard: `.typebox`, `.openai`, `.client-bedrock-runtime`), so the child gets its own temp dir
+// inside the fixture root, which teardown removes. The Bun install cache stays the host's: it is a cache, not a temp
+// leak, and a fresh per-file cache would make the first engine-importing case install cold (#10210's timeout).
+function childEnv(item: Fixture): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    TMPDIR: item.tmp,
+    TEMP: item.tmp,
+    TMP: item.tmp,
+    BUN_TMPDIR: item.tmp,
     HOME: item.home,
     USERPROFILE: item.home,
     SENPI_CODING_AGENT_DIR: item.agentDir,
@@ -58,7 +69,13 @@ function run(item: Fixture, args: string[]) {
   delete env.PI_CODING_AGENT_DIR
   delete env.OPENCODE_CONFIG_DIR
   delete env.OPENCODE_CONFIG
-  const result = spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env })
+  delete env.XDG_CACHE_HOME
+  delete env.OPENCODE_MODELS_PATH
+  return env
+}
+
+function run(item: Fixture, args: string[]) {
+  const result = spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env: childEnv(item) })
   if (result.error) throw result.error
   return result
 }
@@ -347,3 +364,163 @@ describe("omo setup opencode custom provider import", () => {
     })
   })
 })
+
+const NEURALWATT_CATALOG = {
+  neuralwatt: {
+    id: "neuralwatt",
+    env: ["NEURALWATT_API_KEY"],
+    npm: "@ai-sdk/openai-compatible",
+    api: "https://api.neuralwatt.com/v1",
+    name: "Neuralwatt",
+    models: {
+      "kimi-k2.5": { id: "kimi-k2.5", name: "Kimi K2.5", reasoning: true, limit: { context: 262144, output: 32768 } },
+      "old-model": { id: "old-model", status: "deprecated", limit: { context: 8192, output: 1024 } },
+    },
+  },
+}
+
+describe("omo setup opencode catalog provider import (#10158)", () => {
+  describe("#given an opencode api key for a models.dev provider omo has no builtin for", () => {
+    describe("#when setup is accepted", () => {
+      test("#then the provider is described from opencode's catalog cache, its key stored and the default model carried", () => {
+        const item = fixture()
+        opencode(item, { model: "neuralwatt/kimi-k2.5" }, { neuralwatt: { type: "api", key: "nw-key" } })
+        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
+
+        const result = run(item, ["setup", "--yes"])
+        const config = ModelConfig.loadSync(join(item.agentDir, "models.json"))
+        const models = composeModelProvider("neuralwatt", undefined, config, undefined).getModels()
+
+        expect(result.status).toBe(0)
+        expect(config.getError()).toBeUndefined()
+        expect(models.map((model: any) => [model.id, model.api, model.baseUrl, model.contextWindow, model.maxTokens, model.reasoning])).toEqual([
+          ["kimi-k2.5", "openai-completions", "https://api.neuralwatt.com/v1", 262144, 32768, true],
+        ])
+        expect(readAuthStore(join(item.agentDir, "auth.json")).entries.neuralwatt).toMatchObject({ type: "api_key" })
+        expect(result.stdout).toContain("providers-imported: neuralwatt")
+        expect(result.stdout).not.toContain("providers omo does not serve (neuralwatt)")
+        expect(result.stdout).not.toContain("provider neuralwatt is not one omo serves")
+      })
+    })
+  })
+
+  describe("#given that key but no catalog cache", () => {
+    describe("#when setup runs", () => {
+      test("#then it says how to get the catalog instead of importing a guess", () => {
+        const item = fixture()
+        opencode(item, {}, { neuralwatt: { type: "api", key: "nw-key" } })
+
+        const result = run(item, ["setup", "--yes"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout).toContain("no models.dev catalog cache found, so neuralwatt could not be described")
+        expect(existsSync(join(item.agentDir, "models.json"))).toBe(false)
+      })
+    })
+  })
+
+  describe("#given a partial opencode config block for a catalog provider", () => {
+    describe("#when setup is accepted", () => {
+      test("#then the block extends the catalog entry as opencode does, instead of replacing it", () => {
+        const item = fixture()
+        opencode(item, { provider: { neuralwatt: { options: { apiKey: "nw-inline" }, models: { "kimi-k2.5": { limit: { context: 131072, output: 16384 } } } } } })
+        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
+
+        const result = run(item, ["setup", "--yes"])
+        const config = ModelConfig.loadSync(join(item.agentDir, "models.json"))
+        const models = composeModelProvider("neuralwatt", undefined, config, undefined).getModels()
+
+        expect(result.status).toBe(0)
+        expect(models.map((model: any) => [model.id, model.baseUrl, model.contextWindow, model.reasoning])).toEqual([
+          ["kimi-k2.5", "https://api.neuralwatt.com/v1", 131072, true],
+        ])
+      })
+    })
+  })
+
+  describe("#given a config block that overrides only part of a catalog model's limit", () => {
+    describe("#when setup is accepted", () => {
+      test("#then the other limit and the model's own fields come from the catalog, as opencode merges them", () => {
+        const item = fixture()
+        opencode(item, { provider: { neuralwatt: { options: { apiKey: "nw-inline" }, models: { "kimi-k2.5": { limit: { context: 131072 } } } } } })
+        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
+
+        run(item, ["setup", "--yes"])
+        const config = ModelConfig.loadSync(join(item.agentDir, "models.json"))
+        const models = composeModelProvider("neuralwatt", undefined, config, undefined).getModels()
+
+        expect(models.map((model: any) => [model.id, model.contextWindow, model.maxTokens, model.reasoning])).toEqual([
+          ["kimi-k2.5", 131072, 32768, true],
+        ])
+      })
+    })
+  })
+
+  describe("#given a catalog provider declared with no key of its own", () => {
+    describe("#when setup is accepted", () => {
+      test("#then its key resolves from the catalog's environment variable, as opencode reads it", () => {
+        const item = fixture()
+        opencode(item, { provider: { neuralwatt: {} } })
+        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
+
+        run(item, ["setup", "--yes"])
+
+        expect(readAuthStore(join(item.agentDir, "auth.json")).entries.neuralwatt).toMatchObject({ key: "${NEURALWATT_API_KEY}" })
+      })
+    })
+  })
+
+  describe("#given a keyed catalog provider omo has no adapter for", () => {
+    describe("#when setup runs", () => {
+      test("#then it is reported once, with the adapter reason, not also as a provider omo does not serve", () => {
+        const item = fixture()
+        opencode(item, {}, { exotic: { type: "api", key: "ex-key" } })
+        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify({
+          exotic: { id: "exotic", npm: "@ai-sdk/exotic", api: "https://exotic.example/v1", name: "Exotic", models: { m: { id: "m" } } },
+        }))
+
+        const result = run(item, ["setup", "--yes"])
+
+        expect(result.stdout).toContain("catalog provider exotic uses npm package @ai-sdk/exotic")
+        expect(result.stdout).not.toContain("providers omo does not serve (exotic)")
+      })
+    })
+  })
+
+  describe("#given a catalog provider routed through its own proxy endpoint, with no model list and no stored key", () => {
+    describe("#when setup is accepted", () => {
+      test("#then the proxy endpoint is used with the catalog's models, as opencode extends them", () => {
+        const item = fixture()
+        opencode(item, { provider: { neuralwatt: { options: { apiKey: "nw-inline", baseURL: "https://proxy.example/v1" } } } })
+        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
+
+        const result = run(item, ["setup", "--yes"])
+        const config = ModelConfig.loadSync(join(item.agentDir, "models.json"))
+        const models = composeModelProvider("neuralwatt", undefined, config, undefined).getModels()
+
+        expect(result.stdout).toContain("providers-imported: neuralwatt")
+        expect(models.map((model: any) => [model.id, model.baseUrl, model.contextWindow, model.reasoning])).toEqual([
+          ["kimi-k2.5", "https://proxy.example/v1", 262144, true],
+        ])
+      })
+    })
+  })
+})
+
+describe("omo setup e2e temp isolation (#9766)", () => {
+  test("#given a setup run #when the child process asks for its temp dir #then it is inside the fixture root that teardown removes", () => {
+    const item = fixture()
+
+    const child = spawnSync(process.execPath, ["-e", "console.log(require('node:os').tmpdir())"], { encoding: "utf8", env: childEnv(item) })
+
+    expect(child.status).toBe(0)
+    expect(realpathSync(child.stdout.trim())).toBe(realpathSync(item.tmp))
+  })
+
+  test("#given a setup run #when the child is spawned #then it keeps the host's warm Bun install cache instead of a cold per-file one (#10210)", () => {
+    const env = childEnv(fixture())
+
+    expect([env.BUN_INSTALL, env.BUN_INSTALL_CACHE_DIR]).toEqual([process.env.BUN_INSTALL, process.env.BUN_INSTALL_CACHE_DIR])
+  })
+})
+

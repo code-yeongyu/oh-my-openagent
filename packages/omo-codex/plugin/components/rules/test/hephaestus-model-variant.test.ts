@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findPluginBundledCandidates, parseRule } from "@oh-my-opencode/rules-engine/engine";
@@ -137,5 +137,22 @@ describe("Hephaestus bundled rule model variants", () => {
 		expect(output).toContain("based on GPT-5.6");
 		expect(output).not.toContain("based on GPT-5.5");
 		expect(output).not.toContain("[Truncated. Full:");
+	});
+});
+
+// #9538: a format example written as a markdown quote line made replies render as blockquotes.
+describe("Bundled rule format examples", () => {
+	it("#given every shipped bundled rule #when reading it #then no format example is a markdown quote line", () => {
+		const files = readdirSync(join(process.cwd(), "bundled-rules"), { recursive: true })
+			.map(String)
+			.filter((path) => path.endsWith(".md"));
+		expect(files.length).toBeGreaterThan(0);
+
+		for (const path of files) {
+			const quoted = readFileSync(join(process.cwd(), "bundled-rules", path), "utf8")
+				.split("\n")
+				.filter((line) => /^\s*>.*\[[^\]]+\]/.test(line));
+			expect({ path, quoted }).toEqual({ path, quoted: [] });
+		}
 	});
 });

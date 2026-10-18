@@ -10,13 +10,12 @@ import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import { createTaskRecord, isSpawnSpecV1, parseTaskId, syncTaskIdFloor } from "../state"
-import { resolvedReasoningFields } from "../state/resolved-reasoning"
+import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
-import type { ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
+import type { AwaitingInputReason, EffectiveModelRecord, ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
 import { createSteeringEngine } from "../steering"
-import type { CancelOptions, CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
+import type { CancelOptions, CancelOutcome, DestructionPort, InterruptOutcome, RedispatchOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
 import { discardManagedHandle, releaseOnDispose, releaseSupersededHandle, type ManagedChildHandle, type ManagedChildListener } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { failOwnedRun, launchRunOf, ownsRun } from "./launch-fence"
@@ -31,6 +30,7 @@ import { onceOnly } from "./once-only"
 import { ResidencySignal } from "./residency-signal"
 import { resolveExecutionMode, type ExecutionMode } from "./execution-mode"
 import { toContinueResult } from "./continue-result"
+import { planWithWarmBarrel } from "./plan-warm"
 import {
   childIdentityOf,
   hasChildIdentity,
@@ -46,6 +46,7 @@ import {
   recordSpawnedChildSession,
   recordSpawnedPid,
   recordSpawnedRunner,
+  nextRungManagedSpec,
 } from "./manager-helpers"
 import { createIsolationWiring, type IsolationWiring } from "./isolation-wiring"
 import type { IsolationPreparation } from "../isolation"
@@ -53,14 +54,19 @@ import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
 import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { withTaskRecordLockAsync } from "../store/record-lock"
 import { reattachManagedTask } from "./manager-reattach"
+import { TASK_AWAITING_INPUT_EVENT } from "./host-turn-resumed"
 import { PendingStops } from "./pending-stops"
 import { respawnWithWorkpool } from "./workpool-respawn"
 import { NameRegistry } from "./names"
+import { newestSessionPath } from "../lifecycle/session-path"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { TaskSequence } from "./task-sequence"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeChildFacts } from "./child-facts"
+import { stampSpawnEffectiveModel } from "./observed-model"
 import type {
   ContinueResult,
+  ForgetOptions,
   ListScope,
   ListedTask,
   ManagedRunner,
@@ -72,6 +78,8 @@ import type {
   TaskManagerOptions,
 } from "./types"
 import { describeStartFailure } from "./start-failure"
+import { settledWithin } from "./settled-within"
+import { failStrandedHandoff, type StrandedHandoffFailure } from "./fail-stranded-handoff"
 
 type PreparedIsolation = Extract<IsolationPreparation, { readonly ok: true }>
 
@@ -105,7 +113,7 @@ type TaskManagerImplOptions = TaskManagerOptions & {
 }
 
 type LaunchOutcome =
-  | { readonly ok: true; readonly run_epoch?: number; readonly resolved_model?: ResolvedModelRecord; readonly queue_position?: number }
+  | { readonly ok: true; readonly run_epoch?: number; readonly resolved_model?: ResolvedModelRecord; readonly effective_model?: EffectiveModelRecord; readonly queue_position?: number }
   | {
     readonly ok: false
     readonly error: string
@@ -116,12 +124,39 @@ type LaunchOutcome =
 type ReattachingTaskManager = TaskManager & {
   readonly workpools: WorkpoolEngine
   respawn(record: TaskRecord, resumeSessionPath?: string): Promise<RespawnResult>
-  reattach(record: TaskRecord, handle: ManagedChildHandle): Promise<ReattachResult>
+  redispatchTask(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome>
+  reattach(
+    record: TaskRecord,
+    handle: ManagedChildHandle,
+    awaitingInput?: { readonly reason: AwaitingInputReason },
+  ): Promise<ReattachResult>
   waiterKeyCount(): number
   releasedKeyCount(): number
 }
 
+// A start the task host answers this fast (a dead host's refusal, an in-process child) is reported
+// in the tool result; a slower one returns `starting` and its outcome arrives on the record (#10042).
+// A caller that needs the child admitted (a team member must be live to be addressable) awaits
+// whenLaunched(taskId).
+export const START_REPORT_WINDOW_MS = 250
+
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
+// A re-dispatch holds its lock across a child launch, which can take far longer than a record write.
+const REDISPATCH_HOLDER_WAIT_MS = 120_000
+
+function redispatchLockPath(stateDir: string, taskId: string): string {
+  return join(stateDir, "redispatch-locks", taskId)
+}
+
+function redispatchRefusal(record: TaskRecord): RedispatchOutcome | undefined {
+  if (isTerminalRecord(record)) {
+    return { kind: "invalid_state", task_id: record.task_id, reason: `Task ${record.task_id} is ${record.status}; only a task waiting for input can be re-dispatched.` }
+  }
+  if (record.awaiting_input === undefined) {
+    return { kind: "invalid_state", task_id: record.task_id, reason: `Task ${record.task_id} is not waiting for input; only a flagged "resumed, waiting for input" task can be re-dispatched.` }
+  }
+  return undefined
+}
 function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
   const ownerKey = `${owner.kind}\0${owner.runId}\0${owner.nodeId}`
   const digest = createHash("sha256").update(ownerKey).digest("hex")
@@ -161,6 +196,10 @@ class TaskManagerImpl implements TaskManager {
   // next epoch, so the lease the live handle holds is looked up here, not on the record.
   readonly #closingRungs = new Map<string, { readonly epoch: number; readonly handle: ManagedChildHandle }>()
   readonly #waiters = new Map<string, TaskWaiter[]>()
+  readonly #launching = new Map<string, Promise<unknown>>()
+  // Set once session shutdown starts settling launches: a queued launch whose lane frees during
+  // suspension must not start a child for a session that is going away (shutdown parks it instead).
+  #shutdownStarted = false
   readonly #background = new Set<string>()
   readonly #evicting = new Set<string>()
   readonly #sendCounts = new Map<string, number>()
@@ -199,6 +238,7 @@ class TaskManagerImpl implements TaskManager {
       tryBeginSend: (taskId) => this.tryBeginSend(taskId),
       endSend: (taskId) => this.endSend(taskId),
       isEvicting: (taskId) => this.isEvicting(taskId),
+      isLaunching: (taskId) => this.#launching.has(taskId),
       // A rung that runtime fallback is closing is never steered, interrupted through, or revived: its
       // handle is being torn down, and the fallback path retires it once the close ends.
       liveHandle: (taskId) => {
@@ -235,6 +275,7 @@ class TaskManagerImpl implements TaskManager {
       config: options.config,
     })
     this.#outcome = createOutcomeTracker({
+      scheduleExitConfirmation: options.scheduleExitConfirmation,
       store: options.store,
       settleIsolation: (taskId, merge) => this.#isolation.settle(taskId, merge),
       now: this.#now,
@@ -242,7 +283,7 @@ class TaskManagerImpl implements TaskManager {
       tryLoad: (taskId) => this.#tryLoad(taskId),
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       releaseSlot: (taskId, model, epoch) => this.#releaseSlot(taskId, model, epoch),
-      forget: (taskId) => this.forget(taskId),
+      forget: (taskId, options) => this.forget(taskId, options),
       settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
       stopSettlement: (taskId) => this.#stopsPending.settlement(taskId),
@@ -265,14 +306,14 @@ class TaskManagerImpl implements TaskManager {
     registerLifecycleReattachPorts(options.store, {
       reserve: (record) => this.#reserveForReattach(record),
       respawn: (record, resumeSessionPath) => this.respawn(record, resumeSessionPath),
-      reattach: (record, handle) => this.reattach(record, handle),
+      reattach: (record, handle, awaitingInput) => this.reattach(record, handle, awaitingInput),
     })
   }
 
   async start(spec: ManagerStartSpec): Promise<StartResult> {
     const refused = memberKernelToolRefusal(spec)
     if (refused !== undefined) return refused
-    const resolution = this.#options.planner(spec)
+    const resolution = await planWithWarmBarrel(this.#options.planner, spec)
     if (resolution.kind === "error") return { kind: "plan_unresolved", error: resolution.error }
 
     return withResidentStart(this.#options, spec.parent_session_id,
@@ -283,7 +324,7 @@ class TaskManagerImpl implements TaskManager {
     const refused = memberKernelToolRefusal(spec)
     if (refused !== undefined) return refused
     const lockPath = ownerLockPath(this.#options.store.stateDir, owner)
-    const resolution = this.#options.planner(spec)
+    const resolution = await planWithWarmBarrel(this.#options.planner, spec)
     if (resolution.kind === "error") return { kind: "plan_unresolved", error: resolution.error }
 
     return withTaskRecordLockAsync(lockPath, async () => {
@@ -465,7 +506,22 @@ class TaskManagerImpl implements TaskManager {
     }
 
     if (lease !== undefined) {
-      const launched = await this.#launch(context)
+      const launching = this.#trackLaunch(finalRecord.task_id, context)
+      const reported = await settledWithin(launching, START_REPORT_WINDOW_MS)
+      if (!reported.settled) {
+        launching.catch((error: unknown) => {
+          log("senpi-task start still admitting failed", { taskId: finalRecord.task_id, error: String(error) })
+        })
+        return {
+          kind: "started",
+          task_id: finalRecord.task_id,
+          status: "running",
+          starting: true,
+          name: registration.name,
+          ...startParts,
+        }
+      }
+      const launched = reported.value
       if (!launched.ok) {
         return {
           kind: "start_failed",
@@ -493,11 +549,16 @@ class TaskManagerImpl implements TaskManager {
         // told the model it actually got and the epoch its completion will arrive under.
         ...(launched.run_epoch === undefined ? {} : { run_epoch: launched.run_epoch }),
         ...(launched.resolved_model === undefined ? {} : { resolved_model: launched.resolved_model }),
+        ...(launched.effective_model === undefined ? {} : { effective_model: launched.effective_model }),
       }
     }
 
     const position = this.#concurrency.enqueue(plan.model, finalRecord.task_id, finalRecord.notification.run_epoch, () => {
-      void this.#launch(context)
+      // A lane-queued first launch is still a first launch while its host admits it (#10042): a send in
+      // that window queues behind the launch instead of reviving a session that does not exist yet.
+      void this.#trackLaunch(finalRecord.task_id, context).catch((error: unknown) => {
+        log("senpi-task queued launch failed", { taskId: finalRecord.task_id, error: String(error) })
+      })
     })
     return {
       kind: "started",
@@ -518,8 +579,10 @@ class TaskManagerImpl implements TaskManager {
     return toContinueResult(outcome)
   }
 
-  sendToTask(input: SendInput): Promise<SendOutcome> {
-    return this.#steering.sendToTask(input)
+  async sendToTask(input: SendInput): Promise<SendOutcome> {
+    const outcome = await this.#steering.sendToTask(input)
+    if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
+    return outcome
   }
 
   async interruptTask(idOrName: string): Promise<InterruptOutcome> {
@@ -548,8 +611,129 @@ class TaskManagerImpl implements TaskManager {
     return this.#tryLoad(taskId) ?? undefined
   }
 
+  // senpi#3266: the one-step action out of "resumed, waiting for input" that keeps the work. The
+  // flagged task's dead session is abandoned and a FRESH child launches from the persisted prompt,
+  // under the same task identity and a new run epoch. Only a non-terminal flagged task may take it.
+  // Callers passing no callerSessionId act across sessions (task_send forwards none under all_scope).
+  async redispatchTask(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome> {
+    const listed = this.list({ scope: "all" })
+    const record = listed.find((entry) => entry.record.task_id === idOrName)?.record
+      ?? listed.find((entry) => entry.record.name === idOrName)?.record
+    if (record === undefined) {
+      return { kind: "not_found", reason: `No task named ${idOrName}.` }
+    }
+    if (callerSessionId !== undefined && callerSessionId !== record.parent_session_id && callerSessionId !== record.root_session_id) {
+      return {
+        kind: "scope_denied",
+        task_id: record.task_id,
+        owning_session_id: record.parent_session_id,
+        reason: `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to act across sessions.`,
+      }
+    }
+    // One re-dispatch per task at a time, across processes too: a second caller waits, then re-reads
+    // the record and finds the flag already cleared instead of spawning a second child.
+    return withTaskRecordLockAsync(
+      redispatchLockPath(this.#options.store.stateDir, record.task_id),
+      () => this.#redispatchLocked(record.task_id),
+      { holderWaitMs: REDISPATCH_HOLDER_WAIT_MS },
+    )
+  }
+
+  async #redispatchLocked(taskId: string): Promise<RedispatchOutcome> {
+    const record = this.#tryLoad(taskId)
+    if (record === null || record === undefined) return { kind: "not_found", reason: `No task named ${taskId}.` }
+    const refused = redispatchRefusal(record)
+    if (refused !== undefined) return refused
+    const epoch = record.notification.run_epoch
+    const nextEpoch = nextRunEpoch(record)
+    // The fresh run takes over the abandoned run's lane slot in place; a run that held none must win
+    // a free one, or nothing is torn down and the task stays flagged for a later retry.
+    if (!this.#concurrency.transferLease(taskId, epoch, nextEpoch) && !this.#concurrency.tryAcquire(record.model, taskId, nextEpoch)) {
+      return { kind: "capacity_deferred", task_id: taskId, reason: `The ${record.model} lane is full; re-dispatch ${taskId} again once a slot frees.` }
+    }
+    const releaseLease = (): void => this.#concurrency.releaseLease(taskId, nextEpoch)
+    // The abandoned run's settling outcome must never terminalize the task the fresh child continues.
+    this.#outcome.release(taskId)
+    try {
+      await this.#abandonForRedispatch(taskId)
+    } catch (error) {
+      releaseLease()
+      return this.#failRedispatch(taskId, `the old session could not be closed: ${String(error)}`)
+    }
+    const fresh = this.#tryLoad(taskId)
+    if (fresh === null || fresh === undefined || fresh.notification.run_epoch !== epoch || fresh.host_pid !== record.host_pid) {
+      releaseLease()
+      return { kind: "invalid_state", task_id: taskId, reason: `Task ${taskId} moved on while its old session was closing; nothing was re-dispatched.` }
+    }
+    // The old child is gone now: only a task that became terminal (a cancel won) stops the relaunch.
+    // A flag withdrawn mid-teardown (a delivery that read the old handle first) must not strand the
+    // record with no child behind it, so it no longer refuses here.
+    if (isTerminalRecord(fresh)) {
+      releaseLease()
+      return { kind: "invalid_state", task_id: taskId, reason: `Task ${taskId} is ${fresh.status}; it ended while its old session was closing, so nothing was re-dispatched.` }
+    }
+    const respawned = await this.respawn(fresh, undefined)
+    if (!respawned.ok) {
+      releaseLease()
+      return this.#failRedispatch(taskId, `a fresh child could not launch: ${respawned.reason}`)
+    }
+    // reattach tears the handle down itself on every refusal.
+    const reattached = await this.reattach(fresh, respawned.handle)
+    if (!reattached.ok) {
+      releaseLease()
+      return this.#failRedispatch(taskId, `the fresh child could not attach: ${reattached.reason}`)
+    }
+    return { kind: "redispatched", task_id: taskId, run_epoch: this.#tryLoad(taskId)?.notification.run_epoch ?? nextEpoch }
+  }
+
+  // The old child is ended; the record keeps its residency and owner for the fresh child. Without a
+  // lifecycle port (a minimal manager) the handle is ended here, the way a refused reattach ends one.
+  // The handle leaves #live BEFORE its child is stopped, so the outcome that stop settles is no longer
+  // owned and cannot terminalize the record; it is held as a cleanup owner until its dispose lands.
+  async #abandonForRedispatch(taskId: string): Promise<void> {
+    const live = this.#live.get(taskId)
+    if (live !== undefined) {
+      live.unsubscribe()
+      this.#live.delete(taskId)
+      this.#holdForCleanup(taskId, live.handle)
+    }
+    this.forget(taskId, { path: "park" })
+    const destruction = this.#options.destruction
+    if (destruction !== undefined) await destruction.destroyResidentTask(taskId, "redispatch")
+    else if (live !== undefined) await discardManagedHandle(this.#cleanupOwners.get(taskId) ?? live.handle)
+  }
+
+  // The old session is already gone, so a re-dispatch that cannot finish ends the task with the reason
+  // rather than leaving a running record no child stands behind. A cancel that won the race stands.
+  async #failRedispatch(taskId: string, cause: string): Promise<RedispatchOutcome> {
+    const reason = `Re-dispatch failed: ${cause}`
+    this.#options.store.transition(taskId, { type: "fail", timestamp: nowIso(this.#now), error_message: reason })
+    const destruction = this.#options.destruction
+    if (destruction === undefined) this.forget(taskId, { path: "end" })
+    else {
+      await destruction.destroyResidentTask(taskId, "cancel").catch((error: unknown) => {
+        log("senpi-task failed re-dispatch teardown rejected", { taskId, error: String(error) })
+      })
+    }
+    return { kind: "respawn_failed", task_id: taskId, reason }
+  }
+
+  // senpi#3266: the flag says the child cannot move on its own; demonstrated motion withdraws it.
+  #clearAwaitingInput(taskId: string): void {
+    if (this.#tryLoad(taskId)?.awaiting_input === undefined) return
+    this.#options.store.mutate(taskId, (fresh) => {
+      if (fresh.awaiting_input === undefined) return fresh
+      const { awaiting_input: _withdrawn, ...rest } = fresh
+      return { ...rest, updated_at: nowIso(this.#now) }
+    })
+  }
+
   hasPendingSends(taskId: string): boolean {
     return (this.#sendCounts.get(taskId) ?? 0) > 0 || (this.#steering.hasPendingSends(taskId) ?? false)
+  }
+
+  hasInFlightSends(taskId: string): boolean {
+    return (this.#sendCounts.get(taskId) ?? 0) > 0 || this.#steering.hasInFlightSends(taskId)
   }
 
   tryClaimEviction(taskId: string): boolean {
@@ -594,12 +778,19 @@ class TaskManagerImpl implements TaskManager {
     const records = this.#options.store.list().records
     const filtered = scope.scope === "all" ? records : records.filter((record) => inSession(record, scope.session_id))
     return filtered.map((record) => {
+      const lastSeen = this.#live.get(record.task_id)?.handle.lastSeen?.()
+      if (lastSeen !== undefined) record = { ...record, last_seen_at: new Date(lastSeen).toISOString() }
       const position = record.status === "pending" ? this.#concurrency.queuePosition(record.model, record.task_id) : undefined
       return position === undefined ? { record } : { record, queue_position: position }
     })
   }
 
-  forget(taskId: string): void {
+  forget(taskId: string, options: ForgetOptions): void {
+    const stopped = this.#tryLoad(taskId)
+    if (stopped?.killed === true && isTerminalRecord(stopped)) {
+      this.#removeCapacityWaiter(taskId)
+      this.#concurrency.releaseTask(taskId)
+    }
     // A cancel tears the child down through here before its caller releases the slot, and the live
     // entry that names the stopped run's lease is gone after this line.
     if (this.#tryLoad(taskId)?.status === "cancelled") this.#releaseSlotForTask(taskId)
@@ -619,8 +810,9 @@ class TaskManagerImpl implements TaskManager {
     this.#background.delete(taskId)
     this.#released.delete(taskId)
     this.#runStats.delete(taskId)
-    const residency = this.#tryLoad(taskId)?.residency_state
-    if (residency !== "persisted_only" && residency !== "rpc_detached") this.#steering.dropPending(taskId)
+    // Queue ownership follows the teardown path, never the status of the turn being released.
+    if (options.path === "end") this.#steering.dropPending(taskId, options.reason ?? "task_forgotten")
+    this.#settleWaiters(taskId)
   }
 
   getResidentHandle(taskId: string): ManagedChildHandle | undefined { return this.#live.get(taskId)?.handle ?? this.#cleanupOwners.get(taskId) }
@@ -697,8 +889,8 @@ class TaskManagerImpl implements TaskManager {
     }, this.workpools, () => this.get(record.task_id)?.notification.run_epoch ?? -1)
   }
 
-  reattach(record: TaskRecord, handle: ManagedChildHandle): Promise<ReattachResult> {
-    return reattachManagedTask({
+  async reattach(record: TaskRecord, handle: ManagedChildHandle, awaitingInput?: { readonly reason: AwaitingInputReason }): Promise<ReattachResult> {
+    const result = await reattachManagedTask({
       record,
       handle,
       store: this.#options.store,
@@ -721,7 +913,58 @@ class TaskManagerImpl implements TaskManager {
         this.#outcome.trackOutcome(fresh.task_id, attachedHandle, fresh.model, epoch)
         void this.#steering.notifyStarted(fresh.task_id)
       },
+      ...(awaitingInput === undefined ? {} : { awaitingInput }),
     })
+    // The flag is user-visible state: a live progress row leaves "starting" for
+    // "resumed, waiting for input" the moment the stamp lands, not on the next poll.
+    if (awaitingInput !== undefined && result.ok) {
+      for (const listener of this.#childSubscribers.get(record.task_id)?.keys() ?? []) {
+        listener({ type: TASK_AWAITING_INPUT_EVENT })
+      }
+    }
+    return result
+  }
+
+  /**
+   * Session shutdown first gives in-flight first launches up to boundMs to be admitted, so the
+   * normal suspension parks them like any resident child. A launch still unadmitted after that is
+   * parked here like a pending record (persisted_only, host ownership cleared): its late admission
+   * then fails the launch-ownership check and is torn down, and a resumed session relaunches it.
+   */
+  async settleLaunchesForShutdown(boundMs: number): Promise<void> {
+    this.#shutdownStarted = true
+    const inFlight = [...this.#launching.values()].map((launch) => launch.then(() => undefined, () => undefined))
+    if (inFlight.length > 0 && boundMs > 0) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const bound = new Promise<void>((resolveBound) => {
+        timer = setTimeout(resolveBound, boundMs)
+      })
+      await Promise.race([Promise.all(inFlight), bound])
+      clearTimeout(timer)
+    }
+    for (const taskId of this.#launching.keys()) this.#parkUnadmittedLaunch(taskId)
+  }
+
+  // Parks only a launch that is still this host's and has never reached a child: no session, no pid.
+  // started_at goes too, so revival reads it as never started and relaunches it fresh instead of
+  // deferring it for a transcript that never existed. A launch cancelled or admitted meanwhile is left alone.
+  #parkUnadmittedLaunch(taskId: string): void {
+    let parked = false
+    this.#options.store.mutate(taskId, (fresh) => {
+      if (fresh.status !== "running" || fresh.host_pid !== this.#hostPid) return fresh
+      if (fresh.child_session_id !== undefined || fresh.host_session !== undefined || fresh.pid !== undefined) return fresh
+      parked = true
+      const { host_pid: _hostPid, started_at: _startedAt, ...rest } = fresh
+      return { ...rest, residency_state: "persisted_only", updated_at: nowIso(this.#now) }
+    })
+    if (parked) {
+      this.#options.store.appendEvent(taskId, { type: "suspended", payload: { reason: "session_shutdown_before_admission" } })
+    }
+  }
+
+  /** Settles once the task's in-flight launch has settled, admitted or refused; at once when none is in flight. */
+  whenLaunched(taskId: string): Promise<void> {
+    return (this.#launching.get(taskId) ?? Promise.resolve()).then(() => undefined, () => undefined)
   }
 
   waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord> {
@@ -764,11 +1007,25 @@ class TaskManagerImpl implements TaskManager {
   // Test-only observability for proving the release guard never grows unboundedly across revives.
   releasedKeyCount(): number { return this.#released.size }
 
+  #trackLaunch(taskId: string, context: LaunchContext): Promise<LaunchOutcome> {
+    const launching = this.#launch(context)
+    this.#launching.set(taskId, launching)
+    void launching.finally(() => {
+      if (this.#launching.get(taskId) === launching) this.#launching.delete(taskId)
+    }).catch(() => undefined)
+    return launching
+  }
+
   async #launch(initial: LaunchContext): Promise<LaunchOutcome> {
+    if (this.#shutdownStarted) {
+      // Still pending: the shutdown suspension parks it with the other pending records.
+      this.#releaseSlot(initial.record.task_id, initial.model, initial.record.notification.run_epoch)
+      return { ok: false, error: "the session is shutting down" }
+    }
     const startResult = this.#options.store.transition(initial.record.task_id, { type: "start", timestamp: nowIso(this.#now) })
     if (!startResult.applied) {
       this.#releaseSlot(initial.record.task_id, initial.model, initial.record.notification.run_epoch)
-      this.#steering.dropPending(initial.record.task_id)
+      if (startResult.record.status === "cancelled") this.#steering.dropPending(initial.record.task_id, "cancelled")
       this.#settleWaiters(initial.record.task_id)
       return { ok: false, error: "task was cancelled before launch" }
     }
@@ -797,15 +1054,8 @@ class TaskManagerImpl implements TaskManager {
           context = advanced.context
           continue
         }
-        const failure = describeStartFailure(error)
         this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
-        if (failOwnedRun(this.#options.store, launchRunOf(record), nowIso(this.#now), failure)) {
-          this.#options.store.appendEvent(record.task_id, {
-            type: "task_start_failed",
-            payload: { error_message: failure.errorMessage, ...failure.eventFacts },
-          })
-          this.#steering.dropPending(record.task_id)
-        }
+        const failure = this.#recordStartFailure(record, error)
         this.#settleWaiters(record.task_id)
         return {
           ok: false,
@@ -836,12 +1086,32 @@ class TaskManagerImpl implements TaskManager {
     this.#recordSpawnFacts(record.task_id, handle)
     void this.#isolation.stamp(record.task_id, handle)
     this.#outcome.trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
-    void this.#steering.notifyStarted(record.task_id)
+    const recorded = this.#tryLoad(record.task_id)
     return {
       ok: true,
       run_epoch: record.notification.run_epoch,
       ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
+      ...(recorded?.effective_model === undefined ? {} : { effective_model: recorded.effective_model }),
     }
+  }
+
+  #recordStartFailure(record: TaskRecord, error: unknown): ReturnType<typeof describeStartFailure> {
+    const original = describeStartFailure(error)
+    const fresh = this.#tryLoad(record.task_id)
+    const queued = fresh?.pending_steering?.length ?? 0
+    const park = queued > 0 && (fresh?.host_session !== undefined
+      || newestSessionPath({ store: this.#options.store }, record.task_id) !== undefined)
+    const failure = { ...original, errorMessage: park ? original.errorMessage
+      : withDroppedSteeringNotice(original.errorMessage, queued) }
+    if (!failOwnedRun(this.#options.store, launchRunOf(record), nowIso(this.#now), failure)) return original
+    this.#options.store.appendEvent(record.task_id, {
+      type: "task_start_failed", payload: { error_message: failure.errorMessage, ...failure.eventFacts },
+    })
+    if (park) this.#options.store.transition(record.task_id, {
+      type: record.execution_mode === "process" ? "detach_rpc" : "persist_only", timestamp: nowIso(this.#now),
+    })
+    else if (queued > 0) this.#steering.dropPending(record.task_id, "target_gone")
+    return failure
   }
 
   /**
@@ -869,7 +1139,7 @@ class TaskManagerImpl implements TaskManager {
 
     this.#releaseSlot(record.task_id, context.model, record.notification.run_epoch)
 
-    const nextEpoch = record.notification.run_epoch + 1
+    const nextEpoch = nextRunEpoch(record)
     const nextRecord: TaskRecord = {
       ...record,
       model: nextModel.display,
@@ -903,12 +1173,9 @@ class TaskManagerImpl implements TaskManager {
 
     const nextContext: LaunchContext = {
       record: nextRecord,
-      managedSpec: {
-        ...context.managedSpec,
-        model: nextModel.display,
+      managedSpec: nextRungManagedSpec(context.managedSpec, nextModel, {
         fallbackModels: nextRecord.fallback_models ?? [],
-        ...resolvedReasoningFields(nextModel),
-      },
+      }),
       runner: context.runner,
       model: nextModel.display,
     }
@@ -1008,7 +1275,7 @@ class TaskManagerImpl implements TaskManager {
     const spawnSpec = handle.spawnSpec
     // A v1 spawn_spec persisted at spawn is authoritative: the rpc echo would rewrite it as the
     // legacy {cwd, extensions, member_env} shape, dropping the rebuild facts v1 carries.
-    const updated: TaskRecord = spawnSpec === undefined || (current.spawn_spec !== undefined && isSpawnSpecV1(current.spawn_spec))
+    const specApplied: TaskRecord = spawnSpec === undefined || (current.spawn_spec !== undefined && isSpawnSpecV1(current.spawn_spec))
       ? withSession
       : {
           ...withSession,
@@ -1018,7 +1285,12 @@ class TaskManagerImpl implements TaskManager {
             ...(spawnSpec.memberEnv === undefined ? {} : { member_env: spawnSpec.memberEnv }),
           },
         }
+    // The record's effective route comes from the CHILD, never the plan (#9722): the runner read
+    // the session's real model at start (in-process session.model, host get_state), and the
+    // child's own assistant-message observations keep it current (subscribeEffectiveModel).
+    const updated: TaskRecord = stampSpawnEffectiveModel(specApplied, handle.effectiveModel?.())
     if (updated !== current) this.#options.store.replace(updated)
+    void this.#steering.notifyStarted(taskId)
   }
 
   // One child subscription feeds BOTH durable facts: the JSONL transcript log and the run-stats
@@ -1042,6 +1314,7 @@ class TaskManagerImpl implements TaskManager {
       handle, taskId, store: this.#options.store, now: this.#now,
       runStats: this.#runStats, fallbackExhaustions: this.#nativeFallbackExhaustions,
       reopen: () => reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle),
+      onMotion: () => this.#clearAwaitingInput(taskId),
       onExtensionEvent: (event) => {
         const record = this.#tryLoad(taskId)
         if (record != null && record.host_pid === this.#hostPid) this.#options.onChildExtensionEvent?.(event, record)
@@ -1185,13 +1458,10 @@ class TaskManagerImpl implements TaskManager {
       return true
     }
 
-    const nextSpec: ManagedStartSpec = {
-      ...managedSpec,
-      model: nextModel.display,
+    const nextSpec: ManagedStartSpec = nextRungManagedSpec(managedSpec, nextModel, {
       requestedModel: record.requested_model,
       fallbackModels: remainingModels,
-      ...resolvedReasoningFields(nextModel),
-    }
+    })
     const launch = (): void => {
       void this.#launchRuntimeFallback({
         record: nextRecord,
@@ -1214,30 +1484,8 @@ class TaskManagerImpl implements TaskManager {
    * this owner still holds this epoch's handoff; the fail transition then applies only from `running`,
    * so a cancel or interrupt that landed first stands.
    */
-  #failStrandedHandoff(input: {
-    readonly taskId: string
-    readonly epoch: number
-    readonly owner: number | undefined
-    readonly nextModel: string
-    readonly error: unknown
-  }): void {
-    const reason = input.error instanceof Error ? input.error.message : String(input.error)
-    log("senpi-task runtime fallback teardown rejected", { taskId: input.taskId, error: reason })
-    let owned = false
-    this.#options.store.mutate(input.taskId, (fresh) => {
-      if (!isFallbackHandoff(fresh) || fresh.status !== "running" || fresh.notification.run_epoch !== input.epoch || fresh.host_pid !== input.owner) return fresh
-      owned = true
-      // Only the handoff marker goes: fallback_closing_child stays until #keepUnclosedChild hands the
-      // child's identity to its cleanup owner in one write, so no committed state lacks both.
-      const { fallback_handoff_epoch: _ended, ...rest } = fresh
-      return rest
-    })
-    if (!owned) return
-    const message = `Runtime fallback could not close the failed model's child (${reason}); ${input.nextModel} was not started.`
-    const failed = this.#options.store.transition(input.taskId, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
-    if (failed.applied) {
-      this.#options.store.appendEvent(input.taskId, { type: "task_fallback_teardown_failed", payload: { error_message: reason, next_model: input.nextModel } })
-    }
+  #failStrandedHandoff(input: StrandedHandoffFailure): void {
+    failStrandedHandoff(this.#options.store, nowIso(this.#now), input)
   }
 
   /** A launch still owns its task only while the task runs on the same epoch under the same owner. */
@@ -1366,20 +1614,12 @@ class TaskManagerImpl implements TaskManager {
         }
         return
       }
-      const failure = describeStartFailure(error)
       this.#releaseSlot(
         context.record.task_id,
         context.model,
         context.record.notification.run_epoch,
       )
-      // The primary launch path records this breadcrumb; a fallback launch that dies must not be the
-      // one failure that leaves the event log with no cause at all. A stale attempt records nothing.
-      if (failOwnedRun(this.#options.store, launchRunOf(context.record), nowIso(this.#now), failure)) {
-        this.#options.store.appendEvent(context.record.task_id, {
-          type: "task_start_failed",
-          payload: { error_message: failure.errorMessage, ...failure.eventFacts },
-        })
-      }
+      this.#recordStartFailure(context.record, error)
       this.#settleWaiters(context.record.task_id)
       return
     }
@@ -1416,7 +1656,7 @@ class TaskManagerImpl implements TaskManager {
     const live = this.#live.get(taskId)
     const record = this.#tryLoad(taskId)
     if (live === undefined || record === null || record === undefined) return { ok: false }
-    const epoch = record.notification.run_epoch + 1
+    const epoch = nextRunEpoch(record)
     if (!this.#concurrency.tryAcquire(live.model, taskId, epoch)) return { ok: false }
     let released = false
     const release = (): void => {
@@ -1435,7 +1675,7 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #reserveForDetachedRevive(record: TaskRecord): { readonly ok: false } | { readonly ok: true; commit(): void; release(): void } {
-    const epoch = record.notification.run_epoch + 1
+    const epoch = nextRunEpoch(record)
     if (!this.#concurrency.tryAcquire(record.model, record.task_id, epoch)) return { ok: false }
     let released = false
     const release = (): void => {
@@ -1460,7 +1700,7 @@ class TaskManagerImpl implements TaskManager {
 
   #reserveForReattach(record: TaskRecord): { readonly ok: false } | { readonly ok: true; release(): void } {
     if (isTerminalRecord(record)) return { ok: true, release: () => undefined }
-    const epoch = record.notification.run_epoch + 1
+    const epoch = nextRunEpoch(record)
     if (!this.#concurrency.tryAcquire(record.model, record.task_id, epoch)) return { ok: false }
     return { ok: true, release: () => this.#concurrency.releaseLease(record.task_id, epoch) }
   }

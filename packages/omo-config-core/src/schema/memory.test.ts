@@ -43,6 +43,7 @@ const FULL_DEFAULTS: OmoMemorySettings = {
     tool_budget: 8,
     query_expansion: false,
   },
+  projection: { max_entries_per_directory: 40, max_bytes: 24576 },
   compile_warn_tokens: 30000,
   agents: {},
 }
@@ -97,6 +98,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         tool_budget: 8,
         query_expansion: false,
       },
+      projection: { max_entries_per_directory: 12, max_bytes: 4096 },
       compile_warn_tokens: 50000,
       agents: {
         "backend-lead": {

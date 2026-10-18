@@ -1,12 +1,14 @@
 //! The requests the session thread serves and the replies it produces.
 
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams,
-    AxSnapshotParams, CaptureParams, ClipboardText, DragParams, KeyChordParams, PointParams, RaiseWindowParams,
-    ScrollParams, TypeTextParams,
+    AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
+    CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
+    HoldKeysParams, HoldMouseParams, ObserveParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
+use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_core::types::{
-    AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow,
+    AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow, ObserveResult,
 };
 use serde::Serialize;
 
@@ -17,12 +19,16 @@ pub enum Op {
     Displays,
     Windows,
     Capture(CaptureParams),
+    Observe(ObserveParams),
+    CaptureRegion(CaptureRegionParams),
     Click(PointParams),
     MoveMouse(PointParams),
     Drag(DragParams),
     Scroll(ScrollParams),
     TypeText(TypeTextParams),
     KeyChord(KeyChordParams),
+    HoldKeys(HoldKeysParams),
+    HoldMouse(HoldMouseParams),
     RaiseWindow(RaiseWindowParams),
     AxSnapshot(AxSnapshotParams),
     AxQuery(AxQueryParams),
@@ -38,6 +44,11 @@ pub enum Op {
     AxClick(AxClickParams),
     ClipboardRead,
     ClipboardWrite(ClipboardText),
+    ControlGrant(ControlGrantParams),
+    ControlRevoke,
+    ControlState,
+    MenuItems(MenuPathParams),
+    MenusSelect(MenuSelectParams),
 }
 
 /// A request's result; serializes to its engine method's wire `result`
@@ -50,10 +61,13 @@ pub enum Response {
     Displays(Vec<DesktopDisplay>),
     Windows(Vec<DesktopWindow>),
     Capture(CaptureResult),
+    Observe(ObserveResult),
     Snapshot(AxSnapshot),
     Node(AxNode),
     MaybeNode(Option<AxNode>),
     Nodes(Vec<AxNode>),
     Attributes(Vec<(String, String)>),
     Clipboard(ClipboardText),
+    ControlState(ControlStateResult),
+    MenuItems(Vec<MenuItem>),
 }

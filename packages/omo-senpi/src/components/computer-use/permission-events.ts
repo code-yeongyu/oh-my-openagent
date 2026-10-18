@@ -1,9 +1,14 @@
-import { CHILD_PERMISSION_EVENT, parseChildExtensionEvent, readSessionAncestry, type ChildExtensionEvent } from "@oh-my-opencode/senpi-task"
+import {
+  CHILD_PERMISSION_EVENT,
+  TASK_CHILD_EXTENSION_EVENT,
+  parseChildExtensionEvent,
+  readSessionAncestry,
+  type ChildExtensionEvent,
+} from "@oh-my-opencode/senpi-task"
 import * as z from "zod"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import { computerUseSessionId } from "../telemetry/omo-native-computer-use"
 
-export const TASK_CHILD_EXTENSION_EVENT = "omo.task.child_extension_event"
 const ROOT_PERMISSION_EVENT = "omo.computer.permission_required"
 const PERMISSION_LATCHES = Symbol.for("omo.computer.permissionLatches")
 const forwardedSchema = z.object({

@@ -9,9 +9,9 @@ function patternsOf(input: Record<string, unknown>): readonly string[] {
 
 
 describe("computerPermissionParser tiers", () => {
-	it("classifies window->screenshot as read", () => {
+	it.each(["screenshot", "observe"])("classifies window->%s as read", (method) => {
 		// Given
-		const input = { action: "call", chain: [windowStep, { method: "screenshot" }] };
+		const input = { action: "call", chain: [windowStep, { method }] };
 
 		// When
 		const patterns = patternsOf(input);

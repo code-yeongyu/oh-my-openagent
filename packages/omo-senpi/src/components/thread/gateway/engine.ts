@@ -40,7 +40,7 @@ export type GatewayEngine = {
 }
 
 export type GatewayEngineOptions = {
-  readonly store: GatewayStore
+  readonly store: Pick<GatewayStore, "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt">
   readonly endpoints: GatewayEndpointPort
   readonly resolve: GatewayResolve
   readonly now?: () => number

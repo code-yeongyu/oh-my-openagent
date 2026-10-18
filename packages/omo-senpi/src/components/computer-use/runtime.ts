@@ -8,6 +8,7 @@ import {
 } from "@oh-my-opencode/senpi-desktop-tool"
 
 import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
+import { confirmComputerControl } from "./control-confirm"
 import { defaultEngineChild, describeEngineSource } from "./engine-source"
 import { engineErrorCode, TrackedDesktopService, type TrackedDesktopServiceOptions } from "./engine-status"
 import { describeEnginePermissions } from "./permission-status"
@@ -19,6 +20,8 @@ export interface ComputerUseRuntimeOptions {
   readonly engineChild?: (enginePath: string | undefined) => ChildFactory
   readonly onEngineError: (code: ComputerUseEngineErrorCode) => void
   readonly onPermissionRequired?: TrackedDesktopServiceOptions["onPermissionRequired"]
+  /** True when the session runs in full access; foreground control is then granted without a confirm. */
+  readonly fullAccess?: () => boolean
 }
 
 /**
@@ -35,7 +38,7 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
     onPermissionRequired: options.onPermissionRequired,
   })
   const handle = new ComputerHandle({ service, settings: () => options.settings })
-  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool }
+  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool, confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }) }
   return {
     handle,
     service,

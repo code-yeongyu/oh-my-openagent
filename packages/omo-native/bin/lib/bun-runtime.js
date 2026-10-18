@@ -171,28 +171,81 @@ export function probeBunVersion(bunPath, options = {}) {
  *   1. already on bun                  -> stay (the loop guard; without it a re-exec would recurse)
  *   2. OMO_RUNTIME=node                -> stay (explicit user override beats detection)
  *   3. no bun binary anywhere          -> stay (npm-only machines never notice this module)
- *   4. OMO_RUNTIME=bun                 -> re-exec (explicit opt-in, no version floor)
- *   5. bun global install              -> re-exec (the bun that installed omo is the bun to run it)
+ *   4. OMO_RUNTIME=bun or a bun global install, bun >= 1.4 -> re-exec (the user chose bun)
+ *   5. OMO_RUNTIME=bun or a bun global install, older bun  -> refuse with the upgrade message
  *   6. any other install, bun >= 1.4   -> re-exec (a machine that has bun runs omo on bun)
- *   7. an older bun                    -> stay
+ *   7. any other install, older bun    -> stay on node silently
  *
- * Rules 5 and 6 differ only in cost: a bun-global install already proved its bun, so it never pays
- * for the version probe, while an npm, project-local or bunx install probes the discovered binary
- * once per node boot before trusting it.
+ * An explicit choice of bun is never silently swapped for node: the engine needs bun 1.4 (node:sqlite,
+ * worker_threads), so an older bun the user picked fails at startup with one actionable line instead of
+ * inside an extension (#9563). Rule 1's own floor lives in resolveBunGuard.
  */
 export async function resolveBunReexec(input) {
   const env = input.env ?? process.env
   const versions = input.versions ?? process.versions
-  if (versions.bun) return { reexec: false }
+  if (versions.bun) return resolveBunGuard(input)
   const requested = env.OMO_RUNTIME
   if (requested === "node") return { reexec: false }
   const bunPath = findBunBinary(input)
   if (!bunPath) return { reexec: false }
-  if (requested === "bun" || isUnderBunGlobalTree(input.scriptPath, input)) return { reexec: true, bunPath }
   const probe = input.bunVersion ?? probeBunVersion
   const version = await probe(bunPath, { env })
-  if (!bunVersionSatisfies(version)) return { reexec: false }
-  return { reexec: true, bunPath }
+  if (bunVersionSatisfies(version)) return { reexec: true, bunPath }
+  if (choseBun(input)) return { reexec: false, refuse: bunTooOldMessage(version) }
+  return { reexec: false }
+}
+
+/** The one line an explicit but too-old bun gets; `omo: ` is prefixed by the bin's catch. */
+export function bunTooOldMessage(version) {
+  return `OmO needs Bun >= ${BUN_MIN_VERSION} (found ${version || "an unknown version"}); run \`bun upgrade\``
+}
+
+/** True when the user picked bun: OMO_RUNTIME=bun, or omo was installed with `bun add -g`. */
+function choseBun(input) {
+  const env = input.env ?? process.env
+  return env.OMO_RUNTIME === "bun" || isUnderBunGlobalTree(input.scriptPath, input)
+}
+
+/**
+ * Rule 1 with its floor: the process already runs on bun (the POSIX bun-global shim execs bun
+ * directly, so this is where `bun add -g` users arrive). A current bun stays. An older bun the user
+ * chose fails with the upgrade message. An older bun nobody chose hands the launch to node, marked
+ * OMO_RUNTIME=node so node never bounces back; a node that is really bun's own shim does not count,
+ * and landing on an old bun with OMO_RUNTIME=node already set is that bounce, so it fails too.
+ */
+export function resolveBunGuard(input) {
+  const env = input.env ?? process.env
+  const version = (input.versions ?? process.versions).bun
+  if (bunVersionSatisfies(version)) return { reexec: false }
+  if (choseBun(input) || env.OMO_RUNTIME === "node") return { reexec: false, refuse: bunTooOldMessage(version) }
+  const nodePath = findNodeBinary(input)
+  if (!nodePath) return { reexec: false, refuse: bunTooOldMessage(version) }
+  return { reexec: true, nodePath }
+}
+
+/** A real node on PATH: bun's own `node` shim resolves to the bun executable and is skipped. */
+export function findNodeBinary(options = {}) {
+  const env = options.env ?? process.env
+  const platform = options.platform ?? process.platform
+  const exists = options.exists ?? existsSync
+  const realpath = options.realpath ?? realpathSync
+  const paths = pathApi(platform)
+  const name = platform === "win32" ? "node.exe" : "node"
+  const real = (path) => {
+    try {
+      return realpath(path)
+    } catch {
+      return path
+    }
+  }
+  const bunExecutable = real(options.execPath ?? process.execPath)
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path")
+  const entries = pathKey ? (env[pathKey] ?? "").split(pathDelimiter(platform)).filter(Boolean) : []
+  for (const entry of entries) {
+    const candidate = paths.join(entry, name)
+    if (exists(candidate) && real(candidate) !== bunExecutable) return candidate
+  }
+  return undefined
 }
 
 /**
@@ -205,22 +258,27 @@ export async function resolveBunReexec(input) {
  */
 export async function maybeReexecUnderBun(input) {
   const decision = await resolveBunReexec(input)
+  if (decision.refuse) throw new Error(decision.refuse)
   if (!decision.reexec) return false
   const run = input.spawn ?? runChild
   const propagate = input.propagate ?? propagateResult
   const argv = input.argv ?? process.argv
   const execve = input.execve === undefined ? process.execve : input.execve
+  const target = decision.nodePath ?? decision.bunPath
+  // A hand-off to node is pinned there so the node launch never re-execs the old bun again.
+  const childEnv = decision.nodePath ? { ...process.env, OMO_RUNTIME: "node" } : process.env
   if ((input.platform ?? process.platform) !== "win32" && typeof execve === "function") {
     try {
-      execve(decision.bunPath, [decision.bunPath, input.scriptPath, ...argv.slice(2)], process.env)
+      execve(target, [target, input.scriptPath, ...argv.slice(2)], childEnv)
       return true
     } catch {
       // Keep the same inherited environment and signal forwarding if replacement fails.
     }
   }
-  const result = await run(decision.bunPath, [input.scriptPath, ...argv.slice(2)], {
+  const result = await run(target, [input.scriptPath, ...argv.slice(2)], {
     stdio: "inherit",
     windowsHide: true,
+    ...(decision.nodePath ? { env: childEnv } : {}),
   })
   propagate(result)
   return true

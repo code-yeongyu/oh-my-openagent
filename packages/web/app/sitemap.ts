@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next"
 
+import { desktopDownloadEnabled } from "@/lib/desktop-download"
 import { DOC_GUIDE_PAGES } from "@/lib/docs-sections"
 
 const BASE_URL = "https://omo.dev"
@@ -12,6 +13,7 @@ const PUBLIC_ROUTES = [
   "",
   "/docs",
   "/docs/install",
+  ...(desktopDownloadEnabled() ? ["/download"] : []),
   ...DOC_GUIDE_PAGES.map(({ slug }) => `/docs/${slug}`),
   "/manifesto",
   "/manifesto/2026-01",

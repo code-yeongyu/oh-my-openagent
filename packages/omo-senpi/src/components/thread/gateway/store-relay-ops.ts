@@ -44,7 +44,7 @@ const BINDING_COLUMNS = [
 
 const OUTBOX_COLUMNS = [
   "cursor", "binding_id", "revision", "event_kind", "payload", "state", "provider_message_id", "created_at", "reply_token",
-  "question_state", "outcome", "answered_by",
+  "question_state", "outcome", "answered_by", "answer_state",
 ] as const
 
 function refused(code: StoreRefusal["code"], message: string, details?: Readonly<Record<string, unknown>>): StoreRefusal {
@@ -70,6 +70,10 @@ function authorFromColumn(value: unknown): ExternalAuthor | null {
  * one - and a rolled-back insert leaves a spurious wake, never a missed one.
  */
 function touchOutboxMarker(ctx: StoreContext, bindingId: string, cursor: number, now: number): void {
+  if (ctx.afterCommit !== undefined) {
+    ctx.afterCommit.push(() => touchOutboxMarker({ ...ctx, afterCommit: undefined }, bindingId, cursor, now))
+    return
+  }
   const marker = gatewayOutboxMarkerPath(ctx.config.agent_dir)
   const temporary = `${marker}.${process.pid}.${randomUUID()}.tmp`
   writeFileSync(temporary, JSON.stringify({ binding_id: bindingId, cursor, written_at: rfc3339(now) }), { mode: 0o600 })
@@ -385,6 +389,13 @@ export async function bindingView(ctx: StoreContext, request: { readonly now: nu
 
 export { registerIncarnation } from "./store-ownership"
 
+export async function bindingFor(ctx: StoreContext, request: { readonly now: number; readonly platform: string; readonly account_id: string; readonly chat_id: string; readonly thread_id: string }): Promise<BindingRecord | null> {
+  return await transaction(ctx, "binding_for", () => {
+    expireDue(ctx, request.now)
+    return selectBindings(ctx, "platform = ? AND account_id = ? AND chat_id = ? AND thread_id = ? AND status = 'active'", [request.platform, request.account_id, request.chat_id, request.thread_id])[0] ?? null
+  })
+}
+
 function incarnationOf(ctx: StoreContext, durableId: string): string | null {
   return nullableString(ctx.sql.one(["incarnation"], "SELECT incarnation FROM session_meta WHERE durable_id = ?", [durableId])?.incarnation)
 }
@@ -565,6 +576,7 @@ function outboxRowFrom(record: SqlRow, binding: BindingRecord): OutboxRow {
     question_state: (record.question_state ?? null) as OutboxRow["question_state"],
     outcome: (record.outcome ?? null) as OutboxRow["outcome"],
     answered_by: authorFromColumn(record.answered_by),
+    answer_state: (record.answer_state ?? null) as OutboxRow["answer_state"],
   }
 }
 
@@ -579,7 +591,7 @@ function ackedCursor(ctx: StoreContext, bindingId: string): number {
  */
 export async function readOutbox(
   ctx: StoreContext,
-  request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number },
+  request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number; readonly pendingOnly?: boolean },
 ): Promise<RelayOutcome<{ readonly binding_id: string; readonly revision: number; readonly status: BindingRecord["status"]; readonly rows: readonly OutboxRow[]; readonly next_cursor: number; readonly acked_cursor: number }>> {
   const limit = Math.min(Math.max(request.limit ?? OUTBOX_PAGE_DEFAULT, 1), OUTBOX_PAGE_MAX)
   return await transaction(ctx, "read_outbox", () => {
@@ -590,7 +602,7 @@ export async function readOutbox(
     const acked = ackedCursor(ctx, binding.binding_id)
     const after = request.after_cursor ?? acked
     const rows = ctx.sql
-      .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ? ORDER BY cursor LIMIT ?`, [binding.binding_id, after, limit], "cursor")
+      .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ?${request.pendingOnly ? " AND state = 'pending'" : ""} ORDER BY cursor LIMIT ?`, [binding.binding_id, after, limit], "cursor")
       .map((row) => outboxRowFrom(row, binding))
     sweepRetentionIfDue(ctx, request.now)
     return { kind: "ok", binding_id: binding.binding_id, revision: binding.revision, status: binding.status, rows, next_cursor: rows.at(-1)?.cursor ?? after, acked_cursor: acked }
@@ -695,8 +707,18 @@ export async function claimAnswer(ctx: StoreContext, request: { readonly now: nu
   })
 }
 
+/** A question's answer state changed: wake connectors, which hold the binding's later rows until it is delivered. */
+function touchQuestionMarker(ctx: StoreContext, replyToken: string, now: number): void {
+  const row = ctx.sql.one(["cursor", "binding_id"], "SELECT cursor, binding_id FROM outbox WHERE reply_token = ?", [replyToken])
+  if (row !== undefined) touchOutboxMarker(ctx, String(row.binding_id), Number(row.cursor), now)
+}
+
 export async function releaseAnswer(ctx: StoreContext, request: AnswerClaimRef): Promise<boolean> {
-  return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL, answered_by = NULL WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
+  return await transaction(ctx, "release_answer", () => {
+    const changed = write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL, answered_by = NULL WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1
+    if (changed) touchQuestionMarker(ctx, request.reply_token, request.claimed_at)
+    return changed
+  })
 }
 
 /**
@@ -706,14 +728,44 @@ export async function releaseAnswer(ctx: StoreContext, request: AnswerClaimRef):
  * in-flight claim like a release.
  */
 export async function markPriorDelivered(ctx: StoreContext, request: AnswerClaimRef & { readonly prior: PriorAnswer }): Promise<boolean> {
-  return await transaction(ctx, "mark_prior_delivered", () => write(ctx, "UPDATE outbox SET answer_state = 'delivered', answer = ?, answered_at = ?, answered_by = ? WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.prior.answer, request.prior.answered_at, authorColumn(request.prior.answered_by), request.reply_token, request.claimed_at]) === 1)
+  return await transaction(ctx, "mark_prior_delivered", () => {
+    const changed = write(ctx, "UPDATE outbox SET answer_state = 'delivered', answer = ?, answered_at = ?, answered_by = ? WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.prior.answer, request.prior.answered_at, authorColumn(request.prior.answered_by), request.reply_token, request.claimed_at]) === 1
+    if (changed) touchQuestionMarker(ctx, request.reply_token, request.claimed_at)
+    return changed
+  })
+}
+
+/**
+ * The session closed a question it relayed without a relayed answer: answered in its own client, timed
+ * out, or cancelled. The question reads like one closed elsewhere (delivered, no answer text), so a later
+ * `thread_answer` is `already_answered` instead of a claim the session can only refuse, and the outbox
+ * marker wakes connectors: a connector holding the binding's rows behind the question settles it. A
+ * `pending` question changes, and so does one a relay is still handing an answer to (`in_flight`): the session
+ * closed the request without that answer, so the claim's later release must not reopen it, and its frame can
+ * only be refused. A delivered answer is left as it is. Returns the questions closed.
+ */
+export async function closeQuestion(ctx: StoreContext, request: { readonly now: number; readonly session_durable_id: string; readonly ui_request_id: string }): Promise<number> {
+  return await transaction(ctx, "close_question", () => {
+    const open = "(question_state = 'pending' OR (question_state = 'answered' AND answer_state = 'in_flight'))"
+    const rows = ctx.sql.all(["cursor", "binding_id"], `SELECT cursor, binding_id FROM outbox WHERE event_kind = 'question' AND session_durable_id = ? AND ui_request_id = ? AND ${open}`, [request.session_durable_id, request.ui_request_id], "cursor")
+    for (const row of rows) {
+      write(ctx, `UPDATE outbox SET question_state = 'answered', answer_state = 'delivered', answer = NULL, answered_at = ?, answered_by = NULL WHERE cursor = ? AND ${open}`, [request.now, Number(row.cursor)])
+      touchOutboxMarker(ctx, String(row.binding_id), Number(row.cursor), request.now)
+    }
+    return rows.length
+  })
 }
 
 /**
  * The session accepted this claimant's answer: the question is delivered with that answer, whether or
  * not a later answer took the claim over meanwhile (the session resolves a request once, so at most
- * one claimant's frame is ever accepted). A question already delivered is left as it is.
+ * one claimant's frame is ever accepted). A question already delivered with an answer is left as it is; one closed with no
+ * answer text (`closeQuestion`, which the session's own close event can write just before this confirm) takes this answer.
  */
 export async function confirmAnswer(ctx: StoreContext, request: AnswerDelivered): Promise<boolean> {
-  return await transaction(ctx, "confirm_answer", () => write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'delivered', answer = ?, answered_at = ?, answered_by = ? WHERE reply_token = ? AND answer_state IS NOT 'delivered'", [request.answer, request.claimed_at, authorColumn(request.answered_by), request.reply_token]) === 1)
+  return await transaction(ctx, "confirm_answer", () => {
+    const changed = write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'delivered', answer = ?, answered_at = ?, answered_by = ? WHERE reply_token = ? AND (answer_state IS NOT 'delivered' OR answer IS NULL)", [request.answer, request.claimed_at, authorColumn(request.answered_by), request.reply_token]) === 1
+    if (changed) touchQuestionMarker(ctx, request.reply_token, request.claimed_at)
+    return changed
+  })
 }

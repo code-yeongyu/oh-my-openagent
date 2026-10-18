@@ -19,6 +19,7 @@ const NON_RETRYABLE_REASONS = new Set([
   "completion_validation",
   "missing_validated_tip",
   "missing_worktree",
+  "secret_like_content",
 ])
 
 // Outcomes the child did not cause: the parent repo was busy or drifted while the run merged.

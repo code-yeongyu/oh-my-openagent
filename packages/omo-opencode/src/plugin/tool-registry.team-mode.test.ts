@@ -128,7 +128,11 @@ describe("team-mode tool registry wiring", () => {
     expect(Object.keys(result.filteredTools).filter((toolName) => toolName.startsWith("team_"))).toHaveLength(12)
   })
 
-  test("passes ctx.client into every team tool factory", () => {
+  test.each([
+    { agents: false, expected: false },
+    { agents: undefined, expected: true },
+    { agents: true, expected: true },
+  ])("passes ctx.client and claude_code.agents=$agents into team tool factories", ({ agents, expected }) => {
     // given
     const client = {} as OpencodeClient
     const createTeamCreateTool = mock(() => fakeTool)
@@ -147,7 +151,7 @@ describe("team-mode tool registry wiring", () => {
     // when
     createToolRegistry({
       ctx: { directory: "/tmp/team-mode", client } as Parameters<typeof createToolRegistry>[0]["ctx"],
-      pluginConfig: createPluginConfig(),
+      pluginConfig: { ...createPluginConfig(), claude_code: { agents } },
       managers: {
         backgroundManager: {},
         tmuxSessionManager: {},
@@ -193,7 +197,7 @@ describe("team-mode tool registry wiring", () => {
     })
 
     // then
-    expect(createTeamCreateTool).toHaveBeenCalledWith(expect.anything(), client, expect.anything(), expect.anything(), expect.anything())
+    expect(createTeamCreateTool).toHaveBeenCalledWith(expect.anything(), client, expect.anything(), expect.anything(), expect.objectContaining({ claudeCodeAgentsEnabled: expected }))
     expect(createTeamDeleteTool).toHaveBeenCalledWith(expect.anything(), client, expect.anything(), expect.anything())
     expect(createTeamShutdownRequestTool).toHaveBeenCalledWith(expect.anything(), client)
     expect(createTeamApproveShutdownTool).toHaveBeenCalledWith(expect.anything(), client)

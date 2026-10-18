@@ -1,9 +1,9 @@
 /// <reference path="../../../bun-test.d.ts" />
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 
 import {
   appendSessionIdForWork,
@@ -39,8 +39,14 @@ function createStaleWorkRecord(overrides: Record<string, unknown> = {}): Record<
   }
 }
 
+function tempDirectory(prefix: string): string {
+  const directory = mkdtempSync(join(tmpdir(), prefix))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  return directory
+}
+
 function createProject(works: Record<string, unknown>, activeWorkId: string): string {
-  const directory = mkdtempSync(join(tmpdir(), "boulder-stale-work-"))
+  const directory = tempDirectory("boulder-stale-work-")
   const boulderDirectory = join(directory, ".omo")
   mkdirSync(boulderDirectory, { recursive: true })
   const activeWork = works[activeWorkId] as Record<string, unknown>
@@ -61,7 +67,7 @@ function createProject(works: Record<string, unknown>, activeWorkId: string): st
 }
 
 function createSessionsDirectory(): string {
-  return mkdtempSync(join(tmpdir(), "boulder-stale-agent-"))
+  return tempDirectory("boulder-stale-agent-")
 }
 
 function readRawState(directory: string): string {
@@ -301,7 +307,7 @@ describe("reconcileStaleWorks", () => {
 
   test("#given no boulder file #when reconciling #then nothing is written and nothing throws", () => {
     // given
-    const directory = mkdtempSync(join(tmpdir(), "boulder-stale-empty-"))
+    const directory = tempDirectory("boulder-stale-empty-")
 
     // when
     const result = reconcileStaleWorks(directory, { sessionsDirectory: createSessionsDirectory() })
@@ -313,7 +319,7 @@ describe("reconcileStaleWorks", () => {
 
   test("#given an unreadable boulder file #when reconciling #then nothing is written and nothing throws", () => {
     // given
-    const directory = mkdtempSync(join(tmpdir(), "boulder-stale-broken-"))
+    const directory = tempDirectory("boulder-stale-broken-")
     mkdirSync(join(directory, ".omo"), { recursive: true })
     writeFileSync(getBoulderFilePath(directory), "{not-json", "utf-8")
 

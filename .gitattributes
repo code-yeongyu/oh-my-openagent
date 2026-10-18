@@ -12,3 +12,7 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.py text eol=lf
+
+# The vendored sync-format copy and its fixtures are checked byte for byte against a hash manifest
+# (memory-core sync/crypto/vendor-integrity.test.ts): no line-ending conversion on any platform.
+packages/memory-core/src/sync/crypto/vendor/** -text

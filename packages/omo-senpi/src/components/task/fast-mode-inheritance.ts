@@ -1,4 +1,4 @@
-import type { ResolvedChildPlan } from "@oh-my-opencode/senpi-task"
+import { isPriorityAliasOf, type ResolvedChildPlan } from "@oh-my-opencode/senpi-task"
 
 import type { TaskModelRegistry } from "./planner"
 import type { ParentServiceTier } from "./runtime-context"
@@ -28,18 +28,10 @@ function splitModelReference(reference: string): ModelReference | undefined {
   return { provider: reference.slice(0, slash), id: reference.slice(slash + 1) }
 }
 
-function readField(candidate: object, field: string): unknown {
-  return field in candidate ? Reflect.get(candidate, field) : undefined
-}
-
 function asFastVariant(candidate: unknown, base: ModelReference): FastVariant | undefined {
-  if (typeof candidate !== "object" || candidate === null) return undefined
-  const fastId = `${base.id}${FAST_MODEL_SUFFIX}`
-  if (readField(candidate, "provider") !== base.provider || readField(candidate, "id") !== fastId) return undefined
-  if (readField(candidate, "serviceTier") !== "priority" || readField(candidate, "upstreamModelId") !== base.id) {
-    return undefined
-  }
-  return { provider: base.provider, id: fastId, upstreamModelId: base.id, serviceTier: "priority" }
+  return isPriorityAliasOf(candidate, base)
+    ? { provider: base.provider, id: `${base.id}${FAST_MODEL_SUFFIX}`, upstreamModelId: base.id, serviceTier: "priority" }
+    : undefined
 }
 
 /**

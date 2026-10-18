@@ -24,11 +24,15 @@ export type TaskTransition =
       readonly timestamp: string
       readonly error_message?: string
       readonly run_stats?: TaskRunStats
+      // Cancel only the run a handle minted at this epoch names (fenceRun); never a successor run.
+      readonly expected_run_epoch?: number
     }
   | {
       readonly type: "interrupt"
       readonly timestamp: string
       readonly error_message?: string
+      // The partial answer a foreign user abort preserved (F10a); absent when the run had none.
+      readonly final_response?: string
       readonly run_stats?: TaskRunStats
     }
   | {
@@ -56,6 +60,11 @@ export type TaskTransitionAudit =
       readonly type: "invalid_transition_ignored"
       readonly attempted_status: TaskStatus
       readonly current_status: TaskStatus
+    }
+  | {
+      readonly type: "epoch_mismatch_ignored"
+      readonly expected_run_epoch: number
+      readonly run_epoch: number
     }
 
 export type TaskTransitionResult = {

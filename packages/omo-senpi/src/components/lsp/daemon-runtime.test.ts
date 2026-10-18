@@ -4,6 +4,7 @@ import { realpathSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
+import { lspInstallDecisionsPath, userLspConfigPath } from "./config-paths"
 import { callPackagedDaemonTool } from "./daemon-tool-client"
 import { resolveSenpiDaemonRuntime, resolveSenpiPackagedDaemonRuntime } from "./daemon-runtime"
 
@@ -43,7 +44,7 @@ describe("Senpi packaged daemon runtime resolver", () => {
     expect(runtime).toEqual({ cliPath: fixture.cliPath, version: "0.1.0" })
   })
 
-  test("#given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .pi context are forwarded", async () => {
+  test("#given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .omo-first context are forwarded", async () => {
     // given
     const fixture = await makePackagedExtensionFixture()
     await writeFile(
@@ -73,9 +74,12 @@ describe("Senpi packaged daemon runtime resolver", () => {
           args: { filePath: "x.ts", line: 1, character: 0 },
           context: {
             cwd: realpathSync(resolve(projectDir)),
-            projectConfigPaths: [join(realpathSync(resolve(projectDir)), ".pi", "lsp-client.json")],
-            userConfigPath: join(resolve(homeDir), ".pi", "lsp-client.json"),
-            installDecisionsPath: join(resolve(homeDir), ".pi", "lsp-install-decisions.json"),
+            projectConfigPaths: [
+              join(realpathSync(resolve(projectDir)), ".omo", "lsp-client.json"),
+              join(realpathSync(resolve(projectDir)), ".pi", "lsp-client.json"),
+            ],
+            userConfigPath: join(resolve(homeDir), ".omo", "lsp-client.json"),
+            installDecisionsPath: join(resolve(homeDir), ".omo", "lsp-install-decisions.json"),
             capabilities: { installDecisionTool: false },
           },
           signalAborted: true,
@@ -102,8 +106,8 @@ describe("Senpi packaged daemon runtime resolver", () => {
     )
 
     const context = JSON.parse(result.content[0]?.text ?? "null") as { userConfigPath: string; installDecisionsPath: string }
-    expect(context.userConfigPath).toBe(join(homedir(), ".pi", "lsp-client.json"))
-    expect(context.installDecisionsPath).toBe(join(homedir(), ".pi", "lsp-install-decisions.json"))
+    expect(context.userConfigPath).toBe(userLspConfigPath(homedir()))
+    expect(context.installDecisionsPath).toBe(lspInstallDecisionsPath(homedir()))
   })
 
   test("#given all six Senpi LSP names #when executing through the packaged client #then canonical Core tool names are used", async () => {

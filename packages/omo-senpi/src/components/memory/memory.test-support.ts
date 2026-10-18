@@ -1,18 +1,7 @@
-import { mkdtempSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 
-// Every memory test that registers the component without its own `env` falls through to
-// process.env, and memory-core resolves the default root from os.homedir(), which Bun fixes at
-// process start - the root harness's hermetic HOME does not reach it. Component registration
-// sweeps the resolved memory root (transient-sweep.ts), so that fallthrough must land in a
-// per-process temp dir and never in the developer's real ~/.omo/memory. Unconditional on purpose:
-// no test here legitimately needs the real root, and a shell-exported OMO_MEMORY_HOME is real.
-process.env.OMO_MEMORY_HOME = join(mkdtempSync(join(tmpdir(), "omo-memory-test-home-")), "memory")
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 
@@ -20,14 +9,15 @@ export type SessionEntryFixture = {
   readonly type: string
   readonly customType?: string
   readonly data?: unknown
+  readonly timestamp?: string
 }
 
 export class MemoryFakeExtensionAPI extends FakeExtensionAPI {
-  readonly entries: Array<{ customType: string; data: unknown }> = []
+  readonly entries: Array<{ customType: string; data: unknown; options?: { readonly startupBookkeeping?: boolean } }> = []
   readonly entryRenderers: Array<{ customType: string; renderer: unknown }> = []
 
-  appendEntry(customType: string, data?: unknown): void {
-    this.entries.push({ customType, data })
+  appendEntry(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void {
+    this.entries.push(options === undefined ? { customType, data } : { customType, data, options })
   }
 
   registerEntryRenderer(customType: string, renderer: unknown): void {
@@ -63,6 +53,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
     sync: { enabled: true },
     search: { enabled: true },
     recall: { enabled: true, max_items: 2, category: "quick", event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }, sidecar_max_tokens: 48000, max_concurrent_wakes: 2, tool_budget: 8, query_expansion: false },
+    projection: { max_entries_per_directory: 40, max_bytes: 24576 },
     compile_warn_tokens: 30000,
     agents: {},
     ...overrides,

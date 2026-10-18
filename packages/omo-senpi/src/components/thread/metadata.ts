@@ -265,4 +265,4 @@ export const THREAD_TOOL_SEARCH_METADATA: readonly ThreadToolSearchEntry[] = [
  * tokens, so the per-tool entries above stay free of policy prose.
  */
 export const THREAD_FAMILY_PROMPT_GUIDELINES =
-	"Thread tools address peer sessions, never child tasks: call thread_list first and pass a thread_id or unique name it returned, never a guessed address; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace."
+	"Thread tools address peer sessions, never child tasks: call thread_list first and pass a thread_id or unique name it returned, never a guessed address; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."

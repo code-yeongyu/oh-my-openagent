@@ -1700,6 +1700,10 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "additionalProperties": false
@@ -1927,6 +1931,28 @@
           },
           "additionalProperties": false
         },
+        "projection": {
+          "default": {
+            "max_entries_per_directory": 40,
+            "max_bytes": 24576
+          },
+          "type": "object",
+          "properties": {
+            "max_entries_per_directory": {
+              "default": 40,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_bytes": {
+              "default": 24576,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "compile_warn_tokens": {
           "default": 30000,
           "type": "integer",
@@ -2020,6 +2046,10 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 9007199254740991
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "additionalProperties": false
@@ -2177,6 +2207,22 @@
                 },
                 "additionalProperties": false
               },
+              "projection": {
+                "type": "object",
+                "properties": {
+                  "max_entries_per_directory": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -2199,6 +2245,94 @@
       },
       "additionalProperties": false
     },
+    "side_panel": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "width": {
+          "default": "26%",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 24,
+              "maximum": 160
+            },
+            {
+              "type": "string",
+              "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+            }
+          ]
+        },
+        "min_columns": {
+          "default": 120,
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 400
+        },
+        "clickable": {
+          "default": true,
+          "type": "boolean"
+        },
+        "usage_poll_seconds": {
+          "default": 150,
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600
+        },
+        "sections": {
+          "default": {
+            "session": true,
+            "goal": true,
+            "context": true,
+            "usage": false,
+            "agents": true,
+            "tools": true,
+            "files": true,
+            "memory": true
+          },
+          "type": "object",
+          "properties": {
+            "session": {
+              "default": true,
+              "type": "boolean"
+            },
+            "goal": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "default": true,
+              "type": "boolean"
+            },
+            "usage": {
+              "default": false,
+              "type": "boolean"
+            },
+            "agents": {
+              "default": true,
+              "type": "boolean"
+            },
+            "tools": {
+              "default": true,
+              "type": "boolean"
+            },
+            "files": {
+              "default": true,
+              "type": "boolean"
+            },
+            "memory": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "computer": {
       "type": "object",
       "properties": {
@@ -2209,6 +2343,10 @@
         "display": {
           "type": "string",
           "minLength": 1
+        },
+        "showCursor": {
+          "type": "boolean",
+          "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
         },
         "max_width": {
           "type": "integer",
@@ -3884,6 +4022,10 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "additionalProperties": false
@@ -4041,6 +4183,22 @@
               },
               "additionalProperties": false
             },
+            "projection": {
+              "type": "object",
+              "properties": {
+                "max_entries_per_directory": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -4132,6 +4290,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -4289,6 +4451,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -4310,6 +4488,71 @@
           },
           "additionalProperties": false
         },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "goal": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "computer": {
           "type": "object",
           "properties": {
@@ -4320,6 +4563,10 @@
             "display": {
               "type": "string",
               "minLength": 1
+            },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
             },
             "max_width": {
               "type": "integer",
@@ -5995,6 +6242,10 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "additionalProperties": false
@@ -6152,6 +6403,22 @@
               },
               "additionalProperties": false
             },
+            "projection": {
+              "type": "object",
+              "properties": {
+                "max_entries_per_directory": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -6243,6 +6510,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -6400,6 +6671,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -6421,6 +6708,71 @@
           },
           "additionalProperties": false
         },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "goal": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "computer": {
           "type": "object",
           "properties": {
@@ -6431,6 +6783,10 @@
             "display": {
               "type": "string",
               "minLength": 1
+            },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
             },
             "max_width": {
               "type": "integer",
@@ -8106,6 +8462,10 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "additionalProperties": false
@@ -8263,6 +8623,22 @@
               },
               "additionalProperties": false
             },
+            "projection": {
+              "type": "object",
+              "properties": {
+                "max_entries_per_directory": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -8354,6 +8730,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -8511,6 +8891,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -8532,6 +8928,71 @@
           },
           "additionalProperties": false
         },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "goal": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "computer": {
           "type": "object",
           "properties": {
@@ -8542,6 +9003,10 @@
             "display": {
               "type": "string",
               "minLength": 1
+            },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
             },
             "max_width": {
               "type": "integer",
@@ -10215,6 +10680,10 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 9007199254740991
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "additionalProperties": false
@@ -10372,6 +10841,22 @@
                 },
                 "additionalProperties": false
               },
+              "projection": {
+                "type": "object",
+                "properties": {
+                  "max_entries_per_directory": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -10463,6 +10948,10 @@
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
                       "additionalProperties": false
@@ -10620,6 +11109,22 @@
                       },
                       "additionalProperties": false
                     },
+                    "projection": {
+                      "type": "object",
+                      "properties": {
+                        "max_entries_per_directory": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "max_bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "compile_warn_tokens": {
                       "type": "integer",
                       "exclusiveMinimum": 0,
@@ -10641,6 +11146,71 @@
             },
             "additionalProperties": false
           },
+          "side_panel": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "width": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 24,
+                    "maximum": 160
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                  }
+                ]
+              },
+              "min_columns": {
+                "type": "integer",
+                "minimum": 60,
+                "maximum": 400
+              },
+              "clickable": {
+                "type": "boolean"
+              },
+              "usage_poll_seconds": {
+                "type": "integer",
+                "minimum": 60,
+                "maximum": 3600
+              },
+              "sections": {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "type": "boolean"
+                  },
+                  "goal": {
+                    "type": "boolean"
+                  },
+                  "context": {
+                    "type": "boolean"
+                  },
+                  "usage": {
+                    "type": "boolean"
+                  },
+                  "agents": {
+                    "type": "boolean"
+                  },
+                  "tools": {
+                    "type": "boolean"
+                  },
+                  "files": {
+                    "type": "boolean"
+                  },
+                  "memory": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "computer": {
             "type": "object",
             "properties": {
@@ -10651,6 +11221,10 @@
               "display": {
                 "type": "string",
                 "minLength": 1
+              },
+              "showCursor": {
+                "type": "boolean",
+                "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
               },
               "max_width": {
                 "type": "integer",
@@ -12326,6 +12900,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -12483,6 +13061,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -12574,6 +13168,10 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 9007199254740991
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "additionalProperties": false
@@ -12731,6 +13329,22 @@
                           },
                           "additionalProperties": false
                         },
+                        "projection": {
+                          "type": "object",
+                          "properties": {
+                            "max_entries_per_directory": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -12752,6 +13366,71 @@
                 },
                 "additionalProperties": false
               },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "goal": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "computer": {
                 "type": "object",
                 "properties": {
@@ -12762,6 +13441,10 @@
                   "display": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
                   },
                   "max_width": {
                     "type": "integer",
@@ -14437,6 +15120,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -14594,6 +15281,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -14685,6 +15388,10 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 9007199254740991
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "additionalProperties": false
@@ -14842,6 +15549,22 @@
                           },
                           "additionalProperties": false
                         },
+                        "projection": {
+                          "type": "object",
+                          "properties": {
+                            "max_entries_per_directory": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -14863,6 +15586,71 @@
                 },
                 "additionalProperties": false
               },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "goal": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "computer": {
                 "type": "object",
                 "properties": {
@@ -14873,6 +15661,10 @@
                   "display": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
                   },
                   "max_width": {
                     "type": "integer",
@@ -16548,6 +17340,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -16705,6 +17501,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -16796,6 +17608,10 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 9007199254740991
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "additionalProperties": false
@@ -16953,6 +17769,22 @@
                           },
                           "additionalProperties": false
                         },
+                        "projection": {
+                          "type": "object",
+                          "properties": {
+                            "max_entries_per_directory": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -16974,6 +17806,71 @@
                 },
                 "additionalProperties": false
               },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "goal": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "computer": {
                 "type": "object",
                 "properties": {
@@ -16984,6 +17881,10 @@
                   "display": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
                   },
                   "max_width": {
                     "type": "integer",

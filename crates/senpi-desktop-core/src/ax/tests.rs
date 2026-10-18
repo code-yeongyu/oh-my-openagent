@@ -95,6 +95,7 @@ fn window() -> DesktopWindow {
         width: 100,
         height: 100,
         focused: true,
+        is_on_screen: None,
         elevated: None,
     }
 }

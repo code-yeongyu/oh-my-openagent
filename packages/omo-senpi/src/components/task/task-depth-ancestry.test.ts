@@ -106,6 +106,7 @@ async function launchChild(task: Record<string, unknown> = {}): Promise<{ readon
   const config = configFor(cwd, task)
   const launches: Launches = { rpc: [], managed: [] }
   const parent = compose(new FakeExtensionAPI(), cwd, config, launches, {})
+  parent.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "root-session" } })
   await spawnWorker(parent, cwd, "root-session")
   const spec = launches.rpc[0]
   if (spec === undefined) throw new Error("the parent never launched its process child")
@@ -136,6 +137,7 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const { spec, cwd, config } = await launchChild()
     const launches: Launches = { rpc: [], managed: [] }
     const child = compose(daemonChildPi(spec), cwd, config, launches, {})
+    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
 
     // when the child's own task tool spawns
     const details = await spawnWorker(child, cwd, "child-session")
@@ -151,6 +153,7 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const { spec, cwd, config } = await launchChild()
     const launches: Launches = { rpc: [], managed: [] }
     const child = compose(new FakeExtensionAPI(), cwd, config, launches, perChildEnv(spec))
+    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
 
     // when
     const details = await spawnWorker(child, cwd, "child-session")
@@ -165,6 +168,7 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const { spec, cwd, config } = await launchChild({ max_depth: 2 })
     const launches: Launches = { rpc: [], managed: [] }
     const child = compose(daemonChildPi(spec), cwd, config, launches, {})
+    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
 
     // when
     await spawnWorker(child, cwd, "child-session")
@@ -181,7 +185,7 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const launches: Launches = { rpc: [], managed: [] }
     const pi = daemonChildPi(spec)
     const child = compose(pi, cwd, config, launches, {})
-    child.runtime.captureFrom({ sessionManager: { getSessionId: () => "child-session" } })
+    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
     const runtime = createDagRuntime({ pi, engine: child, logger: { info: () => {}, warn: () => {}, error: () => {} } })
     await runtime.attach()
 

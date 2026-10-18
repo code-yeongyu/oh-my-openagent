@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   format-lint-typecheck-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: packages/web
@@ -80,7 +80,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: packages/web
@@ -104,6 +104,15 @@ jobs:
         run: bun run test:e2e
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Upload glyph failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: manifesto-glyph-failures
+          path: packages/web/test-results/*/glyph-*
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Write job summary
         if: always()

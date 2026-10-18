@@ -20,7 +20,7 @@ use crate::worker::{Audited, Worker};
 impl Worker {
     /// The latest frame of `target` plus, for a window, its current geometry
     /// (a resize since capture fails `InvalidCoordinateFrame`).
-    fn frame_for(
+    pub(crate) fn frame_for(
         &mut self,
         target: &Target,
         frame_id: Option<&str>,
@@ -28,7 +28,7 @@ impl Worker {
         let frame = self.frames.latest(target, frame_id)?;
         let current = match target {
             Target::Window(_) => Some(self.window(target)?),
-            Target::Desktop => None,
+            Target::Desktop | Target::Display(_) => None,
         };
         Ok((frame, current))
     }

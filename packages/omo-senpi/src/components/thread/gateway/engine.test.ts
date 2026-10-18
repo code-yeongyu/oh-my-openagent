@@ -73,7 +73,9 @@ describe("all_fifteen_delivery_state_cases", () => {
       }
     }
     expect(observed).toEqual(expected)
-  })
+    // Fifteen sessions, each opening its own store worker, sent to in sequence; nothing here waits on a
+    // timer, so a loaded runner only needs room past the 5 s default (it took 5.1 s in a CPU-capped run).
+  }, 30_000)
 })
 
 describe("turn_epoch_cas_and_fifo", () => {
@@ -348,6 +350,23 @@ describe("cli_sender_principal", () => {
     const text = b.runtime.textOf(id) ?? ""
     expect(text.split("\n")[0]).toContain("source=external")
     expect(text.split("\n")[2]).toBe(JSON.stringify("from the shell"))
+    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "command_line", user: "tester" }, display_text: "from the shell" })
+  })
+
+  test("#given a named session sends to another #when it lands #then the receiver is told the sending session's id and name and the message as written, apart from the provenance header the model reads", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B")
+    const named = h.engineFor(h.store())
+    const result = await named.deliver({ sender: { kind: "session", durable_id: "A", name: "planner" }, target: "B", text: "review the diff" })
+    const id = okId(result)
+    await h.quiesce()
+    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "agent", session_id: "A", name: "planner" }, display_text: "review the diff" })
+    expect((b.runtime.textOf(id) ?? "").split("\n")[0]).toContain("source=peer_agent")
+
+    const unnamed = await named.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "and the tests" })
+    await h.quiesce()
+    expect(b.runtime.senderOf(okId(unnamed))).toEqual({ sender: { kind: "agent", session_id: "A" }, display_text: "and the tests" })
   })
 })
 

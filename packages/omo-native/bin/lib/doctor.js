@@ -111,8 +111,9 @@ function listProcesses() {
 // A standalone binary runs its engine as the provisioned runtime executable itself. The same
 // executable also serves omo's own commands, internal hosts and bundled scripts, so only a bare launch
 // or engine flags count; those other roles are never engines.
-const BINARY_ENGINE = /[\\/]binary-runtime[\\/][^\\/\s]+[\\/]omo(?:\.exe)?(?=\s|$)\s*(\S*)/
-const BINARY_NON_ENGINE_COMMANDS = new Set(["doctor", "setup", "daemon", "update", "upgrade", "host", "install", "remove", "list", "config", "auth", "app-server", "ulw-loop", "--version", "-v"])
+const BINARY_RUNTIME_EXECUTABLE = String.raw`[\\/]binary-runtime[\\/][^\\/\s]+[\\/]omo(?:\.exe)?`
+const BINARY_ENGINE = new RegExp(String.raw`${BINARY_RUNTIME_EXECUTABLE}(?=\s|$)\s*(\S*)`)
+const BINARY_NON_ENGINE_COMMANDS = new Set(["doctor", "setup", "daemon", "update", "upgrade", "host", "install", "remove", "list", "config", "auth", "ulw-loop", "--version", "-v"])
 
 function isBinaryEngine(command) {
   const match = BINARY_ENGINE.exec(command)
@@ -126,6 +127,16 @@ function isEngine(entry) {
   return ENGINE_MARKERS.some((marker) => entry.command.includes(marker)) || isBinaryEngine(entry.command)
 }
 
+// A daemon started by an older engine as `... app-server` keeps running after an upgrade. It has no
+// `--mode` and is reparented to init, so it would otherwise read as an orphaned session.
+const RETIRED_APP_SERVER = new RegExp(
+  String.raw`(?:senpi[\\/]dist[\\/](?:bundle[\\/])?cli\.js|${BINARY_RUNTIME_EXECUTABLE})\s+app-server(?=\s|$)`,
+)
+
+function isRetiredAppServer(entry) {
+  return RETIRED_APP_SERVER.test(entry.command)
+}
+
 function isInteractive(entry) {
   return !entry.command.includes(MANAGED_MODE_FLAG)
 }
@@ -134,7 +145,7 @@ function isInteractive(entry) {
  * Splits every engine process this machine is running into the three groups that matter:
  *   - stale:   interactive engines reparented to init, i.e. their launcher died underneath them
  *   - attached: interactive engines still owned by a live parent (somebody's session)
- *   - managed:  rpc / app-server engines, which are owned by whatever embeds them
+ *   - managed:  `--mode` engines such as rpc, which are owned by whatever embeds them
  * Only the first group is ever reportable, and even then only as a report.
  */
 export function classifyEngineProcesses(entries) {
@@ -144,7 +155,7 @@ export function classifyEngineProcesses(entries) {
   for (const entry of entries) {
     if (!isEngine(entry)) continue
     if (!isInteractive(entry)) managed.push(entry)
-    else if (entry.ppid === 1) stale.push(entry)
+    else if (entry.ppid === 1) stale.push(isRetiredAppServer(entry) ? { ...entry, retiredAppServer: true } : entry)
     else attached.push(entry)
   }
   return { stale, attached, managed }
@@ -153,7 +164,9 @@ export function classifyEngineProcesses(entries) {
 export function formatStaleEngineLines(stale) {
   if (stale.length === 0) return []
   const lines = stale.map((entry) =>
-    `WARN stale engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) has no launcher; it was orphaned by a signaled launcher`
+    entry.retiredAppServer
+      ? `WARN stale engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) is an app-server daemon started by an older version; that command was removed, so stop it`
+      : `WARN stale engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) has no launcher; it was orphaned by a signaled launcher`
   )
   lines.push(`INFO reap them explicitly by pid: omo doctor --reap ${stale.map((entry) => entry.pid).join(" ")}`)
   return lines

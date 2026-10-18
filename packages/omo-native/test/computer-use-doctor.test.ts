@@ -12,6 +12,8 @@ import {
 } from "../computer-use-doctor-runtime"
 import type { EngineLauncher } from "../computer-use-engine-probe"
 import * as releaseSignature from "../../senpi-desktop-engine/src/release-signature"
+
+const PROBE_HANG_CEILING_MS = process.platform === "win32" ? 60_000 : 20_000
 import { describeEngineSource } from "../../omo-senpi/src/components/computer-use/engine-source"
 
 const roots: string[] = []
@@ -46,6 +48,7 @@ function readyReport(overrides: Partial<Extract<ComputerUseDoctorReport, { kind:
       input: true,
       ax: true,
       backgroundWindowInput: true,
+      cursorOverlay: true,
       deliveryModes: ["background", "foreground"],
       capturePermission: "granted",
       inputPermission: "granted",
@@ -69,7 +72,7 @@ const replies = {
   "engine.hello": { protocolVersion: "1", engineVersion: "0.1.0", buildSha: "fixture", abi: "senpi-desktop/1" },
   capabilities: {
     backend: "quartz", displayServer: "Quartz WindowServer", capture: true, input: true, ax: true,
-    backgroundWindowInput: true, deliveryModes: ["background", "foreground"],
+    backgroundWindowInput: true, cursorOverlay: true, deliveryModes: ["background", "foreground"],
     capturePermission: "granted", inputPermission: "granted", axPermission: "granted",
     displayCount: 2, focusGuard: true, stopPath: "global", screenLocked: false
   }
@@ -240,15 +243,25 @@ describe("computer use doctor probe", () => {
       .toEqual(["engine.hello", "capabilities"])
   })
 
-  test.each(["linux", "win32"])("#given no engine built for %s-arm64 #when inspected #then doctor reports unavailable", async (platform) => {
+  test.each([["linux", "riscv64"], ["win32", "ia32"]])("#given no engine built for %s-%s #when inspected #then doctor reports unavailable", async (platform, arch) => {
+    const home = mkdtempSync(join(tmpdir(), "omo-computer-doctor-host-"))
+    roots.push(home)
+    const report = await computerUseDoctorReport({
+      cwd: home, env: { HOME: home }, version: "5.1.4",
+      packageRoot: join(home, "package"), platform, arch,
+    })
+    expect(report.kind).toBe("unavailable")
+    expect(report).toMatchObject({ diagnostic: { reason: "no-release-asset", host: `${platform}-${arch}` } })
+  })
+
+  test.each(["linux", "win32"])("#given a released engine for %s-arm64 not yet downloaded #when inspected #then doctor reports not-installed", async (platform) => {
     const home = mkdtempSync(join(tmpdir(), "omo-computer-doctor-host-"))
     roots.push(home)
     const report = await computerUseDoctorReport({
       cwd: home, env: { HOME: home }, version: "5.1.4",
       packageRoot: join(home, "package"), platform, arch: "arm64",
     })
-    expect(report.kind).toBe("unavailable")
-    expect(report).toMatchObject({ diagnostic: { reason: "no-release-asset", host: `${platform}-arm64` } })
+    expect(report.kind).toBe("not-installed")
   })
 
   test("#given an explicit engine path in the effective Native config #when probed #then only hello and capabilities run before EOF", async () => {
@@ -271,11 +284,12 @@ describe("computer use doctor probe", () => {
       platform: "darwin",
       arch: "arm64",
       launchEngine: runEngineScript,
-      timeoutMs: 1_000,
+      // The probe settles on the engine's own replies and EOF; this is only a hang ceiling (#9720).
+      timeoutMs: PROBE_HANG_CEILING_MS,
     })
 
     // then
-    expect(report.kind).toBe("ready")
+    expect(report.kind === "failed" ? `${report.code}: ${report.message}` : report.kind).toBe("ready")
     if (report.kind !== "ready") throw new Error(`expected ready report, got ${report.kind}`)
     expect(report.enginePath).toBe(engine.path)
     const methods = readFileSync(engine.log, "utf8")
@@ -284,5 +298,5 @@ describe("computer use doctor probe", () => {
       .map((line) => JSON.parse(line).method)
     expect(methods).toEqual(["engine.hello", "capabilities"])
     expect(methods).not.toContain("session.open")
-  })
+  }, PROBE_HANG_CEILING_MS + 5_000)
 })

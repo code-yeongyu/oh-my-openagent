@@ -5,6 +5,8 @@ export interface Env {
   readonly ACCOUNT_ID: string
   readonly ANALYTICS_DATASET: string
   readonly ANALYTICS_TOKEN?: string
+  /** The first UTC day the hourly rollup may write (YYYY-MM-DD); earlier days in its window are left as stored. */
+  readonly ROLLUP_FIRST_DAY?: string
 }
 
 export interface RequestContext {

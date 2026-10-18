@@ -30,6 +30,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
   test("#given the mirrored fallback table #when compared with the independent transcription #then every provider model variant and order is pinned", () => {
     expect(CATEGORY_FALLBACK_CHAINS).toEqual({
       "visual-engineering": [
+        { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" },
@@ -61,12 +62,12 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
       ],
       quick: [
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
+        { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
         { providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"], model: "qwen3.6-flash", variant: "low" },
         { providers: ["opencode-go"], model: "minimax-m3" },
         { providers: ["opencode-go"], model: "minimax-m2.7" },
         { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
-        { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"], model: "claude-haiku-4-5", variant: "off" },
         { providers: ["zai", "zai-coding-cn"], model: "glm-5.3-flash", variant: "low" },
         { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
       ],
@@ -74,7 +75,8 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-sonnet-5-5", variant: "medium" },
         { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.6-pro", variant: "high" },
         { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
-        { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-terra", variant: "high" },
+        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
+        { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-sonnet-5", variant: "low" },
         { providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"], model: "qwen3.8-max-preview", variant: "high" },
         { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
@@ -86,6 +88,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }
       ],
       writing: [
+        { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "low" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" }
       ]

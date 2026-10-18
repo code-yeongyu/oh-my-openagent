@@ -111,27 +111,39 @@ export const hotkeyLatches: Scenario = {
       const capabilities = asObject(await engine.result("capabilities"))
       const notepad = await context.workspace.notepad(engine, "hotkey")
       const before = await observe([notepad.id])
+      // The engine posts the chord through SendInput, so the hook sees it with LLKHF_INJECTED and must
+      // ignore it (#10444): only a person at the keyboard stops input.
       const trigger = await engine.exec("keyChord", { target: "desktop", keys: chord.split("+") })
-      // The chord may latch before the keyChord's closing gate check, which then reports Suspended.
       const triggerCode = errorCode(trigger)
-      const triggered = triggerCode === undefined || triggerCode === "Suspended"
+      const injectedPosted = triggerCode === undefined
+      const afterInjected = asObject(await engine.result("stopPath.status"))
+      // The user's other stop, `/computer stop`, reaches the engine as a host-relay stop.
+      const stopped = await engine.call("stopPath.stop", { source: "host-relay" })
+      const triggered = stopped.error === undefined
       const latched = triggered ? await waitForLatch(engine) : asObject(await engine.result("stopPath.status"))
       const blockedText = marker("blocked")
       const foreground = { deliveryMode: "foreground" }
       const blocked = await engine.exec("typeText", { target: notepad.id, text: blockedText, opts: foreground })
       const resumed = await engine.call("stopPath.resume", { token: engine.resumeToken })
       const resumedStatus = resumed.result === undefined ? {} : asObject(resumed.result)
+      // The stop revoked the foreground grant and resume never restores it (#9651 B5): the human
+      // confirms again, so the host re-grants before foreground input lands.
+      const controlAfterResume = asObject(await engine.result("control.state"))
+      await engine.grant()
       const liveText = marker("resumed")
       const live = await engine.exec("typeText", { target: notepad.id, text: liveText, opts: foreground })
       const after = await observeUntil([notepad.id], (seen) => windowText(seen, notepad.id).includes(liveText))
       return verdict({
         checks: [
-          [triggered ? "chord-posted" : (triggerCode ?? "chord-posted"), triggered],
+          [injectedPosted ? "injected-chord-posted" : (triggerCode ?? "injected-chord-posted"), injectedPosted],
+          ["injected-chord-ignored", afterInjected.suspended === false],
+          [triggered ? "host-stop-sent" : (errorCode(stopped) ?? "host-stop-sent"), triggered],
           ["global-listener-live", started.globalLive === true],
           ["latched-suspended", latched.suspended === true],
           ["suspended-input-refused", errorCode(blocked) === "Suspended"],
           ["suspended-text-never-landed", !windowText(after, notepad.id).includes(blockedText)],
           ["resume-unsuspends", resumed.error === undefined && resumedStatus.suspended === false],
+          ["resume-does-not-restore-the-grant", controlAfterResume.active === false],
           ["resumed-input-lands", live.error === undefined && windowText(after, notepad.id).includes(liveText)],
         ],
         facts: {
@@ -140,11 +152,14 @@ export const hotkeyLatches: Scenario = {
           stopPath: capabilities.stopPath ?? null,
           stopReason: capabilities.stopReason ?? null,
           triggerError: triggerCode ?? null,
+          afterInjected,
+          stopError: errorCode(stopped) ?? null,
           triggerMessage: trigger.error?.message ?? null,
           latchedStatus: latched,
           blockedError: errorCode(blocked) ?? null,
           resumeError: errorCode(resumed) ?? null,
           liveError: errorCode(live) ?? null,
+          controlAfterResume,
         },
         before,
         after,

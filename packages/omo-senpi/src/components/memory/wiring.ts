@@ -1,8 +1,9 @@
 import { MemoryBlockCache, RecallCorpusCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
-import { createDreamTriggerWiring, resolveDreamTriggerSettings } from "./dream-trigger"
+import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
 import { resolveMemorySettings } from "./identity-runtime"
+import { createMemoryMaintenance } from "./memory-maintenance"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
@@ -11,13 +12,16 @@ import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
 import { createMemoryNoticeWiring } from "./memory-notice-wiring"
 import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
+import { createPressureDreamAdmission } from "./pressure-dream-admission"
 import { createMemoryRecallWiring } from "./recall-wiring"
-import { branchEntryCount } from "./wiring-context"
+import { branchEntryCount, sessionIdFrom } from "./wiring-context"
+import { createMemoryUserActivity } from "./user-activity"
+import { logBindReconcileFailure } from "./bind-reconcile-log"
 import {
   createMemoryReflectionLiveWiring,
   createReflectionCompletionApi,
 } from "./wiring-reflection-live"
-import { createMemoryRuntimeWiring, type MemoryRuntimeWiring } from "./wiring-runtime"
+import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
@@ -28,6 +32,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const promptCache = new MemoryBlockCache()
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
+  const userActivity = createMemoryUserActivity(options.env)
   const skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> } = { current: new Map() }
   const memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> } = { current: new Map() }
   const reflectionLive = createMemoryReflectionLiveWiring(options, activeSession, lastEventCtx)
@@ -78,6 +83,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   const kibitzerRef: { current?: KibitzerComposition } = {}
+  const maintenance = createMemoryMaintenance({
+    isLiveSession: (sessionId) => options.sessions.has(sessionId),
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
     for (const tracker of skillsUsageTrackersRef.current.values()) {
@@ -110,7 +119,11 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
   })
 
-  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession)
+  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession, userActivity.has)
+  const pressureDreamAdmission = createPressureDreamAdmission({
+    request: (sessionId) => dreamTriggerWiring.requestPressureDream(sessionId),
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
   shutdownDrain.registerEvaluator(dreamTriggerWiring.shutdownEvaluator())
 
   function resolvePalacePeople(): PalacePeopleOptions | undefined {
@@ -128,12 +141,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
 
   return {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      userActivity.register(pi)
       reflectionLive.registerRpc(pi, resolveContext)
       const kibitzer = createKibitzerComposition({
         env: options.env,
         cwd: options.cwd,
         loadConfig: options.loadConfig,
-        resolveContext,
+        resolveContext: (sessionId) => userActivity.hasInput(sessionId) ? resolveContext(sessionId) : undefined,
         recall: recallWiring,
         corpusCache,
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
@@ -159,44 +173,55 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         journalWiringFor,
         factsWiringFor,
         runtimeFor,
-        triggerSessionFor: runtimeWiring.triggerSessionFor,
+        triggerSessionFor: (eventCtx) => {
+          const sessionId = sessionIdFrom(eventCtx)
+          return sessionId !== undefined && userActivity.has(sessionId) ? runtimeWiring.triggerSessionFor(eventCtx) : undefined
+        },
         resolvePalacePeople,
         loadCommandSettings,
         lastEventCtx,
         activeSession,
         skillsUsageTrackersRef,
         memoryUsageTrackersRef,
+        hasUserActivity: userActivity.has,
         onReflectionLaunch: reflectionLive.onReflectionLaunched,
-        onSettled: reflectionLive.onSettled,
+        onSettled: async (sessionId, eventCtx) => {
+          const identity = resolveContext(sessionId)
+          if (identity !== undefined) {
+            await userActivity.reconcileOnce(sessionId, async () => {
+              try {
+                await runtimeFor(identity).reconcile()
+              } catch (error) {
+                if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+              }
+              pressureDreamAdmission.requestDeferred(sessionId)
+            })
+          }
+          await reflectionLive.onSettled(sessionId, eventCtx)
+        },
         onMemoryWrite: reflectionLive.syncRpc,
       })
     },
 
     async afterBind(pi, sessionId, identity, eventCtx): Promise<void> {
       activeSession.current = sessionId
+      userActivity.reset(sessionId)
+      pressureDreamAdmission.reset(sessionId)
       lastEventCtx.current = eventCtx
       reflectionLive.attach(sessionId)
       registerMemoryFilesystemPolicy(pi, identity)
-      await runtimeFor(identity).reconcile()
+      maintenance.schedule(identity)
       if (branchEntryCount(eventCtx) > 0) {
         await journalWiringFor(identity).reconcileSession(eventCtx)
       }
-      factsWiringFor(identity).reconcileExtractor()
-      const dreamSession = runtimeWiring.dreamSessionById(sessionId)
-      if (dreamSession !== undefined) {
-        void dreamTriggerWiring.reconcileSessionStart(dreamSession).catch((error: unknown) => {
-          options.logger?.warn("omo-senpi memory dream session_start reconcile failed", { error: describe(error) })
-        })
-      }
+      factsWiringFor(identity).reconcileExtractor(sessionId)
       await reflectionLive.bind(
         pi,
         sessionId,
         identity,
         eventCtx,
         () => {
-          void dreamTriggerWiring.requestPressureDream(sessionId).catch((error: unknown) => {
-            options.logger?.warn("omo-senpi memory pressure dream trigger failed", { error: describe(error) })
-          })
+          pressureDreamAdmission.deferOrRequest(sessionId, userActivity.has(sessionId))
         },
       )
     },
@@ -206,6 +231,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
 
     async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+      // Background packing is never worth holding an exit for: stop it before the drain.
+      maintenance.dispose()
       // The journal flush runs FIRST, before the pre-drain awaits can consume the fixed budget:
       // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
       // one first-position flush captures everything and the drain must never re-run it.
@@ -226,6 +253,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         }
       }
       await shutdownDrain.run(input, { journalFlushed })
+      pressureDreamAdmission.reset(input.sessionId)
+      userActivity.reset(input.sessionId)
     },
 
     registerShutdownEvaluator(evaluator: ShutdownEvaluator): void {
@@ -244,23 +273,4 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-function buildDreamTriggerWiring(
-  options: MemoryWiringOptions,
-  runtimeWiring: MemoryRuntimeWiring,
-  activeSession: { current?: string },
-) {
-  return createDreamTriggerWiring({
-    resolveSession: (eventCtx) => runtimeWiring.dreamSessionFor(eventCtx),
-    resolveActiveSession: () => activeSession.current === undefined
-      ? undefined
-      : runtimeWiring.dreamSessionById(activeSession.current),
-    resolveSessionById: runtimeWiring.dreamSessionById,
-    resolveSettings: (identity) => {
-      const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-      return resolveDreamTriggerSettings(settings, identity)
-    },
-    ...(options.logger === undefined ? {} : { logger: options.logger }),
-  })
 }

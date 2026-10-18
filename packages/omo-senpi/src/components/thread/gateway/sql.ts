@@ -3,15 +3,20 @@
  * file open after `close()` whenever a `StatementSync` was ever created (oven-sh/bun#40001), so
  * nothing here calls `prepare()`: parameters reach SQL through a user function (`gw_p(n)`), rows
  * come back through a varargs sink function, and `exec()` is the only entry point. `?` in SQL text
- * is rewritten to `gw_p(n)` in order; SQL written here never carries a literal `?`.
+ * is tokenized so only anonymous placeholders become `gw_p(n)`; quotes and comments stay intact.
  *
  * Row order is never taken from a subquery or from the order the sink is called in: `all()` with
  * `orderBy` puts the ORDER BY on the outer select and passes `row_number() OVER (ORDER BY ...)` as
  * the sink's first argument, and rows are placed by that number.
  */
 
+import { sqlTokens } from "./sql-tokens"
+
+export type SqlAuthorizer = (action: number, arg1: string | null, arg2: string | null, database: string | null, source: string | null) => number
+
 export type SqliteConnection = {
   exec(sql: string): void
+  setAuthorizer(authorizer: SqlAuthorizer | null): void
   function(name: string, options: { readonly varargs?: boolean; readonly deterministic?: boolean }, fn: (...args: never[]) => unknown): void
   close(): void
 }
@@ -23,6 +28,7 @@ export type SqlRow = Readonly<Record<string, unknown>>
 export class Sql {
   private params: readonly SqlValue[] = []
   private sinkRows: unknown[][] = []
+  private authorizer: SqlAuthorizer | null = null
   private readonly db: SqliteConnection
 
   constructor(db: SqliteConnection) {
@@ -36,6 +42,34 @@ export class Sql {
 
   exec(sql: string): void {
     this.db.exec(sql)
+  }
+
+  authorized<T>(authorizer: SqlAuthorizer | null, body: () => T): T {
+    const previous = this.authorizer
+    this.authorizer = authorizer
+    this.db.setAuthorizer(authorizer)
+    try {
+      return body()
+    } finally {
+      this.authorizer = previous
+      this.db.setAuthorizer(previous)
+    }
+  }
+
+  /**
+   * The output column names of a SELECT, as `sqlite3_column_name` would report them, read without
+   * `prepare()`: a temp view's `table_info` (duplicate names come back as `name:1`). The view is only
+   * compiled, never run, and it runs with no authorizer, so authorize the statement before calling this.
+   */
+  resultColumns(sql: string): string[] {
+    return this.authorized(null, () => {
+      this.db.exec(`CREATE TEMP VIEW gw_result_columns AS ${bind(sql)}\n`)
+      try {
+        return this.all(["name"], "SELECT cid, name FROM pragma_table_info('gw_result_columns', 'temp')", [], "cid").map((row) => String(row.name))
+      } finally {
+        this.db.exec("DROP VIEW temp.gw_result_columns")
+      }
+    })
   }
 
   run(sql: string, params: readonly SqlValue[] = []): number {
@@ -53,7 +87,7 @@ export class Sql {
     this.sinkRows = []
     try {
       const ordinal = orderBy === undefined ? "0" : `row_number() OVER (ORDER BY ${orderBy})`
-      this.db.exec(`SELECT gw_sink(${ordinal}, ${columns.join(", ")}) FROM (${bind(sql)})${orderBy === undefined ? "" : ` ORDER BY ${orderBy}`}`)
+      this.db.exec(`SELECT gw_sink(${ordinal}, ${columns.join(", ")}) FROM (${bind(sql)}\n)${orderBy === undefined ? "" : ` ORDER BY ${orderBy}`}`)
       const rows = orderBy === undefined ? this.sinkRows : this.sinkRows.toSorted((left, right) => Number(left[0]) - Number(right[0]))
       return rows.map((values) => Object.fromEntries(columns.map((column, index) => [column, values[index + 1] ?? null])))
     } finally {
@@ -69,7 +103,9 @@ export class Sql {
 
 function bind(sql: string): string {
   let index = 0
-  return sql.replace(/\?/g, () => `gw_p(${index++})`)
+  let bound = ""
+  for (const token of sqlTokens(sql)) bound += token.kind === "parameter" ? `gw_p(${index++})` : token.text
+  return bound
 }
 
 export function isBusyError(error: unknown): boolean {

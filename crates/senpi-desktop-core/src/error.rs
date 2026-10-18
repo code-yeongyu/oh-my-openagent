@@ -30,6 +30,14 @@ pub enum ErrorCode {
     CursorRestoreFailed,
     FocusRestoreFailed,
     TransactionFailed,
+    /// Another session holds the foreground control grant. The slot is never
+    /// stolen; the caller can retry after it releases.
+    InputBusy,
+    /// Foreground delivery without this session's live control grant.
+    ControlRequired,
+    /// The capture target exists but cannot be captured right now; `data`
+    /// says why (e.g. `{ "reason": "minimized" }`).
+    CaptureUnavailable,
 }
 
 impl ErrorCode {
@@ -56,6 +64,9 @@ impl ErrorCode {
             Self::CursorRestoreFailed => "CursorRestoreFailed",
             Self::FocusRestoreFailed => "FocusRestoreFailed",
             Self::TransactionFailed => "TransactionFailed",
+            Self::InputBusy => "InputBusy",
+            Self::ControlRequired => "ControlRequired",
+            Self::CaptureUnavailable => "CaptureUnavailable",
         }
     }
 }
@@ -76,6 +87,14 @@ pub struct PermissionDeniedData {
     pub relaunch_required: bool,
 }
 
+/// Why a `CaptureUnavailable` capture was refused. `reason` is an open token
+/// set: B9 introduces `"minimized"` and later waves add more.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureUnavailableData {
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[error("{}: {}", .code.as_str(), .message)]
@@ -84,6 +103,8 @@ pub struct DesktopError {
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission: Option<PermissionDeniedData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture_unavailable: Option<Box<CaptureUnavailableData>>,
 }
 
 impl DesktopError {
@@ -92,6 +113,7 @@ impl DesktopError {
             code,
             message: message.into(),
             permission: None,
+            capture_unavailable: None,
         }
     }
 
@@ -108,6 +130,22 @@ impl DesktopError {
 
     pub fn capture_failed(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::CaptureFailed, message)
+    }
+
+    /// A capture refused because of the target's state; `reason` is the
+    /// machine-readable cause (B9: `"minimized"`).
+    pub fn capture_unavailable(reason: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::CaptureUnavailable, message)
+            .with_capture_unavailable_reason(reason)
+    }
+
+    /// Attaches `CaptureUnavailable` data; only meaningful on that code.
+    #[must_use]
+    pub fn with_capture_unavailable_reason(mut self, reason: impl Into<String>) -> Self {
+        self.capture_unavailable = Some(Box::new(CaptureUnavailableData {
+            reason: reason.into(),
+        }));
+        self
     }
 
     pub fn input_failed(message: impl Into<String>) -> Self {
@@ -139,10 +177,7 @@ impl DesktopError {
     }
 
     pub fn ax_unsupported() -> Self {
-        Self::new(
-            ErrorCode::AxUnsupported,
-            "accessibility is unavailable on this backend",
-        )
+        Self::new(ErrorCode::AxUnsupported, "accessibility is unavailable on this backend")
     }
 
     pub fn ax_failed(message: impl Into<String>) -> Self {
@@ -151,6 +186,14 @@ impl DesktopError {
 
     pub fn timeout(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::Timeout, message)
+    }
+
+    pub fn input_busy(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InputBusy, message)
+    }
+
+    pub fn control_required(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::ControlRequired, message)
     }
 
     pub fn closed() -> Self {

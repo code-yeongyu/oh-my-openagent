@@ -13,9 +13,14 @@ export async function checkExtensionCurrent(options = {}) {
     memberOutput,
     supervisorOutput,
     advisorRuntimeOutput,
+    sidePanelRuntimeOutput,
     toolkitSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
+    memoryDoctorOutput,
+    memoryMemfsOutput,
+    memoryPalaceOutput,
+    threadClientOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
   } = resolveOutputs(options)
@@ -33,6 +38,16 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentSupervisor === undefined) return { ok: false, reason: "missing-output", output: supervisorOutput }
   const currentAdvisorRuntime = await readBuiltEntry(advisorRuntimeOutput)
   if (currentAdvisorRuntime === undefined) return { ok: false, reason: "missing-output", output: advisorRuntimeOutput }
+  const currentSidePanelRuntime = await readBuiltEntry(sidePanelRuntimeOutput)
+  if (currentSidePanelRuntime === undefined) return { ok: false, reason: "missing-output", output: sidePanelRuntimeOutput }
+  const currentMemoryDoctor = await readBuiltEntry(memoryDoctorOutput)
+  const currentMemoryMemfs = await readBuiltEntry(memoryMemfsOutput)
+  const currentMemoryPalace = await readBuiltEntry(memoryPalaceOutput)
+  const currentThreadClient = await readBuiltEntry(threadClientOutput)
+  if (currentMemoryDoctor === undefined) return { ok: false, reason: "missing-output", output: memoryDoctorOutput }
+  if (currentMemoryMemfs === undefined) return { ok: false, reason: "missing-output", output: memoryMemfsOutput }
+  if (currentMemoryPalace === undefined) return { ok: false, reason: "missing-output", output: memoryPalaceOutput }
+  if (currentThreadClient === undefined) return { ok: false, reason: "missing-output", output: threadClientOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
   const currentGatewayStoreWorker = await readBuiltEntry(gatewayStoreWorkerOutput)
@@ -47,8 +62,13 @@ export async function checkExtensionCurrent(options = {}) {
     memberOutputPath: join(tempRoot, "omo-member.js"),
     supervisorOutputPath: join(tempRoot, "memory-run-supervisor.mjs"),
     advisorRuntimeOutputPath: join(tempRoot, "omo-init-deep-advisor.js"),
+    sidePanelRuntimeOutputPath: join(tempRoot, "omo-side-panel.js"),
     toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
+    memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
+    memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
+    memoryPalaceOutputPath: join(tempRoot, "omo-memory-palace.js"),
+    threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
     threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
@@ -63,6 +83,11 @@ export async function checkExtensionCurrent(options = {}) {
       [currentMember, expected.memberOutputPath, memberOutput],
       [currentSupervisor, expected.supervisorOutputPath, supervisorOutput],
       [currentAdvisorRuntime, expected.advisorRuntimeOutputPath, advisorRuntimeOutput],
+      [currentSidePanelRuntime, expected.sidePanelRuntimeOutputPath, sidePanelRuntimeOutput],
+      [currentMemoryDoctor, expected.memoryDoctorOutputPath, memoryDoctorOutput],
+      [currentMemoryMemfs, expected.memoryMemfsOutputPath, memoryMemfsOutput],
+      [currentMemoryPalace, expected.memoryPalaceOutputPath, memoryPalaceOutput],
+      [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
       [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
@@ -78,7 +103,7 @@ export async function checkExtensionCurrent(options = {}) {
     if (currentPrelude !== expectedPrelude) {
       return { ok: false, reason: "stale-output", output: join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME) }
     }
-    return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput, computerUseOutput, gatewayStoreWorkerOutput, threadSdkOutput }
+    return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput, sidePanelRuntimeOutput, computerUseOutput, gatewayStoreWorkerOutput, threadSdkOutput }
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }

@@ -87,7 +87,7 @@ describe("a leg that ran its tests", () => {
 })
 
 describe("a leg that skipped tests the change needed", () => {
-  test("#given a runtime change whose Windows tests were all skipped #then the check fails and names the label", () => {
+  test("#given a runtime change whose Windows tests were all skipped #then the check fails with an error annotation and summary", () => {
     const result = runLeg({
       outcomes: ["skipped", "skipped", "skipped", "skipped", "skipped"],
       os: "windows-latest",
@@ -97,8 +97,8 @@ describe("a leg that skipped tests the change needed", () => {
     })
 
     expect(result.status).toBe(1)
-    expect(result.stdout).toContain("::error title=tests not run::tests not run: add ci:full-matrix")
-    expect(result.summary).toContain("tests not run: add ci:full-matrix")
+    expect(result.stdout).toContain("::error title=tests not run::")
+    expect(result.summary).toBe(`## Test execution on this leg\n\n${result.stdout.trim().split("::")[2]}\n\n`)
   })
 
   test("#given the full matrix was requested but the leg skipped its tests #then the check fails", () => {

@@ -160,6 +160,10 @@ The optional `memory` block configures the Senpi memory subsystem (`schema/memor
 
 Reflection children start without extensions so they stay fast. When the reflection model belongs to a provider that only an extension registers (a custom gateway declared under `packages` in `settings.json`, for example), omo detects that the model is missing from the extension-free model list and starts that child with extensions loaded instead; the child still keeps its own memory component off. If no child can see the model even with extensions loaded, automatic reflection pauses after that first failure and shows one notice. To fix it, point `categories.<category>.model` (or `memory.reflection.category`) at a model from a core provider, or set `memory.reflection.enabled` to `false`. `/reflect` retries at once, and the paused state is probed again every six hours.
 
+Facts extraction does not launch or drain pending work at startup or relaunch. Automatic memory jobs wait for an accepted, non-extension user prompt in a top-level session in the current engine run; persisted transcript history and task/worker prompts do not grant that permission. Any pending identity-wide queue observed before a bound session's first real settle drains after that turn, regardless of `debounce_settles`. If that queue was empty before the first settle, fresh accumulation keeps the configured debounce. Explicit commands such as `/reflect`, `/dream`, and facts unpark remain user actions.
+
+`memory.facts.model` optionally selects a fully qualified `provider/model` for extraction, with a per-identity override at `memory.agents.<identity>.facts.model`. Without it, an explicitly configured `categories.quick` model or model list keeps its existing meaning for facts; otherwise extraction inherits the live session's selected model. Facts never use built-in quick candidates or arbitrary registry fallbacks. A missing or unavailable selection skips extraction with one warning and leaves the queue pending without adding a failure streak.
+
 ### `git_master` (Native harness)
 
 The optional `git_master` block controls commit attribution in Senpi (`schema/git-master.ts`). When the agent works with the `git-master` skill — reading it in the main session or loading it into a task child via `load_skills` — omo appends a commit-footer directive to the skill content only when you opt in.
@@ -188,6 +192,108 @@ Attribution can also be disabled through:
 
 The block may live at the shared top level, in `[native]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Native harness.
 
+### `side_panel` (Senpi harness)
+
+The optional `side_panel` block controls the omo side panel (`schema/side-panel.ts`): a right-hand
+column in the Senpi TUI carrying session, goal, context, usage, subagent, tool, git and memory
+state. The transcript reflows into the remaining width instead of being covered. The panel is **off by
+default** because it rearranges the whole screen.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `enabled` | boolean | `false` | Render the panel. |
+| `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
+| `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
+| `clickable` | boolean | `true` | Paint file and subagent rows as OSC 8 links, so a mouse click opens the same viewer a command would. Set it to `false` on a terminal that mangles hyperlinks. |
+| `usage_poll_seconds` | integer | `150` | Subscription usage refresh interval, and a floor rather than a ceiling: each provider keeps its own freshness window (five minutes for Anthropic, two and a half for Codex), so a smaller value does not poll faster than that. The cache is shared across sessions on one machine, so this is per machine, not per session. Minimum `60`. |
+| `sections` | object | all `true` except `usage` | Per-section switches: `session`, `goal`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. `usage` is `false` by default: it is the one section that reads credentials and contacts a vendor, so it is its own opt-in (see below). |
+
+Rows are clickable because the fullscreen renderer already captures the mouse and activates OSC 8
+hyperlinks; the panel paints its rows as links to a private scheme and claims the renderer's URL
+callback while it is mounted, handing every other URL straight back. Clicking a file opens its diff;
+clicking a subagent opens its card followed by everything that child recorded, rendered by the task
+engine itself - the same text `task_output` would give you. `/side-panel-diff` reaches the file
+viewer by name; it is registered only when the panel is enabled for the run.
+
+A child the engine is holding rather than running - a host session whose daemon went away, one
+caught by a draining host, or simply one the engine detached when its session ended - is counted
+and drawn as `parked` rather than as running or done, and its card names the reason, because a
+dead daemon and a draining host ask different things of you. The ordinary detach names no reason
+at all and shows up only as a residency that is no longer resident, so the column reads both: a
+child whose record still says `running` while nothing holds it would otherwise sit there with its
+timer climbing. The card also names the lane a child runs in - a session of the shared daemon, a
+child process, or the parent's own process - because those three fail in different ways.
+
+The viewer scrolls with the wheel as well as with the arrow keys, and while it is open the wheel
+belongs to it: the host routes a wheel event to whatever sits under the pointer in its layout, and
+an overlay is not part of that layout, so without this the wheel would scroll the transcript behind
+the popup instead. Text selection is untouched either way, because the renderer activates a link
+only on a press and release inside one cell with no drag - dragging still selects, and double or
+triple clicks still take a word or a line.
+
+The `goal` section is drawn only while a goal is registered, so an ordinary session loses no rows
+to it. It carries the objective, the goal's status, the time and tokens it has spent, how much of a
+token budget is gone when one is set, and the continuation count once the loop has run unattended.
+Clicking the objective opens the whole text, which is the point of that row: the column has space
+for one cut line of it. The block follows the panel's ordinary refresh instead of subscribing,
+because a goal publishes no event an extension can listen for; an unchanged store costs one `stat`
+and no parse at all.
+
+The `memory` section names the memory identity this session writes to - one machine carries many,
+and the wrong one is invisible otherwise - and then reports only what is wrong or waiting. It warns
+when automatic reflection is **parked**: repeated failures trip a circuit breaker that stops
+reflection until a half-open probe, so the row says when that probe is due, and clicking it opens
+the whole failure - reason, fingerprint and the host's own detail - which is what tells you whether
+to run `/reflect` or fix a sandbox. It also carries the resident kibitzer, the sidecar that decides what memory to surface: how many
+wakes it has settled for this session, how long ago the last one was, and a warning when that last
+wake failed - a kibitzer failing every wake is memory that quietly stopped being updated. Whether
+it is awake *right now* is deliberately not shown: that state lives in the sidecar process and is
+never written down, so the column reports what it did rather than guessing at what it is doing.
+Below that it counts the facts batches queued but not yet
+applied, and what recall is holding for this session: nudges waiting for the next prompt, and
+memory paths already surfaced in it. Healthy memory with an empty backlog is a single line. The
+block is read on a five-second floor rather than a watcher, because a park takes three failed
+reflection runs and the queue drains per reflection - nothing here can change between two tool
+calls of one turn.
+
+The `usage` section is **off by default** and is the only part of the panel that reaches the
+network. Turning it on (`"sections": { "usage": true }`) makes the panel read, from the agent
+directory, `auth.json` (the OAuth access token of the subscription the session is serving from) and
+`credential-pool-state.json` (which pooled account is pinned or rotated in), and send that token as a
+bearer to the vendor's own usage endpoint: `api.anthropic.com/api/oauth/usage` for a Claude
+subscription, `chatgpt.com/backend-api/wham/usage` for Codex. Nothing else is read or sent, and no
+API key is ever used. While it is off the poller is never created: no credential read, no timer,
+no request. The answers land in one cache file
+per machine (`$XDG_CACHE_HOME/omo-senpi/side-panel-usage.json`), so parallel sessions share both
+the numbers and the backoff instead of each asking on its own.
+
+```jsonc
+{
+  "side_panel": {
+    "enabled": true,
+    "width": "24%",
+    "sections": { "usage": true }
+  }
+}
+```
+
+`--omo-side-panel` forces the panel on for one run. It cannot force it off: senpi sets a boolean
+extension flag to `true` whatever value follows it (`--omo-side-panel=false` still turns it on) and
+rejects a `--no-` form as an unknown option, so `enabled` in `omo.json` is the switch that can say no.
+
+The reflowing column needs the fullscreen TUI (`--tui-mode fullscreen`, or `tuiMode: "fullscreen"` in
+senpi's settings): only that renderer owns a layout root to wrap. In the default regular mode - and on
+any host that does not expose the layout seam - the same rows render as a block above the editor
+instead, and a headless run renders nothing.
+
+The `files` section lists the working copy as `git status` sees it, both status columns included.
+Clicking a row opens that file's diff in a scrollable read-only viewer, and `/side-panel-diff`
+reaches the same viewer by name - for keyboards, and for a host that hands out no URL hook. No
+keyboard chord is registered by default.
+
+The block may live at the shared top level, in `[native]`, or in profile layers, and follows the
+normal resolution order.
+
 ### `models` (shared catalog)
 
 A record of short name to catalog entry (`schema/model-catalog.ts`). The canonical strict shape is `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs remain accepted and are normalized to `reasoning`; other tuning fields are not catalog-entry keys.
@@ -196,7 +302,7 @@ A record of short name to catalog entry (`schema/model-catalog.ts`). The canonic
 {
   "models": {
     "opus": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
-    "fast": { "model": "anthropic/claude-haiku-4-5" }
+    "fast": { "model": "anthropic/claude-haiku-5-5" }
   },
   "categories": {
     "deep-low": { "model": "opus" },          // resolves to anthropic/claude-opus-5-5 at reasoning max
@@ -222,7 +328,6 @@ Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builti
 
 | Id | Display name | Chain |
 |----|--------------|-------|
-| `recommended` | Recommended (the unset default, not a lane) | `claude-opus-5-5` (medium) -> `claude-fable-5-1` (xhigh) -> `kimi-k3` (max) -> `gpt-6-astra` (xhigh) -> `gpt-6.1-sol` (medium, ChatGPT subscription/API) -> `gpt-6-sol` (medium) -> `glm-5.3` (max); ranked providers only, never a gateway aggregator |
 | `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3` (max) -> `glm-5.3` (max) |
 | `daily-heavy` | Daily · Heavy | `claude-fable-5-1` (xhigh) |
 | `geeky-normal` | Geeky · Normal | `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
@@ -236,10 +341,10 @@ next user-listed candidate, while a bare model id may match any provider.
 
 What happens at session start (`packages/omo-senpi/src/components/model-profile/index.ts`, `resolve.ts`) in OmO Desktop and headless sessions. The interactive TUI does not apply `model_profile` yet; it keeps the model it started with.
 
-- `model_profile` unset: Recommended is applied on a fresh session. The apply is not written back to config. Its rungs are served only by their ranked providers, so a gateway aggregator's copy of a model (for example OpenGateway's `anthropic/claude-opus-5-5`) is never picked; the lanes keep their cross-provider fallback.
+- `model_profile` unset: Daily · Normal is applied on a fresh session. When none of its rungs resolves on the connected providers, the first of Daily · Heavy, Geeky · Normal and Geeky · Heavy that does is applied instead (a ChatGPT-only setup starts on Geeky · Normal); when none resolves, the notice names Daily · Normal and the current model stays. The apply is not written back to config. Builtin rungs are served only by their ranked providers, so a gateway aggregator's copy of a model (for example OpenGateway's `anthropic/claude-opus-5-5`) is never picked. A saved `model_profile: "recommended"` (retired) starts this same default with one log line and is never reported as unknown, unless your own `model_profiles` defines `recommended`.
 - A literal `provider/model`: that exact model is looked up in the live registry and applied.
 - A profile id: the builtin table is overlaid with `model_profiles`, and the first rung the live registry can serve is applied. The notice names the lane, the pick, and the thinking level, for example `OmO Native: model profile "daily-normal" (Daily · Normal) selected anthropic-subscription/claude-opus-5-5 medium; mid-session fallback follows senpi's retry chains`.
-- A rung counts for Recommended or a profile id only when its first turn could use it, which is resolved at session start: the provider's stored credential (per account when the provider holds several and the engine may rotate them - a pinned account is the only one that counts; with `providers.<id>.credentials.rotation: false` in `models.json` or a runtime API key only the default credential counts) and then the model's own request configuration. A saved login that can no longer be refreshed is skipped with the whole provider; a model whose configured headers do not resolve is skipped alone, and its siblings stay eligible. The notice names each skipped provider or model and the recovery for the current surface (`re-authenticate <provider> in Provider authentication settings` on the desktop, `/login <provider>` in an interactive session for a headless run); the raw error is never shown, `details.authFailed` carries `{ provider, model, reason }` with `reason` one of `refresh`, `credentials`, `request`. Each attempted account costs one credential resolution, sequentially (a rejected refresh waits for the provider's exchange timeout). A literal `provider/model` is applied without this check.
+- A rung counts for a profile only when its first turn could use it, which is resolved at session start: the provider's stored credential (per account when the provider holds several and the engine may rotate them - a pinned account is the only one that counts; with `providers.<id>.credentials.rotation: false` in `models.json` or a runtime API key only the default credential counts) and then the model's own request configuration. A saved login that can no longer be refreshed is skipped with the whole provider; a model whose configured headers do not resolve is skipped alone, and its siblings stay eligible. The notice names each skipped provider or model and the recovery for the current surface (`re-authenticate <provider> in Provider authentication settings` on the desktop, `/login <provider>` in an interactive session for a headless run); the raw error is never shown, `details.authFailed` carries `{ provider, model, reason }` with `reason` one of `refresh`, `credentials`, `request`. Each attempted account costs one credential resolution, sequentially (a rejected refresh waits for the provider's exchange timeout). A literal `provider/model` is applied without this check.
 - No rung resolves: a notice lists the chain against this session's model registry and Senpi's default model stays. Absence from the registry is not reported as disconnected auth.
 - Unknown id: `model_profile "<name>" is not defined; known profiles: ...`. Retired ids (`capable`, `deep-work`, `simple-work`) take this path; there is no alias.
 
@@ -385,7 +490,7 @@ OpenGateway has a built-in unlimited provider concurrency default, so it does no
 | `team.max_wall_clock_minutes` | positive int | `120` |
 | `dag` | object | unset |
 
-`task.dag` is an optional block bounding the DAG orchestration subsystem (`schema/task.ts`): `max_nodes_per_run` (`64`), `max_runs_per_session` (`16`), `subscriber_ring` (`1000`), `heartbeat_ms` (`15000`), `history_default_limit` (`256`), `history_max_limit` (`1000`), `retention_days` (`7`), `max_prompt_bytes` (`262144`).
+`task.dag` is an optional block bounding the DAG orchestration subsystem (`schema/task.ts`): `max_nodes_per_run` (`64`), `max_runs_per_session` (`16`, counting only runs that are still active: finished, failed and cancelled runs free their slot), `subscriber_ring` (`1000`), `heartbeat_ms` (`15000`), `history_default_limit` (`256`), `history_max_limit` (`1000`), `retention_days` (`7`), `max_prompt_bytes` (`262144`).
 
 `global_concurrency` caps how many tasks run at once per senpi process, across all model and provider lanes combined. It applies only to the senpi engine; OpenCode `background_task` is unaffected (parity is a follow-up). The cap is per process, not cross-process or machine-wide: two senpi processes each get their own budget. A task spills to a later entry in its fallback chain whenever admission cannot seat it in the preferred model's lane — the per-model/provider/default lane limit is reached or its queue is occupied (the common case), or this global cap is full — even though the preferred model never failed. That later entry can be a DIFFERENT provider, with different pricing and different data handling. If that matters to you, remove cross-provider entries from your fallback chains or use single-model chains. No new storage or telemetry is introduced by this setting.
 

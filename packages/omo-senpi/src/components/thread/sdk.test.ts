@@ -18,7 +18,7 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore } = {}) {
+function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean } = {}) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-"))
   directories.push(agentDir)
   const store: GatewayStore = options.store?.(agentDir) ?? createGatewayStore({ agentDir })
@@ -64,7 +64,7 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
       }),
     },
   }
-  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa-user", host, store })
+  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }) })
   sdks.push(sdk)
   return { sdk, store, wakes, releases }
 }
@@ -205,6 +205,35 @@ describe("thread SDK: bindings and the connector surface", () => {
     expect(await sdk.answer({ binding_id: yId, reply_token: token, answer: "yes" })).toMatchObject({ kind: "error", error: { code: "binding_mismatch" } })
     expect(await sdk.outbox({ binding_id: xId })).toMatchObject({ rows: [{ event: "question", question_state: "pending" }] })
   })
+})
+
+describe("thread SDK: store extensions", () => {
+  const EXTENSION = { name: "alpha", moduleUrl: new URL("./gateway/testing/store-extension.mjs", import.meta.url).href, migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]] }
+  const SETTLE_MS = 10_000
+  async function settled<T>(what: string, call: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const bound = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(`${what} did not settle within ${SETTLE_MS} ms`)), SETTLE_MS)
+    })
+    try {
+      return await Promise.race([call, bound])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  // The gateway connector opens the store through the SDK and admits every inbound chat message with
+  // one extension call that binds or enqueues inside the store worker's transaction. That target
+  // lookup runs while the worker is busy with the call, so it must not ask the same store anything.
+  test("#given the SDK's own store #when an extension operation binds a session and enqueues through that binding #then both settle and the delivery is written", async () => {
+    const { sdk } = fixture({ sdkOwnsStore: true })
+    expect((await sdk.registerStoreExtension(EXTENSION)).kind).toBe("ok")
+    const bound = await settled("tx.bind", sdk.extensionCall<{ kind: string; binding?: { binding_id: string } }>("alpha", "core", { op: "bind", request: { principal: "test", binding: { platform: "custom", account_id: "qa", chat_id: "c1", session_durable_id: "dur-tui", ttl_seconds: null } } }))
+    expect(bound).toMatchObject({ kind: "ok", value: { kind: "ok", binding: { session_durable_id: "dur-tui" } } })
+    const bindingId = bound.kind === "ok" ? (bound.value as { binding: { binding_id: string } }).binding.binding_id : ""
+    const sent = await settled("tx.enqueue", sdk.extensionCall("alpha", "core", { op: "enqueue", request: { binding_id: bindingId, event_id: "evt-1", text: "hello from the chat" } }))
+    expect(sent).toMatchObject({ kind: "ok", value: { kind: "ok", deduplicated: false } })
+  }, SETTLE_MS * 3)
 })
 
 describe("thread SDK: request kinds", () => {

@@ -28,11 +28,11 @@ export function judgeLeg({ outcomes, os, runHeavy, fullMatrix, runtimeTouching, 
     return {
       exitCode: 1,
       level: "error",
-      message: `tests not run: add ci:full-matrix. This change needs the tests on ${os}, but every test step of this leg was skipped.`,
+      message: `tests not run: this change needs the tests on ${os}, but every test step of this leg was skipped. Add ci:full-matrix for a separate diagnostic run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to rerun required checks.`,
     }
   }
   const message = runHeavy
-    ? `tests intentionally not run on ${os}: no runtime path changed, so only ubuntu runs the tests. Add the ci:full-matrix label to run them here.`
+    ? `tests intentionally not run on ${os}: no runtime path changed, so only ubuntu runs the tests. Add ci:full-matrix for a separate run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in required checks.`
     : `tests intentionally not run on ${os}: the change is web or docs only, or a generated release merge, so no leg runs the heavy tests.`
   return { exitCode: 0, level: "notice", message }
 }

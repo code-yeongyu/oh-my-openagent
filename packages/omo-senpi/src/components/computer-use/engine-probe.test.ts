@@ -1,9 +1,10 @@
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { once } from "node:events"
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
+import { fileURLToPath } from "node:url"
 import {
   COMPUTER_USE_DOCTOR_TIMEOUT_MS,
   launchEngineBinary,
@@ -11,6 +12,19 @@ import {
   type EngineLauncher,
   type EngineProbeResult,
 } from "./engine-probe"
+
+test("doctor accepts an older engine without cursorOverlay as unsupported", async () => {
+  // Given: the same real NDJSON engine fixture used by the desktop service.
+  const engine = fileURLToPath(new URL("../../../../senpi-desktop-service/test/fake-engine.mjs", import.meta.url))
+  // When: startup/doctor reads the older capability payload.
+  const result = await probeComputerUseEngine(
+    engine, { FAKE_ENGINE_CURSOR_OMITTED: "1" }, COMPUTER_USE_DOCTOR_TIMEOUT_MS,
+    (path, args, env) => launchEngineBinary(process.execPath, [path, ...args], env),
+  )
+  // Then: version skew does not turn a usable engine into malformed capabilities.
+  expect(result).toMatchObject({ ok: true })
+  if (result.ok) expect(result.value.capabilities.cursorOverlay).toBe(false)
+})
 
 test.skipIf(process.platform === "win32")(
   "#given an engine descendant retaining pipes #when the deadline expires #then the probe returns and the descendant is gone",
@@ -77,6 +91,50 @@ process.stdin.resume();
       }
       await exited
       await probe
+      rmSync(root, { recursive: true, force: true })
+    }
+  },
+  10_000,
+)
+
+test.skipIf(process.platform === "win32")(
+  "#given a probe group that macOS reports as EPERM (exited, not reaped) #when the deadline expires #then the probe reports a timeout instead of throwing",
+  async () => {
+    // given: an engine that never replies, and a group kill that fails the way macOS does for an unreaped group.
+    const root = mkdtempSync(join(tmpdir(), "omo-probe-eperm-"))
+    const engine = join(root, "engine")
+    writeFileSync(engine, `#!${process.execPath}\nprocess.stdin.resume();\n`)
+    chmodSync(engine, 0o755)
+    let child: ReturnType<EngineLauncher> | undefined
+    let exited: Promise<unknown> | undefined
+    const launch: EngineLauncher = (...args) => {
+      child = launchEngineBinary(...args)
+      exited = once(child, "exit")
+      return child
+    }
+    const originalKill = process.kill.bind(process)
+    let groupKillAttempts = 0
+    const kill = spyOn(process, "kill").mockImplementation((pid: number, signal?: string | number) => {
+      if (pid >= 0) return originalKill(pid, signal)
+      groupKillAttempts += 1
+      originalKill(pid, signal)
+      throw Object.assign(new Error("kill() failed: EPERM: Operation not permitted"), { code: "EPERM" })
+    })
+    const uncaught: unknown[] = []
+    const onUncaught = (error: unknown) => { uncaught.push(error) }
+    process.on("uncaughtException", onUncaught)
+    try {
+      // when
+      const result = await probeComputerUseEngine(engine, {}, 200, launch)
+      await exited
+
+      // then
+      expect(result).toMatchObject({ ok: false, code: "timeout" })
+      expect(groupKillAttempts).toBe(1)
+      expect(uncaught).toEqual([])
+    } finally {
+      process.off("uncaughtException", onUncaught)
+      kill.mockRestore()
       rmSync(root, { recursive: true, force: true })
     }
   },

@@ -3,6 +3,8 @@ import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 import type { ChildHandle as InProcessChildHandle } from "../runners/in-process/child-handle"
 import { RunnerError, type ChildSpec } from "../runners/in-process"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
+import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
+import { dirname } from "node:path"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { adaptInProcessHandle, adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
 import type { ManagedRunner, ManagedStartSpec } from "./types"
@@ -66,11 +68,13 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         task_id: spec.taskId,
         cwd: spec.cwd,
         state_dir: spec.stateDir,
+        taskStoreDir: dirname(dirname(spec.stateDir)),
         prompt: spec.prompt,
         // A detached rpc child cannot share the parent's in-memory model registry; thread the resolved
         // provider/modelId so the child resolves the requested model on its own command line.
         ...(spec.model !== undefined ? { model: spec.model } : {}),
         ...(spec.variant !== undefined ? { variant: spec.variant } : {}),
+        ...(spec.fallbackModels !== undefined ? { fallbackModels: spec.fallbackModels.map(modelSelector) } : {}),
         ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
         ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
         depth: spec.depth,

@@ -24,6 +24,7 @@ import {
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { createLateSendOutcomeDeliverer } from "./late-send-outcome"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
 import { registerDagCommands } from "./dag-commands"
@@ -31,6 +32,7 @@ import { createDagReloadSource } from "./dag-reload-source"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { createDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
+import { registerEvalHandleHost } from "./eval-handle-host"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
 import { wireHostPrewarm } from "./host-prewarm"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -236,6 +238,7 @@ function registerTaskTools(
     ...createTaskSendTool({
       manager,
       resolveCallerSessionId,
+      deliverLateOutcome: createLateSendOutcomeDeliverer(pi, () => engine.runtime.sessionId()),
       teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
     }),
   })
@@ -245,6 +248,7 @@ function registerTaskTools(
   })
   registerDagTool(pi, engine, dagRuntime)
   registerWorkpoolTool(pi, engine, skillInvocations, coordinator)
+  registerEvalHandleHost(pi, engine)
 }
 
 function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: DagRuntime): void {

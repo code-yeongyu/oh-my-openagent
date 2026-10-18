@@ -5,6 +5,7 @@ import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
+import { threadLink } from "../thread-link"
 import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadHostViewRequest, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
 import { sendView } from "./send-view"
 
@@ -29,6 +30,8 @@ export type ThreadToolSummary = Omit<ThreadHostSession, "name" | "status" | "cre
   readonly endpoint?: AddressEndpoint | null
   readonly surface?: ThreadSurface | null
   readonly alive?: boolean
+  /** `[title](omo-thread://v1/<thread_id>)` (`thread-link.ts`): paste it when telling the user about this thread. */
+  readonly link: string
 }
 
 export type ThreadToolMetadata = {
@@ -69,6 +72,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface, alive: entry.alive }),
+    link: threadLink(id, entry?.title ?? threadTitle(session.name, null)),
   }
 }
 
@@ -77,7 +81,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
  * reaches one endpoint is that endpoint's listing, exactly as before endpoints were enumerated.
  * With `offline`, an endpoint that does not answer is a host without sessions, never a throw.
  */
-export async function hostView(options: ThreadToolSurfaceOptions, request: ThreadHostViewRequest = {}): Promise<ThreadHostView> {
+export async function hostView(options: Omit<ThreadToolSurfaceOptions, "store">, request: ThreadHostViewRequest = {}): Promise<ThreadHostView> {
   if (options.host.listView !== undefined) return await options.host.listView(request)
   let sessions: readonly ThreadHostSession[]
   try {
@@ -89,7 +93,7 @@ export async function hostView(options: ThreadToolSurfaceOptions, request: Threa
   return { sessions, hosts: [{ socket: options.host.socket, list_sessions: { sessions } }], disk: [] }
 }
 
-export function addressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView, extra: readonly DiskSession[] = []): AddressEntry[] {
+export function addressBook(options: Omit<ThreadToolSurfaceOptions, "store">, view: ThreadHostView, extra: readonly DiskSession[] = []): AddressEntry[] {
   return assembleAddressBook(view.hosts, [...(options.diskSessions?.() ?? []), ...view.disk, ...extra], { facts: readSessionFacts })
 }
 
@@ -101,7 +105,7 @@ export function addressBook(options: ThreadToolSurfaceOptions, view: ThreadHostV
  * judged over the same entries as always. An exact durable id wins over every name, live or on disk:
  * when no endpoint lists the id, its session file is looked up even if a live session's name matches.
  */
-export function sendAddressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView, address: string, allScope?: boolean): AddressEntry[] {
+export function sendAddressBook(options: Omit<ThreadToolSurfaceOptions, "store">, view: ThreadHostView, address: string, allScope?: boolean): AddressEntry[] {
   const book = addressBook(options, view)
   const sessionsDirectory = options.sessionsDirectory?.()
   if (sessionsDirectory === undefined || address === "self") return book
@@ -140,6 +144,7 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
     endpoint: entry.endpoint,
     surface: entry.surface,
     alive: entry.alive,
+    link: threadLink(entry.thread_id, entry.title),
     ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }
 }

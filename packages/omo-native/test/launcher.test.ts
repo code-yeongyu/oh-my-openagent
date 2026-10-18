@@ -455,25 +455,20 @@ await runLauncher(["say", "hi"])
       }
     })
 
-    describe("#when app-server is launched", () => {
-      for (const [label, args] of [
-        ["the server", ["app-server", "--listen", "stdio://"]],
-        ["daemon start", ["app-server", "daemon", "start"]],
-      ] as const) {
-        test(`#then ${label} loads the packaged plugin after the app-server subcommand`, () => {
+    describe("#when the retired app-server command is invoked", () => {
+      for (const args of [
+        ["app-server", "--listen", "stdio://"],
+        ["app-server", "daemon", "start"],
+        ["app-server", "--no-extensions"],
+      ]) {
+        test(`#then ${args.join(" ")} is refused before reaching the engine (#10033)`, () => {
           const fixture = createFixture()
-          const result = run(fixture, [...args])
-          expect(result.status).toBe(0)
-          expect(capture(fixture).argv).toEqual([...args, "--extension", join(fixture.packageRoot, "plugin")])
+          const result = run(fixture, args)
+          expect(result.status).toBe(2)
+          expect(result.stderr.trim().length).toBeGreaterThan(0)
+          expect(existsSync(fixture.captureFile)).toBe(false)
         })
       }
-
-      test("#then --no-extensions leaves the extension list to the caller", () => {
-        const fixture = createFixture()
-        const result = run(fixture, ["app-server", "--no-extensions"])
-        expect(result.status).toBe(0)
-        expect(capture(fixture).argv).toEqual(["app-server", "--no-extensions"])
-      })
     })
 
     describe("#when bare update is requested", () => {

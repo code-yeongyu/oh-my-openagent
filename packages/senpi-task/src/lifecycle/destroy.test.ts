@@ -12,6 +12,7 @@ import {
   type CallLog,
 } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { fenceRun } from "../state/run-fence"
 
 afterEach(cleanupProjects)
 
@@ -281,6 +282,51 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
       notification: { run_epoch: 4 },
     })
     expect(restored?.host_pid).toBeUndefined()
+    lifecycle.dispose?.()
+  })
+
+  test("#given a revived terminal claim #when the revival is rolled back #then the run it rolled back to keeps its own run start, so a handle taken before the revival still works", () => {
+    const store = tempStore()
+    const seeded = seedRecord(store, {
+      task_id: "st_0000000f",
+      status: "completed",
+      residency_state: "rpc_detached",
+      execution_mode: "process",
+      run_epoch: 4,
+      updated_at: "2026-09-01T00:00:00.000Z",
+    })
+    const prior = { ...seeded, run_start_epoch: 3 }
+    store.replace(prior)
+    store.replace({ ...prior, status: "running", residency_state: "resident", host_pid: 6000, run_start_epoch: 5, notification: { ...prior.notification, run_epoch: 5 } })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+
+    const result = lifecycle.rollbackDetachedRevival(prior)
+    const restored = store.load(prior.task_id)
+
+    expect(result).toBe("rolled_back")
+    expect(restored).toMatchObject({ status: "completed", run_start_epoch: 3, notification: { run_epoch: 4 } })
+    expect(restored === null ? "missing" : fenceRun(restored, 4)).toBe("live")
+    lifecycle.dispose?.()
+  })
+
+  test("#given a revived claim on a record from before run starts were tracked #when the revival is rolled back #then no run start survives from the revival", () => {
+    const store = tempStore()
+    const prior = seedRecord(store, {
+      task_id: "st_00000010",
+      status: "completed",
+      residency_state: "rpc_detached",
+      execution_mode: "process",
+      run_epoch: 4,
+      updated_at: "2026-09-01T00:00:00.000Z",
+    })
+    store.replace({ ...prior, status: "running", residency_state: "resident", host_pid: 6000, run_start_epoch: 5, notification: { ...prior.notification, run_epoch: 5 } })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+
+    lifecycle.rollbackDetachedRevival(prior)
+    const restored = store.load(prior.task_id)
+
+    expect(restored?.run_start_epoch).toBeUndefined()
+    expect(restored === null ? "missing" : fenceRun(restored, 4)).toBe("live")
     lifecycle.dispose?.()
   })
 

@@ -2,10 +2,10 @@ import type { DesktopCapabilities, StopPathStatus } from "@oh-my-opencode/senpi-
 import type { ComputerHandle } from "./activation";
 import type { ComputerHostContext } from "./session";
 
-export const COMPUTER_SUBCOMMANDS = ["on", "off", "status", "stop", "resume"] as const;
+export const COMPUTER_SUBCOMMANDS = ["on", "off", "status", "stop", "resume", "cursor on", "cursor off"] as const;
 export type ComputerSubcommand = (typeof COMPUTER_SUBCOMMANDS)[number];
 
-export const COMPUTER_COMMAND_USAGE = "Usage: /computer on|off|status|stop|resume";
+export const COMPUTER_COMMAND_USAGE = "Usage: /computer on|off|status|stop|resume or /computer cursor on|off";
 
 function parseSubcommand(args: string): ComputerSubcommand | undefined {
 	const word = args.trim().toLowerCase() || "status";
@@ -32,6 +32,7 @@ function describeCapabilities(capabilities: DesktopCapabilities | undefined): st
 		`inputPermission=${capabilities.inputPermission}`,
 		`axPermission=${capabilities.axPermission}`,
 		`backgroundWindowInput=${capabilities.backgroundWindowInput}`,
+		`cursorOverlay=${capabilities.cursorOverlay}`,
 		`screenLocked=${capabilities.screenLocked}`,
 	].join(" ");
 }
@@ -40,6 +41,7 @@ async function status(handle: ComputerHandle): Promise<string> {
 	const stopPath = await handle.stopPathStatus();
 	return [
 		`Computer use: enabled=${handle.enabled} active=${handle.active} engine=${handle.running ? "running" : "not started"}`,
+		`virtual cursor: ${handle.settings().showCursor ? "on" : "off"} (/computer cursor on|off)`,
 		`capabilities: ${describeCapabilities(await handle.capabilities())}`,
 		`stop: ${stopPath === undefined ? "n/a (engine not started)" : describeStopPath(stopPath)}`,
 		"permissions: inspection needs computer:read, input and mutation need computer:exec; " +
@@ -48,7 +50,8 @@ async function status(handle: ComputerHandle): Promise<string> {
 }
 
 /**
- * `/computer on|off|status|stop|resume` (no argument = `status`); returns the text to show the user.
+ * `/computer on|off|status|stop|resume|cursor on|cursor off` (no argument = `status`);
+ * returns the text to show the user.
  * `stop` and `resume` are user-only: the model has no tool action that reaches them.
  */
 export async function runComputerCommand(
@@ -70,6 +73,10 @@ export async function runComputerCommand(
 			return "Computer use off for this session.";
 		case "status":
 			return status(handle);
+		case "cursor on":
+		case "cursor off":
+			await handle.setShowCursor(subcommand === "cursor on", context);
+			return `Virtual cursor ${handle.settings().showCursor ? "on" : "off"} for this session.`;
 		case "stop": {
 			const stopped = await handle.stop();
 			return stopped === undefined

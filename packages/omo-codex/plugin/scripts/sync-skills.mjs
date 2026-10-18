@@ -178,7 +178,7 @@ export const ulwExecuteOriginalCompletion = [
 	"When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:",
 	"",
 	"1. Run the plan's final verification commands.",
-	"2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.",
+	"2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.",
 	"3. Remove or mark the Boulder work as completed.",
 	"4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
 ].join("\n");
@@ -198,7 +198,7 @@ const ulwExecuteCodexCompletion = [
 	"1. Run the plan's final verification commands.",
 	"2. Record a self-review in the notepad: re-read the diff, run diagnostics, and capture evidence for every acceptance criterion. Run your own manual QA on the real surface.",
 	"3. Only when the user demanded strict, rigorous, or high-accuracy review, spawn ONE `lazycodex-gate-reviewer`; otherwise your self-review is the final verification.",
-	"4. Finish the PR/branch lifecycle from its task-owned worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.",
+	"4. Finish the PR/branch lifecycle from its task-owned worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.",
 	"5. Remove or mark the Boulder work as completed.",
 	"6. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
 ].join("\n");

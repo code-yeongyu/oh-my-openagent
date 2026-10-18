@@ -44,7 +44,7 @@ function trackerOver(store: ReturnType<typeof tempStore>, handle: ManagedChildHa
     tryLoad: (taskId) => store.load(taskId),
     runStatsSnapshot: () => undefined,
     releaseSlot: () => undefined,
-    forget: (taskId) => forgotten.push(taskId),
+    forget: (taskId, _options) => forgotten.push(taskId),
     settleWaiters: () => undefined,
     tryRuntimeFallback: () => Promise.resolve(false),
   })
@@ -174,4 +174,39 @@ describe("respawn opens a daemon child on its RECORDED socket", () => {
       expect(await result).toMatchObject({ ok: false, disposition: "retryable", code: reason })
     })
   }
+})
+
+describe("respawn hands a daemon child its remaining fallback chain (#9512)", () => {
+  test("#given a recorded child with fallback models #when it is respawned #then the runner spec carries them as selectors", async () => {
+    // given
+    const store = tempStore()
+    const record = seedRecord(store, {
+      ...hostSessionRecordInput("st_0e000009", hostSession("st_0e000009", { socket: SHARD })),
+      spawn_spec: { cwd: "/tmp" },
+      status: "running",
+      fallback_models: [
+        { source: "category", provider: "openai", model_id: "gpt-5.6-sol", display: "GPT", reasoning: "high" },
+        { source: "category", provider: "zai", model_id: "glm-5.3", display: "GLM" },
+      ],
+    })
+    const specs: RpcRunnerSpec[] = []
+
+    // when
+    await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record,
+      sessionPath: record.host_session?.session_path,
+      stateDir: store.stateDir,
+      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      rpcRunner: {
+        start: (spec) => {
+          specs.push(spec)
+          return Promise.reject(new Error("stop after the spec is seen"))
+        },
+      },
+    })
+
+    // then
+    expect(specs.map((spec) => spec.fallbackModels)).toEqual([["openai/gpt-5.6-sol:high", "zai/glm-5.3"]])
+  })
 })

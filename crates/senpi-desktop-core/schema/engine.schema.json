@@ -37,6 +37,39 @@
         "type": "null"
       }
     },
+    "control.grant": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ControlGrantParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
+    "control.revoke": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "control.state": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ControlStateResult"
+      }
+    },
     "capabilities": {
       "effect": "read",
       "hostOnly": false,
@@ -85,6 +118,28 @@
       },
       "result": {
         "$ref": "#/definitions/CaptureResult"
+      }
+    },
+    "captureRegion": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/CaptureRegionParams"
+      },
+      "result": {
+        "$ref": "#/definitions/CaptureResult"
+      }
+    },
+    "observe": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ObserveParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ObserveResult"
       }
     },
     "click": {
@@ -153,12 +208,59 @@
         "type": "null"
       }
     },
+    "holdKeys": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/HoldKeysParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "holdMouse": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/HoldMouseParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
     "raiseWindow": {
       "effect": "exec",
       "hostOnly": false,
       "testOnly": false,
       "params": {
         "$ref": "#/definitions/RaiseWindowParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "menus.items": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuPathParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/MenuItem"
+        }
+      }
+    },
+    "menus.select": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/MenuSelectParams"
       },
       "result": {
         "type": "null"
@@ -474,7 +576,10 @@
     "Cancelled": -32017,
     "CursorRestoreFailed": -32018,
     "FocusRestoreFailed": -32019,
-    "TransactionFailed": -32020
+    "TransactionFailed": -32020,
+    "InputBusy": -32021,
+    "ControlRequired": -32022,
+    "CaptureUnavailable": -32023
   },
   "standardErrors": {
     "parseError": -32700,
@@ -532,6 +637,11 @@
               "$ref": "#/definitions/MacosCanaryMode"
             }
           ]
+        },
+        "showCursor": {
+          "type": "boolean",
+          "description": "Display-only virtual cursor; never changes input admission.",
+          "default": true
         },
         "allowHostRelayOnlyStop": {
           "type": "boolean",
@@ -686,6 +796,10 @@
         "backgroundWindowInput": {
           "type": "boolean"
         },
+        "cursorOverlay": {
+          "type": "boolean",
+          "description": "Whether the display-only virtual cursor is live now."
+        },
         "deliveryModes": {
           "type": "array",
           "items": {
@@ -730,6 +844,10 @@
         },
         "screenLocked": {
           "type": "boolean"
+        },
+        "legacyCapture": {
+          "type": "boolean",
+          "description": "Captures run through the legacy `screencapture` path, not the\nScreenCaptureKit worker (B9: macOS < 14, helper missing, or the\nhelper failed to start)."
         }
       },
       "required": [
@@ -738,6 +856,7 @@
         "input",
         "ax",
         "backgroundWindowInput",
+        "cursorOverlay",
         "deliveryModes",
         "capturePermission",
         "inputPermission",
@@ -747,7 +866,50 @@
         "stopPath",
         "screenLocked"
       ],
-      "description": "Runtime truth about what this host's backend can do right now.\n\nFROZEN field set (IS-2): later todos fill values, never add fields.",
+      "description": "Runtime truth about what this host's backend can do right now.\n\nSchema-backed field set; additions update Rust, generated schema and TS together.",
+      "additionalProperties": false
+    },
+    "ControlGrantParams": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "confirmationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "confirmationId"
+      ],
+      "description": "`control.grant`: `confirmationId` is the host's receipt of the human\nconfirmation it showed; the engine never sees the confirm itself.",
+      "additionalProperties": false
+    },
+    "ControlStateResult": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grantedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "RFC 3339 UTC with milliseconds, matching the audit timestamps."
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "description": "`control.grant` and `control.state` reply: this session's live foreground\ncontrol grant. `reason` and `granted_at` are present exactly when\n`active` is true.",
       "additionalProperties": false
     },
     "DesktopDisplay": {
@@ -868,6 +1030,13 @@
           "type": "boolean",
           "description": "Whether the window currently holds input focus."
         },
+        "isOnScreen": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether the window is on the active Space. `None` on backends that\ncannot tell (X11/Win32/Wayland report every listed window on screen)."
+        },
         "elevated": {
           "type": [
             "boolean",
@@ -886,7 +1055,7 @@
         "height",
         "focused"
       ],
-      "description": "One capturable top-level window in global logical desktop coordinates.",
+      "description": "One capturable top-level window in global logical desktop coordinates.\n`is_on_screen` distinguishes an on-Space window from a same-app window on\nanother Space: both resolve as capture targets, but only an on-screen one\nis user-visible right now.",
       "additionalProperties": false
     },
     "CaptureParams": {
@@ -904,12 +1073,22 @@
               "type": "null"
             }
           ]
+        },
+        "excludeWindowTitles": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Titles of windows to exclude from a display capture."
         }
       },
       "required": [
         "target"
       ],
-      "description": "`capture`: one target (`desktop` or a window id) under optional caps.",
+      "description": "`capture`: one target (`desktop` or a window id) under optional caps.\n`excludeWindowTitles` applies to display captures only: every window with\na matching title is left out of the screenshot (B9, macOS ScreenCaptureKit;\nempty elsewhere and ignored by older engines).",
       "additionalProperties": false
     },
     "CaptureResult": {
@@ -957,6 +1136,26 @@
           "format": "uint32",
           "minimum": 0
         },
+        "coordinateWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureRegion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "scale": {
           "type": "number",
           "format": "double"
@@ -972,6 +1171,17 @@
             "string",
             "null"
           ]
+        },
+        "isOnScreen": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "The captured window's on-Screen state (macOS B9; absent for desktop\ncaptures and backends that cannot tell)."
+        },
+        "legacyCapture": {
+          "type": "boolean",
+          "description": "`true` when this capture ran through the legacy `screencapture`\nfallback instead of the ScreenCaptureKit worker (B9)."
         }
       },
       "required": [
@@ -980,6 +1190,8 @@
         "height",
         "sourceWidth",
         "sourceHeight",
+        "coordinateWidth",
+        "coordinateHeight",
         "scale",
         "target",
         "frameId"
@@ -995,6 +1207,254 @@
         "artifact-only"
       ],
       "description": "How a capture was delivered under the byte budget."
+    },
+    "CaptureRegion": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "width": {
+          "type": "number",
+          "format": "double"
+        },
+        "height": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "description": "Rectangle in the pixels of the last full screenshot, not the zoom image.",
+      "additionalProperties": false
+    },
+    "CaptureRegionParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "region": {
+          "$ref": "#/definitions/CaptureRegion"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureCaps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "region"
+      ],
+      "description": "`captureRegion`: native-detail zoom preserving the last full input frame.",
+      "additionalProperties": false
+    },
+    "ObserveParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureCaps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ax": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AxSnapshotOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "description": "`observe`: an atomic window screenshot and accessibility snapshot.",
+      "additionalProperties": false
+    },
+    "AxSnapshotOptions": {
+      "type": "object",
+      "properties": {
+        "maxDepth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "maxNodes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "all": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "ObserveResult": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/CaptureMode"
+        },
+        "data": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Base64 image bytes when `mode` is inline."
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "artifactPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "coordinateHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureRegion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "target": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isOnScreen": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "The captured window's on-Screen state (macOS B9; absent for desktop\ncaptures and backends that cannot tell)."
+        },
+        "legacyCapture": {
+          "type": "boolean",
+          "description": "`true` when this capture ran through the legacy `screencapture`\nfallback instead of the ScreenCaptureKit worker (B9)."
+        },
+        "ax": {
+          "type": "string"
+        },
+        "nodeCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mode",
+        "width",
+        "height",
+        "sourceWidth",
+        "sourceHeight",
+        "coordinateWidth",
+        "coordinateHeight",
+        "scale",
+        "target",
+        "frameId",
+        "ax",
+        "nodeCount",
+        "truncated"
+      ],
+      "description": "One delivered window observation; capture pixels remain the input frame.",
+      "additionalProperties": false
     },
     "PointParams": {
       "type": "object",
@@ -1233,6 +1693,100 @@
       ],
       "additionalProperties": false
     },
+    "HoldKeysParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "duration": {
+          "type": "number",
+          "format": "double"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "keys",
+        "duration"
+      ],
+      "description": "`holdKeys`: keys are always released before the request settles.",
+      "additionalProperties": false
+    },
+    "HoldMouseParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "duration": {
+          "type": "number",
+          "format": "double"
+        },
+        "button": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keys": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y",
+        "duration"
+      ],
+      "description": "`holdMouse`: coordinates address the latest full capture, never a zoom.",
+      "additionalProperties": false
+    },
     "RaiseWindowParams": {
       "type": "object",
       "properties": {
@@ -1243,6 +1797,90 @@
       "required": [
         "windowId"
       ],
+      "additionalProperties": false
+    },
+    "MenuPathParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`menus.items`: the window whose menu is addressed and the path inside it\n(empty lists the menu bar). `menus.select` takes [`MenuSelectParams`].",
+      "additionalProperties": false
+    },
+    "MenuItem": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "hasSubmenu": {
+          "type": "boolean"
+        },
+        "shortcut": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "path",
+        "enabled",
+        "checked",
+        "hasSubmenu"
+      ],
+      "description": "One immediate child of a native application menu. `path` holds the native\nlabels, ellipses included; selection accepts normalized labels.",
+      "additionalProperties": false
+    },
+    "MenuSelectParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "deliveryMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`menus.select`: the window, the 1..=32-label path to a command, and the\ndelivery. An omitted delivery is background; `foreground` raises and keys\nthe target window and needs this session's live control grant (#9888).",
       "additionalProperties": false
     },
     "ClipboardText": {
@@ -1278,37 +1916,6 @@
       "required": [
         "target"
       ],
-      "additionalProperties": false
-    },
-    "AxSnapshotOptions": {
-      "type": "object",
-      "properties": {
-        "maxDepth": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0,
-          "default": null
-        },
-        "maxNodes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0,
-          "default": null
-        },
-        "all": {
-          "type": [
-            "boolean",
-            "null"
-          ],
-          "default": null
-        }
-      },
       "additionalProperties": false
     },
     "AxSnapshot": {
@@ -1785,17 +2392,26 @@
         "engine.hello",
         "session.open",
         "session.close",
+        "control.grant",
+        "control.revoke",
+        "control.state",
         "capabilities",
         "displays",
         "windows",
         "capture",
+        "captureRegion",
+        "observe",
         "click",
         "moveMouse",
         "drag",
         "scroll",
         "typeText",
         "keyChord",
+        "holdKeys",
+        "holdMouse",
         "raiseWindow",
+        "menus.items",
+        "menus.select",
         "clipboard.read",
         "clipboard.write",
         "ax.snapshot",
@@ -1851,6 +2467,21 @@
           "type": "string",
           "const": "Cancelled",
           "description": "A request aborted by `$/cancel` or a host abort."
+        },
+        {
+          "type": "string",
+          "const": "InputBusy",
+          "description": "Another session holds the foreground control grant. The slot is never\nstolen; the caller can retry after it releases."
+        },
+        {
+          "type": "string",
+          "const": "ControlRequired",
+          "description": "Foreground delivery without this session's live control grant."
+        },
+        {
+          "type": "string",
+          "const": "CaptureUnavailable",
+          "description": "The capture target exists but cannot be captured right now; `data`\nsays why (e.g. `{ \"reason\": \"minimized\" }`)."
         }
       ],
       "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."
@@ -2043,6 +2674,16 @@
               "type": "null"
             }
           ]
+        },
+        "captureUnavailable": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureUnavailableData"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -2080,6 +2721,19 @@
         "screen_recording",
         "accessibility"
       ]
+    },
+    "CaptureUnavailableData": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "description": "Why a `CaptureUnavailable` capture was refused. `reason` is an open token\nset: B9 introduces `\"minimized\"` and later waves add more.",
+      "additionalProperties": false
     },
     "MethodRejectionData": {
       "type": "object",

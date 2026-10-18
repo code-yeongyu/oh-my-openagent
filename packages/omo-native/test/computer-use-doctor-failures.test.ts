@@ -63,6 +63,7 @@ const replies = {
   "engine.hello": { protocolVersion: "9", engineVersion: "0.0.0", buildSha: "fixture", abi: "other/9" },
   capabilities: {
     backend: "fake", capture: false, input: false, ax: false, backgroundWindowInput: false,
+    cursorOverlay: false,
     deliveryModes: [], capturePermission: "denied", inputPermission: "denied", axPermission: "denied",
     displayCount: 0, focusGuard: false, stopPath: "none", screenLocked: false
   }
@@ -102,7 +103,9 @@ createInterface({ input: process.stdin }).on("line", () => {});
     expect(report.kind).toBe("failed")
     if (report.kind !== "failed") throw new Error(`expected failed report, got ${report.kind}`)
     expect(report.code).toBe("timeout")
-    expect(report.message).toContain("timed out after 25 ms")
+    expect(report.message).toBe(
+      `desktop engine probe timed out after 25 ms at ${enginePath} (phase: requests sent, awaiting engine.hello and capabilities)`,
+    )
   })
 
   test("#given an unsupported platform #when inspected #then no engine process is needed", async () => {

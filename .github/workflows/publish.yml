@@ -46,7 +46,8 @@ permissions:
 
 jobs:
   gate-reuse:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9932.
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -151,7 +152,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   preflight-trust:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9933.
+    runs-on: ubuntu-24.04
     needs: [release-metadata]
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     permissions:
@@ -220,7 +222,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   release-metadata:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9934.
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
@@ -333,7 +336,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   prepare-release-state:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9935.
+    runs-on: ubuntu-24.04
     needs: [gate-reuse, preflight-trust, release-metadata]
     if: >-
       always() &&
@@ -437,21 +441,19 @@ jobs:
             exit 1
           fi
 
-          # A release commit may only be REUSED when it is the current base head. A stamp that
-          # sits behind the head belongs to an earlier, abandoned attempt: its tree predates every
-          # merge since, so publishing it would ship a version whose contents nobody reviewed under
-          # that number (2026-09-04: a beta.41 retry re-selected the first attempt's stamp, whose
-          # tree lacked the senpi engine bump; only gate-reuse's CI check kept it off npm). Fail
-          # closed and ask for a fresh version number instead of restamping over a live one.
+          # A merged stamping commit remains reusable only while its tree equals the current
+          # base. The merge wrapper must not replace its maintainer attribution, and later
+          # content must never be silently omitted by reusing an abandoned stamp (#7779).
           reuse_or_refuse() {
             local candidate="$1" origin_desc="$2"
-            if [ "$candidate" = "$BASE_HEAD" ]; then
+            if git merge-base --is-ancestor "$candidate" "$BASE_HEAD" &&
+              [ "$(git rev-parse "${candidate}^{tree}")" = "$(git rev-parse "${BASE_HEAD}^{tree}")" ]; then
               echo "release_sha=${candidate}" >> "$GITHUB_OUTPUT"
               echo "needs_push=false" >> "$GITHUB_OUTPUT"
-              echo "${origin_desc} is the current origin/${BASE_REF} head: ${candidate}"
+              echo "${origin_desc} matches the current origin/${BASE_REF} tree: ${candidate}"
               exit 0
             fi
-            echo "::error::${origin_desc} (${candidate}) is stale: origin/${BASE_REF} has moved to ${BASE_HEAD}. Refusing to publish a tree that predates the base head. Bump to an unused version so a fresh release commit is stamped on the current head."
+            echo "::error::${origin_desc} (${candidate}) is stale or unrelated to origin/${BASE_REF} (${BASE_HEAD}). Bump to an unused version so a fresh release commit is stamped on the current head."
             exit 1
           }
 
@@ -459,7 +461,7 @@ jobs:
             reuse_or_refuse "$(git rev-list --max-count=1 "refs/tags/v${VERSION}")" "Release tag v${VERSION}"
           fi
 
-          RELEASE_SHA="$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
+          RELEASE_SHA="$(git rev-list --no-merges --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
           if [ -n "$RELEASE_SHA" ]; then
             reuse_or_refuse "$RELEASE_SHA" "Release commit for v${VERSION}"
           fi
@@ -504,8 +506,8 @@ jobs:
           # rejects the release commit as stale (v5.0.0-beta.83 release-state PR).
           bun run build:codex-install
 
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config --global user.email "code.yeon.gyu@gmail.com"
+          git config --global user.name "YeonGyu-Kim"
           git add CHANGELOG.md package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           # build-extension.mjs also rewrites the committed bundles under plugin/runtime (the
           # agent-toolkit SDK, the rollback migrator); commit every tracked one it touched or the
@@ -609,9 +611,16 @@ jobs:
           for attempt in $(seq 1 120); do
             PR_STATE="$(retry_gh "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
-              RELEASE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              MERGE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              RELEASE_SHA="$(retry_gh "Read release-state PR source SHA" gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
+              git fetch origin "$MERGE_SHA" "$RELEASE_SHA"
+              if ! git merge-base --is-ancestor "$RELEASE_SHA" "$MERGE_SHA" ||
+                [ "$(git rev-parse "${RELEASE_SHA}^{tree}")" != "$(git rev-parse "${MERGE_SHA}^{tree}")" ]; then
+                echo "::error::Merged release tree differs from its prepared source; refusing publication."
+                exit 1
+              fi
               echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-              echo "Release-state PR #${PR_NUMBER} merged at ${RELEASE_SHA}"
+              echo "Release-state PR #${PR_NUMBER} merged at ${MERGE_SHA}; publishing stamped source ${RELEASE_SHA}"
               exit 0
             fi
 
@@ -643,7 +652,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   dispatch-provenance-safe-publish:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9936.
+    runs-on: ubuntu-24.04
     needs: [release-metadata, prepare-release-state]
     if: >-
       always() &&
@@ -717,7 +727,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-main:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9937.
+    runs-on: ubuntu-24.04
     # post-publish-verify runs the published-package probes in a job that cannot block the release, so the
     # lazycodex publish decision has to cross the job boundary as an output.
     outputs:
@@ -1059,7 +1070,8 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   verify-release-notes:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9938.
+    runs-on: ubuntu-24.04
     needs: [release-metadata, prepare-release-state]
     # A LazyCodex-only release creates no omo GitHub release, so it has no CHANGELOG section to verify.
     if: >-
@@ -1114,8 +1126,11 @@ jobs:
     secrets: inherit
 
   release:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9939.
+    runs-on: ubuntu-24.04
     needs: [release-metadata, prepare-release-state, publish-main, publish-platform]
+    outputs:
+      created: ${{ steps.github-release.outputs.created }}
     if: >-
       always() &&
       inputs.prepared_release_sha != '' &&
@@ -1189,8 +1204,8 @@ jobs:
           bun run --cwd packages/omo-codex/plugin build
           bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
           cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git config --global user.email "code.yeon.gyu@gmail.com"
+          git config --global user.name "YeonGyu-Kim"
           git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo
           if git diff --cached --quiet; then
             echo "LazyCodex marketplace already up to date"
@@ -1267,6 +1282,7 @@ jobs:
             gh release create "v${VERSION}" "$LATEST_FLAG" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
 
       - name: Create GitHub release
+        id: github-release
         # Always a full release, never `--prerelease`, on every channel: the npm
         # dist-tag (beta/next) already carries the channel semantics, and every
         # shipping version is `5.0.0-beta.N`.
@@ -1281,6 +1297,7 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # pipefail matters: an empty tag list is indistinguishable from "no releases
@@ -1289,8 +1306,17 @@ jobs:
           set -euo pipefail
 
           LATEST_FLAG="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
-          gh release view "v${VERSION}" >/dev/null 2>&1 || \
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            if [ -z "$DIST_TAG" ]; then
+              RECOVERY_NOTICE="The release already existed, so it was not announced again. If the earlier run did not post, re-announce with: gh workflow run release-announce.yml -f tag=v${VERSION} -f dry_run=false"
+              printf '::warning::%s\n' "$RECOVERY_NOTICE"
+              printf '%s\n' "$RECOVERY_NOTICE" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
             gh release create "v${VERSION}" "$LATEST_FLAG" --title "v${VERSION}" --notes-file /tmp/changelog.md
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download release-binary artifacts
         if: inputs.skip_platform != true && inputs.lazycodex_only != true
@@ -1329,7 +1355,7 @@ jobs:
           done
           ls -la .omo/release-binaries/
           # The release owns two checksum assets: one for 12 omo launchers,
-          # and one for the four separately downloadable desktop engines.
+          # and one for the six separately downloadable desktop engines.
           (cd .omo/release-binaries && shasum -a 256 omo-* > SHA256SUMS)
           bun script/desktop-engine-release.ts checksums .omo/release-binaries
           gh release upload "v${VERSION}" .omo/release-binaries/omo-* \
@@ -1359,21 +1385,21 @@ jobs:
             if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
             touch "$EXPECTED_DIR/$NAME"
           done
-          for HOST in darwin-arm64 darwin-x64 linux-x64; do
+          for HOST in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             touch "$EXPECTED_DIR/senpi-desktop-engine-${HOST}"
           done
-          touch "$EXPECTED_DIR/senpi-desktop-engine-win32-x64.exe" \
+          touch "$EXPECTED_DIR/senpi-desktop-engine-win32-x64.exe" "$EXPECTED_DIR/senpi-desktop-engine-win32-arm64.exe" \
             "$EXPECTED_DIR/SHA256SUMS" "$EXPECTED_DIR/senpi-desktop-engine-checksums.txt"
           diff -u <(cd "$EXPECTED_DIR" && printf '%s\n' * | sort) \
             <(cd "$VERIFY_DIR" && printf '%s\n' * | sort)
           (
             cd "$VERIFY_DIR"
             test "$(wc -l < SHA256SUMS)" -eq 12
-            test "$(wc -l < senpi-desktop-engine-checksums.txt)" -eq 4
+            test "$(wc -l < senpi-desktop-engine-checksums.txt)" -eq 6
             shasum -a 256 -c SHA256SUMS
             shasum -a 256 -c senpi-desktop-engine-checksums.txt
           )
-          echo "Verified 18/18 release assets for v${VERSION}"
+          echo "Verified 20/20 release assets for v${VERSION}"
 
       - name: Delete draft release
         if: inputs.lazycodex_only != true
@@ -1412,6 +1438,47 @@ jobs:
           JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  release-announce:
+    needs: [release-metadata, release, post-publish-verify, installer-mirror]
+    if: >-
+      !cancelled() &&
+      needs.release.outputs.created == 'true' &&
+      needs.release.result == 'success' &&
+      needs.post-publish-verify.result == 'success' &&
+      (needs.installer-mirror.result == 'success' || (inputs.skip_platform == true && needs.installer-mirror.result == 'skipped')) &&
+      needs.release-metadata.outputs.dist_tag == '' &&
+      inputs.lazycodex_only != true &&
+      inputs.prepared_release_sha != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-announce.yml
+    with:
+      tag: v${{ needs.release-metadata.outputs.version }}
+    secrets:
+      DISCORD_OMO_RELEASES_WEBHOOK_URL: ${{ secrets.DISCORD_OMO_RELEASES_WEBHOOK_URL }}
+
+  release-announce-recovery:
+    needs: [release-metadata, release, post-publish-verify, installer-mirror, release-announce]
+    if: >-
+      always() &&
+      needs.release.outputs.created == 'true' &&
+      needs.release-metadata.outputs.dist_tag == '' &&
+      inputs.lazycodex_only != true &&
+      inputs.prepared_release_sha != '' &&
+      (cancelled() || needs.release-announce.result == 'skipped')
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9983.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Write job summary
+        env:
+          RELEASE_TAG: v${{ needs.release-metadata.outputs.version }}
+        run: |
+          recovery="gh workflow run release-announce.yml -f tag=$RELEASE_TAG -f dry_run=false"
+          echo "::warning::Release announcement $RELEASE_TAG was skipped or cancelled. Fix the release assets, verification, and installer mirror, then confirm the post is missing before recovery: $recovery"
+          printf 'Release announcement `%s` was skipped or cancelled. Once assets, verification, and the installer mirror are ready and no post exists, recover with `%s`.\n' "$RELEASE_TAG" "$recovery" >> "$GITHUB_STEP_SUMMARY"
+
   installer-mirror:
     needs: [release-metadata, release, post-publish-verify]
     # Last release step: mirror the published assets into R2 behind get.omo.dev, then move the installer
@@ -1433,7 +1500,11 @@ jobs:
     secrets: inherit
 
   post-publish-verify:
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9940.
+    runs-on: ubuntu-24.04
+    # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
+    # probe can't hold a runner for GitHub's 6 h default (#9492).
+    timeout-minutes: 120
     needs: [release-metadata, prepare-release-state, publish-main, release]
     # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
     # already public by this point, so blocking the release job on them could only produce the worst
@@ -1471,7 +1542,7 @@ jobs:
           # therefore failed the run AFTER a successful publish. Size the wait to the registry's stated
           # contract and read with --prefer-online so a cached "not found" cannot mask a landed version.
           READINESS_INTERVAL_SECONDS=15
-          READINESS_ATTEMPTS=60   # 60 x 15 s = 15 minutes
+          READINESS_ATTEMPTS=240  # 240 x 15 s = 60 minutes; npm took ~55 minutes to serve omo-ai@5.1.13 (#9492)
           for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
             IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
             TARBALL_URL=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball 2>/dev/null || true)

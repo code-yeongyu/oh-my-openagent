@@ -161,6 +161,7 @@ fn composite(frames: &[(screencast::MonitorStream, RgbaImage)], eis: Option<&[Ei
                 pixel_y: scaled(y, scale),
                 pixel_width: image.width(),
                 pixel_height: image.height(),
+                // The portal exposes order, not the compositor's primary display.
                 is_primary: index == 0,
             }
         })

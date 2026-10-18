@@ -54,6 +54,7 @@ function defaultVersionProbe(binaryPath: string): string {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: SG_VERSION_PROBE_TIMEOUT_MS,
+      windowsHide: true,
     }),
   )
 }

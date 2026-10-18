@@ -20,7 +20,8 @@ describe("computer permission events through the real session", () => {
             })
         // then
         expect(result).toBeDefined()
-        expect(fixture.methods).toContain("capture")
+        // A cell that never reached the engine shows why (its error, or that it timed out) instead of only a missing call (#9495).
+        expect(fixture.methods, JSON.stringify(result)).toContain("capture")
         expect(fixture.events).toEqual([{
           name: "omo.computer.permission_required",
           data: {

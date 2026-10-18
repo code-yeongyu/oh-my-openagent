@@ -10,14 +10,15 @@
 //   geeky-normal-gpt6-only-unavailable  only GPT-6 Sol ids served: unavailable, the lane never falls back to GPT-6.
 //   geeky-normal-sol serves gpt-6.1-sol next to gpt-5.6-sol and proves 6.1 Sol is the first rung.
 //   geeky-normal-api-sol / geeky-normal-copilot-sol  the gpt-5.6-sol medium fallback through the openai / github-copilot ids.
-//   unset            empty omo.json applies the recommended ladder (kimi-k3 on kimi-coding here).
-//   unset-skips-gateway  recommended never takes opengateway's vendor-prefixed Opus; kimi-k3 wins.
-//   unset-gpt-6-1-sol / unset-copilot-gpt-6-sol  recommended's GPT rungs: gpt-6.1-sol medium on the
-//                    subscription next to gpt-6-sol, and the gpt-6-sol medium fallback on Copilot.
+//   unset            empty omo.json starts on Daily · Normal (kimi-k3 on kimi-coding here; #10029).
+//   unset-skips-gateway  the default never takes opengateway's vendor-prefixed Opus; kimi-k3 wins.
+//   unset-gpt-6-1-sol / unset-copilot-gpt-6-sol  GPT beside GLM: Daily · Normal's glm-5.3 max wins.
+//   unset-chatgpt-only-geeky-normal  no Daily lane resolves: Geeky · Normal's gpt-6.1-sol applies.
+//   retired-recommended  model_profile "recommended" (retired, #10029) starts Daily · Normal (glm-5.3 max).
 //   empty-registry   Daily · Normal against only mock-1: unavailable, session keeps mock-1.
 //   literal-pin      model_profile "anthropic/claude-opus-5": that model id is applied.
 //   unknown-profile / capable-removed / deep-work-removed / simple-work-removed
-//                    unknown-profile notice listing recommended and the four lane ids.
+//                    unknown-profile notice listing the four lane ids.
 //   custom-profile   user model_profiles.night-shift applies its chain.
 //   cli-model-wins   `--model` (provenance "cli") with an active lane: the CLI model survives.
 //   lane-beats-recommended-models  the session starts off senpi's recommended ladder (mock-1), the
@@ -272,7 +273,7 @@ function runScenario(name, scenario, args, senpiBin) {
       checks.notice_mentions_retry_chains = applied?.content.includes("retry chains") === true
     }
     if (name === "unset" || name === "unset-skips-gateway") {
-      checks.default_profile = profileNotices[0]?.details?.profile === "recommended"
+      checks.default_profile = profileNotices[0]?.details?.profile === "daily-normal"
     }
     if (name === "empty-registry") {
       checks.unavailable_names_registry = profileNotices[0]?.content.includes("model registry") === true

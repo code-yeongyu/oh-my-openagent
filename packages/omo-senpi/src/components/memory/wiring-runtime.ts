@@ -109,6 +109,7 @@ export function createMemoryRuntimeWiring(
       cwd: options.cwd(),
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
       resolveModelRegistry,
+      resolveSessionModel,
       env: options.env,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
@@ -180,7 +181,7 @@ export function createMemoryRuntimeWiring(
           lastEventCtx.current = eventCtx
           const result = await runtime.store.evaluate(conversationId, event)
           if (result?.status === "active") {
-            runtime.launch(result.run)
+            void runtime.launch(result.run)
             await hooks.onLaunch?.(identity.identity, result.run)
           }
           return result

@@ -24,7 +24,7 @@ export {
 export { toPortableBuildPath } from "./build-artifact.mjs"
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { scriptDir, outputPath, taskOutputPath, memberOutputPath, supervisorOutputPath, advisorRuntimeOutputPath, computerUseOutputPath, gatewayStoreWorkerOutputPath, threadSdkOutputPath } =
+  const { scriptDir, outputPath, taskOutputPath, memberOutputPath, supervisorOutputPath, advisorRuntimeOutputPath, sidePanelRuntimeOutputPath, computerUseOutputPath, gatewayStoreWorkerOutputPath, gatewayRulesExtensionOutputPath, threadSdkOutputPath } =
     extensionBuildPaths
   if (process.argv.includes("--check")) {
     runBuildCommand("node", [join(scriptDir, "build-daemon-launch-spec.mjs"), "--check"])
@@ -40,6 +40,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     console.log(`omo-senpi extension build is current: ${result.output}`)
   } else {
     await buildExtension()
-    console.log(`Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}, ${computerUseOutputPath}, ${gatewayStoreWorkerOutputPath}, ${threadSdkOutputPath}`)
+    console.log(`Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}, ${sidePanelRuntimeOutputPath}, ${computerUseOutputPath}, ${gatewayStoreWorkerOutputPath}, ${gatewayRulesExtensionOutputPath}, ${threadSdkOutputPath}`)
   }
 }

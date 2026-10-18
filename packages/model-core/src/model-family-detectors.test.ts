@@ -12,6 +12,7 @@ import {
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isGpt6AstraModel,
   isGrok45Model,
   isGrok46Model,
   isKimiK2CodeModel,
@@ -24,6 +25,52 @@ import {
 } from "./model-family-detectors"
 
 describe("model family detectors", () => {
+  test("#given supported Astra selectors #then the Astra-only prompt gate recognizes their model", () => {
+    for (const model of [
+      "gpt-6-astra",
+      "gpt-6-astra-fast",
+      "openai/gpt-6-astra",
+      "chatgpt-subscription/gpt-6-astra-fast",
+      "github-copilot/gpt-6-astra",
+      "opencode/gpt-6-astra",
+      "vercel/openai/gpt-6-astra-fast",
+      "openrouter/openai/gpt-6-astra",
+      " GPT-6-Astra ",
+      "gpt-6-astra:high",
+      "gpt-6-astra-fast:max",
+      "chatgpt-subscription/gpt-6-astra (high)",
+      "openai/gpt-6-astra-fast xhigh",
+      "vercel/openai/gpt-6-astra: auto",
+    ]) {
+      expect(isGpt6AstraModel(model)).toBe(true)
+    }
+  })
+
+  test("#given other or unknown selectors #then the Astra-only prompt gate stays closed", () => {
+    for (const model of [
+      undefined,
+      "",
+      "unknown",
+      "openai/gpt-6-sol",
+      "openai/gpt-6-sol-fast:high",
+      "chatgpt-subscription/gpt-6.1-sol",
+      "gpt-6.1-sol-fast (high)",
+      "gpt-6-luna",
+      "gpt-6-luna-fast",
+      "gpt-5.6-sol",
+      "anthropic/claude-fable-5",
+      "gpt-6-astra/claude-opus-5-5",
+      "custom-gpt-6-astra",
+      "gpt-6-astra-preview",
+      "gpt-6-astra-fastest",
+      "gpt-6-astra:unrecognized",
+      "gpt-6-astra (unrecognized)",
+      "gpt-6-astra unrelated",
+    ]) {
+      expect(isGpt6AstraModel(model)).toBe(false)
+    }
+  })
+
   test("#given GPT model ids #then detects GPT family only", () => {
     expect(isGptModel("openai/gpt-5.5")).toBe(true)
     expect(isGptModel("github-copilot/gpt-4o")).toBe(true)

@@ -361,7 +361,7 @@ describe("resolveReflectionModel", () => {
     // lanes with permission_denied), so the builtin chain's connected rungs must stay reachable.
     const pinned: SenpiModelPort = { provider: "devin", id: "swe-2-low" }
     const deepseek: SenpiModelPort = { provider: "deepseek", id: "deepseek-flash" }
-    const haiku: SenpiModelPort = { provider: "anthropic", id: "claude-haiku-4-5" }
+    const haiku: SenpiModelPort = { provider: "anthropic", id: "claude-haiku-5-5" }
     const userRung: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
     const connected = [pinned, deepseek, haiku, userRung]
     const liveRegistry = {
@@ -379,8 +379,8 @@ describe("resolveReflectionModel", () => {
       if (result.kind === "resolved") {
         expect(result.model).toBe("devin/swe-2-low")
         expect(result.fallbacks).toEqual([
+          { model: "anthropic/claude-haiku-5-5", thinking: "medium" },
           { model: "deepseek/deepseek-flash", thinking: "off" },
-          { model: "anthropic/claude-haiku-4-5", thinking: "off" },
         ])
       }
     })
@@ -397,8 +397,8 @@ describe("resolveReflectionModel", () => {
       // then
       expect(result.kind === "resolved" ? result.fallbacks.map((fallback) => fallback.model) : []).toEqual([
         "omo-mock/mock-1",
+        "anthropic/claude-haiku-5-5",
         "deepseek/deepseek-flash",
-        "anthropic/claude-haiku-4-5",
       ])
     })
   })

@@ -246,6 +246,8 @@ Defaults                   (Zod schema defaults)
 
 Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"`
 
+**Reserved in `~/.omo`:** `desktop/` and `desktop.init-*` belong to the OmO desktop app (its data home: a live SQLite database and worktrees; `OMO_DESKTOP_HOME` is the desktop's variable, code-yeongyu/omo-desktop-app#1829). No omo code may create, reset, archive, flatten, migrate, prune, copy or sync those entries; any code that walks `~/.omo` top-level entries must skip them. A project-scoped path (`<project>/.omo`) is the OmO home when the project directory is `$HOME`, so code that copies, migrates, syncs or walks a project's `.omo` must refuse that case (`legacy-workspace-migration.ts` does) (#9727).
+
 ## THREE-TIER MCP SYSTEM
 
 | Tier | Source | Loader | Mechanism |
@@ -291,7 +293,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 | `dispatchInternalPrompt()` | fn | `packages/utils/src/prompt-async-gate/` | - | ONLY sanctioned internal `session.prompt*` route |
 | `canonicalAgentDir()` | fn | `packages/omo-native/bin/lib/agent-dir.js` | - | Single canonical `~/.omo/agent` resolution |
 | `resolveAgentHome()` | fn | `packages/omo-senpi/src/components/agent-home/` | - | Adapter-side twin of `canonicalAgentDir()` |
-| `buildTaskExecute` | fn | `packages/senpi-task/src/tools/task/` | ~103 | `task` tool factory; batch cap 16 on schema AND execution |
+| `buildTaskExecute` | fn | `packages/senpi-task/src/tools/task/` | ~103 | `task` tool factory; uncapped batch, admission via `TaskConcurrency` |
 | `SCOPE_PRIORITY` | const | `packages/skills-loader-core/src/features/opencode-skill-loader/` | - | Numeric skill precedence across 7 discover* sources |
 | `consumeSoulNoticeDelta()` | fn | `packages/memory-core/src/soul/` | - | Soul-notice watermark consumption |
 
@@ -348,6 +350,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 - Never em dashes / en dashes / AI filler ("simply", "obviously", "clearly", "moreover", "furthermore") in generated content.
 - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`).
 - Never empty catch blocks `catch(e) {}`.
+- Never let code that copies, migrates, syncs or walks a project's `.omo` run when the project directory is `$HOME` (there `.omo` is the OmO home), and never touch `~/.omo/desktop*`, the desktop app's live data (#9727).
 - Never test with Arrange-Act-Assert comments — use given/when/then.
 - **Prompt/prose contract tests are forbidden.** Never assert authored agent prompt, `SKILL.md`, rule, `AGENTS.md`, or markdown-instruction wording, headings, section order, fragments, snapshots, negative past wording, or authored text length. Test only machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, or observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation. Pure prose has no automated-test seam; review and QA-by-read are the correct verification.
 - Never dump business logic into `index.ts` — barrel exports only.
@@ -398,6 +401,8 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 
 ## CI/CD
 
+Adding `ci:full-matrix` launches `ci-full-matrix-label.yml`, which calls `ci.yml` with the caller's pull-request payload. Its `full-matrix / <ci job>` checks are optional and do not gate merge. To run the full matrix in the required checks, keep the label and push a commit or reopen the PR. Normal CI ignores label events. The label job has separate concurrency behind its exact label gate, so bot labels cannot cancel either the active full-matrix job or required CI, or replace a required failure with skipped checks.
+
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `ci.yml` | push/PR to master/dev | `block-master-pr` guard, root `bun test` (fast-path matrix via `script/ci-fast-path.mjs`; full OS matrix on runtime-touching or platform-sensitive paths or the `ci:full-matrix` label; a leg that skipped its tests never reports a plain pass), typecheck, codex-compatibility (full `bun run test:codex` plus per-component `npm run check` on ubuntu; platform smoke on macos/windows), senpi-compatibility (bundle `--check` + `bun test packages/omo-senpi`), lazycodex-published-smoke, build, omo-ai-payload-check (npm dry-run payload), auto-commit schema on master push, draft "next" release on dev push |
@@ -408,7 +413,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 | `cla.yml` | issue_comment / PR | CLA assistant for contributors |
 | `lint-workflows.yml` | push/PR touching `.github/workflows/**` | actionlint only (`shellcheck=""` disables shellcheck) |
 | `web-ci.yml` | push/PR to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself | format-check, lint, type-check, next build, opennextjs-cloudflare build |
-| `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v3` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets) |
+| `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v4` to the Sisyphus Labs account (`omo-production` environment, `CLOUDFLARE_API_TOKEN` scoped to Workers scripts + omo.dev zone routes) |
 | `package-labels.yml` | issues opened/edited + pull_request_target | Auto-applies package labels (`opencode` / `lazycodex` / `lazycodex-generated`) |
 | `stats.yml` | weekly cron (Sun) / dispatch | Runs `script/stats.ts` (npm + GitHub-release download counts) |
 

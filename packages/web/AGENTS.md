@@ -68,12 +68,7 @@ bun run cf-typegen       # regenerate cloudflare-env.d.ts from wrangler.toml bin
 | `.github/workflows/web-ci.yml`     | push/PR to master/dev that touches `packages/web/**`             | format check, lint, type-check, next build, opennextjs-cloudflare build |
 | `.github/workflows/web-deploy.yml` | push to master that touches `packages/web/**` OR manual dispatch | full deploy via `cloudflare/wrangler-action@v3`                         |
 
-**Required secrets** (must be configured in repo settings before deploy works):
-
-- `CLOUDFLARE_API_TOKEN` — token with `Workers Scripts: Edit` permission
-- `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID
-
-A `web-production` GitHub environment is referenced by the deploy workflow so deploys can be gated behind required reviewers / wait timers if desired.
+**Account and secret:** the Worker runs on the Sisyphus Labs Cloudflare account (moved 2026-10-09); `wrangler.toml` pins the account id and names the omo.dev zone routes by `zone_id`. The deploy workflow uses the `omo-production` GitHub environment, whose `CLOUDFLARE_API_TOKEN` can edit Workers scripts and the omo.dev zone's routes and nothing else (sisyphuslabs/common-infra `docs/cutover-workers.md`).
 
 ## RELATIONSHIP TO npm PACKAGE
 

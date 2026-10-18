@@ -74,6 +74,7 @@ export type DeliveryRow = {
   readonly expires_at: number
   readonly binding_id: string | null
   readonly binding_revision: number | null
+  readonly actor_user_id: string | null
 }
 
 /**
@@ -190,6 +191,7 @@ export type GatewayDeliverySuccess = {
 export type GatewayDeliveryResult = GatewayDeliverySuccess | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 export type GatewayStoreEvent =
+  | { readonly kind: "extension_error"; readonly extension: string; readonly phase: "stale_transaction" | "after_commit" | "after_rollback" | "async"; readonly error: string }
   | { readonly kind: "busy"; readonly op: string }
   | { readonly kind: "lock_wait_exceeded"; readonly op: string; readonly waited_ms: number }
   | { readonly kind: "completions_emitted"; readonly session_durable_id: string; readonly cursors: readonly number[] }
@@ -197,6 +199,8 @@ export type GatewayStoreEvent =
   | { readonly kind: "barrier"; readonly op: string }
   | { readonly kind: "legacy_mailbox_invalid"; readonly directory: string; readonly error: string }
   | { readonly kind: "legacy_mailbox_skipped"; readonly directory: string; readonly items: readonly LegacyMailboxSkip[] }
+  /** The worker closed the database after a failed open (a migration that rolled back); it exits next. */
+  | { readonly kind: "store_closed" }
 
 /** A legacy mailbox item that can never be delivered (its target is not a durable session id); it is reported, not imported. */
 export type LegacyMailboxSkip = { readonly message_seq: number; readonly target: string; readonly reason: "invalid_target" }

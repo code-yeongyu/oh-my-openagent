@@ -7,6 +7,10 @@ import type { ContinueResult } from "./types"
 // buffered message is delivered as a follow-up prompt the moment the child starts.
 export function toContinueResult(outcome: SendOutcome): ContinueResult {
   switch (outcome.kind) {
+    case "uncertain":
+      return outcome
+    case "failed":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: `${outcome.reason}: ${outcome.detail}`, suggestion: outcome.action }
     case "steered":
       return { kind: "continued", task_id: outcome.task_id, status: outcome.status, delivered: outcome.delivered }
     case "revived":
@@ -24,6 +28,8 @@ export function toContinueResult(outcome: SendOutcome): ContinueResult {
       return { kind: "continued", task_id: outcome.task_id, status: "pending", delivered: "followUp" }
     case "not_continuable":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: outcome.suggestion }
+    case "stale":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: "Fetch the task's current run before sending." }
     case "one_shot_agent":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.message, suggestion: CONTINUE_SUGGESTION }
     case "scope_denied":

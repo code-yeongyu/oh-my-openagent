@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { isCliEntry } from "./entry-guard.mjs";
@@ -18,23 +19,54 @@ const upstreamPaths = [
 	"packages/shared-skills/upstreams/designpowers",
 ];
 
-function initSubmodules({ strict }) {
+function describePinnedSubmodules() {
+	const pins = new Map();
 	try {
-		execFileSync("git", ["submodule", "update", "--init", "--recursive", ...upstreamPaths], {
+		// The index is the source of the gitlinks used by submodule update, not a
+		// remote branch or the (possibly missing) submodule working directory.
+		const entries = execFileSync("git", ["ls-files", "--stage", "-z", "--", ...upstreamPaths], {
 			cwd: repoRoot,
-			stdio: "inherit",
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+			windowsHide: true,
 		});
-		return true;
-	} catch (error) {
-		const message = `[materialize-shared-upstreams] git submodule init failed: ${error instanceof Error ? error.message : String(error)}`;
-		if (strict) throw new Error(message);
-		process.stderr.write(`${message} - continuing without submodule refresh\n`);
-		return false;
+		for (const entry of entries.split("\0")) {
+			const match = /^160000 ([0-9a-f]{40,64}) 0\t(.+)$/.exec(entry);
+			if (match) pins.set(match[2], match[1]);
+		}
+	} catch {
+		// A diagnostic failure must not replace the original fetch error.
+	}
+	return upstreamPaths.map((path) => `${path}@${pins.get(path) ?? "unknown (pinned SHA unavailable)"}`).join(", ");
+}
+
+async function initSubmodules({ strict }) {
+	const maxAttempts = 3;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			execFileSync("git", ["submodule", "update", "--init", "--recursive", ...upstreamPaths], {
+				cwd: repoRoot,
+				stdio: "inherit",
+				windowsHide: true,
+			});
+			return true;
+		} catch (error) {
+			if (attempt < maxAttempts) {
+				const delayMs = 1000 * 2 ** (attempt - 1);
+				process.stderr.write(`[materialize-shared-upstreams] git submodule init failed (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms\n`);
+				await sleep(delayMs);
+				continue;
+			}
+			const message = `[materialize-shared-upstreams] git submodule init failed after ${maxAttempts} attempts: ${error instanceof Error ? error.message : String(error)}; pinned submodules: ${describePinnedSubmodules()}`;
+			if (strict) throw new Error(message, { cause: error });
+			process.stderr.write(`${message} - continuing without submodule refresh\n`);
+			return false;
+		}
 	}
 }
 
 export async function materializeSharedUpstreams({ strict }) {
-	initSubmodules({ strict });
+	await initSubmodules({ strict });
 	const { materializeFrontendRefs } = await import(pathToFileURL(materializeScript).href);
 	const result = await materializeFrontendRefs({ strict });
 	const { stageOmowrightRuntime } = await import(pathToFileURL(stageOmowrightScript).href);

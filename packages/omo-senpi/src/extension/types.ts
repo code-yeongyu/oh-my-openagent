@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@code-yeongyu/senpi"
+import type { EvalHandleHost, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import type { StartupWork } from "./startup-deferral"
@@ -19,6 +19,7 @@ export interface BeforeAgentStartHandlerOptions {
 }
 
 export interface SenpiExtensionAPI {
+  readonly sessionKind?: "interactive" | "worker"
   /**
    * Absolute cwd of the session this extension instance was loaded for. senpi builds one
    * ExtensionAPI per session and already knows the value at load time. Optional because hosts
@@ -56,6 +57,10 @@ export interface SenpiExtensionAPI {
     },
   ): void
   getFlag(name: string): boolean | string | undefined
+  /** The session's current name (`/name`, `set_session_name`); undefined when it has none. */
+  getSessionName?(): string | undefined
+  /** The permission preset senpi enforces for this session (senpi #3301); undefined without the permission system. */
+  getPermissionPreset?(): string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
@@ -68,9 +73,18 @@ export interface SenpiExtensionAPI {
   /** Feature-detected until the pinned Senpi runtime exports read classifiers. */
   registerReadClassifier?(classifier: ReadClassifier): () => void
   registerRemovedToolHint?(name: string, hint: string): void
+  /** Feature-detected: senpi runtimes before 2026.10.7 have no eval-handle capability slot. */
+  provideEvalHandleHost?(host: EvalHandleHost): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
-  appendEntry?(customType: string, data?: unknown): void
+  /** `options.startupBookkeeping` (senpi#3329): older hosts ignore the third argument. */
+  appendEntry?(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
+  exec?(
+    command: string,
+    args: string[],
+    options?: { cwd?: string; timeout?: number },
+  ): Promise<{ stdout: string; stderr: string; code: number }>
 }
 
 export interface ComponentLogger {

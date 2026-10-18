@@ -4,6 +4,7 @@ import {
   compileMemoryBlockAtRevision,
   type CompileMemoryBlockOptions,
 } from "./compile"
+import { DEFAULT_EXTERNAL_PROJECTION_LIMITS } from "./external-projection"
 
 export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 
@@ -38,7 +39,8 @@ export class MemoryBlockCache {
     pinnedRevision?: string | null,
   ): Promise<string> {
     const revision = pinnedRevision === undefined ? await repo.head() : pinnedRevision
-    const key = `${hashMemoryTemplate(template)}:${options.agentId}`
+    const limits = options.projection ?? DEFAULT_EXTERNAL_PROJECTION_LIMITS
+    const key = `${hashMemoryTemplate(template)}:${options.agentId}:${limits.maxEntriesPerDirectory}:${limits.maxBytes}`
     const variant = revision ?? "no-head"
     const existing = this.entries.get(key)
     if (existing?.variant === variant) return existing.pending

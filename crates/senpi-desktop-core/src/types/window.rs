@@ -1,7 +1,12 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::DisplaySelector;
+
 /// One capturable top-level window in global logical desktop coordinates.
+/// `is_on_screen` distinguishes an on-Space window from a same-app window on
+/// another Space: both resolve as capture targets, but only an on-screen one
+/// is user-visible right now.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopWindow {
@@ -22,6 +27,10 @@ pub struct DesktopWindow {
     pub height: u32,
     /// Whether the window currently holds input focus.
     pub focused: bool,
+    /// Whether the window is on the active Space. `None` on backends that
+    /// cannot tell (X11/Win32/Wayland report every listed window on screen).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_on_screen: Option<bool>,
     /// Whether the owning process runs above the engine's integrity level
     /// (Windows); `None` where the platform has no such notion.
     pub elevated: Option<bool>,
@@ -37,10 +46,12 @@ pub struct FrontWindow {
     pub key_window_ax_title: Option<String>,
 }
 
-/// Parsed input/capture target: the whole desktop or one window id.
+/// Parsed input/capture target: desktop, window id, or a display selector.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
     Desktop,
+    /// Canonical `display:<selector>` key, distinct from desktop/window frames.
+    Display(String),
     Window(String),
 }
 
@@ -48,6 +59,13 @@ impl Target {
     pub fn parse(value: &str) -> Self {
         if value.eq_ignore_ascii_case("desktop") {
             Self::Desktop
+        } else if let Some(selector) = value.strip_prefix("display:") {
+            let selector = match DisplaySelector::parse(Some(selector.to_owned())) {
+                DisplaySelector::Active => "active".to_owned(),
+                DisplaySelector::All => "all".to_owned(),
+                DisplaySelector::Id(id) => id,
+            };
+            Self::Display(format!("display:{selector}"))
         } else {
             Self::Window(value.to_string())
         }
@@ -56,7 +74,16 @@ impl Target {
     pub fn key(&self) -> &str {
         match self {
             Self::Desktop => "desktop",
-            Self::Window(id) => id,
+            Self::Window(id) | Self::Display(id) => id,
+        }
+    }
+
+    pub fn display_selector(&self) -> Option<DisplaySelector> {
+        match self {
+            Self::Display(key) => Some(DisplaySelector::parse(
+                key.strip_prefix("display:").map(str::to_owned),
+            )),
+            Self::Desktop | Self::Window(_) => None,
         }
     }
 }
@@ -75,4 +102,15 @@ pub struct PointerOptions {
 pub struct DesktopPoint {
     pub x: f64,
     pub y: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DesktopWindow;
+
+    #[test]
+    fn desktop_window_retains_the_eq_trait_contract() {
+        fn require_eq<T: Eq>() {}
+        require_eq::<DesktopWindow>();
+    }
 }

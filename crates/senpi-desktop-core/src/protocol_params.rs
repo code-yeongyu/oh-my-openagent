@@ -5,18 +5,44 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::RequestId;
-use crate::types::{AxQuery, AxSnapshotOptions, CaptureCaps, DesktopPoint, PointerOptions};
+pub use crate::protocol_holds::{HoldKeysParams, HoldMouseParams};
+use crate::types::{AxQuery, AxSnapshotOptions, CaptureCaps, CaptureRegion, DesktopPoint, PointerOptions};
 
 /// Parameters of a method that takes none: `{}`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct EmptyParams {}
 
 /// `capture`: one target (`desktop` or a window id) under optional caps.
+/// `excludeWindowTitles` applies to display captures only: every window with
+/// a matching title is left out of the screenshot (B9, macOS ScreenCaptureKit;
+/// empty elsewhere and ignored by older engines).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureParams {
     pub target: String,
     pub caps: Option<CaptureCaps>,
+    /// Titles of windows to exclude from a display capture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclude_window_titles: Option<Vec<String>>,
+}
+
+/// `observe`: an atomic window screenshot and accessibility snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserveParams {
+    pub target: String,
+    pub caps: Option<CaptureCaps>,
+    pub ax: Option<AxSnapshotOptions>,
+}
+
+/// `captureRegion`: native-detail zoom preserving the last full input frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureRegionParams {
+    pub target: String,
+    pub region: CaptureRegion,
+    pub caps: Option<CaptureCaps>,
+    pub frame_id: Option<String>,
 }
 
 /// `click` / `moveMouse`: a point in the pixels of the target's latest frame.
@@ -75,6 +101,38 @@ pub struct KeyChordParams {
 #[serde(rename_all = "camelCase")]
 pub struct RaiseWindowParams {
     pub window_id: String,
+}
+
+/// `control.grant`: `confirmationId` is the host's receipt of the human
+/// confirmation it showed; the engine never sees the confirm itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlGrantParams {
+    pub reason: String,
+    pub confirmation_id: String,
+}
+
+/// `menus.items`: the window whose menu is addressed and the path inside it
+/// (empty lists the menu bar). `menus.select` takes [`MenuSelectParams`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuPathParams {
+    pub window_id: String,
+    #[serde(default)]
+    pub path: Vec<String>,
+}
+
+/// `menus.select`: the window, the 1..=32-label path to a command, and the
+/// delivery. An omitted delivery is background; `foreground` raises and keys
+/// the target window and needs this session's live control grant (#9888).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuSelectParams {
+    pub window_id: String,
+    #[serde(default)]
+    pub path: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_mode: Option<String>,
 }
 
 /// `clipboard.write` params and `clipboard.read` result.

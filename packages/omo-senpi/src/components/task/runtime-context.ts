@@ -56,6 +56,7 @@ function asParentServiceTier(value: unknown): ParentServiceTier | undefined {
 export class TaskRuntimeContext {
   #cwd: string
   #modelRegistry: ChildModelRegistry | undefined
+  #modelContext: Pick<LiveTaskContext, "model"> | undefined
   #loadedExtensionPaths: readonly string[] = []
   #parentServiceTier: ParentServiceTier | undefined
   #idle = true
@@ -71,6 +72,7 @@ export class TaskRuntimeContext {
   }
 
   captureFrom(ctx: LiveTaskContext): void {
+    this.#modelContext = ctx
     if (typeof ctx.cwd === "string" && ctx.cwd.length > 0) this.#cwd = ctx.cwd
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
     if (ctx.loadedExtensionPaths !== undefined) this.#loadedExtensionPaths = ctx.loadedExtensionPaths
@@ -101,6 +103,14 @@ export class TaskRuntimeContext {
 
   modelRegistry(): ChildModelRegistry | undefined {
     return this.#modelRegistry
+  }
+
+  // Retain the host context's live getter: fallback can replace its model before a queued wake lands.
+  parentModel(): string | undefined {
+    const model = this.#modelContext?.model
+    if (typeof model === "string") return model
+    if (typeof model !== "object" || model === null || !("id" in model)) return undefined
+    return typeof model.id === "string" ? model.id : undefined
   }
 
   loadedExtensionPaths(): readonly string[] {

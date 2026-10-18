@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { IMAGE, runPythonFacade, WINDOW_SNAPSHOT } from "./harness";
 
 describe("Python computer facade", () => {
+	it("sends display screenshot through the display-hopped chain", () => {
+		// Given
+		const responders = { display: JSON.stringify({ text: "", details: { value: { id: "active" } } }) };
+		// When
+		const run = runPythonFacade("computer.display('active').screenshot(silent=True)", responders);
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "display", args: ["active"] }] },
+			{ action: "call", chain: [{ method: "display", args: ["active"] }, { method: "screenshot", args: [{ silent: true }] }] },
+		]);
+	});
+
 	it("turns keyword arguments into one trailing options object", () => {
 		// When
 		const run = runPythonFacade(
@@ -59,6 +72,24 @@ describe("Python computer facade", () => {
 		expect(run.error).toBe("RuntimeError: PermissionDenied: computer:exec is denied");
 	});
 
+	it("raises RuntimeError with the COMPUTER_PERMISSION_REQUIRED text when a permission denial comes back as an error", () => {
+		// Given — the shape a code-mode marshal produces for the denial at omo #9475
+		const text =
+			"COMPUTER_PERMISSION_REQUIRED: screen recording is not granted. Do not retry until the user says the grant is done and the app was relaunched.";
+		const denial = JSON.stringify({
+			text,
+			details: { value: { code: "COMPUTER_PERMISSION_REQUIRED" }, isError: true },
+			hasError: true,
+			images: [],
+		});
+
+		// When
+		const run = runPythonFacade("computer.screenshot()", { screenshot: denial });
+
+		// Then
+		expect(run.error).toBe(`RuntimeError: ${text}`);
+	});
+
 	it("exposes the resolved window's identity fields on the handle", () => {
 		// When
 		const run = runPythonFacade(
@@ -86,5 +117,66 @@ describe("Python computer facade", () => {
 			error: "TypeError: computer.run() expects a JavaScript code string",
 			calls: [],
 		});
+	});
+
+	it("forwards a win.menu.select delivery keyword as an options argument (#9888)", () => {
+		// When
+		const run = runPythonFacade("win = computer.window(app='Code')\nwin.menu.select(['File', 'Save'], delivery='foreground')");
+
+		// Then
+		expect(run.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "window", args: ["w1"] },
+				{ method: "menu.select", args: [["File", "Save"], { delivery: "foreground" }] },
+			],
+		});
+	});
+
+	it("sends menu.items and menu.select as window-hopped chains with the path forwarded", () => {
+		// When
+		const run = runPythonFacade(
+			"win = computer.window(app='Code')\nwin.menu.items()\nwin.menu.items(['File'])\nwin.menu.select(['File', 'Export…', 'PDF'])",
+		);
+
+		// Then
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "window", args: [{ app: "Code" }] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.items", args: [["File"]] },
+				],
+			},
+			{
+				action: "call",
+				chain: [
+					{ method: "window", args: ["w1"] },
+					{ method: "menu.select", args: [["File", "Export…", "PDF"]] },
+				],
+			},
+		]);
+	});
+
+	it("sends control helpers as one-step call chains (#9651 B5b)", () => {
+		// When
+		const run = runPythonFacade(
+			"computer.control.acquire(reason='click Run')\nout = computer.control.state()\ncomputer.control.release()",
+		);
+
+		// Then
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "control.acquire", args: [{ reason: "click Run" }] }] },
+			{ action: "call", chain: [{ method: "control.state", args: [] }] },
+			{ action: "call", chain: [{ method: "control.release", args: [] }] },
+		]);
 	});
 });

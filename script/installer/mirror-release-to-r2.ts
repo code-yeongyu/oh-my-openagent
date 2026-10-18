@@ -5,7 +5,7 @@
 // channel pointer -> prune old betas. Any failure stops before the pointer moves, so installs keep using
 // the previous version (the release itself is untouched). --dry-run does the same under a scratch prefix,
 // never touches a channel or prunes, and deletes the scratch prefix before exiting.
-import { mkdtemp, rm } from "node:fs/promises"
+import { appendFile, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parseArgs } from "node:util"
@@ -157,6 +157,9 @@ async function main(): Promise<void> {
         await live.write(pointerKey, `${version}\n`, "text/plain")
         log(`moved ${pointerKey}: ${current ?? "(unset)"} -> ${version}`)
       } else log(`kept ${pointerKey} at ${current}; ${version} is older`)
+      // What get.omo.dev must serve for this channel after the run, read back from the bucket (moved or kept).
+      const pointer = dryRun ? "" : ((await live.readText(pointerKey))?.trim() ?? "")
+      if (process.env.GITHUB_OUTPUT && pointer) await appendFile(process.env.GITHUB_OUTPUT, `pointer=${pointer}\n`)
     }
 
     if (!dryRun) {

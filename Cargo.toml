@@ -10,6 +10,7 @@ members = [
     "crates/senpi-desktop-backend-wayland",
     "crates/senpi-desktop-backend-win32",
     "crates/senpi-desktop-engine",
+    "crates/senpi-desktop-xpc",
 ]
 resolver = "2"
 
@@ -38,6 +39,11 @@ objc2-core-graphics = "=0.3.2"
 objc2-foundation = "=0.3.2"
 objc2-application-services = { version = "=0.3.2", default-features = true }
 objc2-core-foundation = "=0.3.2"
+objc2-screen-capture-kit = { version = "=0.3.2", default-features = false, features = [
+    "std", "SCShareableContent", "SCStream", "SCScreenshotManager",
+    "block2", "objc2-core-foundation", "objc2-core-graphics", "libc",
+] }
+block2 = "=0.6.2"
 foreign-types = "=0.5.0"
 arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"] }
 tempfile = "=3.27.0"

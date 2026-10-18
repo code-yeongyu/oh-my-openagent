@@ -1,10 +1,11 @@
 import type { ChildProcess } from "node:child_process"
 import type { AgentSessionEvent, RpcCommand, RpcExtensionUIRequest, RpcResponse } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
+import { TEARDOWN_STEP_BUDGET_MS } from "../../lifecycle/teardown-budget"
 
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { createChildExtensionEvents } from "../child-extension-events"
-import { RpcCommandError } from "./errors"
+import { RpcCommandError, RpcRequestTimeout } from "./errors"
 import { tailStderr } from "./exit-mapping"
 import { buildAutoUiResponse } from "./ui-auto-answer"
 
@@ -21,6 +22,7 @@ export type RpcProtocolClientOptions = {
 type PendingRequest = {
   readonly resolve: (response: RpcResponse) => void
   readonly reject: (error: Error) => void
+  readonly received: () => void
 }
 
 /**
@@ -68,20 +70,40 @@ export class RpcProtocolClient {
     return this.stderrBuffer.length
   }
 
-  send(command: RpcCommand): Promise<RpcResponse> {
+  send(command: RpcCommand, options: { readonly deadlineMs?: number } = {}): Promise<RpcResponse> {
     const stdin = this.child.stdin
     if (this.isExited || stdin === null || stdin === undefined || stdin.writableEnded || stdin.destroyed) {
       return Promise.reject(new Error(`RPC process is not running. Stderr: ${this.stderrTail}`))
     }
     const id = command.id ?? `senpi-task_${++this.nextRequestId}`
     return new Promise<RpcResponse>((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
+      const isInput = command.type === "prompt" || command.type === "steer" || command.type === "follow_up"
+      let received = false
+      let timer: ReturnType<typeof setTimeout>
+      const arm = (ms: number): void => {
+        timer = setTimeout(() => {
+          this.pending.delete(id)
+          reject(new RpcRequestTimeout(command.type, ms))
+        }, ms)
+      }
+      arm(options.deadlineMs ?? (command.type === "get_state" ? 10_000 : command.type === "abort" ? TEARDOWN_STEP_BUDGET_MS : 30_000))
+      const pending: PendingRequest = {
+        resolve: (response) => { clearTimeout(timer); resolve(response) },
+        reject: (error) => { clearTimeout(timer); reject(error) },
+        received: () => {
+          if (!isInput || received) return
+          received = true
+          clearTimeout(timer)
+          arm(5 * 60_000)
+        },
+      }
+      this.pending.set(id, pending)
       stdin.write(`${JSON.stringify({ ...command, id })}\n`, (error) => {
         if (!error) {
           return
         }
         this.pending.delete(id)
-        reject(error)
+        pending.reject(error)
       })
     })
   }
@@ -114,6 +136,10 @@ export class RpcProtocolClient {
   }
 
   detach(): void {
+    for (const [id, pending] of this.pending) {
+      this.pending.delete(id)
+      pending.reject(new Error("RPC client detached"))
+    }
     this.extensionEvents.clear()
     this.eventListeners.clear()
     this.exitListeners.clear()
@@ -153,15 +179,19 @@ export class RpcProtocolClient {
   }
 
   private handleLine(line: string): void {
-    let parsed: { type?: string; id?: string }
+    let parsed: { type?: string; id?: string; for_request?: string }
     try {
-      parsed = JSON.parse(line) as { type?: string; id?: string }
+      parsed = JSON.parse(line) as typeof parsed
     } catch (error) {
       this.onMalformedLine(line, error)
       return
     }
     if (parsed.type === "response") {
       this.resolveResponse(parsed as RpcResponse)
+      return
+    }
+    if (parsed.type === "queued" && typeof parsed.for_request === "string") {
+      this.pending.get(parsed.for_request)?.received()
       return
     }
     if (parsed.type === "extension_ui_request") {

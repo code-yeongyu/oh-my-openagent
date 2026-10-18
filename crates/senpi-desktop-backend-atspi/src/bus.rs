@@ -54,6 +54,10 @@ pub trait AtSpiBus {
 
     fn actions(&mut self, node: &Self::Node) -> BusResult<Vec<String>>;
     fn do_action(&mut self, node: &Self::Node, index: i32) -> BusResult<bool>;
+    /// The key binding the Action interface declares for action `index`.
+    fn key_binding(&mut self, node: &Self::Node, index: i32) -> BusResult<String>;
+    /// Whether both objects are served by the same application connection.
+    fn same_application(&self, a: &Self::Node, b: &Self::Node) -> bool;
 
     /// The first `max_chars` characters of the Text interface.
     fn text(&mut self, node: &Self::Node, max_chars: i32) -> BusResult<String>;

@@ -251,7 +251,7 @@ describe("#given idempotency of prefixGitCommandsInBashCodeBlocks", () => {
 describe("#given git attribution policy suppression", () => {
 	it("#then suppresses commit footer and co-author when NO_AI_ATTRIBUTION is set", () => {
 		const result = withUnixShell(() =>
-			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, {
+			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, undefined, {
 				env: { NO_AI_ATTRIBUTION: "1" },
 				gitConfigReader: () => undefined,
 			}),
@@ -264,7 +264,7 @@ describe("#given git attribution policy suppression", () => {
 
 	it("#then suppresses attribution when git config omo.attribution is false", () => {
 		const result = withUnixShell(() =>
-			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, {
+			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, undefined, {
 				env: {},
 				gitConfigReader: (key) => (key === "omo.attribution" ? "false" : undefined),
 			}),
@@ -277,7 +277,7 @@ describe("#given git attribution policy suppression", () => {
 
 	it("#then suppresses attribution when git config sisyphus.attribution is false", () => {
 		const result = withUnixShell(() =>
-			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, {
+			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, undefined, {
 				env: {},
 				gitConfigReader: (key) => (key === "sisyphus.attribution" ? "false" : undefined),
 			}),
@@ -293,6 +293,7 @@ describe("#given git attribution policy suppression", () => {
 			injectGitMasterConfig(
 				SAMPLE_TEMPLATE,
 				{ commit_footer: "Custom Project Footer" },
+				undefined,
 				{
 					env: { NO_AI_ATTRIBUTION: "1" },
 					gitConfigReader: () => undefined,
@@ -309,6 +310,7 @@ describe("#given git attribution policy suppression", () => {
 			injectGitMasterConfig(
 				SAMPLE_TEMPLATE,
 				{ commit_footer: false, include_co_authored_by: false },
+				undefined,
 				{
 					env: { OMO_GIT_ATTRIBUTION: "1" },
 					gitConfigReader: () => undefined,

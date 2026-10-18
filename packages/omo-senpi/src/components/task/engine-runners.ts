@@ -201,7 +201,10 @@ export function buildRespawnRunner(
  */
 export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunner | RpcProcessRunner {
   const inheritedExtensions = parseExtensionEntries(process.argv)
-  const perChild = new RpcProcessRunner({ inheritedExtensions })
+  const perChild = new RpcProcessRunner({
+    inheritedExtensions,
+    ...(build.onHostWarning === undefined ? {} : { onWarning: build.onHostWarning }),
+  })
   const platform = build.platform ?? process.platform
   if (build.settings.process_runner !== "host" || platform === "win32") return perChild
   const routing = build.hostRouting

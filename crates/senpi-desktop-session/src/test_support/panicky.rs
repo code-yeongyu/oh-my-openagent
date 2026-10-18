@@ -11,6 +11,7 @@ use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, PermissionDeniedData, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
@@ -54,8 +55,8 @@ impl Backend for PanickyFake {
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         self.inner.windows()
     }
-    fn capture(&mut self, target: &Target, caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
-        self.inner.capture(target, caps)
+    fn capture(&mut self, target: &Target, caps: &CaptureCaps, exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
+        self.inner.capture(target, caps, exclude_window_titles)
     }
     fn pointer(
         &mut self,
@@ -90,6 +91,30 @@ impl Backend for PanickyFake {
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         self.inner.raise_window(id)
+    }
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.inner.hold_keys(target, keys, mode, control)
+    }
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.inner.hold_mouse(target, hold, mode, control)
+    }
+    fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+        self.inner.menu_items(window, path)
+    }
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        delivery: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        self.inner.menu_select(window, path, delivery, check_stop)
     }
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
         self.inner.ax()

@@ -34,8 +34,48 @@ function fixture() {
 }
 
 describe("omo daemon rollback preparation", () => {
+  test("#given migration warnings #when rollback prepares #then JSON and stderr both report the affected tasks", () => {
+    const { pluginRoot, agentDir, storeA } = fixture()
+    const warning = {
+      code: "strict_closure_not_retried",
+      task_ids: ["st_00000081"],
+      message: "Old daemon session may still be running and will no longer be retried for close by the older binary.",
+    }
+    const migration = {
+      run(request: Record<string, unknown>) {
+        return {
+          store_dir: request.storeDir,
+          migrate: 0,
+          migrated: 0,
+          skipped: 1,
+          sockets: [],
+          ...(request.storeDir === storeA ? { warnings: [warning] } : {}),
+        }
+      },
+    }
+    const engine = scriptedEngine(() => ({ exitCode: 3, stdout: "" }))
+    const stdout = capture()
+    const stderr = capture()
+    expect(
+      runDaemonCommand(["rollback-prepare", "--json"], {
+        engine,
+        migration,
+        pluginRoot,
+        agentDir,
+        env: {},
+        stdout,
+        stderr,
+        platform: "darwin",
+      }),
+    ).toBe(0)
+    expect(
+      JSON.parse(stdout.text()).stores.find((entry: { store_dir: string }) => entry.store_dir === storeA).warnings,
+    ).toEqual([warning])
+    expect(stderr.text()).toContain(warning.task_ids[0] ?? "")
+    expect(stderr.text()).toContain(warning.message)
+  })
   test("#given complete index coverage and dead endpoints #when rollback prepares #then every store migrates", () => {
-    const { pluginRoot, agentDir, storeA, storeB, socketA, socketB } = fixture()
+    const { pluginRoot, agentDir, storeA, socketA, socketB } = fixture()
     const requests: Record<string, unknown>[] = []
     const migration = {
       run(request: Record<string, unknown>) {
@@ -70,7 +110,7 @@ describe("omo daemon rollback preparation", () => {
   })
 
   test("#given one live endpoint #when rollback prepares #then no migration write runs", () => {
-    const { pluginRoot, agentDir, storeA, socketA } = fixture()
+    const { pluginRoot, agentDir, socketA } = fixture()
     const writes: Record<string, unknown>[] = []
     const migration = {
       run(request: Record<string, unknown>) {

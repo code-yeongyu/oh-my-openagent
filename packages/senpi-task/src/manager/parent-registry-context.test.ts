@@ -96,15 +96,12 @@ describe("findModelReference", () => {
 })
 
 describe("createParentRegistrySessionContext", () => {
-  test("#given no parent registry yet #when the context is built #then it stays empty so senpi keeps its default resolution", () => {
+  test("#given no parent registry yet but a spec carrying a model #when the context is built #then it fails closed as model_unavailable instead of riding the settings default", () => {
     // given
     const provide = createParentRegistrySessionContext(() => undefined)
 
-    // when
-    const context = provide(baseSpec({ model: "omo-mock/mock-1" }))
-
-    // then
-    expect(context).toEqual({})
+    // when / then
+    expect(() => provide(baseSpec({ model: "omo-mock/mock-1" }))).toThrow(/model_unavailable|omo-mock\/mock-1/)
   })
 
   test("#given the parent did not trust its project #when a child starts or resumes #then the child is told the project is untrusted", () => {
@@ -188,17 +185,26 @@ describe("createParentRegistrySessionContext", () => {
     expect(context.thinkingLevel).toBeUndefined()
   })
 
-  test("#given a model reference absent from the parent registry #when the context is built #then registry is still threaded but no Model is set", () => {
+  test("#given a legacy record whose model id still carries a thinking suffix #when the context is built #then it resolves the canonical base and maps the suffix to the thinking level", () => {
     // given
     const registry = registryWithMockProvider()
     const provide = createParentRegistrySessionContext(() => registry)
 
     // when
-    const context = provide(baseSpec({ model: "omo-mock/does-not-exist" }))
+    const context = provide(baseSpec({ model: "omo-mock/mock-1:xhigh" }))
 
     // then
-    expect(context.modelRegistry).toBe(registry)
-    expect(context.model).toBeUndefined()
+    expect(context.model?.id).toBe("mock-1")
+    expect(context.thinkingLevel).toBe("xhigh")
+  })
+
+  test("#given a model reference absent from the parent registry #when the context is built #then it fails closed as model_unavailable instead of threading no Model", () => {
+    // given
+    const registry = registryWithMockProvider()
+    const provide = createParentRegistrySessionContext(() => registry)
+
+    // when / then
+    expect(() => provide(baseSpec({ model: "omo-mock/does-not-exist" }))).toThrow(/model_unavailable|does-not-exist/)
   })
 })
 

@@ -17,12 +17,14 @@ import type { IdleReclaimerScheduler, LifecycleDeps, LifecycleReattachPorts, Pro
 import type { BatchAdmissionOptions } from "./residency"
 
 import { defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
+import { defaultTeardownStepDeadline, type TeardownStepDeadline } from "./teardown-budget"
 export { createIdleReclaimerScheduler, defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
 
 const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
 const DEFAULT_HOST_CLOSE_TIMEOUT_MS = 10_000
 
 export type LifecycleContext = {
+  readonly deferUnresumable?: boolean
   readonly revivePolicy?: LifecycleDeps["revivePolicy"]
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
@@ -35,6 +37,11 @@ export type LifecycleContext = {
   readonly reattachPorts: LifecycleReattachPorts | undefined
   readonly reconcileAdmission: BatchAdmissionOptions
   readonly idleReclaimerScheduler: IdleReclaimerScheduler
+  readonly hostCloseScheduler: IdleReclaimerScheduler
+  readonly teardownStepDeadline: TeardownStepDeadline
+  // Task ids whose teardown threw in this process: their session may still be live here, so a
+  // handle-less park must never treat them as gone (a failed dispose is not a successful park).
+  readonly failedTeardowns: Set<string>
   // Runtime-only parent kernel-tool map (item 6). Deliberate destruction and record expunge release
   // a child's binding here; idle parking deliberately does NOT.
   readonly kernelToolBindings: KernelToolBindingRegistry | undefined
@@ -84,6 +91,9 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     reattachPorts: injectedLifecycleReattachPorts(deps),
     reconcileAdmission: deps.reconcileAdmission ?? {},
     idleReclaimerScheduler: deps.idleReclaimerScheduler ?? defaultIdleReclaimerScheduler,
+    hostCloseScheduler: deps.hostCloseScheduler ?? defaultIdleReclaimerScheduler,
+    teardownStepDeadline: deps.teardownStepDeadline ?? defaultTeardownStepDeadline,
+    failedTeardowns: new Set(),
     kernelToolBindings: deps.kernelToolBindings,
     hostSessionProbe: deps.hostSessionProbe ?? defaultHostSessionProbe(),
     hostSessionClose: deps.hostSessionClose ?? defaultHostSessionCloser,

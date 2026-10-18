@@ -16,6 +16,24 @@ Finds the `senpi-desktop-engine` binary (`crates/senpi-desktop-engine`) for this
 
 ## Prebuilds
 
+Darwin releases embed `senpi-desktop-capture-helper` inside the engine; there is
+no separate helper asset or checksum entry. `publish-platform.yml` compiles it
+for each Darwin architecture with the macOS backend's clang flags, then signs
+and notarizes it as `ai.sisyphuslabs.senpi-desktop-capture-helper` using the
+engine's existing Developer ID credentials. Missing signing material fails the
+leg. The job exports its directory as `SENPI_DESKTOP_CAPTURE_HELPER_SIGNED`
+before building the engine, so `build.rs` embeds the signed bytes rather than
+the ad-hoc development build. The engine is subsequently signed and notarized
+as usual; its shipped checksum covers the embedded helper too.
+
+The runtime writes the embedded bytes unchanged into a private temporary
+directory and marks the helper executable, preserving its Mach-O signature.
+Signed-release live proof is still required: verify the staged helper's
+signature and Team ID, confirm exactly one engine Screen Recording prompt
+(TCC attribution is not established by embedding or a shared Team ID), and
+capture on macOS 14+ with `legacyCapture: false` and `isOnScreen` present.
+Also verify the existing macOS < 14 and unavailable-helper legacy fallbacks.
+
 Only the host prebuild is committed, as `packages/pty` does. `bun run check:prebuild` rebuilds it with `cargo build --release -p senpi-desktop-engine --locked` and `--remap-path-prefix`, then byte-compares the rebuilt binary against the committed one. Pass `-- --update` to re-vendor it. `node scripts/build-desktop-engine-local.mjs` builds the dev candidate into `target/release/`.
 
 ## Import direction

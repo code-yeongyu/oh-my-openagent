@@ -16,7 +16,7 @@ Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex 
 
 The Codex-only `lcx-report-bug`, `lcx-contribute-bug-fix`, and `lcx-doctor` skills live under `packages/omo-codex/plugin/components/lcx/skills/`; they are no longer authored in this package.
 
-Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (3 skills carry the Codex agent role declaration). `ulw-research/scripts/` is a zero-dependency Node CLI (`report-tools.mjs`) for the deliverable phase, documented in `skills/ulw-research/AGENTS.md`; the senpi native `ulw-research` skill has no copy of it and receives `scripts/` plus `references/report-gates.md` and `references/deliverable-phase.md` byte-for-byte at senpi sync time.
+Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (3 skills carry the Codex agent role declaration). `ulw-research/scripts/` is a zero-dependency Node CLI (`report-tools.mjs`) for the deliverable phase, documented in `skills/ulw-research/AGENTS.md`; the senpi native `ulw-research` skill has no copy of it and receives `scripts/` plus `references/report-gates.md`, `references/deliverable-phase.md`, and `references/report-visualization.md` byte-for-byte at senpi sync time.
 
 ## PIPELINE
 

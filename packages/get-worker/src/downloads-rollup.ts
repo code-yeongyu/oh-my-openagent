@@ -73,6 +73,19 @@ export async function storeRollup(db: D1Database, rows: readonly RollupRow[]): P
   return rows.length
 }
 
+/**
+ * Rows on or after ROLLUP_FIRST_DAY only. A day that started on another Cloudflare account (the 2026-10-09 move) is in
+ * D1 from that account's rollup plus a one-time backfill; this account's Analytics Engine has only part of it, and an
+ * upsert would replace the whole day with that part on every hourly run until it leaves the 7-day window.
+ */
+export function rowsFrom(rows: readonly RollupRow[], firstDay: string | undefined): RollupRow[] {
+  if (firstDay === undefined || firstDay === "") return [...rows]
+  if (!DAY.test(firstDay)) throw new RollupError(`ROLLUP_FIRST_DAY is not YYYY-MM-DD: ${firstDay}`)
+  return rows.filter((row) => row.day >= firstDay)
+}
+
 export async function runDownloadsRollup(env: Env, fetcher: typeof fetch = fetch): Promise<number> {
-  return storeRollup(env.DB, await queryAnalytics(env, fetcher))
+  // Checked before the query, so a malformed floor never reaches Analytics Engine or D1.
+  rowsFrom([], env.ROLLUP_FIRST_DAY)
+  return storeRollup(env.DB, rowsFrom(await queryAnalytics(env, fetcher), env.ROLLUP_FIRST_DAY))
 }

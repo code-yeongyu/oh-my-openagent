@@ -128,4 +128,20 @@ describe("/search", () => {
     expect(text).toContain("no senpi sessions directory")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
   })
+
+  test("#given a transcript carrying an aws key #when searched #then the rendered snippet masks the key", async () => {
+    // given
+    const { sessionsDir, pi } = await setup()
+    await writeSession(sessionsDir, "sess-secret", "sess-secret", [
+      { id: "msg-s1", role: "user", text: "my key is AKIAABCDEFGHIJKLMNOP please store it", timestamp: "2026-08-04T10:00:00.000Z" },
+    ])
+    const ctx = fakeCommandContext()
+
+    // when
+    const text = await invoke(pi, "search", "AKIAABCDEFGHIJKLMNOP", ctx)
+
+    // then
+    expect(text).not.toContain("AKIAABCDEFGHIJKLMNOP")
+    expect(text).toContain("***")
+  })
 })

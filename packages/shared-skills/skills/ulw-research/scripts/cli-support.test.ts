@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -8,7 +8,9 @@ import { CliError, exitCodeFor, parseArgs, readJsonFile, writeJsonAtomic } from 
 import { isCliEntry } from "./entry-guard.mjs"
 
 function tempDir() {
-	return mkdtempSync(join(tmpdir(), "report-tools-"))
+	const dir = mkdtempSync(join(tmpdir(), "report-tools-"))
+	onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
+	return dir
 }
 
 describe("parseArgs", () => {

@@ -9,6 +9,7 @@ import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
+import { wireDagVerificationContext } from "./dag-verification-context"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -32,6 +33,9 @@ type EventBridgeDeps = {
 // re-observe owned-member liveness, reclaim mailbox reservations, redeliver unnotified completions,
 // await TTL cleanup (its retention predicate keeps anything with an undelivered notification, so
 // cleanup cannot delete what the previous step just queued), then poll owned leads and sync status.
+
+// Below senpi's per-handler session_shutdown budget, leaving room for the suspension that follows.
+const SHUTDOWN_LAUNCH_SETTLE_MS = 5_000
 export function wireEventBridge(
   pi: SenpiExtensionAPI,
   ctx: ComponentContext,
@@ -42,6 +46,7 @@ export function wireEventBridge(
   deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  wireDagVerificationContext(pi, engine.runtime)
   const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
@@ -104,14 +109,18 @@ export function wireEventBridge(
   })
 
   pi.on("session_shutdown", async (payload, eventCtx) => {
+    const liveContext = asLiveContext(eventCtx)
     unsubscribeTaskSnapshots()
     taskRpc.dispose()
-    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    engine.runtime.captureFrom(liveContext)
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()
     statusUi.dispose()
     state.leadPollers.shutdown()
     await state.resumptionChannels.emitShutdown()
+    // A first launch still being admitted gets a bounded chance to land, so suspension parks it like
+    // any resident child; one still unadmitted is parked to relaunch on resume and never outlives the session (#10042).
+    await engine.manager.settleLaunchesForShutdown?.(SHUTDOWN_LAUNCH_SETTLE_MS)
     const shutdownEvent = payload as SessionShutdownEvent
     const parentSessionId = engine.runtime.sessionId()
     const reason = shutdownEvent.reason
@@ -132,7 +141,22 @@ export function wireEventBridge(
       }))
       : new Set([parentSessionId])
     for (const sessionId of parentSessionIds) {
-      await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
+      const continuing = reason === "new" || reason === "quit"
+        ? engine.manager.list({ scope: "parent-session", session_id: sessionId })
+          .filter(({ record }) => record.killed !== true && (
+            (record.status === "running" && record.runner_kind === "host-session") ||
+            (record.status === "pending" && record.execution_mode === "process" &&
+              engine.settings.process_runner !== "child-process" && engine.settings.resume_children !== false)
+          ))
+        : []
+      const summary = await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
+      const count = continuing.filter(({ record }) =>
+        !summary.failures.some((failure) => failure.task_id === record.task_id)).length
+      if (count > 0) {
+        const notice = `${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`
+        if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
+        else liveContext.ui?.notify(notice, "info")
+      }
     }
   })
 

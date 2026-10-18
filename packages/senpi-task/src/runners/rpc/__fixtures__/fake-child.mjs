@@ -4,8 +4,16 @@
 //   FAKE_IGNORE_TERM=1   install a SIGTERM handler that ignores it (proves SIGKILL escalation)
 //   FAKE_EMIT_UI=1       emit an extension_ui_request confirm at startup
 //   FAKE_EMIT_MALFORMED=1 emit one malformed line then a valid event at startup
+//   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities
+//   FAKE_COMMAND_LOG=path append every received command as one JSON line
+//   FAKE_RETRY_FALLBACK=refuse|hang|exit answer set_retry_fallback with an error, never answer it, or exit on it
+//   FAKE_PROTOCOL_INFO=after-prompt hold the get_protocol_info answer until a prompt arrives (a probe answered late)
+import { appendFileSync } from "node:fs"
 import { createInterface } from "node:readline"
 import { kill } from "node:process"
+
+let promptSeen = false
+let heldProtocolInfo
 
 function emit(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`)
@@ -119,6 +127,22 @@ function handleCommand(cmd) {
       respond("abort", cmd.id)
       emit({ type: "agent_end", willRetry: false, messages: [] })
       return emit({ type: "agent_idle" })
+    case "get_protocol_info":
+      if (process.env.FAKE_PROTOCOL_INFO === "after-prompt" && !promptSeen) {
+        heldProtocolInfo = cmd
+        return
+      }
+      return respond("get_protocol_info", cmd.id, {
+        data: {
+          protocolVersion: 1,
+          capabilities: (process.env.FAKE_CAPABILITIES ?? "").split(",").filter((entry) => entry.length > 0),
+        },
+      })
+    case "set_retry_fallback":
+      if (process.env.FAKE_RETRY_FALLBACK === "hang") return
+      if (process.env.FAKE_RETRY_FALLBACK === "exit") return process.exit(3)
+      if (process.env.FAKE_RETRY_FALLBACK === "refuse") return reject("set_retry_fallback", cmd.id, "set_retry_fallback is refused once a turn has started")
+      return respond("set_retry_fallback", cmd.id)
     case "get_state":
       return respond("get_state", cmd.id, {
         data: {
@@ -144,6 +168,15 @@ function handleLine(line) {
     return
   }
   const parsed = JSON.parse(trimmed)
+  if (process.env.FAKE_COMMAND_LOG) appendFileSync(process.env.FAKE_COMMAND_LOG, `${JSON.stringify(parsed)}\n`)
+  if (parsed.type === "prompt" && !promptSeen) {
+    promptSeen = true
+    if (heldProtocolInfo) {
+      const held = heldProtocolInfo
+      heldProtocolInfo = undefined
+      handleCommand(held)
+    }
+  }
   if (parsed.type === "extension_ui_response") {
     const outcome = parsed.confirmed === false ? "denied" : parsed.cancelled ? "cancelled" : "confirmed"
     emit({ type: "session_info_changed", name: `ui:${outcome}` })

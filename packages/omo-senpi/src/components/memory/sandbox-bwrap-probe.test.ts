@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -120,25 +120,25 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
     expect(usability.usable).toBe(false)
   }, 30_000)
 
-  test("#given a probed executable #when probed again concurrently #then the second call returns immediately from the memoized promise without spawning again", async () => {
-    // given: a stand-in executable that we can time
-    const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-timing-"))
+  test("#given concurrent probes #when both complete #then they share one executable invocation", async () => {
+    // given
+    const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-concurrent-"))
     const executable = join(binDir, "bwrap")
-    writeFileSync(executable, "#!/bin/sh\nexit 0\n")
+    writeFileSync(executable, "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\nexit 0\n")
     chmodSync(executable, 0o755)
 
-    // when: start the first probe and immediately start the second while the first is pending
-    const start = Date.now()
-    const firstPromise = probeBwrapUsability(executable)
-    const secondPromise = probeBwrapUsability(executable)
-    const [first, second] = await Promise.all([firstPromise, secondPromise])
-    const elapsed = Date.now() - start
+    try {
+      // when: both requests start before the event loop can deliver the first child close.
+      const firstPromise = probeBwrapUsability(executable)
+      const secondPromise = probeBwrapUsability(executable)
+      const [first, second] = await Promise.all([firstPromise, secondPromise])
 
-    // then: both completed with the same verdict from a single spawn
-    // The second probe should return almost instantly (< 5ms) from the pending promise cache,
-    // not spawn a new child. Total elapsed should be roughly one spawn time, not two.
-    expect(first).toEqual({ usable: true })
-    expect(second).toEqual({ usable: true })
-    expect(elapsed).toBeLessThan(500) // One spawn should be much faster than two
+      // then
+      expect(first).toEqual({ usable: true })
+      expect(second).toEqual({ usable: true })
+      expect(readFileSync(`${executable}.spawns`, "utf8")).toBe("spawn\n")
+    } finally {
+      rmSync(binDir, { recursive: true, force: true })
+    }
   }, 30_000)
 })

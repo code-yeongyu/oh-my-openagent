@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
 
-import { NoEffectiveChangesError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import { NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import type { MemoryToolCommit, MemoryToolProvenance } from "./memory"
 import { parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
@@ -74,6 +74,10 @@ export async function runMemoryApplyPatch(
             "The patched content matched what was already on disk.",
             { cause: error },
           )
+        }
+        if (error instanceof MemorySecretError) {
+          await repo.restorePaths(paths)
+          throw new MemoryApplyPatchError(error.message, { cause: error })
         }
         throw error
       }

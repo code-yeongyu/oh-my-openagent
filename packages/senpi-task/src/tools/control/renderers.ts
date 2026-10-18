@@ -13,6 +13,7 @@ import {
 import type { TaskCancelInput } from "./cancel"
 import type { MemberScopedTaskSendInput, TaskSendInput, StructuredMessageInput } from "./send-schema"
 import type { CancelResultDetails, SendResultDetails } from "./types"
+import { withDroppedSteeringNotice } from "../../state/queued-steering"
 
 export type ControlRenderTheme = Pick<Theme, "fg" | "italic">
 
@@ -58,7 +59,8 @@ export function renderTaskCancelResult(
   theme: ControlRenderTheme,
 ): RenderComponent {
   const row = taskCancelResultRow(result.details)
-  return linesComponent([theme.fg(row.color, normalizeRendererText(row.text))])
+  const dropped = result.details.kind === "cancelled" || result.details.kind === "cancel_pending" || result.details.kind === "released" ? result.details.undelivered_messages ?? 0 : 0
+  return linesComponent([theme.fg(row.color, normalizeRendererText(withDroppedSteeringNotice(row.text, dropped)))])
 }
 
 function widthComponent(renderLine: (width: number) => string): RenderComponent {
@@ -74,6 +76,7 @@ function taskSendCallLine(args: TaskSendInput, theme: ControlRenderTheme, width:
   const base = joinRendererTokens([
     "task_send",
     `to:${normalizeRendererText(args.to)}`,
+    ...(args.redispatch === true ? ["redispatch"] : []),
   ])
   if (typeof args.message === "string") return withExcerpt(base, "message", args.message, theme, width)
   return base
@@ -141,6 +144,10 @@ function optionalToken(label: string, value: string | undefined): string | undef
 
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
+    case "uncertain":
+      return { color: "warning", text: `task_send ${details.reason} Effect id: ${details.effect_id}` }
+    case "failed":
+      return { color: "error", text: `task_send ${details.reason}: ${details.detail}. Action: ${details.action}.` }
     case "admission_refused":
     case "cwd_unavailable":
     case "config_generation_mismatch":
@@ -156,6 +163,12 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "warning", text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
+    case "redispatched":
+      return { color: "success", text: `task_send redispatched ${details.task_id} epoch ${details.run_epoch}` }
+    case "invalid_state":
+      return { color: "warning", text: `task_send invalid state ${details.task_id}: ${details.reason}` }
+    case "respawn_failed":
+      return { color: "error", text: `task_send redispatch failed ${details.task_id}: ${details.reason}` }
     case "capacity_deferred":
       return { color: "warning", text: `task_send deferred ${details.task_id}: ${details.reason}` }
     case "not_continuable":
@@ -168,6 +181,12 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "error", text: notFoundText(details) }
     case "invalid_arguments":
       return { color: "error", text: `task_send invalid: ${details.reason}` }
+    case "delivering":
+      return { color: "muted", text: `task_send delivering ${details.to} in background (${details.reason})` }
+    case "aborted":
+      return { color: "warning", text: `task_send not sent ${details.to}: turn aborted` }
+    case "send_failed":
+      return { color: "error", text: `task_send failed ${details.to}: ${details.reason}` }
     case "team_message":
       return teamMessageRow(details.team)
     case "shutdown_requested":
@@ -223,6 +242,8 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
       return { color: "warning", text: `task_cancel pending ${details.task_id}: ${details.reason}` }
     case "noop":
       return { color: statusThemeColor(details.status), text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}` }
+    case "released":
+      return { color: statusThemeColor(details.status), text: `task_cancel released ${details.task_id} (${details.status}, child stopped)` }
     case "not_found":
       return { color: "error", text: `task_cancel not found: ${details.reason}` }
     case "invalid_arguments":

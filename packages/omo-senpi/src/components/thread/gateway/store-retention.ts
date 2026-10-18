@@ -9,9 +9,11 @@
  */
 import { OUTBOX_RETENTION_MS, rfc3339 } from "./bindings"
 import { DELIVERY_RETENTION_MS, PAIR_BUCKET_BURST, PAIR_BUCKET_REFILL_MS, RETENTION_SWEEP_BATCH, RETENTION_SWEEP_INTERVAL_MS } from "./constants"
+import type { Sql } from "./sql"
 import { OPEN_STATES, type StoreContext, write } from "./store-ops"
 
-const nextSweepDue = new WeakMap<StoreContext, number>()
+/** Keyed by the connection: an extension call joins core operations through a derived context. */
+const nextSweepDue = new WeakMap<Sql, number>()
 
 export type RetentionSweep = {
   readonly receipts: number
@@ -39,10 +41,10 @@ export function deleteExpiredReceipt(ctx: StoreContext, key: { readonly principa
  * only the rest of the batch, and a batch used up that way still makes the next sweep due at once.
  */
 export function sweepRetentionIfDue(ctx: StoreContext, now: number, receiptsDeleted = 0): RetentionSweep | null {
-  if (now < (nextSweepDue.get(ctx) ?? Number.NEGATIVE_INFINITY)) return null
+  if (now < (nextSweepDue.get(ctx.sql) ?? Number.NEGATIVE_INFINITY)) return null
   const swept = sweepRetention(ctx, now, Math.max(RETENTION_SWEEP_BATCH - receiptsDeleted, 0))
   const full = swept.receipts + receiptsDeleted >= RETENTION_SWEEP_BATCH || Object.values(swept).some((count) => count >= RETENTION_SWEEP_BATCH)
-  nextSweepDue.set(ctx, full ? now : now + RETENTION_SWEEP_INTERVAL_MS)
+  nextSweepDue.set(ctx.sql, full ? now : now + RETENTION_SWEEP_INTERVAL_MS)
   return swept
 }
 

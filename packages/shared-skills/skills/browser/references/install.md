@@ -8,6 +8,13 @@ Three pieces. The onboarding script prepares all three; a human finishes exactly
 | Browser extension | registered from the Web Store listing through Chrome's external-extension mechanism | **yes, up to one click** — the browser asks the user to enable it |
 | Daemon process | auto-starts on the first call | nothing to do |
 
+## Inside the OmO desktop app
+
+The app installs the `bsk` CLI and starts its daemon itself, and keeps the daemon running when the app closes.
+Do not run `browser-install.mjs` there unless the doctor says the app's engine is missing; a session set to
+`OMO_BROWSER_ENGINE=builtin` or `none` never uses this skill's attached engine at all. `BSK_HOME` and `BSK_BIN`
+still decide where the CLI and daemon are found, here and everywhere else.
+
 ## Supported
 
 | | |

@@ -22,6 +22,7 @@
               "input": true,
               "ax": true,
               "backgroundWindowInput": true,
+              "cursorOverlay": false,
               "deliveryModes": [
                 "background",
                 "foreground"
@@ -41,6 +42,7 @@
             "/result/displayServer",
             "/result/ax",
             "/result/backgroundWindowInput",
+            "/result/cursorOverlay",
             "/result/deliveryModes",
             "/result/capturePermission",
             "/result/inputPermission",

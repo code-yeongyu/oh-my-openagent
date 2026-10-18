@@ -43,6 +43,7 @@ function makeManager(project: string) {
 }
 
 async function run(): Promise<void> {
+  process.stdout.write("READY\n")
   const project = mkdtempSync(join(tmpdir(), "senpi-task-seed-floor-"))
   try {
     switch (mode) {
@@ -90,6 +91,7 @@ async function run(): Promise<void> {
   } finally {
     rmSync(project, { recursive: true, force: true })
   }
+  process.stdout.write("DONE\n")
 }
 
 run().catch((error: unknown) => {

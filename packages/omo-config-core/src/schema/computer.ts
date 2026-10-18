@@ -17,6 +17,7 @@ export const OmoComputerSettingsLayerSchema = z
         "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)",
       ),
     display: z.string().min(1),
+    showCursor: z.boolean().describe("Show the display-only macOS cursor overlay (default: true; false hides it)"),
     max_width: positiveInteger,
     max_height: positiveInteger,
     screenshot_max_bytes: positiveInteger,
@@ -47,6 +48,7 @@ type ComputerSettingPath = `computer.${ComputerSettingKey}`
 export const COMPUTER_HARNESS_SUPPORT: Record<ComputerSettingPath, readonly OmoHarnessId[]> = {
   "computer.enabled": ["native"],
   "computer.display": ["native"],
+  "computer.showCursor": ["native"],
   "computer.max_width": ["native"],
   "computer.max_height": ["native"],
   "computer.screenshot_max_bytes": ["native"],

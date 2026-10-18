@@ -61,6 +61,39 @@ export const RESOLVED_MODEL_SOURCES = ["category", "explicit", "agent"] as const
 
 export type ResolvedModelSource = (typeof RESOLVED_MODEL_SOURCES)[number]
 
+export const EFFECTIVE_MODEL_SOURCES = [
+  "category",
+  "explicit",
+  "agent",
+  "set",
+  "cycle",
+  "restore",
+  "fallback",
+  "fallback-revert",
+] as const
+
+export type EffectiveModelSource = (typeof EFFECTIVE_MODEL_SOURCES)[number]
+
+// The record's effective_model: a resolved-model record whose source also names live model
+// events (F12) - a set/cycle by any client, a restore, a fallback hop or its revert - with
+// switched_by_operator marking a set/cycle switch omo did not mint itself.
+export type EffectiveModelRecord = Omit<ResolvedModelRecord, "source"> & {
+  readonly source: EffectiveModelSource
+  readonly switched_by_operator?: boolean
+}
+
+// The live-event half of EFFECTIVE_MODEL_SOURCES: kinds that only ever describe a model change
+// after spawn, never the spawn plan itself. On disk these live in effective_model.change while
+// `source` keeps an old-union value pre-F12 builds can parse (see store/storable-record.ts).
+export const EFFECTIVE_MODEL_CHANGE_KINDS = ["set", "cycle", "restore", "fallback", "fallback-revert"] as const
+
+export type EffectiveModelChangeKind = (typeof EFFECTIVE_MODEL_CHANGE_KINDS)[number]
+
+export type EffectiveModelChange = {
+  readonly kind: EffectiveModelChangeKind
+  readonly switched_by_operator?: boolean
+}
+
 export const BACKGROUND_MODES = ["foreground", "background", "promoted"] as const
 
 export type BackgroundMode = (typeof BACKGROUND_MODES)[number]
@@ -76,17 +109,37 @@ export const SUSPENSION_REASONS = [
   "host_incompatible",
   "idle_evicted",
   "own_host_unreachable",
+  // The session that owns the child was resumed, but its reconcile could not revive the child yet;
+  // `revival_deferred_reason` names the reconcile's deferral (omo#9498).
+  "revival_deferred",
   "store_index_unavailable",
 ] as const
 
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number]
 
+// Why a task reattached onto a session that cannot continue on its own is waiting (senpi#3266):
+// the resumed turn ENDED on an abort, or it never answered at all. `awaiting_input.since` is the
+// reattach timestamp; the flag clears on a successful delivery, a plain reattach, or terminal.
+export const AWAITING_INPUT_REASONS = [
+  "resumed_turn_aborted",
+  "resumed_turn_unfinished",
+] as const
+
+export type AwaitingInputReason = (typeof AWAITING_INPUT_REASONS)[number]
+
+export type TaskAwaitingInput = {
+  readonly reason: AwaitingInputReason
+  readonly since: string
+}
+
 export type HostSessionIdentity = {
+  readonly effect_seq?: number
   readonly socket: string
   readonly routing_id: string
   readonly session_path: string
   readonly instance_id: string
   readonly daemon_pid?: number
+  readonly adopted_entry_id?: string
 }
 
 export type ResolvedModelRecord = {
@@ -99,6 +152,7 @@ export type ResolvedModelRecord = {
   readonly reasoning_effort?: string
   /** Canonical unified reasoning level (off|minimal|low|medium|high|xhigh|max) or a harness-native preset token. */
   readonly reasoning?: string
+  readonly service_tier?: string
   readonly source: ResolvedModelSource
 }
 
