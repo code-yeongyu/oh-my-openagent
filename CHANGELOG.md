@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Task termination recovers when the OS denies a process-group signal.** POSIX `EPERM` now falls back to the owned child handle and preserves TERM/KILL escalation instead of rejecting the whole termination. ([#9596](https://github.com/code-yeongyu/oh-my-openagent/issues/9596), [#9743](https://github.com/code-yeongyu/oh-my-openagent/pull/9743))
 
+**`runtime_fallback` moves to the next model when a Cursor pool is spent.** cursor-opencode-provider reports a spent pool as `capacity_limit`, which the fallback classifier did not recognize, so the session ended on the error instead of trying the next rung of the chain. It is now treated like the `resource_exhausted` error it replaces. ([#10170](https://github.com/code-yeongyu/oh-my-openagent/issues/10170), [#10224](https://github.com/code-yeongyu/oh-my-openagent/pull/10224))
+
 ## [5.1.35] - 2026-10-16
 
 **The omo-senpi typecheck gives the same result wherever the checkout sits.** It used to pick up `@types/node` from folders above the checkout, so a stray older copy there failed the typecheck while CI passed on the same commit. omo-senpi now declares its own `@types/node` and `bun-types` and reads type packages only from its own `node_modules`. ([#10320](https://github.com/code-yeongyu/oh-my-openagent/issues/10320), [#10332](https://github.com/code-yeongyu/oh-my-openagent/pull/10332))
