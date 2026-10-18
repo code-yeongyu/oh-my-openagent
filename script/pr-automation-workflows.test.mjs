@@ -74,3 +74,21 @@ test("CLA signing and administrator rechecks remain reachable", () => {
   expect(action.env.GITHUB_EVENT_NAME).toBeUndefined()
   expect(w.jobs.cla.steps.some(step => step.name === "Report CLA result on the current PR head")).toBe(true)
 })
+
+test("a cancelled or skipped signal never disappears silently", () => {
+  for (const name of ["cla", "review-claims", "package-labels"]) {
+    const w = workflow(name)
+    const notice = w.jobs["notice-skipped-signal"]
+    expect(notice).toBeDefined()
+    expect(notice.if).toContain("github.event_name == 'workflow_run'")
+    expect(notice.if).toContain("github.event.workflow_run.conclusion == 'cancelled'")
+    expect(notice.if).toContain("github.event.workflow_run.conclusion == 'skipped'")
+    expect(notice.permissions).toEqual({ "actions": "read" })
+    expect((notice.steps ?? []).some(step => step.uses?.startsWith("actions/checkout"))).toBe(false)
+    const script = notice.steps.find(step => step.uses?.startsWith("actions/github-script")).with.script
+    expect(script).toContain("listWorkflowRuns")
+    expect(script).toContain("workflow_id: 'pr-automation-signal.yml'")
+    expect(script).toContain("core.warning")
+    expect(script).toContain("head_sha: head")
+  }
+})

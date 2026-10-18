@@ -48,7 +48,7 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | Code | Meaning | What to do |
 |------|---------|------------|
 | `PermissionDenied` | The OS permission for capture, input or accessibility is missing | Grant it to the app that launches OmO; see [Set up your operating system](../guide/computer-use.md#set-up-your-operating-system) |
-| `Suspended` | The user pressed the stop chord or ran `/computer stop` | Stop acting; only the user runs `/computer resume` |
+| `Suspended` | The user pressed the stop chord (on macOS and X11 only a physical press counts; a posted or XTEST chord is ignored) or ran `/computer stop` | Stop acting; only the user runs `/computer resume` |
 | `StopPathUnavailable` | The global stop chord could not be armed, so input is refused | Use a host where the chord arms, or `allow_host_relay_only_stop` |
 | `ScreenLocked` | The screen is locked | Unlock the session |
 | `BackgroundUnavailable` | The target refuses background delivery | Use accessibility actions or `delivery: "foreground"` |

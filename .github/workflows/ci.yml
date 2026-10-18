@@ -193,14 +193,14 @@ jobs:
         with:
           # and 1.3.12 hangs on windows-latest in the ast-grep install-script
           # timeout race.
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
 
       - uses: actions/cache@v6
         if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -360,17 +360,34 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile --ignore-scripts
+
+      # A Bun 1.4.3 frozen install once left @types/node out of the tree; tsgo then fell back to
+      # bun-types' ForkOptions and reported a false 'windowsHide' error in omo-senpi. Fail here,
+      # with the cause, if the declared @types/node does not resolve from omo-senpi.
+      - name: Verify @types/node resolves from omo-senpi
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        shell: bash
+        run: |
+          node -e '
+            const { createRequire } = require("node:module");
+            const path = require("node:path");
+            const pkg = path.resolve("packages/omo-senpi/package.json");
+            const declared = require(pkg).devDependencies["@types/node"];
+            const found = createRequire(pkg)("@types/node/package.json").version;
+            console.log(`@types/node declared ${declared}, resolved ${found}`);
+            if (found !== declared) process.exit(1);
+          '
 
       - name: Type check
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -384,6 +401,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages required by the workspace.
+            - Checks that `@types/node` resolves from `packages/omo-senpi` after the frozen install.
             - Runs root `bun run typecheck`, including script and package checks.
           JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; shared package failures can cascade into adapters.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
@@ -414,13 +432,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -526,13 +544,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -646,7 +664,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - name: Run published lazycodex-ai smoke commands
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -735,13 +753,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -801,13 +819,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -885,13 +903,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -966,12 +984,12 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -1022,7 +1040,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       # The notes travel as a file: passed through a step output into env, a long range exceeded the
       # per-string exec limit and failed the job with "Argument list too long" (#8894).
