@@ -1,3 +1,9 @@
+## 2026-10-17 - A message sent right after a slow launch steers the live child instead of queueing behind nothing (#10399)
+
+- `steering/pending-steering.ts`: `notifyStarted` registers no drain when the persisted queue has nothing to deliver. The launch calls it from `#recordSpawnFacts`; an empty drain still read as "draining" for a few ticks, and when `start()` had answered `starting` (a launch slower than the 250 ms report window, common on Windows) the caller's first `task_send` after `whenLaunched` landed in that window. The #9861 ordering guard then queued it behind nothing, `task_send` reported `queued` for a running child, and the message reached the host only on a later background drain. A message enqueued afterwards still starts its own drain from `enqueuePending`.
+- `runners/rpc-host/__fixtures__/fake-host.ts`: `holdReply(type)` buffers a command's acknowledgements until the returned release sends them in order, so a test can hold a launch past the report window without sleeping.
+- `runners/rpc-host-input-identity.test.ts` adds the slow-launch row; it fails on every run without the fix.
+
 ## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
 
 - `agents/builtin/fallback-chains.ts` (mirrored from `model-core/src/agent-model-requirements.ts`, where `oracle` and `momus` get the same rung): a `{google, google-vertex, opencode}/gemini-4-argon` rung at `high` goes directly before the `gemini-3.1-pro` rung of `plan-reviewer`. The previous rung stays for Copilot (off the Argon rung until code-yeongyu/senpi#3379) and for engine pins without the Argon row. The GPT heads are unchanged: a blind eval put Argon ahead of the previous pro model in 16/16 judgments but behind the GPT heads on correctness, with a median latency of 57 s vs 15 s.

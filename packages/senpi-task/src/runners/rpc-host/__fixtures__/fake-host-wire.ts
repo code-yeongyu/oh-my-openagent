@@ -43,6 +43,8 @@ export interface FakeHostWirePorts {
   /** Mirror the engine: opening at a path whose directory does not exist fails with ENOENT. */
   readonly enforceSessionDir: boolean
   readonly withheld: ReadonlySet<string>
+  /** Input acknowledgements buffered until their hold is released, in arrival order. */
+  readonly held: ReadonlyMap<string, Array<() => void>>
   /** Commands the host refuses, with the error it answers. */
   readonly failed: ReadonlyMap<string, string>
   readonly record: (command: FakeHostCommand) => void
@@ -74,8 +76,11 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
     if (ports.withheld.has(type)) return
     const failure = ports.failed.get(type)
     if (failure !== undefined) return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
-    return writeFrame(socket, { type: "response", id: payload.id, command: type, success: true,
+    const acknowledge = (): void => writeFrame(socket, { type: "response", id: payload.id, command: type, success: true,
       data: { disposition: answer.disposition, replayed: answer.replayed } })
+    const hold = ports.held.get(type)
+    if (hold !== undefined) return void hold.push(acknowledge)
+    return acknowledge()
   }
   if (ports.withheld.has(type)) return
   const failure = ports.failed.get(type)

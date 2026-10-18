@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { startHostWorld } from "./rpc-host/__fixtures__/host-world"
+import { HOST_CHILD_MODEL, startHostWorld } from "./rpc-host/__fixtures__/host-world"
 import { runTaskSend } from "../tools/control/send"
 import { cleanupSteering, makeHarness } from "../steering/__fixtures__/steering-fakes"
 import { adaptRpcHandle } from "../manager/child-handle"
@@ -29,6 +29,82 @@ test("#given a daemon task #when it starts and receives two messages #then every
     await world.cleanup()
   }
 })
+
+test("#given a daemon task whose launch outlasts the start-report window #when it is messaged right after the launch settles #then both messages steer the live child instead of queueing", async () => {
+  // given: the first prompt's acknowledgement is held, so start() answers `starting` before the launch settles,
+  // the order a slow Windows host produced (#10399)
+  const world = await startHostWorld({ transcripts: true })
+  const parent = world.connect("parent")
+  const releasePrompt = world.host.holdReply("prompt")
+  try {
+    const started = await parent.manager.start({
+      prompt: "host child", parent_session_id: "parent", depth: 1, execution_mode: "process", model: HOST_CHILD_MODEL,
+    })
+    if (started.kind !== "started" || started.starting !== true) throw new Error(`expected a still-starting launch, got ${JSON.stringify(started)}`)
+    releasePrompt()
+    await parent.manager.whenLaunched?.(started.task_id)
+
+    // when
+    const first = await runTaskSend(parent.manager, { to: started.task_id, message: "first" }, "parent")
+    const second = await runTaskSend(parent.manager, { to: started.task_id, message: "second" }, "parent")
+
+    // then
+    expect([first.details, second.details].map(details => details.kind)).toEqual(["steered", "steered"])
+    const inputs = world.host.commands.filter(command => ["prompt", "steer", "follow_up"].includes(command.type))
+    expect(inputs.map(command => command.payload.clientMessageId)).toEqual([
+      `${started.task_id}:0:1`, `${started.task_id}:0:2`, `${started.task_id}:0:3`,
+    ])
+    expect(parent.store.load(started.task_id)?.pending_steering).toBeUndefined()
+  } finally {
+    releasePrompt()
+    await world.cleanup()
+  }
+})
+
+test("#given two daemon tasks launched back to back past the start-report window #when they are messaged in turn #then every message reaches its own child once and in order", async () => {
+  // given: both first prompts are held, so both starts answer `starting` and settle together (#10399)
+  const world = await startHostWorld({ transcripts: true })
+  const parent = world.connect("parent")
+  const releasePrompts = world.host.holdReply("prompt")
+  try {
+    const startStillStarting = async (prompt: string): Promise<string> => {
+      const started = await parent.manager.start({
+        prompt, parent_session_id: "parent", depth: 1, execution_mode: "process", model: HOST_CHILD_MODEL,
+      })
+      if (started.kind !== "started" || started.starting !== true) throw new Error(`expected a still-starting launch, got ${JSON.stringify(started)}`)
+      return started.task_id
+    }
+    const first = await startStillStarting("child a")
+    const second = await startStillStarting("child b")
+    releasePrompts()
+    await parent.manager.whenLaunched?.(first)
+    await parent.manager.whenLaunched?.(second)
+
+    // when
+    const outcomes: string[] = []
+    for (const [to, message] of [[first, "a-1"], [second, "b-1"], [first, "a-2"], [second, "b-2"]] as const) {
+      outcomes.push((await runTaskSend(parent.manager, { to, message }, "parent")).details.kind)
+    }
+
+    // then: each child's inputs travel on its own routing handle, with its own increasing identity
+    expect(outcomes).toEqual(["steered", "steered", "steered", "steered"])
+    const inputs = world.host.commands.filter(command => ["prompt", "steer", "follow_up"].includes(command.type))
+    expect(inputs).toHaveLength(6)
+    for (const [taskId, messages] of [[first, ["a-1", "a-2"]], [second, ["b-1", "b-2"]]] as const) {
+      const own = inputs.filter(command => String(command.payload.clientMessageId).startsWith(`${taskId}:`))
+      expect(own.map(command => command.payload.clientMessageId)).toEqual([`${taskId}:0:1`, `${taskId}:0:2`, `${taskId}:0:3`])
+      expect(own.slice(1).map(command => command.payload.message)).toEqual([...messages])
+      expect(new Set(own.map(command => command.sessionId))).toEqual(new Set([routingOf(world, taskId)]))
+    }
+  } finally {
+    releasePrompts()
+    await world.cleanup()
+  }
+})
+
+function routingOf(world: Awaited<ReturnType<typeof startHostWorld>>, taskId: string): string | undefined {
+  return world.host.sessions().findLast(session => session.sessionPath.replaceAll("\\", "/").includes(`/children/${taskId}/`))?.routingId
+}
 
 for (const conflict of [false, true]) {
   test(`#given a withheld steer ack #when the same-id retry ${conflict ? "conflicts" : "replays"} #then ${conflict ? "no delivery is reported" : "the host admits it once"}`, async () => {
