@@ -56,7 +56,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       # SendInput and UI Automation need an interactive window station; fail fast without one.
       - name: Windows interactive-desktop smoke

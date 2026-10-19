@@ -2473,7 +2473,10 @@ session_id: ses_untrusted_999
 
       beforeEach(() => {
         capturedTimers.clear()
-        fakeNow = 10000
+        // Start on the real clock: the prompt gate's module-wide semantic-dedupe record is stamped with
+        // Date.now(), and one written on the real clock by an earlier dispatch that settled late never
+        // expires on a clock that starts in 1970 (#10474).
+        fakeNow = originalDateNow()
         Date.now = () => fakeNow
 
         globalThis.setTimeout = ((callback: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]) => {
@@ -2510,9 +2513,18 @@ session_id: ses_untrusted_999
         Date.now = originalDateNow
       })
 
+      // A timer that reschedules itself lands back in capturedTimers, which this loop is iterating, so a
+      // self-rescheduling chain would never end; fail at the cap instead of spinning until the host runs
+      // out of memory (#10474).
+      const MAX_TIMERS_PER_FIRE = 20
+
       async function firePendingTimers(): Promise<void> {
+        let fired = 0
         for (const [id, entry] of capturedTimers) {
           if (!entry.cleared) {
+            if (++fired > MAX_TIMERS_PER_FIRE) {
+              throw new Error(`runaway: more than ${MAX_TIMERS_PER_FIRE} captured timers fired in one pass`)
+            }
             capturedTimers.delete(id)
             fakeNow += 6000
             await entry.callback()
@@ -2646,6 +2658,37 @@ session_id: ses_untrusted_999
 
         // then - timer was cleared, prompt called only once
         await firePendingTimers()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      })
+
+      test("gate state stamped on the real clock by earlier work does not trap the retry loop", async () => {
+        // given - an earlier hook (a previous test whose dispatch settled late) dispatched on the real
+        // clock, leaving a real-time semantic-dedupe record in the shared prompt gate
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+        writeBoulderState(TEST_DIR, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        })
+        const earlierInput = createMockPluginInput()
+        Date.now = originalDateNow
+        await createTestAtlasHook(earlierInput).handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        Date.now = () => fakeNow
+        expect(earlierInput._promptMock).toHaveBeenCalledTimes(1)
+
+        // when - a fresh hook hits idle on the test clock and its gated continuation is retried
+        const mockInput = createMockPluginInput()
+        const hook = createTestAtlasHook(mockInput)
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await firePendingTimers()
+
+        // then - the earlier records expire as the test clock advances and the retry dispatches once
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       })
 

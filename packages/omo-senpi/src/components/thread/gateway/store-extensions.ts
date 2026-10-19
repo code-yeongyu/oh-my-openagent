@@ -30,6 +30,7 @@ export type StoreExtensionResult<T> =
   | StoreExtensionRefusal
 
 export type StoreExtensionTransaction = {
+  /** `orderBy` lists the statement's output columns (`"created_at, id"`); a LIMIT goes in the statement. */
   readonly all: (columns: readonly string[], sql: string, params?: readonly SqlValue[], orderBy?: string) => readonly SqlRow[]
   readonly one: (columns: readonly string[], sql: string, params?: readonly SqlValue[]) => SqlRow | undefined
   readonly exec: (sql: string, params?: readonly SqlValue[]) => number
