@@ -1,3 +1,11 @@
+## 2026-10-19 - Release binary size budget 160 -> 182 MiB, measured
+
+omo 5.1.37's publish failed on Linux: linux-x64 and linux-x64-baseline built at 173,365,216 bytes and linux-arm64 at 170,969,896, over the 160 MiB budget (5.1.35's linux-x64 was 162,899,424). The growth is the Bun 1.4.3 runtime, not a stray asset: an empty `bun build --compile --target=bun-linux-x64` is 81,315,296 bytes on 1.4.2 and 90,798,048 on 1.4.3 (+9,482,752), and senpi 2026.10.16 -> 2026.10.19 adds about 1.25 MB of package files. `MAX_BINARY_BYTES` in `script/build-omo-binary.ts` and the matching check in `publish-platform.yml` move to 182 MiB, the measured size plus about 10%; the 5 MiB headroom warning is unchanged.
+
+## 2026-10-19 - Adopt senpi 2026.10.19 and fold the unpublished 5.1.36 notes into 5.1.37
+
+All exact senpi pins (root, `omo-native`, `omo-senpi` peer/dev and its `senpi-ai`/`senpi-tui` aliases, `senpi-task`, the pin and package-shape tests, the provider-map derivation comment and the catalog-coverage comment) move from `2026.10.18-1` to `2026.10.19`, with the lockfile and the committed Senpi plugin bundle regenerated. 5.1.36 was stamped on dev (#10542) but its publish never ran, so the `[5.1.36]` CHANGELOG heading is removed and its entries stay under `[Unreleased]` for the 5.1.37 cut. senpi-ai 2026.10.19 gzips `api.anthropic.com` request bodies of 4096+ characters by default; the ccapi-route opt-in is a separate follow-up.
+
 
 
 ## 2026-10-18 - Adopt senpi 2026.10.18-1
