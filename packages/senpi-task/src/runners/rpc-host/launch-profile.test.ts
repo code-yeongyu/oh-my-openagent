@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -18,21 +18,26 @@ describe("daemonLaunchProfileId", () => {
   test("#given one spec reached through a symlink and through its real path #when both profile ids are computed #then they are identical", () => {
     // given
     const root = mkdtempSync(join(tmpdir(), "dh-profile-"))
-    const real = join(root, "real", "plugin")
-    mkdirSync(join(real, "extensions"), { recursive: true })
-    writeFileSync(join(real, "daemon-launch-spec.json"), SPEC)
-    // The reader refuses a spec whose extensions are not on disk.
-    writeFileSync(join(real, "extensions", "omo-member.js"), "export {}\n")
-    symlinkSync(join(root, "real"), join(root, "link"))
-    const viaLink = join(root, "link", "plugin", "daemon-launch-spec.json")
-    const viaReal = join(realpathSync(real), "daemon-launch-spec.json")
+    try {
+      const real = join(root, "real", "plugin")
+      mkdirSync(join(real, "extensions"), { recursive: true })
+      writeFileSync(join(real, "daemon-launch-spec.json"), SPEC)
+      // The reader refuses a group-writable spec, so the mode must not depend on the runner's umask.
+      chmodSync(join(real, "daemon-launch-spec.json"), 0o644)
+      // The reader refuses a spec whose extensions are not on disk.
+      writeFileSync(join(real, "extensions", "omo-member.js"), "export {}\n")
+      symlinkSync(join(root, "real"), join(root, "link"))
+      const viaLink = join(root, "link", "plugin", "daemon-launch-spec.json")
+      const viaReal = join(realpathSync(real), "daemon-launch-spec.json")
 
-    // when
-    const fromLink = daemonLaunchProfileId(readDaemonLaunchSpec(viaLink), viaLink)
-    const fromReal = daemonLaunchProfileId(readDaemonLaunchSpec(viaReal), viaReal)
+      // when
+      const fromLink = daemonLaunchProfileId(readDaemonLaunchSpec(viaLink), viaLink)
+      const fromReal = daemonLaunchProfileId(readDaemonLaunchSpec(viaReal), viaReal)
 
-    // then
-    expect(fromLink).toBe(fromReal)
-    rmSync(root, { recursive: true, force: true })
+      // then
+      expect(fromLink).toBe(fromReal)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

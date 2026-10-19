@@ -1,4 +1,4 @@
-import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionClientOptions } from "./session-client-contract"
+import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionReplaced, HostSessionClientOptions } from "./session-client-contract"
 import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
@@ -58,6 +58,7 @@ export class HostSessionClient {
   private readonly eventListeners = new Set<ChildEventListener>()
   private readonly parkedListeners = new Set<(event: HostSessionParked) => void>()
   private readonly closedListeners = new Set<(event: HostSessionClosed) => void>()
+  private readonly replacedListeners = new Set<(event: HostSessionReplaced) => void>()
   private client: HostRpcClient | undefined
   private routingId: string | undefined
   private identity: SenpiHostProtocolInfo | undefined
@@ -187,6 +188,11 @@ export class HostSessionClient {
     return () => this.closedListeners.delete(listener)
   }
 
+  onReplaced(listener: (event: HostSessionReplaced) => void): () => void {
+    this.replacedListeners.add(listener)
+    return () => this.replacedListeners.delete(listener)
+  }
+
   /** End the session on the host (`close_session`), then drop this child's connection. */
   async close(): Promise<void> {
     this.extensionEvents.clear()
@@ -251,6 +257,15 @@ export class HostSessionClient {
           for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
         } finally {
           this.releaseEndedSession()
+        }
+        return
+      }
+      case "session_replaced": {
+        // The host keeps the routing handle live across the swap: the child follows the new
+        // identity instead of ending, and the next reattach reopens the NEW transcript (F9).
+        const sessionId = this.routingId ?? control.sessionId ?? ""
+        for (const listener of this.replacedListeners) {
+          listener({ sessionId, durableSessionId: control.durableSessionId, sessionFile: control.sessionFile })
         }
         return
       }

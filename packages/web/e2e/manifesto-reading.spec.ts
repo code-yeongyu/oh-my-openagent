@@ -51,36 +51,40 @@ for (const locale of ["en", "ko"]) {
       })
 
       // Without JavaScript the page reads in full: reveal blocks render `pending` (lit) so text is
-      // never stuck at the dim floor if the driver never runs.
-      test("readable before and without JavaScript", async ({ page }) => {
-        await page.emulateMedia({ reducedMotion: "no-preference" })
-        const context = page.context()
-        await context.route("**/*.{js,mjs}", (route) => route.abort())
-        await page.goto(`/${locale}/manifesto`)
-        const state = await page.evaluate(() => {
-          const blocks = Array.from(document.querySelectorAll<HTMLElement>(".lit-read"))
-          const words = Array.from(document.querySelectorAll<HTMLElement>(".lit-read .lit-word"))
-          return {
-            modes: Array.from(new Set(blocks.map((block) => block.dataset.litMode))),
-            wordCount: words.length,
-            // Match the per-word fade's color serialization with a fully lit reference.
-            renderedWords: words.map((word) => {
-              const reference = document.createElement("span")
-              reference.style.color = "color-mix(in oklab, var(--text-hi), var(--text-hi))"
-              word.append(reference)
-              const fullBright = getComputedStyle(reference).color
-              reference.remove()
-              const css = getComputedStyle(word)
-              return { color: css.color, fullBright, opacity: css.opacity }
-            }),
+      // never stuck at the dim floor if the driver never runs. Page scripts are disabled outright: a
+      // URL route misses CI's chunk URLs, which carry `?dpl=<GITHUB_SHA>` (next.config deploymentId),
+      // so the driver could flip blocks to `observer` before the read (#10411).
+      test.describe("without page scripts", () => {
+        test.use({ javaScriptEnabled: false })
+
+        test("readable before and without JavaScript", async ({ page }) => {
+          await page.emulateMedia({ reducedMotion: "no-preference" })
+          await page.goto(`/${locale}/manifesto`)
+          const state = await page.evaluate(() => {
+            const blocks = Array.from(document.querySelectorAll<HTMLElement>(".lit-read"))
+            const words = Array.from(document.querySelectorAll<HTMLElement>(".lit-read .lit-word"))
+            return {
+              modes: Array.from(new Set(blocks.map((block) => block.dataset.litMode))),
+              wordCount: words.length,
+              // Match the per-word fade's color serialization with a fully lit reference.
+              renderedWords: words.map((word) => {
+                const reference = document.createElement("span")
+                reference.style.color = "color-mix(in oklab, var(--text-hi), var(--text-hi))"
+                word.append(reference)
+                const fullBright = getComputedStyle(reference).color
+                reference.remove()
+                const css = getComputedStyle(word)
+                return { color: css.color, fullBright, opacity: css.opacity }
+              }),
+            }
+          })
+          expect(state.modes).toContain("pending")
+          expect(state.wordCount).toBeGreaterThan(0)
+          for (const word of state.renderedWords) {
+            expect(word.color).toBe(word.fullBright)
+            expect(Number.parseFloat(word.opacity)).toBe(1)
           }
         })
-        expect(state.modes).toContain("pending")
-        expect(state.wordCount).toBeGreaterThan(0)
-        for (const word of state.renderedWords) {
-          expect(word.color).toBe(word.fullBright)
-          expect(Number.parseFloat(word.opacity)).toBe(1)
-        }
       })
 
       // Measure actual glyph brightness against lit/unlit references, tolerating AA fringes.

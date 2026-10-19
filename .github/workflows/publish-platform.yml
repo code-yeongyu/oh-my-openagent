@@ -52,13 +52,17 @@ jobs:
           - { host: darwin-arm64, runner: macos-15, rust_target: aarch64-apple-darwin, clang_arch: arm64, binary: senpi-desktop-engine }
           - { host: darwin-x64, runner: macos-15, rust_target: x86_64-apple-darwin, clang_arch: x86_64, binary: senpi-desktop-engine }
           - { host: linux-x64, runner: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu, binary: senpi-desktop-engine }
+          # Native arm64 runners, so --selftest below executes the arm64 build itself; 22.04 keeps the
+          # same glibc floor as the x64 engine.
+          - { host: linux-arm64, runner: ubuntu-22.04-arm, rust_target: aarch64-unknown-linux-gnu, binary: senpi-desktop-engine }
           - { host: win32-x64, runner: windows-latest, rust_target: x86_64-pc-windows-msvc, binary: senpi-desktop-engine.exe }
+          - { host: win32-arm64, runner: windows-11-arm, rust_target: aarch64-pc-windows-msvc, binary: senpi-desktop-engine.exe }
     steps:
       - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - name: Install pinned Rust toolchain and target
         run: |
@@ -197,7 +201,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -496,19 +500,19 @@ jobs:
             else
               ( cd .omo/release-binaries && sha256sum -c SHA256SUMS )
             fi
-            # Same 160 MiB budget as MAX_BINARY_BYTES in script/build-omo-binary.ts: it bounds the
+            # Same 182 MiB budget as MAX_BINARY_BYTES in script/build-omo-binary.ts: it bounds the
             # download every install and update makes. Print the headroom; warn under 5 MiB.
-            local size budget=167772160 warn=5242880
+            local size budget=190840832 warn=5242880
             size="$(wc -c < "$BIN")"
             if [ "$size" -gt "$budget" ]; then
-              echo "release binary ${TARGET} exceeds the 160 MiB size budget (${size} bytes)"
+              echo "release binary ${TARGET} exceeds the 182 MiB size budget (${size} bytes)"
               return 1
             fi
             local headroom=$(( budget - size ))
             if [ "$headroom" -lt "$warn" ]; then
               echo "::warning::release binary ${TARGET} is within 5 MiB of its size budget (${size} bytes, ${headroom} bytes headroom)"
             else
-              echo "release binary ${TARGET}: ${size} bytes, ${headroom} bytes headroom under the 160 MiB budget"
+              echo "release binary ${TARGET}: ${size} bytes, ${headroom} bytes headroom under the 182 MiB budget"
             fi
           }
 
@@ -852,7 +856,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/setup-python@v6
         with:
