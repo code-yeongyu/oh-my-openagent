@@ -13,6 +13,7 @@ import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shar
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
 import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
 import { installEnvironmentIntegrityCheck } from "./test-support/environment-integrity"
+import { installPostHogTestGuard } from "./test-support/posthog-test-guard"
 import { installHermeticHome } from "./test-hermetic-home"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
@@ -124,3 +125,4 @@ afterEach(() => {
 })
 
 installEnvironmentIntegrityCheck()
+installPostHogTestGuard()
