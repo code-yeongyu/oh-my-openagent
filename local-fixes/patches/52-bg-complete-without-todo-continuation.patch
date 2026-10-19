@@ -1,0 +1,325 @@
+From 0ba4156bffb4c7e8d789f4dcf97399386596a153 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 19 Oct 2026 20:54:19 +0300
+Subject: [PATCH] fix(background-agent): complete idle children when todo
+ continuation is disabled
+
+A background child that goes idle with open todos is not completed: the
+session.idle handler and the poller both wait for todo-continuation to
+resume it. With todo-continuation-enforcer in disabled_hooks nothing ever
+resumes it, so a child whose last turn is its answer (an escalation, a
+blocker report) stays "running" and its parent is not notified until the
+60 min hard deadline. Observed on 2026-10-19: bg_3174f2b9 (Sisyphus-Junior)
+ended on "ESCALATE: deep-high" with 4 open todos at 16:44:43Z, then logged
+"Task has incomplete todos via polling, waiting" 180 times until the parent
+cancelled it at 16:53:44Z.
+
+createPluginModule now passes isHookEnabled("todo-continuation-enforcer")
+through createManagers to BackgroundManager as todoContinuationEnabled
+(default true). When it is false, checkSessionTodos no longer defers
+completion, so an idle child with output completes and wakes its parent.
+With the hook enabled nothing changes.
+---
+ .../omo-opencode/src/create-managers.test.ts  |  16 ++
+ packages/omo-opencode/src/create-managers.ts  |   2 +
+ ...manager-todo-continuation-disabled.test.ts | 137 ++++++++++++++++++
+ .../src/features/background-agent/manager.ts  |  11 ++
+ .../src/testing/create-plugin-module.test.ts  |  23 +++
+ .../src/testing/create-plugin-module.ts       |   1 +
+ 6 files changed, 190 insertions(+)
+ create mode 100644 packages/omo-opencode/src/features/background-agent/manager-todo-continuation-disabled.test.ts
+
+diff --git a/packages/omo-opencode/src/create-managers.test.ts b/packages/omo-opencode/src/create-managers.test.ts
+index 9e97ccbbb..66a7beba8 100644
+--- a/packages/omo-opencode/src/create-managers.test.ts
++++ b/packages/omo-opencode/src/create-managers.test.ts
+@@ -18,6 +18,7 @@ const markServerRunningInProcess = mock(() => {})
+ let backgroundManagerOptions: {
+   onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+   onShutdown?: () => void | Promise<void>
++  todoContinuationEnabled?: boolean
+ } | null = null
+ const trackedPaneBySession = new Map<string, string>()
+ const registeredCleanupManagers: CleanupRegistration[] = []
+@@ -38,6 +39,7 @@ class MockBackgroundManager {
+   constructor(config: {
+     onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+     onShutdown?: () => void | Promise<void>
++    todoContinuationEnabled?: boolean
+   }) {
+     backgroundManagerOptions = config
+   }
+@@ -193,6 +195,20 @@ describe("createManagers", () => {
+     expect(markServerRunningInProcess).not.toHaveBeenCalled()
+   })
+ 
++  it("#given todo-continuation-enforcer is disabled #when managers are created #then the background manager does not wait for todo continuation", () => {
++    createManagers({
++      ctx: createContext("/tmp"),
++      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
++      tmuxConfig: createTmuxConfig(false),
++      modelCacheState: createModelCacheState(),
++      backgroundNotificationHookEnabled: false,
++      todoContinuationEnforcerEnabled: false,
++      deps: createDeps(),
++    })
++
++    expect(backgroundManagerOptions?.todoContinuationEnabled).toBe(false)
++  })
++
+   it("#given tmux integration is enabled #when managers are created #then it marks the tmux server as running", () => {
+     const args = {
+       ctx: createContext("/tmp"),
+diff --git a/packages/omo-opencode/src/create-managers.ts b/packages/omo-opencode/src/create-managers.ts
+index 5cb592db9..919c3ae01 100644
+--- a/packages/omo-opencode/src/create-managers.ts
++++ b/packages/omo-opencode/src/create-managers.ts
+@@ -65,6 +65,7 @@ export function createManagers(args: {
+   tmuxConfig: TmuxConfig
+   modelCacheState: ModelCacheState
+   backgroundNotificationHookEnabled: boolean
++  todoContinuationEnforcerEnabled?: boolean
+   runtimeSkillSourceUrl?: string
+   deps?: Partial<CreateManagersDeps>
+ }): Managers {
+@@ -193,6 +194,7 @@ export function createManagers(args: {
+       })
+     },
+     enableParentSessionNotifications: backgroundNotificationHookEnabled,
++    todoContinuationEnabled: args.todoContinuationEnforcerEnabled,
+     modelFallbackControllerAccessor,
+   })
+ 
+diff --git a/packages/omo-opencode/src/features/background-agent/manager-todo-continuation-disabled.test.ts b/packages/omo-opencode/src/features/background-agent/manager-todo-continuation-disabled.test.ts
+new file mode 100644
+index 000000000..3ede22732
+--- /dev/null
++++ b/packages/omo-opencode/src/features/background-agent/manager-todo-continuation-disabled.test.ts
+@@ -0,0 +1,137 @@
++/// <reference types="bun-types" />
++
++import { describe, expect, test } from "bun:test"
++import { tmpdir } from "node:os"
++import type { PluginInput } from "@opencode-ai/plugin"
++import { MIN_IDLE_TIME_MS } from "./constants"
++import { BackgroundManager } from "./manager"
++import type { BackgroundTask } from "./types"
++
++const SESSION_ID = "ses-escalated-child"
++
++function createPluginContext(client: object): PluginInput {
++  const directory = tmpdir()
++  return {
++    project: {
++      id: "test-project",
++      worktree: directory,
++      time: { created: Date.now() },
++    },
++    directory,
++    worktree: directory,
++    serverUrl: new URL("http://localhost:4096"),
++    $: {} as PluginInput["$"],
++    client: client as PluginInput["client"],
++  }
++}
++
++// A child that stopped on purpose: its last turn is an escalation and its todo list still has open items.
++function createManager(todoContinuationEnabled?: boolean): { manager: BackgroundManager; notified: string[] } {
++  const client = {
++    session: {
++      status: async () => ({ data: { [SESSION_ID]: { type: "idle" } } }),
++      get: async () => ({ data: { id: SESSION_ID } }),
++      prompt: async () => ({}),
++      promptAsync: async () => ({}),
++      abort: async () => ({}),
++      todo: async () => ({
++        data: [
++          { content: "inspect the lane", status: "in_progress", priority: "high" },
++          { content: "implement the fix", status: "pending", priority: "high" },
++        ],
++      }),
++      messages: async () => ({
++        data: [
++          { info: { role: "user", id: "msg-1" }, parts: [{ type: "text", text: "fix it" }] },
++          {
++            info: { role: "assistant", finish: "end_turn", id: "msg-2" },
++            parts: [{ type: "text", text: "ESCALATE: deep-high\n\nThe fix depends on a decision only the owner can make." }],
++          },
++        ],
++      }),
++    },
++  }
++  const manager = new BackgroundManager({
++    pluginContext: createPluginContext(client),
++    enableParentSessionNotifications: false,
++    ...(todoContinuationEnabled === undefined ? {} : { todoContinuationEnabled }),
++  })
++  const notified: string[] = []
++  ;(manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> }).notifyParentSession = async (task) => {
++    notified.push(task.id)
++  }
++  return { manager, notified }
++}
++
++function createRunningTask(): BackgroundTask {
++  return {
++    id: "bg_escalated_child",
++    sessionId: SESSION_ID,
++    parentSessionId: "parent-session",
++    parentMessageId: "parent-msg",
++    description: "child that escalates",
++    prompt: "fix it",
++    agent: "sisyphus-junior",
++    status: "running",
++    startedAt: new Date(Date.now() - (MIN_IDLE_TIME_MS + 10)),
++    progress: { toolCalls: 3, lastUpdate: new Date() },
++  }
++}
++
++async function waitUntil(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
++  const startedAt = Date.now()
++  while (!predicate() && Date.now() - startedAt < timeoutMs) {
++    await new Promise((resolve) => setTimeout(resolve, 5))
++  }
++}
++
++describe("BackgroundManager completion with incomplete todos", () => {
++  describe("#given todo-continuation is disabled", () => {
++    test("#when the child session goes idle #then the task completes and the parent is notified", async () => {
++      //#given
++      const { manager, notified } = createManager(false)
++      const task = createRunningTask()
++      manager["tasks"].set(task.id, task)
++
++      //#when
++      manager.handleEvent({ type: "session.idle", properties: { sessionID: SESSION_ID } })
++      await waitUntil(() => notified.length > 0)
++      manager.shutdown()
++
++      //#then
++      expect(task.status).toBe("completed")
++      expect(notified).toEqual([task.id])
++    })
++
++    test("#when polling finds the child idle #then the task completes", async () => {
++      //#given
++      const { manager } = createManager(false)
++      const task = createRunningTask()
++      manager["tasks"].set(task.id, task)
++
++      //#when
++      await manager["pollRunningTasks"]()
++      manager.shutdown()
++
++      //#then
++      expect(task.status).toBe("completed")
++    })
++  })
++
++  describe("#given todo-continuation is enabled (default)", () => {
++    test("#when polling finds the child idle #then the task keeps waiting for the continuation", async () => {
++      //#given
++      const { manager, notified } = createManager()
++      const task = createRunningTask()
++      manager["tasks"].set(task.id, task)
++
++      //#when
++      await manager["pollRunningTasks"]()
++      manager.shutdown()
++
++      //#then
++      expect(task.status).toBe("running")
++      expect(notified).toEqual([])
++    })
++  })
++})
+diff --git a/packages/omo-opencode/src/features/background-agent/manager.ts b/packages/omo-opencode/src/features/background-agent/manager.ts
+index 3d662282e..5753f644c 100644
+--- a/packages/omo-opencode/src/features/background-agent/manager.ts
++++ b/packages/omo-opencode/src/features/background-agent/manager.ts
+@@ -246,6 +246,8 @@ export interface BackgroundManagerConfig {
+   onSubagentSessionDeleted?: OnSubagentSessionDeleted
+   onShutdown?: () => void | Promise<void>
+   enableParentSessionNotifications?: boolean
++  // false when the todo-continuation-enforcer hook is disabled: nothing resumes an idle child with open todos
++  todoContinuationEnabled?: boolean
+   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+   log?: typeof log
+ }
+@@ -290,6 +292,7 @@ export class BackgroundManager {
+   private rootDescendantCounts: Map<string, number>
+   private preStartDescendantReservations: Set<string>
+   private enableParentSessionNotifications: boolean
++  private todoContinuationEnabled: boolean
+   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
+   private logger: typeof log
+   private loggedSessionStatusUnavailable = false
+@@ -316,6 +319,7 @@ export class BackgroundManager {
+     this.rootDescendantCounts = new Map()
+     this.preStartDescendantReservations = new Set()
+     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
++    this.todoContinuationEnabled = options?.todoContinuationEnabled ?? true
+     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
+     this.logger = options?.log ?? log
+     this.parentWakeNotifier = new ParentWakeNotifier(
+@@ -1628,6 +1632,13 @@ The fallback retry session is now created and can be inspected directly.
+   }
+ 
+   private async checkSessionTodos(sessionID: string): Promise<boolean> {
++    // Open todos only defer completion while todo-continuation can resume the child. Without it, the
++    // child's last turn (an escalation, a blocker report) is its final answer, and waiting would leave the
++    // task running, and the parent unnotified, until the hard deadline.
++    if (!this.todoContinuationEnabled) {
++      return false
++    }
++
+     const observedIncompleteTodos = this.observedIncompleteTodosBySession.get(sessionID)
+     if (observedIncompleteTodos === false) {
+       return false
+diff --git a/packages/omo-opencode/src/testing/create-plugin-module.test.ts b/packages/omo-opencode/src/testing/create-plugin-module.test.ts
+index c91d43990..e8616a857 100644
+--- a/packages/omo-opencode/src/testing/create-plugin-module.test.ts
++++ b/packages/omo-opencode/src/testing/create-plugin-module.test.ts
+@@ -611,4 +611,27 @@ describe("createPluginModule()", () => {
+       expect(mockCreatePluginInterface).toHaveBeenCalled()
+     })
+   })
++
++  describe("#given todo-continuation-enforcer is in disabled_hooks", () => {
++    it("#then startup tells the background manager that no continuation will resume idle children", async () => {
++      // given
++      const pluginModule = createTestPluginModule()
++      mockLoadPluginConfig.mockReturnValue({ disabled_hooks: ["todo-continuation-enforcer"] })
++
++      try {
++        // when
++        await pluginModule.server({
++          directory: "/tmp/project",
++          client: {},
++        } as Parameters<typeof pluginModule.server>[0])
++
++        // then
++        expect(mockCreateManagers.mock.calls.at(0)?.[0]).toMatchObject({
++          todoContinuationEnforcerEnabled: false,
++        })
++      } finally {
++        mockLoadPluginConfig.mockReturnValue({})
++      }
++    })
++  })
+ })
+diff --git a/packages/omo-opencode/src/testing/create-plugin-module.ts b/packages/omo-opencode/src/testing/create-plugin-module.ts
+index b04d0a52f..b008bf608 100644
+--- a/packages/omo-opencode/src/testing/create-plugin-module.ts
++++ b/packages/omo-opencode/src/testing/create-plugin-module.ts
+@@ -313,6 +313,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
+       tmuxConfig,
+       modelCacheState,
+       backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
++      todoContinuationEnforcerEnabled: isHookEnabled("todo-continuation-enforcer"),
+       runtimeSkillSourceUrl: runtimeSkillSource?.url,
+     })
+ 
+-- 
+2.55.0.windows.5
+

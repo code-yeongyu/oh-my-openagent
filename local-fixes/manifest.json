@@ -786,6 +786,24 @@
       ],
       "orderNote": "After 47, which added the yieldToEventLoop stages around the config hook in v2/host.ts. 51 edits the same block: it seeds before hooks.config and unseeds after. Tests: v2/host.test.ts 'fix 51 model context limits (opencode-v2)'. RED against e624dd252: 2 fail, Expected 1000000 / Received null. GREEN: 26 pass. Adjacent suites (preemptive-compaction, context-limit-cache, model-core resolver, config-handler, event-shape, hook-bridge-tool-routing): 213 pass / 1 fail. The failure, 'Plan agent demote behavior > plan agent remains unchanged when planner is disabled', fails identically on the base. LSP clean; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS. The upstream variant on #9016 head 502a4f0fd is SwarmStorm/oh-my-openagent#6 (RED 2 fail / GREEN 17 pass). Post-restart acceptance: %TEMP%/oh-my-opencode.log shows '[oh-my-openagent] v2 model context limits seeded' per folder, and '[preemptive-compaction]' lines stop reporting 'unknown context limit' for catalog models.",
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10585"
+    },
+    {
+      "id": "52-bg-complete-without-todo-continuation",
+      "title": "Complete idle background children when todo-continuation is disabled",
+      "commit": "0ba4156bffb4c7e8d789f4dcf97399386596a153",
+      "patch": "patches/52-bg-complete-without-todo-continuation.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/8",
+      "why": "With todo-continuation-enforcer in disabled_hooks (owner config ~/.omo/omo.jsonc), a background child that goes idle with open todos never completes: session-idle-event-handler.ts logs 'Task has incomplete todos, waiting for todo-continuation' and pollRunningTasks logs 'Task has incomplete todos via polling, waiting', both waiting for a continuation that the disabled hook never sends. A child whose last turn is its answer stays running and its parent is never notified until the 60 min hard deadline. Observed 2026-10-19 in %TEMP%/oh-my-opencode.log: bg_3174f2b9 (Sisyphus-Junior, ses_eaafd7cb1ffeV32CuaZ7Pg1wiU) ended on 'ESCALATE: deep-high' at 16:44:43Z with 1 in_progress + 3 pending todos (4 open) (.omo/v2-state/todos.json), then logged the polling wait 180 times until background_cancel at 16:53:44Z; no [todo-continuation-enforcer] line exists for the session. createPluginModule now passes isHookEnabled('todo-continuation-enforcer') through createManagers to BackgroundManager as todoContinuationEnabled (default true); when false, checkSessionTodos does not defer completion. With the hook enabled nothing changes.",
+      "markers": [
+        "todoContinuationEnforcerEnabled",
+        "todoContinuationEnabled"
+      ],
+      "overlapsWith": [
+        "29-setup-phase-timing",
+        "47-v2-setup-nonblocking"
+      ],
+      "orderNote": "After 29 and 47, which placed markSetupPhase/yieldSetupSlice around the createManagers call in testing/create-plugin-module.ts; 52 adds one argument inside that call (cherry-pick onto 502a4f0fd auto-merged). Tests: features/background-agent/manager-todo-continuation-disabled.test.ts, create-managers.test.ts, testing/create-plugin-module.test.ts. RED against 6ab041ac1: 4 fail (Expected 'completed' / Received 'running'; Expected false / Received undefined); the enabled-default control passes. GREEN: 31 pass. Regression: bun test src/features/background-agent src/create-managers*.test.ts src/testing: 888 pass / 0 fail. LSP clean; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS. Upstream variant on #9016 head 502a4f0fd: https://github.com/SwarmStorm/oh-my-openagent/pull/8 (RED 4 fail / GREEN 28 pass). Post-restart acceptance: a background child that stops with open todos logs '[background-agent] Task completed via session.idle event' (or 'via polling (idle status)') and its parent receives the completion notification; no repeated 'Task has incomplete todos via polling, waiting' lines.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10615"
     }
   ],
   "externalFixes": [
