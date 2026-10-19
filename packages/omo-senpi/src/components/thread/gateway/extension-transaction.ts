@@ -1,6 +1,6 @@
 import { createGatewayEngine, type GatewayEngineOptions, type GatewayResolve } from "./engine"
 import { checkExtensionSchema, extensionSchema, extensionSql } from "./extension-sql"
-import { singleExtensionStatement } from "./extension-statement"
+import { orderByClause, orderByTerms, singleExtensionStatement } from "./extension-statement"
 import { createGatewayRelay, type GatewayRelayOptions } from "./relay"
 import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
@@ -100,8 +100,12 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
   const tx: StoreExtensionTransaction = {
     all: (columns, statement, params, orderBy) => sql(statement, () => {
       for (const column of columns) singleExtensionStatement(column)
-      if (orderBy !== undefined) singleExtensionStatement(orderBy)
-      return ctx.sql.all(columns, statement, params, orderBy)
+      if (orderBy === undefined) return ctx.sql.all(columns, statement, params)
+      const terms = orderByTerms(orderBy)
+      // Pass the statement through the extension's authorizer (WHERE 0, so no rows) before its output columns are read
+      // without one, so an unknown-column refusal cannot reveal the shape of a table the extension may not read.
+      ctx.sql.all(["0"], `SELECT 0 FROM (${statement}\n) WHERE 0`, params)
+      return ctx.sql.all(columns, statement, params, orderByClause(terms, ctx.sql.resultColumns(statement)))
     }),
     one: (columns, statement, params) => sql(statement, () => {
       for (const column of columns) singleExtensionStatement(column)

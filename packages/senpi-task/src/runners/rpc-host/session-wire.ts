@@ -67,7 +67,14 @@ const closedSchema = z.object({
   reason: z.string().min(1).optional(),
 })
 
-const controlRecordSchema = z.discriminatedUnion("type", [uiRequestSchema, parkedSchema, closedSchema])
+const replacedSchema = z.object({
+  type: z.literal("session_replaced"),
+  sessionId: z.string().min(1).optional(),
+  durableSessionId: z.string().min(1),
+  sessionFile: z.string().min(1),
+})
+
+const controlRecordSchema = z.discriminatedUnion("type", [uiRequestSchema, parkedSchema, closedSchema, replacedSchema])
 
 /** A frame the session client itself acts on, as opposed to an agent event it fans out. */
 export type HostControlRecord = z.infer<typeof controlRecordSchema>

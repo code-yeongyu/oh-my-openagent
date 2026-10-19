@@ -85,4 +85,22 @@ describe("unspecified-low chain order", () => {
     // then: grok-4.6 left the chain entirely, so its sole presence must not resolve the category
     expect(result.kind).toBe("model_unavailable")
   })
+
+  test("#given only Claude, ChatGPT and Z.ai are connected and the sonnet-5-5 head is absent #when unspecified-low resolves #then the glm-5.3 high rung wins ahead of GPT", () => {
+    // given: the reported setup (#10306) with Sonnet 5.5 unavailable, so neither mimo nor grok can resolve
+    const models: readonly FakeModel[] = [
+      { provider: "zai", id: "glm-5.3" },
+      { provider: "chatgpt-subscription", id: "gpt-6.1-sol" },
+      { provider: "chatgpt-subscription", id: "gpt-5.6-sol" },
+      { provider: "anthropic-subscription", id: "claude-sonnet-5" },
+    ]
+
+    // when
+    const result = resolveCategory("unspecified-low", {}, registry(models))
+
+    // then
+    expect(result.kind).toBe("resolved")
+    if (result.kind !== "resolved") throw new Error("Expected unspecified-low to resolve")
+    expect(result.spec).toMatchObject({ provider: "zai", modelId: "glm-5.3", variant: "high" })
+  })
 })
