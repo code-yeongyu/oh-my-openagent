@@ -24,6 +24,7 @@ export function rollbackDetachedRevival(
       final_response: _freshFinal,
       error_message: _freshError,
       failure_kind: _freshFailureKind,
+      interrupt_cause: _freshInterruptCause,
       failure_reason: _freshFailureReason,
       run_stats: _freshStats,
       killed: _freshKilled,

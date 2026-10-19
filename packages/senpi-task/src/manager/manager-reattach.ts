@@ -80,6 +80,7 @@ export async function reattachManagedTask(input: {
     const {
       error_message: _error,
       failure_kind: _failureKind,
+      interrupt_cause: _interruptCause,
       failure_reason: _failureReason,
       final_response: _final,
       killed: _killed,

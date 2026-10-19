@@ -1,6 +1,7 @@
 import type { ChildEventListener } from "../types"
 import { type ChildExtensionListener, createChildExtensionEvents } from "../child-extension-events"
 import type { HostSessionParked } from "./session-client"
+import type { HostSessionReplaced } from "./session-client-contract"
 
 type ChildEvent = Parameters<ChildEventListener>[0]
 
@@ -9,6 +10,7 @@ export interface ListenerRegistrations {
   subscribe(listener: ChildEventListener): () => boolean
   subscribeExtensionEvents(listener: ChildExtensionListener): () => void
   onParked(listener: (event: HostSessionParked) => void): () => boolean
+  onReplaced(listener: (event: HostSessionReplaced) => void): () => boolean
   onTurnResumed(listener: () => void): () => boolean
   onSelfResumed(listener: () => void): () => boolean
 }
@@ -18,6 +20,7 @@ export interface HandleListeners {
   readonly registrations: ListenerRegistrations
   emitEvent(event: ChildEvent): void
   emitParked(event: HostSessionParked): void
+  emitReplaced(event: HostSessionReplaced): void
   emitTurnResumed(): void
   emitSelfResumed(): void
   clearActive(): void
@@ -65,6 +68,7 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     if (earlyEvents !== undefined) replayed.add(listener)
   }
   const parkedListeners = new Set<(event: HostSessionParked) => void>()
+  const replacedListeners = new Set<(event: HostSessionReplaced) => void>()
   const turnResumedListeners = new Set<() => void>()
   const resumedListeners = new Set<() => void>()
   let earlyResume = false
@@ -79,6 +83,10 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     onParked: (listener) => {
       parkedListeners.add(listener)
       return () => parkedListeners.delete(listener)
+    },
+    onReplaced: (listener) => {
+      replacedListeners.add(listener)
+      return () => replacedListeners.delete(listener)
     },
     onTurnResumed: (listener) => {
       turnResumedListeners.add(listener)
@@ -107,6 +115,9 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     },
     emitParked: (event) => {
       for (const listener of parkedListeners) listener(event)
+    },
+    emitReplaced: (event) => {
+      for (const listener of replacedListeners) listener(event)
     },
     emitTurnResumed: () => {
       for (const listener of turnResumedListeners) listener()

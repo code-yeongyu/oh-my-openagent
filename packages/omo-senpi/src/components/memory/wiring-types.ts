@@ -5,6 +5,7 @@ import type { FactsExtractorRunnerOptions } from "./facts-runner"
 import type { FactsExtractorPort } from "./facts-wiring"
 import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identity-runtime"
 import type { KibitzerChildStarterSeams } from "./kibitzer"
+import type { MemoryMaintenance, MemoryMaintenanceOptions } from "./memory-maintenance"
 import type { ShutdownDrainInput, ShutdownEvaluator } from "./shutdown-drain"
 import type { refreshMemoryStatus } from "./status"
 import type { MemoryFooterTimers } from "./status-live"
@@ -23,6 +24,8 @@ export interface MemoryWiringOptions {
   readonly logger?: ComponentLogger
   readonly createRuntime?: (identity: MemoryIdentityContext, deps: MemoryIdentityRuntimeDeps) => MemoryIdentityRuntime
   readonly createFactsExtractor?: (options: FactsExtractorRunnerOptions) => FactsExtractorPort
+  /** Background repo maintenance; tests substitute one whose in-flight pass they control. */
+  readonly createMaintenance?: (options: MemoryMaintenanceOptions) => MemoryMaintenance
   /** Resident Kibitzer child seams; tests and the live QA driver substitute a scripted child here. */
   readonly kibitzerChildStarter?: KibitzerChildStarterSeams
   readonly now?: () => number

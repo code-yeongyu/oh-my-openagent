@@ -15,6 +15,9 @@ import type {
 } from "./types"
 import type { TaskRunStats } from "./run-stats-types"
 
+/** An interrupt the parent did not request: the host replaced the child's session mid-turn. */
+export type TaskInterruptCause = "session_replaced"
+
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
@@ -129,6 +132,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly effective_model?: EffectiveModelRecord
   readonly final_response?: string
   readonly error_message?: string
+  /** Why a run was interrupted when the parent did not ask for it; such an interrupt notifies the parent. */
+  readonly interrupt_cause?: TaskInterruptCause
   readonly stop_reason?: "deadline"
   readonly deadline?: Readonly<Record<string, unknown>>
   // Exit observed, cause unconfirmed: status stays running until the owning manager confirms it.

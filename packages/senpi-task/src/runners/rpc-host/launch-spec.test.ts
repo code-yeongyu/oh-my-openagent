@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { MEMBER_EXTENSION_BUNDLE_NAME } from "../../team/member-extension/identity"
@@ -47,6 +47,23 @@ function writeSpec(dir: string, spec: unknown, mode = 0o644): string {
   return path
 }
 
+// The checked-out spec's mode follows the checkout's umask (0664 under umask 002), which the reader
+// rightly refuses, so the built-spec tests read a 0644 copy of the shipped bytes from a scratch
+// mirror of the plugin root whose other entries link back to the real plugin. Windows skips the mode
+// check and may lack the symlink privilege, so it reads the real plugin root directly.
+function shippedPluginMirror(): string {
+  if (process.platform === "win32") return pluginRoot
+  const mirror = scratchDir()
+  const specName = "daemon-launch-spec.json"
+  for (const entry of readdirSync(pluginRoot)) {
+    if (entry === specName) continue
+    symlinkSync(join(pluginRoot, entry), join(mirror, entry))
+  }
+  copyFileSync(resolveDaemonLaunchSpecPath(pluginRoot), join(mirror, specName))
+  chmodSync(join(mirror, specName), 0o644)
+  return mirror
+}
+
 describe("resolveDaemonLaunchSpecPath", () => {
   test("#given a plugin root #when resolving #then the spec sits next to the plugin manifest", () => {
     // given
@@ -63,7 +80,7 @@ describe("resolveDaemonLaunchSpecPath", () => {
 describe("readDaemonLaunchSpec", () => {
   test("#given the built plugin spec #when reading #then it parses as spec_version 1 in-process", () => {
     // given
-    const path = resolveDaemonLaunchSpecPath(pluginRoot)
+    const path = resolveDaemonLaunchSpecPath(shippedPluginMirror())
 
     // when
     const spec = readDaemonLaunchSpec(path)
@@ -80,7 +97,8 @@ describe("readDaemonLaunchSpec", () => {
 
   test("#given the built plugin spec #when resolving extensions #then each path exists under the plugin root", () => {
     // given
-    const path = resolveDaemonLaunchSpecPath(pluginRoot)
+    const mirror = shippedPluginMirror()
+    const path = resolveDaemonLaunchSpecPath(mirror)
     const specDir = dirname(path)
 
     // when
@@ -92,7 +110,7 @@ describe("readDaemonLaunchSpec", () => {
       expect(isAbsolute(extension)).toBe(false)
       expect(extension.split("/").includes("..")).toBe(false)
       const resolved = resolve(specDir, extension)
-      const rel = relative(pluginRoot, resolved)
+      const rel = relative(mirror, resolved)
       expect(rel.startsWith("..")).toBe(false)
       expect(isAbsolute(rel)).toBe(false)
       expect(existsSync(resolved)).toBe(true)

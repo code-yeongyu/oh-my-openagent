@@ -35,6 +35,7 @@ const TASK_EVENTS = [
   "context",
   "session_start",
   "session_before_reload",
+  "session_resumed",
   "session_before_switch",
   "session_before_compact",
   "session_compact",

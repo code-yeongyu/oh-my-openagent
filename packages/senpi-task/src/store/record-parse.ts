@@ -96,6 +96,8 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const revivalDeferredReason = readOptionalString(value, "revival_deferred_reason")
   const recoveryDeadlineAt = readOptionalNumber(value, "recovery_deadline_at")
   const failureKind = readOptionalTaskStartFailureKind(value)
+  // An unknown cause (a newer build's) is dropped: the record still parses and the interrupt stays silent.
+  const interruptCause = value.interrupt_cause === "session_replaced" ? "session_replaced" : undefined
   const failureReason = readOptionalTaskStartFailureReason(value)
   const hostSession = parseOptionalHostSession(value)
   validateHostSessionConsistency(runnerKind, hostSession)
@@ -158,6 +160,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(stopReason === undefined ? {} : { stop_reason: stopReason }),
     ...(deadline === undefined ? {} : { deadline }),
     ...(failureKind === undefined ? {} : { failure_kind: failureKind }),
+    ...(interruptCause === undefined ? {} : { interrupt_cause: interruptCause }),
     ...(failureReason === undefined ? {} : { failure_reason: failureReason }),
     ...(killed === undefined ? {} : { killed }),
     ...(runStats === undefined ? {} : { run_stats: runStats }),

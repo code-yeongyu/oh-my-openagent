@@ -155,6 +155,7 @@ describe("plugin load telemetry send path", () => {
     // when
     client.trackActive("distinct-plugin", "plugin_loaded")
     await client.flush()
+    await client.shutdown()
 
     // then
     expect(batchRequests).toEqual(["/batch/"])

@@ -47,7 +47,9 @@ jobs:
         include:
           - { os: macos-14, rust_target: aarch64-apple-darwin }
           - { os: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04-arm, rust_target: aarch64-unknown-linux-gnu }
           - { os: windows-latest, rust_target: x86_64-pc-windows-msvc }
+          - { os: windows-11-arm, rust_target: aarch64-pc-windows-msvc }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -55,7 +57,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/setup-python@v7
         if: runner.os == 'Windows'
@@ -115,7 +117,7 @@ jobs:
       - name: X11 display tests
         if: runner.os == 'Linux'
         run: |
-          xvfb-run -a cargo test -p senpi-desktop-backend-x11 --locked --lib -- --ignored --exact capture::live_tests::captures_root_window stop_path::live_tests::raw_key_chord_latches_supervisor
+          xvfb-run -a cargo test -p senpi-desktop-backend-x11 --locked --lib -- --ignored --exact capture::live_tests::captures_root_window stop_path::live_tests::an_xtest_chord_never_latches_the_supervisor
           env -u DISPLAY cargo test -p senpi-desktop-backend-x11 --locked --lib -- --ignored --exact stop_path::live_tests::start_without_a_display_is_unavailable_and_not_live
           xvfb-run -a cargo test -p senpi-desktop-core --features system-clipboard --locked --lib -- --ignored --exact clipboard::live_tests::a_written_text_reads_back_from_the_system_clipboard --nocapture
 

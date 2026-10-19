@@ -165,7 +165,8 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_end": {
           if (event.willRetry !== false) return
           const outcome = endOutcome(event)
-          if (outcome.status === "cancelled") {
+          // A replaced session runs nothing more for this child: its interrupt is final at once.
+          if (outcome.status === "cancelled" || outcome.status === "interrupted") {
             clearConfirmation()
             held = undefined
             input.settle(outcome)

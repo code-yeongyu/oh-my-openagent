@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - name: Build oh-my-openagent-web (no token in this step)
         if: inputs.worker == 'web'

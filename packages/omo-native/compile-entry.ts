@@ -27,7 +27,7 @@ import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
 import { runSetup } from "./bin/lib/setup-import.js"
 import { runCompiledDoctor, type CompiledDoctorOptions } from "./compiled-doctor"
-import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
+import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine, loadCompiledModelCatalog } from "./compiled-diagnostic-runtime"
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
@@ -226,6 +226,8 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     await (migration.runSetup ?? runSetup)(args.slice(1), {
       loadCoverageRuntime: compiledDiagnosticRuntimeLoader(compiledPackageRoot ?? execDir),
       loadCoverageEngine: loadCompiledCoverageEngine,
+      loadModelCatalog: loadCompiledModelCatalog,
+      pluginRoot: join(compiledPackageRoot ?? execDir, "plugin"),
     })
     return true
   }

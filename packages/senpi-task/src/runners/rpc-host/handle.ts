@@ -11,7 +11,6 @@ import { settleClassifiedSessionExit } from "./handle-exit"
 import type {
   HostSessionChildHandle,
   HostSessionHandleOptions,
-  HostSessionIdentity,
   HostSessionOpenDisposition,
   HostSessionPort,
 } from "./handle-port"
@@ -19,11 +18,12 @@ import { startHostHeartbeat } from "./handle-heartbeat"
 import { unresponsiveMessage } from "../rpc/heartbeat"
 import { createHandleListeners } from "./handle-listeners"
 import { createHandleRecovery } from "./handle-recovery"
+import { createHandleSessionIdentity } from "./handle-session-identity"
 import { createHandleReconciliation } from "./handle-reconciliation"
 import { createHandleStop } from "./handle-stop"
 import { createHandleTeardown } from "./handle-teardown"
 import { createHandleWaiters } from "./handle-waiters"
-import type { HostSessionParked } from "./session-client"
+import type { HostSessionParked, HostSessionReplaced } from "./session-client"
 import { extractTerminalAssistantMessage } from "./terminal-message"
 import { createInputEffects } from "../input-effects"
 import { toHostInput } from "./input-command"
@@ -41,14 +41,13 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   // Both move on a reattach: a recovered transport is a new port, and a reopened session a new
   // routing handle on a possibly new host generation. The session PATH is the child's identity.
   let client: HostSessionPort = options.client
-  let session: HostSessionIdentity = options.session
+  const identity = createHandleSessionIdentity(options.session)
   let openDisposition: HostSessionOpenDisposition = options.openDisposition
   const listeners = createHandleListeners({
     onListenerError: (error) => log("senpi-task early event replay listener failed", { taskId, error: String(error) }),
   })
   const waiters = createHandleWaiters()
   let reachedIdle = false
-  let sessionId: string | undefined
   let finalText: string | undefined
   let turnBaseline: string | undefined
   let turnOutcome: RunnerOutcome | undefined
@@ -120,7 +119,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     port: () => client,
     onState: (state) => {
       lastSeenAt = now()
-      sessionId = state.sessionId
+      identity.observeDurableId(state.sessionId)
     },
     onUnresponsive: () => {
       settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: unresponsiveMessage(taskId) } })
@@ -152,7 +151,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     listeners.emitParked(event)
   }
 
-  const settleClassified = (classified: ReturnType<typeof classifySessionExit>): void => settleClassifiedSessionExit(classified, { session, exit: settleExit, park })
+  const settleClassified = (classified: ReturnType<typeof classifySessionExit>): void => settleClassifiedSessionExit(classified, { session: identity.current(), exit: settleExit, park })
 
   /**
    * A session that ends while this child still holds it is the child's exit. Once the session was
@@ -191,17 +190,17 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     },
     continueInput: (command) => inputEffects.send(command, identified => client.send(toHostInput(identified))),
     port: () => client,
-    identity: () => session,
+    identity: identity.current,
     alive: () => intent === "running" && !parked && !detached && outcome === undefined,
     turnSettled: () => turnOutcome !== undefined || reachedIdle,
     adopt: (next) => {
       client = next.client
-      session = next.session
+      identity.adopt(next.session)
       openDisposition = next.attached ? "attached" : "reopened"
       bindHostSessionPort(client, clientBinding)
     },
     turnResumed: () => listeners.emitTurnResumed(),
-    reconcile: (reopened: boolean) => reconciliation.reconcile(session.sessionPath, undefined, true, reopened),
+    reconcile: (reopened: boolean) => reconciliation.reconcile(identity.current().sessionPath, undefined, true, reopened),
     beginContinuation: () => beginTurn(),
     endLost: () => endSession({ kind: "transport_gone" }),
     // Transport failures park in recovery; a prompt rejection keeps its own actionable cause.
@@ -209,7 +208,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       if (intent === "running" && !stop.requested() && !detached && outcome === undefined)
         settleTurn(promptFailureOutcome(error))
     },
-    park: (reason) => park({ sessionId: session.routingId, sessionPath: session.sessionPath, reason }),
+    park: (reason) => park({ sessionId: identity.current().routingId, sessionPath: identity.current().sessionPath, reason }),
   })
 
   const clientBinding = {
@@ -219,6 +218,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     onExtensionEvent: listeners.extensionEvents.publish,
     onParked: park,
     onClosed: (event: { readonly reason: string | undefined }) => endSession({ kind: "session_closed", reason: event.reason }),
+    onReplaced: (event: HostSessionReplaced) => listeners.emitReplaced(identity.followReplace(event)),
     onTransportGone: recovery.onTransportGone,
   }
 
@@ -268,10 +268,10 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     task_id: taskId,
     kind: "host-session",
     get hostSession() {
-      return { socket: client.socketPath, ...session }
+      return { socket: client.socketPath, ...identity.current() }
     },
     get sessionId() {
-      return sessionId
+      return identity.durableId()
     },
     pid: undefined,
     get attached() {
@@ -295,7 +295,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     markStopping: stop.markStopping,
     stopWhenReachable: stop.stopWhenReachable,
     ...listeners.registrations,
-    reconcileTurn: (record) => reconciliation.reconcile(session.sessionPath, record, false, openDisposition === "reopened"),
+    reconcileTurn: (record) => reconciliation.reconcile(identity.current().sessionPath, record, false, openDisposition === "reopened"),
     onReconciled: reconciliation.subscribe,
     adoptFinishedTurn: async (finalResponse) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return

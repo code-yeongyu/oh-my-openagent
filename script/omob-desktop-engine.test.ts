@@ -97,7 +97,7 @@ describe.skipIf(process.platform === "win32")("ensureDesktopEngine", () => {
 	})
 
 	test("#given a target that ships no engine #when the build runs #then cargo is skipped", () => {
-		expect(ensureDesktopEngine(repo, "linux-arm64", env, quiet)).toBe("skipped")
+		expect(ensureDesktopEngine(repo, "linux-arm64-musl", env, quiet)).toBe("skipped")
 		expect(cargoCalls()).toEqual([])
 	})
 

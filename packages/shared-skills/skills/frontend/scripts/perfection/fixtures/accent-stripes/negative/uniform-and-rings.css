@@ -1,0 +1,3 @@
+.selected { border-radius: 8px; border: 2px solid #6366f1; }
+.chip { border-radius: 999px; box-shadow: inset 0 0 0 2px #6366f1; }
+.lift { border-radius: 12px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.12); }

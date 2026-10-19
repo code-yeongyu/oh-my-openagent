@@ -71,7 +71,7 @@
     "@playwright/test": "1.63.0",
     "@resvg/resvg-wasm": "2.6.2",
     "@tailwindcss/postcss": "4.3.3",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.3",
     "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

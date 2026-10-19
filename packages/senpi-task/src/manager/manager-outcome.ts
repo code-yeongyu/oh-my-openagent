@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { SuspensionReason, TaskRecord, TaskRunStats, TaskTransition } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
+import type { HostSessionReplaced } from "../runners/rpc-host/session-client"
 import type { ForgetOptions } from "./types"
 import { terminalFailureMessage } from "./credential-failure"
 import { nowIso } from "./manager-helpers"
@@ -181,10 +182,41 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   // that stays resident after its turn is exactly the session a host idle sweep parks.
   const parkWatches = new Map<string, () => void>()
 
+  // The host swapped the session under its live routing handle: the child keeps running on a NEW
+  // transcript and durable id, so the record follows - no park, no release. Nothing later may
+  // reattach-by-path into the abandoned transcript (F9).
+  function replaceOwned(taskId: string, handle: ManagedChildHandle, epoch: number, event: HostSessionReplaced): void {
+    if (ownedRecord(ports, taskId, handle, epoch) === null) return
+    ports.store.mutate(taskId, (fresh) => {
+      if (fresh.host_session === undefined) return fresh
+      return {
+        ...fresh,
+        host_session: { ...fresh.host_session, session_path: event.sessionFile },
+        child_session_id: event.durableSessionId,
+        updated_at: nowIso(ports.now),
+      }
+    })
+    ports.store.appendEvent(taskId, {
+      type: "replaced",
+      payload: { session_path: event.sessionFile, durable_session_id: event.durableSessionId },
+    })
+  }
+
+  // One replace watch per task beside the park watch: a resident child whose turn ended is exactly
+  // the session a raw client can still issue `new_session` on.
+  const replaceWatches = new Map<string, () => void>()
+
+  function watchReplaced(taskId: string, handle: ManagedChildHandle, epoch: number): void {
+    const stop = handle.onReplaced?.((event) => replaceOwned(taskId, handle, epoch, event))
+    if (stop !== undefined) replaceWatches.set(taskId, stop)
+  }
+
   function release(taskId: string): void {
     provisional.release(taskId)
     parkWatches.get(taskId)?.()
     parkWatches.delete(taskId)
+    replaceWatches.get(taskId)?.()
+    replaceWatches.delete(taskId)
   }
 
   function watchParks(taskId: string, handle: ManagedChildHandle, epoch: number): void {
@@ -210,6 +242,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
 
   function trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
     watchParks(taskId, handle, epoch)
+    watchReplaced(taskId, handle, epoch)
     handle
       .waitForOutcome()
       .then(async (outcome) => {
@@ -234,9 +267,9 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
           return
         }
 
-        // A foreign user abort interrupted the run (F10a): terminal and resumable with its partial
-        // text kept, and never a failure - no fail transition, so no failure notification fires
-        // and no runtime fallback is attempted.
+        // The run stopped for a reason the parent did not ask for - another client's user abort (F10a,
+        // partial text kept) or its session being replaced (cause and message) - so it is terminal and
+        // resumable, never a failure: no fail transition, no failure notification, no runtime fallback.
         if (outcome.status === "interrupted") {
           ports.releaseSlot(taskId, model, epoch)
           const settlingInterrupted = settleIsolationFor(ports, owned, false)
@@ -244,6 +277,8 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
           persistTerminal(taskId, owned, timestamp, {
             type: "interrupt",
             timestamp,
+            ...(outcome.message === undefined ? {} : { error_message: outcome.message }),
+            ...(outcome.cause === undefined ? {} : { interrupt_cause: outcome.cause }),
             ...(outcome.finalResponse === undefined ? {} : { final_response: outcome.finalResponse }),
             ...(runStats === undefined ? {} : { run_stats: runStats }),
           })

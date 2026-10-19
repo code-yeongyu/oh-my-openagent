@@ -177,7 +177,11 @@ export async function planModelChoices(stage) {
   if (!hasModelChoices(raw)) return empty
   let registry
   try {
-    registry = await (stage.loadRegistry ?? loadEngineModels)({ agentDir: stage.agentDir, customProviders: stage.customProviders })
+    registry = await (stage.loadRegistry ?? loadEngineModels)({
+      agentDir: stage.agentDir,
+      customProviders: stage.customProviders,
+      loadCatalog: stage.runtime.loadModelCatalog,
+    })
   } catch (error) {
     return { ...empty, notices: [...raw.notices, `WARN senpi: could not read the engine's model list (${error.message}); model choices were not carried`] }
   }

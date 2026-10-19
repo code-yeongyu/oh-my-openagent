@@ -266,6 +266,41 @@ describe("createMemoryComponent", () => {
     memoryModuleSupervisor.release()
   })
 
+  test("#given a session bound at session_start #when later runs start #then the full history is never read (senpi#3110)", async () => {
+    // A reopened compacted session answers getEntries() by re-parsing its whole transcript file and holds
+    // the result until it settles idle, so an eager read here pinned that copy for every run.
+    const { cwd, memoryHome } = fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    createMemoryComponent({
+      env: { OMO_MEMORY_HOME: memoryHome },
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+    const live = sessionContext()
+    let historyReads = 0
+    const counted = {
+      ...live,
+      sessionManager: {
+        ...live.sessionManager,
+        getEntries: () => {
+          historyReads++
+          return live.sessionManager.getEntries()
+        },
+      },
+    }
+    await pi.dispatch("session_start", {}, counted)
+    historyReads = 0
+
+    await pi.dispatch("before_agent_start", {}, counted)
+    await pi.dispatch("before_agent_start", {}, counted)
+
+    expect(historyReads).toBe(0)
+    memoryModuleSupervisor.release()
+  })
+
   test("#given enablement latched false at session_start or an event without a session id #when before_agent_start fires #then nothing is bound", async () => {
     const { cwd, memoryHome } = fixture()
     const pi = new MemoryFakeExtensionAPI()

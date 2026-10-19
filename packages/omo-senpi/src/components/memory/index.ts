@@ -48,7 +48,13 @@ export interface MemoryComponentOptions {
 
 type SessionUi = { notify(message: string, level: "error" | "warning"): void }
 type SessionSurface = {
-  readonly entries: readonly SessionEntryLike[]
+  /**
+   * The session's full history, read only when a bind needs its recorded binding. On a reopened
+   * compacted session `getEntries()` re-parses the whole transcript file and keeps it until the session
+   * settles idle, so reading it eagerly on every `before_agent_start` pinned about four times the
+   * transcript for each run (senpi#3110).
+   */
+  readonly readEntries: () => readonly SessionEntryLike[]
   readonly id: string
   readonly ui?: SessionUi
   readonly hasUI?: boolean
@@ -135,7 +141,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         const sessionCwd = surface.cwd ?? cwd
         const memoryRoot = resolveMemoryRoot(env, sessionCwd)
         const resolved = resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
-        const previous = findLatestMemoryBinding(surface.entries)
+        const previous = findLatestMemoryBinding(surface.readEntries())
         const adoption = adoptSessionIdentity({
           recorded: previous,
           resolved,
@@ -285,15 +291,18 @@ function releaseSession(state: SessionState | undefined): void {
 }
 
 function readSessionSurface(value: unknown): SessionSurface {
-  if (!isRecord(value)) return { entries: [], id: "unknown-session" }
+  if (!isRecord(value)) return { readEntries: () => [], id: "unknown-session" }
   const manager = isRecord(value.sessionManager) ? value.sessionManager : undefined
   const getSessionId = manager?.getSessionId
   const getEntries = manager?.getEntries
   const id = typeof getSessionId === "function" ? Reflect.apply(getSessionId, manager, []) : "unknown-session"
-  const entries = typeof getEntries === "function" ? Reflect.apply(getEntries, manager, []) : []
+  const readEntries = (): readonly SessionEntryLike[] => {
+    const entries: unknown = typeof getEntries === "function" ? Reflect.apply(getEntries, manager, []) : []
+    return Array.isArray(entries) ? entries : []
+  }
   const ui = isSessionUi(value.ui) ? value.ui : undefined
   return {
-    entries: Array.isArray(entries) ? entries : [],
+    readEntries,
     id: typeof id === "string" && id.length > 0 ? id : "unknown-session",
     ...(ui === undefined ? {} : { ui }),
     ...(typeof value.hasUI === "boolean" ? { hasUI: value.hasUI } : {}),
