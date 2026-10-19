@@ -11,6 +11,7 @@ import type { ContextCollector } from "../../../features/context-injector"
 import { isHookDisabled, log } from "../../../shared"
 import { appendTranscriptEntry } from "../transcript"
 import { sessionFirstMessageProcessed, sessionInterruptState } from "../session-hook-state"
+import { hasActiveNativeContextMode } from "../../../shared/native-plugin-context"
 
 export function createChatMessageHandler(
 	ctx: PluginInput,
@@ -37,7 +38,7 @@ export function createChatMessageHandler(
 			return
 		}
 
-		const claudeConfig = await loadClaudeHooksConfig()
+		let claudeConfig = await loadClaudeHooksConfig()
 		const extendedConfig = await loadPluginExtendedConfig()
 
 		const textParts = output.parts.filter((p) => p.type === "text" && p.text)
@@ -63,6 +64,24 @@ export function createChatMessageHandler(
 			return
 		}
 
+		const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
+		sessionFirstMessageProcessed.add(input.sessionID)
+		if (isHookDisabled(config, "UserPromptSubmit")) return
+
+		if (claudeConfig?.UserPromptSubmit?.some((matcher) => matcher.hooks.some((hook) => hook.pluginName === "context-mode"))
+			&& await hasActiveNativeContextMode(ctx)) {
+			claudeConfig = {
+				...claudeConfig,
+				UserPromptSubmit: claudeConfig.UserPromptSubmit.map((matcher) => ({
+					...matcher,
+					hooks: matcher.hooks.filter((hook) => hook.pluginName !== "context-mode"),
+				})),
+			}
+			log("[claude-code-hooks] native context-mode owns UserPromptSubmit; bridge skipped")
+		}
+		// No parent read (or HTTP hop on older hosts) when no prompt hook can run.
+		if (!claudeConfig?.UserPromptSubmit?.some((matcher) => matcher.hooks.length > 0)) return
+
 		let parentSessionId: string | undefined
 		try {
 			const sessionInfo = await ctx.client.session.get({
@@ -76,13 +95,6 @@ export function createChatMessageHandler(
 				error: errorMessage,
 			})
 			parentSessionId = undefined
-		}
-
-		const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
-		sessionFirstMessageProcessed.add(input.sessionID)
-
-		if (isHookDisabled(config, "UserPromptSubmit")) {
-			return
 		}
 
 		const userPromptCtx: UserPromptSubmitContext = {

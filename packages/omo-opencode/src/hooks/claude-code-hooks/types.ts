@@ -24,6 +24,8 @@ export interface HookMatcher {
 
 export interface HookCommand {
   type: "command"
+  /** Loader-stamped provenance; never infer plugin identity from command text. */
+  pluginName?: string
   command: string
   /** Env vars allowed to pass through to the spawned process (plugin-sourced hooks are intersected with mcp_env_allowlist) */
   allowedEnvVars?: string[]
@@ -33,6 +35,7 @@ export interface HookCommand {
 
 export interface HookHttp {
   type: "http"
+  pluginName?: string
   url: string
   headers?: Record<string, string>
   allowedEnvVars?: string[]
