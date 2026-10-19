@@ -6,6 +6,9 @@ import type { Plugin } from "@opencode/plugin"
 import { afterEach, describe, expect, test } from "bun:test"
 import { z } from "zod"
 
+import { applyProviderConfig } from "../plugin-handlers/provider-config-handler"
+import { createModelCacheState } from "../plugin-state"
+import { resolveActualContextLimit } from "../shared/context-limit-resolver"
 import { createAdapterState } from "./adapter-state"
 import { permissionsFromV1, renderAgentMarkdown } from "./agent-markdown"
 import { createV1PluginInput } from "./context-facade"
@@ -803,5 +806,106 @@ describe("fix 50 session ownership (opencode-v2)", () => {
     await waitFor(() => seen.some((event) => event.type === "config.updated"))
     expect(seen.some((event) => event.type === "config.updated")).toBe(true)
     await cleanup?.()
+  })
+})
+
+describe("fix 51 model context limits (opencode-v2)", () => {
+  const directories: string[] = []
+
+  afterEach(() => {
+    for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  })
+
+  function setup(opts: {
+    models: () => Promise<unknown>
+    config?: (config: Record<string, unknown>) => void
+  }): { fake: ReturnType<typeof createFakeContext>; modelCacheState: ReturnType<typeof createModelCacheState>; added: string[]; run: () => Promise<unknown> } {
+    const fake = createFakeContext()
+    const directory = mkdtempSync(join(tmpdir(), "omo-v2-limits-"))
+    directories.push(directory)
+    const modelCacheState = createModelCacheState()
+    const added: string[] = []
+    const host = fake.ctx as unknown as {
+      model: { list: () => Promise<unknown> }
+      provider: { transform: (fn: (editor: Record<string, unknown>) => void) => Promise<void> }
+    }
+    host.model.list = opts.models
+    host.provider.transform = async (fn) => {
+      fn({
+        list: () => [],
+        get: () => undefined,
+        add(provider: { info: { id: unknown } }) {
+          added.push(String(provider.info.id))
+        },
+        update() {},
+        remove() {},
+        models: { set() {}, update() {}, remove() {} },
+      })
+    }
+    const run = () => setupOpenCodeV2(fake.ctx, {
+      agentDirectory: directory,
+      server: async () => ({
+        // Mirrors the V1 config handler's provider phase.
+        config: async (config: Record<string, unknown>) => {
+          opts.config?.(config)
+          applyProviderConfig({ config, modelCacheState })
+        },
+      }),
+    })
+    return { fake, modelCacheState, added, run }
+  }
+
+  test("seeds the context-limit cache from the host model catalog", async () => {
+    const { modelCacheState, added, run } = setup({
+      models: async () => [
+        { id: "deepseek-v4.1-flash", modelID: "deepseek-v4.1-flash", providerID: "opencode-go", limit: { context: 1_000_000, output: 384_000 } },
+        { id: "gpt-6-astra", modelID: "gpt-6-astra", providerID: "openai", limit: { context: 1_050_000, output: 128_000 } },
+        { id: "claude-opus-5-5", modelID: "claude-opus-5-5", providerID: "claude-code", limit: { context: 1_000_000, output: 64_000 } },
+        { id: "alias", modelID: "api-name", providerID: "openai", limit: { context: 400_000, output: 32_000 } },
+      ],
+    })
+
+    await run()
+
+    expect(resolveActualContextLimit("opencode-go", "deepseek-v4.1-flash", modelCacheState)).toBe(1_000_000)
+    expect(resolveActualContextLimit("openai", "gpt-6-astra", modelCacheState)).toBe(1_050_000)
+    expect(resolveActualContextLimit("claude-code", "claude-opus-5-5", modelCacheState)).toBe(1_000_000)
+    expect(resolveActualContextLimit("openai", "alias", modelCacheState)).toBe(400_000)
+    expect(resolveActualContextLimit("openai", "api-name", modelCacheState)).toBe(400_000)
+    // The seed is host data: it must not be projected back as plugin-declared providers.
+    expect(added).toEqual([])
+  })
+
+  test("keeps providers the plugin itself declares", async () => {
+    const { modelCacheState, added, run } = setup({
+      models: async () => ({ data: [{ id: "m", providerID: "p", limit: { context: 300_000, output: 1 } }] }),
+      config: (config) => {
+        const providers = config.provider as Record<string, unknown>
+        providers.own = { name: "Own", models: { x: { limit: { context: 128_000 } } } }
+      },
+    })
+
+    await run()
+
+    expect(resolveActualContextLimit("p", "m", modelCacheState)).toBe(300_000)
+    expect(resolveActualContextLimit("own", "x", modelCacheState)).toBe(128_000)
+    expect(added).toEqual(["own"])
+  })
+
+  test("setup still completes when the model catalog is unavailable", async () => {
+    let configured = false
+    const { modelCacheState, run } = setup({
+      models: async () => {
+        throw new Error("catalog down")
+      },
+      config: () => {
+        configured = true
+      },
+    })
+
+    await run()
+
+    expect(configured).toBe(true)
+    expect(resolveActualContextLimit("opencode-go", "deepseek-v4.1-flash", modelCacheState)).toBeNull()
   })
 })
