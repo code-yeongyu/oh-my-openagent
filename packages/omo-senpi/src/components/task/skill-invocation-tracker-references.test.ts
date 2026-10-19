@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { createSkillInvocationTracker } from "./skill-invocation-tracker"
+import { createSkillInvocationStore, createSkillInvocationTracker } from "./skill-invocation-tracker"
 
 const CTX_A = { sessionManager: { getSessionId: () => "sess-a" } }
 const CTX_B = { sessionManager: { getSessionId: () => "sess-b" } }
+
+// The production default is the process-lifetime shared store; each case builds its own so state
+// recorded by one test can never arm the gate in another.
+const trackerFor = (pi: FakeExtensionAPI) => createSkillInvocationTracker(pi, createSkillInvocationStore())
 
 describe("createSkillInvocationTracker - plan-artifact reference counting", () => {
   function toolResult(toolName: string, input: Record<string, unknown>, isError = false) {
@@ -14,7 +18,7 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
   test("#given three reads of plan A and one edit of plan B #when references are queried #then counts accumulate per path with the most-referenced first", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("read", { path: "/repo/.omo/plans/alpha.md" }), CTX_A)
@@ -34,7 +38,7 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
   test("#given apply_patch events mentioning plan paths #when they arrive #then each distinct path counts once per event", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
     const patch =
       "*** Begin Patch\n" +
       "*** Update File: .omo/plans/alpha.md\n" +
@@ -67,7 +71,7 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
   test("#given two plans touched once each #when references are queried #then the most recently touched wins the tie until one pulls ahead", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("read", { path: "/repo/.omo/plans/alpha.md" }), CTX_A)
@@ -91,7 +95,7 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
   test("#given plan touches followed by session shutdown #when references are queried #then the map is cleared", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
     await pi.dispatch("tool_result", toolResult("write", { path: ".omo/plans/x.md" }), CTX_A)
 
     // when
@@ -105,7 +109,7 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
   test("#given an unknown session id #when references are queried #then it reports none and no artifact", () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when / then
     expect(tracker.stateFor("sess-unknown").planArtifactReferences()).toEqual([])
@@ -115,7 +119,7 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
   test("#given windows and posix spellings of the same plan path #when both arrive #then they merge into one normalized reference", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("read", { path: "C:\\repo\\.omo\\plans\\win.md" }), CTX_A)
@@ -130,7 +134,7 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
   test("#given the same plan suffix under two worktree roots #when both arrive #then the roots stay distinct", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    const tracker = createSkillInvocationTracker(pi)
+    const tracker = trackerFor(pi)
 
     // when
     await pi.dispatch("tool_result", toolResult("read", { path: "/wt/one/.omo/plans/a.md" }), CTX_A)
