@@ -21,6 +21,7 @@ const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGRO
 
 function createNotifier(options: {
   readonly onPendingWakeRequeued?: (sessionID: string) => void
+  readonly noAssistantOutputRetryDeadlineMs?: number
 } = {}): {
   readonly notifier: ParentWakeNotifier
   readonly promptAsyncCalls: readonly PromptAsyncCall[]
@@ -60,6 +61,9 @@ function createNotifier(options: {
       toolCallDeferMaxMs: 5_000,
       failureRequeueWindowMs: 1,
       userMessageInProgressWindowMs: 0,
+      ...(options.noAssistantOutputRetryDeadlineMs !== undefined
+        ? { noAssistantOutputRetryDeadlineMs: options.noAssistantOutputRetryDeadlineMs }
+        : {}),
     },
   )
   return { notifier, promptAsyncCalls }
@@ -132,9 +136,9 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
     }
   })
 
-  test("#given a requeued parent wake still produces no assistant output #when the retry window elapses #then the wake is not retried forever", async () => {
-    // given
-    const { notifier, promptAsyncCalls } = createNotifier()
+  test("#given a requeued parent wake still produces no assistant output #when the retry deadline is exhausted #then the wake cycle terminates instead of retrying forever", async () => {
+    // given — a zero deadline so the first no-output window exhausts it
+    const { notifier, promptAsyncCalls } = createNotifier({ noAssistantOutputRetryDeadlineMs: 0 })
     const sessionID = "parent-window-no-continuation-retry-budget"
     notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
 
@@ -142,7 +146,7 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
       await notifier.flushPendingParentWake(sessionID)
       expect(promptAsyncCalls).toHaveLength(1)
       await waitForTimer()
-      expect(notifier.getPendingParentWakes().get(sessionID)?.noAssistantOutputRetryCount).toBe(1)
+      expect(notifier.getPendingParentWakes().get(sessionID)?.noAssistantOutputDeadlineNotice).toBe(true)
 
       releaseParentWakeHold(sessionID)
       await notifier.flushPendingParentWake(sessionID)
