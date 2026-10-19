@@ -121,7 +121,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
       return { index, value }
     }
 
-    // When the four artifact producers and the twelve platform consumers are resolved.
+    // When the six artifact producers and the twelve platform consumers are resolved.
     const install = step(engine.steps, "Install pinned Rust toolchain and target")
     const cargo = step(engine.steps, "Build desktop engine")
     const asset = step(engine.steps, "Stage desktop engine release asset")
@@ -160,14 +160,14 @@ describe("release binary asset lane in the platform publish workflow", () => {
   })
 
   test("uploads one engine artifact per canonical host without baseline duplicates", () => {
-    // Given the dedicated four-host build matrix.
+    // Given the dedicated six-host build matrix.
     const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
     const engineJob = sliceWorkflowSection(workflow, "  desktop-engine:\n", "  build:\n")
 
     // When its host list is compared to the release asset contract, each asset has one producer.
     const hosts = [...engineJob.matchAll(/^\s+- \{ host: ([a-z0-9-]+), runner:/gm)].map((match) => match[1])
     expect(hosts).toEqual([...DESKTOP_ENGINE_RELEASE_HOSTS])
-    expect(new Set(hosts).size).toBe(4)
+    expect(new Set(hosts).size).toBe(6)
     expect(engineJob).toContain("name: desktop-engine-${{ matrix.host }}")
   })
 
@@ -247,7 +247,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
     }
   }, SUBPROCESS_TEST_TIMEOUT_MS)
 
-  test("verifies precisely twelve launchers and four engines on reruns without publishing", () => {
+  test("verifies precisely twelve launchers and six engines on reruns without publishing", () => {
     // Given a synthetic release with canonical names and independently computed hashes.
     const root = mkdtempSync(join(tmpdir(), "omo-engine-assets-"))
     try {
@@ -283,7 +283,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
       // When every release asset exists, the actual workflow verification passes.
       const complete = execute()
       expect(complete.status, complete.stderr).toBe(0)
-      expect(complete.stdout).toContain("Verified 18/18 release assets")
+      expect(complete.stdout).toContain("Verified 20/20 release assets")
 
       // When the engine asset is absent, a skip_platform rerun cannot go green.
       unlinkSync(join(assets, "senpi-desktop-engine-darwin-x64"))

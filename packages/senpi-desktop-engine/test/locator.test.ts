@@ -56,14 +56,24 @@ afterEach(() => {
 });
 
 describe("locateDesktopEngine", () => {
-	it.each(["linux", "win32"])("reports no release asset on an empty %s-arm64 installation", (platform) => {
+	it.each([
+		{ platform: "linux", arch: "arm64", libc: "musl", host: "linux-arm64-musl" },
+		{ platform: "win32", arch: "ia32", libc: undefined, host: "win32-ia32" },
+	] as const)("reports no release asset on an empty $host installation", ({ platform, arch, libc, host }) => {
 		const result = locateDesktopEngine({
-			platform, arch: "arm64", execDir: layout.execDir, packageDir: layout.packageDir,
+			platform, arch, ...(libc === undefined ? {} : { libc }), execDir: layout.execDir, packageDir: layout.packageDir,
 			repoRoot: layout.repoRoot, runtimeDir: "", isQuarantined: () => false,
 		});
-		expect(result.diagnostic).toMatchObject({
-			code: "native-unavailable", host: `${platform}-arm64`, reason: "no-release-asset",
+		expect(result.diagnostic).toMatchObject({ code: "native-unavailable", host, reason: "no-release-asset" });
+	});
+
+	it.each(["linux", "win32"])("reports a missing, downloadable engine on an empty %s-arm64 installation", (platform) => {
+		const result = locateDesktopEngine({
+			platform, arch: "arm64", libc: "glibc", execDir: layout.execDir, packageDir: layout.packageDir,
+			repoRoot: layout.repoRoot, runtimeDir: "", isQuarantined: () => false,
 		});
+		expect(result.diagnostic).toMatchObject({ code: "native-unavailable", host: `${platform}-arm64` });
+		expect(result.diagnostic).not.toHaveProperty("reason");
 	});
 
 	it("accepts a quarantined sidecar with matching installed checksums", () => {

@@ -108,7 +108,7 @@ describe("category routing policy", () => {
     ])
   })
 
-  test("unspecified-low follows the approved 8-rung chain headed by claude-sonnet-5-5 medium", () => {
+  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -132,6 +132,11 @@ describe("category routing policy", () => {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
         variant: "xhigh",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+        variant: "high",
       },
       {
         providers: ["openai", "chatgpt-subscription"],
