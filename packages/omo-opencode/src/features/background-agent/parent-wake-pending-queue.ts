@@ -100,6 +100,8 @@ export class ParentWakePendingQueue {
       if (noAssistantOutputRetryCount > 0) {
         pendingWake.noAssistantOutputRetryCount = noAssistantOutputRetryCount
       }
+      pendingWake.noAssistantOutputDeadlineNotice ||= latestWake.noAssistantOutputDeadlineNotice
+      pendingWake.noAssistantOutputRetryStartedAt ??= latestWake.noAssistantOutputRetryStartedAt
       return
     }
     const clonedWake = cloneParentWake(latestWake)
