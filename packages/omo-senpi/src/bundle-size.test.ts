@@ -122,7 +122,15 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // dependency manifests are unchanged. Committed dev measures 1,539,513 bytes; the #10184 branch measures
 // 1,547,296 (+7,783) after minification (linux/arm64, node 24 + bun 1.4.2). 1,550,000 is the measured need
 // plus a 2,704-byte margin, so later growth still has to justify itself rather than ride on slack.
-const BUDGET_BYTES = 1_550_000
+// Raised 1,550,000 -> 1,556,000 in a standalone measured budget PR for #10584 (persisted recall terms, #10580).
+// The first recall of a session reads each note's BM25 terms back from a store in the memory repo's `.git` instead
+// of tokenizing the corpus again (2.2 s -> 0.38 s on a 6.9k-note memory). The store is read while the corpus loads
+// on the first prompt, so its codec, persistence and save gate sit in the entry bundle's recall path; a lazy sidecar
+// would still leave the growth above dev's 186 bytes of slack. Committed dev b54b8f0ef6 measures 1,549,814 bytes;
+// the #10584 head 92760d209d measures 1,555,499 (+5,685: store codec ~1.7 KB, persistence ~3.0 KB, save gate
+// ~0.5 KB, lazy excerpts ~0.5 KB) after minification (linux/amd64, node 24 + bun 1.4.3, the pinned regen
+// container). 1,556,000 is the measured need plus a 501-byte margin.
+const BUDGET_BYTES = 1_556_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

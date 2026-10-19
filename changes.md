@@ -1,3 +1,7 @@
+## 2026-10-20 - omo-senpi bundle budget 1,550,000 -> 1,556,000, measured for #10584
+
+`packages/omo-senpi/src/bundle-size.test.ts` raises the entry-bundle ceiling to fit #10584's persisted recall terms (#10580): dev measures 1,549,814 bytes and the #10584 head 1,555,499 (+5,685) in the pinned regen container. The new code is on the first prompt's recall path, so it stays in the entry bundle. Later growth still needs its own measured raise: the margin is 501 bytes.
+
 ## 2026-10-19 - Release binary size budget 160 -> 182 MiB, measured
 
 omo 5.1.37's publish failed on Linux: linux-x64 and linux-x64-baseline built at 173,365,216 bytes and linux-arm64 at 170,969,896, over the 160 MiB budget (5.1.35's linux-x64 was 162,899,424). The growth is the Bun 1.4.3 runtime, not a stray asset: an empty `bun build --compile --target=bun-linux-x64` is 81,315,296 bytes on 1.4.2 and 90,798,048 on 1.4.3 (+9,482,752), and senpi 2026.10.16 -> 2026.10.19 adds about 1.25 MB of package files. `MAX_BINARY_BYTES` in `script/build-omo-binary.ts` and the matching check in `publish-platform.yml` move to 182 MiB, the measured size plus about 10%; the 5 MiB headroom warning is unchanged.
