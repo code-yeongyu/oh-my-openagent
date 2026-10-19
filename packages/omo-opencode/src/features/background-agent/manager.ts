@@ -2937,9 +2937,10 @@ The task was re-queued on a fallback model after a retryable failure.
         })
 
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-        const shouldReply = allComplete || isTaskFailure
-
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
+        // An idle parent must be woken by a completion notification with a real
+        // reply-producing turn — not a swallowed internal noReply deposit.
+        const shouldReply = !shouldDeferNotification || allComplete || isTaskFailure
 
         if (shouldDeferNotification) {
           this.queuePendingParentWake(
