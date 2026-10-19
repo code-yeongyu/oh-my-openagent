@@ -7,6 +7,7 @@ export interface BackgroundTaskNotificationTask {
   description: string
   status: BackgroundTaskStatus
   error?: string
+  completionNote?: string
   attempts?: BackgroundTaskAttempt[]
 }
 
@@ -51,7 +52,7 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
 function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   const baseLine = `- \`${task.id}\`: ${task.description || task.id}`
   const statusSuffix = task.status === "completed"
-    ? ""
+    ? (task.completionNote ? ` (${task.completionNote})` : "")
     : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
   const timeline = formatAttemptTimeline(task)
 
@@ -70,6 +71,7 @@ export function buildBackgroundTaskNotificationText(input: {
 
   const safeDescription = (t: BackgroundTaskNotificationTask): string => t.description || t.id
   const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
+  const noteInfo = task.status === "completed" && task.completionNote ? `\n**Note:** ${task.completionNote}` : ""
 
   if (allComplete) {
     const succeededTasks = completedTasks.filter((t) => t.status === "completed")
@@ -116,7 +118,7 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
 ${header}
 **ID:** \`${task.id}\`
 **Description:** ${safeDescription(task)}
-**Duration:** ${duration}${errorInfo}
+**Duration:** ${duration}${errorInfo}${noteInfo}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
 ${isFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}

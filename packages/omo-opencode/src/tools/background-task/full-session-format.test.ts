@@ -137,4 +137,20 @@ describe("formatFullSession", () => {
     expect(output).not.toContain("RESPONSE_1")
     expect(output).not.toContain("PROMPT_2")
   })
+
+  test("#given an errored task #when formatFullSession runs #then the output includes the task error", async () => {
+    // given
+    const task = { ...makeTask(), status: "error" as const, error: "stopped at output limit (32000 tokens), no result" }
+    const client = makeClient([makeMessage("msg_1", "assistant", "partial", 1778525000100)])
+
+    // when
+    const output = await formatFullSession(task, client, {
+      includeThinking: false,
+      includeToolResults: false,
+    })
+
+    // then
+    expect(output).toContain("Status: error")
+    expect(output).toContain("Error: stopped at output limit (32000 tokens), no result")
+  })
 })

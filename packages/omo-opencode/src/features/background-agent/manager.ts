@@ -87,6 +87,15 @@ import {
   MIN_SESSION_GONE_POLLS,
   verifySessionExists as verifySessionStillExists,
 } from "./session-existence"
+import {
+  AssistantTurnFinishTracker,
+  formatOutputLimitError,
+  formatOutputLimitNote,
+  getLatestAssistantTurn,
+  getOutputLimitStop,
+  type AssistantTurnFinish,
+  type OutputLimitStop,
+} from "./output-limit-stop"
 import { getStoppedSessionError, MIN_ERRORED_IDLE_POLLS } from "./session-stopped-on-error"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import {
@@ -281,6 +290,7 @@ export class BackgroundManager {
   private readonly parentWakeNotifier: ParentWakeNotifier
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
   private observedOutputSessions: Set<string> = new Set()
+  private readonly assistantTurnFinish = new AssistantTurnFinishTracker()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
@@ -1399,6 +1409,7 @@ The fallback retry session is now created and can be inspected directly.
     existingTask.queuedAt = new Date()
     existingTask.completedAt = undefined
     existingTask.error = undefined
+    existingTask.completionNote = undefined
     this.updateTaskParent(existingTask, input.parentSessionId)
     existingTask.parentMessageId = input.parentMessageId
     existingTask.parentModel = input.parentModel
@@ -1443,6 +1454,7 @@ The fallback retry session is now created and can be inspected directly.
     existingTask.status = "running"
     existingTask.completedAt = undefined
     existingTask.error = undefined
+    existingTask.completionNote = undefined
     this.updateTaskParent(existingTask, input.parentSessionId)
     existingTask.parentMessageId = input.parentMessageId
     existingTask.parentModel = input.parentModel
@@ -1666,6 +1678,7 @@ The fallback retry session is now created and can be inspected directly.
 
   private clearSessionOutputObserved(sessionID: string): void {
     this.observedOutputSessions.delete(sessionID)
+    this.assistantTurnFinish.clear(sessionID)
   }
 
   private clearSessionTodoObservation(sessionID: string): void {
@@ -1770,6 +1783,8 @@ The fallback retry session is now created and can be inspected directly.
 
       const { task } = resolved
       if (task.status !== "running") return
+
+      this.assistantTurnFinish.recordMessageUpdated(sessionID, info)
 
       const assistantError = info.error
       if (!assistantError) return
@@ -2364,6 +2379,7 @@ The task was re-queued on a fallback model after a retryable failure.
       }, this.directory)
 
       const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
+      this.assistantTurnFinish.recordTurn(sessionID, getLatestAssistantTurn(messages))
 
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(
@@ -2411,6 +2427,36 @@ The task was re-queued on a fallback model after a retryable failure.
       // On error, allow completion to proceed (don't block indefinitely)
       return true
     }
+  }
+
+  private async readLatestAssistantTurn(sessionID: string): Promise<{ turn?: AssistantTurnFinish; stop?: OutputLimitStop } | undefined> {
+    try {
+      const response = await messagesInDirectory(this.client, {
+        path: { id: sessionID },
+      }, this.directory)
+      const messages = normalizeSDKResponse(response, [] as unknown[], { preferResponseOnMissingData: true })
+      return { turn: getLatestAssistantTurn(messages), stop: getOutputLimitStop(messages) }
+    } catch (error) {
+      log("[background-agent] Error reading session messages for output-limit check:", error)
+      return undefined
+    }
+  }
+
+  /**
+   * Returns the output-limit stop of the turn a completion would accept, or "defer" when the child
+   * moved on while the messages were read. Fetches only when events said the latest turn hit the cap,
+   * and decides from the fresh message list, never from a value kept across a resume.
+   */
+  private async readOutputLimitStopForCompletion(sessionID: string): Promise<OutputLimitStop | "defer" | undefined> {
+    const tracked = this.assistantTurnFinish.get(sessionID)
+    if (!tracked?.stoppedOnLength) return undefined
+
+    const fresh = await this.readLatestAssistantTurn(sessionID)
+    if (!fresh) return undefined
+    if (this.assistantTurnFinish.get(sessionID) !== tracked || !fresh.turn) return "defer"
+
+    this.assistantTurnFinish.recordTurn(sessionID, fresh.turn)
+    return fresh.stop
   }
 
   private async readStoppedSessionError(sessionID: string): Promise<string | undefined> {
@@ -2666,6 +2712,31 @@ The task was re-queued on a fallback model after a retryable failure.
       return false
     }
 
+    const outputLimitStop = task.sessionId
+      ? await this.readOutputLimitStopForCompletion(task.sessionId)
+      : undefined
+    if (task.status !== "running") {
+      log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
+      return false
+    }
+    if (outputLimitStop === "defer") {
+      log("[background-agent] Session moved on while its output limit was checked, deferring completion:", { taskId: task.id, source })
+      return false
+    }
+    if (outputLimitStop && !outputLimitStop.hasResult) {
+      const error = formatOutputLimitError(outputLimitStop)
+      log("[background-agent] Session stopped at the output token limit with no result, marking task as error:", {
+        taskId: task.id,
+        sessionID: task.sessionId,
+        error,
+      })
+      await this.failLiveTask(task, error, source)
+      return false
+    }
+    if (outputLimitStop) {
+      task.completionNote = formatOutputLimitNote(outputLimitStop)
+    }
+
     // Reserve a notification-preparation slot for the parent BEFORE flipping the
     // child to a terminal status. The instant status becomes "completed",
     // hasActiveChildTasks() returns false, yet the parent wake is not queued until
@@ -2770,6 +2841,7 @@ The task was re-queued on a fallback model after a retryable failure.
       description: task.description,
       status: task.status,
       error: task.error,
+      completionNote: task.completionNote,
       attempts: cloneAttempts(task),
     })
 
@@ -3084,7 +3156,32 @@ The task was re-queued on a fallback model after a retryable failure.
     return verifySessionStillExists(this.client, sessionID, this.directory)
   }
 
-  private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
+  /**
+   * Fails a task whose child session is still alive and idle (it stopped on its own), with the
+   * same session teardown a completion runs, so the child and its tmux pane do not linger.
+   */
+  private async failLiveTask(task: BackgroundTask, errorMessage: string, source: string): Promise<void> {
+    if (task.status !== "running") return
+    const notificationParentSessionID = task.parentSessionId
+    if (notificationParentSessionID) {
+      this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
+    }
+    try {
+      await this.failCrashedTask(task, errorMessage, { liveSessionSource: source })
+    } finally {
+      if (notificationParentSessionID) {
+        this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
+      }
+    }
+  }
+
+  private async failCrashedTask(
+    task: BackgroundTask,
+    errorMessage: string,
+    options: { liveSessionSource?: string } = {},
+  ): Promise<void> {
+    if (task.status !== "running") return
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "error", errorMessage)
     } else {
@@ -3126,10 +3223,22 @@ The task was re-queued on a fallback model after a retryable failure.
       this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
+    if (options.liveSessionSource && task.sessionId) {
+      const sessionID = task.sessionId
+      subagentSessions.delete(sessionID)
+      clearSessionAgent(sessionID)
+      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
+      await this.abortSessionWithLogging(sessionID, `task failure (${options.liveSessionSource})`)
+      await this.onSubagentSessionDeleted?.({ sessionID }).catch((error) => {
+        log("[background-agent] onSubagentSessionDeleted callback failed:", { taskId: task.id, sessionID, error: String(error) })
+      })
+    }
+
     this.markForNotification(task)
-    this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
+    const notification = this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
     })
+    if (options.liveSessionSource) await notification
   }
 
   private async pollRunningTasks(): Promise<void> {
@@ -3228,6 +3337,20 @@ The task was re-queued on a fallback model after a retryable failure.
               }
 
               task.consecutiveMissedPolls = 0
+            }
+            // A cap stop is the turn's own finish, not a transient error the session may still retry,
+            // so unlike the stopped-on-error check below it does not wait for MIN_ERRORED_IDLE_POLLS.
+            const outputLimitStop = await this.readOutputLimitStopForCompletion(sessionID)
+            if (outputLimitStop && outputLimitStop !== "defer" && !outputLimitStop.hasResult) {
+              if (task.status !== "running") continue
+              const error = formatOutputLimitError(outputLimitStop)
+              log("[background-agent] Session stopped at the output token limit with no deliverable output, marking task as error:", {
+                taskId: task.id,
+                sessionID,
+                error,
+              })
+              await this.failLiveTask(task, error, "polling (output limit)")
+              continue
             }
             const stoppedError = await this.readStoppedSessionError(sessionID)
             if (stoppedError) {
