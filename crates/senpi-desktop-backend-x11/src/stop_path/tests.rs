@@ -88,3 +88,35 @@ fn an_invalid_chord_is_refused_before_any_listener_starts() {
     assert!(!listener.is_live());
     assert!(!supervisor.status().global_live);
 }
+
+#[test]
+fn a_device_the_server_cannot_describe_never_stops_input() {
+    // A lookup that failed, or a device removed before the lookup (a client can
+    // add a master, chord through its XTEST slave and remove it at once).
+    assert!(!super::source::physical_from(None));
+}
+
+#[test]
+fn the_xtest_property_or_name_marks_a_device_synthetic() {
+    use super::source::{physical_from, Described};
+    use x11rb::protocol::xinput::DeviceType;
+    let keyboard = |name: &'static [u8], xtest_property| Described { kind: DeviceType::SLAVE_KEYBOARD, name, xtest_property };
+    assert!(physical_from(Some(keyboard(b"AT Translated Set 2 keyboard", false))));
+    // The server's own marker wins over any name, so renaming cannot dodge it.
+    assert!(!physical_from(Some(keyboard(b"Logitech USB Keyboard", true))));
+    // The name fallback for servers that do not set the property.
+    assert!(!physical_from(Some(keyboard(b"Virtual core XTEST keyboard", false))));
+}
+
+#[test]
+fn a_failed_property_read_fails_closed_for_that_press_only() {
+    use super::source::classify;
+    use x11rb::protocol::xinput::DeviceType;
+    let keyboard = b"AT Translated Set 2 keyboard".as_slice();
+    // The read failed: this press does not stop, and nothing is cached, so the
+    // keyboard's next press is classified again.
+    assert_eq!(classify(DeviceType::SLAVE_KEYBOARD, keyboard, None), (false, false));
+    // The server answered: the result is cached either way.
+    assert_eq!(classify(DeviceType::SLAVE_KEYBOARD, keyboard, Some(false)), (true, true));
+    assert_eq!(classify(DeviceType::SLAVE_KEYBOARD, keyboard, Some(true)), (false, true));
+}

@@ -53,13 +53,17 @@ const repoRoot = resolve(scriptDir, "..")
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
 /**
- * Hard per-binary size budget (160 MiB). It exists to keep the download and install of one
+ * Hard per-binary size budget (182 MiB). It exists to keep the download and install of one
  * platform binary small: every install, `omo update` and CI smoke fetches the full binary, so
  * growth is a user-facing cost, not just a storage one. A release that crosses it fails loud
  * rather than shipping a quietly larger download. Raised from 150 MiB for 5.1.26, when linux-x64
- * reached 157.6 MB; `reportBinaryHeadroom` warns well before the next crossing.
+ * reached 157.6 MB. Raised to 182 MiB for 5.1.38: 5.1.37's linux-x64 binary measured 173,365,216 bytes
+ * (5.1.35: 162,899,424). Bun 1.4.3's runtime alone accounts for +9,482,752 bytes of that (an empty
+ * `bun build --compile --target=bun-linux-x64`: 81,315,296 bytes on 1.4.2, 90,798,048 on 1.4.3); senpi
+ * 2026.10.16 -> 2026.10.19 adds about 1.25 MB. 182 MiB is the measured size plus about 10% headroom.
+ * `reportBinaryHeadroom` warns well before the next crossing.
  */
-export const MAX_BINARY_BYTES = 160 * 1024 * 1024
+export const MAX_BINARY_BYTES = 182 * 1024 * 1024
 
 /** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
 export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024
