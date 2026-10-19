@@ -768,6 +768,24 @@
       ],
       "orderNote": "After 49: both edit the subscription loop in v2/hook-bridge.ts (49 adds the shaper; 50 guards the loop before shaping). Also exports directoryOf/sameDirectory from v2/session-actions.ts; new v2/session-ownership.ts. Tests: v2/host.test.ts (two-folder single-retry, foreign filter, moved child root ownership, fail-open uncached, one lookup per session, non-session pass) — RED 5 fail / GREEN 23 pass. Upstream variant (self-contained helpers) on #9016 head: SwarmStorm/oh-my-openagent#5.",
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10473"
+    },
+    {
+      "id": "51-v2-model-context-limits",
+      "title": "Seed the context-limit cache from the V2 host model catalog",
+      "commit": "87c06893e8370934f4ba73e48081372b4d14a861",
+      "patch": "patches/51-v2-model-context-limits.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/6",
+      "why": "After fix 49 the preemptive-compaction hook runs on v2 but never fires: 359/359 [preemptive-compaction] lines in %TEMP%/oh-my-opencode.log (2026-10-19) were 'Skipping preemptive compaction: unknown context limit for model' (opencode-go/deepseek-v4.1-flash at 79.1%, openai/gpt-6-astra, claude-code/claude-opus-5-5). resolveActualContextLimit (model-core context-limit-resolver.ts) reads modelContextLimitsCache for every non-Anthropic provider (claude-code included). Its only writer, applyProviderConfig, fills it from config.provider[*].models[*].limit.context during the config hook. On V1 that config is the user's opencode.json; on V2 setupOpenCodeV2 calls hooks.config({}) because the host owns provider config, so the cache was cleared and never filled. setupOpenCodeV2 now reads ctx.model.list() (bounded at 2 s; a failure is logged and ignored) and seeds scratch.provider with {models: {id: {limit: {context}}}}, keyed by catalog id and also by API modelID when different. After the hook it removes provider entries that are still pure seed (identity check), so projectProviders does not register host providers as plugin-declared ones.",
+      "markers": [
+        "seedModelContextLimits",
+        "v2 model context limits seeded",
+        "model context limits unavailable"
+      ],
+      "overlapsWith": [
+        "47-v2-setup-nonblocking"
+      ],
+      "orderNote": "After 47, which added the yieldToEventLoop stages around the config hook in v2/host.ts. 51 edits the same block: it seeds before hooks.config and unseeds after. Tests: v2/host.test.ts 'fix 51 model context limits (opencode-v2)'. RED against e624dd252: 2 fail, Expected 1000000 / Received null. GREEN: 26 pass. Adjacent suites (preemptive-compaction, context-limit-cache, model-core resolver, config-handler, event-shape, hook-bridge-tool-routing): 213 pass / 1 fail. The failure, 'Plan agent demote behavior > plan agent remains unchanged when planner is disabled', fails identically on the base. LSP clean; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS. The upstream variant on #9016 head 502a4f0fd is SwarmStorm/oh-my-openagent#6 (RED 2 fail / GREEN 17 pass). Post-restart acceptance: %TEMP%/oh-my-opencode.log shows '[oh-my-openagent] v2 model context limits seeded' per folder, and '[preemptive-compaction]' lines stop reporting 'unknown context limit' for catalog models.",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10585"
     }
   ],
   "externalFixes": [
