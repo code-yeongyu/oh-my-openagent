@@ -119,7 +119,8 @@ export function planAssets({ runtime, agentDir }) {
   const notices = [...source.notices]
   const present = source.mcpServers.length > 0 || source.skills.length > 0
   const paths = { mcp: join(agentDir, "mcp.json"), skills: join(agentDir, "skills") }
-  const result = classifyAssets(source, paths, bundledSkillNames(join(packageRoot, "plugin", "skills")))
+  const pluginRoot = runtime.pluginRoot ?? join(packageRoot, "plugin")
+  const result = classifyAssets(source, paths, bundledSkillNames(join(pluginRoot, "skills")))
   if (result.servers.blocked.length > 0) notices.push(`WARN senpi: malformed mcp.json; these servers were not imported: ${result.servers.blocked.join(", ")}`)
   return {
     agentDir,
