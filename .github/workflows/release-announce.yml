@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
       - name: Install dependencies
         run: timeout -k 10 600 bun install --frozen-lockfile --ignore-scripts
       - name: Announce release
