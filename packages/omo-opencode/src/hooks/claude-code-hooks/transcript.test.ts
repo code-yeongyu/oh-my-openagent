@@ -4,6 +4,7 @@ import {
   buildTranscriptFromSession,
   deleteTempTranscript,
   clearTranscriptCache,
+  describeTranscriptError,
   stopTranscriptCacheCleanup,
 } from "./transcript"
 
@@ -274,5 +275,106 @@ describe("transcript caching", () => {
     }
 
     deleteTempTranscript(path)
+  })
+})
+
+describe("transcript on OpenCode 2 histories", () => {
+  afterEach(() => {
+    stopTranscriptCacheCleanup()
+  })
+
+  // #given a history whose tool parts carry the tool name as `name` (OpenCode 2 stored shape) and one
+  //        tool part with no name at all
+  // #when the transcript is built twice
+  // #then it is built from the named part, the nameless part is skipped, nothing throws, and the
+  //       history is fetched once
+  it("reads v2 tool parts by name and skips parts without a tool name instead of failing", async () => {
+    const client = createMockClient([
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", name: "execute", state: { status: "completed", input: { code: "1" } } },
+          { type: "tool", state: { status: "completed", input: { x: 1 } } },
+        ],
+      },
+    ])
+
+    const first = await buildTranscriptFromSession(client, "ses_v2_parts", "/tmp", "read", { filePath: "/tmp/a" })
+    const second = await buildTranscriptFromSession(client, "ses_v2_parts", "/tmp", "write", { filePath: "/tmp/b" })
+
+    expect(client.session.messages).toHaveBeenCalledTimes(1)
+    expect(first).not.toBeNull()
+    expect(second).not.toBeNull()
+    if (second) {
+      const lines = readFileSync(second, "utf-8").trim().split("\n")
+      expect(lines).toHaveLength(2)
+      expect(lines[0]).toContain("Execute")
+      expect(lines[1]).toContain("Write")
+    }
+    deleteTempTranscript(second)
+  })
+
+  // #given the history fetch rejects
+  // #when several tool calls build the transcript inside the retry window
+  // #then the history is fetched once, every call still gets the current-tool transcript, and a
+  //       cleared cache allows the next fetch
+  it("does not refetch the history on every tool call after a failed build", async () => {
+    const client = {
+      session: {
+        messages: mock(() => Promise.reject(new Error("session unavailable"))),
+      },
+    }
+
+    const first = await buildTranscriptFromSession(client, "ses_failed", "/tmp", "bash", { command: "a" })
+    const second = await buildTranscriptFromSession(client, "ses_failed", "/tmp", "read", { filePath: "/tmp/b" })
+    const third = await buildTranscriptFromSession(client, "ses_failed", "/tmp", "write", { filePath: "/tmp/c" })
+
+    expect(client.session.messages).toHaveBeenCalledTimes(1)
+    expect(first).not.toBeNull()
+    expect(second).not.toBeNull()
+    expect(third).not.toBeNull()
+    if (third) {
+      const content = readFileSync(third, "utf-8")
+      expect(content).toContain("Write")
+      expect(content).not.toContain("Read")
+    }
+    deleteTempTranscript(third)
+
+    clearTranscriptCache("ses_failed")
+    await buildTranscriptFromSession(client, "ses_failed", "/tmp", "bash", { command: "d" })
+    expect(client.session.messages).toHaveBeenCalledTimes(2)
+  })
+
+  // #given the temp transcript was already deleted by the hook runner
+  // #when the next transcript is built from the cache
+  // #then the stale path is not unlinked again and a fresh transcript is returned
+  it("forgets a temp transcript that deleteTempTranscript removed", async () => {
+    const client = createMockClient([])
+    const first = await buildTranscriptFromSession(client, "ses_forget", "/tmp", "bash", { command: "a" })
+    deleteTempTranscript(first)
+    const second = await buildTranscriptFromSession(client, "ses_forget", "/tmp", "read", { filePath: "/tmp/b" })
+    expect(second).not.toBeNull()
+    expect(second).not.toBe(first)
+    if (second) expect(existsSync(second)).toBe(true)
+    deleteTempTranscript(second)
+  })
+
+  it("describes errors with their message instead of serialising them to {}", () => {
+    const plain = new Error("boom")
+    expect(describeTranscriptError(plain)).toMatchObject({ name: "Error", message: "boom" })
+    expect(JSON.stringify(describeTranscriptError(plain))).toContain("boom")
+
+    const errno = Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT", path: "/tmp/x" })
+    expect(describeTranscriptError(errno)).toMatchObject({ message: "ENOENT: no such file", code: "ENOENT", path: "/tmp/x" })
+
+    const typed = (() => {
+      try {
+        ;(undefined as unknown as { trim: () => string }).trim()
+      } catch (error) {
+        return error
+      }
+    })()
+    expect(describeTranscriptError(typed)).toMatchObject({ name: "TypeError" })
+    expect(describeTranscriptError("text")).toEqual({ thrown: "text" })
   })
 })

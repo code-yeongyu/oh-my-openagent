@@ -31,6 +31,8 @@ export function appendTranscriptEntry(
 interface OpenCodeMessagePart {
   type: string
   tool?: string
+  /** OpenCode 2 stores the tool name here; the v2 session facade also aliases it to `tool`. */
+  name?: string
   state?: {
     status?: string
     input?: Record<string, unknown>
@@ -60,16 +62,43 @@ interface TranscriptCacheEntry {
   baseEntries: string[]
   tempPath: string | null
   createdAt: number
+  expiresAt: number
 }
 
 export const TRANSCRIPT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+/**
+ * How long a failed history fetch is remembered. Every PostToolUse hook builds a transcript, so
+ * without this a session whose history cannot be read re-fetches and re-fails on every tool call
+ * (6,924 identical log lines in three days on OpenCode 2 before the v2 tool-part alias landed).
+ */
+export const TRANSCRIPT_FAILURE_RETRY_MS = 60 * 1000 // 1 minute
 const TRANSCRIPT_CACHE_PRUNE_INTERVAL_MS = TRANSCRIPT_CACHE_TTL_MS
 
 const transcriptCache = new Map<string, TranscriptCacheEntry>()
 let cleanupInterval: ReturnType<typeof setInterval> | null = null
 
+/**
+ * JSON.stringify(new Error("x")) is "{}": message, name and stack are not enumerable. Spell the
+ * useful fields out so the log line says what failed.
+ */
+export function describeTranscriptError(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) return { thrown: String(error) }
+  const described: Record<string, unknown> = { name: error.name, message: error.message }
+  for (const key of ["code", "errno", "syscall", "path"] as const) {
+    const value = (error as unknown as Record<string, unknown>)[key]
+    if (value !== undefined) described[key] = value
+  }
+  if (error.stack) described.stack = error.stack.split("\n").slice(0, 4).join("\n")
+  if (error.cause !== undefined) described.cause = error.cause instanceof Error ? error.cause.message : String(error.cause)
+  return described
+}
+
 function logTranscriptError(message: string, error: unknown): void {
-  log(message, { error })
+  log(message, { error: describeTranscriptError(error) })
+}
+
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && (error as { code?: unknown }).code === "ENOENT"
 }
 
 /**
@@ -83,11 +112,7 @@ export function clearTranscriptCache(sessionId?: string): void {
       try {
         unlinkSync(entry.tempPath)
       } catch (error) {
-        if (error instanceof Error) {
-          logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
-        } else {
-          logTranscriptError("[transcript] failed to clean up cached temp transcript", { thrown: error })
-        }
+        if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
       }
     }
     transcriptCache.delete(sessionId)
@@ -97,11 +122,7 @@ export function clearTranscriptCache(sessionId?: string): void {
         try {
           unlinkSync(entry.tempPath)
         } catch (error) {
-          if (error instanceof Error) {
-            logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
-          } else {
-            logTranscriptError("[transcript] failed to clean up cached temp transcript", { thrown: error })
-          }
+          if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
         }
       }
     }
@@ -117,7 +138,7 @@ function pruneExpiredTranscriptCache(): void {
   const now = Date.now()
   for (const sessionId of [...transcriptCache.keys()]) {
     const entry = transcriptCache.get(sessionId)
-    if (!entry || now - entry.createdAt >= TRANSCRIPT_CACHE_TTL_MS) {
+    if (!entry || now >= entry.expiresAt) {
       clearTranscriptCache(sessionId)
     }
   }
@@ -139,7 +160,7 @@ export function stopTranscriptCacheCleanup(): void {
 }
 
 function isCacheValid(entry: TranscriptCacheEntry): boolean {
-  return Date.now() - entry.createdAt < TRANSCRIPT_CACHE_TTL_MS
+  return Date.now() < entry.expiresAt
 }
 
 function buildCurrentEntry(toolName: string, toolInput: Record<string, unknown>): string {
@@ -168,7 +189,10 @@ function parseMessagesToEntries(messages: OpenCodeMessage[]): string[] {
       if (part.state?.status !== "completed") continue
       if (!part.state?.input) continue
 
-      const rawToolName = part.tool as string
+      // OpenCode 1 parts carry `tool`; OpenCode 2 stored parts carry `name`. A part with neither is
+      // not a transcript entry; it must not abort the whole transcript.
+      const rawToolName = typeof part.tool === "string" ? part.tool : typeof part.name === "string" ? part.name : undefined
+      if (!rawToolName) continue
       const toolName = transformToolName(rawToolName)
 
       const entry: DisabledTranscriptEntry = {
@@ -182,6 +206,15 @@ function parseMessagesToEntries(messages: OpenCodeMessage[]): string[] {
     }
   }
   return entries
+}
+
+function writeTempTranscript(sessionId: string, entries: readonly string[]): string {
+  const tempPath = join(
+    tmpdir(),
+    `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
+  )
+  writeFileSync(tempPath, entries.join("\n") + "\n")
+  return tempPath
 }
 
 /**
@@ -209,28 +242,47 @@ export async function buildTranscriptFromSession(
       baseEntries = cached.baseEntries
       previousTempPath = cached.tempPath
     } else {
-      const response = await client.session.messages({
-        path: { id: sessionId },
-        query: { directory },
-      })
+      let fetched: string[]
+      try {
+        const response = await client.session.messages({
+          path: { id: sessionId },
+          query: { directory },
+        })
 
-      const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
-        ?? (response as { data?: unknown[] }).data
-        ?? (Array.isArray(response) ? response : [])
+        const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
+          ?? (response as { data?: unknown[] }).data
+          ?? (Array.isArray(response) ? response : [])
 
-      baseEntries = Array.isArray(messages)
-        ? parseMessagesToEntries(messages as OpenCodeMessage[])
-        : []
+        fetched = Array.isArray(messages)
+          ? parseMessagesToEntries(messages as OpenCodeMessage[])
+          : []
+      } catch (error) {
+        logTranscriptError("[transcript] failed to build transcript from session", error)
+        // Remember the failure for a bounded window: the next tool calls get the current-tool
+        // transcript without re-reading (and re-failing on) the whole session history.
+        fetched = []
+        previousTempPath = cached?.tempPath ?? null
+        transcriptCache.set(sessionId, {
+          baseEntries: fetched,
+          tempPath: null,
+          createdAt: Date.now(),
+          expiresAt: Date.now() + TRANSCRIPT_FAILURE_RETRY_MS,
+        })
+        ensureTranscriptCacheCleanup()
+        baseEntries = fetched
+        if (previousTempPath) deleteTempTranscript(previousTempPath)
+        const tempPath = writeTempTranscript(sessionId, [buildCurrentEntry(currentToolName, currentToolInput)])
+        const entry = transcriptCache.get(sessionId)
+        if (entry) entry.tempPath = tempPath
+        return tempPath
+      }
+      baseEntries = fetched
 
       if (cached?.tempPath) {
         try {
           unlinkSync(cached.tempPath)
         } catch (error) {
-          if (error instanceof Error) {
-            logTranscriptError("[transcript] failed to clean up stale temp transcript", error)
-          } else {
-            logTranscriptError("[transcript] failed to clean up stale temp transcript", { thrown: error })
-          }
+          if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up stale temp transcript", error)
         }
       }
 
@@ -238,6 +290,7 @@ export async function buildTranscriptFromSession(
         baseEntries,
         tempPath: null,
         createdAt: Date.now(),
+        expiresAt: Date.now() + TRANSCRIPT_CACHE_TTL_MS,
       })
       ensureTranscriptCacheCleanup()
     }
@@ -248,19 +301,13 @@ export async function buildTranscriptFromSession(
       try {
         unlinkSync(previousTempPath)
       } catch (error) {
-        if (error instanceof Error) {
-          logTranscriptError("[transcript] failed to clean up previous temp transcript", error)
-        } else {
-          logTranscriptError("[transcript] failed to clean up previous temp transcript", { thrown: error })
-        }
+        // The hook runner deletes the file it was handed (deleteTempTranscript), so a missing
+        // previous transcript is the normal case, not an error.
+        if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up previous temp transcript", error)
       }
     }
 
-    const tempPath = join(
-      tmpdir(),
-      `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
-    )
-    writeFileSync(tempPath, allEntries.join("\n") + "\n")
+    const tempPath = writeTempTranscript(sessionId, allEntries)
 
     const cacheEntry = transcriptCache.get(sessionId)
     if (cacheEntry) {
@@ -277,24 +324,11 @@ export async function buildTranscriptFromSession(
 
     return tempPath
   } catch (error) {
-    if (error instanceof Error) {
-      logTranscriptError("[transcript] failed to build transcript from session", error)
-    } else {
-      logTranscriptError("[transcript] failed to build transcript from session", { thrown: error })
-    }
+    logTranscriptError("[transcript] failed to build transcript from session", error)
     try {
-      const tempPath = join(
-        tmpdir(),
-        `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
-      )
-      writeFileSync(tempPath, buildCurrentEntry(currentToolName, currentToolInput) + "\n")
-      return tempPath
+      return writeTempTranscript(sessionId, [buildCurrentEntry(currentToolName, currentToolInput)])
     } catch (fallbackError) {
-      if (fallbackError instanceof Error) {
-        logTranscriptError("[transcript] failed to write fallback transcript", fallbackError)
-      } else {
-        logTranscriptError("[transcript] failed to write fallback transcript", { thrown: fallbackError })
-      }
+      logTranscriptError("[transcript] failed to write fallback transcript", fallbackError)
       return null
     }
   }
@@ -302,13 +336,14 @@ export async function buildTranscriptFromSession(
 
 export function deleteTempTranscript(path: string | null): void {
   if (!path) return
+  // The cache must not point at a file that no longer exists, or the next build tries to unlink
+  // it again.
+  for (const entry of transcriptCache.values()) {
+    if (entry.tempPath === path) entry.tempPath = null
+  }
   try {
     unlinkSync(path)
   } catch (error) {
-    if (error instanceof Error) {
-      logTranscriptError("[transcript] failed to delete temp transcript", error)
-    } else {
-      logTranscriptError("[transcript] failed to delete temp transcript", { thrown: error })
-    }
+    if (!isMissingFile(error)) logTranscriptError("[transcript] failed to delete temp transcript", error)
   }
 }

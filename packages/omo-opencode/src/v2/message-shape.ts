@@ -79,13 +79,33 @@ function storedMessage(message: Record<string, unknown>, sessionID: string): V1M
   }
 }
 
+// OpenCode 2 stores a tool call as { type: "tool", id, name, state }. The v1 hook code reads the
+// OpenCode 1 part fields `tool` and `callID` (transcripts, tool-pair repair, context-window pruning),
+// so the read-only session view carries both spellings. The hook message view is left alone: it is
+// written back to the host, which must not receive fields it never stored.
+function withV1ToolFields(message: V1Message): V1Message {
+  if (message.info.role !== "assistant") return message
+  return {
+    ...message,
+    parts: message.parts.map((part) =>
+      part.type === "tool"
+        ? {
+            ...part,
+            ...(part.tool === undefined && typeof part.name === "string" ? { tool: part.name } : {}),
+            ...(part.callID === undefined && typeof part.id === "string" ? { callID: part.id } : {}),
+          }
+        : part,
+    ),
+  }
+}
+
 export function storedMessagesToV1(messages: unknown, sessionID: string): V1Message[] {
   if (!Array.isArray(messages)) return []
   const view: V1Message[] = []
   for (const message of messages) {
     if (!isRecord(message)) continue
     const translated = storedMessage(message, sessionID)
-    if (translated) view.push(translated)
+    if (translated) view.push(withV1ToolFields(translated))
   }
   return view
 }
