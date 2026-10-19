@@ -804,6 +804,22 @@
       ],
       "orderNote": "After 29 and 47, which placed markSetupPhase/yieldSetupSlice around the createManagers call in testing/create-plugin-module.ts; 52 adds one argument inside that call (cherry-pick onto 502a4f0fd auto-merged). Tests: features/background-agent/manager-todo-continuation-disabled.test.ts, create-managers.test.ts, testing/create-plugin-module.test.ts. RED against 6ab041ac1: 4 fail (Expected 'completed' / Received 'running'; Expected false / Received undefined); the enabled-default control passes. GREEN: 31 pass. Regression: bun test src/features/background-agent src/create-managers*.test.ts src/testing: 888 pass / 0 fail. LSP clean; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS. Upstream variant on #9016 head 502a4f0fd: https://github.com/SwarmStorm/oh-my-openagent/pull/8 (RED 4 fail / GREEN 28 pass). Post-restart acceptance: a background child that stops with open todos logs '[background-agent] Task completed via session.idle event' (or 'via polling (idle status)') and its parent receives the completion notification; no repeated 'Task has incomplete todos via polling, waiting' lines.",
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10615"
+    },
+    {
+      "id": "53-v2-tool-part-alias-transcript",
+      "title": "Alias stored V2 tool parts to the v1 shape and stop the transcript retry loop",
+      "commit": "d731f595945af91e244f9c54c6e6ab0ab2d1b275",
+      "patch": "patches/53-v2-tool-part-alias-transcript.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/9",
+      "why": "OpenCode 2 stores an assistant tool call as {type:'tool', id, name, state} (session_message rows on 2.0.32, checked read-only in the live opencode.db: 238/238 tool parts carry `name`, none carry `tool`). The v1 hook code reads the OpenCode 1 fields `tool` and `callID` (44 readers of part.tool in omo-opencode). On the v2 session facade every PostToolUse transcript build therefore called transformToolName(undefined), threw TypeError, and logged '[transcript] failed to build transcript from session {\"error\":{}}' because JSON.stringify drops an Error's message. The failure never populated the transcript cache, so each tool call read the whole session history again (ctx.session.context) and failed again: 6,924 identical lines in %TEMP%/oh-my-opencode.log from 2026-10-16 to 2026-10-19 (1,247 on the 19th), plus 1,630 'failed to clean up previous temp transcript' ENOENT lines because the cache still pointed at the temp file the hook runner had just deleted. storedMessagesToV1 now adds `tool` (from name) and `callID` (from id) to tool parts of the read-only session view only (the hook message view written back to the host is unchanged); the transcript reads `tool` or `name`, skips a part with neither, logs errors with name/message/code, remembers a failed history fetch for TRANSCRIPT_FAILURE_RETRY_MS (60 s) instead of refetching on every tool call, ignores ENOENT on expected cleanups, and deleteTempTranscript detaches the path from the cache.",
+      "markers": [
+        "withV1ToolFields",
+        "describeTranscriptError",
+        "TRANSCRIPT_FAILURE_RETRY_MS"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Independent of 01-52. Edits v2/message-shape.ts (also touched by the identity write-back fix in the lane, d6b870b1b; the alias lives in storedMessagesToV1 and does not touch writeHookMessagesBack) and hooks/claude-code-hooks/transcript.ts. Tests: v2/message-shape.test.ts 'storedMessagesToV1' (3) and hooks/claude-code-hooks/transcript.test.ts 'transcript on OpenCode 2 histories' (4). RED against 6ab041ac1: message-shape 1 fail (parts lack tool/callID), transcript 2 fail (history refetched on every call: 2 and 3 calls instead of 1). GREEN: 17 pass across the two files; claude-code-hooks + v2 suites in the work tree pass; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS; LSP clean on the four files. Post-restart acceptance: no new '[transcript] failed to build transcript from session' lines in %TEMP%/oh-my-opencode.log and no new 'failed to clean up previous temp transcript' lines; PostToolUse hooks receive transcript_path files with the session's tool history (more than one line).",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10617"
     }
   ],
   "externalFixes": [

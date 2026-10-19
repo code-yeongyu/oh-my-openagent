@@ -1,0 +1,544 @@
+From d731f595945af91e244f9c54c6e6ab0ab2d1b275 Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 19 Oct 2026 20:57:21 +0300
+Subject: [PATCH] fix(v2): alias stored tool parts to the v1 shape and stop the
+ transcript retry loop
+
+OpenCode 2 stores an assistant tool call as { type: "tool", id, name,
+state } (session_message rows on 2.0.32). The v1 hook code reads the
+OpenCode 1 fields `tool` and `callID`, so on the v2 session facade every
+PostToolUse transcript build hit transformToolName(undefined), threw
+TypeError, and logged "[transcript] failed to build transcript from
+session {"error":{}}" because JSON.stringify drops an Error's message.
+The failure never populated the transcript cache, so each tool call read
+the whole session history again and failed again: 6,924 identical lines
+in %TEMP%/oh-my-opencode.log between 2026-10-16 and 2026-10-19, plus
+1,630 "failed to clean up previous temp transcript" ENOENT lines from the
+cache still pointing at the file the hook runner had just deleted.
+
+- storedMessagesToV1 now adds `tool` (from name) and `callID` (from id)
+  to tool parts of the read-only session view. The hook message view that
+  is written back to the host is unchanged.
+- The transcript reads `tool` or `name`, skips a part with neither, logs
+  errors with name/message/code, remembers a failed history fetch for one
+  minute instead of re-fetching on every tool call, and forgets a temp
+  transcript that deleteTempTranscript removed.
+---
+ .../claude-code-hooks/transcript.test.ts      | 102 +++++++++++
+ .../src/hooks/claude-code-hooks/transcript.ts | 159 +++++++++++-------
+ .../omo-opencode/src/v2/message-shape.test.ts |  66 +++++++-
+ packages/omo-opencode/src/v2/message-shape.ts |  22 ++-
+ 4 files changed, 285 insertions(+), 64 deletions(-)
+
+diff --git a/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.test.ts b/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.test.ts
+index 743978a49..b1234aed6 100644
+--- a/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.test.ts
++++ b/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.test.ts
+@@ -4,6 +4,7 @@ import {
+   buildTranscriptFromSession,
+   deleteTempTranscript,
+   clearTranscriptCache,
++  describeTranscriptError,
+   stopTranscriptCacheCleanup,
+ } from "./transcript"
+ 
+@@ -276,3 +277,104 @@ describe("transcript caching", () => {
+     deleteTempTranscript(path)
+   })
+ })
++
++describe("transcript on OpenCode 2 histories", () => {
++  afterEach(() => {
++    stopTranscriptCacheCleanup()
++  })
++
++  // #given a history whose tool parts carry the tool name as `name` (OpenCode 2 stored shape) and one
++  //        tool part with no name at all
++  // #when the transcript is built twice
++  // #then it is built from the named part, the nameless part is skipped, nothing throws, and the
++  //       history is fetched once
++  it("reads v2 tool parts by name and skips parts without a tool name instead of failing", async () => {
++    const client = createMockClient([
++      {
++        info: { role: "assistant" },
++        parts: [
++          { type: "tool", name: "execute", state: { status: "completed", input: { code: "1" } } },
++          { type: "tool", state: { status: "completed", input: { x: 1 } } },
++        ],
++      },
++    ])
++
++    const first = await buildTranscriptFromSession(client, "ses_v2_parts", "/tmp", "read", { filePath: "/tmp/a" })
++    const second = await buildTranscriptFromSession(client, "ses_v2_parts", "/tmp", "write", { filePath: "/tmp/b" })
++
++    expect(client.session.messages).toHaveBeenCalledTimes(1)
++    expect(first).not.toBeNull()
++    expect(second).not.toBeNull()
++    if (second) {
++      const lines = readFileSync(second, "utf-8").trim().split("\n")
++      expect(lines).toHaveLength(2)
++      expect(lines[0]).toContain("Execute")
++      expect(lines[1]).toContain("Write")
++    }
++    deleteTempTranscript(second)
++  })
++
++  // #given the history fetch rejects
++  // #when several tool calls build the transcript inside the retry window
++  // #then the history is fetched once, every call still gets the current-tool transcript, and a
++  //       cleared cache allows the next fetch
++  it("does not refetch the history on every tool call after a failed build", async () => {
++    const client = {
++      session: {
++        messages: mock(() => Promise.reject(new Error("session unavailable"))),
++      },
++    }
++
++    const first = await buildTranscriptFromSession(client, "ses_failed", "/tmp", "bash", { command: "a" })
++    const second = await buildTranscriptFromSession(client, "ses_failed", "/tmp", "read", { filePath: "/tmp/b" })
++    const third = await buildTranscriptFromSession(client, "ses_failed", "/tmp", "write", { filePath: "/tmp/c" })
++
++    expect(client.session.messages).toHaveBeenCalledTimes(1)
++    expect(first).not.toBeNull()
++    expect(second).not.toBeNull()
++    expect(third).not.toBeNull()
++    if (third) {
++      const content = readFileSync(third, "utf-8")
++      expect(content).toContain("Write")
++      expect(content).not.toContain("Read")
++    }
++    deleteTempTranscript(third)
++
++    clearTranscriptCache("ses_failed")
++    await buildTranscriptFromSession(client, "ses_failed", "/tmp", "bash", { command: "d" })
++    expect(client.session.messages).toHaveBeenCalledTimes(2)
++  })
++
++  // #given the temp transcript was already deleted by the hook runner
++  // #when the next transcript is built from the cache
++  // #then the stale path is not unlinked again and a fresh transcript is returned
++  it("forgets a temp transcript that deleteTempTranscript removed", async () => {
++    const client = createMockClient([])
++    const first = await buildTranscriptFromSession(client, "ses_forget", "/tmp", "bash", { command: "a" })
++    deleteTempTranscript(first)
++    const second = await buildTranscriptFromSession(client, "ses_forget", "/tmp", "read", { filePath: "/tmp/b" })
++    expect(second).not.toBeNull()
++    expect(second).not.toBe(first)
++    if (second) expect(existsSync(second)).toBe(true)
++    deleteTempTranscript(second)
++  })
++
++  it("describes errors with their message instead of serialising them to {}", () => {
++    const plain = new Error("boom")
++    expect(describeTranscriptError(plain)).toMatchObject({ name: "Error", message: "boom" })
++    expect(JSON.stringify(describeTranscriptError(plain))).toContain("boom")
++
++    const errno = Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT", path: "/tmp/x" })
++    expect(describeTranscriptError(errno)).toMatchObject({ message: "ENOENT: no such file", code: "ENOENT", path: "/tmp/x" })
++
++    const typed = (() => {
++      try {
++        ;(undefined as unknown as { trim: () => string }).trim()
++      } catch (error) {
++        return error
++      }
++    })()
++    expect(describeTranscriptError(typed)).toMatchObject({ name: "TypeError" })
++    expect(describeTranscriptError("text")).toEqual({ thrown: "text" })
++  })
++})
+diff --git a/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.ts b/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.ts
+index 8eb0fe9cc..a16f9f9ba 100644
+--- a/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.ts
++++ b/packages/omo-opencode/src/hooks/claude-code-hooks/transcript.ts
+@@ -31,6 +31,8 @@ export function appendTranscriptEntry(
+ interface OpenCodeMessagePart {
+   type: string
+   tool?: string
++  /** OpenCode 2 stores the tool name here; the v2 session facade also aliases it to `tool`. */
++  name?: string
+   state?: {
+     status?: string
+     input?: Record<string, unknown>
+@@ -60,16 +62,43 @@ interface TranscriptCacheEntry {
+   baseEntries: string[]
+   tempPath: string | null
+   createdAt: number
++  expiresAt: number
+ }
+ 
+ export const TRANSCRIPT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
++/**
++ * How long a failed history fetch is remembered. Every PostToolUse hook builds a transcript, so
++ * without this a session whose history cannot be read re-fetches and re-fails on every tool call
++ * (6,924 identical log lines in three days on OpenCode 2 before the v2 tool-part alias landed).
++ */
++export const TRANSCRIPT_FAILURE_RETRY_MS = 60 * 1000 // 1 minute
+ const TRANSCRIPT_CACHE_PRUNE_INTERVAL_MS = TRANSCRIPT_CACHE_TTL_MS
+ 
+ const transcriptCache = new Map<string, TranscriptCacheEntry>()
+ let cleanupInterval: ReturnType<typeof setInterval> | null = null
+ 
++/**
++ * JSON.stringify(new Error("x")) is "{}": message, name and stack are not enumerable. Spell the
++ * useful fields out so the log line says what failed.
++ */
++export function describeTranscriptError(error: unknown): Record<string, unknown> {
++  if (!(error instanceof Error)) return { thrown: String(error) }
++  const described: Record<string, unknown> = { name: error.name, message: error.message }
++  for (const key of ["code", "errno", "syscall", "path"] as const) {
++    const value = (error as unknown as Record<string, unknown>)[key]
++    if (value !== undefined) described[key] = value
++  }
++  if (error.stack) described.stack = error.stack.split("\n").slice(0, 4).join("\n")
++  if (error.cause !== undefined) described.cause = error.cause instanceof Error ? error.cause.message : String(error.cause)
++  return described
++}
++
+ function logTranscriptError(message: string, error: unknown): void {
+-  log(message, { error })
++  log(message, { error: describeTranscriptError(error) })
++}
++
++function isMissingFile(error: unknown): boolean {
++  return error instanceof Error && (error as { code?: unknown }).code === "ENOENT"
+ }
+ 
+ /**
+@@ -83,11 +112,7 @@ export function clearTranscriptCache(sessionId?: string): void {
+       try {
+         unlinkSync(entry.tempPath)
+       } catch (error) {
+-        if (error instanceof Error) {
+-          logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
+-        } else {
+-          logTranscriptError("[transcript] failed to clean up cached temp transcript", { thrown: error })
+-        }
++        if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
+       }
+     }
+     transcriptCache.delete(sessionId)
+@@ -97,11 +122,7 @@ export function clearTranscriptCache(sessionId?: string): void {
+         try {
+           unlinkSync(entry.tempPath)
+         } catch (error) {
+-          if (error instanceof Error) {
+-            logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
+-          } else {
+-            logTranscriptError("[transcript] failed to clean up cached temp transcript", { thrown: error })
+-          }
++          if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up cached temp transcript", error)
+         }
+       }
+     }
+@@ -117,7 +138,7 @@ function pruneExpiredTranscriptCache(): void {
+   const now = Date.now()
+   for (const sessionId of [...transcriptCache.keys()]) {
+     const entry = transcriptCache.get(sessionId)
+-    if (!entry || now - entry.createdAt >= TRANSCRIPT_CACHE_TTL_MS) {
++    if (!entry || now >= entry.expiresAt) {
+       clearTranscriptCache(sessionId)
+     }
+   }
+@@ -139,7 +160,7 @@ export function stopTranscriptCacheCleanup(): void {
+ }
+ 
+ function isCacheValid(entry: TranscriptCacheEntry): boolean {
+-  return Date.now() - entry.createdAt < TRANSCRIPT_CACHE_TTL_MS
++  return Date.now() < entry.expiresAt
+ }
+ 
+ function buildCurrentEntry(toolName: string, toolInput: Record<string, unknown>): string {
+@@ -168,7 +189,10 @@ function parseMessagesToEntries(messages: OpenCodeMessage[]): string[] {
+       if (part.state?.status !== "completed") continue
+       if (!part.state?.input) continue
+ 
+-      const rawToolName = part.tool as string
++      // OpenCode 1 parts carry `tool`; OpenCode 2 stored parts carry `name`. A part with neither is
++      // not a transcript entry; it must not abort the whole transcript.
++      const rawToolName = typeof part.tool === "string" ? part.tool : typeof part.name === "string" ? part.name : undefined
++      if (!rawToolName) continue
+       const toolName = transformToolName(rawToolName)
+ 
+       const entry: DisabledTranscriptEntry = {
+@@ -184,6 +208,15 @@ function parseMessagesToEntries(messages: OpenCodeMessage[]): string[] {
+   return entries
+ }
+ 
++function writeTempTranscript(sessionId: string, entries: readonly string[]): string {
++  const tempPath = join(
++    tmpdir(),
++    `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
++  )
++  writeFileSync(tempPath, entries.join("\n") + "\n")
++  return tempPath
++}
++
+ /**
+  * Build Claude Code compatible transcript from session messages.
+  * Uses per-session cache to avoid redundant session.messages() API calls.
+@@ -209,28 +242,47 @@ export async function buildTranscriptFromSession(
+       baseEntries = cached.baseEntries
+       previousTempPath = cached.tempPath
+     } else {
+-      const response = await client.session.messages({
+-        path: { id: sessionId },
+-        query: { directory },
+-      })
+-
+-      const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
+-        ?? (response as { data?: unknown[] }).data
+-        ?? (Array.isArray(response) ? response : [])
+-
+-      baseEntries = Array.isArray(messages)
+-        ? parseMessagesToEntries(messages as OpenCodeMessage[])
+-        : []
++      let fetched: string[]
++      try {
++        const response = await client.session.messages({
++          path: { id: sessionId },
++          query: { directory },
++        })
++
++        const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
++          ?? (response as { data?: unknown[] }).data
++          ?? (Array.isArray(response) ? response : [])
++
++        fetched = Array.isArray(messages)
++          ? parseMessagesToEntries(messages as OpenCodeMessage[])
++          : []
++      } catch (error) {
++        logTranscriptError("[transcript] failed to build transcript from session", error)
++        // Remember the failure for a bounded window: the next tool calls get the current-tool
++        // transcript without re-reading (and re-failing on) the whole session history.
++        fetched = []
++        previousTempPath = cached?.tempPath ?? null
++        transcriptCache.set(sessionId, {
++          baseEntries: fetched,
++          tempPath: null,
++          createdAt: Date.now(),
++          expiresAt: Date.now() + TRANSCRIPT_FAILURE_RETRY_MS,
++        })
++        ensureTranscriptCacheCleanup()
++        baseEntries = fetched
++        if (previousTempPath) deleteTempTranscript(previousTempPath)
++        const tempPath = writeTempTranscript(sessionId, [buildCurrentEntry(currentToolName, currentToolInput)])
++        const entry = transcriptCache.get(sessionId)
++        if (entry) entry.tempPath = tempPath
++        return tempPath
++      }
++      baseEntries = fetched
+ 
+       if (cached?.tempPath) {
+         try {
+           unlinkSync(cached.tempPath)
+         } catch (error) {
+-          if (error instanceof Error) {
+-            logTranscriptError("[transcript] failed to clean up stale temp transcript", error)
+-          } else {
+-            logTranscriptError("[transcript] failed to clean up stale temp transcript", { thrown: error })
+-          }
++          if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up stale temp transcript", error)
+         }
+       }
+ 
+@@ -238,6 +290,7 @@ export async function buildTranscriptFromSession(
+         baseEntries,
+         tempPath: null,
+         createdAt: Date.now(),
++        expiresAt: Date.now() + TRANSCRIPT_CACHE_TTL_MS,
+       })
+       ensureTranscriptCacheCleanup()
+     }
+@@ -248,19 +301,13 @@ export async function buildTranscriptFromSession(
+       try {
+         unlinkSync(previousTempPath)
+       } catch (error) {
+-        if (error instanceof Error) {
+-          logTranscriptError("[transcript] failed to clean up previous temp transcript", error)
+-        } else {
+-          logTranscriptError("[transcript] failed to clean up previous temp transcript", { thrown: error })
+-        }
++        // The hook runner deletes the file it was handed (deleteTempTranscript), so a missing
++        // previous transcript is the normal case, not an error.
++        if (!isMissingFile(error)) logTranscriptError("[transcript] failed to clean up previous temp transcript", error)
+       }
+     }
+ 
+-    const tempPath = join(
+-      tmpdir(),
+-      `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
+-    )
+-    writeFileSync(tempPath, allEntries.join("\n") + "\n")
++    const tempPath = writeTempTranscript(sessionId, allEntries)
+ 
+     const cacheEntry = transcriptCache.get(sessionId)
+     if (cacheEntry) {
+@@ -277,24 +324,11 @@ export async function buildTranscriptFromSession(
+ 
+     return tempPath
+   } catch (error) {
+-    if (error instanceof Error) {
+-      logTranscriptError("[transcript] failed to build transcript from session", error)
+-    } else {
+-      logTranscriptError("[transcript] failed to build transcript from session", { thrown: error })
+-    }
++    logTranscriptError("[transcript] failed to build transcript from session", error)
+     try {
+-      const tempPath = join(
+-        tmpdir(),
+-        `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
+-      )
+-      writeFileSync(tempPath, buildCurrentEntry(currentToolName, currentToolInput) + "\n")
+-      return tempPath
++      return writeTempTranscript(sessionId, [buildCurrentEntry(currentToolName, currentToolInput)])
+     } catch (fallbackError) {
+-      if (fallbackError instanceof Error) {
+-        logTranscriptError("[transcript] failed to write fallback transcript", fallbackError)
+-      } else {
+-        logTranscriptError("[transcript] failed to write fallback transcript", { thrown: fallbackError })
+-      }
++      logTranscriptError("[transcript] failed to write fallback transcript", fallbackError)
+       return null
+     }
+   }
+@@ -302,13 +336,14 @@ export async function buildTranscriptFromSession(
+ 
+ export function deleteTempTranscript(path: string | null): void {
+   if (!path) return
++  // The cache must not point at a file that no longer exists, or the next build tries to unlink
++  // it again.
++  for (const entry of transcriptCache.values()) {
++    if (entry.tempPath === path) entry.tempPath = null
++  }
+   try {
+     unlinkSync(path)
+   } catch (error) {
+-    if (error instanceof Error) {
+-      logTranscriptError("[transcript] failed to delete temp transcript", error)
+-    } else {
+-      logTranscriptError("[transcript] failed to delete temp transcript", { thrown: error })
+-    }
++    if (!isMissingFile(error)) logTranscriptError("[transcript] failed to delete temp transcript", error)
+   }
+ }
+diff --git a/packages/omo-opencode/src/v2/message-shape.test.ts b/packages/omo-opencode/src/v2/message-shape.test.ts
+index e7dc652ff..4b3bee271 100644
+--- a/packages/omo-opencode/src/v2/message-shape.test.ts
++++ b/packages/omo-opencode/src/v2/message-shape.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, expect, test } from "bun:test"
+ import { TeamModeConfigSchema } from "../config/schema/team-mode"
+ import { createTeamModeStatusInjector } from "../hooks/team-mode-status-injector"
+-import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
++import { hookMessagesToV1, storedMessagesToV1, writeHookMessagesBack } from "./message-shape"
+ 
+ type Message = { id?: string; role: string; content: Array<Record<string, unknown>> }
+ 
+@@ -85,3 +85,67 @@ describe("writeHookMessagesBack", () => {
+     ])
+   })
+ })
++
++describe("storedMessagesToV1", () => {
++  // OpenCode 2 stores a tool call as { type: "tool", id, name, state } (seen in session_message rows
++  // on 2.0.32); the v1 hook code reads part.tool and part.callID.
++  test("aliases the stored tool part name and id to the v1 tool and callID fields", () => {
++    const view = storedMessagesToV1(
++      [
++        {
++          type: "assistant",
++          id: "msg_1",
++          agent: "build",
++          model: { providerID: "anthropic", modelID: "claude" },
++          content: [
++            { type: "reasoning", text: "Run it." },
++            {
++              type: "tool",
++              id: "call_1",
++              name: "execute",
++              executed: true,
++              state: { status: "completed", input: { code: "1" }, content: [], metadata: {} },
++              time: { start: 1, end: 2 },
++            },
++          ],
++        },
++      ],
++      "ses_1",
++    )
++    expect(view).toHaveLength(1)
++    expect(view[0]?.parts[0]).toEqual({ type: "reasoning", text: "Run it." })
++    expect(view[0]?.parts[1]).toMatchObject({
++      type: "tool",
++      id: "call_1",
++      name: "execute",
++      tool: "execute",
++      callID: "call_1",
++      state: { status: "completed", input: { code: "1" } },
++    })
++  })
++
++  test("keeps an explicit v1 tool field and leaves non-tool parts untouched", () => {
++    const view = storedMessagesToV1(
++      [
++        {
++          type: "assistant",
++          id: "msg_1",
++          content: [
++            { type: "tool", id: "call_1", name: "bash", tool: "Bash", callID: "call_legacy", state: { status: "completed", input: {} } },
++            { type: "text", text: "done" },
++          ],
++        },
++      ],
++      "ses_1",
++    )
++    expect(view[0]?.parts[0]).toMatchObject({ tool: "Bash", callID: "call_legacy", name: "bash" })
++    expect(view[0]?.parts[1]).toEqual({ type: "text", text: "done" })
++  })
++
++  test("does not add v1 aliases to the hook message view that is written back to the host", () => {
++    const stored = { type: "assistant", id: "msg_1", content: [{ type: "tool", id: "call_1", name: "read", state: { status: "completed", input: {} } }] }
++    const view = hookMessagesToV1([stored], "ses_1")
++    expect(view[0]?.parts[0]).not.toHaveProperty("tool")
++    expect(view[0]?.parts[0]).not.toHaveProperty("callID")
++  })
++})
+diff --git a/packages/omo-opencode/src/v2/message-shape.ts b/packages/omo-opencode/src/v2/message-shape.ts
+index b75e62958..bfb6a28d0 100644
+--- a/packages/omo-opencode/src/v2/message-shape.ts
++++ b/packages/omo-opencode/src/v2/message-shape.ts
+@@ -79,13 +79,33 @@ function storedMessage(message: Record<string, unknown>, sessionID: string): V1M
+   }
+ }
+ 
++// OpenCode 2 stores a tool call as { type: "tool", id, name, state }. The v1 hook code reads the
++// OpenCode 1 part fields `tool` and `callID` (transcripts, tool-pair repair, context-window pruning),
++// so the read-only session view carries both spellings. The hook message view is left alone: it is
++// written back to the host, which must not receive fields it never stored.
++function withV1ToolFields(message: V1Message): V1Message {
++  if (message.info.role !== "assistant") return message
++  return {
++    ...message,
++    parts: message.parts.map((part) =>
++      part.type === "tool"
++        ? {
++            ...part,
++            ...(part.tool === undefined && typeof part.name === "string" ? { tool: part.name } : {}),
++            ...(part.callID === undefined && typeof part.id === "string" ? { callID: part.id } : {}),
++          }
++        : part,
++    ),
++  }
++}
++
+ export function storedMessagesToV1(messages: unknown, sessionID: string): V1Message[] {
+   if (!Array.isArray(messages)) return []
+   const view: V1Message[] = []
+   for (const message of messages) {
+     if (!isRecord(message)) continue
+     const translated = storedMessage(message, sessionID)
+-    if (translated) view.push(translated)
++    if (translated) view.push(withV1ToolFields(translated))
+   }
+   return view
+ }
