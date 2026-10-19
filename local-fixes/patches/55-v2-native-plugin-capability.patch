@@ -1,0 +1,110 @@
+From 105994606ac028e087f73b617765de62a77dc24c Mon Sep 17 00:00:00 2001
+From: "Mohamed R. Khalil" <m.radwan.khalil@gmail.com>
+Date: Mon, 19 Oct 2026 20:54:07 +0300
+Subject: [PATCH] fix(v2): expose active native plugin ownership to
+ compatibility hooks
+
+Signed-off-by: Mohamed R. Khalil <m.radwan.khalil@gmail.com>
+---
+ .../src/shared/native-plugin-context.test.ts  | 25 +++++++++++++++++++
+ .../src/shared/native-plugin-context.ts       | 25 +++++++++++++++++++
+ .../omo-opencode/src/v2/context-facade.ts     |  5 ++--
+ 3 files changed, 53 insertions(+), 2 deletions(-)
+ create mode 100644 packages/omo-opencode/src/shared/native-plugin-context.test.ts
+ create mode 100644 packages/omo-opencode/src/shared/native-plugin-context.ts
+
+diff --git a/packages/omo-opencode/src/shared/native-plugin-context.test.ts b/packages/omo-opencode/src/shared/native-plugin-context.test.ts
+new file mode 100644
+index 000000000..cf6b19ac4
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/native-plugin-context.test.ts
+@@ -0,0 +1,25 @@
++import { describe, expect, test } from "bun:test"
++import { hasActiveNativeContextMode, withNativePluginLookup } from "./native-plugin-context"
++
++describe("native plugin capability bridge", () => {
++  test("unsupported host keeps the Claude bridge", async () => {
++    expect(await hasActiveNativeContextMode({})).toBe(false)
++  })
++
++  test("reads activation state afresh and scopes it to this host context", async () => {
++    let status = "loading"
++    const input = withNativePluginLookup({}, async () => ({ data: [{ id: "context-mode", state: { status } }] }))
++    expect(await hasActiveNativeContextMode(input)).toBe(false)
++    status = "active"
++    expect(await hasActiveNativeContextMode(input)).toBe(true)
++    expect(await hasActiveNativeContextMode({})).toBe(false)
++    status = "error"
++    expect(await hasActiveNativeContextMode(input)).toBe(false)
++  })
++
++  test("does not mistake configuration or a similar plugin id for active native ownership", async () => {
++    for (const result of [{ data: [{ id: "context-mode" }] }, { data: [{ id: "not-context-mode", state: { status: "active" } }] }, null, {}]) {
++      expect(await hasActiveNativeContextMode(withNativePluginLookup({}, async () => result))).toBe(false)
++    }
++  })
++})
+diff --git a/packages/omo-opencode/src/shared/native-plugin-context.ts b/packages/omo-opencode/src/shared/native-plugin-context.ts
+new file mode 100644
+index 000000000..bbc92843d
+--- /dev/null
++++ b/packages/omo-opencode/src/shared/native-plugin-context.ts
+@@ -0,0 +1,25 @@
++import { log } from "./logger"
++
++// OMO-internal capability bridge, not a speculative property on the host API.
++const nativePluginLookups = new WeakMap<object, () => Promise<unknown>>()
++
++export function withNativePluginLookup<T extends object>(input: T, lookup?: () => Promise<unknown>): T {
++  if (lookup) nativePluginLookups.set(input, lookup)
++  return input
++}
++
++export async function hasActiveNativeContextMode(input: object): Promise<boolean> {
++  const lookup = nativePluginLookups.get(input)
++  if (!lookup) return false
++  try {
++    const result = await lookup() as { data?: Array<{ id?: string; state?: { status?: string } }> }
++    return Array.isArray(result?.data) && result.data.some(
++      (plugin) => plugin.id === "context-mode" && plugin.state?.status === "active",
++    )
++  } catch (error) {
++    log("[claude-code-hooks] native plugin lookup failed; preserving prompt bridge", {
++      error: error instanceof Error ? error.message : String(error),
++    })
++    return false
++  }
++}
+diff --git a/packages/omo-opencode/src/v2/context-facade.ts b/packages/omo-opencode/src/v2/context-facade.ts
+index 79e93fb35..f5026c1de 100644
+--- a/packages/omo-opencode/src/v2/context-facade.ts
++++ b/packages/omo-opencode/src/v2/context-facade.ts
+@@ -1,6 +1,7 @@
+ import type { Plugin } from "@opencode/plugin"
+ 
+ import { log } from "../shared/logger"
++import { withNativePluginLookup } from "../shared/native-plugin-context"
+ import { createAdapterState, type AdapterState } from "./adapter-state"
+ import { agentsFrom, configData, modelsFrom, providersFrom, serveOrigin, sessionCatalog, sessionStatusMap, skillsFrom } from "./catalog"
+ import { listenPortOf } from "./serve-http"
+@@ -139,7 +140,7 @@ export function createV1PluginInput(ctx: V2Context, deps: FacadeDeps = {}): {
+     },
+   }
+ 
+-  return {
++  return withNativePluginLookup({
+     directory,
+     worktree,
+     serverUrl: undefined,
+@@ -196,7 +197,7 @@ export function createV1PluginInput(ctx: V2Context, deps: FacadeDeps = {}): {
+       },
+     },
+     $: typeof Bun === "undefined" ? undefined : Bun.$,
+-  }
++  }, typeof ctx.plugin?.list === "function" ? () => ctx.plugin.list() : undefined)
+ }
+ 
+ export { createAdapterState }
+-- 
+2.55.0.windows.5
+

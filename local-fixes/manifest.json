@@ -820,6 +820,52 @@
       "overlapsWith": [],
       "orderNote": "Independent of 01-52. Edits v2/message-shape.ts (also touched by the identity write-back fix in the lane, d6b870b1b; the alias lives in storedMessagesToV1 and does not touch writeHookMessagesBack) and hooks/claude-code-hooks/transcript.ts. Tests: v2/message-shape.test.ts 'storedMessagesToV1' (3) and hooks/claude-code-hooks/transcript.test.ts 'transcript on OpenCode 2 histories' (4). RED against 6ab041ac1: message-shape 1 fail (parts lack tool/callID), transcript 2 fail (history refetched on every call: 2 and 3 calls instead of 1). GREEN: 17 pass across the two files; claude-code-hooks + v2 suites in the work tree pass; tsgo --noEmit -p packages/omo-opencode/tsconfig.json PASS; LSP clean on the four files. Post-restart acceptance: no new '[transcript] failed to build transcript from session' lines in %TEMP%/oh-my-opencode.log and no new 'failed to clean up previous temp transcript' lines; PostToolUse hooks receive transcript_path files with the session's tool history (more than one line).",
       "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10617"
+    },
+    {
+      "id": "54-claude-hook-plugin-provenance",
+      "title": "Retain Claude plugin identity on loaded hook actions",
+      "commit": "2f4b6791bad9bb480a7dddf04c998d72fc6dd8da",
+      "patch": "patches/54-claude-hook-plugin-provenance.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/7",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10614",
+      "why": "Merged Claude hook configurations otherwise lose plugin identity, preventing native-plugin deduplication without guessing from command text. The loader now stamps pluginName alongside pluginRoot for command and HTTP actions.",
+      "markers": [
+        "action.pluginName = pluginName"
+      ],
+      "overlapsWith": [],
+      "orderNote": "First of the three ordered native context-mode bridge changes. Direct loader tests were RED (pluginName undefined), then GREEN. Separate commit and patch preserve replay dependency ordering. Stage only; live source unchanged. See docs/qa/omo-warmstall-followups.md."
+    },
+    {
+      "id": "55-v2-native-plugin-capability",
+      "title": "Expose active native plugin ownership to compatibility hooks",
+      "commit": "e8653291a52fe992c90ff29d4276b777793f0937",
+      "patch": "patches/55-v2-native-plugin-capability.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/7",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10614",
+      "why": "The v2 facade did not retain access to the public native plugin catalog. An OMO-internal WeakMap now connects each facade context to ctx.plugin.list. It checks exact context-mode identity and active state at prompt time, because a real host's catalog was empty during setup and populated after activation. Missing or failed lookups preserve the legacy bridge. No host API invented.",
+      "markers": [
+        "nativePluginLookups",
+        "withNativePluginLookup"
+      ],
+      "overlapsWith": [],
+      "orderNote": "Second ordered bridge change; required by 54. The lookup API was verified in process on isolated OpenCode 2.0.32 with global fetch forbidden. Capability tests cover scope isolation, changing activation state, missing API and nonmatching ids. Full repository typecheck and all changed-file LSP checks pass."
+    },
+    {
+      "id": "56-native-context-mode-prompt-bridge",
+      "title": "Suppress redundant context-mode prompt bridging only when its native plugin is active",
+      "commit": "98a1d6caa6528a8fc5e639875427c76cdeec2b76",
+      "patch": "patches/56-native-context-mode-prompt-bridge.patch",
+      "pr": "https://github.com/SwarmStorm/oh-my-openagent/pull/7",
+      "upstreamIssue": "https://github.com/code-yeongyu/oh-my-openagent/issues/10614",
+      "why": "Native context-mode and its Claude UserPromptSubmit hook both executed on every prompt, adding a redundant Node child and wait. Filter only context-mode-sourced prompt actions when the native plugin is active; preserve user hooks, transcripts, first-message bookkeeping, child-session suppression, and legacy behavior otherwise. Skip the parent read when disabled or no prompt hooks remain. Existing session.get is already in process on the verified v2 host.",
+      "markers": [
+        "native context-mode owns UserPromptSubmit; bridge skipped"
+      ],
+      "overlapsWith": [
+        "52-claude-hook-plugin-provenance",
+        "53-v2-native-plugin-capability"
+      ],
+      "orderNote": "After 52 and 53; never replay alone. RED: expected zero redundant dispatches, observed one; mixed hooks expected one, observed two. GREEN integration lane: 164 tests/21 files, full typecheck, nine TypeScript files LSP clean. Real isolated 2.0.32 host: active=[user], absent=[user,context-mode], actual child processes. Upstream variant on 502a4f0fd: 148 tests/21 files and full typecheck pass, signed PR #7. Offline non-repository profile: quiet setup 386ms, concurrent setups 645-676ms, loaded gap 98ms; historical five-second freeze NOT reproduced, no speculative startup change. Stage only."
     }
   ],
   "externalFixes": [
