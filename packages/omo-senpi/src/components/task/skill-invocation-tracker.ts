@@ -1,6 +1,13 @@
 import type { SkillInvocationState } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
+import {
+  depositSessionHandoff,
+  discardSessionHandoff,
+  type PlanTouch,
+  shutdownKeepsSession,
+  takeSessionHandoff,
+} from "./skill-invocation-handoff"
 
 // Session-scoped state feeding the senpi-task invocation gate for plan-gated agents (plan-consultant/plan-reviewer).
 // Three observation channels, deliberately separated because they carry different trust levels:
@@ -84,7 +91,8 @@ const PLAN_ARTIFACT_PATH_TOOLS: ReadonlySet<string> = new Set(["read", "write", 
 export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvocationTracker {
   const invokedBySession = new Map<string, Set<string>>()
   const requestedBySession = new Map<string, Set<string>>()
-  const planTouchesBySession = new Map<string, Map<string, { count: number; lastTouchedAt: number }>>()
+  const planTouchesBySession = new Map<string, Map<string, PlanTouch>>()
+  const adoptedSessions = new Set<string>()
   let planTouchSequence = 0
 
   const record = (target: Map<string, Set<string>>, sessionId: string | undefined, skill: string | undefined): void => {
@@ -97,10 +105,37 @@ export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvoca
     target.set(sessionId, new Set([skill]))
   }
 
+  // Adopt the session's handoff once per session per generation, before this generation records
+  // anything for it, so the rebuilt tracker starts from what the retired one observed.
+  const adoptHandoff = (sessionId: string | undefined): void => {
+    if (sessionId === undefined || adoptedSessions.has(sessionId)) return
+    adoptedSessions.add(sessionId)
+    const handoff = takeSessionHandoff(sessionId)
+    if (handoff === undefined) return
+    for (const skill of handoff.invoked) record(invokedBySession, sessionId, skill)
+    for (const skill of handoff.requested) record(requestedBySession, sessionId, skill)
+    if (handoff.planTouches.length > 0) {
+      const touches = planTouchesBySession.get(sessionId) ?? new Map<string, PlanTouch>()
+      for (const [path, touch] of handoff.planTouches) if (!touches.has(path)) touches.set(path, { ...touch })
+      planTouchesBySession.set(sessionId, touches)
+    }
+    planTouchSequence = Math.max(planTouchSequence, handoff.planTouchSequence)
+  }
+
+  const depositHandoff = (sessionId: string): void => {
+    depositSessionHandoff(sessionId, {
+      invoked: [...(invokedBySession.get(sessionId) ?? [])],
+      requested: [...(requestedBySession.get(sessionId) ?? [])],
+      planTouches: [...(planTouchesBySession.get(sessionId) ?? [])].map(([path, touch]) => [path, { ...touch }] as const),
+      planTouchSequence,
+    })
+  }
+
   pi.on("tool_result", (payload, eventCtx) => {
     const event = asToolResultEvent(payload)
     if (event === undefined || event.isError) return
     const sessionId = extractSessionId(eventCtx)
+    adoptHandoff(sessionId)
     if (event.toolName === "read") record(invokedBySession, sessionId, skillNameFromPath(event.path))
     if (sessionId === undefined) return
     const touched = planArtifactPathsTouched(event)
@@ -125,6 +160,7 @@ export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvoca
     if (event.source === AGENT_MANUFACTURABLE_INPUT_SOURCE) return
     const text = event.text
     const sessionId = extractSessionId(eventCtx)
+    adoptHandoff(sessionId)
     if (text.startsWith(SKILL_COMMAND_PREFIX)) {
       // Mirror senpi's parse (see the ultrawork component): the skill name runs to the first space.
       const spaceIndex = text.indexOf(" ")
@@ -148,27 +184,33 @@ export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvoca
     if (isOwnWordsPlanRequest(visible)) record(requestedBySession, sessionId, "ulw-plan")
   })
 
-  pi.on("session_shutdown", (_payload, eventCtx) => {
+  pi.on("session_shutdown", (payload, eventCtx) => {
     const sessionId = extractSessionId(eventCtx)
     if (sessionId === undefined) return
+    if (shutdownKeepsSession(payload)) depositHandoff(sessionId)
+    else discardSessionHandoff(sessionId)
     invokedBySession.delete(sessionId)
     requestedBySession.delete(sessionId)
     planTouchesBySession.delete(sessionId)
+    adoptedSessions.delete(sessionId)
   })
 
   return {
-    stateFor: (sessionId) => ({
-      hasInvoked: (skill) => invokedBySession.get(sessionId)?.has(skill) ?? false,
-      hasUserRequested: (skill) => requestedBySession.get(sessionId)?.has(skill) ?? false,
-      hasPlanArtifact: () => (planTouchesBySession.get(sessionId)?.size ?? 0) > 0,
-      planArtifactReferences: () => {
-        const touches = planTouchesBySession.get(sessionId)
-        if (touches === undefined) return []
-        return [...touches.entries()]
-          .map(([path, touch]) => ({ path, count: touch.count, lastTouchedAt: touch.lastTouchedAt }))
-          .sort((a, b) => b.count - a.count || b.lastTouchedAt - a.lastTouchedAt)
-      },
-    }),
+    stateFor: (sessionId) => {
+      adoptHandoff(sessionId)
+      return {
+        hasInvoked: (skill) => invokedBySession.get(sessionId)?.has(skill) ?? false,
+        hasUserRequested: (skill) => requestedBySession.get(sessionId)?.has(skill) ?? false,
+        hasPlanArtifact: () => (planTouchesBySession.get(sessionId)?.size ?? 0) > 0,
+        planArtifactReferences: () => {
+          const touches = planTouchesBySession.get(sessionId)
+          if (touches === undefined) return []
+          return [...touches.entries()]
+            .map(([path, touch]) => ({ path, count: touch.count, lastTouchedAt: touch.lastTouchedAt }))
+            .sort((a, b) => b.count - a.count || b.lastTouchedAt - a.lastTouchedAt)
+        },
+      }
+    },
   }
 }
 
