@@ -3,7 +3,9 @@ import type { PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakeSessionInspector } from "./parent-wake-session-inspector"
 
-const MAX_NO_ASSISTANT_OUTPUT_RETRIES = 1
+export const DEFAULT_NO_ASSISTANT_OUTPUT_RETRY_DEADLINE_MS = 60_000
+export const DEFAULT_NO_ASSISTANT_OUTPUT_RETRY_BASE_DELAY_MS = 1_000
+const NO_ASSISTANT_OUTPUT_RETRY_MAX_BACKOFF_MS = 10_000
 
 type ParentWakeWindowRecoveryInput = {
   readonly sessionID: string
@@ -11,7 +13,16 @@ type ParentWakeWindowRecoveryInput = {
   readonly dispatchedTracker: ParentWakeDispatchedTracker
   readonly sessionInspector: ParentWakeSessionInspector
   readonly requeueWake: (wake: PendingParentWake) => void
-  readonly scheduleFlush: () => void
+  readonly scheduleFlush: (delayMs?: number) => void
+  readonly noAssistantOutputRetryDeadlineMs: number
+  readonly noAssistantOutputRetryBaseDelayMs: number
+}
+
+export function noAssistantOutputRetryBackoffMs(retryCount: number, baseDelayMs: number): number {
+  if (retryCount <= 1) {
+    return Math.max(0, baseDelayMs)
+  }
+  return Math.min(baseDelayMs * 2 ** (retryCount - 1), NO_ASSISTANT_OUTPUT_RETRY_MAX_BACKOFF_MS)
 }
 
 export async function handleDispatchedParentWakeWindowElapsed(
@@ -19,6 +30,16 @@ export async function handleDispatchedParentWakeWindowElapsed(
 ): Promise<void> {
   const currentWake = input.dispatchedTracker.getWake(input.sessionID)
   if (!currentWake || currentWake.dispatchedAt !== input.wake.dispatchedAt) {
+    return
+  }
+
+  // The deadline-notice deposit is terminal: the notification text is already
+  // in the parent session's chat history, so no further retries are owed.
+  if (input.wake.noAssistantOutputDeadlineNotice === true) {
+    input.dispatchedTracker.clearWake(input.sessionID)
+    log("[background-agent] Completed parent wake cycle after deadline notice deposit:", {
+      sessionID: input.sessionID,
+    })
     return
   }
 
@@ -30,23 +51,34 @@ export async function handleDispatchedParentWakeWindowElapsed(
     return
   }
 
-  const retryCount = input.wake.noAssistantOutputRetryCount ?? 0
-  if (retryCount >= MAX_NO_ASSISTANT_OUTPUT_RETRIES) {
+  // No assistant output after a dispatch is a failure, not a success to coalesce
+  // away: retry with backoff to a bounded deadline.
+  const now = Date.now()
+  const retryStartedAt = input.wake.noAssistantOutputRetryStartedAt ?? now
+  if (now - retryStartedAt >= input.noAssistantOutputRetryDeadlineMs) {
     input.dispatchedTracker.clearWake(input.sessionID)
-    log("[background-agent] Stopped retrying parent wake after repeated no-output dispatch:", {
+    input.wake.noAssistantOutputDeadlineNotice = true
+    input.requeueWake(input.wake)
+    input.scheduleFlush(0)
+    log("[background-agent] Deadline exhausted for no-output parent wake; queued visible notice deposit:", {
       sessionID: input.sessionID,
-      retryCount,
+      retryCount: input.wake.noAssistantOutputRetryCount ?? 0,
+      deadlineMs: input.noAssistantOutputRetryDeadlineMs,
     })
     return
   }
 
+  const retryCount = (input.wake.noAssistantOutputRetryCount ?? 0) + 1
+  const retryDelayMs = noAssistantOutputRetryBackoffMs(retryCount, input.noAssistantOutputRetryBaseDelayMs)
   input.dispatchedTracker.clearWake(input.sessionID)
-  input.wake.noAssistantOutputRetryCount = retryCount + 1
+  input.wake.noAssistantOutputRetryCount = retryCount
+  input.wake.noAssistantOutputRetryStartedAt = retryStartedAt
   input.requeueWake(input.wake)
-  input.scheduleFlush()
+  input.scheduleFlush(retryDelayMs)
   log("[background-agent] Requeued dispatched parent wake after no assistant output:", {
     sessionID: input.sessionID,
-    retryCount: input.wake.noAssistantOutputRetryCount,
+    retryCount,
+    retryDelayMs,
   })
 }
 

@@ -8,6 +8,8 @@ import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
 import { ParentWakeSessionInspector } from "./parent-wake-session-inspector"
 import type { ParentWakeNotifierDeps, ParentWakeNotifierOptions } from "./parent-wake-notifier-types"
 import {
+  DEFAULT_NO_ASSISTANT_OUTPUT_RETRY_BASE_DELAY_MS,
+  DEFAULT_NO_ASSISTANT_OUTPUT_RETRY_DEADLINE_MS,
   handleDispatchedParentWakeWindowElapsed,
   logParentWakeWindowRecoveryError,
   rescheduleParentWakeWindowRecoveryAfterError,
@@ -41,6 +43,10 @@ export class ParentWakeNotifier {
           sessionInspector: this.sessionInspector,
           requeueWake: (latestWake) => this.requeueWake(sessionID, latestWake),
           scheduleFlush: () => this.schedulePendingParentWakeFlush(sessionID),
+          noAssistantOutputRetryDeadlineMs:
+            options.noAssistantOutputRetryDeadlineMs ?? DEFAULT_NO_ASSISTANT_OUTPUT_RETRY_DEADLINE_MS,
+          noAssistantOutputRetryBaseDelayMs:
+            options.noAssistantOutputRetryBaseDelayMs ?? DEFAULT_NO_ASSISTANT_OUTPUT_RETRY_BASE_DELAY_MS,
         }).catch((error: unknown) => {
           logParentWakeWindowRecoveryError(
             sessionID,
