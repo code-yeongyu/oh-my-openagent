@@ -99,6 +99,21 @@ export function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake):
   ].join("\u0000")
 }
 
+// A no-output retry must never be coalesced with the dispatch that produced no
+// assistant output: the 15 s semantic-dedupe hold would silently swallow the
+// retry (observed 2026-10-19: ses_eede11ad). Scoping the key to the retry count
+// makes every retry a fresh dispatch.
+export function createNoAssistantOutputRetryDedupeKey(wake: PendingParentWake): string {
+  return [
+    "background-agent-parent-wake-no-output-retry",
+    String(wake.noAssistantOutputRetryCount ?? 0),
+    wake.noAssistantOutputDeadlineNotice === true ? "deadline-notice" : "",
+    ...wake.notifications,
+    JSON.stringify(wake.promptContext),
+    wake.shouldReply ? "reply" : "silent",
+  ].join("\u0000")
+}
+
 function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number): boolean {
   if (!isRecord(part)) {
     return false
