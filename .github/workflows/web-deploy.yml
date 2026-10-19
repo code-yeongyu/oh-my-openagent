@@ -12,7 +12,9 @@ on:
         required: false
         default: ""
   push:
-    branches: [master, dev]
+    # The site deploys from dev only (lead, 2026-10-18): a master push is a release-state merge, and the
+    # omo-production environment refuses it, which failed this workflow on every release.
+    branches: [dev]
     paths:
       - "packages/web/**"
       - "docs/**"
@@ -44,7 +46,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.2"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
