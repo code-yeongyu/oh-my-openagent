@@ -38,7 +38,12 @@ const MODE: AgentMode = "subagent"
 
 // Core tools that Sisyphus-Junior must NEVER have access to
 // Note: call_omo_agent is ALLOWED so subagents can spawn explore/librarian
-const BLOCKED_TOOLS = ["task"]
+// Task delegation is gated per spawn by the background manager's depth/member-aware
+// tool surface (ordinary children within maxDepth keep the task family; team members
+// and children at the depth floor do not). A static permission deny here would veto
+// that per-spawn grant in every context, so the permission layer no longer hard-denies
+// task. Sync spawn paths keep their own task:false via getAgentToolRestrictions.
+const BLOCKED_TOOLS: string[] = []
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
   model: "anthropic/claude-sonnet-5",
