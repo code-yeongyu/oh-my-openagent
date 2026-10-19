@@ -1,6 +1,7 @@
 import type { Plugin } from "@opencode/plugin"
 
 import { log } from "../shared/logger"
+import { withNativePluginLookup } from "../shared/native-plugin-context"
 import { createAdapterState, type AdapterState } from "./adapter-state"
 import { agentsFrom, configData, modelsFrom, providersFrom, serveOrigin, sessionCatalog, sessionStatusMap, skillsFrom } from "./catalog"
 import { listenPortOf } from "./serve-http"
@@ -139,7 +140,7 @@ export function createV1PluginInput(ctx: V2Context, deps: FacadeDeps = {}): {
     },
   }
 
-  return {
+  return withNativePluginLookup({
     directory,
     worktree,
     serverUrl: undefined,
@@ -196,7 +197,7 @@ export function createV1PluginInput(ctx: V2Context, deps: FacadeDeps = {}): {
       },
     },
     $: typeof Bun === "undefined" ? undefined : Bun.$,
-  }
+  }, typeof ctx.plugin?.list === "function" ? () => ctx.plugin.list() : undefined)
 }
 
 export { createAdapterState }
