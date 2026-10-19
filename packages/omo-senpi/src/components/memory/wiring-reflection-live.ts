@@ -39,6 +39,8 @@ export interface MemoryReflectionLiveWiring {
   onSettled(sessionId: string, eventCtx: unknown): Promise<void>
   syncRpc(): Promise<void>
   shutdown(identity?: string): void
+  /** Resolves once every status refresh started by bind or settle has finished (each one runs git in the identity dir). */
+  settled(): Promise<void>
   clearStatus(eventCtx: unknown): void
 }
 
@@ -88,6 +90,11 @@ export function createMemoryReflectionLiveWiring(
   const healthAlertOnce = createOncePerSessionGuard()
   const liveSession: { current?: ReflectionLiveSession } = {}
   const rpcBridge: { current?: MemoryRpcBridge } = {}
+  const statusRefreshes = new Set<Promise<unknown>>()
+  const track = (refresh: Promise<unknown>): void => {
+    const tracked: Promise<unknown> = refresh.catch(() => {}).finally(() => statusRefreshes.delete(tracked))
+    statusRefreshes.add(tracked)
+  }
   const footerLive = createMemoryFooterStatusLive({
     resolveContext: (sessionId) => options.sessions.get(sessionId)?.context,
     isActive: (identity) => activeRuns.isActive(identity),
@@ -131,7 +138,8 @@ export function createMemoryReflectionLiveWiring(
             ...(ui === undefined ? {} : { ui }),
             ...(options.logger === undefined ? {} : { logger: options.logger }),
           }
-      refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
+      const initialStatus = refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
+      if (initialStatus !== undefined) track(initialStatus)
       if (liveSession.current !== undefined) {
         try {
           await drainCompletions(
@@ -157,7 +165,7 @@ export function createMemoryReflectionLiveWiring(
     onReflectionLaunched,
     onLiveReflectionCompleted,
     async onSettled(sessionId, eventCtx): Promise<void> {
-      void footerLive.refresh(sessionId, readUi(eventCtx))
+      track(footerLive.refresh(sessionId, readUi(eventCtx)))
       await rpcBridge.current?.sync()
     },
     async syncRpc(): Promise<void> {
@@ -167,6 +175,10 @@ export function createMemoryReflectionLiveWiring(
       if (identity !== undefined) activeRuns.clear(identity)
       footerLive.dispose()
       rpcBridge.current?.detach()
+    },
+    async settled(): Promise<void> {
+      while (statusRefreshes.size > 0) await Promise.all([...statusRefreshes])
+      await footerLive.settled()
     },
     clearStatus(eventCtx): void {
       footerLive.stop()
@@ -190,17 +202,17 @@ function refreshInitialStatus(
   identity: MemoryIdentityContext,
   ui: StatusUi | undefined,
   requestPressureDream: () => void,
-): void {
-  if (ui === undefined) return
+): Promise<unknown> | undefined {
+  if (ui === undefined) return undefined
   const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-  void refreshMemoryStatus({
+  return refreshMemoryStatus({
     context: identity,
     ui,
     compileWarnTokens: settings.compile_warn_tokens,
     alreadyNotified: false,
     requestPressureDream,
     sessionId,
-  }).catch(() => {})
+  })
 }
 
 async function drainCompletions(
