@@ -9,6 +9,7 @@ import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createMemoryRpcBridge, type MemoryRpcBridge } from "./memory-rpc-bridge"
 import { resolveAgentReflectionSettings } from "./reflection-settings"
+import { isStaleExtensionContextError } from "./stale-extension-context"
 import { MEMORY_STATUS_KEY, refreshMemoryStatus } from "./status"
 import { createActiveReflectionRuns } from "./status-active-runs"
 import { createMemoryFooterStatusLive } from "./status-live-wiring"
@@ -44,21 +45,9 @@ export interface MemoryReflectionLiveWiring {
   clearStatus(eventCtx: unknown): void
 }
 
-// Stale-ctx prefixes thrown by senpi's runner guard when a pi captured at bind is probed after
-// session replacement (newSession/fork/switchSession) or runtime reload. Under --multi-session the
-// RPC host replaces sessions inside one long-lived process, so a reflection run launched off a
-// reservation right at boot can probe a ctx retired before the first fresh bind.
-// See: https://github.com/code-yeongyu/oh-my-openagent/issues/7946
-const STALE_EXTENSION_CONTEXT_ERROR_PREFIXES = [
-  "This extension ctx is stale after session replacement or reload.",
-  "stale extension generation after reload",
-] as const
-
-function isStaleExtensionContextError(error: unknown): boolean {
-  return error instanceof Error
-    && STALE_EXTENSION_CONTEXT_ERROR_PREFIXES.some((prefix) => error.message.startsWith(prefix))
-}
-
+// A pi captured at bind is retired by session replacement or runtime reload. Under --multi-session
+// the RPC host replaces sessions inside one long-lived process, so a reflection run launched off a
+// reservation right at boot can probe a ctx retired before the first fresh bind (#7946).
 export function createReflectionCompletionApi(pi: SenpiExtensionAPI): ReflectionCompletionApi | undefined {
   if (!hasMemoryCapabilities(pi)) return undefined
   return {
