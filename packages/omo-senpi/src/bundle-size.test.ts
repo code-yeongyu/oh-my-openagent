@@ -122,7 +122,14 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // dependency manifests are unchanged. Committed dev measures 1,539,513 bytes; the #10184 branch measures
 // 1,547,296 (+7,783) after minification (linux/arm64, node 24 + bun 1.4.2). 1,550,000 is the measured need
 // plus a 2,704-byte margin, so later growth still has to justify itself rather than ride on slack.
-const BUDGET_BYTES = 1_550_000
+// Raised 1,550,000 -> 1,556,000 in a standalone measured budget PR for #10604 (#10322): every memory git
+// run holds a kernel flock that its git inherits, so a dead writer's stranded git lock is reclaimed on
+// Linux hosts whose /proc cannot be read. The flock binding with errno classification, the local-filesystem
+// allowlist and the activity lock sit on the per-git-run path in the entry bundle and cannot move to a lazy
+// sidecar; no dependency manifest changed. Committed dev measures 1,549,814 bytes (186 under the old
+// ceiling); the #10604 branch measures 1,553,396 (+3,582) after minification (linux/amd64, node 24 + bun
+// 1.4.3). 1,556,000 is the measured need plus a 2,604-byte margin.
+const BUDGET_BYTES = 1_556_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
