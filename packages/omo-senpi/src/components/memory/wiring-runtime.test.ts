@@ -9,6 +9,7 @@ import { createMemoryIdentityContext } from "./context"
 import type { FactsExtractorRunnerOptions } from "./facts-runner"
 import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identity-runtime"
 import { loadedMemoryConfig, memorySettings } from "./memory.test-support"
+import { withLaunchScope } from "./launch-facts"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 
 const roots: string[] = []
@@ -68,10 +69,10 @@ describe("memory runtime agent-dir resolution", () => {
         captured = deps
         return stubRuntime()
       },
-    }, { current: { agentDir: engineAgentDir } }).runtimeFor(identity)
+    }, { current: { agentDir: engineAgentDir, sessionManager: { getSessionId: () => "session-1" } } }).runtimeFor(identity)
 
-    // then
-    expect(captured?.resolveAgentDir?.()).toBe(engineAgentDir)
+    // then: a launch reads it inside its run's scope, which this session belongs to (#10339)
+    expect(withLaunchScope({ conversationIds: ["session-1"] }, () => captured?.resolveAgentDir?.())).toBe(engineAgentDir)
   }, 30_000)
 
   test("#given an event context whose agent dir is unusable #when a reflection runtime is created #then it falls back to the detected agent home", async () => {
