@@ -314,7 +314,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 
 ## CONVENTIONS
 
-- **Runtime:** Bun only (1.4.0, pinned identically in CI and `.devcontainer/Dockerfile`). Never npm/yarn/pnpm. (Exceptions: `packages/lsp-tools-mcp` + `packages/lsp-daemon` are Node-targeted, vendored, and built with `npm` + vitest/biome.)
+- **Runtime:** Bun only (1.4.3, pinned identically in CI and `.devcontainer/Dockerfile`). Never npm/yarn/pnpm. (Exceptions: `packages/lsp-tools-mcp` + `packages/lsp-daemon` are Node-targeted, vendored, and built with `npm` + vitest/biome.)
 - **TypeScript:** strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`).
 - **Tests:** Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style — nested `describe` with `#given`/`#when`/`#then` prefixes, or inline `// given` / `// when` / `// then` comments. Never Arrange-Act-Assert comments.
 - **CI tests:** every root-test leg runs the shared serial quarantine (`script/root-test-serial-quarantine.ts`) in one process, then parallelizes the remainder — Linux/macOS via `bunfig.root.parallel.toml`, Windows shard 2 via `bunfig.win2.parallel.windows.toml` after running `packages/senpi-task/src/runners/rpc-host` in its own invocation through `script/bun-panic-retry.ts` (one retry on a Bun crash only, oven-sh/bun#44390). `script/ci-fast-path.mjs` (`classifyCiMode`) runs the full OS matrix for every runtime-touching change (every path except an explicit allowlist of web, prose such as top-level Markdown and README/CHANGELOG/AGENTS-style Markdown outside `packages/*/src`, and listed repository metadata), platform-sensitive paths, or the `ci:full-matrix` label; every OS leg ends with `script/ci-leg-tests-guard.mjs`, which fails a leg that skipped tests the change needed (`tests not run: add ci:full-matrix`) and marks an intended skip as `tests intentionally not run`. `bun run test:fast` partitions locally (opencode-memory → senpi → root-rest via `bunfig.win2.toml`).
@@ -387,7 +387,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 
 | Harness | Committed wiring | Runs |
 |---------|------------------|------|
-| GitHub Codespaces / VS Code Dev Containers | [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) + [`.devcontainer/Dockerfile`](.devcontainer/Dockerfile) (Node 24 + Bun 1.4.0 + tmux, matching CI) | `postCreateCommand` runs `setup.sh` on container create |
+| GitHub Codespaces / VS Code Dev Containers | [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) + [`.devcontainer/Dockerfile`](.devcontainer/Dockerfile) (Node 24 + Bun 1.4.3 + tmux, matching CI) | `postCreateCommand` runs `setup.sh` on container create |
 | Plain Docker | [`script/agent/docker-dev.sh`](script/agent/docker-dev.sh) | builds the same Dockerfile, opens a shell |
 | Cursor cloud agents | [`.cursor/environment.json`](.cursor/environment.json) | `install` runs `setup.sh` on environment creation |
 | Claude Code | [`.claude/settings.json`](.claude/settings.json) | `SessionStart` runs `setup.sh`, `SessionEnd` launches `cleanup-hook.sh` |

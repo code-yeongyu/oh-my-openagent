@@ -29,7 +29,7 @@ The tool comes with a `computer-use` skill, the full helper reference. If you al
 
 ### Where the engine comes from
 
-- **Compiled OmO binary:** the engine is staged inside the extracted runtime on macOS (arm64, x64), Linux x64 (glibc) and Windows x64.
+- **Compiled OmO binary:** the engine is staged inside the extracted runtime on macOS (arm64, x64), Linux (x64 and arm64, glibc) and Windows (x64 and arm64). Musl Linux has no released engine.
 - **npm install (`omo-ai`):** the npm package carries no native binaries. On first use, OmO looks for an engine for its own release version under `~/.omo/cache/senpi-desktop-engine/<version>/<host>/`, and when none is there it downloads the matching asset from the OmO GitHub release and verifies it against the release's checksum file before running it.
 - **Your own build:** set `computer.engine_path` to a binary, or build one in a checkout with `cargo build --release -p senpi-desktop-engine`.
 
@@ -127,7 +127,9 @@ Wayland has no focused-window geometry and uses the first display the portal rep
 omo --permission computer:read=allow --permission computer:exec=deny
 ```
 
-**The stop chord.** While input is possible, a global stop chord is armed (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape on Linux and Windows, or `stop_hotkey`). Pressing it suspends all computer input immediately: a `type` already in progress stops at the next character, and an action cut short by the suspension releases any keys and buttons it was holding; `/computer stop` does the same from the prompt. Input stays suspended until you run `/computer resume`. If the chord cannot be armed, input is refused with `StopPathUnavailable` rather than running without a way to stop it; `allow_host_relay_only_stop: true` accepts `/computer stop` as the only stop path, and is meant for hosts that relay a stop reliably.
+**The stop chord.** While input is possible, a global stop chord is armed (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape on Linux and Windows, or `stop_hotkey`). Pressing it suspends all computer input immediately: a `type` already in progress stops at the next character, and an action cut short by the suspension releases any keys and buttons it was holding; `/computer stop` does the same from the prompt. Input stays suspended until you run `/computer resume`. Every running session watches the chord itself, so one press stops all of them. On macOS and Linux X11 only a physical key press counts: a chord a program sends (the agent's own `press`, `xdotool`, another app posting key events) is ignored, so no program sending key events can stop computer use or keep it stopped. A virtual keyboard installed at the system level (a driver, or Linux `uinput`, which need administrator rights) looks like hardware and is not filtered. The Wayland GlobalShortcuts portal cannot tell the two apart, and Windows still accepts a sent chord until #10444 is finished. If the chord cannot be armed, input is refused with `StopPathUnavailable` rather than running without a way to stop it; `allow_host_relay_only_stop: true` accepts `/computer stop` as the only stop path, and is meant for hosts that relay a stop reliably.
+
+**Foreground control asks you first.** Background input, the default, needs no extra approval. Before the agent can take your foreground (input with `delivery: "foreground"`, or raising a window with `win.raise()`), OmO shows "Allow foreground computer control?" with the agent's reason. Only your answer grants it: a non-interactive run has no one to ask, so it never grants. When OmO runs inside another app (OmO Desktop or an RPC client), that app shows the question, and an app that never answers leaves control off. Declining, letting the question time out, or interrupting while it is open all leave control off. Until you approve, foreground actions fail with `ControlRequired`. The approval covers foreground input for the current task only and does not authorize anything else, such as sending messages or deleting data. It ends when the task finishes, when any `computer` run in it fails or is interrupted, when the session closes, and when you press the stop chord; `/computer resume` never brings it back, so the next foreground action asks again. Only one session holds foreground control at a time: if another session asks meanwhile, its question still appears, and even after you approve it gets `InputBusy` instead of taking control over. In full access mode (`--permission-preset full-access`) OmO grants foreground control without asking and says so in the session, and the same revocation rules apply.
 
 **Before input reaches an application,** the engine refuses it when input is suspended, the screen is locked, the stop path is gone, or the OS permission is missing.
 
@@ -159,14 +161,16 @@ omo --permission computer:read=allow --permission computer:exec=deny
 | `BackgroundUnavailable` | The target app or platform rejects this background action (a macOS app with several windows for keystrokes, a Windows toolkit restriction or non-client drag, some Linux toolkits, Wayland) | Read the named action and toolkit in the error; use accessibility `setValue` / `press`, or request `delivery: "foreground"` where supported. Windows may invoke an accessible control for an unmodified single left click, but never bypasses UIPI |
 | `StopPathUnavailable` | The global stop chord could not be armed (commonly Wayland without GlobalShortcuts) | Use a compositor with GlobalShortcuts, or set `allow_host_relay_only_stop: true` knowing `/computer stop` is then the only stop |
 | `Suspended` | You pressed the stop chord or ran `/computer stop` | Run `/computer resume` when you want input back |
+| `ControlRequired` | A foreground action or `win.raise()` ran without your foreground-control approval, or after it ended | Approve the "Allow foreground computer control?" question when the agent asks; background delivery needs no approval |
+| `InputBusy` | Another session holds foreground control | Finish or interrupt that session's task, then retry |
 
 ## Known limitations
 
 Computer use is experimental on every OS. These are the known gaps:
 
 - macOS (experimental): a background click can raise the clicked window to just below the frontmost window; your frontmost app, front window, focus, cursor and next-keystroke destination are kept. Restoring the full previous window order is tracked in [#8930](https://github.com/code-yeongyu/oh-my-openagent/issues/8930).
-- Linux (experimental): on Wayland, no single-window capture, no per-window input, no `raise()`; the stop chord needs the GlobalShortcuts portal. No released engine for Linux arm64 yet.
-- Windows (experimental): no input into elevated applications from a non-elevated OmO (UIPI), including accessibility click fallback. Background input is action-specific: WPF pointer/text and Chromium posted input remain restricted; see [Windows](#windows). No released engine for Windows arm64 yet.
+- Linux (experimental): on Wayland, no single-window capture, no per-window input, no `raise()`; the stop chord needs the GlobalShortcuts portal. No released engine for musl Linux (Alpine).
+- Windows (experimental): no input into elevated applications from a non-elevated OmO (UIPI), including accessibility click fallback. Background input is action-specific: WPF pointer/text and Chromium posted input remain restricted; see [Windows](#windows).
 
 ## Engine modes and bunshin
 

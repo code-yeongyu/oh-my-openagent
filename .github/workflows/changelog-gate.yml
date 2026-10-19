@@ -29,7 +29,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - name: Check this PR's Unreleased addition
         env:
