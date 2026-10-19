@@ -90,7 +90,15 @@ export const loadTrustAnchor = async (stateDir: string, account: string): Promis
   try {
     raw = await readFile(join(pinDir(stateDir, account), PIN_FILE), "utf8")
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return { ok: false, reason: "no_pin", next: ANCHOR_NEXT_STEP }
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      try {
+        await readdir(pinDir(stateDir, account))
+      } catch (missing) {
+        if (missing instanceof Error && "code" in missing && missing.code === "ENOENT") return { ok: false, reason: "no_pin", next: ANCHOR_NEXT_STEP }
+        throw missing
+      }
+      return { ok: false, reason: "corrupt_pin", next: ANCHOR_NEXT_STEP }
+    }
     throw error
   }
   const anchor = parsePin(raw, account)

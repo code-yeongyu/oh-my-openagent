@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { creatorAnchor, type PinCandidate } from "./anchor.ts"
 import { appendEntries, emptyChain } from "./chain.ts"
 import * as cryptoIndex from "./index.ts"
@@ -90,6 +90,15 @@ describe("the pinned root: set once from a proven walk, then the only root", () 
 describe("a pin file that is missing or does not parse is no anchor, never a fallback", () => {
   test("missing", async () => {
     await expectNoAnchor(stateDir(), "no_pin")
+  })
+
+  test("an account directory without its pin is corrupt and cannot be replaced", async () => {
+    const dir = stateDir()
+    const accountDir = dirname(pinPath(dir))
+    mkdirSync(accountDir, { recursive: true })
+    await expectNoAnchor(dir, "corrupt_pin")
+    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({ problem: "corrupt_pin" })
+    expect(readdirSync(accountDir)).toEqual([])
   })
 
   test.each([

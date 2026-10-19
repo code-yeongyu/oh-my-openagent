@@ -132,6 +132,7 @@ export const emptyChain = (account: string, anchor: ChainAnchor): ChainState =>
 export const atVerifiedHead = (state: ChainState, head: Head): ChainState | null => {
   if (!isChainState(state) || !state.anchored || state.head === null) return null
   if (head.keyring_link !== state.head.keyring_link || head.seq < state.head.seq) return null
+  if (head.seq === state.head.seq && head.link !== state.head.link) return null
   return mintState({ ...state, head })
 }
 
