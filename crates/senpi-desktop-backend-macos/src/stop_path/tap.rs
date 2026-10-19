@@ -23,6 +23,9 @@ const HEAD_INSERT: u32 = 0; // kCGHeadInsertEventTap
 const LISTEN_ONLY: u32 = 1; // kCGEventTapOptionListenOnly
 pub(super) const EVENT_KEY_DOWN: u32 = 10; // kCGEventKeyDown
 const KEYCODE_FIELD: u32 = 9; // kCGKeyboardEventKeycode
+/// `kCGEventSourceUnixProcessID`: 0 for hardware input, the poster's pid for
+/// an event a process created (`CGEventPost`, `CGEventPostToPid`).
+const SOURCE_UNIX_PID_FIELD: u32 = 41;
 const KEY_DOWN_MASK: u64 = 1 << EVENT_KEY_DOWN;
 pub(super) const TAP_DISABLED_BY_TIMEOUT: u32 = 0xFFFF_FFFE; // kCGEventTapDisabledByTimeout
 pub(super) const TAP_DISABLED_BY_USER_INPUT: u32 = 0xFFFF_FFFF; // kCGEventTapDisabledByUserInput
@@ -89,6 +92,12 @@ pub(super) const fn classify(event_type: u32) -> TapAction {
     }
 }
 
+/// Whether a key event came from hardware: the window server stamps the
+/// posting process's pid on every event a process creates, and 0 on HID input.
+pub(super) const fn is_physical(source_pid: i64) -> bool {
+    source_pid == 0
+}
+
 /// A heartbeat step keeps the path live only when the run loop is still
 /// servicing the tap and the tap is enabled.
 pub(super) const fn listener_step_is_live(run_loop_result: i32, tap_enabled: bool) -> bool {
@@ -105,7 +114,7 @@ struct TapContext<'a> {
 /// Native operations are injected only by this module's callback tests.
 struct TapCalls {
     enable: unsafe extern "C" fn(CfMachPortRef, bool),
-    keycode: unsafe extern "C" fn(CgEventRef, u32) -> i64,
+    integer_field: unsafe extern "C" fn(CgEventRef, u32) -> i64,
     flags: unsafe extern "C" fn(CgEventRef) -> u64,
 }
 
@@ -129,7 +138,16 @@ extern "C" fn tap_callback(
         TapAction::KeyDown if !event.is_null() => {
             // SAFETY: [FFI] `event` is the non-null key-down handed to this
             // callback; it is only read.
-            let keycode = unsafe { (context.calls.keycode)(event, KEYCODE_FIELD) };
+            let source_pid = unsafe { (context.calls.integer_field)(event, SOURCE_UNIX_PID_FIELD) };
+            // Only the person at the keyboard stops input: an event a process
+            // posted (the agent's own input included) carries its pid.
+            if !is_physical(source_pid) {
+                #[cfg(test)]
+                context.shared.update(|control| control.hooks.posted_ignored += 1);
+                return event;
+            }
+            // SAFETY: [FFI] as above.
+            let keycode = unsafe { (context.calls.integer_field)(event, KEYCODE_FIELD) };
             // SAFETY: [FFI] as above.
             let flags = unsafe { (context.calls.flags)(event) };
             context.shared.key_down(keycode, flags);
@@ -177,7 +195,7 @@ pub(super) fn run(shared: &Shared) -> TapRun {
         tap: Cell::new(ptr::null_mut()),
         calls: TapCalls {
             enable: CGEventTapEnable,
-            keycode: CGEventGetIntegerValueField,
+            integer_field: CGEventGetIntegerValueField,
             flags: CGEventGetFlags,
         },
     };
@@ -279,6 +297,8 @@ mod hooks {
         pub(in crate::stop_path) simulated_step_live: Option<bool>,
         /// Times a tap went live.
         pub(in crate::stop_path) went_live: u64,
+        /// Key-downs the callback ignored because a process posted them.
+        pub(in crate::stop_path) posted_ignored: u64,
     }
 
     pub(super) fn apply(context: &TapContext<'_>, user_info: *mut c_void) -> bool {

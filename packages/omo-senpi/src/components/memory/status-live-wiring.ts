@@ -32,6 +32,8 @@ export interface MemoryFooterStatusLive {
   stop(): void
   /** Permanently stops animation (session shutdown). */
   dispose(): void
+  /** Resolves once the footer restore that runs git after a run stops animating has finished. */
+  settled(): Promise<void>
 }
 
 /**
@@ -115,6 +117,10 @@ export function createMemoryFooterStatusLive(
 
     dispose() {
       live.dispose()
+    },
+
+    settled() {
+      return live.settled()
     },
   }
 }
