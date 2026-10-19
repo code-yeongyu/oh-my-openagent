@@ -1,0 +1,4 @@
+.card:focus-visible { border-radius: 12px; border-left: 3px solid var(--accent); }
+input:invalid { border-radius: 6px; border-bottom: 2px solid #dc2626; }
+.field[aria-invalid="true"] { border-radius: 6px; border-bottom: 2px solid #dc2626; }
+table td.sorted { border-radius: 4px; border-left: 3px solid #3b82f6; }
