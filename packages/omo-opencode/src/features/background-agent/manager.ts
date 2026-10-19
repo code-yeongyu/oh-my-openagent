@@ -246,6 +246,8 @@ export interface BackgroundManagerConfig {
   onSubagentSessionDeleted?: OnSubagentSessionDeleted
   onShutdown?: () => void | Promise<void>
   enableParentSessionNotifications?: boolean
+  // false when the todo-continuation-enforcer hook is disabled: nothing resumes an idle child with open todos
+  todoContinuationEnabled?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   log?: typeof log
 }
@@ -290,6 +292,7 @@ export class BackgroundManager {
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
+  private todoContinuationEnabled: boolean
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   private logger: typeof log
   private loggedSessionStatusUnavailable = false
@@ -316,6 +319,7 @@ export class BackgroundManager {
     this.rootDescendantCounts = new Map()
     this.preStartDescendantReservations = new Set()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
+    this.todoContinuationEnabled = options?.todoContinuationEnabled ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
     this.parentWakeNotifier = new ParentWakeNotifier(
@@ -1628,6 +1632,13 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
+    // Open todos only defer completion while todo-continuation can resume the child. Without it, the
+    // child's last turn (an escalation, a blocker report) is its final answer, and waiting would leave the
+    // task running, and the parent unnotified, until the hard deadline.
+    if (!this.todoContinuationEnabled) {
+      return false
+    }
+
     const observedIncompleteTodos = this.observedIncompleteTodosBySession.get(sessionID)
     if (observedIncompleteTodos === false) {
       return false

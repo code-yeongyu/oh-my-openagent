@@ -65,6 +65,7 @@ export function createManagers(args: {
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
+  todoContinuationEnforcerEnabled?: boolean
   runtimeSkillSourceUrl?: string
   deps?: Partial<CreateManagersDeps>
 }): Managers {
@@ -193,6 +194,7 @@ export function createManagers(args: {
       })
     },
     enableParentSessionNotifications: backgroundNotificationHookEnabled,
+    todoContinuationEnabled: args.todoContinuationEnforcerEnabled,
     modelFallbackControllerAccessor,
   })
 

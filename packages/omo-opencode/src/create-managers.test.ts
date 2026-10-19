@@ -18,6 +18,7 @@ const markServerRunningInProcess = mock(() => {})
 let backgroundManagerOptions: {
   onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   onShutdown?: () => void | Promise<void>
+  todoContinuationEnabled?: boolean
 } | null = null
 const trackedPaneBySession = new Map<string, string>()
 const registeredCleanupManagers: CleanupRegistration[] = []
@@ -38,6 +39,7 @@ class MockBackgroundManager {
   constructor(config: {
     onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
     onShutdown?: () => void | Promise<void>
+    todoContinuationEnabled?: boolean
   }) {
     backgroundManagerOptions = config
   }
@@ -191,6 +193,20 @@ describe("createManagers", () => {
     createManagers(args)
 
     expect(markServerRunningInProcess).not.toHaveBeenCalled()
+  })
+
+  it("#given todo-continuation-enforcer is disabled #when managers are created #then the background manager does not wait for todo continuation", () => {
+    createManagers({
+      ctx: createContext("/tmp"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      todoContinuationEnforcerEnabled: false,
+      deps: createDeps(),
+    })
+
+    expect(backgroundManagerOptions?.todoContinuationEnabled).toBe(false)
   })
 
   it("#given tmux integration is enabled #when managers are created #then it marks the tmux server as running", () => {

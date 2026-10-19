@@ -611,4 +611,27 @@ describe("createPluginModule()", () => {
       expect(mockCreatePluginInterface).toHaveBeenCalled()
     })
   })
+
+  describe("#given todo-continuation-enforcer is in disabled_hooks", () => {
+    it("#then startup tells the background manager that no continuation will resume idle children", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+      mockLoadPluginConfig.mockReturnValue({ disabled_hooks: ["todo-continuation-enforcer"] })
+
+      try {
+        // when
+        await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(mockCreateManagers.mock.calls.at(0)?.[0]).toMatchObject({
+          todoContinuationEnforcerEnabled: false,
+        })
+      } finally {
+        mockLoadPluginConfig.mockReturnValue({})
+      }
+    })
+  })
 })
