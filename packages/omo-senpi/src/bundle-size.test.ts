@@ -122,7 +122,14 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // dependency manifests are unchanged. Committed dev measures 1,539,513 bytes; the #10184 branch measures
 // 1,547,296 (+7,783) after minification (linux/arm64, node 24 + bun 1.4.2). 1,550,000 is the measured need
 // plus a 2,704-byte margin, so later growth still has to justify itself rather than ride on slack.
-const BUDGET_BYTES = 1_550_000
+// Raised 1,550,000 -> 1,553,000 in a standalone measured budget PR for #10315 (dori-extension loader, #10421).
+// #10421 renames the `gateway` config section to `dori` and adds the startup migration that moves a legacy
+// `gateway` section (`legacy-dori-section.ts` in omo-config-core). config-startup runs that migration before
+// Senpi reads its configuration, so it belongs in the entry bundle and cannot move to a lazy sidecar. The
+// dependency manifests are unchanged. Committed dev measures 1,549,814 bytes (186 bytes of slack); the #10421
+// branch measures 1,550,751 (+937) after minification (linux/amd64, node 24 + bun 1.4.3). 1,553,000 is the
+// measured need plus a 2,249-byte margin.
+const BUDGET_BYTES = 1_553_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
