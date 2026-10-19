@@ -106,6 +106,7 @@ import {
   getMaxLiveDescendantsPerRoot,
   getMaxSubagentDepth,
   resolveSubagentSpawnContext,
+  shouldIncludeTaskTools,
   type SubagentSpawnContext,
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
@@ -935,14 +936,27 @@ The fallback retry session is now created and can be inspected directly.
       }
     }
 
+    // Depth/member-aware task surface: ordinary children within maxDepth keep the
+    // task family (senpi-task includeTaskTools parity); team members and children at
+    // the depth floor do not. The grant rides last so agent-level task denies (e.g.
+    // sisyphus-junior) only apply when the spawn itself is not delegation-capable.
+    // An explicit user permission deny always wins.
+    const includeTaskTools =
+      userDenied.task !== false &&
+      shouldIncludeTaskTools({
+        teamRunId: input.teamRunId,
+        spawnDepth: task.spawnDepth,
+        maxDepth: getMaxSubagentDepth(this.config),
+      })
     const launchTools = {
-      task: false,
+      task: includeTaskTools,
       call_omo_agent: true,
       question: false,
       ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),
+      ...(includeTaskTools ? { task: true } : {}),
     }
     setSessionTools(sessionID, launchTools)
 
@@ -1524,13 +1538,20 @@ The fallback retry session is now created and can be inspected directly.
           ...(resumeModel ? { model: resumeModel } : {}),
           ...(resumeVariant ? { variant: resumeVariant } : {}),
           tools: (() => {
+            // Same depth/member-aware grant as launch (see startTask).
+            const includeTaskTools = shouldIncludeTaskTools({
+              teamRunId: existingTask.teamRunId,
+              spawnDepth: existingTask.spawnDepth,
+              maxDepth: getMaxSubagentDepth(this.config),
+            })
             const tools = {
-              task: false,
+              task: includeTaskTools,
               call_omo_agent: true,
               question: false,
               ...getAgentToolRestrictions(existingTask.agent, {
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,
               }),
+              ...(includeTaskTools ? { task: true } : {}),
             }
             setSessionTools(existingTask.sessionId!, tools)
             return tools

@@ -595,7 +595,8 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
       const bootstrap = getDelegatedChildSessionBootstrap("ses_background_bootstrap")
       expect(bootstrap?.system).toBe("bg-skill-system-sentinel")
       expect(bootstrap?.tools?.question).toBe(false)
-      expect(bootstrap?.tools?.task).toBe(false)
+      // ordinary child within maxDepth: the task family is granted per spawn
+      expect(bootstrap?.tools?.task).toBe(true)
       expect(getDelegatedChildSessionBootstrap("ses_background_bootstrap")).toBeDefined()
 
       const completed = await tryCompleteTaskForTest(manager, task)
@@ -8267,7 +8268,9 @@ describe("BackgroundManager - tool permission spread order", () => {
     //#then
     expect(capturedTools).toBeDefined()
     expect(capturedTools?.call_omo_agent).toBe(false)
-    expect(capturedTools?.task).toBe(false)
+    // ordinary child within maxDepth: task rides the depth/member-aware grant;
+    // the explore write/edit restrictions still apply
+    expect(capturedTools?.task).toBe(true)
     expect(capturedTools?.write).toBe(false)
     expect(capturedTools?.edit).toBe(false)
 
@@ -8415,7 +8418,9 @@ describe("BackgroundManager - tool permission spread order", () => {
     //#then
     expect(capturedTools).toBeDefined()
     expect(capturedTools?.call_omo_agent).toBe(false)
-    expect(capturedTools?.task).toBe(false)
+    // ordinary child within maxDepth: task rides the depth/member-aware grant;
+    // the explore write/edit restrictions still apply
+    expect(capturedTools?.task).toBe(true)
     expect(capturedTools?.write).toBe(false)
     expect(capturedTools?.edit).toBe(false)
 
