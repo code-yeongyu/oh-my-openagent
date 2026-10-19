@@ -1,3 +1,11 @@
+## 2026-10-14 - Preserve planning requests across same-process session transitions
+
+The task skill-invocation tracker hands authenticated request, invocation and plan-artifact records to replacement trackers keyed by session ID. Reload, new, resume and fork transitions retain the prior session's evidence; quit and unknown shutdown reasons discard it. Extension-injected inputs still cannot authorize review, and ulw-execute still forbids review.
+
+The adoption marker is cleared on shutdown so returning through the same tracker also restores evidence. The new same-tracker regression failed before this correction; focused tracker tests and adapter typecheck passed afterward. This is an in-process handoff, not persistence across application restarts.
+
+The handoff store lives in its own module, `skill-invocation-handoff.ts`. A generation takes a record when it adopts it, and the store keeps at most 256 sessions (oldest first out), so sessions the user left and never revisited cannot pile up in a long-running host. A forked child gets a new session id and does not inherit the parent's approval; only returning to the parent restores it. The reload case was proven on a real senpi 2026.10.13 RPC host: with `reload` between two plan-reviewer spawns, this build allowed the second spawn in 2 of 2 runs while dev denied it in 2 of 2 (senpi keeps the extension module across a reload, so the module-level store is shared).
+
 ## 2026-10-17 - `omo --help` no longer runs the OpenCode config migration (#10428)
 
 Thanks to @bluet for the report and the clean reproduction, and to @twotnguyen for #10433, which first routed `--help` around the extension. Senpi loads every extension to list their flags for `--help`, and it builds the runtime for `--list-models` and `--list-tips` before exiting, so `config-startup` ran the legacy migration on those launches and moved `~/.config/opencode/oh-my-openagent.json` into `~/.omo/migration-backup-*` before the user ever started a session. A 4.19.x OpenCode plugin then ran on its defaults. The migration guide says the move happens the first time omo starts a session.
