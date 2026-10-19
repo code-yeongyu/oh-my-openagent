@@ -8,7 +8,7 @@ import { resolvePluginPaths } from "./plugin-path-resolver"
  * dispatcher can set CLAUDE_PLUGIN_ROOT on the spawned hook process (#4458).
  * The plugin association is otherwise lost once configs are merged together.
  */
-function stampPluginRoot(config: HooksConfig, pluginRoot: string): void {
+function stampPluginRoot(config: HooksConfig, pluginRoot: string, pluginName: string): void {
   const eventMap = config.hooks
   if (!eventMap) return
   for (const matchers of Object.values(eventMap)) {
@@ -18,6 +18,7 @@ function stampPluginRoot(config: HooksConfig, pluginRoot: string): void {
       for (const action of matcher.hooks as HookEntry[]) {
         if (action && (action.type === "command" || action.type === "http")) {
           action.pluginRoot = pluginRoot
+          action.pluginName = pluginName
         }
       }
     }
@@ -35,7 +36,7 @@ export function loadPluginHooksConfigs(plugins: LoadedPlugin[]): HooksConfig[] {
       let config = JSON.parse(content) as HooksConfig
 
       config = resolvePluginPaths(config, plugin.installPath)
-      stampPluginRoot(config, plugin.installPath)
+      stampPluginRoot(config, plugin.installPath, plugin.name)
 
       configs.push(config)
       log(`Loaded plugin hooks config from ${plugin.name}`, { path: plugin.hooksPath })

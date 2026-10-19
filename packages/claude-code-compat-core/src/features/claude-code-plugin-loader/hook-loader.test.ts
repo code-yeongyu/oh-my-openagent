@@ -67,6 +67,7 @@ describe("loadPluginHooksConfigs pluginRoot stamping (#4458)", () => {
       expect(action.type).toBe("command")
       // Type narrowing for the test: command-type entries should carry pluginRoot.
       expect((action as { pluginRoot?: string }).pluginRoot).toBe(plugin.installPath)
+      expect((action as { pluginName?: string }).pluginName).toBe(plugin.name)
     }
   })
 
@@ -92,5 +93,6 @@ describe("loadPluginHooksConfigs pluginRoot stamping (#4458)", () => {
     const action = configs[0]?.hooks?.PostToolUse?.[0]?.hooks?.[0]
     expect(action?.type).toBe("http")
     expect((action as { pluginRoot?: string }).pluginRoot).toBe(plugin.installPath)
+    expect((action as { pluginName?: string }).pluginName).toBe(plugin.name)
   })
 })
