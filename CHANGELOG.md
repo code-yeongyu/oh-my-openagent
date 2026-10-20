@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A task stays running while the child's own background work is still going.** A child that ended its turn with a detached eval cell or a background terminal session still in flight was recorded `completed` right away, and the work's completion notification then resumed a task already reported finished; the parent saw a clean completion before the child had actually stopped. The supervisor now watches the child's own work: it holds the completed outcome at the idle edge and records the completion only after a settled probe with no pending work, so the wake from that work lands in the real final turn. The terminal half rides senpi's `wake_source_state` records, whose background-session lane comes from this change's sibling [senpi#3651](https://github.com/code-yeongyu/senpi/pull/3651). ([#10487](https://github.com/code-yeongyu/oh-my-openagent/issues/10487), [senpi#3492](https://github.com/code-yeongyu/senpi/issues/3492), [#10532](https://github.com/code-yeongyu/oh-my-openagent/pull/10532))
+
 **Onboarding saves only the facts you keep, and the TUI and the desktop share one completion flag.** The facts you accept are written through memory's own write path, and finishing onboarding in either the TUI or the desktop marks it done for both. ([#10506](https://github.com/code-yeongyu/oh-my-openagent/pull/10506))
 
 ## [5.1.39] - 2026-10-20

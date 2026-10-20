@@ -1,17 +1,29 @@
 // Wake sources a child's own session lifecycle publishes as raw `extension_event` records on the
 // handle-level event stream of both runners (senpi#3208 emits them through `pi.rpc.emit`, so they
-// never touch the permission-shaped extension channel). A turn that ended on a terminal provider
-// error is only "terminal with no live continuation" when none of these owns the session: a goal's
-// recovery timer (`goal_continuation_timer_state`) or a terminal monitor's live watches
-// (`terminal_monitor_state` / `terminal_monitor_ended`). Lifetimes differ: goal timers belong to
-// the turn that armed them and are cleared when a new turn begins (`resetTurn`); terminal monitors
-// live for the whole session, so only the engine's own state records (a zero-count snapshot, a
-// monitor-ended notice) clear them - a monitor armed in an earlier turn still protects a later one.
+// never touch the permission-shaped extension channel). A turn that ended is only "terminal with
+// no live continuation" when none of these owns the session.
+//
+// Two questions are tracked separately because the settle gates differ:
+// - hasLiveWakeSources: a session-scoped lifecycle that will resume the session on its own (a
+//   goal's recovery timer `goal_continuation_timer_state`, a terminal monitor's live watches
+//   `terminal_monitor_state` / `terminal_monitor_ended`). These hold a held ERROR outcome.
+//   Lifetimes differ: goal timers belong to the turn that armed them and are cleared when a new
+//   turn begins (`resetTurn`); terminal monitors live for the whole session, so only the engine's
+//   own state records (a zero-count snapshot, a monitor-ended notice) clear them - a monitor
+//   armed in an earlier turn still protects a later one.
+// - hasPendingAsyncWork: the child's OWN async work still in flight (senpi#3492, omo#10487): a
+//   detached eval cell (senpi-codemode), a background terminal session, publishing its per-source
+//   snapshot as `wake_source_state`. senpi still emits `agent_idle` while this runs, so a
+//   COMPLETED outcome is not terminal until every source reports zero: the work's completion
+//   notification wakes the child into the real final turn. Monitors deliberately do not gate a
+//   completed outcome - their wake semantics keep the session resumable, not the turn open.
 
 export type TurnWakeSources = {
   readonly observe: (record: unknown) => void
   readonly hasLiveWakeSources: () => boolean
-  /** A new turn began: goal timers belonged to the turn that armed them. Session-lifetime sources (terminal monitors) survive. */
+  /** The child's own async work (detached eval cells, background sessions, ...) is still in flight. */
+  readonly hasPendingAsyncWork: () => boolean
+  /** A new turn began: goal timers belonged to the turn that armed them. Session-lifetime sources (terminal monitors, pending async work) survive. */
   readonly resetTurn: () => void
 }
 
@@ -40,12 +52,24 @@ function monitorActiveCount(data: unknown): number | undefined {
   return typeof count === "number" && Number.isInteger(count) && count >= 0 ? count : undefined
 }
 
+function wakeSourceSnapshot(data: unknown): { readonly source: string; readonly activeCount: number } | undefined {
+  if (typeof data !== "object" || data === null) return undefined
+  const source = (data as { readonly source?: unknown }).source
+  const count = (data as { readonly activeCount?: unknown }).activeCount
+  if (typeof source !== "string" || source.length === 0) return undefined
+  if (typeof count !== "number" || !Number.isInteger(count) || count < 0) return undefined
+  return { source, activeCount: count }
+}
+
 export function createTurnWakeSources(): TurnWakeSources {
   // One entry per ARMED goal continuation timer kind (`monitor`, `userGrace`, senpi#3319's
   // `providerRetry`, ...). An armed timer of ANY kind is a live wake; an `armed: false` clears
   // only its own kind so a stale disarm never cancels a timer another kind still holds.
   const armedGoalTimers = new Set<string>()
   const monitorWatches = new Map<string, true>()
+  // One entry per source with work in flight (`senpi-codemode`, `terminal-background-sessions`,
+  // ...); a zero-count snapshot removes its source, so an absent key means nothing pending.
+  const pendingAsyncWork = new Map<string, number>()
 
   const trackMonitorSnapshot = (data: unknown): void => {
     const count = monitorActiveCount(data)
@@ -82,6 +106,14 @@ export function createTurnWakeSources(): TurnWakeSources {
         }
         return
       }
+      if (isExtensionEventNamed(event, "wake_source_state")) {
+        const snapshot = wakeSourceSnapshot(event.data)
+        if (snapshot !== undefined) {
+          if (snapshot.activeCount === 0) pendingAsyncWork.delete(snapshot.source)
+          else pendingAsyncWork.set(snapshot.source, snapshot.activeCount)
+        }
+        return
+      }
       if (isExtensionEventNamed(event, "terminal_monitor_state")) {
         trackMonitorSnapshot(event.data)
         return
@@ -97,6 +129,9 @@ export function createTurnWakeSources(): TurnWakeSources {
     hasLiveWakeSources() {
       if (armedGoalTimers.size > 0) return true
       return monitorWatches.size > 0
+    },
+    hasPendingAsyncWork() {
+      return pendingAsyncWork.size > 0
     },
     resetTurn() {
       armedGoalTimers.clear()

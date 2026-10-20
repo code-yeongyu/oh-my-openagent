@@ -88,6 +88,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     },
     settleConfirmMs: heartbeatIntervalMs,
     wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
+    pendingAsyncWorkLive: () => wakeSources.hasPendingAsyncWork(),
     disposed: () => tornDown,
     scheduleConfirmation: options.settlementScheduler,
   })

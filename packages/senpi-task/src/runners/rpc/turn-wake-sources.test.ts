@@ -103,3 +103,98 @@ describe("createTurnWakeSources (senpi#3262)", () => {
     expect(tracker.hasLiveWakeSources()).toBe(false)
   })
 })
+
+describe("createTurnWakeSources async work (senpi#3492, omo#10487)", () => {
+  test("#given a detached eval cell snapshot #when it goes quiet #then the async-work predicate tracks it without touching the monitor ledger", () => {
+    // given
+    const tracker = createTurnWakeSources()
+
+    // when - senpi-codemode publishes one live cell on the generic wake-source channel
+    tracker.observe(
+      extensionEvent("wake_source_state", {
+        source: "senpi-codemode",
+        activeCount: 1,
+        items: [{ id: "cell_1", description: "eval cell", startedAtMs: 1 }],
+      }),
+    )
+
+    // then - the child's own work is pending; the error-gate ledger is deliberately separate:
+    // pending async work holds a COMPLETED outcome (omo#10487), not the error wake gate
+    expect(tracker.hasPendingAsyncWork()).toBe(true)
+    expect(tracker.hasLiveWakeSources()).toBe(false)
+
+    // when - the cell settles and the source publishes its empty snapshot
+    tracker.observe(extensionEvent("wake_source_state", { source: "senpi-codemode", activeCount: 0 }))
+
+    // then
+    expect(tracker.hasPendingAsyncWork()).toBe(false)
+    expect(tracker.hasLiveWakeSources()).toBe(false)
+  })
+
+  test("#given two sources with pending work #when one drains #then only its own snapshot clears it", () => {
+    // given - a background terminal session and two eval cells in flight
+    const tracker = createTurnWakeSources()
+    tracker.observe(
+      extensionEvent("wake_source_state", {
+        source: "terminal-background-sessions",
+        activeCount: 1,
+        items: [{ id: "bash_1", description: "nightly build", startedAtMs: 1 }],
+      }),
+    )
+    tracker.observe(extensionEvent("wake_source_state", { source: "senpi-codemode", activeCount: 2 }))
+    expect(tracker.hasPendingAsyncWork()).toBe(true)
+
+    // when - the codemode source drains
+    tracker.observe(extensionEvent("wake_source_state", { source: "senpi-codemode", activeCount: 0 }))
+
+    // then - the session stays owned by the remaining source
+    expect(tracker.hasPendingAsyncWork()).toBe(true)
+
+    // when - the last source drains
+    tracker.observe(extensionEvent("wake_source_state", { source: "terminal-background-sessions", activeCount: 0 }))
+
+    // then
+    expect(tracker.hasPendingAsyncWork()).toBe(false)
+  })
+
+  test("#given a live monitor #when the async-work predicate is asked #then monitors do not hold a completed turn", () => {
+    // given - a monitor wake keeps its session-resume semantics and must not gate completion
+    const tracker = createTurnWakeSources()
+    tracker.observe(
+      extensionEvent("terminal_monitor_state", {
+        activeCount: 1,
+        monitors: [{ id: "w1", description: "watch the build", startedAtMs: 1 }],
+      }),
+    )
+
+    // then
+    expect(tracker.hasLiveWakeSources()).toBe(true)
+    expect(tracker.hasPendingAsyncWork()).toBe(false)
+  })
+
+  test("#given pending async work #when a new turn begins #then the work is session-scoped and survives the reset", () => {
+    // given
+    const tracker = createTurnWakeSources()
+    tracker.observe(extensionEvent("wake_source_state", { source: "senpi-codemode", activeCount: 1 }))
+
+    // when
+    tracker.resetTurn()
+
+    // then
+    expect(tracker.hasPendingAsyncWork()).toBe(true)
+  })
+
+  test("#given a malformed wake-source snapshot #when observed #then it is ignored", () => {
+    // given
+    const tracker = createTurnWakeSources()
+
+    // when - missing source, negative count, empty source, non-object payload
+    tracker.observe(extensionEvent("wake_source_state", { activeCount: 1 }))
+    tracker.observe(extensionEvent("wake_source_state", { source: "senpi-codemode", activeCount: -1 }))
+    tracker.observe(extensionEvent("wake_source_state", { source: "", activeCount: 3 }))
+    tracker.observe(extensionEvent("wake_source_state", "nope"))
+
+    // then
+    expect(tracker.hasPendingAsyncWork()).toBe(false)
+  })
+})

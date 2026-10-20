@@ -1,3 +1,40 @@
+## 2026-10-18 - A completed turn with the child's own async work still running is not terminal (#10487, senpi#3492)
+
+A child that ended its turn with a detached eval cell or a background terminal session still in
+flight was recorded `completed` the moment `agent_idle` arrived, and the work's completion
+notification then resumed a task that had already been reported finished - the terminal half of
+a turn was recorded before the turn's own work drained. `agent_idle` is emitted while that work
+runs (the engine's deferred-continuation gate covers monitors and goal timers, not the child's
+own async work), so `createTurnSettlement` saw a clean idle edge and settled the completed
+outcome.
+
+`runners/rpc/turn-wake-sources.ts` now tracks the async-work sources beside its wake-source
+ledgers: any raw `wake_source_state` record (`{ source, activeCount }`) observed on the handle's
+`extension_event` funnel updates a per-source count, and `hasPendingAsyncWork()` reports whether
+any source is above zero. Sources are independent - the session-wide background-session lane
+(`terminal-background-sessions`, published on every transition by code-yeongyu/senpi#3651) and
+the codemode detached-cell lane (`senpi-codemode`, on the wire since senpi#3208) each clear only
+with their own zero-count snapshot. `hasLiveWakeSources()` deliberately keeps its old meaning
+(goal timers and monitors only) because monitors keep the session resumable, not the turn open
+(omo#9069): the completed hold was given its own predicate instead of widening the error gate.
+
+`runners/rpc/turn-settlement.ts` holds a completed outcome when `agent_idle` lands with pending
+async work (`pendingAsyncWorkLive`), and confirms it the way a held error is confirmed: the
+handle's `reconfirmHeld()` re-arms the bounded confirmation when a tracked source changes, and
+only a `sessionIsIdle` probe with no pending source settles the outcome. The work's completion
+notification wakes the child into the real final turn: `agent_start` drops the held outcome, and
+`resetTurn` leaves async-work counts alone because the work is session-scoped, not turn-scoped.
+Absent predicate keeps the historical behavior (a completed outcome settles at `agent_idle`), and
+works without a wired probe too.
+`runners/rpc/handle.ts` / `runners/rpc-host/handle.ts` wire the predicate from the tracker.
+
+Tests: `runners/rpc/turn-wake-sources.test.ts` pins the snapshot ledger (independent sources,
+malformed snapshots ignored, turn reset leaves async work standing);
+`runners/rpc/turn-settlement.test.ts` pins the completed hold end-to-end (held at `agent_idle`,
+settled by probe after the drain, dropped when the wake starts a new turn, unchanged without
+pending work); `runners/rpc/handle-wake-sources.test.ts` drives the real handle through
+`wake_source_state` frames and asserts the task stays running until the cell drains.
+
 ## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
 
 - `agents/builtin/fallback-chains.ts` (mirrored from `model-core/src/agent-model-requirements.ts`, where `oracle` and `momus` get the same rung): a `{google, google-vertex, opencode}/gemini-4-argon` rung at `high` goes directly before the `gemini-3.1-pro` rung of `plan-reviewer`. The previous rung stays for Copilot (off the Argon rung until code-yeongyu/senpi#3379) and for engine pins without the Argon row. The GPT heads are unchanged: a blind eval put Argon ahead of the previous pro model in 16/16 judgments but behind the GPT heads on correctness, with a median latency of 57 s vs 15 s.

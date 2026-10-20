@@ -76,6 +76,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     probe: () => client.getState(),
     settleConfirmMs: heartbeatIntervalMs,
     wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
+    pendingAsyncWorkLive: () => wakeSources.hasPendingAsyncWork(),
     disposed: () => tornDown,
   })
   let continuationState: "none" | "pending_delivery" | "awaiting_start" = "none"
