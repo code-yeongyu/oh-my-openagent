@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parseSpec, pendingSpecs, waitForRegistryVersions, type RegistryFetch } from "./wait-registry-versions.mjs"
+import { parseSpec, pendingSpecs, platformPackageNames, waitForRegistryVersions, type RegistryFetch } from "./wait-registry-versions.mjs"
 
 const registry = (served: Record<string, string>): RegistryFetch => async (url) => {
   const parts = new URL(url).pathname.split("/").filter(Boolean)
@@ -84,5 +84,20 @@ describe("wait-registry-versions overall deadline", () => {
     expect(result).toEqual({ ok: false, pending: [{ spec: "oh-my-openagent@5.1.38", reason: "HTTP 404" }] })
     expect(now).toBeLessThanOrEqual(60 * minute + 4 * minute)
     expect(probes).toBeLessThan(20)
+  })
+})
+
+describe("platformPackageNames", () => {
+  test("#given the root manifest #when platform packages are derived #then both families come from optionalDependencies", () => {
+    expect(platformPackageNames({ optionalDependencies: { "oh-my-opencode-linux-x64": "5.1.38", "oh-my-opencode-windows-arm64": "5.1.38", "left-pad": "1.0.0" } })).toEqual([
+      "oh-my-opencode-linux-x64",
+      "oh-my-openagent-linux-x64",
+      "oh-my-opencode-windows-arm64",
+      "oh-my-openagent-windows-arm64",
+    ])
+  })
+
+  test("#given a manifest with no platform packages #when derived #then it fails closed", () => {
+    expect(() => platformPackageNames({})).toThrow(/no oh-my-opencode-<platform> package/)
   })
 })
