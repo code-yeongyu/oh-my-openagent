@@ -81,11 +81,11 @@ The receiver decides with `gateway/decision.ts` (`decideDelivery`), from the tar
 | --- | --- | --- | --- |
 | `idle` | admit followUp -> `started` | refuse `not_steerable` | admit followUp -> `started` |
 | `mid_turn` | admit followUp -> `queued` | epoch matches: admit steer -> `steered`; else refuse `turn_conflict` | admit followUp -> `queued` |
-| `waiting_question` | admit followUp -> `queued` | refuse `not_steerable` | admit followUp -> `queued` |
+| `waiting_question` | admit followUp -> `queued` | epoch matches: admit steer -> `steered`; else refuse `turn_conflict` | admit followUp -> `queued` |
 | `compacting` | admit followUp -> `queued` | refuse `not_steerable` | admit followUp -> `queued` |
 | `offline` | `queued_offline` | refuse `turn_conflict` | `queued_offline` |
 
-senpi's admission may still answer `held_draft` (the user is composing, or a submission has not reached the runtime): nothing is enqueued, the row stays claimable and the next wake retries, and the drain shows `queuedNotice` once. `already_admitted` settles a replayed claim without a second entry. A question answer never travels as a delivery: it goes through `thread_answer`.
+senpi's admission may still answer `held_draft` (the user is composing, or a submission has not reached the runtime): nothing is enqueued, the row stays claimable and the next wake retries, and the drain shows `queuedNotice` once. `already_admitted` settles a replayed claim without a second entry. A delivery into a session waiting on a blocking question is that question's answer (senpi#3786: senpi offers it to the ask-user `input` handler, which settles the question with it); with a non-blocking question open it is delivered after it. `thread_answer` remains the structured answer path.
 
 ## Budgets
 

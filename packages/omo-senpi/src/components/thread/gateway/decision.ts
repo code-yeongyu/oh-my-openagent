@@ -10,13 +10,14 @@ export type DeliveryDecision =
 
 /**
  * The 15-cell table {idle, mid_turn, waiting_question, compacting, offline} x {auto, steer,
- * follow_up}. Question answers never travel through a delivery, so a steer into a waiting
- * question is `not_steerable`, like a steer into an idle or compacting session.
+ * follow_up}. A delivery into a session waiting on a blocking question is that question's answer
+ * (senpi#3786), so a steer into a waiting question is admitted like a mid-turn steer; a steer into
+ * an idle or compacting session is `not_steerable`.
  */
 export function decideDelivery(state: TargetState, mode: GatewayDeliveryMode, expectedTurnId: number | null, turnEpoch: number | null): DeliveryDecision {
   if (state === "offline") return mode === "steer" ? { kind: "refuse", reason: "turn_conflict" } : { kind: "queued_offline" }
   if (mode === "steer") {
-    if (state !== "mid_turn") return { kind: "refuse", reason: "not_steerable" }
+    if (state !== "mid_turn" && state !== "waiting_question") return { kind: "refuse", reason: "not_steerable" }
     if (expectedTurnId === null || turnEpoch === null || expectedTurnId !== turnEpoch) return { kind: "refuse", reason: "turn_conflict" }
     return { kind: "admit", deliverAs: "steer", expected_turn_id: expectedTurnId, expect: "steered" }
   }

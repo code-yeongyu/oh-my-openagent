@@ -9,7 +9,7 @@ const MODES: readonly GatewayDeliveryMode[] = ["auto", "steer", "follow_up"]
 const EXPECTED: Readonly<Record<TargetState, Readonly<Record<GatewayDeliveryMode, string>>>> = {
   idle: { auto: "admit:followUp:started", steer: "refuse:not_steerable", follow_up: "admit:followUp:started" },
   mid_turn: { auto: "admit:followUp:queued", steer: "admit:steer:steered", follow_up: "admit:followUp:queued" },
-  waiting_question: { auto: "admit:followUp:queued", steer: "refuse:not_steerable", follow_up: "admit:followUp:queued" },
+  waiting_question: { auto: "admit:followUp:queued", steer: "admit:steer:steered", follow_up: "admit:followUp:queued" },
   compacting: { auto: "admit:followUp:queued", steer: "refuse:not_steerable", follow_up: "admit:followUp:queued" },
   offline: { auto: "queued_offline", steer: "refuse:turn_conflict", follow_up: "queued_offline" },
 }
@@ -31,5 +31,10 @@ describe("gateway decision table", () => {
   test("#given a mid-turn target #when a steer names a stale or missing epoch #then it is a turn conflict, never admitted", () => {
     expect(decideDelivery("mid_turn", "steer", 2, 3)).toEqual({ kind: "refuse", reason: "turn_conflict" })
     expect(decideDelivery("mid_turn", "steer", null, 3)).toEqual({ kind: "refuse", reason: "turn_conflict" })
+  })
+
+  test("#given a target waiting on a blocking question #when a steer names a stale or missing epoch #then it is a turn conflict, never admitted", () => {
+    expect(decideDelivery("waiting_question", "steer", 2, 3)).toEqual({ kind: "refuse", reason: "turn_conflict" })
+    expect(decideDelivery("waiting_question", "steer", null, 3)).toEqual({ kind: "refuse", reason: "turn_conflict" })
   })
 })

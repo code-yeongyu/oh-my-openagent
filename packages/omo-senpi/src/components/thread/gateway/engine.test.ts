@@ -55,7 +55,7 @@ describe("all_fifteen_delivery_state_cases", () => {
     const expected: Record<string, readonly [string, string | null]> = {
       "idle/auto": ["started", "applied"], "idle/steer": ["error:not_steerable", "refused"], "idle/follow_up": ["started", "applied"],
       "mid_turn/auto": ["queued", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
-      "waiting_question/auto": ["queued", "admitted"], "waiting_question/steer": ["error:not_steerable", "refused"], "waiting_question/follow_up": ["queued", "admitted"],
+      "waiting_question/auto": ["queued", "admitted"], "waiting_question/steer": ["steered", "admitted"], "waiting_question/follow_up": ["queued", "admitted"],
       "compacting/auto": ["queued", "admitted"], "compacting/steer": ["error:not_steerable", "refused"], "compacting/follow_up": ["queued", "admitted"],
       "offline/auto": ["queued_offline", "queued"], "offline/steer": ["error:turn_conflict", null], "offline/follow_up": ["queued_offline", "queued"],
     }
