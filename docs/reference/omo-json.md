@@ -166,14 +166,15 @@ Facts extraction does not launch or drain pending work at startup or relaunch. A
 
 ### `git_master` (Native harness)
 
-The optional `git_master` block controls commit attribution in Senpi (`schema/git-master.ts`). When the agent works with the `git-master` skill — reading it in the main session or loading it into a task child via `load_skills` — omo appends a commit-footer directive to the skill content only when you opt in.
+The optional `git_master` block controls how the `git-master` skill runs git in Senpi (`schema/git-master.ts`). When the agent works with the skill — reading it in the main session or loading it into a task child via `load_skills` — omo adds a mandatory "GIT COMMAND PREFIX" section and prefixes every `git` command in the skill's bash blocks with `git_env_prefix`, so your own git hooks can tell git-master is acting (for example, a hook that checks `GIT_MASTER`). The prefix always uses the bash form (`GIT_MASTER=1 git ...`), because Senpi's bash tool runs bash (Git Bash on Windows) whatever your login shell is. It also appends a commit-footer directive when you opt in.
 
-Commit-identity contract: commits omo causes in your repository carry your own git `user.name` / `user.email` as author and committer, and omo never adds a `Co-authored-by` trailer or any other GitHub-resolvable automation identity. A default install appends nothing.
+Commit-identity contract: commits omo causes in your repository carry your own git `user.name` / `user.email` as author and committer, and omo never adds a `Co-authored-by` trailer or any other GitHub-resolvable automation identity. A default install adds only the git command prefix.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `commit_footer` | boolean \| string | `false` | Opt in to the "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)" footer in the commit body. A string replaces the builtin footer text. |
 | `include_co_authored_by` | boolean | `false` | Deprecated no-op, accepted so existing configs keep validating. omo does not emit a `Co-authored-by` trailer regardless of this value. |
+| `git_env_prefix` | string | `"GIT_MASTER=1"` | Space-separated `NAME=value` assignments (letters, digits, `_`, `-`) put before every git command git-master runs. `""` turns the prefix off. Same key and default as the OpenCode plugin's `git_master.git_env_prefix`. |
 
 To opt in to the body footer:
 
