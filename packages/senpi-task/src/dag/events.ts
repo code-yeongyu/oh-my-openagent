@@ -152,12 +152,14 @@ export function dagNodeRetriedEvent(input: {
   priorTaskId?: string
   execAttempt: number
   promptChanged: boolean
+  automatic?: Extract<DagRunEventPayload, { readonly type: "dag.node.retried" }>["automatic"]
 }): DagRunEventPayload {
   const payload: DagRunEventPayload = {
     type: "dag.node.retried",
     nodeId: input.nodeId,
     execAttempt: input.execAttempt,
     promptChanged: input.promptChanged,
+    ...(input.automatic === undefined ? {} : { automatic: input.automatic }),
   }
   if (input.priorTaskId !== undefined) {
     return { ...payload, priorTaskId: input.priorTaskId }

@@ -174,7 +174,7 @@ function renderMemoryNotice(
     ...(soulNotice === undefined
       ? []
       : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${soulNotice.sha.slice(0, 7)} since your last run`]),
-    ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision)]),
+    ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision, turn.sources)]),
   ]
   if (lines.length === 0) return undefined
   return ["<memory_notice>", ...lines, "</memory_notice>"].join("\n")
