@@ -96,6 +96,9 @@ export interface TaskEngine {
 export interface ComposeTaskEngineDeps {
   readonly pi: SenpiExtensionAPI
   readonly omoConfig: OmoConfig
+  // Live user-config source for the planner seam. Defaults to the composition-time snapshot;
+  // the task component passes a re-loader so mid-session omo.json(c) edits apply to new plans.
+  readonly getOmoConfig?: () => OmoConfig
   readonly cwd: string
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly coordinator?: IdleInjectionCoordinator
@@ -216,14 +219,15 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const resolveRegistry: ResolveModelRegistry = () => runtime.modelRegistry()
+  const getOmoConfig = deps.getOmoConfig ?? (() => deps.omoConfig)
   // The default route a pin-less child would ride, named in model_unavailable refusals (#9722) so
   // the caller sees the substitution the failure prevented. Read lazily per plan: a mid-session
   // default change reaches the next spawn's message.
   const resolveDefaultRoute = () =>
     readSettingsDefaultRoute({ cwd: runtime.cwd(), agentDir: host.agentDir ?? resolveAgentHome({ env: deps.env ?? process.env }) })
   const basePlanner = createGenerationObservingPlanner({
-    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier(), resolveDefaultRoute),
-    omoConfig: deps.omoConfig,
+    planner: createTaskChildPlanner(getOmoConfig, agents, resolveRegistry, () => runtime.parentServiceTier(), resolveDefaultRoute),
+    omoConfig: getOmoConfig,
     resolveRegistry,
     generations: categoryConfigGenerations,
   })
