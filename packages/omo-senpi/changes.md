@@ -34,6 +34,16 @@ Review HIGH on #10505: the TUI onboarding's migration inventory called `runOnboa
 
 ## 2026-10-19 - An apply's own credentials write no longer makes its provider stage stale (#10496)
 
+## 2026-10-19 - Stage the shared DAG infrastructure retry runtime (#10605)
+
+Regenerated `plugin/extensions/omo-task.js` with `bun run build:senpi-plugin`.
+The bundled task engine now carries the shared scheduler's two bounded
+infrastructure retries, durable backoff metadata, and retry diagnostics. TUI and
+desktop continue to use that same engine; no adapter-specific retry path was
+added. Manual prompt overrides keep their pre-amendment eligibility check.
+The protocol field audit reads the extracted `event-types.ts` union so its
+overflow-payload equality assertion continues to inspect the shipped contract.
+
 ## 2026-10-19 - git-master applies git_env_prefix again (#10613)
 
 The OpenCode plugin put `git_master.git_env_prefix` (default `GIT_MASTER=1`) in front of every git command git-master ran, so a user's own git hooks could tell the skill was acting. Native dropped it. `components/git-master/skill-content.ts` now runs the same rewrite as the plugin (`injectGitMasterConfig` from `skills-loader-core`, footer off) on the skill text: a mandatory "GIT COMMAND PREFIX" section, plus the prefix on every `git` line in the skill's bash blocks. It covers both ways the skill arrives: the `read` result of `*/git-master/SKILL.md` (first text part rewritten, footer directive still appended as its own part) and `load_skills` in `task-skill-loader.ts`. The prefix always takes the bash form, because senpi's bash tool runs bash (Git Bash on Windows) whatever the user's login shell is; a csh `setenv` or PowerShell `$env:` form would be lost there. The section goes after the skill's YAML frontmatter, and the opt-in footer's example commit uses the prefix too. `git_env_prefix: ""` turns it off; with the footer also off the skill passes through untouched. `scripts/qa/git-master-attribution-e2e.mjs` gains the prefix checks and a prefix-off scenario.

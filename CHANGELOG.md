@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Resuming a finished background task runs the continuation again.** `task(task_id=...)` no longer re-completes the task on the previous run's output and aborts the session before the new prompt runs. ([#10686](https://github.com/code-yeongyu/oh-my-openagent/pull/10686))
+**A DAG node whose child dies on infrastructure is retried instead of taking its whole branch down.** When a mass-ulw node's child stops answering its heartbeats or loses its host session, the node is now retried automatically, at most twice, with a backoff. Its dependents are skipped only if the retries fail too. Before, one starved wave failed and every later node was skipped (an overloaded machine skipped 54 of 61 nodes). Task failures and cancelled nodes behave as before, and the TUI and the desktop app share this behaviour ([#10605](https://github.com/code-yeongyu/oh-my-openagent/issues/10605), [#10616](https://github.com/code-yeongyu/oh-my-openagent/pull/10616)).
+
+## [5.1.40] - 2026-10-20
+
 **Onboarding saves only the facts you keep, and the TUI and the desktop share one completion flag.** The facts you accept are written through memory's own write path, and finishing onboarding in either the TUI or the desktop marks it done for both. ([#10506](https://github.com/code-yeongyu/oh-my-openagent/pull/10506))
 
 ## [5.1.39] - 2026-10-20
