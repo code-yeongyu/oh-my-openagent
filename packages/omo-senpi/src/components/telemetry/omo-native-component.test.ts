@@ -13,6 +13,7 @@ import type {
   ComputerUseTelemetryObservers,
 } from "./omo-native-computer-use"
 import { CONSENT_CACHE_MS, createOmoNativeTelemetryComponent } from "./omo-native-component"
+import { KNOWN_PROVIDERS, providerPropertyName } from "./model-vocabulary"
 import * as parallelSummaryModule from "./omo-native-parallel-summary"
 import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, OMO_NATIVE_SCHEMA_VERSION } from "./product-identity"
 import { OWNER_STALE_MS, summaryDir } from "./session-summary-storage"
@@ -26,6 +27,14 @@ import {
 } from "./telemetry.test-support"
 
 const SHARED_KEYS = Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS)
+// session_started carries a flag only for each connected built-in provider; writeInventory connects openai.
+const PROVIDER_FLAGS: ReadonlySet<string> = new Set(KNOWN_PROVIDERS.map(providerPropertyName))
+const CONNECTED_PROVIDER_FLAGS: ReadonlySet<string> = new Set([providerPropertyName("openai")])
+
+function shippedKeys(event: keyof typeof OMO_NATIVE_PROPERTY_ALLOWLISTS): string[] {
+  const keys: readonly string[] = OMO_NATIVE_PROPERTY_ALLOWLISTS[event]
+  return keys.filter((key) => !PROVIDER_FLAGS.has(key) || CONNECTED_PROVIDER_FLAGS.has(key))
+}
 
 function context(sessionId: string): Record<string, unknown> {
   return {
@@ -127,7 +136,7 @@ function computerObservers(): {
 function assertAllowlistedPayloadKeys(messages: readonly TelemetryCaptureMessage[]): void {
   for (const message of nativeMessages(messages)) {
     const event = message.event as keyof typeof OMO_NATIVE_PROPERTY_ALLOWLISTS
-    const allowed: readonly string[] = [...OMO_NATIVE_PROPERTY_ALLOWLISTS[event], ...SHARED_KEYS].toSorted()
+    const allowed: readonly string[] = [...shippedKeys(event), ...SHARED_KEYS].toSorted()
     const actual = Object.keys(message.properties ?? {}).sort()
     if (event === "delegation_completed") {
       expect(actual.filter((key) => !allowed.includes(key))).toEqual([])
@@ -192,7 +201,7 @@ describe("OmO Native telemetry component integration", () => {
       ])
       expect(nativeMessages(recorder.messages).map(({ properties }) => Object.keys(properties ?? {}).sort())).toEqual([
         [...OMO_NATIVE_PROPERTY_ALLOWLISTS.daily_active, ...SHARED_KEYS].sort(),
-        [...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_started, ...SHARED_KEYS].sort(),
+        [...shippedKeys("session_started"), ...SHARED_KEYS].sort(),
         [...OMO_NATIVE_PROPERTY_ALLOWLISTS.prompt_submitted, ...SHARED_KEYS].sort(),
         [...OMO_NATIVE_PROPERTY_ALLOWLISTS.turn_completed, ...SHARED_KEYS].sort(),
         [...OMO_NATIVE_PROPERTY_ALLOWLISTS.feature_used, ...SHARED_KEYS].sort(),

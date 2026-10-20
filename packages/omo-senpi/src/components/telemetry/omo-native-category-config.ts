@@ -8,8 +8,10 @@ import { resolveCategory } from "@oh-my-opencode/senpi-task/category-resolver"
 
 import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import type { TaskModelRegistry } from "../task/planner"
-import { categoryPropertyName } from "./category-config-schema"
-import { maskProviderAndModel, type OmoNativeEventName } from "./product-identity"
+import { categoryPropertyName, OTHER_VALUE, type CategoryState } from "./category-config-schema"
+import { DELEGATION_REASONING_EFFORTS } from "./delegation-schema"
+import { ALL_KNOWN_MODEL_IDS, KNOWN_PROVIDERS } from "./model-vocabulary"
+import type { OmoNativeEventName } from "./product-identity"
 
 const BUILTIN_CATEGORY_NAMES: readonly string[] = BUILTIN_CATEGORY_DEFAULTS.map(({ name }) => name)
 const FINGERPRINT_LENGTH = 16
@@ -43,11 +45,9 @@ export function createCategoryConfigCapture(options: CategoryConfigCaptureOption
       options.captureEvent("category_config", {
         $session_id: options.sessionHash,
         config_generation: generation,
-        ...Object.fromEntries(
-          Object.entries(categories).map(([name, value]) => [categoryPropertyName(name), value]),
-        ),
+        ...Object.fromEntries(Object.entries(categories).flatMap(([name, value]) => categoryProperties(name, value))),
         combo_fingerprint: createHash("sha256").update(form).digest("hex").slice(0, FINGERPRINT_LENGTH),
-        user_category_count: counts.user,
+        custom_category_count: counts.user,
         builtin_overridden_count: counts.overridden,
         source,
       })
@@ -55,41 +55,66 @@ export function createCategoryConfigCapture(options: CategoryConfigCaptureOption
   }
 }
 
+type CategoryValue =
+  | { readonly state: Exclude<CategoryState, "set"> }
+  | { readonly state: "set"; readonly provider: string; readonly model: string; readonly reasoning: string; readonly depth: number }
+
 // One closed value per builtin category. The map is keyed by category NAME (not property name) so the
 // canonical form stays comparable with the planner-side generation counter's canonicalization.
 function encodeCategories(
   omoConfig: OmoConfig,
   registry: TaskModelRegistry,
-): Readonly<Record<string, string>> {
+): Readonly<Record<string, CategoryValue>> {
   return Object.fromEntries(BUILTIN_CATEGORY_NAMES.map((name) => [name, encodeCategory(name, omoConfig, registry)]))
 }
 
 /**
- * `<provider>/<model_id>/<reasoning>` with a `+<depth>` suffix when the selection came from a
- * non-head rung of the builtin chain, or the exact tokens `disabled`, `unavailable`, `absent`.
- * Provider and model are masked, so an arbitrary user model exports as `custom/custom/<reasoning>`.
+ * The resolution as closed values: provider and model only from the shipped vocabulary, everything
+ * else `other`, so a user's gateway or fine-tune name can never become a value.
  */
-function encodeCategory(name: string, omoConfig: OmoConfig, registry: TaskModelRegistry): string {
+function encodeCategory(name: string, omoConfig: OmoConfig, registry: TaskModelRegistry): CategoryValue {
   const resolution = resolveResilient(name, omoConfig, registry)
   switch (resolution.kind) {
-    case "resolved": {
-      const masked = maskProviderAndModel(resolution.spec.provider, resolution.spec.modelId)
-      const reasoning = resolution.spec.reasoning
-        ?? resolution.spec.reasoningEffort
-        ?? resolution.spec.variant
-        ?? "none"
-      const depth = chainDepth(name, resolution.modelSelection.fallbackEntry?.model)
-      return `${masked.provider}/${masked.model_id}/${reasoning}${depth === 0 ? "" : `+${depth}`}`
-    }
+    case "resolved":
+      return {
+        state: "set",
+        provider: KNOWN_PROVIDER_IDS.has(resolution.spec.provider) ? resolution.spec.provider : OTHER_VALUE,
+        model: ALL_KNOWN_MODEL_IDS.has(resolution.spec.modelId) ? resolution.spec.modelId : OTHER_VALUE,
+        reasoning: maskReasoning(resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant),
+        depth: chainDepth(name, resolution.modelSelection.fallbackEntry?.model),
+      }
     case "disabled":
-      return "disabled"
+      return { state: "disabled" }
     case "model_unavailable":
-      return "unavailable"
+      return { state: "unavailable" }
     case "not_found":
-      return "absent"
+      return { state: "absent" }
     default:
       return assertNever(resolution)
   }
+}
+
+const KNOWN_PROVIDER_IDS: ReadonlySet<string> = new Set(KNOWN_PROVIDERS)
+
+function categoryProperties(name: string, value: CategoryValue): [string, string | number][] {
+  const stem = categoryPropertyName(name)
+  if (value.state !== "set") return [[`${stem}_state`, value.state]]
+  return [
+    [`${stem}_state`, value.state],
+    [`${stem}_provider`, value.provider],
+    [`${stem}_model`, value.model],
+    [`${stem}_reasoning`, value.reasoning],
+    [`${stem}_depth`, value.depth],
+  ]
+}
+
+const REASONING_EFFORTS: ReadonlySet<string> = new Set(DELEGATION_REASONING_EFFORTS)
+
+// Same rule as delegation_completed's reasoning_effort: a harness-native preset is real but unbounded,
+// so it exports as `other`; absent exports as `none`. Keeps every `cat_*_reasoning` value inside its enum.
+function maskReasoning(level: string | undefined): string {
+  if (level === undefined) return "none"
+  return REASONING_EFFORTS.has(level) ? level : "other"
 }
 
 type Resolution = ReturnType<typeof resolveCategory<SenpiModelPort>>
@@ -134,14 +159,19 @@ function categoryCounts(omoConfig: OmoConfig): { readonly user: number; readonly
 // Name-sorted serialization, so the fingerprint is stable across omo.json key order and across
 // property insertion order: the same effective configuration always fingerprints identically.
 function canonicalForm(
-  categories: Readonly<Record<string, string>>,
+  categories: Readonly<Record<string, CategoryValue>>,
   counts: { readonly user: number; readonly overridden: number },
 ): string {
   const entries = Object.entries(categories)
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-    .map(([name, value]) => `${name}=${value};`)
+    .map(([name, value]) => `${name}=${categoryToken(value)};`)
     .join("")
   return `${entries}|u=${counts.user}|o=${counts.overridden}`
+}
+
+function categoryToken(value: CategoryValue): string {
+  if (value.state !== "set") return value.state
+  return `${value.provider}/${value.model}/${value.reasoning}${value.depth === 0 ? "" : `+${value.depth}`}`
 }
 
 function assertNever(value: never): never {

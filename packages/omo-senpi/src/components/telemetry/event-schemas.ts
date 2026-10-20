@@ -5,7 +5,7 @@ import { CATEGORY_CONFIG_SCHEMA } from "./category-config-schema"
 import { PROCESS_CRASHED_SCHEMA } from "./crash-schema"
 import { buildDelegationCompletedSchema } from "./delegation-schema"
 import { KIBITZER_SUMMARY_SCHEMA } from "./kibitzer-schema"
-import { KNOWN_MODELS, KNOWN_PROVIDERS } from "./model-vocabulary"
+import { KNOWN_MODELS, KNOWN_PROVIDERS, providerPropertyName } from "./model-vocabulary"
 import { PARALLELISM_SUMMARY_SCHEMA } from "./parallelism-schema"
 import { SESSION_SUMMARY_SCHEMA } from "./session-summary-schema"
 import { TELEMETRY_SESSION_ROLES } from "./session-role"
@@ -60,7 +60,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
   daily_active: Object.freeze({
     "$session_id": STRING_PROPERTY,
     day_utc: STRING_PROPERTY,
-    reason: enumProperty(["session_start"] as const),
+    start_trigger: enumProperty(["session_start"] as const),
   }),
   session_started: Object.freeze({
     "$session_id": STRING_PROPERTY,
@@ -68,24 +68,26 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     "$os_version": STRING_PROPERTY,
     arch: STRING_PROPERTY,
     cpu_count: NUMBER_PROPERTY,
+    custom_provider_count: NUMBER_PROPERTY,
     default_model: enumProperty([...new Set(Object.values(KNOWN_MODELS).flat()), "custom"] as const),
     default_provider: enumProperty([...KNOWN_PROVIDERS, "custom"] as const),
     memory_bucket: enumProperty(["lt_8_gb", "8_15_gb", "16_31_gb", "32_63_gb", "64_plus_gb"] as const),
     model_count: NUMBER_PROPERTY,
     provider_count: NUMBER_PROPERTY,
-    providers: STRING_PROPERTY,
-    reason: enumProperty(["startup", "reload", "new", "resume", "fork"] as const),
+    // One flag per connected built-in provider; user-defined providers only count in custom_provider_count.
+    ...(Object.fromEntries(KNOWN_PROVIDERS.map((id) => [providerPropertyName(id), BOOLEAN_PROPERTY])) as Readonly<Record<string, typeof BOOLEAN_PROPERTY>>),
     session_role: enumProperty(TELEMETRY_SESSION_ROLES),
-    // Device-reported IANA zone. A timezone signal, never a country signal: countries share zones,
-    // span zones, and users override them. Country comes from PostHog's server-side GeoIP.
-    timezone: STRING_PROPERTY,
+    start_trigger: enumProperty(["startup", "reload", "new", "resume", "fork"] as const),
+    // The device's UTC offset in minutes, never the zone name: an offset is not a country signal
+    // either. Country comes from PostHog's server-side GeoIP.
+    utc_offset_minutes: NUMBER_PROPERTY,
   }),
   prompt_submitted: Object.freeze({
     "$session_id": STRING_PROPERTY,
     input_source: enumProperty(["interactive", "rpc", "extension"] as const),
     invocation_stage: enumProperty(["none", "first_arm", "remention", "post_compact_rearm"] as const),
     is_effective_ultrawork_invocation: BOOLEAN_PROPERTY,
-    is_real_user_prompt: BOOLEAN_PROPERTY,
+    is_real_user: BOOLEAN_PROPERTY,
     is_turn_start: BOOLEAN_PROPERTY,
     keyword_any: BOOLEAN_PROPERTY,
     keyword_occurrence_bucket: enumProperty(["1", "2", "3_5", "6_plus"] as const),
@@ -95,7 +97,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     prompt_length_bucket: enumProperty(["lt_100", "100_500", "500_2000", "gte_2000"] as const),
     queue_mode: enumProperty(["immediate", "follow_up", "steer", "other"] as const),
     real_prompt_ordinal_bucket: enumProperty(["1", "2_3", "4_10", "11_25", "26_plus"] as const),
-    suppression_reason: enumProperty([
+    suppression_cause: enumProperty([
       "none", "no_keyword", "identifier_reference", "negated_mention", "extension_source", "child_session", "embedded_directive", "skill_expansion", "skill_name_only",
     ] as const),
   }),

@@ -109,7 +109,7 @@ describe("delegation_completed projection", () => {
       task_seq: 3,
       run_epoch: 0,
       status: "completed",
-      start_reason: "initial_spawn",
+      start_trigger: "initial_spawn",
       category: "deep-low",
       agent_type: "none",
       owner_kind: "plain_child",
@@ -258,7 +258,7 @@ describe("delegation_completed projection", () => {
 
     // then
     expect(dag.owner_kind).toBe("dag_node")
-    expect(dag.start_reason).toBe("dag_retry")
+    expect(dag.start_trigger).toBe("dag_retry")
     expect(member.owner_kind).toBe("team_member")
     expect(unprovable.owner_kind).toBe("unknown")
   })

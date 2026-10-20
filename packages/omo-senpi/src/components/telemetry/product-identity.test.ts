@@ -29,7 +29,7 @@ import {
   maskProviderAndModel,
   withOmoNativeAttribution,
 } from "./product-identity"
-import { MAX_TRACKED_CALLS } from "./wave-assembler"
+import { ALL_KNOWN_MODEL_IDS } from "./model-vocabulary"
 import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
 import { UNCONFIGURED_POSTHOG_API_KEY, getTelemetryApiKey, isConfiguredTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
@@ -212,22 +212,6 @@ describe("OmO Native product identity", () => {
     expect([...BUILTIN_CATEGORY_NAMES].sort()).toEqual(categoryNames.sort())
   })
 
-  test("#given the tracked-call cap #when the widest wave histogram is encoded #then it stays inside the 64 character privacy limit", () => {
-    // given: the wave assembler tracks at most MAX_TRACKED_CALLS (2000) calls, so no bucket count exceeds 4 digits
-    const bucketCount = 8
-    const widestBucketValue = String(MAX_TRACKED_CALLS)
-
-    // when: the fixed buckets (1, 2, 3, 4, 5_8, 9_16, 17_32, 33plus) are positionally encoded without labels
-    const worstCaseHistogram = Array.from({ length: bucketCount }, () => widestBucketValue).join(":")
-
-    // then: the encoded string is 39 characters, well under the wrapper's silent 64 character truncation
-    expect(widestBucketValue).toHaveLength(4)
-    expect(worstCaseHistogram).toHaveLength(bucketCount * 4 + (bucketCount - 1))
-    expect(worstCaseHistogram.length).toBeLessThanOrEqual(64)
-    expect(OMO_NATIVE_EVENT_SCHEMAS.parallelism_summary.non_eval_wave_size_histogram.type).toBe("string")
-    expect(OMO_NATIVE_PROPERTY_ALLOWLISTS.parallelism_summary).toContain("non_eval_wave_size_histogram")
-  })
-
   test("#given the native event schemas #when inspected #then delegation_completed and category_config exist with exactly the planned property sets and enum vocabularies", () => {
     // given: the two events the task-execution insights are built on
     const delegation = OMO_NATIVE_EVENT_SCHEMAS.delegation_completed
@@ -238,20 +222,26 @@ describe("OmO Native product identity", () => {
       "$session_id", "agent_type", "background_mode", "cache_read_tokens", "cache_write_tokens",
       "category", "config_generation", "cost_status", "cost_usd", "duration_ms", "duration_status",
       "execution_mode", "fallback_attempts", "input_tokens", "model_id", "model_source",
-      "output_tokens", "owner_kind", "provider", "reasoning_effort", "run_epoch", "start_reason",
+      "output_tokens", "owner_kind", "provider", "reasoning_effort", "run_epoch", "start_trigger",
       "stats_status", "status", "task_send_queued_count", "task_send_running_count", "task_seq",
       "token_status", "tool_calls", "total_tokens", "turns",
     ].sort())
+    const categoryKeys = BUILTIN_CATEGORY_NAMES.flatMap((name) => {
+      const base = `cat_${name.replaceAll("-", "_")}`
+      return [`${base}_state`, `${base}_provider`, `${base}_model`, `${base}_reasoning`, `${base}_depth`]
+    })
     expect(Object.keys(categoryConfig).sort()).toEqual([
-      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep_high",
-      "cat_deep_low", "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
-      "cat_visual_engineering", "cat_writing", "combo_fingerprint", "config_generation", "source",
-      "user_category_count",
+      "$session_id", "builtin_overridden_count", ...categoryKeys, "combo_fingerprint", "config_generation", "source",
+      "custom_category_count",
     ].sort())
+    expect(categoryConfig.cat_quick_state?.values).toEqual(["set", "disabled", "unavailable", "absent"])
+    expect(categoryConfig.cat_quick_provider?.values).toEqual([...KNOWN_PROVIDERS, "other"])
+    expect(categoryConfig.cat_quick_model?.values).toEqual([...ALL_KNOWN_MODEL_IDS, "other"])
+    expect(categoryConfig.cat_quick_reasoning?.values).toEqual([...delegation.reasoning_effort.values])
 
     // and: every discriminating string is a closed vocabulary
     expect(delegation.status.values).toEqual(["completed", "error", "cancelled", "interrupted", "lost"])
-    expect(delegation.start_reason.values).toEqual([
+    expect(delegation.start_trigger.values).toEqual([
       "initial_spawn", "runtime_fallback", "session_resume", "dag_retry", "revive_after_completed",
       "revive_after_error", "revive_after_cancelled", "revive_after_interrupted", "revive_after_lost",
       "unknown",
@@ -269,7 +259,7 @@ describe("OmO Native product identity", () => {
     expect(delegation.duration_status.values).toEqual(["monotonic", "wall_clock", "unavailable"])
     expect(delegation.category.values).toEqual([...BUILTIN_CATEGORY_NAMES, "custom", "none"])
     expect(delegation.agent_type.values).toEqual([...CURATED_AGENTS, "custom", "none"])
-    expect(categoryConfig.source.values).toEqual(OMO_NATIVE_EVENT_SCHEMAS.session_started.reason.values)
+    expect(categoryConfig.source.values).toEqual(OMO_NATIVE_EVENT_SCHEMAS.session_started.start_trigger.values)
 
     // and: the join keys and every measurement stay unbucketed numbers
     for (const key of ["task_seq", "run_epoch", "config_generation", "duration_ms", "turns", "tool_calls"] as const) {
@@ -277,8 +267,9 @@ describe("OmO Native product identity", () => {
     }
     expect(categoryConfig.config_generation).toEqual({ type: "number" })
 
-    // and: session_started now carries the honestly-labeled timezone signal
-    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.timezone).toEqual({ type: "string" })
+    // and: session_started carries a bounded UTC offset, never a zone name
+    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.utc_offset_minutes).toEqual({ type: "number" })
+    expect(OMO_NATIVE_EVENT_SCHEMAS.session_started).not.toHaveProperty("timezone")
   })
 
   test("#given computer-use telemetry schemas #when inspected #then every property and string value is closed", () => {

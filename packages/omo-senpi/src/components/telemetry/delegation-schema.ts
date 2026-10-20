@@ -87,7 +87,7 @@ export function buildDelegationCompletedSchema(masked: {
     provider: enumProperty(masked.providers),
     reasoning_effort: enumProperty(DELEGATION_REASONING_EFFORTS),
     run_epoch: NUMBER_PROPERTY,
-    start_reason: enumProperty(DELEGATION_START_REASONS),
+    start_trigger: enumProperty(DELEGATION_START_REASONS),
     stats_status: enumProperty(DELEGATION_COVERAGE_STATUSES),
     status: enumProperty(DELEGATION_STATUSES),
     task_send_queued_count: NUMBER_PROPERTY,

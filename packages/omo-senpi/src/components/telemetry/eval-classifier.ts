@@ -12,11 +12,19 @@ export type ClassifiableWave = {
   readonly spanMs: number
 }
 
+/** Non-eval waves counted by size: 1, 2-3, 4-7 and 8 or more calls. */
+export type WaveSizeBuckets = {
+  readonly size1: number
+  readonly size2to3: number
+  readonly size4to7: number
+  readonly size8plus: number
+}
+
 export type NonEvalWaveCounters = {
   readonly wavesTotal: number
   readonly wavesMulti: number
   readonly joinedCalls: number
-  readonly waveSizeHistogram: string
+  readonly waveSizeBuckets: WaveSizeBuckets
 }
 
 export type WaveBucketSummary = {
@@ -29,8 +37,6 @@ export type WaveBucketSummary = {
 }
 
 const EVAL_TOOL_NAMES = ["eval", "codemode", "code_mode"] as const
-const WAVE_SIZE_BUCKET_MAXIMA = [1, 2, 3, 4, 8, 16, 32] as const
-const HISTOGRAM_BUCKET_COUNT = WAVE_SIZE_BUCKET_MAXIMA.length + 1
 
 export function isEvalToolName(toolName: string): boolean {
   return EVAL_TOOL_NAMES.some((expected) => matchesToolName(toolName, expected))
@@ -48,7 +54,7 @@ export function classifyWaveBucket(wave: ClassifiableWave): WaveBucket {
 }
 
 export function summarizeWaveBuckets(waves: readonly ClassifiableWave[]): WaveBucketSummary {
-  const histogram = new Array<number>(HISTOGRAM_BUCKET_COUNT).fill(0)
+  const sizes = { size1: 0, size2to3: 0, size4to7: 0, size8plus: 0 }
   let wavesTotal = 0
   let wavesMulti = 0
   let joinedCalls = 0
@@ -78,7 +84,7 @@ export function summarizeWaveBuckets(waves: readonly ClassifiableWave[]): WaveBu
     wavesTotal += 1
     joinedCalls += size
     if (size > 1) wavesMulti += 1
-    if (size > 0) histogram[waveSizeBucketIndex(size)] += 1
+    if (size > 0) sizes[waveSizeBucket(size)] += 1
   }
 
   return {
@@ -86,7 +92,7 @@ export function summarizeWaveBuckets(waves: readonly ClassifiableWave[]): WaveBu
       wavesTotal,
       wavesMulti,
       joinedCalls,
-      waveSizeHistogram: histogram.join(":"),
+      waveSizeBuckets: sizes,
     },
     evalOnlyWaves,
     evalOnlyDurationMs,
@@ -96,9 +102,11 @@ export function summarizeWaveBuckets(waves: readonly ClassifiableWave[]): WaveBu
   }
 }
 
-function waveSizeBucketIndex(size: number): number {
-  const index = WAVE_SIZE_BUCKET_MAXIMA.findIndex((maximum) => size <= maximum)
-  return index === -1 ? HISTOGRAM_BUCKET_COUNT - 1 : index
+function waveSizeBucket(size: number): keyof WaveSizeBuckets {
+  if (size <= 1) return "size1"
+  if (size <= 3) return "size2to3"
+  if (size <= 7) return "size4to7"
+  return "size8plus"
 }
 
 function durationOf(wave: ClassifiableWave): number {

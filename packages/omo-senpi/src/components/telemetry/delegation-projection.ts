@@ -44,7 +44,7 @@ export function projectDelegationCompleted(input: DelegationProjectionInput): De
     task_seq: finiteCount(record.task_seq),
     run_epoch: finiteCount(record.notification.run_epoch),
     status: record.status,
-    start_reason: input.startReason,
+    start_trigger: input.startReason,
     category: closedName(record.category, BUILTIN_CATEGORY_NAMES),
     agent_type: closedName(record.agent_type, CURATED_READONLY_AGENT_NAMES),
     owner_kind: ownerKindOf(record),

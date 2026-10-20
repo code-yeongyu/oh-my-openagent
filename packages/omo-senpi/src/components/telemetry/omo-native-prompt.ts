@@ -88,7 +88,7 @@ function properties(prompt: PendingPrompt, disposition: Disposition | undefined)
     input_source: prompt.inputSource,
     invocation_stage: classification.stage,
     is_effective_ultrawork_invocation: classification.effective,
-    is_real_user_prompt: prompt.inputSource !== "extension",
+    is_real_user: prompt.inputSource !== "extension",
     is_turn_start: disposition === "started",
     keyword_any: classification.matchedUlw || classification.matchedUltrawork,
     keyword_occurrence_bucket: occurrenceBucket(classification.occurrenceCount),
@@ -98,7 +98,7 @@ function properties(prompt: PendingPrompt, disposition: Disposition | undefined)
     prompt_length_bucket: prompt.promptLengthBucket,
     queue_mode: queueMode(disposition, prompt.streamingBehavior),
     real_prompt_ordinal_bucket: prompt.ordinalBucket,
-    suppression_reason: classification.suppressionReason,
+    suppression_cause: classification.suppressionReason,
   } satisfies Record<PromptProperty, string | boolean>
 }
 

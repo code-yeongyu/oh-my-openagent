@@ -111,7 +111,7 @@ describe("omo-native delegation capture", () => {
     expect(captured[0]?.properties).toMatchObject({ task_send_running_count: 0, task_send_queued_count: 0 })
   })
 
-  test("#given a task that completes then is revived and errors #when both terminals are captured #then two events share task_seq with run_epoch 0 and 1 and the second carries start_reason \"revive_after_completed\"", () => {
+  test("#given a task that completes then is revived and errors #when both terminals are captured #then two events share task_seq with run_epoch 0 and 1 and the second carries start_trigger \"revive_after_completed\"", () => {
     // given
     const dir = stateDir()
     const { captured, notify, dispose } = harness(dir)
@@ -126,7 +126,7 @@ describe("omo-native delegation capture", () => {
     dispose()
 
     // then
-    expect(captured.map(({ properties }) => [properties.task_seq, properties.run_epoch, properties.start_reason])).toEqual([
+    expect(captured.map(({ properties }) => [properties.task_seq, properties.run_epoch, properties.start_trigger])).toEqual([
       [7, 0, "initial_spawn"],
       [7, 1, "revive_after_completed"],
     ])
@@ -147,7 +147,7 @@ describe("omo-native delegation capture", () => {
     dispose()
 
     // then
-    expect(captured[1]?.properties.start_reason).toBe("revive_after_error")
+    expect(captured[1]?.properties.start_trigger).toBe("revive_after_error")
   })
 
   test("#given a lost-to-lost reason update and a residency evict on a terminal record #when observed #then zero events are captured", () => {

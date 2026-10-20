@@ -13,6 +13,7 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { getSenpiTelemetryStateDir, SENPI_TELEMETRY_EVENT_NAME } from "./index"
 import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
 import { createOmoNativeSessionComponent } from "./omo-native-session"
+import { wireViolations } from "./telemetry-wire.test-support"
 import {
   FIXED_NOW,
   createEnabledEnv,
@@ -72,7 +73,8 @@ function register(agentDir: string, recorder: Recorder, options: {
   readonly configEnabled?: boolean
   readonly diagnostics?: (input: TelemetryDiagnosticInput | { readonly event: "omo_native_inventory_read_failed" }) => void
   readonly setTimeoutFn?: (callback: () => void, delay: number) => unknown
-  readonly timeZone?: () => string
+  readonly utcOffsetMinutes?: () => number
+  readonly osRelease?: string
 } = {}): FakeExtensionAPI {
   const pi = new FakeExtensionAPI()
   const configEnabled = options.configEnabled
@@ -82,9 +84,11 @@ function register(agentDir: string, recorder: Recorder, options: {
     hashSessionId: (raw) => `hashed:${raw}`,
     ...(configEnabled === undefined ? {} : { isConfigEnabled: () => configEnabled }),
     now: options.now ?? FIXED_NOW,
-    osProvider: createOsProvider("native-session-host"),
+    osProvider: options.osRelease === undefined
+      ? createOsProvider("native-session-host")
+      : { ...createOsProvider("native-session-host"), release: () => options.osRelease as string },
     setTimeoutFn: options.setTimeoutFn,
-    ...(options.timeZone === undefined ? {} : { timeZone: options.timeZone }),
+    ...(options.utcOffsetMinutes === undefined ? {} : { utcOffsetMinutes: options.utcOffsetMinutes }),
     transportFactory: recorder.factory,
   }).register(pi, { config: pi, logger: createSilentLogger() })
   return pi
@@ -239,6 +243,11 @@ describe("OmO Native session telemetry", () => {
         "2026-07-03",
         "2026-07-04",
       ])
+      for (const { event, properties } of recorder.messages.filter(({ event }) => event === "daily_active")) {
+        expect(properties).toMatchObject({ start_trigger: "session_start" })
+        expect(properties).not.toHaveProperty("reason")
+        expect(wireViolations(event, properties ?? {})).toEqual([])
+      }
       expect(recorder.messages.filter(({ event }) => event === SENPI_TELEMETRY_EVENT_NAME)).toHaveLength(2)
     })
   })
@@ -295,13 +304,15 @@ describe("OmO Native session telemetry", () => {
     })
   })
 
-  it("#given real-shape providers/defaultProvider/defaultModel fixtures #when session_started emits #then inventory is masked and the key set is exact", async () => {
+  it("#given real-shape providers/defaultProvider/defaultModel fixtures #when session_started emits #then known providers are booleans, private ones only a count, and the row validates against the artifact", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
       writeInventory(agentDir, {
         providers: {
           anthropic: { models: [{ id: "claude-sonnet-5" }, { id: "private-model" }] },
           private_cloud: { models: [{ id: "secret-model" }] },
+          "github-copilot": { models: [] },
+          "corp-gateway": { models: [] },
         },
         defaultProvider: "anthropic",
         defaultModel: "private-model",
@@ -324,39 +335,47 @@ describe("OmO Native session telemetry", () => {
         default_provider: "anthropic",
         memory_bucket: "64_plus_gb",
         model_count: 3,
-        provider_count: 2,
-        providers: "anthropic",
-        reason: "fork",
+        provider_count: 4,
+        provider_anthropic: true,
+        provider_github_copilot: true,
+        custom_provider_count: 2,
+        start_trigger: "fork",
       })
-      expect(Object.keys(captured?.properties ?? {}).sort()).toEqual([
-        ...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_started,
-        ...SHARED_KEYS,
-      ].sort())
+      const properties = captured?.properties ?? {}
+      expect(properties).not.toHaveProperty("reason")
+      expect(properties).not.toHaveProperty("providers")
+      expect(properties).not.toHaveProperty("timezone")
+      expect(Object.keys(properties).filter((key) => key.startsWith("provider_") && key !== "provider_count").sort())
+        .toEqual(["provider_anthropic", "provider_github_copilot"])
+      expect(JSON.stringify(properties)).not.toMatch(/private_cloud|corp-gateway|corp_gateway/)
+      const allowed = new Set<string>([...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_started, ...SHARED_KEYS])
+      expect(Object.keys(properties).filter((key) => !allowed.has(key))).toEqual([])
+      expect(wireViolations("session_started", properties)).toEqual([])
     })
   })
 
-  it("#given an injected IANA time zone #when session_started is captured #then timezone is present, at most 64 characters, and category_config is captured once afterwards with the same $session_id", async () => {
+  it("#given an injected UTC offset #when session_started is captured #then utc_offset_minutes is that integer, no zone name ships, and category_config is captured once afterwards with the same $session_id", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
       writeInventory(agentDir)
       const recorder = createRecorder()
-      const pi = register(agentDir, recorder, { timeZone: () => "Asia/Seoul" })
+      const pi = register(agentDir, recorder, { utcOffsetMinutes: () => 540 })
 
       // when
       await pi.dispatch("session_start", { type: "session_start", reason: "resume" }, registryCtx("zoned"))
 
       // then
       const started = recorder.messages.find(({ event }) => event === "session_started")
-      expect(started?.properties?.timezone).toBe("Asia/Seoul")
-      expect(String(started?.properties?.timezone).length).toBeLessThanOrEqual(64)
+      expect(started?.properties?.utc_offset_minutes).toBe(540)
+      expect(started?.properties).not.toHaveProperty("timezone")
+      expect(wireViolations("session_started", started?.properties ?? {})).toEqual([])
       const configs = recorder.messages.filter(({ event }) => event === "category_config")
       expect(configs).toHaveLength(1)
       expect(configs[0]?.properties?.$session_id).toBe(started?.properties?.$session_id)
       expect(configs[0]?.properties?.source).toBe("resume")
-      expect(Object.keys(configs[0]?.properties ?? {}).sort()).toEqual([
-        ...OMO_NATIVE_PROPERTY_ALLOWLISTS.category_config,
-        ...SHARED_KEYS,
-      ].sort())
+      const configAllowed = new Set<string>([...OMO_NATIVE_PROPERTY_ALLOWLISTS.category_config, ...SHARED_KEYS])
+      expect(Object.keys(configs[0]?.properties ?? {}).filter((key) => !configAllowed.has(key))).toEqual([])
+      expect(wireViolations("category_config", configs[0]?.properties ?? {})).toEqual([])
       expect(recorder.messages.map(({ event }) => event).indexOf("category_config")).toBeGreaterThan(
         recorder.messages.map(({ event }) => event).indexOf("session_started"),
       )
@@ -379,22 +398,22 @@ describe("OmO Native session telemetry", () => {
     })
   })
 
-  it("#given a throwing time zone provider #when session_start fires #then session_started ships without a timezone property", async () => {
+  it.each([
+    ["a throwing offset provider", () => { throw new Error("no clock") }],
+    ["an offset beyond UTC+14", () => 900],
+    ["a fractional offset", () => 330.5],
+  ])("#given %s #when session_start fires #then session_started ships without utc_offset_minutes", async (_name, utcOffsetMinutes) => {
     await withTempAgentDir(async (agentDir) => {
       // given
       writeInventory(agentDir)
       const recorder = createRecorder()
-      const pi = register(agentDir, recorder, {
-        timeZone: () => {
-          throw new Error("no ICU")
-        },
-      })
+      const pi = register(agentDir, recorder, { utcOffsetMinutes })
 
       // when
       await expect(pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("zoneless"))).resolves.toBeDefined()
 
       // then
-      expect(recorder.messages.find(({ event }) => event === "session_started")?.properties).not.toHaveProperty("timezone")
+      expect(recorder.messages.find(({ event }) => event === "session_started")?.properties).not.toHaveProperty("utc_offset_minutes")
     })
   })
 
@@ -438,7 +457,7 @@ describe("OmO Native session telemetry", () => {
 
       // then
       const properties = recorder.messages.find(({ event }) => event === "session_started")?.properties
-      expect(properties).toMatchObject({ model_count: 0, provider_count: 0, providers: "" })
+      expect(properties).toMatchObject({ model_count: 0, provider_count: 0, custom_provider_count: 0 })
       expect(properties).not.toHaveProperty("default_provider")
       expect(properties).not.toHaveProperty("default_model")
       expect(diagnostics.filter(({ event }) => event === "omo_native_inventory_read_failed")).toHaveLength(1)
@@ -457,11 +476,8 @@ describe("OmO Native session telemetry", () => {
       await pi.dispatch("session_start", { type: "session_start", reason: "reload" }, sessionCtx())
 
       // then
-      expect(recorder.messages.find(({ event }) => event === "session_started")?.properties).toMatchObject({
-        model_count: 0,
-        provider_count: 0,
-        providers: "",
-      })
+      const started = recorder.messages.find(({ event }) => event === "session_started")?.properties
+      expect(started).toMatchObject({ model_count: 0, provider_count: 0, custom_provider_count: 0 })
       expect(diagnostics).toEqual([])
     })
   })
@@ -549,5 +565,19 @@ describe("OmO Native session telemetry", () => {
       expect(recorder.shutdowns).toEqual([1, 1])
       expect(delays).toEqual([1_000])
     })
+  })
+
+  it("#given kernel releases with and without a build suffix #when a session starts #then $os_version is the bare dotted release or is omitted", async () => {
+    const cases: readonly [string, string | undefined][] = [["26.4.1 (25E253)", "26.4.1"], ["6.8.0-45-generic", "6.8.0"], ["Darwin", undefined]]
+    for (const [release, expected] of cases) {
+      await withTempAgentDir(async (agentDir) => {
+        writeInventory(agentDir)
+        const recorder = createRecorder()
+        await register(agentDir, recorder, { osRelease: release }).dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("os-version"))
+        const properties = recorder.messages.find(({ event }) => event === "session_started")?.properties ?? {}
+        expect(`${release} -> ${properties["$os_version"] ?? "omitted"}`).toBe(`${release} -> ${expected ?? "omitted"}`)
+        expect(wireViolations("session_started", properties)).toEqual([])
+      })
+    }
   })
 })

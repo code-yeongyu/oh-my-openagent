@@ -15,7 +15,10 @@ export type OmoNativeInventory = {
   readonly defaultProvider?: string
   readonly modelCount: number
   readonly providerCount: number
-  readonly providers: string
+  /** Built-in provider ids that are connected, sorted; each ships as `provider_<id>: true`. */
+  readonly knownProviders: readonly string[]
+  /** How many connected providers are user-defined; their names never leave the machine. */
+  readonly customProviderCount: number
 }
 
 /**
@@ -50,10 +53,12 @@ export function readOmoNativeInventory(
     const masked = defaultProvider !== undefined && defaultModel !== undefined
       ? maskProviderAndModel(defaultProvider, defaultModel)
       : undefined
+    const classified = classifyProviders(providerIds)
     return {
       providerCount: providerIds.length,
       modelCount,
-      providers: providerIds.filter((id) => isKnownProvider(id)).sort().join(","),
+      knownProviders: classified.known,
+      customProviderCount: classified.customCount,
       ...(masked === undefined ? {} : {
         defaultProvider: masked.provider,
         defaultModel: masked.model_id,
@@ -61,8 +66,18 @@ export function readOmoNativeInventory(
     }
   } catch (error) {
     diagnostics?.({ event: "omo_native_inventory_read_failed", error, source: "omo-native-session" })
-    return { providerCount: 0, modelCount: 0, providers: "" }
+    return { providerCount: 0, modelCount: 0, knownProviders: [], customProviderCount: 0 }
   }
+}
+
+/**
+ * Splits connected provider ids into the built-in ones (deduplicated, sorted) and a count of the rest:
+ * a user-defined provider name is never a value and never a property name.
+ */
+export function classifyProviders(providerIds: readonly string[]): { readonly known: string[]; readonly customCount: number } {
+  const unique = [...new Set(providerIds)]
+  const known = unique.filter(isKnownProvider).sort()
+  return { known, customCount: unique.length - known.length }
 }
 
 function readObject(path: string): Record<string, unknown> {

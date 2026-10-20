@@ -25,8 +25,8 @@ export type CrashShardKind = (typeof SHARD_KINDS)[number]
 
 /**
  * Privacy schema for `process_crashed`: how a process died and on which runtime, nothing else. No
- * stack, path, prompt or session id ever reaches it; the crash-time versions are version-shaped
- * strings or `unknown`.
+ * stack, path, prompt or session id ever reaches it; a crash-time version ships only when it is
+ * semver-shaped and is omitted otherwise.
  */
 export const PROCESS_CRASHED_SCHEMA = Object.freeze({
   "$os": STRING_PROPERTY,

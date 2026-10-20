@@ -5,6 +5,7 @@ import type {
 } from "@oh-my-opencode/telemetry-core"
 
 import { CRASH_DETECTIONS, CRASH_SIGNALS, PROCESS_KINDS, UPTIME_BUCKETS } from "./crash-schema"
+import { VERSION_PATTERN } from "./event-schema-constraints"
 import { claimUnreportedCrashRecords, type ClaimedCrashRecord } from "./process-crash-records"
 
 export type CaptureProcessCrashesInput = {
@@ -54,9 +55,9 @@ export function processCrashedProperties(
     ...(record.code === undefined ? {} : { exit_code: record.code }),
     uptime_ms: Math.round(record.uptimeMs),
     uptime_bucket: uptimeBucket(record.uptimeMs),
-    crashed_bun_version: versionOrUnknown(record.bunVersion),
-    crashed_engine_version: versionOrUnknown(record.engineVersion),
-    crashed_omo_version: versionOrUnknown(record.productVersion),
+    ...semverOrOmitted("crashed_bun_version", record.bunVersion),
+    ...semverOrOmitted("crashed_engine_version", record.engineVersion),
+    ...semverOrOmitted("crashed_omo_version", record.productVersion),
     $os: osProvider.platform(),
     arch: osProvider.arch(),
   }
@@ -78,9 +79,11 @@ function uptimeBucket(ms: number): (typeof UPTIME_BUCKETS)[number] {
   return "24h_plus"
 }
 
-/** Only version-shaped strings leave the machine; anything else (paths, junk) becomes `unknown`. */
-function versionOrUnknown(value: string | undefined): string {
-  return value !== undefined && /^[0-9][0-9A-Za-z.+-]{0,31}$/.test(value) ? value : "unknown"
+const SEMVER = new RegExp(VERSION_PATTERN)
+
+/** Only semver-shaped versions leave the machine; anything else (paths, junk, absent) is omitted. */
+function semverOrOmitted(key: string, value: string | undefined): Record<string, string> {
+  return value !== undefined && SEMVER.test(value) ? { [key]: value } : {}
 }
 
 function oneOf<const Values extends readonly string[]>(values: Values, value: string, fallback: Values[number]): Values[number] {

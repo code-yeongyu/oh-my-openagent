@@ -86,6 +86,11 @@ export const KNOWN_MODELS = Object.freeze({
 export type KnownProvider = keyof typeof KNOWN_MODELS
 export const KNOWN_PROVIDERS = Object.freeze(Object.keys(KNOWN_MODELS) as KnownProvider[])
 
+/** `session_started` property for one built-in provider id: `github-copilot` -> `provider_github_copilot`. */
+export function providerPropertyName(providerId: KnownProvider | string): string {
+  return `provider_${providerId.replaceAll("-", "_")}`
+}
+
 // Flat union of every model id above: the exportable model vocabulary, independent of provider.
 export const ALL_KNOWN_MODEL_IDS: ReadonlySet<string> = Object.freeze(
   new Set(Object.values(KNOWN_MODELS).flat()),

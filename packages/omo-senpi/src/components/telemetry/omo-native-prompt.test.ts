@@ -106,9 +106,9 @@ describe("OmO Native prompt telemetry", () => {
 
       expect(testHarness.captures.map(({ properties }) => ({
         any: properties["keyword_any"],
-        real: properties["is_real_user_prompt"],
+        real: properties["is_real_user"],
         stage: properties["invocation_stage"],
-        suppression: properties["suppression_reason"],
+        suppression: properties["suppression_cause"],
       }))).toEqual([
         { any: false, real: true, stage: "none", suppression: "no_keyword" },
         { any: true, real: false, stage: "none", suppression: "extension_source" },

@@ -89,7 +89,7 @@ export function assertEnabled(events) {
     checks.push({ name, result: "PASS", detail })
   }
   const native = events.filter((event) => nativeEvents.has(event.event))
-  const realPrompts = native.filter((event) => event.event === "prompt_submitted" && event.properties.is_real_user_prompt === true)
+  const realPrompts = native.filter((event) => event.event === "prompt_submitted" && event.properties.is_real_user === true)
   check("exactly-three-real-prompts", realPrompts.length === 3, `observed ${realPrompts.length}; events=${events.map((event) => event.event).join(",")}`)
   const first = realPrompts.find((event) => event.properties.real_prompt_ordinal_bucket === "1")
   check("first-prompt-ulw-classification", first !== undefined && first.properties.is_effective_ultrawork_invocation === true && first.properties.keyword_variant === "ulw" && first.properties.keyword_occurrence_bucket === "1" && first.properties.invocation_stage === "first_arm", JSON.stringify(first?.properties ?? null))
@@ -129,11 +129,6 @@ export function privacyScan(events, checks) {
       }
       if (key === "provider" || key === "default_provider") {
         if (value !== "custom" && !knownProviders.has(value)) throw new Error(`known-provider-allowlist: ${key}=${value}`)
-        continue
-      }
-      if (key === "providers") {
-        const providers = value === "" ? [] : value.split(",")
-        if (providers.some((provider) => !knownProviders.has(provider))) throw new Error(`known-provider-allowlist: ${key}=${value}`)
         continue
       }
       if (/(^|\s)(\/|~\/|[A-Za-z]:\\)/.test(value)) throw new Error(`path-privacy: ${event.event}.${key}=${value}`)
