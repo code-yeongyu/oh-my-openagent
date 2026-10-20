@@ -1,4 +1,4 @@
-import { userInfo } from "node:os"
+import { homedir } from "node:os"
 import { dirname, join, posix, resolve } from "node:path"
 import { toPosixPath } from "../internal/posix-path"
 import { DEFAULT_READ_FILE_SYSTEM, type OmoConfigEnv, type OmoConfigReadFileSystem } from "./types"
@@ -17,7 +17,7 @@ export type ResolveOmoConfigPathsOptions = {
 
 export const MAX_PROJECT_CONFIG_DIRECTORY_DEPTH = 256
 
-const ACCOUNT_HOME_DIR = userInfo().homedir
+const ACCOUNT_HOME_DIR = homedir()
 
 export function resolveHomeDir(env: OmoConfigEnv = process.env): string {
   const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd()
