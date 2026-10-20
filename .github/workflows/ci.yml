@@ -11,9 +11,12 @@ on:
   workflow_call:
 
 concurrency:
-  # Queue refs are unique per group, so unrelated groups never cancel each other.
+  # Queue refs are unique per group, so unrelated groups never cancel each other. One group per ref: a push to
+  # master/dev is never cancelled, so the running dev run always finishes (the baseline PR failures are judged
+  # against), and GitHub keeps only the newest pending push run, so at most two dev runs exist at a time. PR runs
+  # still cancel their superseded run on the same ref.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions:
   contents: read
