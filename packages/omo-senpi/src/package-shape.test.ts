@@ -79,14 +79,14 @@ describe("omo-senpi package shape", () => {
     expect(readBoolean(manifest, "private")).toBe(true)
     expect(readString(manifest, "type")).toBe("module")
     expect(readString(manifest, "version")).toBe(readString(rootManifest, "version"))
-    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install"])
+    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install", "./onboarding/session-history"])
     expect(scripts).toMatchObject({
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
     })
-    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.16")
+    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.19-2")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
-    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.16")
+    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.19-2")
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",

@@ -9,9 +9,16 @@
 !/plugin/extensions/omo-memory-doctor.js
 !/plugin/extensions/omo-memory-memfs.js
 !/plugin/extensions/omo-memory-palace.js
+!/plugin/extensions/omo-session-history.js
+!/plugin/extensions/omo-recall-store.js
+!/plugin/extensions/omo-telemetry-posthog.js
+!/plugin/extensions/omo-memory-sync.js
+!/plugin/extensions/loro_wasm_bg.wasm
+!/plugin/extensions/CaseFolding.txt
 !/plugin/extensions/omo-computer-use.js
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js
+!/plugin/extensions/omo-onboarding-scan.js
 !/plugin/extensions/omo-side-panel.js
 !/plugin/extensions/omo-task.js
 !/plugin/extensions/omo-thread-client.js

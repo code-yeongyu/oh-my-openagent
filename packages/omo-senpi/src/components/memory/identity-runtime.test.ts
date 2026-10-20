@@ -9,6 +9,7 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createMemoryIdentityContext } from "./context"
 import { createIdentityRuntime } from "./identity-runtime"
+import { currentLaunchScope, withLaunchScope, type LaunchScope } from "./launch-facts"
 import { componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import type { ReflectionSandbox, ReflectionSpawnArgs } from "./worker"
 
@@ -404,3 +405,66 @@ describe("memory identity runtime agent-dir resolution", () => {
     30_000,
   )
 })
+
+describe("memory identity runtime binds every launch to its own run (#10339)", () => {
+  async function runtimeSeeingScopes(name: string): Promise<{ runtime: ReturnType<typeof createIdentityRuntime>; seen: (LaunchScope | undefined)[] }> {
+    const root = await mkdtemp(join(tmpdir(), `omo-memory-identity-runtime-scope-${name}-`))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: name,
+      identityPaths: buildIdentityPaths(root, name),
+      binding: { identity: name, repoPathHash: "hash", boundAt: 1 },
+    })
+    const seen: (LaunchScope | undefined)[] = []
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      // The runner resolves the session model at the start of every launch: record the scope it runs in.
+      resolveSessionModel: () => {
+        seen.push(currentLaunchScope())
+        return undefined
+      },
+      logger: componentContext().logger,
+    })
+    return { runtime, seen }
+  }
+
+  test("#given a reconcile-style launch with no trigger snapshot #when the runner resolves its facts #then it runs in a scope of its own run's conversations", async () => {
+    // given
+    const { runtime, seen } = await runtimeSeeingScopes("agent-scope-plain")
+    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+
+    // when
+    await runtime.launch(reserved.run)
+
+    // then
+    expect(seen).toEqual([{ conversationIds: ["conversation-a"] }])
+  }, 30_000)
+
+  test("#given a launch for conversation A started inside session B's trigger scope #when the runner resolves its facts #then it never sees B's snapshot", async () => {
+    // given: B's trigger scope carries B's snapshot (a queued follow-up for A is launched from inside it)
+    const { runtime, seen } = await runtimeSeeingScopes("agent-scope-nested")
+    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+    const sessionB = {
+      conversationIds: ["conversation-b"],
+      snapshot: {
+        modelRegistry: undefined,
+        sessionModel: { provider: "b", id: "b-model" },
+        parentContextTokens: 9,
+        parentSessionFile: "/B.jsonl",
+        parentCacheReusable: true,
+        agentDir: "/B",
+      },
+    }
+
+    // when
+    await withLaunchScope(sessionB, () => runtime.launch(reserved.run))
+
+    // then
+    expect(seen).toEqual([{ conversationIds: ["conversation-a"] }])
+  }, 30_000)
+})
+

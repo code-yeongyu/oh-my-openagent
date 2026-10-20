@@ -13,9 +13,10 @@ export const DEFAULT_COMMIT_FOOTER =
  */
 export function buildGitMasterAttributionDirective(
   settings: OmoGitMasterSettings,
-  options?: GitAttributionCheckOptions,
+  options: GitAttributionCheckOptions & { readonly gitCommandPrefix?: string } = {},
 ): string | undefined {
-  const resolved = resolveGitAttribution(settings, options)
+  const { gitCommandPrefix = "", ...attributionOptions } = options
+  const resolved = resolveGitAttribution(settings, attributionOptions)
   const footerText = resolveFooterText(resolved.commitFooter)
   if (footerText === undefined) return undefined
 
@@ -31,7 +32,7 @@ export function buildGitMasterAttributionDirective(
     "",
     "**Example:**",
     "```bash",
-    `git commit -m "{Commit Message}" -m "${footerText}"`,
+    `${gitCommandPrefix === "" ? "" : `${gitCommandPrefix} `}git commit -m "{Commit Message}" -m "${footerText}"`,
     "```",
     "</commit_attribution>",
   ].join("\n")

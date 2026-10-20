@@ -15,7 +15,7 @@ function registryOf(provider: string, ids: readonly string[]): SenpiModelRegistr
   }
 }
 
-// The pinned engine's catalog for each provider (senpi 2026.10.16, ModelRuntime.getAvailable()).
+// The pinned engine's catalog for each provider (senpi 2026.10.19-2, ModelRuntime.getAvailable()).
 const ZAI_MODELS = ["glm-4.7", "glm-5-turbo", "glm-5.2", "glm-5.2-highspeed", "glm-5.3", "glm-5.3-flash", "glm-5.3-highspeed"]
 const ANTHROPIC_MODELS = [
   "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-5-5", "claude-opus-4-8", "claude-opus-5", "claude-opus-5-5",
@@ -26,12 +26,12 @@ const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "open
 describe("resolveCategoryCoverage", () => {
   describe("#given a zai-only registry", () => {
     describe("#when coverage is resolved with no user categories", () => {
-      it("#then quick and unspecified-high are usable and each gap names its unconnected chain providers", () => {
+      it("#then quick, unspecified-high and unspecified-low are usable and each gap names its unconnected chain providers", () => {
         const coverage = resolveCategoryCoverage({}, registryOf("zai", ZAI_MODELS))
 
-        expect(coverage.usable).toEqual(["quick", "unspecified-high"])
+        expect(coverage.usable).toEqual(["quick", "unspecified-high", "unspecified-low"])
         expect(coverage.unusable.map((gap) => gap.name)).toEqual([
-          "architect", "artistry", "deep-high", "deep-low", "ultrabrain", "unspecified-low", "visual-engineering", "writing",
+          "architect", "artistry", "deep-high", "deep-low", "ultrabrain", "visual-engineering", "writing",
         ])
         const providersOf = (name: string) => coverage.unusable.find((gap) => gap.name === name)?.providers
         expect(providersOf("architect")).toEqual(["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"])
@@ -66,7 +66,7 @@ describe("resolveCategoryCoverage", () => {
           registryOf("zai", ZAI_MODELS),
         )
 
-        expect(coverage.usable).toEqual(["quick", "unspecified-high"])
+        expect(coverage.usable).toEqual(["quick", "unspecified-high", "unspecified-low"])
         const names = [...coverage.usable, ...coverage.unusable.map((gap) => gap.name)]
         expect(names).not.toContain("writing")
       })

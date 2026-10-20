@@ -2,7 +2,7 @@ import { resolveOmoGitMasterSettings, type OmoGitMasterSettings } from "@oh-my-o
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
-import { buildGitMasterAttributionDirective } from "./directive"
+import { resolveGitMasterSkillAdditions } from "./skill-content"
 
 const GIT_MASTER_SKILL_PATH_SUFFIX = "/git-master/SKILL.md"
 
@@ -53,12 +53,22 @@ export function createGitMasterAttributionComponent(
           if (event === undefined) return undefined
           const cwd = pi.cwd ?? process.cwd()
           const settings = loadSettings(cwd)
-          const directive = buildGitMasterAttributionDirective(settings, { cwd })
-          if (directive === undefined) return undefined
-          ctx.logger.info("omo-senpi git-master attribution appended", {
+          const additions = resolveGitMasterSkillAdditions(settings, { cwd })
+          if (additions === undefined) return undefined
+          ctx.logger.info("omo-senpi git-master settings applied", {
             commitFooter: settings.commit_footer,
+            gitEnvPrefix: settings.git_env_prefix,
           })
-          return { content: [...event.content, { type: "text", text: directive }] }
+          const firstTextIndex = event.content.findIndex((item) => typeof item["text"] === "string")
+          const content = event.content.map((item, index) =>
+            index === firstTextIndex && typeof item["text"] === "string"
+              ? { ...item, text: additions.rewriteSkillText(item["text"]) }
+              : item,
+          )
+          return {
+            content:
+              additions.directive === undefined ? content : [...content, { type: "text", text: additions.directive }],
+          }
         },
       )
     },

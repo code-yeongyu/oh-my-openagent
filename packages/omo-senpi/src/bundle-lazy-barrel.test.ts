@@ -17,9 +17,14 @@ const BUNDLE_FILES = [
   "omo-init-deep-advisor.js",
   "omo-computer-use.js",
   "omo-side-panel.js",
+  "omo-onboarding-scan.js",
   "omo-memory-doctor.js",
   "omo-memory-memfs.js",
   "omo-memory-palace.js",
+  "omo-session-history.js",
+  "omo-recall-store.js",
+  "omo-telemetry-posthog.js",
+  "omo-memory-sync.js",
   "omo-thread-client.js",
 ] as const
 

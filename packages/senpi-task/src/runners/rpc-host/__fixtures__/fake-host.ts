@@ -56,6 +56,8 @@ export interface FakeHost {
   withholdReply(type: string): void
   /** Answer the named command again from now on; a reply already withheld stays unanswered. */
   allowReply(type: string): void
+  /** Queue the named command's replies until the returned release is called; release sends them all, in order. */
+  holdReply(type: string): () => void
   /** Refuse the named command with this error from now on; `undefined` answers it normally again. */
   failReply(type: string, error: string | undefined): void
   requestUi(routingId: string, request: Readonly<Record<string, unknown>>): void
@@ -64,9 +66,12 @@ export interface FakeHost {
   stall(driftMs: number): void
   /** Finish the turn in flight with an assistant answer, exactly as a real session would. */
   completeTurn(routingId: string, text: string): void
-  // The host-side abort of a turn in flight (a user escape, a forced stop): the transcript gains
-  // the aborted assistant row and the session goes idle, exactly as the real host leaves it.
-  abortTurn(routingId: string): void
+  /**
+   * The host-side abort of a turn in flight (a user escape, a forced stop, a replaced session): the transcript
+   * gains the aborted assistant row and the session goes idle, exactly as the real host leaves it. `abortCause`
+   * names a cause the host reported (senpi's `abortCause`).
+   */
+  abortTurn(routingId: string, text?: string, abortCause?: Readonly<Record<string, unknown>>): void
   evict(sessionPath: string): void
   closeSession(routingId: string, reason: string): void
   holdPath(sessionPath: string, ownerInstanceId: string): void
@@ -101,6 +106,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   const sockets = new Set<Socket>()
   const connectionWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
   const withheld = new Set<string>()
+  const held = new Map<string, Array<() => void>>()
   const failed = new Map<string, string>()
   let identity = fakeProtocolInfo(options)
   let generation = typeof identity.generation === "number" ? identity.generation : 1
@@ -117,7 +123,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     }
   }
 
-  const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, failed, record }
+  const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, held, failed, record }
 
   const settleConnectionWaiters = (): void => {
     for (let index = connectionWaiters.length - 1; index >= 0; index--) {
@@ -200,6 +206,14 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     withholdReply: (type) => {
       withheld.add(type)
     },
+    holdReply: (type) => {
+      held.set(type, [])
+      return () => {
+        const queued = held.get(type) ?? []
+        held.delete(type)
+        for (const reply of queued) reply()
+      }
+    },
     allowReply: (type) => {
       withheld.delete(type)
     },
@@ -223,14 +237,12 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message] })
       sendTo(routingId, { type: "agent_idle" })
     },
-    // The host-side abort of a turn in flight (a user escape, a forced stop): the transcript gains
-    // the aborted assistant row and the session goes idle, exactly as the real host leaves it.
-    abortTurn: (routingId) => {
-      const message = { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "aborted" }
+    abortTurn: (routingId, text = "", abortCause) => {
+      const message = { role: "assistant", content: [{ type: "text", text }], stopReason: "aborted" }
       table.appendTranscript(routingId, message)
       table.setStreaming(routingId, false)
       sendTo(routingId, { type: "message_end", message })
-      sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message] })
+      sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message], aborted: true, abortSource: "user", ...(abortCause === undefined ? {} : { abortCause }) })
       sendTo(routingId, { type: "agent_idle" })
     },
     evict: (sessionPath) => {

@@ -63,12 +63,19 @@ console.log("{}")
 // not survive that merge: the task host and its RPC workers load the plugin, which would take a
 // marker that matches a user-set HERDR_AGENT as the launcher's and remove the user's value (#10448).
 describe("host calls never hand down an inherited herdr hint marker (#10448)", () => {
-  test.each([
-    ["daemon status", ["daemon", "status"]],
-    ["host status --all", ["host", "status", "--all"]],
-  ] as const)("#given a user-set HERDR_AGENT and a matching inherited marker #when `omo %s` starts the engine #then it keeps the user's value and gets no marker", (_name, args) => {
+  const keepsUserValueWithoutMarker = (args: readonly string[]): void => {
     const launches = engineLaunches(args, { HERDR_ENV: "1", HERDR_AGENT: "claude", OMO_HERDR_AGENT_HINT: "claude" })
     expect(launches.length).toBeGreaterThan(0)
     for (const launch of launches) expect({ HERDR_AGENT: launch.HERDR_AGENT, marker: launch.marker }).toEqual({ HERDR_AGENT: "claude", marker: null })
+  }
+
+  // `omo daemon` refuses to start a task host on win32 by design (no unix socket, bin/lib/daemon.js),
+  // so no engine is ever launched there and this case only applies on POSIX (#10523).
+  test.skipIf(process.platform === "win32")("#given a user-set HERDR_AGENT and a matching inherited marker #when `omo daemon status` starts the engine #then it keeps the user's value and gets no marker", () => {
+    keepsUserValueWithoutMarker(["daemon", "status"])
+  })
+
+  test("#given a user-set HERDR_AGENT and a matching inherited marker #when `omo host status --all` starts the engine #then it keeps the user's value and gets no marker", () => {
+    keepsUserValueWithoutMarker(["host", "status", "--all"])
   })
 })

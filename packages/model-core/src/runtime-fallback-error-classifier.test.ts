@@ -188,6 +188,22 @@ describe("runtime fallback error classifier", () => {
     expect(type).toBeUndefined()
   })
 
+  test("#given the Cursor provider's capacity_limit UnknownError #when classified #then it is retryable quota exhaustion", () => {
+    // given
+    const error = {
+      name: "UnknownError",
+      data: { message: "Cursor Run failed after 3 attempts: Cursor API error (code=capacity_limit)" },
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
   test("leaves OpenCode context overflow to native compaction", () => {
     //#given
     const error = {
