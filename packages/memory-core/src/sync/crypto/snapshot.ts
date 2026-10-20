@@ -3,7 +3,7 @@ import { atVerifiedHead, type ChainState, emptyChain, verifyKeyringEntry } from 
 import type { KeyringEntry } from "./entry.ts"
 import { isCancelledAdmission } from "./fold.ts"
 import { openBatch } from "./open.ts"
-import { wire } from "./receiver.ts"
+import { receiverPass, wire } from "./receiver.ts"
 import type { RejectionCounter } from "./rejection.ts"
 import { b64urlDecode, sha256B64 } from "./vendor/sync-format/jcs.ts"
 import { verifyObject } from "./vendor/sync-format/object.ts"
@@ -69,8 +69,9 @@ export const importSnapshot = async (
   if (snapshot.account !== account) return refuse("account_mismatch")
   const covered = keyringEntries.filter((candidate) => candidate.seq <= snapshot.covers_seq)
   let state = emptyChain(account, anchor)
+  const pass = await receiverPass([], covered)
   for (const entry of covered) {
-    const step = await verifyKeyringEntry(state, entry, "keyring-only")
+    const step = await verifyKeyringEntry(state, entry, "keyring-only", pass)
     if (!step.ok) {
       const anchorFailure = step.reason === "untrusted_root" || step.reason === "anchor_mismatch"
       return refuse(anchorFailure ? step.reason : "keyring_prefix_refused")

@@ -29,6 +29,12 @@ export function installHermeticHome(): HermeticHome {
   const agentDir = join(home, ".omo", "agent")
   for (const name of AGENT_DIR_ENV_NAMES) delete process.env[name]
   process.env.PI_CODING_AGENT_DIR = agentDir
+  // The user skill roots follow these too: the OpenCode config dir falls back to os.homedir()/.config,
+  // which the HOME change above does not move, and a developer's shell may export any of them. Left
+  // alone, a user skill (a `ulw-plan` in ~/.config/opencode/skills) outranks the shared one (#10632).
+  process.env.XDG_CONFIG_HOME = join(home, ".config")
+  delete process.env.OPENCODE_CONFIG_DIR
+  delete process.env.CLAUDE_CONFIG_DIR
   afterAll(async () => {
     // The temp-root teardown reads and removes the directory these hosts write into, so it waits for them
     // to exit, and it runs even when the shard check throws: a later preload afterAll does not run

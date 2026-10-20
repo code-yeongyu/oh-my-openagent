@@ -24,10 +24,23 @@ const SUMMARY_STORE = "written only by the consent-checked session-summary recor
 
 export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   {
+    file: "lazy-posthog.ts", fn: "createLazyPostHogTransportFactory>=>>forward",
+    guard: "",
+    route: VIA_SESSION_CLIENT,
+    call: "target.capture(message)",
+    reason: "forwards only the captures admitted by the existing gated clients; the unchanged SDK fetch gate also checks delayed sends",
+  },
+  {
+    file: "lazy-posthog.ts", fn: "createLazyPostHogTransportFactory>=>>load>=>",
+    guard: "unless(module === undefined)",
+    call: "module.createDefaultPostHogTransport(apiKey)",
+    reason: "constructed only on the first admitted capture or a flush of its queue; receives the same consent-gated fetch and SDK options",
+  },
+  {
     file: "index.ts", fn: "recordSenpiDailyActive",
     guard: "",
     route: { kind: "callers", fn: "recordSenpiDailyActive" },
-    call: "recordDailyActive(options.transportFactory === undefined ? input : { ...input,)", reason: LEGACY_DAILY_ACTIVE,
+    call: "recordDailyActive(input)", reason: LEGACY_DAILY_ACTIVE,
   },
   {
     file: "index.ts", fn: "createSenpiTelemetryComponent>register>on(=>)",
