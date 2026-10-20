@@ -2438,7 +2438,8 @@ The task was re-queued on a fallback model after a retryable failure.
       const response = await messagesInDirectory(this.client, {
         path: { id: sessionID },
       }, this.directory)
-      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { id?: string } }>, { preferResponseOnMissingData: true })
+      const messages = normalizeSDKResponse<Array<{ info?: { id?: string } }> | undefined>(response, undefined)
+      if (!Array.isArray(messages)) return false
       if (anchor.anchorMessageID !== undefined) {
         const anchorIndex = messages.findIndex((message) => message.info?.id === anchor.anchorMessageID)
         return anchorIndex === -1 || anchorIndex < messages.length - 1
@@ -2446,7 +2447,7 @@ The task was re-queued on a fallback model after a retryable failure.
       return messages.length > anchor.anchorMessageCount
     } catch (error) {
       log("[background-agent] Error checking resume anchor messages:", { sessionID, error })
-      return true
+      return false
     }
   }
 

@@ -6,6 +6,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import type { BackgroundTask } from "./types"
+import type { BackgroundTaskConfig } from "../../config/schema"
+import { MIN_RUNTIME_BEFORE_STALE_MS } from "./constants"
 
 type FixtureMessage = { info?: { id?: string; role?: string }; parts?: Array<{ type?: string; text?: string }> }
 
@@ -32,7 +34,7 @@ function previousRunMessages(): FixtureMessage[] {
   ]
 }
 
-function createManagerWithMessages(messages: FixtureMessage[], options?: { appendOnPrompt?: boolean }) {
+function createManagerWithMessages(messages: FixtureMessage[], options?: { appendOnPrompt?: boolean; config?: BackgroundTaskConfig }) {
   const aborts: string[] = []
   const prompts: string[][] = []
   const client = {
@@ -55,15 +57,15 @@ function createManagerWithMessages(messages: FixtureMessage[], options?: { appen
         return { data: true }
       },
       todo: async () => ({ data: [] }),
-      messages: async () => ({ data: messages }),
+      messages: async (): Promise<unknown> => ({ data: messages }),
     },
   }
   const manager = new BackgroundManager({
     pluginContext: createPluginContext(client),
-    config: undefined,
+    config: options?.config,
     enableParentSessionNotifications: false,
   })
-  return { manager, prompts, aborts }
+  return { manager, prompts, aborts, client }
 }
 
 function createCompletedTask(): BackgroundTask {
@@ -105,6 +107,69 @@ afterEach(() => {
 })
 
 describe("BackgroundManager resume completion anchor", () => {
+  test.each([
+    ["rejects", () => Promise.reject(new TypeError("messages unavailable"))],
+    ["returns an SDK error", async () => ({ error: { name: "UnknownError", data: { message: "messages unavailable" } } })],
+  ])("poller keeps the continuation running when the post-resume read %s", async (_label, readMessages) => {
+    //#given
+    const { manager, aborts, client } = createManagerWithMessages(previousRunMessages())
+    track(manager)
+    const task = createCompletedTask()
+    manager["tasks"].set(task.id, task)
+    manager["observedOutputSessions"].add(resumeInput.sessionId)
+    await manager.resume(resumeInput)
+    client.session.messages = readMessages
+
+    //#when
+    await manager.pollRunningTasks()
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(aborts).toHaveLength(0)
+  })
+
+  test("poller completes after a failed message read recovers with new output", async () => {
+    //#given
+    const messages = previousRunMessages()
+    const { manager, client } = createManagerWithMessages(messages)
+    track(manager)
+    const task = createCompletedTask()
+    manager["tasks"].set(task.id, task)
+    manager["observedOutputSessions"].add(resumeInput.sessionId)
+    await manager.resume(resumeInput)
+    const readMessages = client.session.messages
+    client.session.messages = async () => ({ error: { name: "UnknownError" } })
+    await manager.pollRunningTasks()
+    client.session.messages = readMessages
+    messages.push({ info: { id: "msg_recovered", role: "assistant" }, parts: [{ type: "text", text: "new output" }] })
+
+    //#when
+    await manager.pollRunningTasks()
+
+    //#then
+    expect(task.status).toBe("completed")
+  })
+
+  test("poller cancels an unadvanced continuation through the existing stale timeout", async () => {
+    //#given
+    const config = { staleTimeoutMs: 60_000 }
+    const { manager, client, aborts } = createManagerWithMessages(previousRunMessages(), { config })
+    track(manager)
+    const task = createCompletedTask()
+    manager["tasks"].set(task.id, task)
+    await manager.resume(resumeInput)
+    client.session.messages = async () => ({ error: { name: "UnknownError" } })
+    task.startedAt = new Date(Date.now() - MIN_RUNTIME_BEFORE_STALE_MS - 1)
+    task.progress = { toolCalls: 0, lastUpdate: new Date(Date.now() - config.staleTimeoutMs - 1) }
+
+    //#when
+    await manager.pollRunningTasks()
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(aborts).toHaveLength(1)
+  })
+
   test("poller does not re-complete a resumed task on the previous run's output", async () => {
     //#given
     const messages = previousRunMessages()
