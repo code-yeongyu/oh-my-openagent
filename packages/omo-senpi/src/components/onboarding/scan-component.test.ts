@@ -616,10 +616,12 @@ describe("onboarding apply ordering and notice routing", () => {
     const profile = openCodeProfile()
     const host = register(profile)
     const { scanId } = await host.scan({})
-    // A regular file where the agent directory should be: nothing can be created under it on any OS.
-    // A 0o555 directory only refuses writes on POSIX; Windows ignores the mode bits (#10650).
-    mkdirSync(dirname(profile.agentDir), { recursive: true })
-    writeFileSync(profile.agentDir, "")
+    // A regular file where ~/.omo should be: both model-choice targets (<agentDir>/settings.json and
+    // ~/.omo/omo.jsonc) live under it, so neither can be created on any OS. A 0o555 directory only
+    // refuses writes on POSIX (#10650), and blocking only the agent dir left ~/.omo/omo.jsonc writable.
+    const omoHome = dirname(profile.agentDir)
+    rmSync(omoHome, { recursive: true, force: true })
+    writeFileSync(omoHome, "")
     const written: string[] = []
     const originalWrite = process.stdout.write
     process.stdout.write = ((chunk: unknown) => { written.push(String(chunk)); return true }) as typeof process.stdout.write
@@ -628,10 +630,14 @@ describe("onboarding apply ordering and notice routing", () => {
       response = await host.apply({ scanId, stages: ["model-choices"] })
     } finally {
       process.stdout.write = originalWrite
-      rmSync(profile.agentDir, { force: true })
+      rmSync(omoHome, { force: true })
     }
 
     expect(written).toEqual([])
-    expect(response).toEqual(expect.objectContaining({ notices: [expect.stringContaining("could not edit")] }))
+    // One notice per planned target; which targets a platform's scan plans can differ, so every
+    // notice must be the refusal and at least one must exist.
+    const notices = (response as { notices?: readonly string[] }).notices ?? []
+    expect(notices.length).toBeGreaterThan(0)
+    for (const notice of notices) expect(notice).toContain("could not edit")
   })
 })
