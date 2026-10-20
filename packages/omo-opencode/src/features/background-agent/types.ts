@@ -105,6 +105,15 @@ export interface BackgroundTask {
   consecutiveMissedPolls?: number
   /** Number of consecutive idle polls where the session still ended on an errored assistant turn */
   consecutiveErroredIdlePolls?: number
+  /**
+   * Message-count/id anchor captured when a completed task is resumed.
+   * While set, completion paths require at least one new message after the
+   * anchor so the previous run's output cannot re-complete the task.
+   */
+  resumeAnchor?: {
+    anchorMessageCount: number
+    anchorMessageID?: string
+  }
 }
 
 export interface BackgroundTaskSnapshot {

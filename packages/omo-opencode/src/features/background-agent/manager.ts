@@ -1466,6 +1466,10 @@ The fallback retry session is now created and can be inspected directly.
       lastUpdate: new Date(),
     }
 
+    // Anchor on the messages that already exist so completion paths can tell
+    // the previous run's output apart from the continuation's new turn.
+    existingTask.resumeAnchor = await this.captureResumeAnchor(existingTask.sessionId)
+
     this.startPolling()
     if (existingTask.sessionId) {
       subagentSessions.add(existingTask.sessionId)
@@ -1931,6 +1935,7 @@ The fallback retry session is now created and can be inspected directly.
         },
         idleDeferralTimers: this.idleDeferralTimers,
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
+        sessionHasMessagesAfterAnchor: (sessionID, task) => this.sessionHasMessagesAfterAnchor(sessionID, task),
         checkSessionTodos: (id) => this.checkSessionTodos(id),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
@@ -2413,6 +2418,38 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
+  private async captureResumeAnchor(sessionID: string): Promise<NonNullable<BackgroundTask["resumeAnchor"]> | undefined> {
+    try {
+      const response = await messagesInDirectory(this.client, {
+        path: { id: sessionID },
+      }, this.directory)
+      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { id?: string } }>, { preferResponseOnMissingData: true })
+      return { anchorMessageCount: messages.length, anchorMessageID: messages.at(-1)?.info?.id }
+    } catch (error) {
+      log("[background-agent] Could not capture resume anchor; completing unanchored:", { sessionID, error })
+      return undefined
+    }
+  }
+
+  private async sessionHasMessagesAfterAnchor(sessionID: string, task: BackgroundTask): Promise<boolean> {
+    const anchor = task.resumeAnchor
+    if (!anchor) return true
+    try {
+      const response = await messagesInDirectory(this.client, {
+        path: { id: sessionID },
+      }, this.directory)
+      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { id?: string } }>, { preferResponseOnMissingData: true })
+      if (anchor.anchorMessageID !== undefined) {
+        const anchorIndex = messages.findIndex((message) => message.info?.id === anchor.anchorMessageID)
+        return anchorIndex === -1 || anchorIndex < messages.length - 1
+      }
+      return messages.length > anchor.anchorMessageCount
+    } catch (error) {
+      log("[background-agent] Error checking resume anchor messages:", { sessionID, error })
+      return true
+    }
+  }
+
   private async readStoppedSessionError(sessionID: string): Promise<string | undefined> {
     try {
       const response = await messagesInDirectory(this.client, {
@@ -2555,6 +2592,7 @@ The task was re-queued on a fallback model after a retryable failure.
         task.error = reason
       }
     }
+    task.resumeAnchor = undefined
     if (wasRunning && task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
@@ -2686,6 +2724,7 @@ The task was re-queued on a fallback model after a retryable failure.
         task.status = "completed"
         task.completedAt = new Date()
       }
+      task.resumeAnchor = undefined
       this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
       if (task.rootSessionId) {
@@ -3190,6 +3229,14 @@ The task was re-queued on a fallback model after a retryable failure.
               sessionStatus: sessionStatus.type,
               toolCalls: task.progress?.toolCalls ?? 0,
             })
+            continue
+          }
+
+          // A resumed task must produce at least one message after its resume
+          // anchor before any completion path may finish it; otherwise the
+          // previous run's output re-completes it before the continuation runs.
+          if (task.resumeAnchor && !(await this.sessionHasMessagesAfterAnchor(sessionID, task))) {
+            log("[background-agent] Resumed task has no new messages after the resume anchor, waiting:", task.id)
             continue
           }
 

@@ -8,6 +8,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   findBySession: (sessionID: string) => BackgroundTask | undefined
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
+  sessionHasMessagesAfterAnchor: (sessionID: string, task: BackgroundTask) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
   emitIdleEvent: (sessionID: string) => void
@@ -17,6 +18,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     findBySession,
     idleDeferralTimers,
     validateSessionHasOutput,
+    sessionHasMessagesAfterAnchor,
     checkSessionTodos,
     tryCompleteTask,
     emitIdleEvent,
@@ -63,6 +65,11 @@ export function handleSessionIdleBackgroundEvent(args: {
 
       if (!hasValidOutput) {
         log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
+        return
+      }
+
+      if (task.resumeAnchor && !(await sessionHasMessagesAfterAnchor(sessionID, task))) {
+        log("[background-agent] Session.idle but resumed task has no new messages after the resume anchor, waiting:", task.id)
         return
       }
 
