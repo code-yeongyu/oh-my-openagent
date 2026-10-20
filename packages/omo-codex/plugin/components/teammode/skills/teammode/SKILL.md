@@ -50,6 +50,13 @@ Inspect your active tool list and select:
    communicate with, and observe plain workers, announce that exact mechanism and use it for
    non-overlapping scopes. Otherwise continue serially and report the capability limitation;
    never promise or imply plain subagents that this session cannot create.
+   When the session exposes `multi_agent_v1.*`, the missing V2 set is a per-session surface
+   choice, not a missing install: Codex picks the surface when the session starts, from the
+   active model's catalog `multi_agent_version` and the `multi_agent_v2` feature flag. Tell
+   the user once that a NEW session gets the V2 transport after either the model's catalog
+   entry is pinned to `multi_agent_version = "v2"` (by whatever tool writes the configured
+   `model_catalog_json`) or `codex features enable multi_agent_v2` is run; this session
+   cannot switch.
 
 Then, BEFORE running `init` (or instead of it in case 4), tell the user in one line what this
 environment provides and which route you picked:
