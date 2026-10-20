@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Skill MCP servers now receive an ambient `GOOGLE_CLOUD_PROJECT`, so Vertex/ADC-backed skills can resolve their project (credentials stay filtered).** The env cleaner used to strip `GOOGLE_CLOUD_PROJECT` alongside the secret list, so every Vertex-backed skill failed with cryptic 403s despite correct ADC credentials and billing; `GOOGLE_APPLICATION_CREDENTIALS`, `GCP_`-prefixed and `_KEY`/`_SECRET`/`_TOKEN`/`_PASSWORD`/`_CREDENTIAL(S)`/`_API_KEY`-suffixed variables stay blocked. ([#10414](https://github.com/code-yeongyu/oh-my-openagent/issues/10414), [#10415](https://github.com/code-yeongyu/oh-my-openagent/pull/10415))
+
 **Onboarding saves only the facts you keep, and the TUI and the desktop share one completion flag.** The facts you accept are written through memory's own write path, and finishing onboarding in either the TUI or the desktop marks it done for both. ([#10506](https://github.com/code-yeongyu/oh-my-openagent/pull/10506))
 
 ## [5.1.39] - 2026-10-20
